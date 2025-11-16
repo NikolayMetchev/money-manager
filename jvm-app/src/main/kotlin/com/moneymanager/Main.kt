@@ -1,20 +1,29 @@
 package com.moneymanager
 
-import com.moneymanager.data.Database
 import com.moneymanager.data.DatabaseDriverFactory
+import com.moneymanager.di.AppComponent
+import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountType
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
 
-fun main() {
+fun main() = runBlocking {
     println("Money Manager - JVM Application")
     println("=================================")
 
-    // Initialize the database
-    Database.initialize(DatabaseDriverFactory())
-    val database = Database.getInstance()
+    // Initialize DI component
+    val component = AppComponent.create(DatabaseDriverFactory())
 
-    // Example: Query all accounts
-    val accounts = database.accountQueries.selectAll().executeAsList()
+    // Get repositories from the component
+    val accountRepository = component.accountRepository
+    val categoryRepository = component.categoryRepository
+    val transactionRepository = component.transactionRepository
+
+    println("\nDependency injection initialized successfully!")
+
+    // Example: Query all accounts using the repository
+    val accounts = accountRepository.getAllAccounts().first()
     println("\nCurrent accounts: ${accounts.size}")
 
     if (accounts.isEmpty()) {
@@ -23,11 +32,31 @@ fun main() {
         println("- Create accounts")
         println("- Add categories")
         println("- Record transactions")
+
+        // Example: Create a sample account
+        println("\nCreating a sample checking account...")
+        val sampleAccount = Account(
+            name = "Main Checking",
+            type = AccountType.CHECKING,
+            currency = "USD",
+            initialBalance = 1000.0,
+            currentBalance = 1000.0,
+            createdAt = Clock.System.now(),
+            updatedAt = Clock.System.now()
+        )
+        val accountId = accountRepository.createAccount(sampleAccount)
+        println("Created account with ID: $accountId")
+
+        // Fetch and display the created account
+        val createdAccount = accountRepository.getAccountById(accountId).first()
+        createdAccount?.let {
+            println("  - ${it.name} (${it.type}): ${it.currentBalance} ${it.currency}")
+        }
     } else {
         accounts.forEach { account ->
             println("  - ${account.name} (${account.type}): ${account.currentBalance} ${account.currency}")
         }
     }
 
-    println("\nDatabase initialized successfully!")
+    println("\nApplication completed successfully!")
 }

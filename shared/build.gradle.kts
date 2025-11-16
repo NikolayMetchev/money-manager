@@ -1,6 +1,7 @@
 plugins {
     kotlin("multiplatform")
     id("app.cash.sqldelight") version "2.0.2"
+    id("dev.zacsweers.metro")
 }
 
 kotlin {
@@ -13,6 +14,7 @@ kotlin {
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.1")
+                implementation("app.cash.sqldelight:coroutines-extensions:2.0.2")
             }
         }
 
