@@ -1,7 +1,7 @@
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 
 plugins {
-    id("org.jetbrains.kotlin.multiplatform")
+    id("moneymanager.kotlin-multiplatform-convention")
 }
 
 val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")

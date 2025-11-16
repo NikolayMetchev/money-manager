@@ -12,12 +12,6 @@ configure<KotlinMultiplatformExtension> {
     jvmToolchain(21)
 
     sourceSets {
-        val commonMain by getting {
-            dependencies {
-                implementation(libs.findLibrary("kotlinx-datetime").get())
-            }
-        }
-
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))

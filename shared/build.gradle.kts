@@ -1,5 +1,4 @@
 plugins {
-    id("moneymanager.kotlin-multiplatform-convention")
     id("moneymanager.coroutines-convention")
     alias(libs.plugins.sqldelight)
     alias(libs.plugins.metro)
@@ -9,6 +8,7 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
+                implementation(libs.kotlinx.datetime)
                 implementation(libs.metro.runtime)
                 implementation(libs.sqldelight.coroutines.extensions)
             }
