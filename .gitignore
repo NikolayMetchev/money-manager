@@ -17,6 +17,7 @@ out/
 # OS
 .DS_Store
 Thumbs.db
+NUL
 
 # Local configuration
 local.properties
