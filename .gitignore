@@ -1,0 +1,28 @@
+# Gradle
+.gradle/
+build/
+gradle-9.2.0-bin.zip
+gradle-9.2.0/
+
+# IntelliJ IDEA
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/usage.statistics.xml
+.idea/shelf
+.idea/discord.xml
+*.iws
+*.iml
+out/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local configuration
+local.properties
+
+# SQLDelight generated files (keep in source control)
+# All generated files in build/ are already ignored above
+
+# Claude
+.claude/

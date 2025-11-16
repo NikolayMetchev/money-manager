@@ -1,0 +1,42 @@
+CREATE TABLE Account (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL, -- CHECKING, SAVINGS, CREDIT_CARD, CASH, INVESTMENT
+    currency TEXT NOT NULL DEFAULT 'USD',
+    initialBalance REAL NOT NULL DEFAULT 0.0,
+    currentBalance REAL NOT NULL DEFAULT 0.0,
+    color TEXT,
+    icon TEXT,
+    isActive INTEGER NOT NULL DEFAULT 1,
+    createdAt INTEGER NOT NULL,
+    updatedAt INTEGER NOT NULL
+);
+
+selectAll:
+SELECT * FROM Account;
+
+selectById:
+SELECT * FROM Account WHERE id = ?;
+
+selectActive:
+SELECT * FROM Account WHERE isActive = 1;
+
+insert:
+INSERT INTO Account(name, type, currency, initialBalance, currentBalance, color, icon, isActive, createdAt, updatedAt)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+update:
+UPDATE Account
+SET name = ?, type = ?, currency = ?, color = ?, icon = ?, isActive = ?, updatedAt = ?
+WHERE id = ?;
+
+updateBalance:
+UPDATE Account
+SET currentBalance = ?, updatedAt = ?
+WHERE id = ?;
+
+delete:
+DELETE FROM Account WHERE id = ?;
+
+lastInsertRowId:
+SELECT last_insert_rowid();

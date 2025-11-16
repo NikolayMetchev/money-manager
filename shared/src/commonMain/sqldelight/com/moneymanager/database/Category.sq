@@ -1,0 +1,42 @@
+CREATE TABLE Category (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL, -- INCOME, EXPENSE
+    color TEXT,
+    icon TEXT,
+    parentId INTEGER,
+    isActive INTEGER NOT NULL DEFAULT 1,
+    createdAt INTEGER NOT NULL,
+    updatedAt INTEGER NOT NULL,
+    FOREIGN KEY (parentId) REFERENCES Category(id) ON DELETE SET NULL
+);
+
+selectAll:
+SELECT * FROM Category;
+
+selectById:
+SELECT * FROM Category WHERE id = ?;
+
+selectByType:
+SELECT * FROM Category WHERE type = ? AND isActive = 1;
+
+selectTopLevel:
+SELECT * FROM Category WHERE parentId IS NULL AND isActive = 1;
+
+selectByParent:
+SELECT * FROM Category WHERE parentId = ? AND isActive = 1;
+
+insert:
+INSERT INTO Category(name, type, color, icon, parentId, isActive, createdAt, updatedAt)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+update:
+UPDATE Category
+SET name = ?, color = ?, icon = ?, parentId = ?, isActive = ?, updatedAt = ?
+WHERE id = ?;
+
+delete:
+DELETE FROM Category WHERE id = ?;
+
+lastInsertRowId:
+SELECT last_insert_rowid();

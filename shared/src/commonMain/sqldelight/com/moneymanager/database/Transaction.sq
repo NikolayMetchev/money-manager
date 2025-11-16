@@ -1,0 +1,55 @@
+CREATE TABLE TransactionRecord (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    accountId INTEGER NOT NULL,
+    categoryId INTEGER,
+    type TEXT NOT NULL, -- INCOME, EXPENSE, TRANSFER
+    amount REAL NOT NULL,
+    currency TEXT NOT NULL DEFAULT 'USD',
+    description TEXT,
+    note TEXT,
+    transactionDate INTEGER NOT NULL,
+    toAccountId INTEGER, -- For transfers
+    createdAt INTEGER NOT NULL,
+    updatedAt INTEGER NOT NULL,
+    FOREIGN KEY (accountId) REFERENCES Account(id) ON DELETE CASCADE,
+    FOREIGN KEY (categoryId) REFERENCES Category(id) ON DELETE SET NULL,
+    FOREIGN KEY (toAccountId) REFERENCES Account(id) ON DELETE SET NULL
+);
+
+selectAll:
+SELECT * FROM TransactionRecord ORDER BY transactionDate DESC;
+
+selectById:
+SELECT * FROM TransactionRecord WHERE id = ?;
+
+selectByAccount:
+SELECT * FROM TransactionRecord WHERE accountId = ? OR toAccountId = ? ORDER BY transactionDate DESC;
+
+selectByCategory:
+SELECT * FROM TransactionRecord WHERE categoryId = ? ORDER BY transactionDate DESC;
+
+selectByDateRange:
+SELECT * FROM TransactionRecord
+WHERE transactionDate >= ? AND transactionDate <= ?
+ORDER BY transactionDate DESC;
+
+selectByAccountAndDateRange:
+SELECT * FROM TransactionRecord
+WHERE (accountId = ? OR toAccountId = ?)
+AND transactionDate >= ? AND transactionDate <= ?
+ORDER BY transactionDate DESC;
+
+insert:
+INSERT INTO TransactionRecord(accountId, categoryId, type, amount, currency, description, note, transactionDate, toAccountId, createdAt, updatedAt)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+update:
+UPDATE TransactionRecord
+SET accountId = ?, categoryId = ?, type = ?, amount = ?, currency = ?, description = ?, note = ?, transactionDate = ?, toAccountId = ?, updatedAt = ?
+WHERE id = ?;
+
+delete:
+DELETE FROM TransactionRecord WHERE id = ?;
+
+lastInsertRowId:
+SELECT last_insert_rowid();
