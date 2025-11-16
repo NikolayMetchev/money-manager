@@ -12,7 +12,7 @@ fun main() = runBlocking {
     println("Money Manager - JVM Application")
     println("=================================")
 
-    // Initialize DI component
+    // Initialize DI component using Metro-generated code
     val component = AppComponent.create(DatabaseDriverFactory())
 
     // Get repositories from the component

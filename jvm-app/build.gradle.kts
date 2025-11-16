@@ -5,6 +5,7 @@ plugins {
 
 dependencies {
     implementation(project(":shared"))
+    implementation(libs.metro.runtime)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.datetime)
 }
