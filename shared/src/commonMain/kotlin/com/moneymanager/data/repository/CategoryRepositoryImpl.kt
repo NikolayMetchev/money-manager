@@ -70,7 +70,7 @@ class CategoryRepositoryImpl(
         queries.lastInsertRowId().executeAsOne()
     }
 
-    override suspend fun updateCategory(category: Category) = withContext(Dispatchers.Default) {
+    override suspend fun updateCategory(category: Category): Unit = withContext(Dispatchers.Default) {
         queries.update(
             name = category.name,
             color = category.color,
@@ -80,10 +80,12 @@ class CategoryRepositoryImpl(
             updatedAt = category.updatedAt.toEpochMilliseconds(),
             id = category.id
         )
+        Unit
     }
 
-    override suspend fun deleteCategory(id: Long) = withContext(Dispatchers.Default) {
+    override suspend fun deleteCategory(id: Long): Unit = withContext(Dispatchers.Default) {
         queries.delete(id)
+        Unit
     }
 
     private fun com.moneymanager.database.Category.toDomainModel() = Category(

@@ -60,7 +60,7 @@ class AccountRepositoryImpl(
         queries.lastInsertRowId().executeAsOne()
     }
 
-    override suspend fun updateAccount(account: Account) = withContext(Dispatchers.Default) {
+    override suspend fun updateAccount(account: Account): Unit = withContext(Dispatchers.Default) {
         queries.update(
             name = account.name,
             type = account.type.name,
@@ -71,18 +71,21 @@ class AccountRepositoryImpl(
             updatedAt = account.updatedAt.toEpochMilliseconds(),
             id = account.id
         )
+        Unit
     }
 
-    override suspend fun updateAccountBalance(accountId: Long, newBalance: Double) = withContext(Dispatchers.Default) {
+    override suspend fun updateAccountBalance(accountId: Long, newBalance: Double): Unit = withContext(Dispatchers.Default) {
         queries.updateBalance(
             currentBalance = newBalance,
             updatedAt = kotlinx.datetime.Clock.System.now().toEpochMilliseconds(),
             id = accountId
         )
+        Unit
     }
 
-    override suspend fun deleteAccount(id: Long) = withContext(Dispatchers.Default) {
+    override suspend fun deleteAccount(id: Long): Unit = withContext(Dispatchers.Default) {
         queries.delete(id)
+        Unit
     }
 
     private fun com.moneymanager.database.Account.toDomainModel() = Account(

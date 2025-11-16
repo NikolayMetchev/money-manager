@@ -91,7 +91,7 @@ class TransactionRepositoryImpl(
         queries.lastInsertRowId().executeAsOne()
     }
 
-    override suspend fun updateTransaction(transaction: Transaction) = withContext(Dispatchers.Default) {
+    override suspend fun updateTransaction(transaction: Transaction): Unit = withContext(Dispatchers.Default) {
         queries.update(
             accountId = transaction.accountId,
             categoryId = transaction.categoryId,
@@ -105,10 +105,12 @@ class TransactionRepositoryImpl(
             updatedAt = transaction.updatedAt.toEpochMilliseconds(),
             id = transaction.id
         )
+        Unit
     }
 
-    override suspend fun deleteTransaction(id: Long) = withContext(Dispatchers.Default) {
+    override suspend fun deleteTransaction(id: Long): Unit = withContext(Dispatchers.Default) {
         queries.delete(id)
+        Unit
     }
 
     private fun com.moneymanager.database.TransactionRecord.toDomainModel() = Transaction(
