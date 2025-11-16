@@ -1,5 +1,6 @@
 plugins {
     id("moneymanager.kotlin-multiplatform-convention")
+    id("moneymanager.coroutines-convention")
     alias(libs.plugins.sqldelight)
     alias(libs.plugins.metro)
 }

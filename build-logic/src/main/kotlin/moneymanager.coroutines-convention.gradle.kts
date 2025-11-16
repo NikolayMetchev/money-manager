@@ -7,20 +7,10 @@ plugins {
 val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
 
 configure<KotlinMultiplatformExtension> {
-    jvm()
-
-    jvmToolchain(21)
-
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation(libs.findLibrary("kotlinx-datetime").get())
-            }
-        }
-
-        val commonTest by getting {
-            dependencies {
-                implementation(kotlin("test"))
+                implementation(libs.findLibrary("kotlinx-coroutines-core").get())
             }
         }
     }
