@@ -1,7 +1,7 @@
 plugins {
-    kotlin("multiplatform")
-    id("app.cash.sqldelight") version "2.0.2"
-    id("dev.zacsweers.metro")
+    alias(libs.plugins.kotlin.multiplatform)
+    alias(libs.plugins.sqldelight)
+    alias(libs.plugins.metro)
 }
 
 kotlin {
@@ -12,9 +12,9 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.1")
-                implementation("app.cash.sqldelight:coroutines-extensions:2.0.2")
+                implementation(libs.kotlinx.coroutines.core)
+                implementation(libs.kotlinx.datetime)
+                implementation(libs.sqldelight.coroutines.extensions)
             }
         }
 
@@ -26,7 +26,7 @@ kotlin {
 
         val jvmMain by getting {
             dependencies {
-                implementation("app.cash.sqldelight:sqlite-driver:2.0.2")
+                implementation(libs.sqldelight.sqlite.driver)
             }
         }
     }
