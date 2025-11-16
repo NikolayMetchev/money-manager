@@ -4,6 +4,8 @@ plugins {
     id("org.jetbrains.kotlin.multiplatform")
 }
 
+val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
+
 configure<KotlinMultiplatformExtension> {
     jvm()
 
@@ -12,8 +14,8 @@ configure<KotlinMultiplatformExtension> {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
-                implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.1")
+                implementation(libs.findLibrary("kotlinx-coroutines-core").get())
+                implementation(libs.findLibrary("kotlinx-datetime").get())
             }
         }
 
