@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
 class AccountRepositoryImpl(
-    private val database: MoneyManagerDatabase
+    database: MoneyManagerDatabase
 ) : AccountRepository {
 
     private val queries = database.accountQueries
@@ -63,7 +63,6 @@ class AccountRepositoryImpl(
             updatedAt = account.updatedAt.toEpochMilliseconds(),
             id = account.id
         )
-        Unit
     }
 
     override suspend fun updateAccountBalance(accountId: Long, newBalance: Double): Unit = withContext(Dispatchers.Default) {
@@ -72,11 +71,9 @@ class AccountRepositoryImpl(
             updatedAt = kotlinx.datetime.Clock.System.now().toEpochMilliseconds(),
             id = accountId
         )
-        Unit
     }
 
     override suspend fun deleteAccount(id: Long): Unit = withContext(Dispatchers.Default) {
         queries.delete(id)
-        Unit
     }
 }
