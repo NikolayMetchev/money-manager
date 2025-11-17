@@ -13,7 +13,7 @@ fun main() = runBlocking {
     println("=================================")
 
     // Initialize DI component using Metro-generated code
-    val component = AppComponent.create(DatabaseDriverFactory())
+    val component: AppComponent = AppComponent.create(DatabaseDriverFactory())
 
     // Get repositories from the component
     val accountRepository = component.accountRepository
