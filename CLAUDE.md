@@ -8,13 +8,15 @@ Money Manager is a personal finance management application built with Kotlin Mul
 
 ## Technology Stack
 
-- **Language**: Kotlin 2.2.21
+- **Language**: Kotlin 2.2.20
 - **Build System**: Gradle 9.2.0
 - **Java Version**: 21
-- **Database**: SQLite via SQLDelight 2.0.2
+- **Database**: SQLite via SQLDelight 2.2.1
+- **Dependency Injection**: Metro 0.7.5 (compile-time DI)
 - **Multiplatform**: Kotlin Multiplatform (currently targeting JVM, with plans for Android, iOS, and Web)
 - **Coroutines**: kotlinx-coroutines-core 1.9.0
 - **DateTime**: kotlinx-datetime 0.6.1
+- **Dependency Management**: Gradle Version Catalog (libs.versions.toml)
 
 ## Build Commands
 
@@ -48,12 +50,18 @@ Money Manager is a personal finance management application built with Kotlin Mul
 
 ### Module Organization
 
+- **build-logic/**: Gradle convention plugins for shared build configuration
+  - `src/main/kotlin/`:
+    - `moneymanager.kotlin-multiplatform-convention.gradle.kts`: Base KMP setup with JVM toolchain and test dependencies
+    - `moneymanager.coroutines-convention.gradle.kts`: Adds coroutines support on top of base convention
+
 - **shared/**: Kotlin Multiplatform module containing core business logic
   - `src/commonMain/`: Platform-independent code
     - `kotlin/com/moneymanager/domain/`: Domain models and repository interfaces
-    - `kotlin/com/moneymanager/data/`: Database initialization and driver factories
+    - `kotlin/com/moneymanager/data/`: Repository implementations and driver factories
+    - `kotlin/com/moneymanager/di/`: Metro DI components and modules
     - `sqldelight/com/moneymanager/database/`: SQLDelight schema definitions
-  - `src/jvmMain/`: JVM-specific implementations
+  - `src/jvmMain/`: JVM-specific implementations (DatabaseDriverFactory)
 
 - **jvm-app/**: JVM-specific application module
   - `src/main/kotlin/com/moneymanager/`: JVM application entry point
@@ -90,7 +98,29 @@ Repository interfaces are defined in `shared/src/commonMain/kotlin/com/moneymana
 - `CategoryRepository`
 - `TransactionRepository`
 
-These use Kotlin Flow for reactive data streams.
+Repository implementations use Metro DI annotations:
+- `@Inject`: Constructor injection for dependencies
+- `@SingleIn(AppScope::class)`: Singleton scoping
+- `@ContributesBinding(AppScope::class)`: Automatic binding of implementation to interface
+
+All repositories use Kotlin Flow for reactive data streams and depend on SQLDelight's `MoneyManagerDatabase`.
+
+### Dependency Injection with Metro
+
+The project uses Metro for compile-time dependency injection:
+
+**DI Components** (`shared/src/commonMain/kotlin/com/moneymanager/di/`):
+- `AppScope.kt`: Scope marker for application-wide singletons
+- `AppComponent.kt`: Main DI component (interface) annotated with `@DependencyGraph(AppScope::class)`
+- `DatabaseModule.kt`: Provides database instance with `@ContributesTo(AppScope::class)` and `@Provides`
+
+**Usage**:
+```kotlin
+val component = AppComponent.create(DatabaseDriverFactory())
+val accountRepository = component.accountRepository
+```
+
+Metro generates the implementation classes at compile time. Look for generated files in `build/generated/` to see the wiring code.
 
 ## Development Notes
 
@@ -106,24 +136,70 @@ For each platform, implement platform-specific `DatabaseDriverFactory` in the co
 
 ### Database Initialization
 
-The database is initialized using the singleton `Database` object:
+The database is initialized via Metro DI. The `DatabaseModule` provides the singleton instance:
+
 ```kotlin
-Database.initialize(DatabaseDriverFactory())
-val db = Database.getInstance()
+@ContributesTo(AppScope::class)
+interface DatabaseModule {
+    @Provides
+    @SingleIn(AppScope::class)
+    fun provideDatabase(driverFactory: DatabaseDriverFactory): MoneyManagerDatabase {
+        return MoneyManagerDatabase(driverFactory.createDriver())
+    }
+}
 ```
 
-The JVM implementation uses an in-memory SQLite database by default. For persistent storage, use `createDriver(databasePath: String)` instead.
+The `DatabaseDriverFactory` is platform-specific (expect/actual pattern):
+- **JVM**: Uses SQLite JDBC driver with in-memory database by default
+- To use persistent storage: pass a database path to `createDriver(databasePath: String)`
 
 ### Gradle Configuration
 
-- Root `build.gradle.kts`: Defines plugin versions and shared repositories
-- `shared/build.gradle.kts`: Multiplatform module with SQLDelight configuration
-- `jvm-app/build.gradle.kts`: JVM application with main class configuration
-- `settings.gradle.kts`: Includes plugin management and module declarations
+The project uses modern Gradle practices for maintainability:
 
-### Common Issues
+**Version Catalog** (`gradle/libs.versions.toml`):
+- Centralized dependency version management
+- Defines all library versions, dependencies, and plugin references
+- Accessed via `libs` in build files (e.g., `libs.metro.runtime`)
+
+**Convention Plugins** (`build-logic/`):
+- `moneymanager.kotlin-multiplatform-convention`: Base KMP setup (JVM toolchain 21, test dependencies)
+- `moneymanager.coroutines-convention`: Depends on base convention and adds coroutines
+- Benefits: DRY principle, consistent configuration across modules
+
+**Module Build Files**:
+- `shared/build.gradle.kts`: Applies coroutines convention, SQLDelight, and Metro plugins
+- `jvm-app/build.gradle.kts`: JVM application with main class configuration
+- `settings.gradle.kts`: Plugin management and module declarations
+- Root `build.gradle.kts`: Minimal, defines shared repositories
+
+**Configuration Cache**:
+- Enabled in `gradle.properties` for faster builds (11s → 2s improvement)
+- Use `org.gradle.configuration-cache=true`
+
+### Common Issues and Best Practices
 
 1. **Java Version**: The project requires Java 21. Ensure `JAVA_HOME` points to JDK 21+
-2. **Gradle Daemon**: The project is configured to stop daemon after builds (single-use for JVM settings)
-3. **SQLDelight Boolean**: Never use `AS Boolean` type in .sq files - use INTEGER and handle conversion in code if needed
-4. **Expect/Actual Classes**: Warnings about Beta features can be suppressed with `-Xexpect-actual-classes` flag if needed
+
+2. **Kotlin Version for Metro**: Metro 0.7.5 is compiled with Kotlin 2.2.20. Keep project Kotlin version aligned to avoid issues with code generation.
+
+3. **Metro Code Generation**:
+   - Metro generates code at compile time via compiler plugin
+   - Generated files appear in `build/generated/ksp/`
+   - If code generation fails, ensure `metro-runtime` dependency is included
+   - Components must be `interface` (not `abstract class` or `object`)
+   - Modules with `@ContributesTo` must be `interface` (not `object`)
+
+4. **SQLDelight 2.2.1 Breaking Changes**:
+   - `execute()`, `update()`, and `delete()` methods now return `Long` (affected rows count) instead of `Unit`
+   - Repository methods that need to return `Unit` must explicitly add `: Unit` return type and `Unit` statement
+   - Never use `AS Boolean` type in .sq files - use INTEGER (0/1) and handle conversion in code
+
+5. **Convention Plugin Dependencies**:
+   - The `coroutines-convention` plugin applies the `kotlin-multiplatform-convention` plugin
+   - Only apply `coroutines-convention` if you need both KMP and coroutines
+   - Module-specific dependencies (like `kotlinx-datetime`) should be in module build files, not conventions
+
+6. **Expect/Actual Classes**: Warnings about Beta features can be suppressed with `-Xexpect-actual-classes` flag if needed
+
+7. **Configuration Cache**: With configuration cache enabled, first builds after changes to build files will invalidate cache (expected behavior)
