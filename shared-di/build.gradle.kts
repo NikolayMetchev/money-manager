@@ -1,6 +1,5 @@
 plugins {
-    id("moneymanager.coroutines-convention")
-    alias(libs.plugins.metro)
+    id("moneymanager.metro-convention")
 }
 
 kotlin {
@@ -8,7 +7,6 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 implementation(projects.shared)
-                implementation(libs.metro.runtime)
             }
         }
     }

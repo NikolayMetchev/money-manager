@@ -17,7 +17,7 @@ mappie-api = { module = "tech.mappie:mappie-api", version.ref = "mappie" }
 # Gradle plugins (for use in build-logic convention plugins)
 kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
 sqldelight-gradle-plugin = { module = "app.cash.sqldelight:gradle-plugin", version.ref = "sqldelight" }
-metro-gradle-plugin = { module = "dev.zacsweers.metro:metro-gradle-plugin", version.ref = "metro" }
+metro-gradle-plugin = { module = "dev.zacsweers.metro:dev.zacsweers.metro.gradle.plugin", version.ref = "metro" }
 mappie-gradle-plugin = { module = "tech.mappie.plugin:tech.mappie.plugin.gradle.plugin", version.ref = "mappie" }
 
 [plugins]
