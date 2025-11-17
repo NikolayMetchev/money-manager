@@ -3,10 +3,10 @@ package com.moneymanager.data.repository
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
+import com.moneymanager.data.mapper.AccountMapper
 import com.moneymanager.database.MoneyManagerDatabase
 import com.moneymanager.di.AppScope
 import com.moneymanager.domain.model.Account
-import com.moneymanager.domain.model.AccountType
 import com.moneymanager.domain.repository.AccountRepository
 import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.Inject
@@ -15,7 +15,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
-import kotlinx.datetime.Instant
 
 @Inject
 @SingleIn(AppScope::class)
@@ -30,19 +29,19 @@ class AccountRepositoryImpl(
         queries.selectAll()
             .asFlow()
             .mapToList(Dispatchers.Default)
-            .map { accounts -> accounts.map { it.toDomainModel() } }
+            .map { accounts -> AccountMapper.mapList(accounts) }
 
     override fun getAccountById(id: Long): Flow<Account?> =
         queries.selectById(id)
             .asFlow()
             .mapToOneOrNull(Dispatchers.Default)
-            .map { it?.toDomainModel() }
+            .map { it?.let { AccountMapper.map(it) } }
 
     override fun getActiveAccounts(): Flow<List<Account>> =
         queries.selectActive()
             .asFlow()
             .mapToList(Dispatchers.Default)
-            .map { accounts -> accounts.map { it.toDomainModel() } }
+            .map { accounts -> AccountMapper.mapList(accounts) }
 
     override suspend fun createAccount(account: Account): Long = withContext(Dispatchers.Default) {
         queries.insert(
@@ -87,18 +86,4 @@ class AccountRepositoryImpl(
         queries.delete(id)
         Unit
     }
-
-    private fun com.moneymanager.database.Account.toDomainModel() = Account(
-        id = id,
-        name = name,
-        type = AccountType.valueOf(type),
-        currency = currency,
-        initialBalance = initialBalance,
-        currentBalance = currentBalance,
-        color = color,
-        icon = icon,
-        isActive = isActive == 1L,
-        createdAt = Instant.fromEpochMilliseconds(createdAt),
-        updatedAt = Instant.fromEpochMilliseconds(updatedAt)
-    )
 }

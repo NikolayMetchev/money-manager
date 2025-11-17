@@ -3,6 +3,7 @@ package com.moneymanager.data.repository
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
+import com.moneymanager.data.mapper.CategoryMapper
 import com.moneymanager.database.MoneyManagerDatabase
 import com.moneymanager.di.AppScope
 import com.moneymanager.domain.model.Category
@@ -15,7 +16,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
-import kotlinx.datetime.Instant
 
 @Inject
 @SingleIn(AppScope::class)
@@ -30,31 +30,31 @@ class CategoryRepositoryImpl(
         queries.selectAll()
             .asFlow()
             .mapToList(Dispatchers.Default)
-            .map { categories -> categories.map { it.toDomainModel() } }
+            .map { categories -> CategoryMapper.mapList(categories) }
 
     override fun getCategoryById(id: Long): Flow<Category?> =
         queries.selectById(id)
             .asFlow()
             .mapToOneOrNull(Dispatchers.Default)
-            .map { it?.toDomainModel() }
+            .map { it?.let { CategoryMapper.map(it) } }
 
     override fun getCategoriesByType(type: CategoryType): Flow<List<Category>> =
         queries.selectByType(type.name)
             .asFlow()
             .mapToList(Dispatchers.Default)
-            .map { categories -> categories.map { it.toDomainModel() } }
+            .map { categories -> CategoryMapper.mapList(categories) }
 
     override fun getTopLevelCategories(): Flow<List<Category>> =
         queries.selectTopLevel()
             .asFlow()
             .mapToList(Dispatchers.Default)
-            .map { categories -> categories.map { it.toDomainModel() } }
+            .map { categories -> CategoryMapper.mapList(categories) }
 
     override fun getCategoriesByParent(parentId: Long): Flow<List<Category>> =
         queries.selectByParent(parentId)
             .asFlow()
             .mapToList(Dispatchers.Default)
-            .map { categories -> categories.map { it.toDomainModel() } }
+            .map { categories -> CategoryMapper.mapList(categories) }
 
     override suspend fun createCategory(category: Category): Long = withContext(Dispatchers.Default) {
         queries.insert(
@@ -87,16 +87,4 @@ class CategoryRepositoryImpl(
         queries.delete(id)
         Unit
     }
-
-    private fun com.moneymanager.database.Category.toDomainModel() = Category(
-        id = id,
-        name = name,
-        type = CategoryType.valueOf(type),
-        color = color,
-        icon = icon,
-        parentId = parentId,
-        isActive = isActive == 1L,
-        createdAt = Instant.fromEpochMilliseconds(createdAt),
-        updatedAt = Instant.fromEpochMilliseconds(updatedAt)
-    )
 }

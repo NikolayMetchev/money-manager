@@ -3,10 +3,10 @@ package com.moneymanager.data.repository
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
+import com.moneymanager.data.mapper.TransactionMapper
 import com.moneymanager.database.MoneyManagerDatabase
 import com.moneymanager.di.AppScope
 import com.moneymanager.domain.model.Transaction
-import com.moneymanager.domain.model.TransactionType
 import com.moneymanager.domain.repository.TransactionRepository
 import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.Inject
@@ -30,25 +30,25 @@ class TransactionRepositoryImpl(
         queries.selectAll()
             .asFlow()
             .mapToList(Dispatchers.Default)
-            .map { transactions -> transactions.map { it.toDomainModel() } }
+            .map { transactions -> TransactionMapper.mapList(transactions) }
 
     override fun getTransactionById(id: Long): Flow<Transaction?> =
         queries.selectById(id)
             .asFlow()
             .mapToOneOrNull(Dispatchers.Default)
-            .map { it?.toDomainModel() }
+            .map { it?.let { TransactionMapper.map(it) } }
 
     override fun getTransactionsByAccount(accountId: Long): Flow<List<Transaction>> =
         queries.selectByAccount(accountId, accountId)
             .asFlow()
             .mapToList(Dispatchers.Default)
-            .map { transactions -> transactions.map { it.toDomainModel() } }
+            .map { transactions -> TransactionMapper.mapList(transactions) }
 
     override fun getTransactionsByCategory(categoryId: Long): Flow<List<Transaction>> =
         queries.selectByCategory(categoryId)
             .asFlow()
             .mapToList(Dispatchers.Default)
-            .map { transactions -> transactions.map { it.toDomainModel() } }
+            .map { transactions -> TransactionMapper.mapList(transactions) }
 
     override fun getTransactionsByDateRange(startDate: Instant, endDate: Instant): Flow<List<Transaction>> =
         queries.selectByDateRange(
@@ -57,7 +57,7 @@ class TransactionRepositoryImpl(
         )
             .asFlow()
             .mapToList(Dispatchers.Default)
-            .map { transactions -> transactions.map { it.toDomainModel() } }
+            .map { transactions -> TransactionMapper.mapList(transactions) }
 
     override fun getTransactionsByAccountAndDateRange(
         accountId: Long,
@@ -72,7 +72,7 @@ class TransactionRepositoryImpl(
         )
             .asFlow()
             .mapToList(Dispatchers.Default)
-            .map { transactions -> transactions.map { it.toDomainModel() } }
+            .map { transactions -> TransactionMapper.mapList(transactions) }
 
     override suspend fun createTransaction(transaction: Transaction): Long = withContext(Dispatchers.Default) {
         queries.insert(
@@ -112,19 +112,4 @@ class TransactionRepositoryImpl(
         queries.delete(id)
         Unit
     }
-
-    private fun com.moneymanager.database.TransactionRecord.toDomainModel() = Transaction(
-        id = id,
-        accountId = accountId,
-        categoryId = categoryId,
-        type = TransactionType.valueOf(type),
-        amount = amount,
-        currency = currency,
-        description = description,
-        note = note,
-        transactionDate = Instant.fromEpochMilliseconds(transactionDate),
-        toAccountId = toAccountId,
-        createdAt = Instant.fromEpochMilliseconds(createdAt),
-        updatedAt = Instant.fromEpochMilliseconds(updatedAt)
-    )
 }
