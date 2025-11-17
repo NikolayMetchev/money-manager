@@ -22,19 +22,19 @@ class AccountRepositoryImpl(
         queries.selectAll()
             .asFlow()
             .mapToList(Dispatchers.Default)
-            .map { accounts -> AccountMapper.mapList(accounts) }
+            .map(AccountMapper::mapList)
 
     override fun getAccountById(id: Long): Flow<Account?> =
         queries.selectById(id)
             .asFlow()
             .mapToOneOrNull(Dispatchers.Default)
-            .map { it?.let { AccountMapper.map(it) } }
+            .map { it?.let(AccountMapper::map) }
 
     override fun getActiveAccounts(): Flow<List<Account>> =
         queries.selectActive()
             .asFlow()
             .mapToList(Dispatchers.Default)
-            .map { accounts -> AccountMapper.mapList(accounts) }
+            .map(AccountMapper::mapList)
 
     override suspend fun createAccount(account: Account): Long = withContext(Dispatchers.Default) {
         queries.insert(

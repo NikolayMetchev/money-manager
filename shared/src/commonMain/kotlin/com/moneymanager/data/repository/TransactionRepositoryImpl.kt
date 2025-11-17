@@ -23,25 +23,25 @@ class TransactionRepositoryImpl(
         queries.selectAll()
             .asFlow()
             .mapToList(Dispatchers.Default)
-            .map { transactions -> TransactionMapper.mapList(transactions) }
+            .map(TransactionMapper::mapList)
 
     override fun getTransactionById(id: Long): Flow<Transaction?> =
         queries.selectById(id)
             .asFlow()
             .mapToOneOrNull(Dispatchers.Default)
-            .map { it?.let { TransactionMapper.map(it) } }
+            .map { it?.let(TransactionMapper::map) }
 
     override fun getTransactionsByAccount(accountId: Long): Flow<List<Transaction>> =
         queries.selectByAccount(accountId, accountId)
             .asFlow()
             .mapToList(Dispatchers.Default)
-            .map { transactions -> TransactionMapper.mapList(transactions) }
+            .map(TransactionMapper::mapList)
 
     override fun getTransactionsByCategory(categoryId: Long): Flow<List<Transaction>> =
         queries.selectByCategory(categoryId)
             .asFlow()
             .mapToList(Dispatchers.Default)
-            .map { transactions -> TransactionMapper.mapList(transactions) }
+            .map(TransactionMapper::mapList)
 
     override fun getTransactionsByDateRange(startDate: Instant, endDate: Instant): Flow<List<Transaction>> =
         queries.selectByDateRange(
@@ -50,7 +50,7 @@ class TransactionRepositoryImpl(
         )
             .asFlow()
             .mapToList(Dispatchers.Default)
-            .map { transactions -> TransactionMapper.mapList(transactions) }
+            .map(TransactionMapper::mapList)
 
     override fun getTransactionsByAccountAndDateRange(
         accountId: Long,
@@ -65,7 +65,7 @@ class TransactionRepositoryImpl(
         )
             .asFlow()
             .mapToList(Dispatchers.Default)
-            .map { transactions -> TransactionMapper.mapList(transactions) }
+            .map(TransactionMapper::mapList)
 
     override suspend fun createTransaction(transaction: Transaction): Long = withContext(Dispatchers.Default) {
         queries.insert(

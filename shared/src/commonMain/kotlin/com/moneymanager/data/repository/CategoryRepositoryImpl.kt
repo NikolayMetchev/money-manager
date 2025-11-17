@@ -23,31 +23,31 @@ class CategoryRepositoryImpl(
         queries.selectAll()
             .asFlow()
             .mapToList(Dispatchers.Default)
-            .map { categories -> CategoryMapper.mapList(categories) }
+            .map(CategoryMapper::mapList)
 
     override fun getCategoryById(id: Long): Flow<Category?> =
         queries.selectById(id)
             .asFlow()
             .mapToOneOrNull(Dispatchers.Default)
-            .map { it?.let { CategoryMapper.map(it) } }
+            .map { it?.let(CategoryMapper::map) }
 
     override fun getCategoriesByType(type: CategoryType): Flow<List<Category>> =
         queries.selectByType(type.name)
             .asFlow()
             .mapToList(Dispatchers.Default)
-            .map { categories -> CategoryMapper.mapList(categories) }
+            .map(CategoryMapper::mapList)
 
     override fun getTopLevelCategories(): Flow<List<Category>> =
         queries.selectTopLevel()
             .asFlow()
             .mapToList(Dispatchers.Default)
-            .map { categories -> CategoryMapper.mapList(categories) }
+            .map(CategoryMapper::mapList)
 
     override fun getCategoriesByParent(parentId: Long): Flow<List<Category>> =
         queries.selectByParent(parentId)
             .asFlow()
             .mapToList(Dispatchers.Default)
-            .map { categories -> CategoryMapper.mapList(categories) }
+            .map(CategoryMapper::mapList)
 
     override suspend fun createCategory(category: Category): Long = withContext(Dispatchers.Default) {
         queries.insert(
