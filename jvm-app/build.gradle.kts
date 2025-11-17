@@ -4,8 +4,8 @@ plugins {
 }
 
 dependencies {
-    implementation(project(":shared"))
-    implementation(project(":shared-di"))
+    implementation(projects.shared)
+    implementation(projects.sharedDi)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.datetime)
 }

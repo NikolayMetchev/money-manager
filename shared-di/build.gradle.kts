@@ -7,7 +7,7 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation(project(":shared"))
+                implementation(projects.shared)
                 implementation(libs.metro.runtime)
             }
         }
