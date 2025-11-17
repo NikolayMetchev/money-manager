@@ -22,6 +22,7 @@
             <option value="$PROJECT_DIR$/build-logic" />
             <option value="$PROJECT_DIR$/jvm-app" />
             <option value="$PROJECT_DIR$/shared" />
+            <option value="$PROJECT_DIR$/shared-di" />
           </set>
         </option>
       </GradleProjectSettings>

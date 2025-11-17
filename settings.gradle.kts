@@ -10,4 +10,5 @@ pluginManagement {
 rootProject.name = "money-manager"
 
 include(":shared")
+include(":shared-di")
 include(":jvm-app")

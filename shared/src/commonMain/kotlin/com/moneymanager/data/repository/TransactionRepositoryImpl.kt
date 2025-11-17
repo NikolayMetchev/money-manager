@@ -5,21 +5,14 @@ import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
 import com.moneymanager.data.mapper.TransactionMapper
 import com.moneymanager.database.MoneyManagerDatabase
-import com.moneymanager.di.AppScope
 import com.moneymanager.domain.model.Transaction
 import com.moneymanager.domain.repository.TransactionRepository
-import dev.zacsweers.metro.ContributesBinding
-import dev.zacsweers.metro.Inject
-import dev.zacsweers.metro.SingleIn
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.Instant
 
-@Inject
-@SingleIn(AppScope::class)
-@ContributesBinding(AppScope::class)
 class TransactionRepositoryImpl(
     private val database: MoneyManagerDatabase
 ) : TransactionRepository {

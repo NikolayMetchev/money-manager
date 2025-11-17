@@ -2,7 +2,6 @@ plugins {
     id("moneymanager.coroutines-convention")
     id("moneymanager.mappie-convention")
     alias(libs.plugins.sqldelight)
-    alias(libs.plugins.metro)
 }
 
 kotlin {
@@ -10,7 +9,6 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 implementation(libs.kotlinx.datetime)
-                implementation(libs.metro.runtime)
                 implementation(libs.sqldelight.coroutines.extensions)
             }
         }
