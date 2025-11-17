@@ -2,7 +2,7 @@
 kotlin = "2.2.21"
 sqldelight = "2.2.1"
 metro = "0.7.5"
-mappie = "2.2.20-1.6.0"
+mappie = "2.2.21-1.6.1"
 kotlinx-coroutines = "1.9.0"
 kotlinx-datetime = "0.6.1"
 
