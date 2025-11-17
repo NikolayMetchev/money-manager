@@ -5,10 +5,9 @@ import com.moneymanager.di.AppComponent
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountType
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
 
-fun main() = runBlocking {
+suspend fun main() {
     println("Money Manager - JVM Application")
     println("=================================")
 
