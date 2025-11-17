@@ -9,8 +9,12 @@ pluginManagement {
     }
 }
 
-rootProject.name = "money-manager"
+plugins {
+    id("com.pablisco.gradle.auto.include") version "1.3"
+}
 
-include(":shared")
-include(":shared-di")
-include(":jvm-app")
+autoInclude {
+    ignore(":build-logic")
+}
+
+rootProject.name = "money-manager"
