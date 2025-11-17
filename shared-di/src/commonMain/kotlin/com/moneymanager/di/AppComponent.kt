@@ -1,6 +1,6 @@
 package com.moneymanager.di
 
-import com.moneymanager.data.DatabaseDriverFactory
+import com.moneymanager.database.DatabaseDriverFactory
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.TransactionRepository

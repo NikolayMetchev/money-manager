@@ -1,4 +1,4 @@
-package com.moneymanager.data
+package com.moneymanager.database
 
 import app.cash.sqldelight.db.SqlDriver
 

@@ -1,6 +1,6 @@
 package com.moneymanager
 
-import com.moneymanager.data.DatabaseDriverFactory
+import com.moneymanager.database.DatabaseDriverFactory
 import com.moneymanager.di.AppComponent
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountType

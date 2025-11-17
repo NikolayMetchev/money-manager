@@ -1,9 +1,9 @@
-package com.moneymanager.data.repository
+package com.moneymanager.database.repository
 
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
-import com.moneymanager.data.mapper.CategoryMapper
+import com.moneymanager.database.mapper.CategoryMapper
 import com.moneymanager.database.MoneyManagerDatabase
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CategoryType

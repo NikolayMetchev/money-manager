@@ -1,6 +1,6 @@
 package com.moneymanager.di
 
-import com.moneymanager.data.DatabaseDriverFactory
+import com.moneymanager.database.DatabaseDriverFactory
 import com.moneymanager.database.MoneyManagerDatabase
 import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Provides

@@ -1,4 +1,4 @@
-package com.moneymanager.data.mapper
+package com.moneymanager.database.mapper
 
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CategoryType

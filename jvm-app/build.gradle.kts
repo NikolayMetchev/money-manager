@@ -5,6 +5,7 @@ plugins {
 
 dependencies {
     implementation(projects.shared)
+    implementation(projects.sharedDatabase)
     implementation(projects.sharedDi)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.datetime)

@@ -6,7 +6,7 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation(projects.shared)
+                implementation(projects.sharedDatabase)
             }
         }
     }

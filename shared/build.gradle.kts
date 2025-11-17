@@ -1,7 +1,5 @@
 plugins {
-    id("moneymanager.coroutines-convention")
-    id("moneymanager.mappie-convention")
-    alias(libs.plugins.sqldelight)
+    id("moneymanager.kotlin-multiplatform-convention")
 }
 
 kotlin {
@@ -9,22 +7,8 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 implementation(libs.kotlinx.datetime)
-                implementation(libs.sqldelight.coroutines.extensions)
+                implementation(libs.kotlinx.coroutines.core)
             }
-        }
-
-        val jvmMain by getting {
-            dependencies {
-                implementation(libs.sqldelight.sqlite.driver)
-            }
-        }
-    }
-}
-
-sqldelight {
-    databases {
-        create("MoneyManagerDatabase") {
-            packageName.set("com.moneymanager.database")
         }
     }
 }

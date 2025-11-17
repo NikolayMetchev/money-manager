@@ -1,9 +1,9 @@
 package com.moneymanager.di
 
-import com.moneymanager.data.repository.AccountRepositoryImpl
-import com.moneymanager.data.repository.CategoryRepositoryImpl
-import com.moneymanager.data.repository.TransactionRepositoryImpl
 import com.moneymanager.database.MoneyManagerDatabase
+import com.moneymanager.database.repository.AccountRepositoryImpl
+import com.moneymanager.database.repository.CategoryRepositoryImpl
+import com.moneymanager.database.repository.TransactionRepositoryImpl
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.TransactionRepository
