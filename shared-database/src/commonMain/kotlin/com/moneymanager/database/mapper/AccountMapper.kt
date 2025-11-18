@@ -1,8 +1,10 @@
+@file:OptIn(kotlin.time.ExperimentalTime::class)
+
 package com.moneymanager.database.mapper
 
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountType
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 import tech.mappie.api.ObjectMappie
 
 object AccountMapper : ObjectMappie<com.moneymanager.database.Account, Account>() {

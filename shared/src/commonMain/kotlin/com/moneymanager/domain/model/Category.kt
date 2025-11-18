@@ -1,6 +1,8 @@
+@file:OptIn(kotlin.time.ExperimentalTime::class)
+
 package com.moneymanager.domain.model
 
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 data class Category(
     val id: Long = 0,

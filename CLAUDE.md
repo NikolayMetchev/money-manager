@@ -15,10 +15,12 @@ Money Manager is a personal finance management application built with Kotlin Mul
 - **Dependency Injection**: Metro 0.7.5 (compile-time DI)
 - **Multiplatform**: Kotlin Multiplatform (currently targeting JVM, with plans for Android, iOS, and Web)
 - **Coroutines**: kotlinx-coroutines-core 1.9.0
-- **DateTime**: kotlinx-datetime 0.6.1
+- **DateTime**: kotlinx-datetime 0.7.1
 - **Dependency Management**: Gradle Version Catalog (libs.versions.toml)
 
 ## Build Commands
+
+**IMPORTANT (Windows)**: On Windows, run Gradle commands directly using `./gradlew.bat` without wrapping them in `cmd /c` or `powershell`. For example: `./gradlew.bat build` (not `cmd /c "gradlew.bat build"`).
 
 ### Building the Project
 ```bash
