@@ -1,16 +1,14 @@
 package com.moneymanager
 
+import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.application
+import androidx.compose.ui.window.rememberWindowState
+import androidx.compose.ui.unit.dp
 import com.moneymanager.database.DatabaseDriverFactory
 import com.moneymanager.di.AppComponent
-import com.moneymanager.domain.model.Account
-import com.moneymanager.domain.model.AccountType
-import kotlinx.coroutines.flow.first
-import kotlinx.datetime.Clock
+import com.moneymanager.ui.MoneyManagerApp
 
-suspend fun main() {
-    println("Money Manager - JVM Application")
-    println("=================================")
-
+fun main() = application {
     // Initialize DI component using Metro-generated code
     val component: AppComponent = AppComponent.create(DatabaseDriverFactory())
 
@@ -19,43 +17,15 @@ suspend fun main() {
     val categoryRepository = component.categoryRepository
     val transactionRepository = component.transactionRepository
 
-    println("\nDependency injection initialized successfully!")
-
-    // Example: Query all accounts using the repository
-    val accounts = accountRepository.getAllAccounts().first()
-    println("\nCurrent accounts: ${accounts.size}")
-
-    if (accounts.isEmpty()) {
-        println("No accounts found. The database is ready for use!")
-        println("\nYou can now:")
-        println("- Create accounts")
-        println("- Add categories")
-        println("- Record transactions")
-
-        // Example: Create a sample account
-        println("\nCreating a sample checking account...")
-        val sampleAccount = Account(
-            name = "Main Checking",
-            type = AccountType.CHECKING,
-            currency = "USD",
-            initialBalance = 1000.0,
-            currentBalance = 1000.0,
-            createdAt = Clock.System.now(),
-            updatedAt = Clock.System.now()
+    Window(
+        onCloseRequest = ::exitApplication,
+        title = "Money Manager",
+        state = rememberWindowState(width = 1000.dp, height = 700.dp)
+    ) {
+        MoneyManagerApp(
+            accountRepository = accountRepository,
+            categoryRepository = categoryRepository,
+            transactionRepository = transactionRepository
         )
-        val accountId = accountRepository.createAccount(sampleAccount)
-        println("Created account with ID: $accountId")
-
-        // Fetch and display the created account
-        val createdAccount = accountRepository.getAccountById(accountId).first()
-        createdAccount?.let {
-            println("  - ${it.name} (${it.type}): ${it.currentBalance} ${it.currency}")
-        }
-    } else {
-        accounts.forEach { account ->
-            println("  - ${account.name} (${account.type}): ${account.currentBalance} ${account.currency}")
-        }
     }
-
-    println("\nApplication completed successfully!")
 }
