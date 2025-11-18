@@ -11,11 +11,8 @@ dependencies {
     implementation(projects.sharedDi)
     implementation(projects.composeUi)
 
-    // Transitive dependencies that should be declared directly
-    implementation(libs.compose.runtime.desktop)
-    implementation(libs.compose.ui.desktop)
-    implementation(libs.compose.ui.graphics.desktop)
-    implementation(libs.compose.ui.unit.desktop)
+    // Compose Desktop with platform-specific Skiko natives
+    implementation(compose.desktop.currentOs)
 }
 
 application {

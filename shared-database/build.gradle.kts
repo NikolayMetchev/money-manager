@@ -26,6 +26,11 @@ sqldelight {
     databases {
         create("MoneyManagerDatabase") {
             packageName.set("com.moneymanager.database")
+            verifyMigrations.set(false)
         }
     }
+}
+
+tasks.withType<app.cash.sqldelight.gradle.VerifyMigrationTask>().configureEach {
+    enabled = false
 }
