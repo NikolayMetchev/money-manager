@@ -161,6 +161,7 @@ The project uses modern Gradle practices for maintainability:
 - Centralized dependency version management
 - Defines all library versions, dependencies, and plugin references
 - Accessed via `libs` in build files (e.g., `libs.metro.runtime`)
+- **IMPORTANT**: ALL dependencies MUST be defined in `libs.versions.toml` and referenced via `libs.*`. NEVER hardcode dependencies with version numbers directly in build files (e.g., `implementation("group:artifact:version")`). Always add them to the version catalog first.
 
 **Convention Plugins** (`build-logic/`):
 - `moneymanager.kotlin-multiplatform-convention`: Base KMP setup (JVM toolchain 21, test dependencies)
@@ -203,3 +204,9 @@ The project uses modern Gradle practices for maintainability:
 6. **Expect/Actual Classes**: Warnings about Beta features can be suppressed with `-Xexpect-actual-classes` flag if needed
 
 7. **Configuration Cache**: With configuration cache enabled, first builds after changes to build files will invalidate cache (expected behavior)
+
+8. **Dependency Management**:
+   - **ALWAYS** add new dependencies to `gradle/libs.versions.toml` first
+   - **NEVER** hardcode dependencies with versions directly in build files
+   - Use `libs.*` references in all build files for consistency and centralized version management
+   - Example: Use `implementation(libs.kotlinx.coroutines.core)` NOT `implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")`

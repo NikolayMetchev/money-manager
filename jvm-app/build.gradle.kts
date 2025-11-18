@@ -10,11 +10,12 @@ dependencies {
     implementation(projects.sharedDatabase)
     implementation(projects.sharedDi)
     implementation(projects.composeUi)
-    implementation(libs.kotlinx.coroutines.core)
-    implementation(libs.kotlinx.datetime)
 
-    implementation(compose.desktop.currentOs)
-    implementation(compose.material3)
+    // Transitive dependencies that should be declared directly
+    implementation(libs.compose.runtime.desktop)
+    implementation(libs.compose.ui.desktop)
+    implementation(libs.compose.ui.graphics.desktop)
+    implementation(libs.compose.ui.unit.desktop)
 }
 
 application {

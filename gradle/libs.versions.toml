@@ -7,6 +7,7 @@ kotlinx-coroutines = "1.9.0"
 kotlinx-datetime = "0.6.1"
 compose = "1.7.5"
 compose-plugin = "1.8.0"
+dependency-analysis = "3.4.1"
 
 [libraries]
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
@@ -15,6 +16,10 @@ sqldelight-coroutines-extensions = { module = "app.cash.sqldelight:coroutines-ex
 sqldelight-sqlite-driver = { module = "app.cash.sqldelight:sqlite-driver", version.ref = "sqldelight" }
 metro-runtime = { module = "dev.zacsweers.metro:runtime", version.ref = "metro" }
 mappie-api = { module = "tech.mappie:mappie-api", version.ref = "mappie" }
+compose-runtime-desktop = { module = "org.jetbrains.compose.runtime:runtime-desktop", version.ref = "compose-plugin" }
+compose-ui-desktop = { module = "org.jetbrains.compose.ui:ui-desktop", version.ref = "compose-plugin" }
+compose-ui-graphics-desktop = { module = "org.jetbrains.compose.ui:ui-graphics-desktop", version.ref = "compose-plugin" }
+compose-ui-unit-desktop = { module = "org.jetbrains.compose.ui:ui-unit-desktop", version.ref = "compose-plugin" }
 
 # Gradle plugins (for use in build-logic convention plugins)
 kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
@@ -31,3 +36,4 @@ metro = { id = "dev.zacsweers.metro", version.ref = "metro" }
 mappie = { id = "tech.mappie.plugin", version.ref = "mappie" }
 compose = { id = "org.jetbrains.compose", version.ref = "compose-plugin" }
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+dependency-analysis = { id = "com.autonomousapps.dependency-analysis", version.ref = "dependency-analysis" }
