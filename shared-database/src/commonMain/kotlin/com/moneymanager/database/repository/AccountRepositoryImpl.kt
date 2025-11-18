@@ -1,3 +1,5 @@
+@file:OptIn(kotlin.time.ExperimentalTime::class)
+
 package com.moneymanager.database.repository
 
 import app.cash.sqldelight.coroutines.asFlow
@@ -68,7 +70,7 @@ class AccountRepositoryImpl(
     override suspend fun updateAccountBalance(accountId: Long, newBalance: Double): Unit = withContext(Dispatchers.Default) {
         queries.updateBalance(
             currentBalance = newBalance,
-            updatedAt = kotlinx.datetime.Clock.System.now().toEpochMilliseconds(),
+            updatedAt = kotlin.time.Clock.System.now().toEpochMilliseconds(),
             id = accountId
         )
     }
