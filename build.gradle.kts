@@ -33,3 +33,10 @@ dependencyAnalysis {
         }
     }
 }
+
+// Run buildHealth as part of the build task
+subprojects {
+    tasks.matching { it.name == "build" }.configureEach {
+        finalizedBy(rootProject.tasks.named("buildHealth"))
+    }
+}
