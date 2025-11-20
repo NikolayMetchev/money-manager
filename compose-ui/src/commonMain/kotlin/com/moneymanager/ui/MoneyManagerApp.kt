@@ -17,7 +17,8 @@ import com.moneymanager.ui.screens.TransactionsScreen
 fun MoneyManagerApp(
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
-    transactionRepository: TransactionRepository
+    transactionRepository: TransactionRepository,
+    databasePath: String? = null
 ) {
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Accounts) }
 
@@ -25,7 +26,18 @@ fun MoneyManagerApp(
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text(currentScreen.title) },
+                    title = {
+                        Column {
+                            Text(currentScreen.title)
+                            databasePath?.let { path ->
+                                Text(
+                                    text = "Database: $path",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                                )
+                            }
+                        }
+                    },
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = MaterialTheme.colorScheme.primaryContainer,
                         titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer

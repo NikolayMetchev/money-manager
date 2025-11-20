@@ -1,6 +1,6 @@
 package com.moneymanager.di
 
-import com.moneymanager.database.DatabaseDriverFactory
+import app.cash.sqldelight.db.SqlDriver
 import com.moneymanager.database.MoneyManagerDatabase
 import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Provides
@@ -10,7 +10,7 @@ import dev.zacsweers.metro.SingleIn
 interface DatabaseModule {
     @Provides
     @SingleIn(AppScope::class)
-    fun provideDatabase(driverFactory: DatabaseDriverFactory): MoneyManagerDatabase {
-        return MoneyManagerDatabase(driverFactory.createDriver())
+    fun provideDatabase(driver: SqlDriver): MoneyManagerDatabase {
+        return MoneyManagerDatabase(driver)
     }
 }

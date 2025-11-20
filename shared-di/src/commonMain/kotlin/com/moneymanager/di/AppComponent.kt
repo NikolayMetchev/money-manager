@@ -1,6 +1,6 @@
 package com.moneymanager.di
 
-import com.moneymanager.database.DatabaseDriverFactory
+import app.cash.sqldelight.db.SqlDriver
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.TransactionRepository
@@ -15,6 +15,6 @@ interface AppComponent {
 
     @DependencyGraph.Factory
     interface Factory {
-        fun create(@Provides driverFactory: DatabaseDriverFactory): AppComponent
+        fun create(@Provides driver: SqlDriver): AppComponent
     }
 }

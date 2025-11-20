@@ -11,9 +11,16 @@ actual class DatabaseDriverFactory {
         return driver
     }
 
-    fun createDriver(databasePath: String): SqlDriver {
+    fun createDriver(databasePath: String, isNewDatabase: Boolean = false): SqlDriver {
         val driver: SqlDriver = JdbcSqliteDriver("jdbc:sqlite:$databasePath")
-        MoneyManagerDatabase.Schema.create(driver)
+
+        if (isNewDatabase) {
+            // Create schema for new database
+            MoneyManagerDatabase.Schema.create(driver)
+        }
+        // For existing databases, schema already exists
+        // Future: Handle schema migrations here
+
         return driver
     }
 }
