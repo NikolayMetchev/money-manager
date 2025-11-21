@@ -52,7 +52,10 @@ fun AccountsScreen(accountRepository: AccountRepository) {
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(accounts) { account ->
-                        AccountCard(account)
+                        AccountCard(
+                            account = account,
+                            accountRepository = accountRepository
+                        )
                     }
                 }
             }
@@ -77,7 +80,12 @@ fun AccountsScreen(accountRepository: AccountRepository) {
 }
 
 @Composable
-fun AccountCard(account: Account) {
+fun AccountCard(
+    account: Account,
+    accountRepository: AccountRepository
+) {
+    var showDeleteDialog by remember { mutableStateOf(false) }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
@@ -92,15 +100,25 @@ fun AccountCard(account: Account) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = account.name,
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Text(
-                    text = account.type.name,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = account.name,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Text(
+                        text = account.type.name,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                IconButton(
+                    onClick = { showDeleteDialog = true }
+                ) {
+                    Text(
+                        text = "🗑️",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
             }
             Spacer(modifier = Modifier.height(8.dp))
             Text(
@@ -120,6 +138,14 @@ fun AccountCard(account: Account) {
                 )
             }
         }
+    }
+
+    if (showDeleteDialog) {
+        DeleteAccountDialog(
+            account = account,
+            accountRepository = accountRepository,
+            onDismiss = { showDeleteDialog = false }
+        )
     }
 }
 
@@ -278,6 +304,90 @@ fun CreateAccountDialog(
             TextButton(
                 onClick = onDismiss,
                 enabled = !isSaving
+            ) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@Composable
+fun DeleteAccountDialog(
+    account: Account,
+    accountRepository: AccountRepository,
+    onDismiss: () -> Unit
+) {
+    var isDeleting by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
+    AlertDialog(
+        onDismissRequest = { if (!isDeleting) onDismiss() },
+        icon = {
+            Text(
+                text = "⚠️",
+                style = MaterialTheme.typography.headlineMedium
+            )
+        },
+        title = { Text("Delete Account?") },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "Are you sure you want to delete \"${account.name}\"?",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Text(
+                    text = "This action cannot be undone. All transactions associated with this account will become orphaned.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                errorMessage?.let { error ->
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = error,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    isDeleting = true
+                    errorMessage = null
+                    scope.launch {
+                        try {
+                            accountRepository.deleteAccount(account.id)
+                            onDismiss()
+                        } catch (e: Exception) {
+                            logger.error(e) { "Failed to delete account: ${e.message}" }
+                            errorMessage = "Failed to delete account: ${e.message}"
+                            isDeleting = false
+                        }
+                    }
+                },
+                enabled = !isDeleting,
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.error
+                )
+            ) {
+                if (isDeleting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Text("Delete")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !isDeleting
             ) {
                 Text("Cancel")
             }
