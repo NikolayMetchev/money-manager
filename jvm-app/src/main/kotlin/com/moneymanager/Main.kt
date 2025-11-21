@@ -8,12 +8,17 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.database.DatabaseDriverFactory
 import com.moneymanager.di.AppComponent
 import com.moneymanager.ui.MoneyManagerApp
+import org.lighthousegames.logging.logging
 import java.nio.file.Path
 
+private val logger = logging()
+
 fun main() = application {
+    logger.info { "Starting Money Manager application" }
     // Check if default database exists
     val defaultDbPath = DatabaseConfig.getDefaultDatabasePath()
     val dbExists = DatabaseConfig.databaseFileExists(defaultDbPath)
+    logger.debug { "Default database path: $defaultDbPath, exists: $dbExists" }
 
     // State for managing database selection
     var databasePath by remember { mutableStateOf<Path?>(if (dbExists) defaultDbPath else null) }
@@ -49,12 +54,14 @@ fun main() = application {
             // Initialize database driver with the selected path
             val driverFactory = DatabaseDriverFactory()
             val isNewDatabase = !DatabaseConfig.databaseFileExists(dbPath)
+            logger.info { "Initializing database at: $dbPath (new: $isNewDatabase)" }
             val driver = remember(dbPath) {
                 driverFactory.createDriver(
                     databasePath = DatabaseConfig.getJdbcPath(dbPath),
                     isNewDatabase = isNewDatabase
                 )
             }
+            logger.info { "Database initialized successfully" }
 
             // Initialize DI component using Metro-generated code
             val component: AppComponent = remember(driver) { AppComponent.create(driver) }

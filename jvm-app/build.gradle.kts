@@ -13,6 +13,11 @@ dependencies {
 
     // Compose Desktop with platform-specific Skiko natives
     implementation(compose.desktop.currentOs)
+
+    // Logging
+    implementation(libs.kmlogging)
+    implementation(libs.log4j.core)
+    implementation(libs.log4j.slf4j2.impl)
 }
 
 application {

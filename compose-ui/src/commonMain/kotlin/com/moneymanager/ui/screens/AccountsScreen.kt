@@ -14,7 +14,10 @@ import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountType
 import com.moneymanager.domain.repository.AccountRepository
 import kotlinx.coroutines.launch
+import org.lighthousegames.logging.logging
 import kotlin.time.Clock
+
+private val logger = logging()
 
 @Composable
 fun AccountsScreen(accountRepository: AccountRepository) {
@@ -251,6 +254,7 @@ fun CreateAccountDialog(
                                     accountRepository.createAccount(newAccount)
                                     onDismiss()
                                 } catch (e: Exception) {
+                                    logger.error(e) { "Failed to create account: ${e.message}" }
                                     errorMessage = "Failed to create account: ${e.message}"
                                     isSaving = false
                                 }

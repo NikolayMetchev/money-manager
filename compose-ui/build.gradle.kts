@@ -21,6 +21,7 @@ kotlin {
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.datetime)
                 implementation(libs.metro.runtime)
+                implementation(libs.kmlogging)
             }
         }
     }

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN" monitorInterval="30">
+    <Properties>
+        <!-- Log directory in user home next to database -->
+        <Property name="LOG_DIR">${sys:user.home}/.dbmanager/logs</Property>
+        <Property name="LOG_PATTERN">%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n</Property>
+    </Properties>
+
+    <Appenders>
+        <!-- Console Appender for development -->
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="${LOG_PATTERN}"/>
+        </Console>
+
+        <!-- Rolling File Appender -->
+        <RollingFile name="RollingFile"
+                     fileName="${LOG_DIR}/money-manager.log"
+                     filePattern="${LOG_DIR}/money-manager-%d{yyyy-MM-dd}-%i.log.gz">
+            <PatternLayout pattern="${LOG_PATTERN}"/>
+            <Policies>
+                <!-- Roll over daily -->
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+                <!-- Roll over when file reaches 10MB -->
+                <SizeBasedTriggeringPolicy size="10 MB"/>
+            </Policies>
+            <!-- Keep max 30 files or 1GB total -->
+            <DefaultRolloverStrategy max="30">
+                <Delete basePath="${LOG_DIR}" maxDepth="1">
+                    <IfFileName glob="money-manager-*.log.gz"/>
+                    <!-- Delete if older than 30 days -->
+                    <IfLastModified age="30d"/>
+                    <!-- Or delete if total size exceeds 1GB -->
+                    <IfAccumulatedFileSize exceeds="1 GB"/>
+                </Delete>
+            </DefaultRolloverStrategy>
+        </RollingFile>
+    </Appenders>
+
+    <Loggers>
+        <!-- Application loggers -->
+        <Logger name="com.moneymanager" level="debug" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="RollingFile"/>
+        </Logger>
+
+        <!-- SQLDelight query logging (set to debug to see SQL queries) -->
+        <Logger name="app.cash.sqldelight" level="info" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="RollingFile"/>
+        </Logger>
+
+        <!-- Root logger -->
+        <Root level="info">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="RollingFile"/>
+        </Root>
+    </Loggers>
+</Configuration>

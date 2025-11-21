@@ -5,6 +5,9 @@ metro = "0.7.6"
 mappie = "2.2.21-1.6.1"
 kotlinx-coroutines = "1.10.2"
 kotlinx-datetime = "0.7.1"
+kmlogging = "1.5.0"
+log4j = "2.24.3"
+slf4j = "2.0.16"
 compose = "1.7.5"
 compose-plugin = "1.8.0"
 dependency-analysis = "3.4.1"
@@ -16,6 +19,10 @@ sqldelight-coroutines-extensions = { module = "app.cash.sqldelight:coroutines-ex
 sqldelight-sqlite-driver = { module = "app.cash.sqldelight:sqlite-driver", version.ref = "sqldelight" }
 metro-runtime = { module = "dev.zacsweers.metro:runtime", version.ref = "metro" }
 mappie-api = { module = "tech.mappie:mappie-api", version.ref = "mappie" }
+kmlogging = { module = "org.lighthousegames:logging", version.ref = "kmlogging" }
+log4j-core = { module = "org.apache.logging.log4j:log4j-core", version.ref = "log4j" }
+log4j-slf4j2-impl = { module = "org.apache.logging.log4j:log4j-slf4j2-impl", version.ref = "log4j" }
+slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
 compose-runtime-desktop = { module = "org.jetbrains.compose.runtime:runtime-desktop", version.ref = "compose-plugin" }
 compose-ui-desktop = { module = "org.jetbrains.compose.ui:ui-desktop", version.ref = "compose-plugin" }
 compose-ui-graphics-desktop = { module = "org.jetbrains.compose.ui:ui-graphics-desktop", version.ref = "compose-plugin" }
