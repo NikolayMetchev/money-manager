@@ -9,7 +9,7 @@ kmlogging = "2.0.3"
 log4j = "2.25.2"
 slf4j = "2.0.16"
 compose = "1.7.5"
-compose-plugin = "1.8.0"
+compose-plugin = "1.9.3"
 dependency-analysis = "3.5.0"
 
 [libraries]
