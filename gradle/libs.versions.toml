@@ -10,7 +10,7 @@ log4j = "2.24.3"
 slf4j = "2.0.16"
 compose = "1.7.5"
 compose-plugin = "1.8.0"
-dependency-analysis = "3.4.1"
+dependency-analysis = "3.5.0"
 
 [libraries]
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
