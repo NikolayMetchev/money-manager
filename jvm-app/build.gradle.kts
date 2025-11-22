@@ -14,10 +14,19 @@ dependencies {
     // Compose Desktop with platform-specific Skiko natives
     implementation(compose.desktop.currentOs)
 
+    // Declare transitive dependencies directly (required by buildHealth)
+    implementation(libs.androidx.compose.runtime.desktop)
+    implementation(libs.compose.foundation.desktop)
+    implementation(libs.compose.foundation.layout.desktop)
+    implementation(libs.compose.material.desktop)
+    implementation(libs.compose.ui.text.desktop)
+    implementation(libs.sqldelight.runtime)
+    implementation(libs.diamondedge.logging)
+
     // Logging
     implementation(libs.kmlogging)
-    implementation(libs.log4j.core)
-    implementation(libs.log4j.slf4j2.impl)
+    runtimeOnly(libs.log4j.core)
+    runtimeOnly(libs.log4j.slf4j2.impl)
 }
 
 application {

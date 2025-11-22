@@ -19,6 +19,8 @@ dependencyAnalysis {
     issues {
         all {
             onAny {
+                severity("fail")
+
                 // Ignore warnings related to compose.desktop.currentOs
                 // This dependency provides platform-specific Skiko natives required for Compose Desktop
                 exclude("org.jetbrains.compose.desktop:desktop-jvm-windows-x64")
