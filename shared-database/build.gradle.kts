@@ -14,6 +14,12 @@ kotlin {
             }
         }
 
+        val commonTest by getting {
+            dependencies {
+                implementation(libs.kotlinx.coroutines.test)
+            }
+        }
+
         val jvmMain by getting {
             dependencies {
                 implementation(libs.sqldelight.sqlite.driver)
