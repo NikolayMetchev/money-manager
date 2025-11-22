@@ -27,3 +27,12 @@ application {
 kotlin {
     jvmToolchain(21)
 }
+
+// Handle duplicate JARs in distribution tasks
+tasks.withType<Tar>().configureEach {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+tasks.withType<Zip>().configureEach {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
