@@ -9,7 +9,7 @@ val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
 configure<KotlinMultiplatformExtension> {
     jvm()
 
-    jvmToolchain(21)
+    jvmToolchain(libs.findVersion("jvm").get().toString().toInt())
 
     sourceSets {
         val commonTest by getting {

@@ -2,6 +2,12 @@ plugins {
     `kotlin-dsl`
 }
 
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(libs.versions.jvm.get().toInt()))
+    }
+}
+
 dependencies {
     implementation(libs.kotlin.gradle.plugin)
     implementation(libs.sqldelight.gradle.plugin)
