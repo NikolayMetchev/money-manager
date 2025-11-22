@@ -122,21 +122,14 @@ fun AccountCard(
             }
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "${account.currency} ${String.format("%.2f", account.currentBalance)}",
+                text = "${account.currency} ${String.format("%.2f", account.initialBalance)}",
                 style = MaterialTheme.typography.headlineSmall,
-                color = if (account.currentBalance >= 0) {
+                color = if (account.initialBalance >= 0) {
                     MaterialTheme.colorScheme.primary
                 } else {
                     MaterialTheme.colorScheme.error
                 }
             )
-            if (account.currentBalance != account.initialBalance) {
-                Text(
-                    text = "Initial: ${account.currency} ${String.format("%.2f", account.initialBalance)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
         }
     }
 
@@ -273,7 +266,6 @@ fun CreateAccountDialog(
                                         type = selectedType,
                                         currency = currency.trim().uppercase(),
                                         initialBalance = balance,
-                                        currentBalance = balance,
                                         createdAt = now,
                                         updatedAt = now
                                     )

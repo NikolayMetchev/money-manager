@@ -9,6 +9,5 @@ interface AccountRepository {
     fun getActiveAccounts(): Flow<List<Account>>
     suspend fun createAccount(account: Account): Long
     suspend fun updateAccount(account: Account)
-    suspend fun updateAccountBalance(accountId: Long, newBalance: Double)
     suspend fun deleteAccount(id: Long)
 }

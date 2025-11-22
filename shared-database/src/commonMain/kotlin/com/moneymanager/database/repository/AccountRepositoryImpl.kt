@@ -44,7 +44,6 @@ class AccountRepositoryImpl(
             type = account.type.name,
             currency = account.currency,
             initialBalance = account.initialBalance,
-            currentBalance = account.currentBalance,
             color = account.color,
             icon = account.icon,
             isActive = if (account.isActive) 1 else 0,
@@ -64,14 +63,6 @@ class AccountRepositoryImpl(
             isActive = if (account.isActive) 1 else 0,
             updatedAt = account.updatedAt.toEpochMilliseconds(),
             id = account.id
-        )
-    }
-
-    override suspend fun updateAccountBalance(accountId: Long, newBalance: Double): Unit = withContext(Dispatchers.Default) {
-        queries.updateBalance(
-            currentBalance = newBalance,
-            updatedAt = kotlin.time.Clock.System.now().toEpochMilliseconds(),
-            id = accountId
         )
     }
 
