@@ -11,13 +11,29 @@ dependencies {
     implementation(projects.sharedDi)
     implementation(projects.composeUi)
 
-    // Compose Desktop with platform-specific Skiko natives
-    implementation(compose.desktop.currentOs)
+    // Compose Desktop with Skiko natives for all platforms
+    implementation(libs.compose.desktop.windows.x64)
+    implementation(libs.compose.desktop.macos.x64)
+    implementation(libs.compose.desktop.macos.arm64)
+    implementation(libs.compose.desktop.linux.x64)
+    implementation(libs.compose.desktop.linux.arm64)
+
+    // Declare transitive dependencies directly (required by buildHealth)
+    implementation(libs.androidx.compose.runtime.desktop)
+    implementation(libs.compose.foundation.desktop)
+    implementation(libs.compose.foundation.layout.desktop)
+    implementation(libs.compose.material.desktop)
+    implementation(libs.compose.ui.desktop)
+    implementation(libs.compose.ui.graphics.desktop)
+    implementation(libs.compose.ui.text.desktop)
+    implementation(libs.compose.ui.unit.desktop)
+    implementation(libs.sqldelight.runtime)
+    implementation(libs.diamondedge.logging)
 
     // Logging
     implementation(libs.kmlogging)
-    implementation(libs.log4j.core)
-    implementation(libs.log4j.slf4j2.impl)
+    runtimeOnly(libs.log4j.core)
+    runtimeOnly(libs.log4j.slf4j2.impl)
 }
 
 application {
@@ -26,4 +42,13 @@ application {
 
 kotlin {
     jvmToolchain(21)
+}
+
+// Handle duplicate JARs in distribution tasks
+tasks.withType<Tar>().configureEach {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+tasks.withType<Zip>().configureEach {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }

@@ -48,6 +48,23 @@ Money Manager is a personal finance management application built with Kotlin Mul
 ./gradlew :jvm-app:build     # Build JVM application
 ```
 
+### Pre-Push Checklist
+
+**IMPORTANT**: Always build locally before pushing changes to ensure code quality and catch issues early:
+
+```bash
+./gradlew build
+```
+
+This practice:
+- Catches compilation errors before CI
+- Runs all tests locally
+- Verifies changes work on your environment
+- Saves CI minutes and time
+- Prevents broken builds on main branch
+
+Only push to remote after a successful local build.
+
 ## Project Structure
 
 ### Module Organization
