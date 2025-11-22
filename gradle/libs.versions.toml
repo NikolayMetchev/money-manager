@@ -38,6 +38,11 @@ compose-foundation-desktop = { module = "org.jetbrains.compose.foundation:founda
 compose-foundation-layout-desktop = { module = "org.jetbrains.compose.foundation:foundation-layout-desktop", version.ref = "compose-plugin" }
 compose-material-desktop = { module = "org.jetbrains.compose.material:material-desktop", version.ref = "compose-plugin" }
 compose-ui-text-desktop = { module = "org.jetbrains.compose.ui:ui-text-desktop", version.ref = "compose-plugin" }
+compose-desktop-windows-x64 = { module = "org.jetbrains.compose.desktop:desktop-jvm-windows-x64", version.ref = "compose-plugin" }
+compose-desktop-macos-x64 = { module = "org.jetbrains.compose.desktop:desktop-jvm-macos-x64", version.ref = "compose-plugin" }
+compose-desktop-macos-arm64 = { module = "org.jetbrains.compose.desktop:desktop-jvm-macos-arm64", version.ref = "compose-plugin" }
+compose-desktop-linux-x64 = { module = "org.jetbrains.compose.desktop:desktop-jvm-linux-x64", version.ref = "compose-plugin" }
+compose-desktop-linux-arm64 = { module = "org.jetbrains.compose.desktop:desktop-jvm-linux-arm64", version.ref = "compose-plugin" }
 
 # Gradle plugins (for use in build-logic convention plugins)
 kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
