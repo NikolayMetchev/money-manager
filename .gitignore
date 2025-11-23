@@ -11,6 +11,7 @@ gradle-9.2.0/
 .idea/usage.statistics.xml
 .idea/shelf
 .idea/discord.xml
+.idea/deploymentTargetSelector.xml
 *.iws
 *.iml
 out/
