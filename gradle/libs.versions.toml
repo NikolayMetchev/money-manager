@@ -17,10 +17,10 @@ dependency-analysis = "3.5.0"
 
 # Android
 android-gradle-plugin = "8.13.1"
-android-compileSdk = "35"
+android-compileSdk = "36"
 android-minSdk = "28"
 android-targetSdk = "35"
-androidx-activity-compose = "1.10.0"
+androidx-activity-compose = "1.12.0"
 
 [libraries]
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
