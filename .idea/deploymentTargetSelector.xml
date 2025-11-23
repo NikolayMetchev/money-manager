@@ -2,9 +2,9 @@
 <project version="4">
   <component name="deploymentTargetSelector">
     <selectionStates>
-      <SelectionState runConfigName="Adnroid App">
+      <SelectionState runConfigName="Android App">
         <option name="selectionMode" value="DROPDOWN" />
-        <DropdownSelection timestamp="2025-11-23T00:15:29.164851200Z">
+        <DropdownSelection timestamp="2025-11-23T10:19:38.291069400Z">
           <Target type="DEFAULT_BOOT">
             <handle>
               <DeviceId pluginId="LocalEmulator" identifier="path=C:\Users\nikol\.android\avd\Medium_Phone.avd" />
