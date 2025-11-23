@@ -23,4 +23,5 @@ dependencies {
     implementation(libs.mappie.gradle.plugin)
     implementation(libs.metro.gradle.plugin)
     implementation(libs.compose.gradle.plugin)
+    implementation(libs.android.gradle.plugin)
 }

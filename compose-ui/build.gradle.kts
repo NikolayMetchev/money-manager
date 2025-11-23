@@ -1,5 +1,6 @@
 plugins {
-    id("moneymanager.compose-multiplatform-convention")
+    id("moneymanager.android-convention")
+    alias(libs.plugins.compose)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.metro)
 }
