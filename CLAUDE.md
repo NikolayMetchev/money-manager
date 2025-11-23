@@ -229,3 +229,9 @@ The project uses modern Gradle practices for maintainability:
    - **NEVER** hardcode dependencies with versions directly in build files
    - Use `libs.*` references in all build files for consistency and centralized version management
    - Example: Use `implementation(libs.kotlinx.coroutines.core)` NOT `implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")`
+
+9. **Build Health (Dependency Analysis)**:
+   - **NEVER** skip or exclude modules from the `buildHealth` task
+   - The dependency analysis plugin helps maintain a healthy dependency graph
+   - If `buildHealth` fails, add the recommended dependencies directly to the module
+   - Do NOT use `exclude()` or conditional logic to skip modules from dependency analysis

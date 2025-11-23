@@ -1,5 +1,5 @@
 plugins {
-    id("moneymanager.coroutines-convention")
+    id("moneymanager.android-convention")
     id("moneymanager.mappie-convention")
     alias(libs.plugins.sqldelight)
 }
@@ -10,6 +10,7 @@ kotlin {
             dependencies {
                 api(projects.shared)
                 implementation(libs.kotlinx.datetime)
+                implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.sqldelight.coroutines.extensions)
             }
         }
@@ -23,6 +24,12 @@ kotlin {
         val jvmMain by getting {
             dependencies {
                 implementation(libs.sqldelight.sqlite.driver)
+            }
+        }
+
+        val androidMain by getting {
+            dependencies {
+                implementation(libs.sqldelight.android.driver)
             }
         }
     }
