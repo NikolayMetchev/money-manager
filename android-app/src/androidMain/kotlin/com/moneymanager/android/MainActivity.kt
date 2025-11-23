@@ -23,12 +23,15 @@ class MainActivity : ComponentActivity() {
         val categoryRepository = component.categoryRepository
         val transactionRepository = component.transactionRepository
 
+        // Get the actual database path on Android
+        val dbPath = applicationContext.getDatabasePath("money_manager.db").absolutePath
+
         setContent {
             MoneyManagerApp(
                 accountRepository = accountRepository,
                 categoryRepository = categoryRepository,
                 transactionRepository = transactionRepository,
-                databasePath = null  // Android uses internal storage
+                databasePath = dbPath
             )
         }
     }
