@@ -11,6 +11,7 @@ import com.moneymanager.ui.navigation.Screen
 import com.moneymanager.ui.screens.AccountsScreen
 import com.moneymanager.ui.screens.CategoriesScreen
 import com.moneymanager.ui.screens.TransactionsScreen
+import com.moneymanager.ui.debug.DebugLogScreen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,6 +65,12 @@ fun MoneyManagerApp(
                         selected = currentScreen is Screen.Transactions,
                         onClick = { currentScreen = Screen.Transactions }
                     )
+                    NavigationBarItem(
+                        icon = { Text("🐛") },
+                        label = { Text("Debug") },
+                        selected = currentScreen is Screen.Debug,
+                        onClick = { currentScreen = Screen.Debug }
+                    )
                 }
             }
         ) { paddingValues ->
@@ -72,6 +79,7 @@ fun MoneyManagerApp(
                     is Screen.Accounts -> AccountsScreen(accountRepository)
                     is Screen.Categories -> CategoriesScreen(categoryRepository)
                     is Screen.Transactions -> TransactionsScreen(transactionRepository)
+                    is Screen.Debug -> DebugLogScreen()
                 }
             }
         }
