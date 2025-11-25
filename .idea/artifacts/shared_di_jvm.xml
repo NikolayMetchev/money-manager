@@ -1,8 +1,0 @@
-<component name="ArtifactManager">
-  <artifact type="jar" name="shared-di-jvm">
-    <output-path>$PROJECT_DIR$/shared-di/build/libs</output-path>
-    <root id="archive" name="shared-di-jvm.jar">
-      <element id="module-output" name="money-manager.shared-di.jvmMain" />
-    </root>
-  </artifact>
-</component>
