@@ -6,24 +6,22 @@ kotlin {
     sourceSets {
         val androidMain by getting {
             dependencies {
-                implementation(projects.shared)
-                implementation(projects.sharedDatabase)
-                implementation(projects.sharedDi)
-                implementation(projects.composeUi)
-
-                implementation(libs.androidx.activity)
-                implementation(libs.androidx.activity.compose)
-                implementation(libs.androidx.compose.runtime)
-                implementation(libs.sqldelight.runtime)
-                implementation(compose.runtime)
-                implementation(compose.foundation)
-                implementation(compose.material3)
-                implementation(compose.ui)
-                implementation(compose.components.resources)
-
-                implementation(libs.kotlinx.coroutines.core)
-                implementation(kotlin("stdlib"))
-            }
+            implementation(kotlin("stdlib"))
+            implementation(compose.components.resources)
+            implementation(compose.foundation)
+            implementation(compose.material3)
+            implementation(compose.runtime)
+            implementation(compose.ui)
+            implementation(libs.androidx.activity)
+            implementation(libs.androidx.activity.compose)
+            implementation(libs.androidx.compose.runtime)
+            implementation(libs.kotlinx.coroutines.core)
+            implementation(libs.sqldelight.runtime)
+            implementation(projects.composeUi)
+            implementation(projects.shared)
+            implementation(projects.sharedDatabase)
+            implementation(projects.sharedDi)
+        }
         }
     }
 }
@@ -39,12 +37,12 @@ android {
 }
 
 dependencies {
+    implementation(kotlin("stdlib"))
+    implementation(libs.androidx.activity)
+    implementation(libs.androidx.activity.compose)
+    implementation(projects.composeUi)
     // Direct dependencies for buildHealth (also declared in androidMain source set)
     implementation(projects.shared)
     implementation(projects.sharedDatabase)
     implementation(projects.sharedDi)
-    implementation(projects.composeUi)
-    implementation(libs.androidx.activity)
-    implementation(libs.androidx.activity.compose)
-    implementation(kotlin("stdlib"))
 }

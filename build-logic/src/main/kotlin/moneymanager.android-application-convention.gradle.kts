@@ -3,9 +3,10 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 
 plugins {
-    id("org.jetbrains.kotlin.multiplatform")
     id("com.android.application")
+    id("com.squareup.sort-dependencies")
     id("org.jetbrains.compose")
+    id("org.jetbrains.kotlin.multiplatform")
     id("org.jetbrains.kotlin.plugin.compose")
 }
 

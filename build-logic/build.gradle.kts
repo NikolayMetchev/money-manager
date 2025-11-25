@@ -18,12 +18,13 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
 }
 
 dependencies {
-    implementation(libs.kotlin.gradle.plugin)
+    implementation(libs.android.gradle.plugin)
+    implementation(libs.compose.gradle.plugin)
+    implementation(libs.detekt.gradle.plugin)
     implementation(libs.kotlin.compose.compiler.gradle.plugin)
-    implementation(libs.sqldelight.gradle.plugin)
+    implementation(libs.kotlin.gradle.plugin)
     implementation(libs.mappie.gradle.plugin)
     implementation(libs.metro.gradle.plugin)
-    implementation(libs.compose.gradle.plugin)
-    implementation(libs.android.gradle.plugin)
-    implementation(libs.detekt.gradle.plugin)
+    implementation(libs.sort.dependencies.gradle.plugin)
+    implementation(libs.sqldelight.gradle.plugin)
 }

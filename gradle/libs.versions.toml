@@ -15,6 +15,7 @@ compose-plugin = "1.9.3"
 androidx-compose = "1.9.5"
 dependency-analysis = "3.5.0"
 detekt = "2.0.0-alpha.1"
+sort-dependencies = "0.15"
 
 # Android
 android-gradle-plugin = "8.13.1"
@@ -68,6 +69,7 @@ compose-gradle-plugin = { module = "org.jetbrains.compose:compose-gradle-plugin"
 android-gradle-plugin = { module = "com.android.tools.build:gradle", version.ref = "android-gradle-plugin" }
 detekt-gradle-plugin = { module = "dev.detekt:dev.detekt.gradle.plugin", version.ref = "detekt" }
 dependency-analysis-gradle-plugin = { module = "com.autonomousapps:dependency-analysis-gradle-plugin", version.ref = "dependency-analysis" }
+sort-dependencies-gradle-plugin = { module = "com.squareup.sort-dependencies:com.squareup.sort-dependencies.gradle.plugin", version.ref = "sort-dependencies" }
 
 [plugins]
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
@@ -82,3 +84,4 @@ build-health = { id = "com.autonomousapps.build-health", version.ref = "dependen
 detekt = { id = "dev.detekt", version.ref = "detekt" }
 android-kotlin-multiplatform-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "android-gradle-plugin" }
 android-application = { id = "com.android.application", version.ref = "android-gradle-plugin" }
+sort-dependencies = { id = "com.squareup.sort-dependencies", version.ref = "sort-dependencies" }

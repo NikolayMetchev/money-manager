@@ -3,8 +3,9 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 
 plugins {
-    id("org.jetbrains.kotlin.multiplatform")
+    id("com.squareup.sort-dependencies")
     id("dev.detekt")
+    id("org.jetbrains.kotlin.multiplatform")
 }
 
 val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
