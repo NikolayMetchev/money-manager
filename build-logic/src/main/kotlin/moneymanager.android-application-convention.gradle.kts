@@ -8,6 +8,7 @@ plugins {
     id("org.jetbrains.compose")
     id("org.jetbrains.kotlin.multiplatform")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("org.jlleitschuh.gradle.ktlint")
 }
 
 val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")

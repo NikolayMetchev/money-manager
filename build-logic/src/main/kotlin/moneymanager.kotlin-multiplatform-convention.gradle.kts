@@ -6,6 +6,7 @@ plugins {
     id("com.squareup.sort-dependencies")
     id("dev.detekt")
     id("org.jetbrains.kotlin.multiplatform")
+    id("org.jlleitschuh.gradle.ktlint")
 }
 
 val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
