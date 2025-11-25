@@ -25,4 +25,5 @@ dependencies {
     implementation(libs.compose.gradle.plugin)
     implementation(libs.android.gradle.plugin)
     implementation(libs.detekt.gradle.plugin)
+    implementation(libs.dependency.analysis.gradle.plugin)
 }
