@@ -15,10 +15,9 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.moneymanager.database.DatabaseDriverFactory
 import com.moneymanager.di.AppComponent
-import com.moneymanager.ui.MoneyManagerApp
 import com.moneymanager.ui.ErrorDialog
 import com.moneymanager.ui.ErrorState
-import com.moneymanager.ui.ErrorScreen
+import com.moneymanager.ui.MoneyManagerApp
 import com.moneymanager.ui.SimpleFallbackErrorScreen
 import com.moneymanager.ui.debug.LogCollector
 import com.moneymanager.ui.debug.LogLevel
