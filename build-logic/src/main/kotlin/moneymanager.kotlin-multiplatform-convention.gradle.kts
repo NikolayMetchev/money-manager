@@ -48,7 +48,7 @@ tasks {
         dependsOn(detekt)
     }
     build {
-        dependsOn(buildHealth)
+        dependsOn("projectHealth")
     }
 }
 
