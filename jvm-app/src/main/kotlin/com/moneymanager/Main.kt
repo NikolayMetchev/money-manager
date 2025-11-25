@@ -1,10 +1,19 @@
 package com.moneymanager
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
@@ -26,6 +35,15 @@ import java.nio.file.Path
 
 private val logger = logging()
 
+// Color constants for error screen
+@Suppress("MagicNumber")
+private val ERROR_BACKGROUND_COLOR = Color(0xFFFFEBEE)
+@Suppress("MagicNumber")
+private val ERROR_TITLE_COLOR = Color(0xFFB71C1C)
+@Suppress("MagicNumber")
+private val ERROR_TEXT_COLOR = Color(0xFF424242)
+
+@Suppress("TooGenericExceptionCaught", "PrintStackTrace")
 private fun log(level: LogLevel, message: String, throwable: Throwable? = null) {
     try {
         LogCollector.log(level, message, throwable)
@@ -49,6 +67,7 @@ private fun log(level: LogLevel, message: String, throwable: Throwable? = null) 
     }
 }
 
+@Suppress("TooGenericExceptionCaught", "PrintStackTrace")
 fun main() {
     // Install global exception handler to prevent app crashes
     Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
@@ -79,136 +98,143 @@ fun main() {
                 title = "Money Manager - Startup Error",
                 state = rememberWindowState(width = 1000.dp, height = 700.dp)
             ) {
-                MinimalErrorScreen(startupError!!.first, startupError!!.second)
+                MinimalErrorScreen(startupError.first, startupError.second)
             }
             return@application
         }
 
-        // State for managing database selection
-        var databasePath by remember { mutableStateOf<Path?>(null) }
-        var showDatabaseDialog by remember { mutableStateOf(false) }
-        var errorState by remember { mutableStateOf<ErrorState?>(null) }
-        var initResult by remember { mutableStateOf<InitResult?>(null) }
-        var fatalError by remember { mutableStateOf<Pair<String, String>?>(null) }
+        MainWindow()
+    }
+}
 
-        // Initialize on startup
-        LaunchedEffect(Unit) {
-            try {
-                log(LogLevel.INFO, "LaunchedEffect: Starting initialization")
-                val defaultDbPath = DatabaseConfig.getDefaultDatabasePath()
-                val dbExists = DatabaseConfig.databaseFileExists(defaultDbPath)
-                log(LogLevel.DEBUG, "Default database path: $defaultDbPath, exists: $dbExists")
+@Suppress("TooGenericExceptionCaught", "LongMethod", "CyclomaticComplexMethod", "FunctionNaming")
+@Composable
+private fun MainWindow() {
+    // State for managing database selection
+    var databasePath by remember { mutableStateOf<Path?>(null) }
+    var showDatabaseDialog by remember { mutableStateOf(false) }
+    var errorState by remember { mutableStateOf<ErrorState?>(null) }
+    var initResult by remember { mutableStateOf<InitResult?>(null) }
+    var fatalError by remember { mutableStateOf<Pair<String, String>?>(null) }
 
-                if (dbExists) {
-                    databasePath = defaultDbPath
-                    log(LogLevel.INFO, "Existing database found, initializing...")
-                    // Initialize immediately
-                    initResult = initializeApplication(defaultDbPath)
-                    log(LogLevel.INFO, "Initialization result: ${initResult?.javaClass?.simpleName}")
-                } else {
-                    log(LogLevel.INFO, "No existing database, showing dialog")
-                    showDatabaseDialog = true
-                }
-            } catch (e: Exception) {
-                log(LogLevel.ERROR, "Failed to initialize on startup: ${e.message}", e)
-                fatalError = "Failed to initialize: ${e.message}" to e.stackTraceToString()
+    // Initialize on startup
+    LaunchedEffect(Unit) {
+        try {
+            log(LogLevel.INFO, "LaunchedEffect: Starting initialization")
+            val defaultDbPath = DatabaseConfig.getDefaultDatabasePath()
+            val dbExists = DatabaseConfig.databaseFileExists(defaultDbPath)
+            log(LogLevel.DEBUG, "Default database path: $defaultDbPath, exists: $dbExists")
+
+            if (dbExists) {
+                databasePath = defaultDbPath
+                log(LogLevel.INFO, "Existing database found, initializing...")
+                // Initialize immediately
+                initResult = initializeApplication(defaultDbPath)
+                log(LogLevel.INFO, "Initialization result: ${initResult?.javaClass?.simpleName}")
+            } else {
+                log(LogLevel.INFO, "No existing database, showing dialog")
+                showDatabaseDialog = true
             }
+        } catch (e: Exception) {
+            log(LogLevel.ERROR, "Failed to initialize on startup: ${e.message}", e)
+            fatalError = "Failed to initialize: ${e.message}" to e.stackTraceToString()
+        }
+    }
+
+    // Window title based on state
+    val windowTitle = when {
+        fatalError != null -> "Money Manager - Fatal Error"
+        initResult is InitResult.Error -> "Money Manager - Error"
+        databasePath != null -> "Money Manager - ${databasePath.fileName}"
+        else -> "Money Manager - Setup"
+    }
+
+    Window(
+        onCloseRequest = ::exitApplication,
+        title = windowTitle,
+        state = rememberWindowState(width = 1000.dp, height = 700.dp)
+    ) {
+        // Show fatal error screen if something went very wrong
+        if (fatalError != null) {
+            SimpleFallbackErrorScreen(
+                message = fatalError.first,
+                stackTrace = fatalError.second
+            )
+            return@Window
         }
 
-        // Window title based on state
-        val windowTitle = when {
-            fatalError != null -> "Money Manager - Fatal Error"
-            initResult is InitResult.Error -> "Money Manager - Error"
-            databasePath != null -> "Money Manager - ${databasePath!!.fileName}"
-            else -> "Money Manager - Setup"
+        // Show database selection dialog if needed
+        if (showDatabaseDialog && initResult == null) {
+            DatabaseSelectionDialog(
+                defaultPath = DatabaseConfig.getDefaultDatabasePath(),
+                onDatabaseSelected = { selectedPath ->
+                    try {
+                        log(LogLevel.INFO, "User selected database path: $selectedPath")
+                        DatabaseConfig.ensureDirectoryExists(selectedPath)
+                        databasePath = selectedPath
+                        showDatabaseDialog = false
+                        log(LogLevel.INFO, "Database path set successfully")
+                        // Initialize after path is set
+                        initResult = initializeApplication(selectedPath)
+                    } catch (e: Exception) {
+                        log(LogLevel.ERROR, "Failed to set database path: ${e.message}", e)
+                        errorState = ErrorState(
+                            message = "Failed to set database path: ${e.message}",
+                            canRecover = true,
+                            fullException = e.stackTraceToString()
+                        )
+                    }
+                },
+                onCancel = {
+                    log(LogLevel.INFO, "User cancelled database selection - exiting application")
+                    exitApplication()
+                }
+            )
         }
 
-        Window(
-            onCloseRequest = ::exitApplication,
-            title = windowTitle,
-            state = rememberWindowState(width = 1000.dp, height = 700.dp)
-        ) {
-            // Show fatal error screen if something went very wrong
-            if (fatalError != null) {
-                SimpleFallbackErrorScreen(
-                    message = fatalError!!.first,
-                    stackTrace = fatalError!!.second
-                )
-                return@Window
-            }
+        // Show error dialog if present (for non-fatal errors only)
+        errorState?.let { error ->
+            ErrorDialog(
+                error = error,
+                onDismiss = {
+                    errorState = null
+                }
+            )
+        }
 
-            // Show database selection dialog if needed
-            if (showDatabaseDialog && initResult == null) {
-                DatabaseSelectionDialog(
-                    defaultPath = DatabaseConfig.getDefaultDatabasePath(),
-                    onDatabaseSelected = { selectedPath ->
-                        try {
-                            log(LogLevel.INFO, "User selected database path: $selectedPath")
-                            DatabaseConfig.ensureDirectoryExists(selectedPath)
-                            databasePath = selectedPath
-                            showDatabaseDialog = false
-                            log(LogLevel.INFO, "Database path set successfully")
-                            // Initialize after path is set
-                            initResult = initializeApplication(selectedPath)
-                        } catch (e: Exception) {
-                            log(LogLevel.ERROR, "Failed to set database path: ${e.message}", e)
-                            errorState = ErrorState(
-                                message = "Failed to set database path: ${e.message}",
-                                canRecover = true,
-                                fullException = e.stackTraceToString()
-                            )
-                        }
-                    },
-                    onCancel = {
-                        log(LogLevel.INFO, "User cancelled database selection - exiting application")
-                        exitApplication()
-                    }
+        // Show main app or error screen based on initialization result
+        when (val result = initResult) {
+            is InitResult.Success -> {
+                MoneyManagerApp(
+                    accountRepository = result.accountRepository,
+                    categoryRepository = result.categoryRepository,
+                    transactionRepository = result.transactionRepository,
+                    databasePath = databasePath.toString()
                 )
             }
-
-            // Show error dialog if present (for non-fatal errors only)
-            errorState?.let { error ->
-                ErrorDialog(
-                    error = error,
-                    onDismiss = {
-                        errorState = null
-                    }
+            is InitResult.Error -> {
+                // Use minimal error screen to avoid any Material3 issues
+                MinimalErrorScreen(
+                    message = result.message,
+                    stackTrace = result.fullException
                 )
             }
-
-            // Show main app or error screen based on initialization result
-            when (val result = initResult) {
-                is InitResult.Success -> {
-                    MoneyManagerApp(
-                        accountRepository = result.accountRepository,
-                        categoryRepository = result.categoryRepository,
-                        transactionRepository = result.transactionRepository,
-                        databasePath = databasePath.toString()
-                    )
-                }
-                is InitResult.Error -> {
-                    // Use minimal error screen to avoid any Material3 issues
-                    MinimalErrorScreen(
-                        message = result.message,
-                        stackTrace = result.fullException
-                    )
-                }
-                null -> {
-                    // Still initializing or waiting for user input
-                    // Don't show anything if dialog is open
-                }
+            null -> {
+                // Still initializing or waiting for user input
+                // Don't show anything if dialog is open
             }
         }
     }
 }
 
+@Suppress("FunctionNaming")
 @Composable
 private fun MinimalErrorScreen(message: String, stackTrace: String) {
     // Ultra-minimal error screen using only foundation and compose.ui
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFFFEBEE))
+            .background(ERROR_BACKGROUND_COLOR)
             .padding(16.dp)
             .verticalScroll(rememberScrollState())
     ) {
@@ -216,7 +242,7 @@ private fun MinimalErrorScreen(message: String, stackTrace: String) {
             text = "APPLICATION ERROR",
             style = androidx.compose.ui.text.TextStyle(
                 fontSize = 24.sp,
-                color = Color(0xFFB71C1C),
+                color = ERROR_TITLE_COLOR,
                 fontFamily = FontFamily.Default
             )
         )
@@ -242,7 +268,7 @@ private fun MinimalErrorScreen(message: String, stackTrace: String) {
             style = androidx.compose.ui.text.TextStyle(
                 fontSize = 12.sp,
                 fontFamily = FontFamily.Monospace,
-                color = Color(0xFF424242)
+                color = ERROR_TEXT_COLOR
             )
         )
     }
@@ -258,6 +284,7 @@ private sealed class InitResult {
     data class Error(val message: String, val fullException: String) : InitResult()
 }
 
+@Suppress("TooGenericExceptionCaught", "PrintStackTrace", "ReturnCount")
 private fun initializeApplication(dbPath: Path): InitResult {
     return try {
         log(LogLevel.INFO, "=== Starting Database Initialization ===")

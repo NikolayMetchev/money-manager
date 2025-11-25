@@ -26,6 +26,12 @@ allprojects {
 
 subprojects {
     apply(plugin = "com.autonomousapps.dependency-analysis")
+    apply(plugin = "dev.detekt")
+
+    // Make check task depend on detekt to run it as part of the build
+    tasks.matching { it.name == "check" }.configureEach {
+        dependsOn(tasks.matching { it.name == "detekt" })
+    }
 }
 
 dependencyAnalysis {
