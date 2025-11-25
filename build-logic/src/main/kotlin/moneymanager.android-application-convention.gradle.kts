@@ -44,3 +44,10 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
         jvmTarget.set(JvmTarget.JVM_24)
     }
 }
+
+ktlint {
+    android.set(true)
+    // Allow CI to ignore failures when auto-formatting via system property
+    // Usage: ./gradlew lintFormat -Dktlint.ignoreFailures=true
+    ignoreFailures.set(System.getProperty("ktlint.ignoreFailures", "false").toBoolean())
+}

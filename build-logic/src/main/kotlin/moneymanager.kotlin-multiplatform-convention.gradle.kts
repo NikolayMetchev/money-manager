@@ -38,13 +38,8 @@ detekt {
 }
 
 ktlint {
-    // Don't fail the build on lint errors for format tasks
-    // This allows CI to fix what it can and commit the changes
     android.set(false)
-}
-
-tasks.withType<org.jlleitschuh.gradle.ktlint.tasks.KtLintFormatTask>().configureEach {
-    // Ensure format tasks never fail the build
-    // They will still format files, but won't cause CI to fail
-    setFailOnError(false)
+    // Allow CI to ignore failures when auto-formatting via system property
+    // Usage: ./gradlew lintFormat -Dktlint.ignoreFailures=true
+    ignoreFailures.set(System.getProperty("ktlint.ignoreFailures", "false").toBoolean())
 }
