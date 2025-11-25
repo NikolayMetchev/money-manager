@@ -78,6 +78,7 @@ mappie = { id = "tech.mappie.plugin", version.ref = "mappie" }
 compose = { id = "org.jetbrains.compose", version.ref = "compose-plugin" }
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 dependency-analysis = { id = "com.autonomousapps.dependency-analysis", version.ref = "dependency-analysis" }
+build-health = { id = "com.autonomousapps.build-health", version.ref = "dependency-analysis" }
 detekt = { id = "dev.detekt", version.ref = "detekt" }
 android-kotlin-multiplatform-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "android-gradle-plugin" }
 android-application = { id = "com.android.application", version.ref = "android-gradle-plugin" }

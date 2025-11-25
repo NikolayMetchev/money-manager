@@ -9,9 +9,24 @@ pluginManagement {
     }
 }
 
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath("com.android.tools.build:gradle:8.13.1")
+    }
+}
+
 plugins {
     id("com.pablisco.gradle.auto.include") version "1.3"
     id("com.gradle.develocity") version "4.2.2"
+    id("com.autonomousapps.build-health") version "3.5.0"
+
+    // Kotlin plugins declared here for classloader compatibility with DAGP
+    id("org.jetbrains.kotlin.multiplatform") version "2.2.21" apply false
+    id("org.jetbrains.kotlin.jvm") version "2.2.21" apply false
 }
 
 develocity {
