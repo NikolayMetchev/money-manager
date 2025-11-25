@@ -38,13 +38,19 @@ private val logger = logging()
 // Color constants for error screen
 @Suppress("MagicNumber")
 private val ERROR_BACKGROUND_COLOR = Color(0xFFFFEBEE)
+
 @Suppress("MagicNumber")
 private val ERROR_TITLE_COLOR = Color(0xFFB71C1C)
+
 @Suppress("MagicNumber")
 private val ERROR_TEXT_COLOR = Color(0xFF424242)
 
 @Suppress("TooGenericExceptionCaught", "PrintStackTrace")
-private fun log(level: LogLevel, message: String, throwable: Throwable? = null) {
+private fun log(
+    level: LogLevel,
+    message: String,
+    throwable: Throwable? = null,
+) {
     try {
         LogCollector.log(level, message, throwable)
         val logMessage = if (throwable != null) "$message: ${throwable.message}" else message
@@ -96,7 +102,7 @@ fun main() {
             Window(
                 onCloseRequest = ::exitApplication,
                 title = "Money Manager - Startup Error",
-                state = rememberWindowState(width = 1000.dp, height = 700.dp)
+                state = rememberWindowState(width = 1000.dp, height = 700.dp),
             ) {
                 MinimalErrorScreen(startupError.first, startupError.second)
             }
@@ -142,24 +148,25 @@ private fun MainWindow(onExit: () -> Unit) {
     }
 
     // Window title based on state
-    val windowTitle = when {
-        fatalError != null -> "Money Manager - Fatal Error"
-        initResult is InitResult.Error -> "Money Manager - Error"
-        databasePath != null -> "Money Manager - ${databasePath?.fileName}"
-        else -> "Money Manager - Setup"
-    }
+    val windowTitle =
+        when {
+            fatalError != null -> "Money Manager - Fatal Error"
+            initResult is InitResult.Error -> "Money Manager - Error"
+            databasePath != null -> "Money Manager - ${databasePath?.fileName}"
+            else -> "Money Manager - Setup"
+        }
 
     Window(
         onCloseRequest = onExit,
         title = windowTitle,
-        state = rememberWindowState(width = 1000.dp, height = 700.dp)
+        state = rememberWindowState(width = 1000.dp, height = 700.dp),
     ) {
         // Show fatal error screen if something went very wrong
         val currentFatalError = fatalError
         if (currentFatalError != null) {
             SimpleFallbackErrorScreen(
                 message = currentFatalError.first,
-                stackTrace = currentFatalError.second
+                stackTrace = currentFatalError.second,
             )
             return@Window
         }
@@ -179,17 +186,18 @@ private fun MainWindow(onExit: () -> Unit) {
                         initResult = initializeApplication(selectedPath)
                     } catch (e: Exception) {
                         log(LogLevel.ERROR, "Failed to set database path: ${e.message}", e)
-                        errorState = ErrorState(
-                            message = "Failed to set database path: ${e.message}",
-                            canRecover = true,
-                            fullException = e.stackTraceToString()
-                        )
+                        errorState =
+                            ErrorState(
+                                message = "Failed to set database path: ${e.message}",
+                                canRecover = true,
+                                fullException = e.stackTraceToString(),
+                            )
                     }
                 },
                 onCancel = {
                     log(LogLevel.INFO, "User cancelled database selection - exiting application")
                     onExit()
-                }
+                },
             )
         }
 
@@ -199,7 +207,7 @@ private fun MainWindow(onExit: () -> Unit) {
                 error = error,
                 onDismiss = {
                     errorState = null
-                }
+                },
             )
         }
 
@@ -211,14 +219,14 @@ private fun MainWindow(onExit: () -> Unit) {
                     accountRepository = result.accountRepository,
                     categoryRepository = result.categoryRepository,
                     transactionRepository = result.transactionRepository,
-                    databasePath = currentDbPath?.toString() ?: "Unknown"
+                    databasePath = currentDbPath?.toString() ?: "Unknown",
                 )
             }
             is InitResult.Error -> {
                 // Use minimal error screen to avoid any Material3 issues
                 MinimalErrorScreen(
                     message = result.message,
-                    stackTrace = result.fullException
+                    stackTrace = result.fullException,
                 )
             }
             null -> {
@@ -230,47 +238,55 @@ private fun MainWindow(onExit: () -> Unit) {
 }
 
 @Composable
-private fun MinimalErrorScreen(message: String, stackTrace: String) {
+private fun MinimalErrorScreen(
+    message: String,
+    stackTrace: String,
+) {
     // Ultra-minimal error screen using only foundation and compose.ui
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(ERROR_BACKGROUND_COLOR)
-            .padding(16.dp)
-            .verticalScroll(rememberScrollState())
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(ERROR_BACKGROUND_COLOR)
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState()),
     ) {
         androidx.compose.foundation.text.BasicText(
             text = "APPLICATION ERROR",
-            style = androidx.compose.ui.text.TextStyle(
-                fontSize = 24.sp,
-                color = ERROR_TITLE_COLOR,
-                fontFamily = FontFamily.Default
-            )
+            style =
+                androidx.compose.ui.text.TextStyle(
+                    fontSize = 24.sp,
+                    color = ERROR_TITLE_COLOR,
+                    fontFamily = FontFamily.Default,
+                ),
         )
         Spacer(modifier = Modifier.height(16.dp))
         androidx.compose.foundation.text.BasicText(
             text = message,
-            style = androidx.compose.ui.text.TextStyle(
-                fontSize = 16.sp,
-                color = Color.Black
-            )
+            style =
+                androidx.compose.ui.text.TextStyle(
+                    fontSize = 16.sp,
+                    color = Color.Black,
+                ),
         )
         Spacer(modifier = Modifier.height(24.dp))
         androidx.compose.foundation.text.BasicText(
             text = "Full Stack Trace:",
-            style = androidx.compose.ui.text.TextStyle(
-                fontSize = 14.sp,
-                color = Color.Black
-            )
+            style =
+                androidx.compose.ui.text.TextStyle(
+                    fontSize = 14.sp,
+                    color = Color.Black,
+                ),
         )
         Spacer(modifier = Modifier.height(8.dp))
         androidx.compose.foundation.text.BasicText(
             text = stackTrace,
-            style = androidx.compose.ui.text.TextStyle(
-                fontSize = 12.sp,
-                fontFamily = FontFamily.Monospace,
-                color = ERROR_TEXT_COLOR
-            )
+            style =
+                androidx.compose.ui.text.TextStyle(
+                    fontSize = 12.sp,
+                    fontFamily = FontFamily.Monospace,
+                    color = ERROR_TEXT_COLOR,
+                ),
         )
     }
 }
@@ -279,7 +295,7 @@ private sealed class InitResult {
     data class Success(
         val accountRepository: com.moneymanager.domain.repository.AccountRepository,
         val categoryRepository: com.moneymanager.domain.repository.CategoryRepository,
-        val transactionRepository: com.moneymanager.domain.repository.TransactionRepository
+        val transactionRepository: com.moneymanager.domain.repository.TransactionRepository,
     ) : InitResult()
 
     data class Error(val message: String, val fullException: String) : InitResult()
@@ -295,41 +311,44 @@ private fun initializeApplication(dbPath: Path): InitResult {
         log(LogLevel.INFO, "Is new database: $isNewDatabase")
         log(LogLevel.INFO, "JDBC path: ${DatabaseConfig.getJdbcPath(dbPath)}")
 
-        val driver = try {
-            log(LogLevel.INFO, "About to create database driver...")
-            val result = driverFactory.createDriver(
-                databasePath = DatabaseConfig.getJdbcPath(dbPath),
-                isNewDatabase = isNewDatabase
-            )
-            log(LogLevel.INFO, "Database driver created successfully")
-            result
-        } catch (e: Exception) {
-            log(LogLevel.ERROR, "EXCEPTION creating database driver", e)
-            log(LogLevel.ERROR, "Exception class: ${e.javaClass.name}")
-            log(LogLevel.ERROR, "Exception message: ${e.message}")
-            log(LogLevel.ERROR, "Exception cause: ${e.cause}")
-            log(LogLevel.ERROR, "Full stack trace follows:")
-            e.printStackTrace()
-            return InitResult.Error(
-                "Failed to create database driver: ${e.javaClass.simpleName}: ${e.message}",
-                e.stackTraceToString()
-            )
-        }
+        val driver =
+            try {
+                log(LogLevel.INFO, "About to create database driver...")
+                val result =
+                    driverFactory.createDriver(
+                        databasePath = DatabaseConfig.getJdbcPath(dbPath),
+                        isNewDatabase = isNewDatabase,
+                    )
+                log(LogLevel.INFO, "Database driver created successfully")
+                result
+            } catch (e: Exception) {
+                log(LogLevel.ERROR, "EXCEPTION creating database driver", e)
+                log(LogLevel.ERROR, "Exception class: ${e.javaClass.name}")
+                log(LogLevel.ERROR, "Exception message: ${e.message}")
+                log(LogLevel.ERROR, "Exception cause: ${e.cause}")
+                log(LogLevel.ERROR, "Full stack trace follows:")
+                e.printStackTrace()
+                return InitResult.Error(
+                    "Failed to create database driver: ${e.javaClass.simpleName}: ${e.message}",
+                    e.stackTraceToString(),
+                )
+            }
         log(LogLevel.INFO, "Database driver initialized successfully")
 
-        val component: AppComponent = try {
-            log(LogLevel.INFO, "About to create DI component...")
-            val result = AppComponent.create(driver)
-            log(LogLevel.INFO, "DI component created successfully")
-            result
-        } catch (e: Exception) {
-            log(LogLevel.ERROR, "EXCEPTION creating DI component", e)
-            e.printStackTrace()
-            return InitResult.Error(
-                "Failed to create DI component: ${e.javaClass.simpleName}: ${e.message}",
-                e.stackTraceToString()
-            )
-        }
+        val component: AppComponent =
+            try {
+                log(LogLevel.INFO, "About to create DI component...")
+                val result = AppComponent.create(driver)
+                log(LogLevel.INFO, "DI component created successfully")
+                result
+            } catch (e: Exception) {
+                log(LogLevel.ERROR, "EXCEPTION creating DI component", e)
+                e.printStackTrace()
+                return InitResult.Error(
+                    "Failed to create DI component: ${e.javaClass.simpleName}: ${e.message}",
+                    e.stackTraceToString(),
+                )
+            }
         log(LogLevel.INFO, "DI component created successfully")
 
         val accountRepository = component.accountRepository
@@ -344,7 +363,7 @@ private fun initializeApplication(dbPath: Path): InitResult {
         e.printStackTrace()
         InitResult.Error(
             e.message ?: "Unknown error",
-            e.stackTraceToString()
+            e.stackTraceToString(),
         )
     }
 }

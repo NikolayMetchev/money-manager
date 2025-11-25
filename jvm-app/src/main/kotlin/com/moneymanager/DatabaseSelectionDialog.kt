@@ -35,23 +35,24 @@ import java.nio.file.Paths
 fun DatabaseSelectionDialog(
     defaultPath: Path,
     onDatabaseSelected: (Path) -> Unit,
-    onCancel: () -> Unit
+    onCancel: () -> Unit,
 ) {
     var selectedPath by remember { mutableStateOf(defaultPath) }
 
     Dialog(onDismissRequest = onCancel) {
         Surface(
-            modifier = Modifier
-                .width(500.dp)
-                .wrapContentHeight(),
+            modifier =
+                Modifier
+                    .width(500.dp)
+                    .wrapContentHeight(),
             shape = MaterialTheme.shapes.medium,
-            elevation = 8.dp
+            elevation = 8.dp,
         ) {
             DatabaseSelectionContent(
                 selectedPath = selectedPath,
                 onPathChange = { selectedPath = it },
                 onDatabaseSelected = { onDatabaseSelected(selectedPath) },
-                onCancel = onCancel
+                onCancel = onCancel,
             )
         }
     }
@@ -62,20 +63,20 @@ private fun DatabaseSelectionContent(
     selectedPath: Path,
     onPathChange: (Path) -> Unit,
     onDatabaseSelected: () -> Unit,
-    onCancel: () -> Unit
+    onCancel: () -> Unit,
 ) {
     Column(
         modifier = Modifier.padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(
             text = "Database Setup",
-            style = MaterialTheme.typography.h5
+            style = MaterialTheme.typography.h5,
         )
 
         Text(
             text = "No database file found. Would you like to create a new database?",
-            style = MaterialTheme.typography.body1
+            style = MaterialTheme.typography.body1,
         )
 
         Divider()
@@ -88,7 +89,7 @@ private fun DatabaseSelectionContent(
 
         DatabaseActionButtons(
             onCancel = onCancel,
-            onConfirm = onDatabaseSelected
+            onConfirm = onDatabaseSelected,
         )
     }
 }
@@ -97,16 +98,16 @@ private fun DatabaseSelectionContent(
 private fun DatabasePathDisplay(selectedPath: Path) {
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
             text = "Database location:",
-            style = MaterialTheme.typography.subtitle2
+            style = MaterialTheme.typography.subtitle2,
         )
         Text(
             text = selectedPath.toString(),
             style = MaterialTheme.typography.body2,
-            color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
+            color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f),
         )
     }
 }
@@ -118,7 +119,7 @@ private fun DatabaseLocationButton(onPathChange: (Path) -> Unit) {
             val newPath = showFileChooserDialog()
             newPath?.let { onPathChange(it) }
         },
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Text("Choose Different Location...")
     }
@@ -127,11 +128,11 @@ private fun DatabaseLocationButton(onPathChange: (Path) -> Unit) {
 @Composable
 private fun DatabaseActionButtons(
     onCancel: () -> Unit,
-    onConfirm: () -> Unit
+    onConfirm: () -> Unit,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
     ) {
         TextButton(onClick = onCancel) {
             Text("Cancel")

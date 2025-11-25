@@ -15,9 +15,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
 class AccountRepositoryImpl(
-    database: MoneyManagerDatabase
+    database: MoneyManagerDatabase,
 ) : AccountRepository {
-
     private val queries = database.accountQueries
 
     override fun getAllAccounts(): Flow<List<Account>> =
@@ -38,35 +37,38 @@ class AccountRepositoryImpl(
             .mapToList(Dispatchers.Default)
             .map(AccountMapper::mapList)
 
-    override suspend fun createAccount(account: Account): Long = withContext(Dispatchers.Default) {
-        queries.insert(
-            name = account.name,
-            type = account.type.name,
-            currency = account.currency,
-            initialBalance = account.initialBalance,
-            color = account.color,
-            icon = account.icon,
-            isActive = if (account.isActive) 1 else 0,
-            createdAt = account.createdAt.toEpochMilliseconds(),
-            updatedAt = account.updatedAt.toEpochMilliseconds()
-        )
-        queries.lastInsertRowId().executeAsOne()
-    }
+    override suspend fun createAccount(account: Account): Long =
+        withContext(Dispatchers.Default) {
+            queries.insert(
+                name = account.name,
+                type = account.type.name,
+                currency = account.currency,
+                initialBalance = account.initialBalance,
+                color = account.color,
+                icon = account.icon,
+                isActive = if (account.isActive) 1 else 0,
+                createdAt = account.createdAt.toEpochMilliseconds(),
+                updatedAt = account.updatedAt.toEpochMilliseconds(),
+            )
+            queries.lastInsertRowId().executeAsOne()
+        }
 
-    override suspend fun updateAccount(account: Account): Unit = withContext(Dispatchers.Default) {
-        queries.update(
-            name = account.name,
-            type = account.type.name,
-            currency = account.currency,
-            color = account.color,
-            icon = account.icon,
-            isActive = if (account.isActive) 1 else 0,
-            updatedAt = account.updatedAt.toEpochMilliseconds(),
-            id = account.id
-        )
-    }
+    override suspend fun updateAccount(account: Account): Unit =
+        withContext(Dispatchers.Default) {
+            queries.update(
+                name = account.name,
+                type = account.type.name,
+                currency = account.currency,
+                color = account.color,
+                icon = account.icon,
+                isActive = if (account.isActive) 1 else 0,
+                updatedAt = account.updatedAt.toEpochMilliseconds(),
+                id = account.id,
+            )
+        }
 
-    override suspend fun deleteAccount(id: Long): Unit = withContext(Dispatchers.Default) {
-        queries.delete(id)
-    }
+    override suspend fun deleteAccount(id: Long): Unit =
+        withContext(Dispatchers.Default) {
+            queries.delete(id)
+        }
 }

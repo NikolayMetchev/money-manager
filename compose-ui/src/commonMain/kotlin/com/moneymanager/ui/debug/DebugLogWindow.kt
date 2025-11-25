@@ -32,15 +32,16 @@ fun DebugLogScreen() {
     Column(modifier = Modifier.fillMaxSize()) {
         // Control bar
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(8.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Button(
                 onClick = { LogCollector.clear() },
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
             ) {
                 Text("Clear Logs")
             }
@@ -48,7 +49,7 @@ fun DebugLogScreen() {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(
                     checked = autoScroll,
-                    onCheckedChange = { autoScroll = it }
+                    onCheckedChange = { autoScroll = it },
                 )
                 Text("Auto-scroll", style = MaterialTheme.typography.bodyMedium)
             }
@@ -58,7 +59,7 @@ fun DebugLogScreen() {
             Text(
                 text = "${logs.size} log entries",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 
@@ -68,22 +69,23 @@ fun DebugLogScreen() {
         if (logs.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
             ) {
                 Text(
                     text = "No logs yet",
                     style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         } else {
             LazyColumn(
                 state = listState,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .padding(8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 items(logs) { entry ->
                     LogEntryRow(entry)
@@ -96,36 +98,39 @@ fun DebugLogScreen() {
 @Composable
 private fun LogEntryRow(entry: LogEntry) {
     val timeFormat = remember { SimpleDateFormat("HH:mm:ss.SSS") }
-    val backgroundColor = when (entry.level) {
-        LogLevel.ERROR -> MaterialTheme.colorScheme.errorContainer
-        LogLevel.WARN -> Color(0xFFFFF9C4)
-        LogLevel.INFO -> MaterialTheme.colorScheme.primaryContainer
-        LogLevel.DEBUG -> MaterialTheme.colorScheme.surfaceContainer
-    }
+    val backgroundColor =
+        when (entry.level) {
+            LogLevel.ERROR -> MaterialTheme.colorScheme.errorContainer
+            LogLevel.WARN -> Color(0xFFFFF9C4)
+            LogLevel.INFO -> MaterialTheme.colorScheme.primaryContainer
+            LogLevel.DEBUG -> MaterialTheme.colorScheme.surfaceContainer
+        }
 
-    val textColor = when (entry.level) {
-        LogLevel.ERROR -> MaterialTheme.colorScheme.onErrorContainer
-        LogLevel.WARN -> Color(0xFF827717)
-        LogLevel.INFO -> MaterialTheme.colorScheme.onPrimaryContainer
-        LogLevel.DEBUG -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
+    val textColor =
+        when (entry.level) {
+            LogLevel.ERROR -> MaterialTheme.colorScheme.onErrorContainer
+            LogLevel.WARN -> Color(0xFF827717)
+            LogLevel.INFO -> MaterialTheme.colorScheme.onPrimaryContainer
+            LogLevel.DEBUG -> MaterialTheme.colorScheme.onSurfaceVariant
+        }
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(backgroundColor, MaterialTheme.shapes.small)
-            .padding(8.dp)
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(backgroundColor, MaterialTheme.shapes.small)
+                .padding(8.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             // Timestamp
             Text(
                 text = timeFormat.format(Date(entry.timestamp)),
                 fontFamily = FontFamily.Monospace,
                 fontSize = 11.sp,
-                color = textColor.copy(alpha = 0.7f)
+                color = textColor.copy(alpha = 0.7f),
             )
 
             // Level
@@ -134,7 +139,7 @@ private fun LogEntryRow(entry: LogEntry) {
                 fontFamily = FontFamily.Monospace,
                 fontSize = 11.sp,
                 color = textColor,
-                modifier = Modifier.width(50.dp)
+                modifier = Modifier.width(50.dp),
             )
 
             // Message
@@ -143,7 +148,7 @@ private fun LogEntryRow(entry: LogEntry) {
                 fontFamily = FontFamily.Monospace,
                 fontSize = 12.sp,
                 color = textColor,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
             )
         }
 
@@ -156,7 +161,7 @@ private fun LogEntryRow(entry: LogEntry) {
                 fontFamily = FontFamily.Monospace,
                 fontSize = 10.sp,
                 color = textColor.copy(alpha = 0.8f),
-                modifier = Modifier.padding(start = 16.dp, top = 4.dp)
+                modifier = Modifier.padding(start = 16.dp, top = 4.dp),
             )
         }
     }

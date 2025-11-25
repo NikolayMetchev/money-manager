@@ -5,5 +5,5 @@ enum class AccountType {
     SAVINGS,
     CREDIT_CARD,
     CASH,
-    INVESTMENT
+    INVESTMENT,
 }

@@ -6,22 +6,22 @@ kotlin {
     sourceSets {
         val androidMain by getting {
             dependencies {
-            implementation(kotlin("stdlib"))
-            implementation(compose.components.resources)
-            implementation(compose.foundation)
-            implementation(compose.material3)
-            implementation(compose.runtime)
-            implementation(compose.ui)
-            implementation(libs.androidx.activity)
-            implementation(libs.androidx.activity.compose)
-            implementation(libs.androidx.compose.runtime)
-            implementation(libs.kotlinx.coroutines.core)
-            implementation(libs.sqldelight.runtime)
-            implementation(projects.composeUi)
-            implementation(projects.shared)
-            implementation(projects.sharedDatabase)
-            implementation(projects.sharedDi)
-        }
+                implementation(kotlin("stdlib"))
+                implementation(compose.components.resources)
+                implementation(compose.foundation)
+                implementation(compose.material3)
+                implementation(compose.runtime)
+                implementation(compose.ui)
+                implementation(libs.androidx.activity)
+                implementation(libs.androidx.activity.compose)
+                implementation(libs.androidx.compose.runtime)
+                implementation(libs.kotlinx.coroutines.core)
+                implementation(libs.sqldelight.runtime)
+                implementation(projects.composeUi)
+                implementation(projects.shared)
+                implementation(projects.sharedDatabase)
+                implementation(projects.sharedDi)
+            }
         }
     }
 }

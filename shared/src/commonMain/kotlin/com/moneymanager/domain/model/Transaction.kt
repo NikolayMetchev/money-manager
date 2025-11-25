@@ -16,5 +16,5 @@ data class Transaction(
     val transactionDate: Instant,
     val toAccountId: Long? = null,
     val createdAt: Instant,
-    val updatedAt: Instant
+    val updatedAt: Instant,
 )

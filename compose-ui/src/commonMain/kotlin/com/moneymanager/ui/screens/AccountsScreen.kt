@@ -26,35 +26,36 @@ fun AccountsScreen(accountRepository: AccountRepository) {
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp)
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
         ) {
             Text(
                 text = "Your Accounts",
                 style = MaterialTheme.typography.headlineMedium,
-                modifier = Modifier.padding(bottom = 16.dp)
+                modifier = Modifier.padding(bottom = 16.dp),
             )
 
             if (accounts.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
+                    contentAlignment = Alignment.Center,
                 ) {
                     Text(
                         text = "No accounts yet. Add your first account!",
                         style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             } else {
                 LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(accounts) { account ->
                         AccountCard(
                             account = account,
-                            accountRepository = accountRepository
+                            accountRepository = accountRepository,
                         )
                     }
                 }
@@ -63,9 +64,10 @@ fun AccountsScreen(accountRepository: AccountRepository) {
 
         FloatingActionButton(
             onClick = { showCreateDialog = true },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(16.dp)
+            modifier =
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(16.dp),
         ) {
             Text("+", style = MaterialTheme.typography.headlineLarge)
         }
@@ -73,7 +75,7 @@ fun AccountsScreen(accountRepository: AccountRepository) {
         if (showCreateDialog) {
             CreateAccountDialog(
                 accountRepository = accountRepository,
-                onDismiss = { showCreateDialog = false }
+                onDismiss = { showCreateDialog = false },
             )
         }
     }
@@ -82,41 +84,42 @@ fun AccountsScreen(accountRepository: AccountRepository) {
 @Composable
 fun AccountCard(
     account: Account,
-    accountRepository: AccountRepository
+    accountRepository: AccountRepository,
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = account.name,
-                        style = MaterialTheme.typography.titleMedium
+                        style = MaterialTheme.typography.titleMedium,
                     )
                     Text(
                         text = account.type.name,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 IconButton(
-                    onClick = { showDeleteDialog = true }
+                    onClick = { showDeleteDialog = true },
                 ) {
                     Text(
                         text = "🗑️",
-                        style = MaterialTheme.typography.titleMedium
+                        style = MaterialTheme.typography.titleMedium,
                     )
                 }
             }
@@ -124,11 +127,12 @@ fun AccountCard(
             Text(
                 text = "${account.currency} ${String.format("%.2f", account.initialBalance)}",
                 style = MaterialTheme.typography.headlineSmall,
-                color = if (account.initialBalance >= 0) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.error
-                }
+                color =
+                    if (account.initialBalance >= 0) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.error
+                    },
             )
         }
     }
@@ -137,7 +141,7 @@ fun AccountCard(
         DeleteAccountDialog(
             account = account,
             accountRepository = accountRepository,
-            onDismiss = { showDeleteDialog = false }
+            onDismiss = { showDeleteDialog = false },
         )
     }
 }
@@ -146,7 +150,7 @@ fun AccountCard(
 @Composable
 fun CreateAccountDialog(
     accountRepository: AccountRepository,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
     var name by remember { mutableStateOf("") }
     var selectedType by remember { mutableStateOf(AccountType.CHECKING) }
@@ -163,10 +167,11 @@ fun CreateAccountDialog(
         title = { Text("Create New Account") },
         text = {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 OutlinedTextField(
                     value = name,
@@ -174,12 +179,12 @@ fun CreateAccountDialog(
                     label = { Text("Account Name") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    enabled = !isSaving
+                    enabled = !isSaving,
                 )
 
                 ExposedDropdownMenuBox(
                     expanded = isTypeDropdownExpanded,
-                    onExpandedChange = { if (!isSaving) isTypeDropdownExpanded = it }
+                    onExpandedChange = { if (!isSaving) isTypeDropdownExpanded = it },
                 ) {
                     OutlinedTextField(
                         value = selectedType.name.replace("_", " "),
@@ -187,14 +192,15 @@ fun CreateAccountDialog(
                         readOnly = true,
                         label = { Text("Account Type") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isTypeDropdownExpanded) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .menuAnchor(),
-                        enabled = !isSaving
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .menuAnchor(),
+                        enabled = !isSaving,
                     )
                     ExposedDropdownMenu(
                         expanded = isTypeDropdownExpanded,
-                        onDismissRequest = { isTypeDropdownExpanded = false }
+                        onDismissRequest = { isTypeDropdownExpanded = false },
                     ) {
                         AccountType.entries.forEach { type ->
                             DropdownMenuItem(
@@ -202,7 +208,7 @@ fun CreateAccountDialog(
                                 onClick = {
                                     selectedType = type
                                     isTypeDropdownExpanded = false
-                                }
+                                },
                             )
                         }
                     }
@@ -215,7 +221,7 @@ fun CreateAccountDialog(
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     placeholder = { Text("USD") },
-                    enabled = !isSaving
+                    enabled = !isSaving,
                 )
 
                 OutlinedTextField(
@@ -229,14 +235,14 @@ fun CreateAccountDialog(
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     placeholder = { Text("0.00") },
-                    enabled = !isSaving
+                    enabled = !isSaving,
                 )
 
                 errorMessage?.let { error ->
                     Text(
                         text = error,
                         color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall
+                        style = MaterialTheme.typography.bodySmall,
                     )
                 }
             }
@@ -261,14 +267,15 @@ fun CreateAccountDialog(
                                 try {
                                     val balance = initialBalance.toDoubleOrNull() ?: 0.0
                                     val now = Clock.System.now()
-                                    val newAccount = Account(
-                                        name = name.trim(),
-                                        type = selectedType,
-                                        currency = currency.trim().uppercase(),
-                                        initialBalance = balance,
-                                        createdAt = now,
-                                        updatedAt = now
-                                    )
+                                    val newAccount =
+                                        Account(
+                                            name = name.trim(),
+                                            type = selectedType,
+                                            currency = currency.trim().uppercase(),
+                                            initialBalance = balance,
+                                            createdAt = now,
+                                            updatedAt = now,
+                                        )
                                     accountRepository.createAccount(newAccount)
                                     onDismiss()
                                 } catch (e: Exception) {
@@ -280,12 +287,12 @@ fun CreateAccountDialog(
                         }
                     }
                 },
-                enabled = !isSaving
+                enabled = !isSaving,
             ) {
                 if (isSaving) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp
+                        strokeWidth = 2.dp,
                     )
                 } else {
                     Text("Create")
@@ -295,11 +302,11 @@ fun CreateAccountDialog(
         dismissButton = {
             TextButton(
                 onClick = onDismiss,
-                enabled = !isSaving
+                enabled = !isSaving,
             ) {
                 Text("Cancel")
             }
-        }
+        },
     )
 }
 
@@ -307,7 +314,7 @@ fun CreateAccountDialog(
 fun DeleteAccountDialog(
     account: Account,
     accountRepository: AccountRepository,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
     var isDeleting by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -318,29 +325,29 @@ fun DeleteAccountDialog(
         icon = {
             Text(
                 text = "⚠️",
-                style = MaterialTheme.typography.headlineMedium
+                style = MaterialTheme.typography.headlineMedium,
             )
         },
         title = { Text("Delete Account?") },
         text = {
             Column(
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
                     text = "Are you sure you want to delete \"${account.name}\"?",
-                    style = MaterialTheme.typography.bodyLarge
+                    style = MaterialTheme.typography.bodyLarge,
                 )
                 Text(
                     text = "This action cannot be undone. All transactions associated with this account will become orphaned.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 errorMessage?.let { error ->
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = error,
                         color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall
+                        style = MaterialTheme.typography.bodySmall,
                     )
                 }
             }
@@ -362,14 +369,15 @@ fun DeleteAccountDialog(
                     }
                 },
                 enabled = !isDeleting,
-                colors = ButtonDefaults.textButtonColors(
-                    contentColor = MaterialTheme.colorScheme.error
-                )
+                colors =
+                    ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error,
+                    ),
             ) {
                 if (isDeleting) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp
+                        strokeWidth = 2.dp,
                     )
                 } else {
                     Text("Delete")
@@ -379,10 +387,10 @@ fun DeleteAccountDialog(
         dismissButton = {
             TextButton(
                 onClick = onDismiss,
-                enabled = !isDeleting
+                enabled = !isDeleting,
             ) {
                 Text("Cancel")
             }
-        }
+        },
     )
 }

@@ -20,30 +20,31 @@ fun TransactionsScreen(transactionRepository: TransactionRepository) {
     val transactions by transactionRepository.getAllTransactions().collectAsState(initial = emptyList())
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(16.dp),
     ) {
         Text(
             text = "Your Transactions",
             style = MaterialTheme.typography.headlineMedium,
-            modifier = Modifier.padding(bottom = 16.dp)
+            modifier = Modifier.padding(bottom = 16.dp),
         )
 
         if (transactions.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
             ) {
                 Text(
                     text = "No transactions yet. Add your first transaction!",
                     style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         } else {
             LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(transactions) { transaction ->
                     TransactionCard(transaction)
@@ -57,44 +58,46 @@ fun TransactionsScreen(transactionRepository: TransactionRepository) {
 fun TransactionCard(transaction: Transaction) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column {
                     Text(
                         text = transaction.description ?: "Transaction",
-                        style = MaterialTheme.typography.titleMedium
+                        style = MaterialTheme.typography.titleMedium,
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = transaction.type.name,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     val dateTime = transaction.transactionDate.toLocalDateTime(TimeZone.currentSystemDefault())
                     Text(
                         text = "${dateTime.date}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 Text(
                     text = "${transaction.currency} ${String.format("%.2f", transaction.amount)}",
                     style = MaterialTheme.typography.headlineSmall,
-                    color = when (transaction.type.name.uppercase()) {
-                        "INCOME" -> MaterialTheme.colorScheme.primary
-                        "EXPENSE" -> MaterialTheme.colorScheme.error
-                        else -> MaterialTheme.colorScheme.onSurface
-                    }
+                    color =
+                        when (transaction.type.name.uppercase()) {
+                            "INCOME" -> MaterialTheme.colorScheme.primary
+                            "EXPENSE" -> MaterialTheme.colorScheme.error
+                            else -> MaterialTheme.colorScheme.onSurface
+                        },
                 )
             }
             transaction.note?.let { note ->
@@ -102,7 +105,7 @@ fun TransactionCard(transaction: Transaction) {
                 Text(
                     text = note,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
