@@ -1,9 +1,8 @@
 plugins {
+    id("moneymanager.kotlin-convention")
     alias(libs.plugins.compose)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.kotlin.jvm)
-    alias(libs.plugins.ktlint)
-    alias(libs.plugins.sort.dependencies)
 }
 
 dependencies {
@@ -34,32 +33,23 @@ dependencies {
     runtimeOnly(libs.log4j.slf4j2.impl)
 }
 
-kotlin {
-    compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_24)
-    }
-}
-
-tasks.withType<JavaCompile> {
-    targetCompatibility = "24"
-}
-
 compose.desktop {
     application {
         mainClass = "com.moneymanager.MainKt"
 
         // Add required Java modules for the bundled JRE
-        jvmArgs += listOf(
-            "--add-modules", "java.sql"
-        )
+        jvmArgs +=
+            listOf(
+                "--add-modules", "java.sql",
+            )
 
         nativeDistributions {
             // Include java.sql module in the custom runtime
             modules("java.sql", "java.naming", "java.management")
             targetFormats(
-                org.jetbrains.compose.desktop.application.dsl.TargetFormat.Dmg,  // macOS
-                org.jetbrains.compose.desktop.application.dsl.TargetFormat.Msi,  // Windows
-                org.jetbrains.compose.desktop.application.dsl.TargetFormat.Deb   // Linux
+                org.jetbrains.compose.desktop.application.dsl.TargetFormat.Dmg, // macOS
+                org.jetbrains.compose.desktop.application.dsl.TargetFormat.Msi, // Windows
+                org.jetbrains.compose.desktop.application.dsl.TargetFormat.Deb, // Linux
             )
 
             packageName = "MoneyManager"
@@ -73,7 +63,7 @@ compose.desktop {
                 shortcut = true
                 menu = true
                 dirChooser = true
-                console = true  // Show console window to see error output
+                console = true // Show console window to see error output
                 // IMPORTANT: Keep this UUID constant across versions to allow upgrades/reinstalls
                 upgradeUuid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
             }
