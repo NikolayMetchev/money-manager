@@ -24,6 +24,7 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.moneymanager.database.DatabaseDriverFactory
 import com.moneymanager.di.AppComponent
+import com.moneymanager.ui.DatabaseSelectionDialog
 import com.moneymanager.ui.ErrorDialog
 import com.moneymanager.ui.ErrorState
 import com.moneymanager.ui.MoneyManagerApp
@@ -31,7 +32,10 @@ import com.moneymanager.ui.SimpleFallbackErrorScreen
 import com.moneymanager.ui.debug.LogCollector
 import com.moneymanager.ui.debug.LogLevel
 import org.lighthousegames.logging.logging
+import java.awt.FileDialog
+import java.awt.Frame
 import java.nio.file.Path
+import java.nio.file.Paths
 
 private val logger = logging()
 
@@ -198,6 +202,20 @@ private fun MainWindow(onExit: () -> Unit) {
                     log(LogLevel.INFO, "User cancelled database selection - exiting application")
                     onExit()
                 },
+                onShowFileChooser = {
+                    val fileDialog = FileDialog(null as Frame?, "Choose Database Location", FileDialog.SAVE)
+                    fileDialog.file = "default.db"
+                    fileDialog.isVisible = true
+
+                    val selectedFile = fileDialog.file
+                    val selectedDir = fileDialog.directory
+
+                    if (selectedFile != null && selectedDir != null) {
+                        Paths.get(selectedDir, selectedFile)
+                    } else {
+                        null
+                    }
+                },
             )
         }
 
@@ -301,7 +319,7 @@ private sealed class InitResult {
     data class Error(val message: String, val fullException: String) : InitResult()
 }
 
-@Suppress("TooGenericExceptionCaught", "PrintStackTrace", "ReturnCount")
+@Suppress("TooGenericExceptionCaught", "PrintStackTrace", "ReturnCount", "LongMethod")
 private fun initializeApplication(dbPath: Path): InitResult {
     return try {
         log(LogLevel.INFO, "=== Starting Database Initialization ===")

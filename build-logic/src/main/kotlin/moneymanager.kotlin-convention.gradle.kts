@@ -31,4 +31,11 @@ ktlint {
     // Allow CI to ignore failures when auto-formatting via system property
     // Usage: ./gradlew lintFormat -Dktlint.ignoreFailures=true
     ignoreFailures.set(System.getProperty("ktlint.ignoreFailures", "false").toBoolean())
+
+    // Exclude generated files from linting
+    filter {
+        exclude { entry ->
+            entry.file.toString().contains("generated")
+        }
+    }
 }

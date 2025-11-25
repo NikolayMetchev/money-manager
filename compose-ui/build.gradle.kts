@@ -25,3 +25,9 @@ kotlin {
         }
     }
 }
+
+// Compose-specific ktlint configuration
+ktlint {
+    // Allow wildcard imports (common in Compose)
+    disabledRules.set(setOf("no-wildcard-imports", "function-naming"))
+}

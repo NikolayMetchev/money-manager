@@ -47,9 +47,12 @@ compose.desktop {
             // Include java.sql module in the custom runtime
             modules("java.sql", "java.naming", "java.management")
             targetFormats(
-                org.jetbrains.compose.desktop.application.dsl.TargetFormat.Dmg, // macOS
-                org.jetbrains.compose.desktop.application.dsl.TargetFormat.Msi, // Windows
-                org.jetbrains.compose.desktop.application.dsl.TargetFormat.Deb, // Linux
+                // macOS
+                org.jetbrains.compose.desktop.application.dsl.TargetFormat.Dmg,
+                // Windows
+                org.jetbrains.compose.desktop.application.dsl.TargetFormat.Msi,
+                // Linux
+                org.jetbrains.compose.desktop.application.dsl.TargetFormat.Deb,
             )
 
             packageName = "MoneyManager"
