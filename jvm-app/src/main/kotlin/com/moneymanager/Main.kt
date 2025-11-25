@@ -103,13 +103,13 @@ fun main() {
             return@application
         }
 
-        MainWindow()
+        MainWindow(onExit = ::exitApplication)
     }
 }
 
 @Suppress("TooGenericExceptionCaught", "LongMethod", "CyclomaticComplexMethod", "FunctionNaming")
 @Composable
-private fun MainWindow() {
+private fun MainWindow(onExit: () -> Unit) {
     // State for managing database selection
     var databasePath by remember { mutableStateOf<Path?>(null) }
     var showDatabaseDialog by remember { mutableStateOf(false) }
@@ -145,20 +145,21 @@ private fun MainWindow() {
     val windowTitle = when {
         fatalError != null -> "Money Manager - Fatal Error"
         initResult is InitResult.Error -> "Money Manager - Error"
-        databasePath != null -> "Money Manager - ${databasePath.fileName}"
+        databasePath != null -> "Money Manager - ${databasePath?.fileName}"
         else -> "Money Manager - Setup"
     }
 
     Window(
-        onCloseRequest = ::exitApplication,
+        onCloseRequest = onExit,
         title = windowTitle,
         state = rememberWindowState(width = 1000.dp, height = 700.dp)
     ) {
         // Show fatal error screen if something went very wrong
-        if (fatalError != null) {
+        val currentFatalError = fatalError
+        if (currentFatalError != null) {
             SimpleFallbackErrorScreen(
-                message = fatalError.first,
-                stackTrace = fatalError.second
+                message = currentFatalError.first,
+                stackTrace = currentFatalError.second
             )
             return@Window
         }
@@ -187,7 +188,7 @@ private fun MainWindow() {
                 },
                 onCancel = {
                     log(LogLevel.INFO, "User cancelled database selection - exiting application")
-                    exitApplication()
+                    onExit()
                 }
             )
         }
@@ -205,11 +206,12 @@ private fun MainWindow() {
         // Show main app or error screen based on initialization result
         when (val result = initResult) {
             is InitResult.Success -> {
+                val currentDbPath = databasePath
                 MoneyManagerApp(
                     accountRepository = result.accountRepository,
                     categoryRepository = result.categoryRepository,
                     transactionRepository = result.transactionRepository,
-                    databasePath = databasePath.toString()
+                    databasePath = currentDbPath?.toString() ?: "Unknown"
                 )
             }
             is InitResult.Error -> {
