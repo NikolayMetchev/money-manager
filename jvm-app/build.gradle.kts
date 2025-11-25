@@ -22,12 +22,13 @@ dependencies {
     implementation(libs.compose.foundation.desktop)
     api(libs.compose.foundation.layout.desktop)
     implementation(libs.compose.material.desktop)
-    api(libs.compose.ui.desktop)
+    implementation(libs.compose.ui.desktop)
     implementation(libs.compose.ui.graphics.desktop)
     implementation(libs.compose.ui.text.desktop)
     implementation(libs.compose.ui.unit.desktop)
     implementation(libs.sqldelight.runtime)
     implementation(libs.diamondedge.logging)
+    implementation(libs.kotlinx.coroutines.core)
 
     // Logging
     implementation(libs.kmlogging)
