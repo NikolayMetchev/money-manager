@@ -31,7 +31,6 @@ import java.nio.file.Paths
 /**
  * Dialog shown on startup when the default database file doesn't exist
  */
-@Suppress("LongMethod")
 @Composable
 fun DatabaseSelectionDialog(
     defaultPath: Path,
