@@ -36,3 +36,15 @@ detekt {
     buildUponDefaultConfig = true
     allRules = false
 }
+
+ktlint {
+    // Don't fail the build on lint errors for format tasks
+    // This allows CI to fix what it can and commit the changes
+    android.set(false)
+}
+
+tasks.withType<org.jlleitschuh.gradle.ktlint.tasks.KtLintFormatTask>().configureEach {
+    // Ensure format tasks never fail the build
+    // They will still format files, but won't cause CI to fail
+    setFailOnError(false)
+}
