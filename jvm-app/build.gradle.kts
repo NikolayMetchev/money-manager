@@ -6,7 +6,6 @@ plugins {
 }
 
 dependencies {
-    // Declare transitive dependencies directly (required by buildHealth)
     api(libs.androidx.compose.runtime.desktop)
     api(libs.compose.foundation.layout.desktop)
 
@@ -14,7 +13,6 @@ dependencies {
     implementation(libs.compose.desktop.linux.x64)
     implementation(libs.compose.desktop.macos.arm64)
     implementation(libs.compose.desktop.macos.x64)
-    // Compose Desktop with Skiko natives for all platforms
     implementation(libs.compose.desktop.windows.x64)
     implementation(libs.compose.foundation.desktop)
     implementation(libs.compose.material.desktop)
@@ -23,7 +21,6 @@ dependencies {
     implementation(libs.compose.ui.text.desktop)
     implementation(libs.compose.ui.unit.desktop)
     implementation(libs.diamondedge.logging)
-    // Logging
     implementation(libs.kmlogging)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.sqldelight.runtime)

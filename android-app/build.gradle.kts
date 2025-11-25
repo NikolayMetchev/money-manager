@@ -41,7 +41,6 @@ dependencies {
     implementation(libs.androidx.activity)
     implementation(libs.androidx.activity.compose)
     implementation(projects.composeUi)
-    // Direct dependencies for buildHealth (also declared in androidMain source set)
     implementation(projects.shared)
     implementation(projects.sharedDatabase)
     implementation(projects.sharedDi)
