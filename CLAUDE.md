@@ -48,6 +48,30 @@ Money Manager is a personal finance management application built with Kotlin Mul
 ./gradlew :jvm-app:build     # Build JVM application
 ```
 
+### Creating Native Binaries
+
+The JVM application can be packaged as native installers for Windows, macOS, and Linux using Compose Desktop packaging:
+
+```bash
+# Package for the current platform
+./gradlew :jvm-app:packageDistributionForCurrentOS
+
+# Create release binaries for the current platform
+./gradlew :jvm-app:packageReleaseDistributionForCurrentOS
+
+# Platform-specific installers:
+./gradlew :jvm-app:packageMsi     # Windows MSI installer
+./gradlew :jvm-app:packageDmg     # macOS DMG installer
+./gradlew :jvm-app:packageDeb     # Linux DEB package
+
+# Create an uber JAR (runnable on any platform with JRE)
+./gradlew :jvm-app:packageUberJarForCurrentOS
+```
+
+**Output location**: Built packages will be in `jvm-app/build/compose/binaries/main/`
+
+**Note**: The installers include a bundled Java Runtime, so users don't need Java installed. Cross-platform building may require the target platform (e.g., creating macOS .dmg typically requires a Mac).
+
 ### Pre-Push Checklist
 
 **IMPORTANT**: Always build locally before pushing changes to ensure code quality and catch issues early:
