@@ -1,21 +1,3 @@
-buildscript {
-    repositories {
-        google()
-        mavenCentral()
-    }
-    dependencies {
-        classpath(libs.android.gradle.plugin)
-    }
-}
-
-plugins {
-    alias(libs.plugins.dependency.analysis)
-    alias(libs.plugins.kotlin.multiplatform) apply false
-    alias(libs.plugins.kotlin.jvm) apply false
-    alias(libs.plugins.android.kotlin.multiplatform.library) apply false
-    alias(libs.plugins.android.application) apply false
-}
-
 allprojects {
     repositories {
         google()
@@ -24,8 +6,6 @@ allprojects {
 }
 
 subprojects {
-    apply(plugin = "com.autonomousapps.dependency-analysis")
-
     // Make check task depend on detekt to run it as part of the build
     tasks.matching { it.name == "check" }.configureEach {
         dependsOn(tasks.matching { it.name == "detekt" })
@@ -50,9 +30,3 @@ dependencyAnalysis {
     }
 }
 
-// Run buildHealth as part of the build task
-subprojects {
-    tasks.matching { it.name == "build" }.configureEach {
-        finalizedBy(rootProject.tasks.named("buildHealth"))
-    }
-}
