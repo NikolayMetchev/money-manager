@@ -31,7 +31,7 @@ import java.nio.file.Paths
 /**
  * Dialog shown on startup when the default database file doesn't exist
  */
-@Suppress("FunctionNaming", "LongMethod")
+@Suppress("LongMethod")
 @Composable
 fun DatabaseSelectionDialog(
     defaultPath: Path,
@@ -58,7 +58,6 @@ fun DatabaseSelectionDialog(
     }
 }
 
-@Suppress("FunctionNaming")
 @Composable
 private fun DatabaseSelectionContent(
     selectedPath: Path,
@@ -95,7 +94,6 @@ private fun DatabaseSelectionContent(
     }
 }
 
-@Suppress("FunctionNaming")
 @Composable
 private fun DatabasePathDisplay(selectedPath: Path) {
     Column(
@@ -114,7 +112,6 @@ private fun DatabasePathDisplay(selectedPath: Path) {
     }
 }
 
-@Suppress("FunctionNaming")
 @Composable
 private fun DatabaseLocationButton(onPathChange: (Path) -> Unit) {
     OutlinedButton(
@@ -128,7 +125,6 @@ private fun DatabaseLocationButton(onPathChange: (Path) -> Unit) {
     }
 }
 
-@Suppress("FunctionNaming")
 @Composable
 private fun DatabaseActionButtons(
     onCancel: () -> Unit,

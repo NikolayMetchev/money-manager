@@ -10,7 +10,6 @@ buildscript {
 
 plugins {
     alias(libs.plugins.dependency.analysis)
-    alias(libs.plugins.detekt)
     alias(libs.plugins.kotlin.multiplatform) apply false
     alias(libs.plugins.kotlin.jvm) apply false
     alias(libs.plugins.android.kotlin.multiplatform.library) apply false
@@ -26,7 +25,6 @@ allprojects {
 
 subprojects {
     apply(plugin = "com.autonomousapps.dependency-analysis")
-    apply(plugin = "dev.detekt")
 
     // Make check task depend on detekt to run it as part of the build
     tasks.matching { it.name == "check" }.configureEach {

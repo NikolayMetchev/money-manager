@@ -107,7 +107,7 @@ fun main() {
     }
 }
 
-@Suppress("TooGenericExceptionCaught", "LongMethod", "CyclomaticComplexMethod", "FunctionNaming")
+@Suppress("TooGenericExceptionCaught", "LongMethod", "CyclomaticComplexMethod")
 @Composable
 private fun MainWindow(onExit: () -> Unit) {
     // State for managing database selection
@@ -229,7 +229,6 @@ private fun MainWindow(onExit: () -> Unit) {
     }
 }
 
-@Suppress("FunctionNaming")
 @Composable
 private fun MinimalErrorScreen(message: String, stackTrace: String) {
     // Ultra-minimal error screen using only foundation and compose.ui
