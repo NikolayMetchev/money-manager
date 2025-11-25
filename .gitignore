@@ -1,7 +1,7 @@
 # Gradle
 .gradle/
 build/
-build-logic/.kotlin/
+.kotlin/
 gradle-9.2.0-bin.zip
 gradle-9.2.0/
 
