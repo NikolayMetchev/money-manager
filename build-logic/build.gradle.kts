@@ -24,4 +24,5 @@ dependencies {
     implementation(libs.metro.gradle.plugin)
     implementation(libs.compose.gradle.plugin)
     implementation(libs.android.gradle.plugin)
+    implementation(libs.detekt.gradle.plugin)
 }
