@@ -1,14 +1,12 @@
 import com.android.build.api.dsl.ApplicationExtension
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 
 plugins {
+    id("moneymanager.kotlin-convention")
     id("com.android.application")
-    id("com.squareup.sort-dependencies")
     id("org.jetbrains.compose")
     id("org.jetbrains.kotlin.multiplatform")
     id("org.jetbrains.kotlin.plugin.compose")
-    id("org.jlleitschuh.gradle.ktlint")
 }
 
 val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
@@ -39,15 +37,7 @@ configure<ApplicationExtension> {
     }
 }
 
-tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
-    compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_24)
-    }
-}
-
+// Override ktlint android setting for Android modules
 ktlint {
     android.set(true)
-    // Allow CI to ignore failures when auto-formatting via system property
-    // Usage: ./gradlew lintFormat -Dktlint.ignoreFailures=true
-    ignoreFailures.set(System.getProperty("ktlint.ignoreFailures", "false").toBoolean())
 }
