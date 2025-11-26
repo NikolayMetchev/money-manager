@@ -8,15 +8,20 @@ Money Manager is a personal finance management application built with Kotlin Mul
 
 ## Technology Stack
 
-- **Language**: Kotlin 2.2.20
+- **Language**: Kotlin 2.2.21
 - **Build System**: Gradle 9.2.0
-- **Java Version**: 21
+- **Java Toolchain**: 25 (Target: 24)
 - **Database**: SQLite via SQLDelight 2.2.1
-- **Dependency Injection**: Metro 0.7.5 (compile-time DI)
-- **Multiplatform**: Kotlin Multiplatform (currently targeting JVM, with plans for Android, iOS, and Web)
-- **Coroutines**: kotlinx-coroutines-core 1.9.0
+- **Dependency Injection**: Metro 0.7.7 (compile-time DI)
+- **UI Framework**: Compose Multiplatform 1.9.3 with Material 3
+- **Object Mapping**: Mappie 2.2.21-1.6.1 (database-to-domain conversions)
+- **Code Quality**: Detekt 2.0.0-alpha.1, ktlint 12.1.2
+- **Multiplatform**: Kotlin Multiplatform (currently targeting JVM and Android)
+- **Coroutines**: kotlinx-coroutines-core 1.10.2
 - **DateTime**: kotlinx-datetime 0.7.1
+- **Logging**: KMLogging 2.0.3 (multiplatform), Log4j 2.25.2 (JVM runtime)
 - **Dependency Management**: Gradle Version Catalog (libs.versions.toml)
+- **Build Tools**: Gradle dependency-analysis 3.5.0, sort-dependencies 0.15
 
 ## Build Commands
 
@@ -44,8 +49,44 @@ Money Manager is a personal finance management application built with Kotlin Mul
 
 ### Building Specific Modules
 ```bash
-./gradlew :shared:build      # Build shared multiplatform module
-./gradlew :jvm-app:build     # Build JVM application
+./gradlew :shared:build              # Build shared domain module
+./gradlew :shared-database:build     # Build database module
+./gradlew :shared-di:build           # Build DI module
+./gradlew :compose-ui:build          # Build Compose UI module
+./gradlew :jvm-app:build             # Build JVM application
+./gradlew :android-app:build         # Build Android application
+```
+
+### Running the Android Application
+```bash
+# Build and install debug APK on connected device/emulator
+./gradlew :android-app:installDebug
+
+# Build debug APK (output: android-app/build/outputs/apk/debug/)
+./gradlew :android-app:assembleDebug
+
+# Build release APK
+./gradlew :android-app:assembleRelease
+
+# Build Android App Bundle (for Play Store)
+./gradlew :android-app:bundleRelease
+```
+
+**Android Requirements**:
+- Android SDK with API 28+ (minSdk), API 36 (compileSdk)
+- Connected Android device or emulator
+- Target SDK: API 35
+
+### Code Quality and Formatting
+```bash
+# Format code with ktlint and sort dependencies
+./gradlew lintFormat
+
+# Check dependency health
+./gradlew buildHealth
+
+# Run detekt static analysis
+./gradlew detekt
 ```
 
 ### Creating Native Binaries
@@ -93,21 +134,60 @@ Only push to remote after a successful local build.
 
 ### Module Organization
 
+The project follows a modular architecture with clear separation of concerns:
+
 - **build-logic/**: Gradle convention plugins for shared build configuration
   - `src/main/kotlin/`:
-    - `moneymanager.kotlin-multiplatform-convention.gradle.kts`: Base KMP setup with JVM toolchain and test dependencies
-    - `moneymanager.coroutines-convention.gradle.kts`: Adds coroutines support on top of base convention
+    - `moneymanager.kotlin-convention.gradle.kts`: Base Kotlin setup with detekt, ktlint, sort-dependencies
+    - `moneymanager.kotlin-multiplatform-convention.gradle.kts`: Base KMP setup with JVM toolchain
+    - `moneymanager.coroutines-convention.gradle.kts`: Adds coroutines support
+    - `moneymanager.android-convention.gradle.kts`: Android library multiplatform setup
+    - `moneymanager.android-application-convention.gradle.kts`: Android application setup
+    - `moneymanager.compose-multiplatform-convention.gradle.kts`: Compose multiplatform with Material 3
+    - `moneymanager.mappie-convention.gradle.kts`: Mappie object mapping
+    - `moneymanager.metro-convention.gradle.kts`: Metro DI plugin and runtime
 
-- **shared/**: Kotlin Multiplatform module containing core business logic
-  - `src/commonMain/`: Platform-independent code
-    - `kotlin/com/moneymanager/domain/`: Domain models and repository interfaces
-    - `kotlin/com/moneymanager/data/`: Repository implementations and driver factories
-    - `kotlin/com/moneymanager/di/`: Metro DI components and modules
+- **shared/**: Core domain module (multiplatform: JVM, Android)
+  - `src/commonMain/kotlin/com/moneymanager/domain/`:
+    - `model/`: Domain models (Account, Category, Transaction)
+    - `repository/`: Repository interfaces (AccountRepository, CategoryRepository, TransactionRepository)
+  - Platform-independent domain logic only, no implementations
+
+- **shared-database/**: Database module (multiplatform: JVM, Android)
+  - `src/commonMain/`:
     - `sqldelight/com/moneymanager/database/`: SQLDelight schema definitions
-  - `src/jvmMain/`: JVM-specific implementations (DatabaseDriverFactory)
+      - `Account.sq`: Account table and queries
+      - `Category.sq`: Category table and queries
+      - `Transaction.sq`: TransactionRecord table and queries
+    - `kotlin/com/moneymanager/`:
+      - `repository/`: Repository implementations using SQLDelight
+      - `mapper/`: Mappie mappers for database-to-domain conversions
+      - `DatabaseDriverFactory.kt`: Platform-specific database driver (expect/actual)
+  - `src/jvmMain/`: JVM DatabaseDriverFactory (JDBC SQLite driver)
+  - `src/androidMain/`: Android DatabaseDriverFactory (AndroidSqliteDriver)
 
-- **jvm-app/**: JVM-specific application module
+- **shared-di/**: Dependency injection module (multiplatform: JVM, Android)
+  - `src/commonMain/kotlin/com/moneymanager/di/`:
+    - `AppScope.kt`: Scope marker for application-wide singletons
+    - `AppComponent.kt`: Main DI component interface
+    - `DatabaseModule.kt`: Provides database instance
+    - `RepositoryModule.kt`: Provides repository implementations
+
+- **compose-ui/**: Compose Multiplatform UI module (JVM, Android)
+  - `src/commonMain/kotlin/com/moneymanager/ui/`:
+    - `screens/`: Main screens (AccountsScreen, CategoriesScreen, TransactionsScreen)
+    - `components/`: Reusable UI components (ErrorScreen, ErrorDialog, MinimalErrorScreen)
+  - `src/jvmMain/`: JVM-specific UI (Debug logging window, database selection dialog)
+  - Material 3 design system
+
+- **jvm-app/**: JVM Desktop application
   - `src/main/kotlin/com/moneymanager/`: JVM application entry point
+  - Compose Desktop with native installers support
+
+- **android-app/**: Android application
+  - `src/main/kotlin/com/moneymanager/`: Android MainActivity
+  - `src/main/AndroidManifest.xml`: App manifest
+  - minSdk 28, targetSdk 35, compileSdk 36
 
 ### Domain Model
 
@@ -127,55 +207,200 @@ The application follows a clean architecture pattern with three main entities:
 ### Database Schema
 
 SQLDelight is used for type-safe database access. Schema files are located in:
-- `shared/src/commonMain/sqldelight/com/moneymanager/database/`
+- `shared-database/src/commonMain/sqldelight/com/moneymanager/database/`
   - `Account.sq`: Account table and queries
   - `Category.sq`: Category table and queries
   - `Transaction.sq`: TransactionRecord table and queries
 
 **Important**: Boolean values in the database are stored as INTEGER (0/1) since SQLite doesn't have a native boolean type. Do not use `AS Boolean` in schema definitions as it causes import issues.
 
+### Mapper Layer
+
+The project uses **Mappie** for type-safe object mapping between database types and domain types:
+
+- Mapper interfaces are located in `shared-database/src/commonMain/kotlin/com/moneymanager/mapper/`
+- Mappie generates implementation code at compile time
+- Mappers convert SQLDelight-generated types to domain models
+- Example: `AccountEntity` (database) → `Account` (domain)
+
+**Usage**:
+```kotlin
+@Mapper
+interface AccountMapper {
+    fun toDomain(entity: AccountEntity): Account
+}
+```
+
+Mappie automatically generates mapping code based on matching property names and types.
+
 ### Repository Pattern
 
-Repository interfaces are defined in `shared/src/commonMain/kotlin/com/moneymanager/domain/repository/`:
+**Repository Interfaces** are defined in `shared/src/commonMain/kotlin/com/moneymanager/domain/repository/`:
 - `AccountRepository`
 - `CategoryRepository`
 - `TransactionRepository`
 
-Repository implementations use Metro DI annotations:
-- `@Inject`: Constructor injection for dependencies
-- `@SingleIn(AppScope::class)`: Singleton scoping
-- `@ContributesBinding(AppScope::class)`: Automatic binding of implementation to interface
+**Repository Implementations** are located in `shared-database/src/commonMain/kotlin/com/moneymanager/repository/`:
+- Plain Kotlin classes with constructor dependencies
+- No DI annotations on the classes themselves
+- Registered via `@Provides` functions in `RepositoryModule` (in `shared-di`)
+- All repositories use Kotlin Flow for reactive data streams
+- Depend on SQLDelight's `MoneyManagerDatabase` and Mappie mappers
 
-All repositories use Kotlin Flow for reactive data streams and depend on SQLDelight's `MoneyManagerDatabase`.
+**Example**:
+```kotlin
+// Repository implementation (in shared-database)
+class AccountRepositoryImpl(
+    private val database: MoneyManagerDatabase,
+    private val mapper: AccountMapper
+) : AccountRepository {
+    override fun getAllAccounts(): Flow<List<Account>> =
+        database.accountQueries.selectAll()
+            .asFlow()
+            .mapToList(Dispatchers.IO)
+            .map { entities -> entities.map(mapper::toDomain) }
+}
+
+// Registration in RepositoryModule (in shared-di)
+@Provides
+@SingleIn(AppScope::class)
+fun provideAccountRepository(
+    database: MoneyManagerDatabase,
+    mapper: AccountMapper
+): AccountRepository = AccountRepositoryImpl(database, mapper)
+```
 
 ### Dependency Injection with Metro
 
-The project uses Metro for compile-time dependency injection:
+The project uses Metro for compile-time dependency injection. All DI configuration is in the `shared-di` module:
 
-**DI Components** (`shared/src/commonMain/kotlin/com/moneymanager/di/`):
+**DI Components** (`shared-di/src/commonMain/kotlin/com/moneymanager/di/`):
 - `AppScope.kt`: Scope marker for application-wide singletons
 - `AppComponent.kt`: Main DI component (interface) annotated with `@DependencyGraph(AppScope::class)`
-- `DatabaseModule.kt`: Provides database instance with `@ContributesTo(AppScope::class)` and `@Provides`
+- `DatabaseModule.kt`: Provides database instance via `@Provides` function
+- `RepositoryModule.kt`: Provides all repository implementations via `@Provides` functions
 
-**Usage**:
+**Component Creation**:
 ```kotlin
-val component = AppComponent.create(DatabaseDriverFactory())
+// Create with SqlDriver directly
+val driver: SqlDriver = DatabaseDriverFactory().createDriver()
+val component = AppComponent.create(driver)
+
+// Access repositories
 val accountRepository = component.accountRepository
+val categoryRepository = component.categoryRepository
+val transactionRepository = component.transactionRepository
 ```
 
-Metro generates the implementation classes at compile time. Look for generated files in `build/generated/` to see the wiring code.
+**Module Pattern**:
+```kotlin
+@ContributesTo(AppScope::class)
+interface DatabaseModule {
+    @Provides
+    @SingleIn(AppScope::class)
+    fun provideDatabase(driver: SqlDriver): MoneyManagerDatabase {
+        return MoneyManagerDatabase(driver)
+    }
+}
+
+@ContributesTo(AppScope::class)
+interface RepositoryModule {
+    @Provides
+    @SingleIn(AppScope::class)
+    fun provideAccountRepository(
+        database: MoneyManagerDatabase,
+        mapper: AccountMapper
+    ): AccountRepository = AccountRepositoryImpl(database, mapper)
+}
+```
+
+Metro generates the implementation classes at compile time via compiler plugin. Look for generated files in `build/generated/ksp/` to see the wiring code.
+
+### Compose UI Module
+
+The `compose-ui` module provides a Material 3-based user interface for both JVM and Android platforms:
+
+**Common Screens** (`compose-ui/src/commonMain/kotlin/com/moneymanager/ui/screens/`):
+- `AccountsScreen`: Display and manage financial accounts
+- `CategoriesScreen`: Display and manage transaction categories
+- `TransactionsScreen`: Display and manage transactions
+
+**Error Handling Components** (`compose-ui/src/commonMain/kotlin/com/moneymanager/ui/components/`):
+- `ErrorScreen`: Full-screen error display
+- `ErrorDialog`: Modal error dialog
+- `MinimalErrorScreen`: Compact error display
+
+**Platform-Specific UI** (`compose-ui/src/jvmMain/kotlin/com/moneymanager/ui/`):
+- `DebugLoggingWindow`: JVM-only debug logging console
+- `DatabaseSelectionDialog`: JVM-only database file picker
+
+**Design System**:
+- Material 3 components
+- Multiplatform support (JVM and Android only - Compose doesn't support native)
+- Consistent UI across platforms
 
 ## Development Notes
 
+### Code Quality Tools
+
+The project uses multiple tools to maintain code quality and consistency:
+
+**Detekt** (Static Code Analysis):
+- Configuration: `config/detekt/detekt.yml`
+- Analyzes Kotlin code for code smells and potential issues
+- Run: `./gradlew detekt`
+- Reports generated in `build/reports/detekt/`
+
+**ktlint** (Code Formatting):
+- Enforces Kotlin coding conventions
+- Automatically formats code
+- Run: `./gradlew ktlintFormat`
+- Check without formatting: `./gradlew ktlintCheck`
+
+**sort-dependencies** (Gradle Dependencies):
+- Automatically sorts dependencies in build files
+- Run: `./gradlew sortDependencies`
+- Ensures consistent dependency ordering
+
+**lintFormat** (Combined Task):
+- Runs both `sortDependencies` and `ktlintFormat`
+- Run: `./gradlew lintFormat`
+- Used by CI for automatic PR formatting
+
+**buildHealth** (Dependency Analysis):
+- Analyzes project dependency graph
+- Identifies unused dependencies and missing declarations
+- Run: `./gradlew buildHealth`
+- Reports appear in `build/reports/dependency-analysis/`
+- **Important**: Never exclude modules from this task
+
+### Platform Support Status
+
+The project currently supports:
+
+- **JVM** ✅: Fully implemented with Compose Desktop UI
+- **Android** ✅: Fully implemented with Compose for Android UI
+  - minSdk 28, targetSdk 35, compileSdk 36
+  - Platform-specific `DatabaseDriverFactory` using AndroidSqliteDriver
+- **iOS** ⚠️: Not yet implemented (planned)
+  - Database layer ready (can add iOS targets to `shared` and `shared-database`)
+  - UI would need native iOS implementation (Compose Multiplatform supports iOS but not yet integrated)
+- **Web** ⚠️: Not yet implemented (planned)
+  - Would use `@OptIn(ExperimentalWasmDsl::class) wasmJs { browser() }`
+  - Database would need browser-compatible driver (e.g., SQL.js)
+- **Native** ❌: Not supported
+  - Compose Multiplatform doesn't support native targets
+  - `compose-ui` module is limited to JVM and Android only
+
 ### Adding New Platforms
 
-The project is set up for multiplatform but currently only targets JVM. To add other platforms:
+To add iOS or Web support:
 
-1. **Android**: Add `id("com.android.library")` plugin and `androidTarget()` in shared/build.gradle.kts
-2. **iOS**: Add iOS targets (`iosX64()`, `iosArm64()`, `iosSimulatorArm64()`)
-3. **Web**: Add `@OptIn(ExperimentalWasmDsl::class) wasmJs { browser() }`
-
-For each platform, implement platform-specific `DatabaseDriverFactory` in the corresponding source set.
+1. Add platform targets to multiplatform modules (`shared`, `shared-database`, `shared-di`)
+2. Implement platform-specific `DatabaseDriverFactory` in the corresponding source set
+3. For iOS: Use NativeSqliteDriver from SQLDelight
+4. For Web: Use a browser-compatible SQLite driver (e.g., SQL.js wrapper)
+5. UI implementation would be platform-specific (native iOS UI or Compose for Web)
 
 ### Database Initialization
 
@@ -186,15 +411,55 @@ The database is initialized via Metro DI. The `DatabaseModule` provides the sing
 interface DatabaseModule {
     @Provides
     @SingleIn(AppScope::class)
-    fun provideDatabase(driverFactory: DatabaseDriverFactory): MoneyManagerDatabase {
-        return MoneyManagerDatabase(driverFactory.createDriver())
+    fun provideDatabase(driver: SqlDriver): MoneyManagerDatabase {
+        return MoneyManagerDatabase(driver)
     }
 }
 ```
 
-The `DatabaseDriverFactory` is platform-specific (expect/actual pattern):
-- **JVM**: Uses SQLite JDBC driver with in-memory database by default
-- To use persistent storage: pass a database path to `createDriver(databasePath: String)`
+The `AppComponent` is created with a `SqlDriver`, which is platform-specific:
+
+**JVM** (`shared-database/src/jvmMain/kotlin/com/moneymanager/DatabaseDriverFactory.kt`):
+```kotlin
+actual class DatabaseDriverFactory {
+    actual fun createDriver(databasePath: String?): SqlDriver {
+        val url = databasePath?.let { "jdbc:sqlite:$it" } ?: "jdbc:sqlite::memory:"
+        return JdbcSqliteDriver(url).also {
+            MoneyManagerDatabase.Schema.create(it)
+        }
+    }
+}
+```
+- Uses JDBC SQLite driver
+- In-memory database if no path provided: `createDriver()`
+- Persistent database with path: `createDriver("/path/to/database.db")`
+
+**Android** (`shared-database/src/androidMain/kotlin/com/moneymanager/DatabaseDriverFactory.kt`):
+```kotlin
+actual class DatabaseDriverFactory(private val context: Context) {
+    actual fun createDriver(databasePath: String?): SqlDriver {
+        return AndroidSqliteDriver(
+            schema = MoneyManagerDatabase.Schema,
+            context = context,
+            name = databasePath ?: "moneymanager.db"
+        )
+    }
+}
+```
+- Uses AndroidSqliteDriver
+- Requires Android Context
+- Default database name: "moneymanager.db"
+
+**Usage**:
+```kotlin
+// JVM
+val driver = DatabaseDriverFactory().createDriver("/path/to/db.db")
+val component = AppComponent.create(driver)
+
+// Android
+val driver = DatabaseDriverFactory(applicationContext).createDriver()
+val component = AppComponent.create(driver)
+```
 
 ### Gradle Configuration
 
@@ -207,15 +472,25 @@ The project uses modern Gradle practices for maintainability:
 - **IMPORTANT**: ALL dependencies MUST be defined in `libs.versions.toml` and referenced via `libs.*`. NEVER hardcode dependencies with version numbers directly in build files (e.g., `implementation("group:artifact:version")`). Always add them to the version catalog first.
 
 **Convention Plugins** (`build-logic/`):
-- `moneymanager.kotlin-multiplatform-convention`: Base KMP setup (JVM toolchain 21, test dependencies)
-- `moneymanager.coroutines-convention`: Depends on base convention and adds coroutines
-- Benefits: DRY principle, consistent configuration across modules
+- `moneymanager.kotlin-convention`: Base Kotlin setup with detekt, ktlint, sort-dependencies
+- `moneymanager.kotlin-multiplatform-convention`: Base KMP setup (JVM toolchain 25, test dependencies)
+- `moneymanager.coroutines-convention`: Adds coroutines support on top of base convention
+- `moneymanager.android-convention`: Android library multiplatform setup with Kotlin and compose conventions
+- `moneymanager.android-application-convention`: Android application setup with compose convention
+- `moneymanager.compose-multiplatform-convention`: Compose multiplatform with Material 3
+- `moneymanager.mappie-convention`: Mappie plugin and API dependencies
+- `moneymanager.metro-convention`: Metro plugin and runtime dependencies
+- Benefits: DRY principle, consistent configuration across modules, reduced build file duplication
 
 **Module Build Files**:
-- `shared/build.gradle.kts`: Applies coroutines convention, SQLDelight, and Metro plugins
-- `jvm-app/build.gradle.kts`: JVM application with main class configuration
-- `settings.gradle.kts`: Plugin management and module declarations
-- Root `build.gradle.kts`: Minimal, defines shared repositories
+- `shared/build.gradle.kts`: Applies coroutines convention for domain models
+- `shared-database/build.gradle.kts`: Applies coroutines, mappie conventions, and SQLDelight plugin
+- `shared-di/build.gradle.kts`: Applies coroutines and metro conventions
+- `compose-ui/build.gradle.kts`: Applies android, coroutines, and compose-multiplatform conventions
+- `jvm-app/build.gradle.kts`: JVM application with Compose Desktop
+- `android-app/build.gradle.kts`: Android application with Compose
+- `settings.gradle.kts`: Plugin management, auto module discovery via `com.pablisco.gradle.auto.include`
+- Root `build.gradle.kts`: Minimal, defines shared repositories and lintFormat task
 
 **Configuration Cache**:
 - Enabled in `gradle.properties` for faster builds (11s → 2s improvement)
@@ -223,9 +498,9 @@ The project uses modern Gradle practices for maintainability:
 
 ### Common Issues and Best Practices
 
-1. **Java Version**: The project requires Java 21. Ensure `JAVA_HOME` points to JDK 21+
+1. **Java Version**: The project requires Java 25 toolchain (target: 24). Ensure `JAVA_HOME` points to JDK 21+ (minimum), preferably JDK 25.
 
-2. **Kotlin Version for Metro**: Metro 0.7.5 is compiled with Kotlin 2.2.20. Keep project Kotlin version aligned to avoid issues with code generation.
+2. **Kotlin Version for Metro**: Metro 0.7.7 is compiled with Kotlin 2.2.21. Keep project Kotlin version aligned to avoid issues with code generation.
 
 3. **Metro Code Generation**:
    - Metro generates code at compile time via compiler plugin
@@ -233,29 +508,49 @@ The project uses modern Gradle practices for maintainability:
    - If code generation fails, ensure `metro-runtime` dependency is included
    - Components must be `interface` (not `abstract class` or `object`)
    - Modules with `@ContributesTo` must be `interface` (not `object`)
+   - Repositories are now registered via `@Provides` functions, not `@Inject` or `@ContributesBinding`
 
-4. **SQLDelight 2.2.1 Breaking Changes**:
+4. **Mappie Object Mapping**:
+   - Mappie generates mapping code at compile time
+   - Mapper interfaces must be annotated with `@Mapper`
+   - Generated implementations appear in `build/generated/ksp/`
+   - Mappie automatically maps properties with matching names and types
+   - For custom mapping logic, use `@Mapping` annotations
+
+5. **SQLDelight 2.2.1 Breaking Changes**:
    - `execute()`, `update()`, and `delete()` methods now return `Long` (affected rows count) instead of `Unit`
    - Repository methods that need to return `Unit` must explicitly add `: Unit` return type and `Unit` statement
    - Never use `AS Boolean` type in .sq files - use INTEGER (0/1) and handle conversion in code
 
-5. **Convention Plugin Dependencies**:
+6. **Convention Plugin Dependencies**:
    - The `coroutines-convention` plugin applies the `kotlin-multiplatform-convention` plugin
-   - Only apply `coroutines-convention` if you need both KMP and coroutines
+   - The `android-convention` plugin applies both `kotlin-convention` and `compose-multiplatform-convention`
    - Module-specific dependencies (like `kotlinx-datetime`) should be in module build files, not conventions
+   - Use appropriate convention plugins to avoid duplication
 
-6. **Expect/Actual Classes**: Warnings about Beta features can be suppressed with `-Xexpect-actual-classes` flag if needed
+7. **Expect/Actual Classes**: Warnings about Beta features can be suppressed with `-Xexpect-actual-classes` flag if needed
 
-7. **Configuration Cache**: With configuration cache enabled, first builds after changes to build files will invalidate cache (expected behavior)
+8. **Configuration Cache**: With configuration cache enabled, first builds after changes to build files will invalidate cache (expected behavior)
 
-8. **Dependency Management**:
+9. **Dependency Management**:
    - **ALWAYS** add new dependencies to `gradle/libs.versions.toml` first
    - **NEVER** hardcode dependencies with versions directly in build files
    - Use `libs.*` references in all build files for consistency and centralized version management
-   - Example: Use `implementation(libs.kotlinx.coroutines.core)` NOT `implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")`
+   - Example: Use `implementation(libs.kotlinx.coroutines.core)` NOT `implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")`
 
-9. **Build Health (Dependency Analysis)**:
-   - **NEVER** skip or exclude modules from the `buildHealth` task
-   - The dependency analysis plugin helps maintain a healthy dependency graph
-   - If `buildHealth` fails, add the recommended dependencies directly to the module
-   - Do NOT use `exclude()` or conditional logic to skip modules from dependency analysis
+10. **Build Health (Dependency Analysis)**:
+    - **NEVER** skip or exclude modules from the `buildHealth` task
+    - The dependency analysis plugin helps maintain a healthy dependency graph
+    - If `buildHealth` fails, add the recommended dependencies directly to the module
+    - Do NOT use `exclude()` or conditional logic to skip modules from dependency analysis
+
+11. **Code Formatting**:
+    - Always run `./gradlew lintFormat` before committing code
+    - CI will automatically format PRs, but local formatting is preferred
+    - ktlint and sort-dependencies maintain consistent code style
+
+12. **Multiplatform Module Structure**:
+    - `shared`: Domain models and repository interfaces only (no implementations)
+    - `shared-database`: Database implementations, mappers, and platform-specific drivers
+    - `shared-di`: DI configuration and component definitions
+    - `compose-ui`: UI components (JVM and Android only - Compose doesn't support native)
