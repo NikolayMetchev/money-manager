@@ -10,8 +10,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
-import com.moneymanager.database.DatabaseDriverFactory
+import com.moneymanager.database.getDefaultDatabasePath
 import com.moneymanager.di.AppComponent
+import com.moneymanager.domain.di.AppComponentParams
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.ui.DatabaseSelectionDialog
 import com.moneymanager.ui.ErrorDialog
@@ -111,14 +112,14 @@ private fun MainWindow(onExit: () -> Unit) {
     LaunchedEffect(Unit) {
         try {
             log(LogLevel.INFO, "LaunchedEffect: Starting initialization")
-            val defaultDbPath = DatabaseConfig.getDefaultDatabasePath()
-            val dbExists = DatabaseConfig.databaseFileExists(defaultDbPath)
+            val defaultDbPath = getDefaultDatabasePath()
+            val dbExists = defaultDbPath.toFile().exists()
             log(LogLevel.DEBUG, "Default database path: $defaultDbPath, exists: $dbExists")
 
             if (dbExists) {
                 databasePath = defaultDbPath
                 log(LogLevel.INFO, "Existing database found, initializing...")
-                // Initialize immediately
+                // Initialize immediately with the path
                 initResult = initializeApplication(defaultDbPath)
                 log(LogLevel.INFO, "Initialization result: ${initResult?.javaClass?.simpleName}")
             } else {
@@ -158,15 +159,14 @@ private fun MainWindow(onExit: () -> Unit) {
         // Show database selection dialog if needed
         if (showDatabaseDialog && initResult == null) {
             DatabaseSelectionDialog(
-                defaultPath = DatabaseConfig.getDefaultDatabasePath(),
+                defaultPath = getDefaultDatabasePath(),
                 onDatabaseSelected = { selectedPath ->
                     try {
                         log(LogLevel.INFO, "User selected database path: $selectedPath")
-                        DatabaseConfig.ensureDirectoryExists(selectedPath)
                         databasePath = selectedPath
                         showDatabaseDialog = false
                         log(LogLevel.INFO, "Database path set successfully")
-                        // Initialize after path is set
+                        // Initialize after path is set (directory creation is handled by DatabaseDriverFactory)
                         initResult = initializeApplication(selectedPath)
                     } catch (e: Exception) {
                         log(LogLevel.ERROR, "Failed to set database path: ${e.message}", e)
@@ -247,44 +247,19 @@ private sealed class InitResult {
     data class Error(val message: String, val fullException: String) : InitResult()
 }
 
-@Suppress("TooGenericExceptionCaught", "PrintStackTrace", "ReturnCount", "LongMethod")
+@Suppress("TooGenericExceptionCaught", "PrintStackTrace", "ReturnCount")
 private fun initializeApplication(dbPath: Path): InitResult {
     return try {
-        log(LogLevel.INFO, "=== Starting Database Initialization ===")
-        val driverFactory = DatabaseDriverFactory()
-        val isNewDatabase = !DatabaseConfig.databaseFileExists(dbPath)
+        log(LogLevel.INFO, "=== Starting Application Initialization ===")
         log(LogLevel.INFO, "Database path: $dbPath")
-        log(LogLevel.INFO, "Is new database: $isNewDatabase")
-        log(LogLevel.INFO, "JDBC path: ${DatabaseConfig.getJdbcPath(dbPath)}")
 
-        val driver =
-            try {
-                log(LogLevel.INFO, "About to create database driver...")
-                val result =
-                    driverFactory.createDriver(
-                        databasePath = DatabaseConfig.getJdbcPath(dbPath),
-                        isNewDatabase = isNewDatabase,
-                    )
-                log(LogLevel.INFO, "Database driver created successfully")
-                result
-            } catch (e: Exception) {
-                log(LogLevel.ERROR, "EXCEPTION creating database driver", e)
-                log(LogLevel.ERROR, "Exception class: ${e.javaClass.name}")
-                log(LogLevel.ERROR, "Exception message: ${e.message}")
-                log(LogLevel.ERROR, "Exception cause: ${e.cause}")
-                log(LogLevel.ERROR, "Full stack trace follows:")
-                e.printStackTrace()
-                return InitResult.Error(
-                    "Failed to create database driver: ${e.javaClass.simpleName}: ${e.message}",
-                    e.stackTraceToString(),
-                )
-            }
-        log(LogLevel.INFO, "Database driver initialized successfully")
-
+        // Create AppComponent with database path
+        // DI system will handle DatabaseDriverFactory creation and database initialization
         val component: AppComponent =
             try {
-                log(LogLevel.INFO, "About to create DI component...")
-                val result = AppComponent.create(driver)
+                log(LogLevel.INFO, "Creating DI component...")
+                val params = AppComponentParams(databasePath = dbPath.toAbsolutePath().toString())
+                val result = AppComponent.create(params)
                 log(LogLevel.INFO, "DI component created successfully")
                 result
             } catch (e: Exception) {
@@ -295,7 +270,6 @@ private fun initializeApplication(dbPath: Path): InitResult {
                     e.stackTraceToString(),
                 )
             }
-        log(LogLevel.INFO, "DI component created successfully")
 
         val accountRepository = component.accountRepository
         val categoryRepository = component.categoryRepository

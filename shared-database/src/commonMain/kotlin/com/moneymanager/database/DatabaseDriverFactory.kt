@@ -2,6 +2,6 @@ package com.moneymanager.database
 
 import app.cash.sqldelight.db.SqlDriver
 
-expect class DatabaseDriverFactory {
+interface DatabaseDriverFactory {
     fun createDriver(): SqlDriver
 }

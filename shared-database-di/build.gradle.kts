@@ -1,14 +1,14 @@
 plugins {
     id("moneymanager.android-convention")
-    alias(libs.plugins.metro)
+    id("moneymanager.metro-convention")
 }
 
 kotlin {
     sourceSets {
-        val commonMain by getting {
+        commonMain {
             dependencies {
-                api(projects.sharedDatabaseDi)
-                implementation(libs.metro.runtime)
+                implementation(libs.sqldelight.runtime)
+                implementation(projects.shared)
                 implementation(projects.sharedDatabase)
             }
         }
