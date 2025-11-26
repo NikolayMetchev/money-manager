@@ -6,17 +6,28 @@ import java.io.File
 import java.nio.file.Files
 import java.nio.file.Paths
 
-actual class DatabaseDriverFactory {
-    actual fun createDriver(databasePath: String?): SqlDriver {
-        // If no path provided, use in-memory database (for tests)
-        if (databasePath == null) {
-            val driver: SqlDriver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
-            MoneyManagerDatabase.Schema.create(driver)
-            return driver
-        }
+/**
+ * In-memory database driver factory for JVM platform.
+ * Useful for tests and temporary sessions.
+ */
+class InMemoryDatabaseDriverFactory : DatabaseDriverFactory {
+    override fun createDriver(): SqlDriver {
+        val driver: SqlDriver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
+        MoneyManagerDatabase.Schema.create(driver)
+        return driver
+    }
+}
 
-        // Resolve the path
-        val resolvedPath = resolveDatabasePath(databasePath)
+/**
+ * File-based database driver factory for JVM platform.
+ * Persists data to a SQLite database file.
+ *
+ * @param databasePath Optional path to the database file. If null, uses the default path.
+ */
+class FileDatabaseDriverFactory(private val databasePath: String? = null) : DatabaseDriverFactory {
+    override fun createDriver(): SqlDriver {
+        // Use provided path or default path
+        val resolvedPath = resolveDatabasePath(databasePath ?: getDefaultDatabasePath())
         val dbFile = File(resolvedPath)
 
         // Auto-detect if this is a new database

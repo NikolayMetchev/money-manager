@@ -2,8 +2,9 @@
 
 package com.moneymanager.database.repository
 
+import com.moneymanager.database.DatabaseDriverFactory
+import com.moneymanager.database.InMemoryDatabaseDriverFactory
 import com.moneymanager.database.MoneyManagerDatabase
-import com.moneymanager.database.test.TestDatabaseDriverFactory
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountType
 import kotlinx.coroutines.flow.first
@@ -22,11 +23,13 @@ class AccountRepositoryImplTest {
     private lateinit var database: MoneyManagerDatabase
     private lateinit var repository: AccountRepositoryImpl
     private lateinit var driver: app.cash.sqldelight.db.SqlDriver
+    private lateinit var databaseDriverFactory: DatabaseDriverFactory
 
     @BeforeTest
     fun setup() {
         // Create an in-memory database for testing
-        driver = TestDatabaseDriverFactory.create()
+        databaseDriverFactory = InMemoryDatabaseDriverFactory()
+        driver = databaseDriverFactory.createDriver()
         database = MoneyManagerDatabase(driver)
         repository = AccountRepositoryImpl(database)
     }
