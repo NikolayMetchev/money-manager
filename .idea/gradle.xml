@@ -27,6 +27,8 @@
             <option value="$PROJECT_DIR$/jvm-app" />
             <option value="$PROJECT_DIR$/shared" />
             <option value="$PROJECT_DIR$/shared-database" />
+            <option value="$PROJECT_DIR$/shared-database-di" />
+            <option value="$PROJECT_DIR$/shared-database-test" />
             <option value="$PROJECT_DIR$/shared-di" />
           </set>
         </option>

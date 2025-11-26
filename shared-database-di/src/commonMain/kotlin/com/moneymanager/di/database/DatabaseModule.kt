@@ -1,7 +1,8 @@
-package com.moneymanager.di
+package com.moneymanager.di.database
 
 import app.cash.sqldelight.db.SqlDriver
 import com.moneymanager.database.MoneyManagerDatabase
+import com.moneymanager.domain.di.AppScope
 import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn

@@ -2,8 +2,8 @@
 
 package com.moneymanager.database.repository
 
-import com.moneymanager.database.DatabaseDriverFactory
 import com.moneymanager.database.MoneyManagerDatabase
+import com.moneymanager.database.test.TestDatabaseDriverFactory
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountType
 import kotlinx.coroutines.flow.first
@@ -26,8 +26,7 @@ class AccountRepositoryImplTest {
     @BeforeTest
     fun setup() {
         // Create an in-memory database for testing
-        val driverFactory = DatabaseDriverFactory()
-        driver = driverFactory.createDriver()
+        driver = TestDatabaseDriverFactory.create()
         database = MoneyManagerDatabase(driver)
         repository = AccountRepositoryImpl(database)
     }

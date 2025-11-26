@@ -3,9 +3,9 @@ package com.moneymanager.android
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import com.moneymanager.database.DatabaseDriverFactory
 import com.moneymanager.di.AppComponent
 import com.moneymanager.di.initializeVersionReader
+import com.moneymanager.domain.di.AppComponentParams
 import com.moneymanager.ui.MoneyManagerApp
 
 class MainActivity : ComponentActivity() {
@@ -15,12 +15,10 @@ class MainActivity : ComponentActivity() {
         // Initialize version reader with application context
         initializeVersionReader(applicationContext)
 
-        // Initialize database driver with Android context
-        val driverFactory = DatabaseDriverFactory(applicationContext)
-        val driver = driverFactory.createDriver()
-
-        // Initialize DI component using Metro-generated code
-        val component: AppComponent = AppComponent.create(driver)
+        // Initialize DI component with Android context
+        // Metro DI will handle DatabaseDriverFactory creation and database initialization
+        val params = AppComponentParams(context = applicationContext)
+        val component: AppComponent = AppComponent.create(params)
 
         // Get repositories and version from the component
         val accountRepository = component.accountRepository
