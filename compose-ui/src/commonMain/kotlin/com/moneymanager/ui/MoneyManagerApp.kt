@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.TransactionRepository
@@ -12,7 +13,6 @@ import com.moneymanager.ui.navigation.Screen
 import com.moneymanager.ui.screens.AccountsScreen
 import com.moneymanager.ui.screens.CategoriesScreen
 import com.moneymanager.ui.screens.TransactionsScreen
-import com.moneymanager.ui.util.readAppVersion
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -20,6 +20,7 @@ fun MoneyManagerApp(
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
     transactionRepository: TransactionRepository,
+    appVersion: AppVersion,
     databasePath: String? = null,
 ) {
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Accounts) }
@@ -31,9 +32,8 @@ fun MoneyManagerApp(
                     title = {
                         Column {
                             Text(currentScreen.title)
-                            val version = remember(Unit) { readAppVersion() }
                             Text(
-                                text = "v$version",
+                                text = "v${appVersion.value}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
                             )

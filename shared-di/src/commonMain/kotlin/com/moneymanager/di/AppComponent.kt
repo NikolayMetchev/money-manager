@@ -1,6 +1,7 @@
 package com.moneymanager.di
 
 import app.cash.sqldelight.db.SqlDriver
+import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.TransactionRepository
@@ -12,11 +13,13 @@ interface AppComponent {
     val accountRepository: AccountRepository
     val categoryRepository: CategoryRepository
     val transactionRepository: TransactionRepository
+    val appVersion: AppVersion
 
     @DependencyGraph.Factory
     interface Factory {
         fun create(
             @Provides driver: SqlDriver,
+            @Provides version: AppVersion,
         ): AppComponent
     }
 }

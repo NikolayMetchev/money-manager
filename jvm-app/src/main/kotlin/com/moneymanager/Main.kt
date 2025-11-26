@@ -12,6 +12,7 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.moneymanager.database.DatabaseDriverFactory
 import com.moneymanager.di.AppComponent
+import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.ui.DatabaseSelectionDialog
 import com.moneymanager.ui.ErrorDialog
 import com.moneymanager.ui.ErrorState
@@ -216,6 +217,7 @@ private fun MainWindow(onExit: () -> Unit) {
                     accountRepository = result.accountRepository,
                     categoryRepository = result.categoryRepository,
                     transactionRepository = result.transactionRepository,
+                    appVersion = result.appVersion,
                     databasePath = currentDbPath?.toString() ?: "Unknown",
                 )
             }
@@ -239,9 +241,25 @@ private sealed class InitResult {
         val accountRepository: com.moneymanager.domain.repository.AccountRepository,
         val categoryRepository: com.moneymanager.domain.repository.CategoryRepository,
         val transactionRepository: com.moneymanager.domain.repository.TransactionRepository,
+        val appVersion: AppVersion,
     ) : InitResult()
 
     data class Error(val message: String, val fullException: String) : InitResult()
+}
+
+/**
+ * Reads the application version from the VERSION file in resources.
+ */
+@Suppress("TooGenericExceptionCaught")
+private fun readAppVersion(): AppVersion {
+    return try {
+        val versionStream = object {}.javaClass.getResourceAsStream("/VERSION")
+        val versionString = versionStream?.bufferedReader()?.use { it.readText().trim() } ?: "Unknown"
+        AppVersion(versionString)
+    } catch (e: Exception) {
+        log(LogLevel.WARN, "Failed to read version file: ${e.message}", e)
+        AppVersion("Unknown")
+    }
 }
 
 @Suppress("TooGenericExceptionCaught", "PrintStackTrace", "ReturnCount", "LongMethod")
@@ -278,10 +296,14 @@ private fun initializeApplication(dbPath: Path): InitResult {
             }
         log(LogLevel.INFO, "Database driver initialized successfully")
 
+        // Read app version
+        val appVersion = readAppVersion()
+        log(LogLevel.INFO, "App version: ${appVersion.value}")
+
         val component: AppComponent =
             try {
                 log(LogLevel.INFO, "About to create DI component...")
-                val result = AppComponent.create(driver)
+                val result = AppComponent.create(driver, appVersion)
                 log(LogLevel.INFO, "DI component created successfully")
                 result
             } catch (e: Exception) {
@@ -300,7 +322,7 @@ private fun initializeApplication(dbPath: Path): InitResult {
         log(LogLevel.INFO, "All repositories initialized successfully")
         log(LogLevel.INFO, "=== Initialization Complete ===")
 
-        InitResult.Success(accountRepository, categoryRepository, transactionRepository)
+        InitResult.Success(accountRepository, categoryRepository, transactionRepository, appVersion)
     } catch (e: Exception) {
         log(LogLevel.ERROR, "FATAL ERROR initializing application", e)
         e.printStackTrace()
