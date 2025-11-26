@@ -19,7 +19,6 @@ interface AppComponent {
     interface Factory {
         fun create(
             @Provides driver: SqlDriver,
-            @Provides version: AppVersion,
         ): AppComponent
     }
 }

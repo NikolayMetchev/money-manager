@@ -247,21 +247,6 @@ private sealed class InitResult {
     data class Error(val message: String, val fullException: String) : InitResult()
 }
 
-/**
- * Reads the application version from the VERSION file in resources.
- */
-@Suppress("TooGenericExceptionCaught")
-private fun readAppVersion(): AppVersion {
-    return try {
-        val versionStream = object {}.javaClass.getResourceAsStream("/VERSION")
-        val versionString = versionStream?.bufferedReader()?.use { it.readText().trim() } ?: "Unknown"
-        AppVersion(versionString)
-    } catch (e: Exception) {
-        log(LogLevel.WARN, "Failed to read version file: ${e.message}", e)
-        AppVersion("Unknown")
-    }
-}
-
 @Suppress("TooGenericExceptionCaught", "PrintStackTrace", "ReturnCount", "LongMethod")
 private fun initializeApplication(dbPath: Path): InitResult {
     return try {
@@ -296,14 +281,10 @@ private fun initializeApplication(dbPath: Path): InitResult {
             }
         log(LogLevel.INFO, "Database driver initialized successfully")
 
-        // Read app version
-        val appVersion = readAppVersion()
-        log(LogLevel.INFO, "App version: ${appVersion.value}")
-
         val component: AppComponent =
             try {
                 log(LogLevel.INFO, "About to create DI component...")
-                val result = AppComponent.create(driver, appVersion)
+                val result = AppComponent.create(driver)
                 log(LogLevel.INFO, "DI component created successfully")
                 result
             } catch (e: Exception) {
@@ -319,6 +300,8 @@ private fun initializeApplication(dbPath: Path): InitResult {
         val accountRepository = component.accountRepository
         val categoryRepository = component.categoryRepository
         val transactionRepository = component.transactionRepository
+        val appVersion = component.appVersion
+        log(LogLevel.INFO, "App version: ${appVersion.value}")
         log(LogLevel.INFO, "All repositories initialized successfully")
         log(LogLevel.INFO, "=== Initialization Complete ===")
 
