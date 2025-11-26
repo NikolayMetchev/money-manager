@@ -46,6 +46,8 @@ android {
 tasks.register<Copy>("copyVersionToAssets") {
     from(rootProject.file("VERSION"))
     into("src/main/assets")
+    inputs.file(rootProject.file("VERSION"))
+    outputs.file("src/main/assets/VERSION")
 }
 
 tasks.named("preBuild") {

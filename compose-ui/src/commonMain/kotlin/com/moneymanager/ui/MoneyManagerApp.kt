@@ -31,7 +31,7 @@ fun MoneyManagerApp(
                     title = {
                         Column {
                             Text(currentScreen.title)
-                            val version = remember { readAppVersion() }
+                            val version = remember(Unit) { readAppVersion() }
                             Text(
                                 text = "v$version",
                                 style = MaterialTheme.typography.bodySmall,
