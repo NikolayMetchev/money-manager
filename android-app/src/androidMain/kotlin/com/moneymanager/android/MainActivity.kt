@@ -5,11 +5,15 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import com.moneymanager.database.DatabaseDriverFactory
 import com.moneymanager.di.AppComponent
+import com.moneymanager.di.initializeVersionReader
 import com.moneymanager.ui.MoneyManagerApp
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Initialize version reader with application context
+        initializeVersionReader(applicationContext)
 
         // Initialize database driver with Android context
         val driverFactory = DatabaseDriverFactory(applicationContext)
@@ -18,10 +22,11 @@ class MainActivity : ComponentActivity() {
         // Initialize DI component using Metro-generated code
         val component: AppComponent = AppComponent.create(driver)
 
-        // Get repositories from the component
+        // Get repositories and version from the component
         val accountRepository = component.accountRepository
         val categoryRepository = component.categoryRepository
         val transactionRepository = component.transactionRepository
+        val appVersion = component.appVersion
 
         // Get the actual database path on Android
         val dbPath = applicationContext.getDatabasePath("money_manager.db").absolutePath
@@ -31,6 +36,7 @@ class MainActivity : ComponentActivity() {
                 accountRepository = accountRepository,
                 categoryRepository = categoryRepository,
                 transactionRepository = transactionRepository,
+                appVersion = appVersion,
                 databasePath = dbPath,
             )
         }

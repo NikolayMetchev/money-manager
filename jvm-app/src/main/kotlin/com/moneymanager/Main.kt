@@ -12,6 +12,7 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.moneymanager.database.DatabaseDriverFactory
 import com.moneymanager.di.AppComponent
+import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.ui.DatabaseSelectionDialog
 import com.moneymanager.ui.ErrorDialog
 import com.moneymanager.ui.ErrorState
@@ -216,6 +217,7 @@ private fun MainWindow(onExit: () -> Unit) {
                     accountRepository = result.accountRepository,
                     categoryRepository = result.categoryRepository,
                     transactionRepository = result.transactionRepository,
+                    appVersion = result.appVersion,
                     databasePath = currentDbPath?.toString() ?: "Unknown",
                 )
             }
@@ -239,6 +241,7 @@ private sealed class InitResult {
         val accountRepository: com.moneymanager.domain.repository.AccountRepository,
         val categoryRepository: com.moneymanager.domain.repository.CategoryRepository,
         val transactionRepository: com.moneymanager.domain.repository.TransactionRepository,
+        val appVersion: AppVersion,
     ) : InitResult()
 
     data class Error(val message: String, val fullException: String) : InitResult()
@@ -297,10 +300,12 @@ private fun initializeApplication(dbPath: Path): InitResult {
         val accountRepository = component.accountRepository
         val categoryRepository = component.categoryRepository
         val transactionRepository = component.transactionRepository
+        val appVersion = component.appVersion
+        log(LogLevel.INFO, "App version: ${appVersion.value}")
         log(LogLevel.INFO, "All repositories initialized successfully")
         log(LogLevel.INFO, "=== Initialization Complete ===")
 
-        InitResult.Success(accountRepository, categoryRepository, transactionRepository)
+        InitResult.Success(accountRepository, categoryRepository, transactionRepository, appVersion)
     } catch (e: Exception) {
         log(LogLevel.ERROR, "FATAL ERROR initializing application", e)
         e.printStackTrace()

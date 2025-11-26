@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.TransactionRepository
@@ -19,6 +20,7 @@ fun MoneyManagerApp(
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
     transactionRepository: TransactionRepository,
+    appVersion: AppVersion,
     databasePath: String? = null,
 ) {
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Accounts) }
@@ -30,6 +32,11 @@ fun MoneyManagerApp(
                     title = {
                         Column {
                             Text(currentScreen.title)
+                            Text(
+                                text = "v${appVersion.value}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                            )
                             databasePath?.let { path ->
                                 Text(
                                     text = "Database: $path",

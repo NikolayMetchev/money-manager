@@ -34,6 +34,24 @@ android {
         versionCode = 1
         versionName = "1.0.0"
     }
+
+    sourceSets {
+        getByName("main") {
+            assets.srcDirs("src/main/assets")
+        }
+    }
+}
+
+// Copy VERSION file to Android assets
+tasks.register<Copy>("copyVersionToAssets") {
+    from(rootProject.file("VERSION"))
+    into("src/main/assets")
+    inputs.file(rootProject.file("VERSION"))
+    outputs.file("src/main/assets/VERSION")
+}
+
+tasks.named("preBuild") {
+    dependsOn("copyVersionToAssets")
 }
 
 dependencies {
