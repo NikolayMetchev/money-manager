@@ -6,10 +6,14 @@ import androidx.activity.compose.setContent
 import com.moneymanager.database.DatabaseDriverFactory
 import com.moneymanager.di.AppComponent
 import com.moneymanager.ui.MoneyManagerApp
+import com.moneymanager.ui.util.initVersionReader
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Initialize version reader with assets
+        initVersionReader(applicationContext.assets)
 
         // Initialize database driver with Android context
         val driverFactory = DatabaseDriverFactory(applicationContext)

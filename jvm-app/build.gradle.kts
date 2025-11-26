@@ -24,6 +24,13 @@ dependencies {
     runtimeOnly(libs.log4j.slf4j2.impl)
 }
 
+// Copy VERSION file to resources
+tasks.named<ProcessResources>("processResources") {
+    from(rootProject.file("VERSION")) {
+        into(".")
+    }
+}
+
 compose.desktop {
     application {
         mainClass = "com.moneymanager.MainKt"

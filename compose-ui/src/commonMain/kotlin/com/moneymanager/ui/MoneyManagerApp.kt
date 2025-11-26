@@ -12,6 +12,7 @@ import com.moneymanager.ui.navigation.Screen
 import com.moneymanager.ui.screens.AccountsScreen
 import com.moneymanager.ui.screens.CategoriesScreen
 import com.moneymanager.ui.screens.TransactionsScreen
+import com.moneymanager.ui.util.readAppVersion
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -30,6 +31,12 @@ fun MoneyManagerApp(
                     title = {
                         Column {
                             Text(currentScreen.title)
+                            val version = remember { readAppVersion() }
+                            Text(
+                                text = "v$version",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                            )
                             databasePath?.let { path ->
                                 Text(
                                     text = "Database: $path",
