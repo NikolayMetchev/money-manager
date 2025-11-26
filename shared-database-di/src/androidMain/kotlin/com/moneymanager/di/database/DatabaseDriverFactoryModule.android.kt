@@ -1,5 +1,6 @@
 package com.moneymanager.di.database
 
+import android.content.Context
 import app.cash.sqldelight.db.SqlDriver
 import com.moneymanager.database.FileDatabaseDriverFactory
 import com.moneymanager.domain.di.AppComponentParams
@@ -12,7 +13,14 @@ import dev.zacsweers.metro.SingleIn
 actual interface DatabaseDriverFactoryModule {
     @Provides
     @SingleIn(AppScope::class)
-    fun provideSqlDriver(params: AppComponentParams): SqlDriver {
-        return FileDatabaseDriverFactory(params.context).createDriver()
+    fun provideSqlDriver(context: Context): SqlDriver {
+        return FileDatabaseDriverFactory(context).createDriver()
     }
+}
+
+@ContributesTo(AppScope::class)
+interface ContextModule {
+    @Provides
+    @SingleIn(AppScope::class)
+    fun provideContext(params: AppComponentParams): Context = params.context
 }

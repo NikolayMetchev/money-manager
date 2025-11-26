@@ -10,7 +10,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
-import com.moneymanager.database.FileDatabaseDriverFactory
+import com.moneymanager.database.getDefaultDatabasePath
 import com.moneymanager.di.AppComponent
 import com.moneymanager.domain.di.AppComponentParams
 import com.moneymanager.domain.model.AppVersion
@@ -112,7 +112,7 @@ private fun MainWindow(onExit: () -> Unit) {
     LaunchedEffect(Unit) {
         try {
             log(LogLevel.INFO, "LaunchedEffect: Starting initialization")
-            val defaultDbPath = Paths.get(FileDatabaseDriverFactory.getDefaultDatabasePath())
+            val defaultDbPath = getDefaultDatabasePath()
             val dbExists = defaultDbPath.toFile().exists()
             log(LogLevel.DEBUG, "Default database path: $defaultDbPath, exists: $dbExists")
 
@@ -159,7 +159,7 @@ private fun MainWindow(onExit: () -> Unit) {
         // Show database selection dialog if needed
         if (showDatabaseDialog && initResult == null) {
             DatabaseSelectionDialog(
-                defaultPath = Paths.get(FileDatabaseDriverFactory.getDefaultDatabasePath()),
+                defaultPath = getDefaultDatabasePath(),
                 onDatabaseSelected = { selectedPath ->
                     try {
                         log(LogLevel.INFO, "User selected database path: $selectedPath")
