@@ -1,5 +1,0 @@
-root = false
-
-[*.{kt,kts}]
-# Disable function naming rule for Compose functions
-ktlint_standard_function-naming = disabled

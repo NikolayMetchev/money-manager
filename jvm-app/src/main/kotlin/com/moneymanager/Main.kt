@@ -1,24 +1,12 @@
 package com.moneymanager
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
@@ -27,6 +15,7 @@ import com.moneymanager.di.AppComponent
 import com.moneymanager.ui.DatabaseSelectionDialog
 import com.moneymanager.ui.ErrorDialog
 import com.moneymanager.ui.ErrorState
+import com.moneymanager.ui.MinimalErrorScreen
 import com.moneymanager.ui.MoneyManagerApp
 import com.moneymanager.ui.SimpleFallbackErrorScreen
 import com.moneymanager.ui.debug.LogCollector
@@ -38,16 +27,6 @@ import java.nio.file.Path
 import java.nio.file.Paths
 
 private val logger = logging()
-
-// Color constants for error screen
-@Suppress("MagicNumber")
-private val ERROR_BACKGROUND_COLOR = Color(0xFFFFEBEE)
-
-@Suppress("MagicNumber")
-private val ERROR_TITLE_COLOR = Color(0xFFB71C1C)
-
-@Suppress("MagicNumber")
-private val ERROR_TEXT_COLOR = Color(0xFF424242)
 
 @Suppress("TooGenericExceptionCaught", "PrintStackTrace")
 private fun log(
@@ -117,7 +96,7 @@ fun main() {
     }
 }
 
-@Suppress("TooGenericExceptionCaught", "LongMethod", "CyclomaticComplexMethod")
+@Suppress("TooGenericExceptionCaught", "LongMethod", "CyclomaticComplexMethod", "FunctionName")
 @Composable
 private fun MainWindow(onExit: () -> Unit) {
     // State for managing database selection
@@ -252,60 +231,6 @@ private fun MainWindow(onExit: () -> Unit) {
                 // Don't show anything if dialog is open
             }
         }
-    }
-}
-
-@Composable
-private fun MinimalErrorScreen(
-    message: String,
-    stackTrace: String,
-) {
-    // Ultra-minimal error screen using only foundation and compose.ui
-    Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .background(ERROR_BACKGROUND_COLOR)
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState()),
-    ) {
-        androidx.compose.foundation.text.BasicText(
-            text = "APPLICATION ERROR",
-            style =
-                androidx.compose.ui.text.TextStyle(
-                    fontSize = 24.sp,
-                    color = ERROR_TITLE_COLOR,
-                    fontFamily = FontFamily.Default,
-                ),
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        androidx.compose.foundation.text.BasicText(
-            text = message,
-            style =
-                androidx.compose.ui.text.TextStyle(
-                    fontSize = 16.sp,
-                    color = Color.Black,
-                ),
-        )
-        Spacer(modifier = Modifier.height(24.dp))
-        androidx.compose.foundation.text.BasicText(
-            text = "Full Stack Trace:",
-            style =
-                androidx.compose.ui.text.TextStyle(
-                    fontSize = 14.sp,
-                    color = Color.Black,
-                ),
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        androidx.compose.foundation.text.BasicText(
-            text = stackTrace,
-            style =
-                androidx.compose.ui.text.TextStyle(
-                    fontSize = 12.sp,
-                    fontFamily = FontFamily.Monospace,
-                    color = ERROR_TEXT_COLOR,
-                ),
-        )
     }
 }
 
