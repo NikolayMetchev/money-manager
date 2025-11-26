@@ -33,6 +33,12 @@ dependencies {
     runtimeOnly(libs.log4j.slf4j2.impl)
 }
 
+// Compose-specific ktlint configuration
+ktlint {
+    // Allow uppercase function names (standard for @Composable functions)
+    disabledRules.set(setOf("standard:function-naming"))
+}
+
 compose.desktop {
     application {
         mainClass = "com.moneymanager.MainKt"

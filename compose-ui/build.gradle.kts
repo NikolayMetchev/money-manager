@@ -23,11 +23,23 @@ kotlin {
                 implementation(projects.sharedDi)
             }
         }
+        val jvmMain by getting {
+            dependencies {
+                // Material (v2) for jvm-specific dialogs
+                implementation(compose.material)
+                implementation(compose.uiTooling)
+            }
+        }
     }
 }
 
 // Compose-specific ktlint configuration
 ktlint {
-    // Allow wildcard imports (common in Compose)
-    disabledRules.set(setOf("no-wildcard-imports", "function-naming"))
+    // Allow wildcard imports and uppercase function names (standard in Compose)
+    disabledRules.set(
+        setOf(
+            "standard:no-wildcard-imports",
+            "standard:function-naming",
+        ),
+    )
 }
