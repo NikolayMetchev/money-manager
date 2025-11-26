@@ -1,4 +1,17 @@
+// Read version from system property, project property, or VERSION file
+// Priority: -Dversion=X > -Pversion=X > VERSION file > "unspecified"
+val versionFile = rootProject.file("VERSION")
+val projectVersion = System.getProperty("version")
+    ?: (project.findProperty("version") as? String)?.takeIf { it != "unspecified" }
+    ?: if (versionFile.exists()) {
+        versionFile.readText().trim()
+    } else {
+        "unspecified"
+    }
+
 allprojects {
+    version = projectVersion
+
     repositories {
         google()
         mavenCentral()
