@@ -27,6 +27,8 @@ Money Manager is a personal finance management application built with Kotlin Mul
 
 **IMPORTANT (Windows)**: On Windows, run Gradle commands directly using `./gradlew.bat` without wrapping them in `cmd /c` or `powershell`. For example: `./gradlew.bat build` (not `cmd /c "gradlew.bat build"`).
 
+**IMPORTANT (Gradle Daemon)**: Do NOT use the `--no-daemon` flag when running Gradle commands. The Gradle daemon significantly improves build performance. Let Gradle manage the daemon lifecycle automatically.
+
 ### Building the Project
 ```bash
 ./gradlew build

@@ -6,19 +6,9 @@ plugins {
 }
 
 dependencies {
-    api(libs.androidx.compose.runtime.desktop)
-    api(libs.compose.foundation.layout.desktop)
-
-    implementation(libs.compose.desktop.linux.arm64)
-    implementation(libs.compose.desktop.linux.x64)
-    implementation(libs.compose.desktop.macos.arm64)
-    implementation(libs.compose.desktop.macos.x64)
-    implementation(libs.compose.desktop.windows.x64)
-    implementation(libs.compose.foundation.desktop)
-    implementation(libs.compose.material.desktop)
+    implementation(libs.androidx.compose.runtime.desktop)
     implementation(libs.compose.ui.desktop)
     implementation(libs.compose.ui.graphics.desktop)
-    implementation(libs.compose.ui.text.desktop)
     implementation(libs.compose.ui.unit.desktop)
     implementation(libs.diamondedge.logging)
     implementation(libs.kmlogging)
@@ -29,14 +19,9 @@ dependencies {
     implementation(projects.sharedDatabase)
     implementation(projects.sharedDi)
 
+    runtimeOnly(compose.desktop.currentOs)
     runtimeOnly(libs.log4j.core)
     runtimeOnly(libs.log4j.slf4j2.impl)
-}
-
-// Compose-specific ktlint configuration
-ktlint {
-    // Allow uppercase function names (standard for @Composable functions)
-    disabledRules.set(setOf("standard:function-naming"))
 }
 
 compose.desktop {
