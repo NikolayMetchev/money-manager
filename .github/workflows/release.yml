@@ -8,10 +8,68 @@ on:
 
 permissions:
   contents: write # Required to create releases and upload assets
+  actions: read # Required to check workflow status
 
 jobs:
+  check-build:
+    name: Verify Build Passed
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get commit SHA for tag
+        id: get-sha
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            # For tag pushes, get the commit the tag points to
+            COMMIT_SHA="${{ github.sha }}"
+          else
+            # For workflow_dispatch, get the SHA from the ref
+            COMMIT_SHA=$(git rev-parse HEAD)
+          fi
+          echo "sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
+          echo "Checking build status for commit: $COMMIT_SHA"
+
+      - name: Check if build workflow passed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          COMMIT_SHA="${{ steps.get-sha.outputs.sha }}"
+          echo "Waiting for build workflow to complete for commit $COMMIT_SHA..."
+
+          # Wait up to 10 minutes for build to complete
+          for i in {1..60}; do
+            # Get the latest build workflow run for this commit
+            BUILD_STATUS=$(gh run list \
+              --workflow=build.yml \
+              --commit="$COMMIT_SHA" \
+              --json conclusion \
+              --jq '.[0].conclusion // "pending"')
+
+            echo "Build status: $BUILD_STATUS"
+
+            if [ "$BUILD_STATUS" = "success" ]; then
+              echo "✓ Build workflow passed for commit $COMMIT_SHA"
+              exit 0
+            elif [ "$BUILD_STATUS" = "failure" ] || [ "$BUILD_STATUS" = "cancelled" ]; then
+              echo "✗ Build workflow failed or was cancelled for commit $COMMIT_SHA"
+              echo "Release cannot proceed without a successful build"
+              exit 1
+            fi
+
+            # Still pending, wait and retry
+            sleep 10
+          done
+
+          echo "✗ Timeout waiting for build workflow to complete"
+          exit 1
+
   build-all:
     name: Build ${{ matrix.platform }}
+    needs: [check-build]
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
