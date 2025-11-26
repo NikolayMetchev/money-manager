@@ -47,7 +47,7 @@ compose.desktop {
             )
 
             packageName = "MoneyManager"
-            packageVersion = "1.0.4" // Increment for each build to test upgrade
+            packageVersion = project.version.toString()
             description = "Personal Finance Management Application"
             vendor = "MoneyManager"
 
