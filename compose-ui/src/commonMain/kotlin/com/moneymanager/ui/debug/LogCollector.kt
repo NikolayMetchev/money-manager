@@ -13,13 +13,18 @@ object LogCollector {
 
     private const val MAX_LOGS = 500
 
-    fun log(level: LogLevel, message: String, throwable: Throwable? = null) {
-        val entry = LogEntry(
-            timestamp = System.currentTimeMillis(),
-            level = level,
-            message = message,
-            throwable = throwable
-        )
+    fun log(
+        level: LogLevel,
+        message: String,
+        throwable: Throwable? = null,
+    ) {
+        val entry =
+            LogEntry(
+                timestamp = System.currentTimeMillis(),
+                level = level,
+                message = message,
+                throwable = throwable,
+            )
         _logs.value = (_logs.value + entry).takeLast(MAX_LOGS)
     }
 
@@ -32,12 +37,12 @@ data class LogEntry(
     val timestamp: Long,
     val level: LogLevel,
     val message: String,
-    val throwable: Throwable? = null
+    val throwable: Throwable? = null,
 )
 
 enum class LogLevel(val displayName: String) {
     DEBUG("DEBUG"),
     INFO("INFO"),
     WARN("WARN"),
-    ERROR("ERROR")
+    ERROR("ERROR"),
 }

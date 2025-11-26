@@ -31,7 +31,7 @@ class MainActivity : ComponentActivity() {
                 accountRepository = accountRepository,
                 categoryRepository = categoryRepository,
                 transactionRepository = transactionRepository,
-                databasePath = dbPath
+                databasePath = dbPath,
             )
         }
     }

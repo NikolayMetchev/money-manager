@@ -2,7 +2,6 @@ package com.moneymanager.database
 
 import app.cash.sqldelight.db.SqlDriver
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
-import com.moneymanager.database.MoneyManagerDatabase
 
 actual class DatabaseDriverFactory {
     actual fun createDriver(): SqlDriver {
@@ -11,7 +10,10 @@ actual class DatabaseDriverFactory {
         return driver
     }
 
-    fun createDriver(databasePath: String, isNewDatabase: Boolean = false): SqlDriver {
+    fun createDriver(
+        databasePath: String,
+        isNewDatabase: Boolean = false,
+    ): SqlDriver {
         val driver: SqlDriver = JdbcSqliteDriver("jdbc:sqlite:$databasePath")
 
         if (isNewDatabase) {

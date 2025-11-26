@@ -1,7 +1,7 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 
 plugins {
+    id("moneymanager.kotlin-convention")
     id("org.jetbrains.kotlin.multiplatform")
     id("com.android.kotlin.multiplatform.library")
 }
@@ -33,8 +33,7 @@ kotlin {
     }
 }
 
-tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
-    compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_24)
-    }
+// Override ktlint android setting for Android modules
+ktlint {
+    android.set(true)
 }

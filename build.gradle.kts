@@ -16,6 +16,7 @@ tasks.register("lintFormat") {
     description = "Runs all formatting tasks"
     group = "formatting"
     dependsOn(subprojects.mapNotNull { it.tasks.findByName("sortDependencies") })
+    dependsOn(subprojects.mapNotNull { it.tasks.findByName("ktlintFormat") })
 }
 
 dependencyAnalysis {

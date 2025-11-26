@@ -1,10 +1,7 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
-import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 
 plugins {
-    id("com.squareup.sort-dependencies")
-    id("dev.detekt")
+    id("moneymanager.kotlin-convention")
     id("org.jetbrains.kotlin.multiplatform")
 }
 
@@ -22,16 +19,4 @@ configure<KotlinMultiplatformExtension> {
             }
         }
     }
-}
-
-tasks.withType<KotlinJvmCompile>().configureEach {
-    compilerOptions {
-        jvmTarget.set(JvmTarget.fromTarget(libs.findVersion("jvm-target").get().toString()))
-    }
-}
-
-detekt {
-    config.setFrom(rootProject.file("detekt.yml"))
-    buildUponDefaultConfig = true
-    allRules = false
 }

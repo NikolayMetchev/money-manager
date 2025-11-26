@@ -1,4 +1,4 @@
-package com.moneymanager
+package com.moneymanager.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -23,10 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import java.awt.FileDialog
-import java.awt.Frame
 import java.nio.file.Path
-import java.nio.file.Paths
 
 /**
  * Dialog shown on startup when the default database file doesn't exist
@@ -35,23 +32,26 @@ import java.nio.file.Paths
 fun DatabaseSelectionDialog(
     defaultPath: Path,
     onDatabaseSelected: (Path) -> Unit,
-    onCancel: () -> Unit
+    onCancel: () -> Unit,
+    onShowFileChooser: () -> Path?,
 ) {
     var selectedPath by remember { mutableStateOf(defaultPath) }
 
     Dialog(onDismissRequest = onCancel) {
         Surface(
-            modifier = Modifier
-                .width(500.dp)
-                .wrapContentHeight(),
+            modifier =
+                Modifier
+                    .width(500.dp)
+                    .wrapContentHeight(),
             shape = MaterialTheme.shapes.medium,
-            elevation = 8.dp
+            elevation = 8.dp,
         ) {
             DatabaseSelectionContent(
                 selectedPath = selectedPath,
                 onPathChange = { selectedPath = it },
                 onDatabaseSelected = { onDatabaseSelected(selectedPath) },
-                onCancel = onCancel
+                onCancel = onCancel,
+                onShowFileChooser = onShowFileChooser,
             )
         }
     }
@@ -62,33 +62,37 @@ private fun DatabaseSelectionContent(
     selectedPath: Path,
     onPathChange: (Path) -> Unit,
     onDatabaseSelected: () -> Unit,
-    onCancel: () -> Unit
+    onCancel: () -> Unit,
+    onShowFileChooser: () -> Path?,
 ) {
     Column(
         modifier = Modifier.padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(
             text = "Database Setup",
-            style = MaterialTheme.typography.h5
+            style = MaterialTheme.typography.h5,
         )
 
         Text(
             text = "No database file found. Would you like to create a new database?",
-            style = MaterialTheme.typography.body1
+            style = MaterialTheme.typography.body1,
         )
 
         Divider()
 
         DatabasePathDisplay(selectedPath)
 
-        DatabaseLocationButton(onPathChange = onPathChange)
+        DatabaseLocationButton(
+            onPathChange = onPathChange,
+            onShowFileChooser = onShowFileChooser,
+        )
 
         Divider()
 
         DatabaseActionButtons(
             onCancel = onCancel,
-            onConfirm = onDatabaseSelected
+            onConfirm = onDatabaseSelected,
         )
     }
 }
@@ -97,28 +101,31 @@ private fun DatabaseSelectionContent(
 private fun DatabasePathDisplay(selectedPath: Path) {
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
             text = "Database location:",
-            style = MaterialTheme.typography.subtitle2
+            style = MaterialTheme.typography.subtitle2,
         )
         Text(
             text = selectedPath.toString(),
             style = MaterialTheme.typography.body2,
-            color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f)
+            color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f),
         )
     }
 }
 
 @Composable
-private fun DatabaseLocationButton(onPathChange: (Path) -> Unit) {
+private fun DatabaseLocationButton(
+    onPathChange: (Path) -> Unit,
+    onShowFileChooser: () -> Path?,
+) {
     OutlinedButton(
         onClick = {
-            val newPath = showFileChooserDialog()
+            val newPath = onShowFileChooser()
             newPath?.let { onPathChange(it) }
         },
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Text("Choose Different Location...")
     }
@@ -127,11 +134,11 @@ private fun DatabaseLocationButton(onPathChange: (Path) -> Unit) {
 @Composable
 private fun DatabaseActionButtons(
     onCancel: () -> Unit,
-    onConfirm: () -> Unit
+    onConfirm: () -> Unit,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
     ) {
         TextButton(onClick = onCancel) {
             Text("Cancel")
@@ -139,20 +146,5 @@ private fun DatabaseActionButtons(
         Button(onClick = onConfirm) {
             Text("Create Database")
         }
-    }
-}
-
-private fun showFileChooserDialog(): Path? {
-    val fileDialog = FileDialog(null as Frame?, "Choose Database Location", FileDialog.SAVE)
-    fileDialog.file = "default.db"
-    fileDialog.isVisible = true
-
-    val selectedFile = fileDialog.file
-    val selectedDir = fileDialog.directory
-
-    return if (selectedFile != null && selectedDir != null) {
-        Paths.get(selectedDir, selectedFile)
-    } else {
-        null
     }
 }

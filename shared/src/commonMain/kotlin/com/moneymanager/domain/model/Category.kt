@@ -13,5 +13,5 @@ data class Category(
     val parentId: Long? = null,
     val isActive: Boolean = true,
     val createdAt: Instant,
-    val updatedAt: Instant
+    val updatedAt: Instant,
 )

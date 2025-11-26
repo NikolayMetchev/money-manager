@@ -5,8 +5,8 @@ package com.moneymanager.database.repository
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
-import com.moneymanager.database.mapper.TransactionMapper
 import com.moneymanager.database.MoneyManagerDatabase
+import com.moneymanager.database.mapper.TransactionMapper
 import com.moneymanager.domain.model.Transaction
 import com.moneymanager.domain.repository.TransactionRepository
 import kotlinx.coroutines.Dispatchers
@@ -16,9 +16,8 @@ import kotlinx.coroutines.withContext
 import kotlin.time.Instant
 
 class TransactionRepositoryImpl(
-    private val database: MoneyManagerDatabase
+    private val database: MoneyManagerDatabase,
 ) : TransactionRepository {
-
     private val queries = database.transactionQueries
 
     override fun getAllTransactions(): Flow<List<Transaction>> =
@@ -45,10 +44,13 @@ class TransactionRepositoryImpl(
             .mapToList(Dispatchers.Default)
             .map(TransactionMapper::mapList)
 
-    override fun getTransactionsByDateRange(startDate: Instant, endDate: Instant): Flow<List<Transaction>> =
+    override fun getTransactionsByDateRange(
+        startDate: Instant,
+        endDate: Instant,
+    ): Flow<List<Transaction>> =
         queries.selectByDateRange(
             startDate.toEpochMilliseconds(),
-            endDate.toEpochMilliseconds()
+            endDate.toEpochMilliseconds(),
         )
             .asFlow()
             .mapToList(Dispatchers.Default)
@@ -57,54 +59,57 @@ class TransactionRepositoryImpl(
     override fun getTransactionsByAccountAndDateRange(
         accountId: Long,
         startDate: Instant,
-        endDate: Instant
+        endDate: Instant,
     ): Flow<List<Transaction>> =
         queries.selectByAccountAndDateRange(
             accountId,
             accountId,
             startDate.toEpochMilliseconds(),
-            endDate.toEpochMilliseconds()
+            endDate.toEpochMilliseconds(),
         )
             .asFlow()
             .mapToList(Dispatchers.Default)
             .map(TransactionMapper::mapList)
 
-    override suspend fun createTransaction(transaction: Transaction): Long = withContext(Dispatchers.Default) {
-        queries.insert(
-            accountId = transaction.accountId,
-            categoryId = transaction.categoryId,
-            type = transaction.type.name,
-            amount = transaction.amount,
-            currency = transaction.currency,
-            description = transaction.description,
-            note = transaction.note,
-            transactionDate = transaction.transactionDate.toEpochMilliseconds(),
-            toAccountId = transaction.toAccountId,
-            createdAt = transaction.createdAt.toEpochMilliseconds(),
-            updatedAt = transaction.updatedAt.toEpochMilliseconds()
-        )
-        queries.lastInsertRowId().executeAsOne()
-    }
+    override suspend fun createTransaction(transaction: Transaction): Long =
+        withContext(Dispatchers.Default) {
+            queries.insert(
+                accountId = transaction.accountId,
+                categoryId = transaction.categoryId,
+                type = transaction.type.name,
+                amount = transaction.amount,
+                currency = transaction.currency,
+                description = transaction.description,
+                note = transaction.note,
+                transactionDate = transaction.transactionDate.toEpochMilliseconds(),
+                toAccountId = transaction.toAccountId,
+                createdAt = transaction.createdAt.toEpochMilliseconds(),
+                updatedAt = transaction.updatedAt.toEpochMilliseconds(),
+            )
+            queries.lastInsertRowId().executeAsOne()
+        }
 
-    override suspend fun updateTransaction(transaction: Transaction): Unit = withContext(Dispatchers.Default) {
-        queries.update(
-            accountId = transaction.accountId,
-            categoryId = transaction.categoryId,
-            type = transaction.type.name,
-            amount = transaction.amount,
-            currency = transaction.currency,
-            description = transaction.description,
-            note = transaction.note,
-            transactionDate = transaction.transactionDate.toEpochMilliseconds(),
-            toAccountId = transaction.toAccountId,
-            updatedAt = transaction.updatedAt.toEpochMilliseconds(),
-            id = transaction.id
-        )
-        Unit
-    }
+    override suspend fun updateTransaction(transaction: Transaction): Unit =
+        withContext(Dispatchers.Default) {
+            queries.update(
+                accountId = transaction.accountId,
+                categoryId = transaction.categoryId,
+                type = transaction.type.name,
+                amount = transaction.amount,
+                currency = transaction.currency,
+                description = transaction.description,
+                note = transaction.note,
+                transactionDate = transaction.transactionDate.toEpochMilliseconds(),
+                toAccountId = transaction.toAccountId,
+                updatedAt = transaction.updatedAt.toEpochMilliseconds(),
+                id = transaction.id,
+            )
+            Unit
+        }
 
-    override suspend fun deleteTransaction(id: Long): Unit = withContext(Dispatchers.Default) {
-        queries.delete(id)
-        Unit
-    }
+    override suspend fun deleteTransaction(id: Long): Unit =
+        withContext(Dispatchers.Default) {
+            queries.delete(id)
+            Unit
+        }
 }

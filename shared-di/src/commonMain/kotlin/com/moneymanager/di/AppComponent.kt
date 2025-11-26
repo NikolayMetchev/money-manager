@@ -15,6 +15,8 @@ interface AppComponent {
 
     @DependencyGraph.Factory
     interface Factory {
-        fun create(@Provides driver: SqlDriver): AppComponent
+        fun create(
+            @Provides driver: SqlDriver,
+        ): AppComponent
     }
 }

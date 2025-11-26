@@ -16,30 +16,31 @@ fun CategoriesScreen(categoryRepository: CategoryRepository) {
     val categories by categoryRepository.getAllCategories().collectAsState(initial = emptyList())
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(16.dp),
     ) {
         Text(
             text = "Your Categories",
             style = MaterialTheme.typography.headlineMedium,
-            modifier = Modifier.padding(bottom = 16.dp)
+            modifier = Modifier.padding(bottom = 16.dp),
         )
 
         if (categories.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
+                contentAlignment = Alignment.Center,
             ) {
                 Text(
                     text = "No categories yet. Add your first category!",
                     style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         } else {
             LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(categories) { category ->
                     CategoryCard(category)
@@ -53,31 +54,32 @@ fun CategoriesScreen(categoryRepository: CategoryRepository) {
 fun CategoryCard(category: Category) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Column {
                 Text(
                     text = category.name,
-                    style = MaterialTheme.typography.titleMedium
+                    style = MaterialTheme.typography.titleMedium,
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = category.type.name,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 if (category.parentId != null) {
                     Text(
                         text = "Subcategory",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.secondary
+                        color = MaterialTheme.colorScheme.secondary,
                     )
                 }
             }

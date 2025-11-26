@@ -12,21 +12,22 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun ErrorDialog(
     error: ErrorState,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Application Error") },
         text = {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 400.dp)
-                    .verticalScroll(rememberScrollState())
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 400.dp)
+                        .verticalScroll(rememberScrollState()),
             ) {
                 Text(
                     text = error.message,
-                    style = MaterialTheme.typography.bodyMedium
+                    style = MaterialTheme.typography.bodyMedium,
                 )
 
                 error.fullException?.let { fullException ->
@@ -35,14 +36,14 @@ fun ErrorDialog(
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
                         text = "Full Exception Details:",
-                        style = MaterialTheme.typography.titleSmall
+                        style = MaterialTheme.typography.titleSmall,
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = fullException,
                         style = MaterialTheme.typography.bodySmall,
                         fontFamily = FontFamily.Monospace,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
@@ -52,12 +53,12 @@ fun ErrorDialog(
                 Text("OK")
             }
         },
-        modifier = Modifier.width(600.dp)
+        modifier = Modifier.width(600.dp),
     )
 }
 
 data class ErrorState(
     val message: String,
     val canRecover: Boolean,
-    val fullException: String? = null
+    val fullException: String? = null,
 )

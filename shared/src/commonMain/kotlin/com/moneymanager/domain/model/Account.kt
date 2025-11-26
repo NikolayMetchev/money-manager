@@ -14,5 +14,5 @@ data class Account(
     val icon: String? = null,
     val isActive: Boolean = true,
     val createdAt: Instant,
-    val updatedAt: Instant
+    val updatedAt: Instant,
 )

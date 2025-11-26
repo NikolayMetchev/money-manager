@@ -3,7 +3,6 @@ package com.moneymanager.ui
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.ui.debug.DebugLogScreen
@@ -12,44 +11,46 @@ import com.moneymanager.ui.debug.DebugLogScreen
 @Composable
 fun ErrorScreen(
     errorMessage: String,
-    fullException: String?
+    fullException: String?,
 ) {
     MaterialTheme {
         Scaffold(
             topBar = {
                 TopAppBar(
                     title = { Text("Application Error") },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer,
-                        titleContentColor = MaterialTheme.colorScheme.onErrorContainer
-                    )
+                    colors =
+                        TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                            titleContentColor = MaterialTheme.colorScheme.onErrorContainer,
+                        ),
                 )
-            }
+            },
         ) { paddingValues ->
             Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues),
             ) {
                 // Error message section
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     color = MaterialTheme.colorScheme.errorContainer,
-                    tonalElevation = 2.dp
+                    tonalElevation = 2.dp,
                 ) {
                     Column(
-                        modifier = Modifier.padding(16.dp)
+                        modifier = Modifier.padding(16.dp),
                     ) {
                         Text(
                             text = "The application failed to initialize:",
                             style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onErrorContainer
+                            color = MaterialTheme.colorScheme.onErrorContainer,
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = errorMessage,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onErrorContainer
+                            color = MaterialTheme.colorScheme.onErrorContainer,
                         )
 
                         fullException?.let { exception ->
@@ -57,13 +58,13 @@ fun ErrorScreen(
                             Text(
                                 text = "Exception Details:",
                                 style = MaterialTheme.typography.titleSmall,
-                                color = MaterialTheme.colorScheme.onErrorContainer
+                                color = MaterialTheme.colorScheme.onErrorContainer,
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
                                 text = exception.take(500) + if (exception.length > 500) "..." else "",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onErrorContainer
+                                color = MaterialTheme.colorScheme.onErrorContainer,
                             )
                         }
 
@@ -73,7 +74,7 @@ fun ErrorScreen(
                         Text(
                             text = "See full debug logs below ↓",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onErrorContainer
+                            color = MaterialTheme.colorScheme.onErrorContainer,
                         )
                     }
                 }
