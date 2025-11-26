@@ -6,6 +6,7 @@ on:
 
 permissions:
   contents: write # Required to create tags
+  actions: write # Required to trigger workflows
 
 jobs:
   create-tag:
