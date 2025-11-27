@@ -4,7 +4,6 @@ import com.moneymanager.database.AndroidSqlDriverFactory
 import com.moneymanager.database.InMemoryMoneyManagerDatabaseFactory
 import com.moneymanager.database.MoneyManagerDatabaseFactory
 import com.moneymanager.di.TestScope
-import com.moneymanager.di.database.DbTestComponentParams
 import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
