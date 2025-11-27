@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import com.moneymanager.database.DbLocation
 import java.nio.file.Path
 
 /**
@@ -30,12 +31,12 @@ import java.nio.file.Path
  */
 @Composable
 fun DatabaseSelectionDialog(
-    defaultPath: Path,
+    defaultPath: DbLocation,
     onDatabaseSelected: (Path) -> Unit,
     onCancel: () -> Unit,
     onShowFileChooser: () -> Path?,
 ) {
-    var selectedPath by remember { mutableStateOf(defaultPath) }
+    var selectedPath by remember { mutableStateOf(defaultPath.path) }
 
     Dialog(onDismissRequest = onCancel) {
         Surface(

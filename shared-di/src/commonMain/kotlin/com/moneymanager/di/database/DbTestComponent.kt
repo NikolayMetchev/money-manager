@@ -1,19 +1,18 @@
-package com.moneymanager.di
+package com.moneymanager.di.database
 
 import com.moneymanager.database.RepositoryFactory
-import com.moneymanager.domain.model.AppVersion
+import com.moneymanager.di.TestScope
 import dev.zacsweers.metro.DependencyGraph
 import dev.zacsweers.metro.Provides
 
-@DependencyGraph(AppScope::class)
-interface AppComponent {
+@DependencyGraph(TestScope::class)
+interface DbTestComponent {
     val repositoryFactory: RepositoryFactory
-    val appVersion: AppVersion
 
     @DependencyGraph.Factory
     interface Factory {
         fun create(
-            @Provides params: AppComponentParams,
-        ): AppComponent
+            @Provides params: DbTestComponentParams,
+        ): DbTestComponent
     }
 }

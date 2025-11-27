@@ -1,6 +1,5 @@
 package com.moneymanager.di
 
-import com.moneymanager.domain.di.AppScope
 import com.moneymanager.domain.model.AppVersion
 import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Provides

@@ -10,9 +10,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
-import com.moneymanager.database.getDefaultDatabasePath
+import com.moneymanager.database.DEFAULT_DATABASE_PATH
+import com.moneymanager.database.DbLocation
 import com.moneymanager.di.AppComponent
-import com.moneymanager.domain.di.AppComponentParams
+import com.moneymanager.di.AppComponentParams
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.ui.DatabaseSelectionDialog
 import com.moneymanager.ui.ErrorDialog
@@ -25,7 +26,6 @@ import com.moneymanager.ui.debug.LogLevel
 import org.lighthousegames.logging.logging
 import java.awt.FileDialog
 import java.awt.Frame
-import java.nio.file.Path
 import java.nio.file.Paths
 
 private val logger = logging()
@@ -102,7 +102,7 @@ fun main() {
 @Composable
 private fun MainWindow(onExit: () -> Unit) {
     // State for managing database selection
-    var databasePath by remember { mutableStateOf<Path?>(null) }
+    var databasePath by remember { mutableStateOf<DbLocation?>(null) }
     var showDatabaseDialog by remember { mutableStateOf(false) }
     var errorState by remember { mutableStateOf<ErrorState?>(null) }
     var initResult by remember { mutableStateOf<InitResult?>(null) }
@@ -112,8 +112,8 @@ private fun MainWindow(onExit: () -> Unit) {
     LaunchedEffect(Unit) {
         try {
             log(LogLevel.INFO, "LaunchedEffect: Starting initialization")
-            val defaultDbPath = getDefaultDatabasePath()
-            val dbExists = defaultDbPath.toFile().exists()
+            val defaultDbPath = DEFAULT_DATABASE_PATH
+            val dbExists = defaultDbPath.exists()
             log(LogLevel.DEBUG, "Default database path: $defaultDbPath, exists: $dbExists")
 
             if (dbExists) {
@@ -137,7 +137,7 @@ private fun MainWindow(onExit: () -> Unit) {
         when {
             fatalError != null -> "Money Manager - Fatal Error"
             initResult is InitResult.Error -> "Money Manager - Error"
-            databasePath != null -> "Money Manager - ${databasePath?.fileName}"
+            databasePath != null -> "Money Manager - $databasePath"
             else -> "Money Manager - Setup"
         }
 
@@ -159,15 +159,15 @@ private fun MainWindow(onExit: () -> Unit) {
         // Show database selection dialog if needed
         if (showDatabaseDialog && initResult == null) {
             DatabaseSelectionDialog(
-                defaultPath = getDefaultDatabasePath(),
+                defaultPath = DEFAULT_DATABASE_PATH,
                 onDatabaseSelected = { selectedPath ->
                     try {
                         log(LogLevel.INFO, "User selected database path: $selectedPath")
-                        databasePath = selectedPath
+                        databasePath = DbLocation(selectedPath)
                         showDatabaseDialog = false
                         log(LogLevel.INFO, "Database path set successfully")
                         // Initialize after path is set (directory creation is handled by DatabaseDriverFactory)
-                        initResult = initializeApplication(selectedPath)
+                        initResult = initializeApplication(DbLocation(selectedPath))
                     } catch (e: Exception) {
                         log(LogLevel.ERROR, "Failed to set database path: ${e.message}", e)
                         errorState =
@@ -248,17 +248,17 @@ private sealed class InitResult {
 }
 
 @Suppress("TooGenericExceptionCaught", "PrintStackTrace", "ReturnCount")
-private fun initializeApplication(dbPath: Path): InitResult {
+private fun initializeApplication(dbLocation: DbLocation): InitResult {
     return try {
         log(LogLevel.INFO, "=== Starting Application Initialization ===")
-        log(LogLevel.INFO, "Database path: $dbPath")
+        log(LogLevel.INFO, "Database path: $dbLocation")
 
         // Create AppComponent with database path
         // DI system will handle DatabaseDriverFactory creation and database initialization
         val component: AppComponent =
             try {
                 log(LogLevel.INFO, "Creating DI component...")
-                val params = AppComponentParams(databasePath = dbPath.toAbsolutePath().toString())
+                val params = AppComponentParams()
                 val result = AppComponent.create(params)
                 log(LogLevel.INFO, "DI component created successfully")
                 result
@@ -271,9 +271,9 @@ private fun initializeApplication(dbPath: Path): InitResult {
                 )
             }
 
-        val accountRepository = component.accountRepository
-        val categoryRepository = component.categoryRepository
-        val transactionRepository = component.transactionRepository
+        val accountRepository = component.repositoryFactory.createAccountRepository({ DEFAULT_DATABASE_PATH })
+        val categoryRepository = component.repositoryFactory.createCategoryRepository({ DEFAULT_DATABASE_PATH })
+        val transactionRepository = component.repositoryFactory.createTransactionRepository({ DEFAULT_DATABASE_PATH })
         val appVersion = component.appVersion
         log(LogLevel.INFO, "App version: ${appVersion.value}")
         log(LogLevel.INFO, "All repositories initialized successfully")

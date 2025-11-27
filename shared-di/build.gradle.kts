@@ -7,8 +7,8 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                api(projects.sharedDatabaseDi)
                 implementation(libs.metro.runtime)
+                implementation(projects.shared)
                 implementation(projects.sharedDatabase)
             }
         }
