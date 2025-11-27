@@ -10,15 +10,21 @@ import com.moneymanager.domain.repository.TransactionRepository
 class DbRepositoryFactory(
     private val moneyManagerFactory: MoneyManagerDatabaseFactory,
 ) : RepositoryFactory {
+    private var cachedDatabase: MoneyManagerDatabase? = null
+
+    private fun getDatabase(listener: DefaultLocationMissingListener): MoneyManagerDatabase {
+        return cachedDatabase ?: moneyManagerFactory.createMoneyManager(listener).also { cachedDatabase = it }
+    }
+
     override fun createAccountRepository(listener: DefaultLocationMissingListener): AccountRepository {
-        return AccountRepositoryImpl(moneyManagerFactory.createMoneyManager(listener))
+        return AccountRepositoryImpl(getDatabase(listener))
     }
 
     override fun createCategoryRepository(listener: DefaultLocationMissingListener): CategoryRepository {
-        return CategoryRepositoryImpl(moneyManagerFactory.createMoneyManager(listener))
+        return CategoryRepositoryImpl(getDatabase(listener))
     }
 
     override fun createTransactionRepository(listener: DefaultLocationMissingListener): TransactionRepository {
-        return TransactionRepositoryImpl(moneyManagerFactory.createMoneyManager(listener))
+        return TransactionRepositoryImpl(getDatabase(listener))
     }
 }
