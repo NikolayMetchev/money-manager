@@ -26,9 +26,10 @@ class MainActivity : ComponentActivity() {
         val appVersion = component.appVersion
 
         // Create repositories from factory with default listener
-        val listener = DefaultLocationMissingListener {
-            com.moneymanager.database.DbLocation(com.moneymanager.database.DEFAULT_DATABASE_NAME)
-        }
+        val listener =
+            DefaultLocationMissingListener {
+                com.moneymanager.database.DbLocation(com.moneymanager.database.DEFAULT_DATABASE_NAME)
+            }
         val accountRepository = repositoryFactory.createAccountRepository(listener)
         val categoryRepository = repositoryFactory.createCategoryRepository(listener)
         val transactionRepository = repositoryFactory.createTransactionRepository(listener)

@@ -3,11 +3,10 @@ package com.moneymanager.database
 import app.cash.sqldelight.db.SqlDriver
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver.Companion.IN_MEMORY
-import com.moneymanager.database.DbLocation
 import java.nio.file.Files
 import kotlin.io.path.exists
 
-object JvmSqlDriverFactory: SqlDriverFactory {
+object JvmSqlDriverFactory : SqlDriverFactory {
     override fun createSqlDriver(dbLocation: DbLocation): SqlDriver {
         // Use provided path or default path
         val dbFile = dbLocation.path

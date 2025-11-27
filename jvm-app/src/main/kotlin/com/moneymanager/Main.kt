@@ -26,7 +26,6 @@ import com.moneymanager.ui.debug.LogLevel
 import org.lighthousegames.logging.logging
 import java.awt.FileDialog
 import java.awt.Frame
-import java.nio.file.Path
 import java.nio.file.Paths
 
 private val logger = logging()
@@ -272,7 +271,7 @@ private fun initializeApplication(dbLocation: DbLocation): InitResult {
                 )
             }
 
-        val accountRepository = component.repositoryFactory.createAccountRepository( { DEFAULT_DATABASE_PATH })
+        val accountRepository = component.repositoryFactory.createAccountRepository({ DEFAULT_DATABASE_PATH })
         val categoryRepository = component.repositoryFactory.createCategoryRepository({ DEFAULT_DATABASE_PATH })
         val transactionRepository = component.repositoryFactory.createTransactionRepository({ DEFAULT_DATABASE_PATH })
         val appVersion = component.appVersion
