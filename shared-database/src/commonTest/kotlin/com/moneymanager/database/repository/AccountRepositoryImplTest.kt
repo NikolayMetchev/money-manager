@@ -2,14 +2,13 @@
 
 package com.moneymanager.database.repository
 
-import com.moneymanager.database.DatabaseDriverFactory
-import com.moneymanager.database.InMemoryDatabaseDriverFactory
-import com.moneymanager.database.MoneyManagerDatabase
+import com.moneymanager.di.database.DbTestComponent
+import com.moneymanager.di.database.DbTestComponentParams
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountType
+import com.moneymanager.domain.repository.AccountRepository
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
-import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -20,23 +19,13 @@ import kotlin.test.assertTrue
 import kotlin.time.Clock
 
 class AccountRepositoryImplTest {
-    private lateinit var database: MoneyManagerDatabase
-    private lateinit var repository: AccountRepositoryImpl
-    private lateinit var driver: app.cash.sqldelight.db.SqlDriver
-    private lateinit var databaseDriverFactory: DatabaseDriverFactory
+    private lateinit var repository: AccountRepository
 
     @BeforeTest
     fun setup() {
-        // Create an in-memory database for testing
-        databaseDriverFactory = InMemoryDatabaseDriverFactory()
-        driver = databaseDriverFactory.createDriver()
-        database = MoneyManagerDatabase(driver)
-        repository = AccountRepositoryImpl(database)
-    }
-
-    @AfterTest
-    fun teardown() {
-        driver.close()
+        // Create test component with in-memory database
+        val component = DbTestComponent.create(DbTestComponentParams())
+        repository = component.accountRepository
     }
 
     // CREATE ACCOUNT TESTS
