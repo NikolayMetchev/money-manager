@@ -20,6 +20,7 @@ kotlin {
             dependencies {
                 implementation(libs.kotlinx.coroutines.test)
                 implementation(projects.sharedDatabaseTest)
+                implementation(projects.sharedDi)
             }
         }
 

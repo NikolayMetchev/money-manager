@@ -2,6 +2,8 @@
 
 package com.moneymanager.database.repository
 
+import com.moneymanager.database.DEFAULT_DATABASE_PATH
+import com.moneymanager.database.DefaultLocationMissingListener
 import com.moneymanager.di.database.DbTestComponent
 import com.moneymanager.di.database.DbTestComponentParams
 import com.moneymanager.domain.model.Account
@@ -25,7 +27,8 @@ class AccountRepositoryImplTest {
     fun setup() {
         // Create test component with in-memory database
         val component = DbTestComponent.create(DbTestComponentParams())
-        repository = component.accountRepository
+        val listener = DefaultLocationMissingListener { DEFAULT_DATABASE_PATH }
+        repository = component.repositoryFactory.createAccountRepository(listener)
     }
 
     // CREATE ACCOUNT TESTS
