@@ -1,4 +1,4 @@
-package database
+package com.moneymanager.di.database
 
 import com.moneymanager.di.AppScope
 import dev.zacsweers.metro.ContributesTo

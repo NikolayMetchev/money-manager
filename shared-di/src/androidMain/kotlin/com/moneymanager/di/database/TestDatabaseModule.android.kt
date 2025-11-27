@@ -1,9 +1,10 @@
-package database
+package com.moneymanager.di.database
 
+import com.moneymanager.database.AndroidSqlDriverFactory
 import com.moneymanager.database.InMemoryMoneyManagerDatabaseFactory
-import com.moneymanager.database.JvmSqlDriverFactory
 import com.moneymanager.database.MoneyManagerDatabaseFactory
 import com.moneymanager.di.TestScope
+import com.moneymanager.di.database.DbTestComponentParams
 import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
@@ -12,5 +13,7 @@ import dev.zacsweers.metro.SingleIn
 actual interface TestDatabaseModule {
     @Provides
     @SingleIn(TestScope::class)
-    fun provideMoneyManagerDatabaseFactory(): MoneyManagerDatabaseFactory = InMemoryMoneyManagerDatabaseFactory(JvmSqlDriverFactory)
+    fun provideMoneyManagerDatabaseFactory(params: DbTestComponentParams): MoneyManagerDatabaseFactory {
+        return InMemoryMoneyManagerDatabaseFactory(AndroidSqlDriverFactory(params.context))
+    }
 }

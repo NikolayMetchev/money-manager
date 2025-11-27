@@ -1,4 +1,4 @@
-package database
+package com.moneymanager.di.database
 
 /**
  * JVM-specific parameters for DbTestComponent creation.

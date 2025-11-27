@@ -1,4 +1,4 @@
-package database
+package com.moneymanager.di.database
 
 import com.moneymanager.database.DbRepositoryFactory
 import com.moneymanager.database.MoneyManagerDatabaseFactory

@@ -1,4 +1,4 @@
-package database
+package com.moneymanager.di.database
 
 import com.moneymanager.database.AndroidSqlDriverFactory
 import com.moneymanager.database.DEFAULT_DATABASE_NAME

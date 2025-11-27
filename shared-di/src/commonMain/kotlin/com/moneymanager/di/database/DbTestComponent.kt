@@ -1,4 +1,4 @@
-package database
+package com.moneymanager.di.database
 
 import com.moneymanager.database.RepositoryFactory
 import com.moneymanager.di.TestScope
