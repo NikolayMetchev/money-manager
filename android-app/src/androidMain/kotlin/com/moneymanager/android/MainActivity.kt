@@ -5,7 +5,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import com.moneymanager.di.AppComponent
 import com.moneymanager.di.initializeVersionReader
-import com.moneymanager.domain.di.AppComponentParams
 import com.moneymanager.ui.MoneyManagerApp
 
 class MainActivity : ComponentActivity() {

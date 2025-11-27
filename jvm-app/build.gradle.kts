@@ -17,7 +17,6 @@ dependencies {
     implementation(projects.composeUi)
     implementation(projects.shared)
     implementation(projects.sharedDatabase)
-    implementation(projects.sharedDatabaseDi)
     implementation(projects.sharedDi)
 
     runtimeOnly(compose.desktop.currentOs)

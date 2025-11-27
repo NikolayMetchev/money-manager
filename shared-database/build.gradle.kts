@@ -19,7 +19,6 @@ kotlin {
         val commonTest by getting {
             dependencies {
                 implementation(libs.kotlinx.coroutines.test)
-                implementation(projects.sharedDatabaseDi)
                 implementation(projects.sharedDatabaseTest)
             }
         }
