@@ -8,7 +8,6 @@ import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.TransactionRepository
-import com.moneymanager.ui.debug.DebugLogScreen
 import com.moneymanager.ui.navigation.Screen
 import com.moneymanager.ui.screens.AccountsScreen
 import com.moneymanager.ui.screens.CategoriesScreen
@@ -73,12 +72,6 @@ fun MoneyManagerApp(
                         selected = currentScreen is Screen.Transactions,
                         onClick = { currentScreen = Screen.Transactions },
                     )
-                    NavigationBarItem(
-                        icon = { Text("🐛") },
-                        label = { Text("Debug") },
-                        selected = currentScreen is Screen.Debug,
-                        onClick = { currentScreen = Screen.Debug },
-                    )
                 }
             },
         ) { paddingValues ->
@@ -87,7 +80,6 @@ fun MoneyManagerApp(
                     is Screen.Accounts -> AccountsScreen(accountRepository)
                     is Screen.Categories -> CategoriesScreen(categoryRepository)
                     is Screen.Transactions -> TransactionsScreen(transactionRepository)
-                    is Screen.Debug -> DebugLogScreen()
                 }
             }
         }

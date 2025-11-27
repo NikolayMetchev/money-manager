@@ -20,8 +20,6 @@ import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.ui.DatabaseSelectionDialog
 import com.moneymanager.ui.MoneyManagerApp
-import com.moneymanager.ui.debug.LogCollector
-import com.moneymanager.ui.debug.LogLevel
 import org.lighthousegames.logging.logging
 import java.awt.FileDialog
 import java.awt.Frame
@@ -29,27 +27,8 @@ import java.nio.file.Paths
 
 private val logger = logging()
 
-private fun log(
-    level: LogLevel,
-    message: String,
-    throwable: Throwable? = null,
-) {
-    LogCollector.log(level, message, throwable)
-    val logMessage = if (throwable != null) "$message: ${throwable.message}" else message
-    when (level) {
-        LogLevel.DEBUG -> logger.debug { logMessage }
-        LogLevel.INFO -> logger.info { logMessage }
-        LogLevel.WARN -> logger.warn { logMessage }
-        LogLevel.ERROR -> logger.error { logMessage }
-    }
-    throwable?.let {
-        logger.error(it) { "Stack trace" }
-        it.printStackTrace()
-    }
-}
-
 fun main() {
-    log(LogLevel.INFO, "Starting Money Manager application")
+    logger.info { "Starting Money Manager application" }
 
     application {
         MainWindow(onExit = ::exitApplication)
@@ -65,18 +44,18 @@ private fun MainWindow(onExit: () -> Unit) {
 
     // Initialize on startup
     LaunchedEffect(Unit) {
-        log(LogLevel.INFO, "LaunchedEffect: Starting initialization")
+        logger.info { "LaunchedEffect: Starting initialization" }
         val defaultDbPath = DEFAULT_DATABASE_PATH
         val dbExists = defaultDbPath.exists()
-        log(LogLevel.DEBUG, "Default database path: $defaultDbPath, exists: $dbExists")
+        logger.debug { "Default database path: $defaultDbPath, exists: $dbExists" }
 
         if (dbExists) {
             databasePath = defaultDbPath
-            log(LogLevel.INFO, "Existing database found, initializing...")
+            logger.info { "Existing database found, initializing..." }
             appState = initializeApplication(defaultDbPath)
-            log(LogLevel.INFO, "Initialization complete")
+            logger.info { "Initialization complete" }
         } else {
-            log(LogLevel.INFO, "No existing database, showing dialog")
+            logger.info { "No existing database, showing dialog" }
             showDatabaseDialog = true
         }
     }
@@ -97,14 +76,14 @@ private fun MainWindow(onExit: () -> Unit) {
             DatabaseSelectionDialog(
                 defaultPath = DEFAULT_DATABASE_PATH,
                 onDatabaseSelected = { selectedPath ->
-                    log(LogLevel.INFO, "User selected database path: $selectedPath")
+                    logger.info { "User selected database path: $selectedPath" }
                     databasePath = DbLocation(selectedPath)
                     showDatabaseDialog = false
-                    log(LogLevel.INFO, "Database path set successfully")
+                    logger.info { "Database path set successfully" }
                     appState = initializeApplication(DbLocation(selectedPath))
                 },
                 onCancel = {
-                    log(LogLevel.INFO, "User cancelled database selection - exiting application")
+                    logger.info { "User cancelled database selection - exiting application" }
                     onExit()
                 },
                 onShowFileChooser = {
@@ -146,21 +125,21 @@ private data class AppState(
 )
 
 private fun initializeApplication(dbLocation: DbLocation): AppState {
-    log(LogLevel.INFO, "=== Starting Application Initialization ===")
-    log(LogLevel.INFO, "Database path: $dbLocation")
+    logger.info { "=== Starting Application Initialization ===" }
+    logger.info { "Database path: $dbLocation" }
 
-    log(LogLevel.INFO, "Creating DI component...")
+    logger.info { "Creating DI component..." }
     val params = AppComponentParams()
     val component: AppComponent = AppComponent.create(params)
-    log(LogLevel.INFO, "DI component created successfully")
+    logger.info { "DI component created successfully" }
 
     val accountRepository = component.repositoryFactory.createAccountRepository({ DEFAULT_DATABASE_PATH })
     val categoryRepository = component.repositoryFactory.createCategoryRepository({ DEFAULT_DATABASE_PATH })
     val transactionRepository = component.repositoryFactory.createTransactionRepository({ DEFAULT_DATABASE_PATH })
     val appVersion = component.appVersion
-    log(LogLevel.INFO, "App version: ${appVersion.value}")
-    log(LogLevel.INFO, "All repositories initialized successfully")
-    log(LogLevel.INFO, "=== Initialization Complete ===")
+    logger.info { "App version: ${appVersion.value}" }
+    logger.info { "All repositories initialized successfully" }
+    logger.info { "=== Initialization Complete ===" }
 
     return AppState(accountRepository, categoryRepository, transactionRepository, appVersion)
 }
