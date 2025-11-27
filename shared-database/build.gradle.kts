@@ -8,32 +8,32 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                api(projects.shared)
+            api(projects.shared)
 
-                implementation(libs.kotlinx.coroutines.core)
-                implementation(libs.kotlinx.datetime)
-                implementation(libs.sqldelight.coroutines.extensions)
-            }
+            implementation(libs.kotlinx.coroutines.core)
+            implementation(libs.kotlinx.datetime)
+            implementation(libs.sqldelight.coroutines.extensions)
+        }
         }
 
         val commonTest by getting {
             dependencies {
-                implementation(libs.kotlinx.coroutines.test)
-                implementation(projects.sharedDatabaseTest)
-                implementation(projects.sharedDatabaseDi)
-            }
+            implementation(libs.kotlinx.coroutines.test)
+            implementation(projects.sharedDatabaseDi)
+            implementation(projects.sharedDatabaseTest)
+        }
         }
 
         val jvmMain by getting {
             dependencies {
-                implementation(libs.sqldelight.sqlite.driver)
-            }
+            implementation(libs.sqldelight.sqlite.driver)
+        }
         }
 
         val androidMain by getting {
             dependencies {
-                implementation(libs.sqldelight.android.driver)
-            }
+            implementation(libs.sqldelight.android.driver)
+        }
         }
     }
 }
