@@ -11,6 +11,8 @@ interface DbTestComponent {
 
     @DependencyGraph.Factory
     interface Factory {
-        fun create(@Provides params: DbTestComponentParams): DbTestComponent
+        fun create(
+            @Provides params: DbTestComponentParams,
+        ): DbTestComponent
     }
 }

@@ -14,7 +14,11 @@ import dev.zacsweers.metro.SingleIn
 actual interface DatabaseDriverFactoryModule {
     @Provides
     @SingleIn(AppScope::class)
-    fun provideMoneyManagerDatabaseFactory(): MoneyManagerDatabaseFactory = DbLocationMoneyManagerDatabaseFactory(DbLocationFactory(
-        DEFAULT_DATABASE_PATH
-    ), JvmSqlDriverFactory)
+    fun provideMoneyManagerDatabaseFactory(): MoneyManagerDatabaseFactory =
+        DbLocationMoneyManagerDatabaseFactory(
+            DbLocationFactory(
+                DEFAULT_DATABASE_PATH,
+            ),
+            JvmSqlDriverFactory,
+        )
 }

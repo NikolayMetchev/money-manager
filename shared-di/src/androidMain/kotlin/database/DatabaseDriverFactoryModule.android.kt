@@ -1,6 +1,5 @@
 package database
 
-import android.content.Context
 import com.moneymanager.database.AndroidSqlDriverFactory
 import com.moneymanager.database.DEFAULT_DATABASE_NAME
 import com.moneymanager.database.DbLocation

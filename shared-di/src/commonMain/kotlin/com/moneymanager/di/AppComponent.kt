@@ -12,6 +12,8 @@ interface AppComponent {
 
     @DependencyGraph.Factory
     interface Factory {
-        fun create(@Provides params: AppComponentParams): AppComponent
+        fun create(
+            @Provides params: AppComponentParams,
+        ): AppComponent
     }
 }
