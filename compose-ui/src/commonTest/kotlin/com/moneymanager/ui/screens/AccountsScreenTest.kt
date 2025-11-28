@@ -2,39 +2,39 @@
 
 package com.moneymanager.ui.screens
 
-import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.runComposeUiTest
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountType
 import com.moneymanager.domain.repository.AccountRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
-import org.junit.Rule
-import org.junit.Test
+import kotlin.test.Test
 import kotlin.time.Clock
 
+@OptIn(ExperimentalTestApi::class)
 class AccountsScreenTest {
-    @get:Rule
-    val composeTestRule = createComposeRule()
-
     @Test
-    fun accountsScreen_displaysEmptyState_whenNoAccounts() {
+    fun accountsScreen_displaysEmptyState_whenNoAccounts() = runComposeUiTest {
         // Given
         val repository = FakeAccountRepository(emptyList())
 
         // When
-        composeTestRule.setContent {
+        setContent {
             AccountsScreen(accountRepository = repository)
         }
 
         // Then
-        composeTestRule.onNodeWithText("Your Accounts").assertIsDisplayed()
-        composeTestRule.onNodeWithText("No accounts yet. Add your first account!").assertIsDisplayed()
+        onNodeWithText("Your Accounts").assertIsDisplayed()
+        onNodeWithText("No accounts yet. Add your first account!").assertIsDisplayed()
     }
 
     @Test
-    fun accountsScreen_displaysAccounts_whenAccountsExist() {
+    fun accountsScreen_displaysAccounts_whenAccountsExist() = runComposeUiTest {
         // Given
         val now = Clock.System.now()
         val accounts =
@@ -61,51 +61,51 @@ class AccountsScreenTest {
         val repository = FakeAccountRepository(accounts)
 
         // When
-        composeTestRule.setContent {
+        setContent {
             AccountsScreen(accountRepository = repository)
         }
 
         // Then
-        composeTestRule.onNodeWithText("Checking Account").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Savings Account").assertIsDisplayed()
-        composeTestRule.onNodeWithText("USD 1000.00").assertIsDisplayed()
-        composeTestRule.onNodeWithText("USD 5000.00").assertIsDisplayed()
+        onNodeWithText("Checking Account").assertIsDisplayed()
+        onNodeWithText("Savings Account").assertIsDisplayed()
+        onNodeWithText("USD 1000.00").assertIsDisplayed()
+        onNodeWithText("USD 5000.00").assertIsDisplayed()
     }
 
     @Test
-    fun accountsScreen_displaysFloatingActionButton() {
+    fun accountsScreen_displaysFloatingActionButton() = runComposeUiTest {
         // Given
         val repository = FakeAccountRepository(emptyList())
 
         // When
-        composeTestRule.setContent {
+        setContent {
             AccountsScreen(accountRepository = repository)
         }
 
         // Then
-        composeTestRule.onNodeWithText("+").assertIsDisplayed()
+        onNodeWithText("+").assertIsDisplayed()
     }
 
     @Test
-    fun accountsScreen_opensCreateDialog_whenFabClicked() {
+    fun accountsScreen_opensCreateDialog_whenFabClicked() = runComposeUiTest {
         // Given
         val repository = FakeAccountRepository(emptyList())
 
         // When
-        composeTestRule.setContent {
+        setContent {
             AccountsScreen(accountRepository = repository)
         }
 
-        composeTestRule.onNodeWithText("+").performClick()
+        onNodeWithText("+").performClick()
 
         // Then
-        composeTestRule.onNodeWithText("Create New Account").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Account Name").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Account Type").assertIsDisplayed()
+        onNodeWithText("Create New Account").assertIsDisplayed()
+        onNodeWithText("Account Name").assertIsDisplayed()
+        onNodeWithText("Account Type").assertIsDisplayed()
     }
 
     @Test
-    fun accountCard_displaysAccountInformation() {
+    fun accountCard_displaysAccountInformation() = runComposeUiTest {
         // Given
         val now = Clock.System.now()
         val account =
@@ -121,18 +121,18 @@ class AccountsScreenTest {
         val repository = FakeAccountRepository(listOf(account))
 
         // When
-        composeTestRule.setContent {
+        setContent {
             AccountsScreen(accountRepository = repository)
         }
 
         // Then
-        composeTestRule.onNodeWithText("My Checking").assertIsDisplayed()
-        composeTestRule.onNodeWithText("CHECKING").assertIsDisplayed()
-        composeTestRule.onNodeWithText("EUR 2500.50").assertIsDisplayed()
+        onNodeWithText("My Checking").assertIsDisplayed()
+        onNodeWithText("CHECKING").assertIsDisplayed()
+        onNodeWithText("EUR 2500.50").assertIsDisplayed()
     }
 
     @Test
-    fun accountCard_displaysNegativeBalance_inErrorColor() {
+    fun accountCard_displaysNegativeBalance_inErrorColor() = runComposeUiTest {
         // Given
         val now = Clock.System.now()
         val account =
@@ -148,16 +148,16 @@ class AccountsScreenTest {
         val repository = FakeAccountRepository(listOf(account))
 
         // When
-        composeTestRule.setContent {
+        setContent {
             AccountsScreen(accountRepository = repository)
         }
 
         // Then
-        composeTestRule.onNodeWithText("USD -500.00").assertIsDisplayed()
+        onNodeWithText("USD -500.00").assertIsDisplayed()
     }
 
     @Test
-    fun accountCard_opensDeleteDialog_whenDeleteButtonClicked() {
+    fun accountCard_opensDeleteDialog_whenDeleteButtonClicked() = runComposeUiTest {
         // Given
         val now = Clock.System.now()
         val account =
@@ -173,61 +173,61 @@ class AccountsScreenTest {
         val repository = FakeAccountRepository(listOf(account))
 
         // When
-        composeTestRule.setContent {
+        setContent {
             AccountsScreen(accountRepository = repository)
         }
 
         // Click the delete button (trash icon)
-        composeTestRule.onNodeWithText("🗑️").performClick()
+        onNodeWithText("🗑️").performClick()
 
         // Then
-        composeTestRule.onNodeWithText("Delete Account?").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Are you sure you want to delete \"Test Account\"?").assertIsDisplayed()
+        onNodeWithText("Delete Account?").assertIsDisplayed()
+        onNodeWithText("Are you sure you want to delete \"Test Account\"?").assertIsDisplayed()
     }
 
     @Test
-    fun createAccountDialog_validatesRequiredFields() {
+    fun createAccountDialog_validatesRequiredFields() = runComposeUiTest {
         // Given
         val repository = FakeAccountRepository(emptyList())
 
         // When
-        composeTestRule.setContent {
+        setContent {
             AccountsScreen(accountRepository = repository)
         }
 
         // Open dialog
-        composeTestRule.onNodeWithText("+").performClick()
+        onNodeWithText("+").performClick()
 
         // Try to create without filling fields
-        composeTestRule.onNodeWithText("Create").performClick()
+        onNodeWithText("Create").performClick()
 
         // Then
-        composeTestRule.onNodeWithText("Account name is required").assertIsDisplayed()
+        onNodeWithText("Account name is required").assertIsDisplayed()
     }
 
     @Test
-    fun createAccountDialog_canBeDismissed() {
+    fun createAccountDialog_canBeDismissed() = runComposeUiTest {
         // Given
         val repository = FakeAccountRepository(emptyList())
 
         // When
-        composeTestRule.setContent {
+        setContent {
             AccountsScreen(accountRepository = repository)
         }
 
         // Open dialog
-        composeTestRule.onNodeWithText("+").performClick()
-        composeTestRule.onNodeWithText("Create New Account").assertIsDisplayed()
+        onNodeWithText("+").performClick()
+        onNodeWithText("Create New Account").assertIsDisplayed()
 
         // Click cancel
-        composeTestRule.onNodeWithText("Cancel").performClick()
+        onNodeWithText("Cancel").performClick()
 
         // Then - dialog should be dismissed
-        composeTestRule.onNodeWithText("Create New Account").assertDoesNotExist()
+        onNodeWithText("Create New Account").assertDoesNotExist()
     }
 
     @Test
-    fun deleteAccountDialog_canBeDismissed() {
+    fun deleteAccountDialog_canBeDismissed() = runComposeUiTest {
         // Given
         val now = Clock.System.now()
         val account =
@@ -243,23 +243,23 @@ class AccountsScreenTest {
         val repository = FakeAccountRepository(listOf(account))
 
         // When
-        composeTestRule.setContent {
+        setContent {
             AccountsScreen(accountRepository = repository)
         }
 
         // Open delete dialog
-        composeTestRule.onNodeWithText("🗑️").performClick()
-        composeTestRule.onNodeWithText("Delete Account?").assertIsDisplayed()
+        onNodeWithText("🗑️").performClick()
+        onNodeWithText("Delete Account?").assertIsDisplayed()
 
         // Click cancel
-        composeTestRule.onNodeWithText("Cancel").performClick()
+        onNodeWithText("Cancel").performClick()
 
         // Then - dialog should be dismissed
-        composeTestRule.onNodeWithText("Delete Account?").assertDoesNotExist()
+        onNodeWithText("Delete Account?").assertDoesNotExist()
     }
 
     @Test
-    fun accountsScreen_displaysMultipleAccounts() {
+    fun accountsScreen_displaysMultipleAccounts() = runComposeUiTest {
         // Given
         val now = Clock.System.now()
         val accounts =
@@ -295,14 +295,14 @@ class AccountsScreenTest {
         val repository = FakeAccountRepository(accounts)
 
         // When
-        composeTestRule.setContent {
+        setContent {
             AccountsScreen(accountRepository = repository)
         }
 
         // Then - all accounts should be visible
-        composeTestRule.onNodeWithText("Account 1").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Account 2").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Account 3").assertIsDisplayed()
+        onNodeWithText("Account 1").assertIsDisplayed()
+        onNodeWithText("Account 2").assertIsDisplayed()
+        onNodeWithText("Account 3").assertIsDisplayed()
     }
 
     // Fake repository for testing

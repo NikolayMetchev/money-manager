@@ -25,7 +25,6 @@ kotlin {
         }
         val commonTest by getting {
             dependencies {
-                implementation(libs.junit4)
                 implementation(libs.kotlinx.coroutines.test)
                 implementation(libs.turbine)
                 @OptIn(org.jetbrains.compose.ExperimentalComposeLibrary::class)
@@ -37,11 +36,6 @@ kotlin {
                 // Material (v2) for jvm-specific dialogs
                 implementation(compose.material)
                 implementation(compose.uiTooling)
-            }
-        }
-        val jvmTest by getting {
-            dependencies {
-                implementation(libs.compose.ui.test.junit4)
             }
         }
     }

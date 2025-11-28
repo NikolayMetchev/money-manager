@@ -70,9 +70,6 @@ androidx-test-runner = { module = "androidx.test:runner", version.ref = "android
 androidx-test-core = { module = "androidx.test:core", version.ref = "androidx-test-core" }
 
 # Testing
-compose-ui-test-junit4 = { module = "org.jetbrains.compose.ui:ui-test-junit4", version.ref = "compose-ui-test" }
-compose-ui-test-manifest = { module = "org.jetbrains.compose.ui:ui-test-manifest", version.ref = "compose-ui-test" }
-junit4 = { module = "junit:junit", version = "4.13.2" }
 turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
 
 # Gradle plugins (for use in build-logic convention plugins)
