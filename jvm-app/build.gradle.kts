@@ -6,16 +6,14 @@ plugins {
 }
 
 dependencies {
-    implementation(libs.androidx.compose.runtime.desktop)
-    implementation(libs.compose.ui.desktop)
+    api(libs.androidx.compose.runtime.desktop)
+    api(libs.compose.ui.desktop)
     implementation(libs.compose.ui.graphics.desktop)
     implementation(libs.compose.ui.unit.desktop)
     implementation(libs.diamondedge.logging)
     implementation(libs.kmlogging)
     implementation(libs.kotlinx.coroutines.core)
-    implementation(libs.sqldelight.runtime)
     implementation(projects.composeUi)
-    implementation(projects.shared)
     implementation(projects.sharedDatabase)
     implementation(projects.sharedDi)
 
