@@ -314,11 +314,9 @@ class AccountsScreenTest {
 
         override fun getAllAccounts(): Flow<List<Account>> = accountsFlow
 
-        override fun getActiveAccounts(): Flow<List<Account>> =
-            flowOf(accounts.filter { it.isActive })
+        override fun getActiveAccounts(): Flow<List<Account>> = flowOf(accounts.filter { it.isActive })
 
-        override fun getAccountById(id: Long): Flow<Account?> =
-            flowOf(accounts.find { it.id == id })
+        override fun getAccountById(id: Long): Flow<Account?> = flowOf(accounts.find { it.id == id })
 
         override suspend fun createAccount(account: Account): Long {
             val newId = (accounts.maxOfOrNull { it.id } ?: 0L) + 1
