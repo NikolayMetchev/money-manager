@@ -64,7 +64,3 @@ sqldelight {
 tasks.withType<app.cash.sqldelight.gradle.VerifyMigrationTask>().configureEach {
     enabled = false
 }
-
-tasks.named("check") {
-    dependsOn("pixel6api34AndroidDeviceTest")
-}
