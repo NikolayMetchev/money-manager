@@ -21,6 +21,13 @@ kotlin {
             jvmTarget.set(JvmTarget.JVM_24)
         }
 
+        // Enable code coverage for instrumented tests
+        buildTypes {
+            debug {
+                enableAndroidTestCoverage = true
+            }
+        }
+
         // Enable instrumented tests with Gradle Managed Device
         withDeviceTest {
             managedDevices {

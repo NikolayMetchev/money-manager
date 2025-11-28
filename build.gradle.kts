@@ -76,6 +76,10 @@ kover {
                 title = "Money Manager Code Coverage"
             }
         }
+        merge {
+            // Merge reports from all projects
+            allProjects()
+        }
     }
 }
 
