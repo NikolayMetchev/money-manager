@@ -1,6 +1,5 @@
 plugins {
-    id("moneymanager.android-convention")
-    alias(libs.plugins.compose)
+    id("moneymanager.compose-multiplatform-convention")
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.metro)
 }
@@ -42,6 +41,13 @@ kotlin {
             dependencies {
                 // Skiko native libraries for desktop UI tests
                 implementation(compose.desktop.currentOs)
+            }
+        }
+        val androidDeviceTest by getting {
+            dependencies {
+                // Compose UI testing for Android
+                implementation(libs.androidx.test.runner)
+                implementation(libs.androidx.test.core)
             }
         }
     }
