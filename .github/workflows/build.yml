@@ -18,7 +18,7 @@ jobs:
       - name: Build with Gradle
         uses: ./.github/actions/gradle-run
         with:
-          command: build koverXmlReport --stacktrace
+          command: build --stacktrace
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
       - name: Upload coverage and test results to Codecov

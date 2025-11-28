@@ -35,6 +35,7 @@ tasks.register("build") {
     group = "build"
     dependsOn(subprojects.mapNotNull { it.tasks.findByName("build") })
     dependsOn("buildHealth")
+    dependsOn("koverXmlReport")
 }
 
 tasks.register("lintFormat") {
