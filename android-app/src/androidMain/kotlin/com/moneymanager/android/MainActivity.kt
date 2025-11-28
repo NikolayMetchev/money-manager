@@ -9,6 +9,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.moneymanager.database.DatabaseState
+import com.moneymanager.database.RepositorySet
 import com.moneymanager.di.AppComponent
 import com.moneymanager.di.AppComponentParams
 import com.moneymanager.di.initializeVersionReader
@@ -28,7 +29,6 @@ class MainActivity : ComponentActivity() {
         val component: AppComponent = AppComponent.create(params)
 
         val databaseManager = component.databaseManager
-        val repositoryFactory = component.repositoryFactory
         val appVersion = component.appVersion
 
         setContent {
@@ -40,7 +40,7 @@ class MainActivity : ComponentActivity() {
                     try {
                         val defaultLocation = databaseManager.getDefaultLocation()
                         val database = databaseManager.openDatabase(defaultLocation)
-                        val repositories = repositoryFactory.createRepositories(database)
+                        val repositories = RepositorySet(database)
                         databaseState = DatabaseState.DatabaseLoaded(defaultLocation, repositories)
                     } catch (e: Exception) {
                         databaseState = DatabaseState.Error(e)

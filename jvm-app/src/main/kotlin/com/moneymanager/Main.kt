@@ -13,6 +13,7 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.moneymanager.database.DatabaseState
 import com.moneymanager.database.DbLocation
+import com.moneymanager.database.RepositorySet
 import com.moneymanager.di.AppComponent
 import com.moneymanager.di.AppComponentParams
 import com.moneymanager.ui.DatabaseSelectionDialog
@@ -49,7 +50,6 @@ private fun MainWindow(onExit: () -> Unit) {
         }
 
     val databaseManager = component.databaseManager
-    val repositoryFactory = component.repositoryFactory
     val appVersion = component.appVersion
 
     var databaseState by remember { mutableStateOf<DatabaseState>(DatabaseState.NoDatabaseSelected) }
@@ -66,7 +66,7 @@ private fun MainWindow(onExit: () -> Unit) {
             logger.info { "Existing database found, opening..." }
             try {
                 val database = databaseManager.openDatabase(defaultLocation)
-                val repositories = repositoryFactory.createRepositories(database)
+                val repositories = RepositorySet(database)
                 databaseState = DatabaseState.DatabaseLoaded(defaultLocation, repositories)
                 logger.info { "Database opened successfully" }
             } catch (e: Exception) {
@@ -103,7 +103,7 @@ private fun MainWindow(onExit: () -> Unit) {
                             val location = DbLocation(selectedPath)
                             logger.info { "Opening database at: $location" }
                             val database = databaseManager.openDatabase(location)
-                            val repositories = repositoryFactory.createRepositories(database)
+                            val repositories = RepositorySet(database)
                             databaseState = DatabaseState.DatabaseLoaded(location, repositories)
                             logger.info { "Database initialized successfully" }
                         } catch (e: Exception) {
