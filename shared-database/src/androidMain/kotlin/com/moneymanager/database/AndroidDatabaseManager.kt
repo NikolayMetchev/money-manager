@@ -2,6 +2,7 @@ package com.moneymanager.database
 
 import android.content.Context
 import app.cash.sqldelight.driver.android.AndroidSqliteDriver
+import com.moneymanager.database.sql.MoneyManagerDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 

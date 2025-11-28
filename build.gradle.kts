@@ -1,3 +1,7 @@
+plugins {
+    alias(libs.plugins.kover)
+}
+
 // Read version from system property, project property, or VERSION file
 // Priority: -Dversion=X > -Pversion=X > VERSION file > "unspecified"
 val versionFile = rootProject.file("VERSION")
@@ -37,6 +41,39 @@ dependencyAnalysis {
         all {
             onAny {
                 severity("fail")
+            }
+        }
+    }
+}
+
+// Aggregate Kover coverage from all subprojects
+dependencies {
+    subprojects.forEach { subproject ->
+        kover(subproject)
+    }
+}
+
+kover {
+    reports {
+        filters {
+            excludes {
+                // Exclude generated code
+                classes("*_Factory", "*_Factory\$*")
+                classes("*_Impl", "*_Impl\$*")
+                classes("*MapperImpl")
+                // Exclude Metro DI generated code
+                classes("*Component\$*")
+                classes("*Module\$*")
+                // Exclude SQLDelight generated code
+                classes("com.moneymanager.database.*")
+            }
+        }
+        total {
+            html {
+                title = "Money Manager Code Coverage"
+            }
+            xml {
+                title = "Money Manager Code Coverage"
             }
         }
     }

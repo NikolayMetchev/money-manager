@@ -7,8 +7,8 @@ import com.moneymanager.domain.model.AccountType
 import tech.mappie.api.ObjectMappie
 import kotlin.time.Instant
 
-object AccountMapper : ObjectMappie<com.moneymanager.database.Account, Account>() {
-    override fun map(from: com.moneymanager.database.Account) =
+object AccountMapper : ObjectMappie<com.moneymanager.database.sql.Account, Account>() {
+    override fun map(from: com.moneymanager.database.sql.Account) =
         mapping {
             Account::type fromValue AccountType.valueOf(from.type)
             Account::isActive fromValue (from.isActive == 1L)
