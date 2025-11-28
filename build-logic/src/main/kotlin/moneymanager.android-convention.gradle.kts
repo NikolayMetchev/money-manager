@@ -23,6 +23,9 @@ kotlin {
 
         // Enable instrumented tests with Gradle Managed Device
         withDeviceTest {
+            // Enable code coverage for instrumented tests
+            enableCoverage = true
+
             managedDevices {
                 localDevices {
                     // Create a managed device named "pixel6api34"
