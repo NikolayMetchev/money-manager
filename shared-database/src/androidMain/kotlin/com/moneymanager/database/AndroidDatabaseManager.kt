@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 private val DEFAULT_DB_LOCATION = DbLocation(DEFAULT_DATABASE_NAME)
+
 /**
  * Android implementation of DatabaseManager.
  * Manages SQLite databases using Android's built-in database support.
@@ -31,5 +32,3 @@ class AndroidDatabaseManager(private val context: Context) : DatabaseManager {
 
     override fun getDefaultLocation() = DEFAULT_DB_LOCATION
 }
-
-
