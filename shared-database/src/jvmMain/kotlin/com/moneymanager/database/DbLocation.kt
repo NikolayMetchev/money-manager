@@ -5,11 +5,11 @@ import java.nio.file.Paths
 import kotlin.io.path.exists
 
 val DEFAULT_DATABASE_PATH: DbLocation =
-    com.moneymanager.database.DbLocation(
+    DbLocation(
         Paths.get(
             System.getProperty("user.home"),
             ".moneymanager",
-            "default.db",
+            DEFAULT_DATABASE_NAME,
         ),
     )
 

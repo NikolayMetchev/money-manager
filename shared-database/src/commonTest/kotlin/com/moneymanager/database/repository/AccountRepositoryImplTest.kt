@@ -29,9 +29,9 @@ class AccountRepositoryImplTest {
             val databaseManager = component.databaseManager
             val repositoryFactory = component.repositoryFactory
 
-            // Create in-memory database for testing
+            // Open in-memory database for testing
             // Use IN_MEMORY_DATABASE on JVM, which uses a special ":memory:" marker
-            val database = databaseManager.createDatabase(com.moneymanager.database.IN_MEMORY_DATABASE)
+            val database = databaseManager.openDatabase(com.moneymanager.database.IN_MEMORY_DATABASE)
             val repositories = repositoryFactory.createRepositories(database)
 
             repository = repositories.accountRepository

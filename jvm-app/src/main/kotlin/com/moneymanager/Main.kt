@@ -101,13 +101,13 @@ private fun MainWindow(onExit: () -> Unit) {
                     coroutineScope.launch {
                         try {
                             val location = DbLocation(selectedPath)
-                            logger.info { "Creating/opening database at: $location" }
-                            val database = databaseManager.createDatabase(location)
+                            logger.info { "Opening database at: $location" }
+                            val database = databaseManager.openDatabase(location)
                             val repositories = repositoryFactory.createRepositories(database)
                             databaseState = DatabaseState.DatabaseLoaded(location, repositories)
                             logger.info { "Database initialized successfully" }
                         } catch (e: Exception) {
-                            logger.error { "Failed to create/open database: ${e.message}" }
+                            logger.error { "Failed to open database: ${e.message}" }
                             databaseState = DatabaseState.Error(e)
                         }
                     }
