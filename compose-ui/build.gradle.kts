@@ -51,6 +51,7 @@ kotlin {
                 @OptIn(org.jetbrains.compose.ExperimentalComposeLibrary::class)
                 implementation(compose.uiTest)
 
+                implementation(kotlin("test"))
                 implementation(libs.androidx.test.core)
                 implementation(libs.androidx.test.runner)
                 implementation(libs.kotlinx.coroutines.test)
