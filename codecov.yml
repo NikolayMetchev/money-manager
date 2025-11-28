@@ -1,0 +1,15 @@
+# Codecov configuration
+# https://docs.codecov.com/docs/codecovyml-reference
+
+coverage:
+  status:
+    project:
+      default:
+        # Wait for all uploads before setting status
+        after_n_builds: 2
+
+comment:
+  # Wait for both unit and instrumented test uploads before commenting
+  after_n_builds: 2
+  layout: "header, diff, flags, components"
+  require_changes: false
