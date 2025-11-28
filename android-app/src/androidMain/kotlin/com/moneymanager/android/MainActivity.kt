@@ -51,13 +51,10 @@ class MainActivity : ComponentActivity() {
             // Show main app once database is loaded
             when (val state = databaseState) {
                 is DatabaseState.DatabaseLoaded -> {
-                    val dbPath = applicationContext.getDatabasePath(state.location.name).absolutePath
                     MoneyManagerApp(
-                        accountRepository = state.repositories.accountRepository,
-                        categoryRepository = state.repositories.categoryRepository,
-                        transactionRepository = state.repositories.transactionRepository,
+                        repositorySet = state.repositories,
                         appVersion = appVersion,
-                        databasePath = dbPath,
+                        databaseLocation = state.location,
                     )
                 }
                 is DatabaseState.NoDatabaseSelected -> {

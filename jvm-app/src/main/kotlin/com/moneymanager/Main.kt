@@ -138,11 +138,9 @@ private fun MainWindow(onExit: () -> Unit) {
         when (val state = databaseState) {
             is DatabaseState.DatabaseLoaded -> {
                 MoneyManagerApp(
-                    accountRepository = state.repositories.accountRepository,
-                    categoryRepository = state.repositories.categoryRepository,
-                    transactionRepository = state.repositories.transactionRepository,
+                    repositorySet = state.repositories,
                     appVersion = appVersion,
-                    databasePath = state.location.toString(),
+                    databaseLocation = state.location,
                 )
             }
             is DatabaseState.NoDatabaseSelected -> {
