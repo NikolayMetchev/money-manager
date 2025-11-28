@@ -1,8 +1,10 @@
+import kotlinx.kover.gradle.plugin.dsl.KoverProjectExtension
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("com.squareup.sort-dependencies")
     id("dev.detekt")
+    id("org.jetbrains.kotlinx.kover")
     id("org.jlleitschuh.gradle.ktlint")
 }
 
@@ -36,6 +38,24 @@ ktlint {
     filter {
         exclude { entry ->
             entry.file.toString().contains("generated")
+        }
+    }
+}
+
+configure<KoverProjectExtension> {
+    reports {
+        filters {
+            excludes {
+                // Exclude generated code
+                classes("*_Factory", "*_Factory\$*")
+                classes("*_Impl", "*_Impl\$*")
+                classes("*MapperImpl")
+                // Exclude Metro DI generated code
+                classes("*Component\$*")
+                classes("*Module\$*")
+                // Exclude SQLDelight generated code
+                classes("com.moneymanager.database.sql.*")
+            }
         }
     }
 }

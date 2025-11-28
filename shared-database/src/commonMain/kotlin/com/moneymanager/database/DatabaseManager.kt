@@ -1,5 +1,7 @@
 package com.moneymanager.database
 
+import com.moneymanager.database.sql.MoneyManagerDatabase
+
 /**
  * Default database filename used across all platforms.
  */

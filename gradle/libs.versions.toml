@@ -15,6 +15,7 @@ compose-plugin = "1.9.3"
 androidx-compose = "1.9.5"
 dependency-analysis = "3.5.0"
 detekt = "2.0.0-alpha.1"
+kover = "0.9.3"
 ktlint = "12.1.2"
 sort-dependencies = "0.15"
 
@@ -76,6 +77,7 @@ detekt-gradle-plugin = { module = "dev.detekt:dev.detekt.gradle.plugin", version
 dependency-analysis-gradle-plugin = { module = "com.autonomousapps:dependency-analysis-gradle-plugin", version.ref = "dependency-analysis" }
 ktlint-gradle-plugin = { module = "org.jlleitschuh.gradle:ktlint-gradle", version.ref = "ktlint" }
 sort-dependencies-gradle-plugin = { module = "com.squareup.sort-dependencies:com.squareup.sort-dependencies.gradle.plugin", version.ref = "sort-dependencies" }
+kover-gradle-plugin = { module = "org.jetbrains.kotlinx:kover-gradle-plugin", version.ref = "kover" }
 
 [plugins]
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
@@ -92,3 +94,4 @@ ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlint" }
 android-kotlin-multiplatform-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "android-gradle-plugin" }
 android-application = { id = "com.android.application", version.ref = "android-gradle-plugin" }
 sort-dependencies = { id = "com.squareup.sort-dependencies", version.ref = "sort-dependencies" }
+kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
