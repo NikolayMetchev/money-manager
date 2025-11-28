@@ -16,12 +16,7 @@ This directory contains multiplatform UI tests for the Compose components using 
 ./gradlew :compose-ui:testDebugUnitTest
 ```
 
-### On Windows
-Compose Desktop UI tests may have issues running locally on Windows due to Skiko graphics library limitations. If tests fail locally:
-
-1. **CI/CD is the primary target**: Tests should work fine in GitHub Actions CI (Linux runners)
-2. **Use WSL2**: Run tests in WSL2 for better compatibility
-3. **macOS/Linux**: These platforms handle headless Compose tests natively
+The tests work on all platforms (Windows, macOS, Linux) thanks to the Skiko desktop runtime dependency included in `jvmTest`.
 
 ## Test Architecture
 
