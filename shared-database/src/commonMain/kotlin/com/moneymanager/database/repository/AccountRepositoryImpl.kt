@@ -5,8 +5,8 @@ package com.moneymanager.database.repository
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
-import com.moneymanager.database.MoneyManagerDatabase
 import com.moneymanager.database.mapper.AccountMapper
+import com.moneymanager.database.sql.MoneyManagerDatabase
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.repository.AccountRepository
 import kotlinx.coroutines.Dispatchers

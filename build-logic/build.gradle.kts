@@ -23,6 +23,7 @@ dependencies {
     implementation(libs.detekt.gradle.plugin)
     implementation(libs.kotlin.compose.compiler.gradle.plugin)
     implementation(libs.kotlin.gradle.plugin)
+    implementation(libs.kover.gradle.plugin)
     implementation(libs.ktlint.gradle.plugin)
     implementation(libs.mappie.gradle.plugin)
     implementation(libs.metro.gradle.plugin)

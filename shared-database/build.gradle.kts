@@ -19,7 +19,6 @@ kotlin {
         val commonTest by getting {
             dependencies {
                 implementation(libs.kotlinx.coroutines.test)
-                implementation(projects.sharedDatabaseTest)
                 implementation(projects.sharedDi)
             }
         }
@@ -44,7 +43,6 @@ kotlin {
                 implementation(libs.androidx.test.core)
                 implementation(libs.androidx.test.runner)
                 implementation(libs.kotlinx.coroutines.test)
-                implementation(projects.sharedDatabaseTest)
                 implementation(projects.sharedDi)
             }
             kotlin.srcDir("src/commonTest/kotlin")
@@ -55,7 +53,7 @@ kotlin {
 sqldelight {
     databases {
         create("MoneyManagerDatabase") {
-            packageName.set("com.moneymanager.database")
+            packageName.set("com.moneymanager.database.sql")
             verifyMigrations.set(false)
         }
     }
