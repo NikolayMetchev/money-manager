@@ -38,6 +38,12 @@ kotlin {
                 implementation(compose.uiTooling)
             }
         }
+        val jvmTest by getting {
+            dependencies {
+                // Skiko native libraries for desktop UI tests
+                implementation(compose.desktop.currentOs)
+            }
+        }
     }
 }
 
