@@ -2,8 +2,9 @@
 
 package com.moneymanager.database.repository
 
-import com.moneymanager.di.database.DbTestComponent
-import com.moneymanager.di.database.DbTestComponentParams
+import com.moneymanager.database.RepositorySet
+import com.moneymanager.di.AppComponent
+import com.moneymanager.di.AppComponentParams
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountType
 import com.moneymanager.domain.repository.AccountRepository
@@ -24,14 +25,14 @@ class AccountRepositoryImplTest {
     @BeforeTest
     fun setup() =
         runTest {
-            // Create test component with in-memory database
-            val component = DbTestComponent.create(DbTestComponentParams())
+            // Create app component
+            val component = AppComponent.create(AppComponentParams())
             val databaseManager = component.databaseManager
 
             // Open in-memory database for testing
             // Use IN_MEMORY_DATABASE on JVM, which uses a special ":memory:" marker
             val database = databaseManager.openDatabase(com.moneymanager.database.IN_MEMORY_DATABASE)
-            val repositories = com.moneymanager.database.RepositorySet(database)
+            val repositories = RepositorySet(database)
 
             repository = repositories.accountRepository
         }
