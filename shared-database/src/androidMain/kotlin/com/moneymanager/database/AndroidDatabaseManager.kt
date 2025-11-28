@@ -26,9 +26,12 @@ class AndroidDatabaseManager(private val context: Context) : DatabaseManager {
             MoneyManagerDatabase(driver)
         }
 
-    override suspend fun databaseExists(location: DbLocation) =
+    override suspend fun databaseExists(location: DbLocation): Boolean {
+        // In-memory databases always "exist"
+        if (location.isInMemory()) return true
         // On Android, we can check if the database file exists in the databases directory
-        context.getDatabasePath(location.name).exists()
+        return context.getDatabasePath(location.name).exists()
+    }
 
     override fun getDefaultLocation() = DEFAULT_DB_LOCATION
 }

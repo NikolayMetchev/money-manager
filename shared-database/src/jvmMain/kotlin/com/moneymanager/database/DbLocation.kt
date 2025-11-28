@@ -17,7 +17,7 @@ val DEFAULT_DATABASE_PATH: DbLocation =
  * Special marker for in-memory database on JVM.
  * A null path indicates an in-memory database.
  */
-val IN_MEMORY_DATABASE: DbLocation =
+actual val IN_MEMORY_DATABASE: DbLocation =
     DbLocation(null)
 
 actual data class DbLocation(val path: Path?) {
@@ -25,5 +25,5 @@ actual data class DbLocation(val path: Path?) {
 
     override fun toString() = path?.toString() ?: ":memory:"
 
-    fun isInMemory() = path == null
+    actual fun isInMemory() = path == null
 }

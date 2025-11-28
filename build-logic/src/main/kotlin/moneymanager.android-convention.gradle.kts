@@ -20,6 +20,26 @@ kotlin {
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_24)
         }
+
+        // Enable instrumented tests with Gradle Managed Device
+        withDeviceTest {
+            managedDevices {
+                localDevices {
+                    // Create a managed device named "pixel6api34"
+                    create("pixel6api34") {
+                        device = "Pixel 6"
+                        apiLevel = 34
+                        systemImageSource = "aosp-atd"
+                    }
+                }
+                // Create a device group for running all tests
+                groups {
+                    create("allDevices") {
+                        targetDevices.add(allDevices["pixel6api34"])
+                    }
+                }
+            }
+        }
     }
 
     jvmToolchain(libs.findVersion("jvm-toolchain").get().toString().toInt())

@@ -35,6 +35,20 @@ kotlin {
                 implementation(libs.sqldelight.android.driver)
             }
         }
+
+        val androidDeviceTest by getting {
+            // Note: Cannot use dependsOn(commonTest) due to source set tree restrictions
+            // Tests are shared via kotlin.srcDir() below
+            dependencies {
+                implementation(kotlin("test"))
+                implementation(libs.androidx.test.core)
+                implementation(libs.androidx.test.runner)
+                implementation(libs.kotlinx.coroutines.test)
+                implementation(projects.sharedDatabaseTest)
+                implementation(projects.sharedDi)
+            }
+            kotlin.srcDir("src/commonTest/kotlin")
+        }
     }
 }
 
@@ -49,4 +63,8 @@ sqldelight {
 
 tasks.withType<app.cash.sqldelight.gradle.VerifyMigrationTask>().configureEach {
     enabled = false
+}
+
+tasks.named("check") {
+    dependsOn("pixel6api34AndroidDeviceTest")
 }
