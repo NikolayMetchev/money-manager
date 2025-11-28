@@ -23,11 +23,25 @@ kotlin {
                 implementation(projects.sharedDi)
             }
         }
+        val commonTest by getting {
+            dependencies {
+                implementation(libs.junit4)
+                implementation(libs.kotlinx.coroutines.test)
+                implementation(libs.turbine)
+                @OptIn(org.jetbrains.compose.ExperimentalComposeLibrary::class)
+                implementation(compose.uiTest)
+            }
+        }
         val jvmMain by getting {
             dependencies {
                 // Material (v2) for jvm-specific dialogs
                 implementation(compose.material)
                 implementation(compose.uiTooling)
+            }
+        }
+        val jvmTest by getting {
+            dependencies {
+                implementation(libs.compose.ui.test.junit4)
             }
         }
     }
@@ -42,4 +56,11 @@ ktlint {
             "standard:function-naming",
         ),
     )
+}
+
+// Configure tests to run in headless mode for Compose Desktop
+tasks.withType<Test> {
+    systemProperty("java.awt.headless", "true")
+    // Additional properties for Skiko on Windows
+    systemProperty("skiko.test.harness", "true")
 }
