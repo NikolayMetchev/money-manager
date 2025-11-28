@@ -13,8 +13,17 @@ val DEFAULT_DATABASE_PATH: DbLocation =
         ),
     )
 
-actual data class DbLocation(val path: Path) {
-    actual fun exists() = path.exists()
+/**
+ * Special marker for in-memory database on JVM.
+ * A null path indicates an in-memory database.
+ */
+val IN_MEMORY_DATABASE: DbLocation =
+    DbLocation(null)
 
-    override fun toString() = path.toString()
+actual data class DbLocation(val path: Path?) {
+    actual fun exists() = path?.exists() ?: true // in-memory databases always "exist"
+
+    override fun toString() = path?.toString() ?: ":memory:"
+
+    fun isInMemory() = path == null
 }

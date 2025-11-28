@@ -36,7 +36,8 @@ fun DatabaseSelectionDialog(
     onCancel: () -> Unit,
     onShowFileChooser: () -> Path?,
 ) {
-    var selectedPath by remember { mutableStateOf(defaultPath.path) }
+    // defaultPath.path might be null for in-memory databases, but UI always needs a real path
+    var selectedPath by remember { mutableStateOf(defaultPath.path ?: defaultPath.path) }
 
     Dialog(onDismissRequest = onCancel) {
         Surface(
@@ -50,7 +51,7 @@ fun DatabaseSelectionDialog(
             DatabaseSelectionContent(
                 selectedPath = selectedPath,
                 onPathChange = { selectedPath = it },
-                onDatabaseSelected = { onDatabaseSelected(selectedPath) },
+                onDatabaseSelected = { selectedPath?.let(onDatabaseSelected) },
                 onCancel = onCancel,
                 onShowFileChooser = onShowFileChooser,
             )
@@ -60,8 +61,8 @@ fun DatabaseSelectionDialog(
 
 @Composable
 private fun DatabaseSelectionContent(
-    selectedPath: Path,
-    onPathChange: (Path) -> Unit,
+    selectedPath: Path?,
+    onPathChange: (Path?) -> Unit,
     onDatabaseSelected: () -> Unit,
     onCancel: () -> Unit,
     onShowFileChooser: () -> Path?,
@@ -99,7 +100,7 @@ private fun DatabaseSelectionContent(
 }
 
 @Composable
-private fun DatabasePathDisplay(selectedPath: Path) {
+private fun DatabasePathDisplay(selectedPath: Path?) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -109,7 +110,7 @@ private fun DatabasePathDisplay(selectedPath: Path) {
             style = MaterialTheme.typography.subtitle2,
         )
         Text(
-            text = selectedPath.toString(),
+            text = selectedPath?.toString() ?: "No path selected",
             style = MaterialTheme.typography.body2,
             color = MaterialTheme.colors.onSurface.copy(alpha = 0.6f),
         )
@@ -118,13 +119,13 @@ private fun DatabasePathDisplay(selectedPath: Path) {
 
 @Composable
 private fun DatabaseLocationButton(
-    onPathChange: (Path) -> Unit,
+    onPathChange: (Path?) -> Unit,
     onShowFileChooser: () -> Path?,
 ) {
     OutlinedButton(
         onClick = {
             val newPath = onShowFileChooser()
-            newPath?.let { onPathChange(it) }
+            onPathChange(newPath)
         },
         modifier = Modifier.fillMaxWidth(),
     ) {

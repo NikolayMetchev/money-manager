@@ -1,13 +1,15 @@
 package com.moneymanager.database
 
-import com.moneymanager.domain.repository.AccountRepository
-import com.moneymanager.domain.repository.CategoryRepository
-import com.moneymanager.domain.repository.TransactionRepository
-
+/**
+ * Factory for creating repository instances from a database.
+ * Repositories are bound to a specific database instance.
+ */
 interface RepositoryFactory {
-    fun createAccountRepository(listener: DefaultLocationMissingListener): AccountRepository
-
-    fun createCategoryRepository(listener: DefaultLocationMissingListener): CategoryRepository
-
-    fun createTransactionRepository(listener: DefaultLocationMissingListener): TransactionRepository
+    /**
+     * Creates a complete set of repositories for the given database.
+     *
+     * @param database The database instance to use for repository operations
+     * @return A RepositorySet containing all application repositories
+     */
+    fun createRepositories(database: MoneyManagerDatabase): RepositorySet
 }
