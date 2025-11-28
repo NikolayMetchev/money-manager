@@ -36,15 +36,16 @@ class MainActivity : ComponentActivity() {
 
             // Open default database on startup
             LaunchedEffect(Unit) {
-                withContext(Dispatchers.IO) {
-                    try {
-                        val defaultLocation = databaseManager.getDefaultLocation()
-                        val database = databaseManager.openDatabase(defaultLocation)
-                        val repositories = RepositorySet(database)
-                        databaseState = DatabaseState.DatabaseLoaded(defaultLocation, repositories)
-                    } catch (e: Exception) {
-                        databaseState = DatabaseState.Error(e)
-                    }
+                try {
+                    val defaultLocation = databaseManager.getDefaultLocation()
+                    val repositories =
+                        withContext(Dispatchers.IO) {
+                            val database = databaseManager.openDatabase(defaultLocation)
+                            RepositorySet(database)
+                        }
+                    databaseState = DatabaseState.DatabaseLoaded(defaultLocation, repositories)
+                } catch (e: Exception) {
+                    databaseState = DatabaseState.Error(e)
                 }
             }
 

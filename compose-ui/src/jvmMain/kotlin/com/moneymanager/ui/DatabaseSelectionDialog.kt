@@ -36,8 +36,9 @@ fun DatabaseSelectionDialog(
     onCancel: () -> Unit,
     onShowFileChooser: () -> Path?,
 ) {
-    // defaultPath.path might be null for in-memory databases, but UI always needs a real path
-    var selectedPath by remember { mutableStateOf(defaultPath.path ?: defaultPath.path) }
+    // UI always needs a real path for database selection dialog
+    require(defaultPath.path != null) { "Database selection dialog requires a non-null path" }
+    var selectedPath by remember { mutableStateOf<Path?>(defaultPath.path) }
 
     Dialog(onDismissRequest = onCancel) {
         Surface(

@@ -1,7 +1,12 @@
 package com.moneymanager.database
 
 actual data class DbLocation(val name: String?) {
-    actual fun exists() = true
+    /**
+     * On Android, checking file existence requires Context.
+     * Use [DatabaseManager.databaseExists] for actual file existence checks.
+     * This returns true for non-memory databases (assumed to exist or will be created).
+     */
+    actual fun exists() = !isInMemory()
 
     actual fun isInMemory() = name == null
 }

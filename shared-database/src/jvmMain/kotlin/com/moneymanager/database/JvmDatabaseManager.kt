@@ -7,7 +7,12 @@ import java.nio.file.Files
 import kotlin.io.path.exists
 
 private val DbLocation.jdbcUrl: String
-    get() = if (isInMemory()) "jdbc:sqlite::memory:" else "jdbc:sqlite:$path"
+    get() =
+        if (isInMemory()) {
+            "jdbc:sqlite::memory:"
+        } else {
+            "jdbc:sqlite:${path ?: error("Non-memory database must have a path")}"
+        }
 
 /**
  * JVM implementation of DatabaseManager.
