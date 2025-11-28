@@ -18,8 +18,18 @@ jobs:
       - name: Build with Gradle
         uses: ./.github/actions/gradle-run
         with:
-          command: build --stacktrace
+          command: build koverXmlReport --stacktrace
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   android-test:
     name: Android Instrumented Tests
