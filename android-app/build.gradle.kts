@@ -54,6 +54,11 @@ tasks.named("preBuild") {
     dependsOn("copyVersionToAssets")
 }
 
+// Ensure explodeAssetSourceDebug runs after copyVersionToAssets
+tasks.matching { it.name.startsWith("explodeAssetSource") }.configureEach {
+    mustRunAfter("copyVersionToAssets")
+}
+
 dependencies {
     implementation(kotlin("stdlib"))
     implementation(libs.androidx.activity)
