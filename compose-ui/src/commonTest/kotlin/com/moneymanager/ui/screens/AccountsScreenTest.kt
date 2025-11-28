@@ -19,291 +19,302 @@ import kotlin.time.Clock
 @OptIn(ExperimentalTestApi::class)
 class AccountsScreenTest {
     @Test
-    fun accountsScreen_displaysEmptyState_whenNoAccounts() = runComposeUiTest {
-        // Given
-        val repository = FakeAccountRepository(emptyList())
+    fun accountsScreen_displaysEmptyState_whenNoAccounts() =
+        runComposeUiTest {
+            // Given
+            val repository = FakeAccountRepository(emptyList())
 
-        // When
-        setContent {
-            AccountsScreen(accountRepository = repository)
+            // When
+            setContent {
+                AccountsScreen(accountRepository = repository)
+            }
+
+            // Then
+            onNodeWithText("Your Accounts").assertIsDisplayed()
+            onNodeWithText("No accounts yet. Add your first account!").assertIsDisplayed()
         }
 
-        // Then
-        onNodeWithText("Your Accounts").assertIsDisplayed()
-        onNodeWithText("No accounts yet. Add your first account!").assertIsDisplayed()
-    }
+    @Test
+    fun accountsScreen_displaysAccounts_whenAccountsExist() =
+        runComposeUiTest {
+            // Given
+            val now = Clock.System.now()
+            val accounts =
+                listOf(
+                    Account(
+                        id = 1L,
+                        name = "Checking Account",
+                        type = AccountType.CHECKING,
+                        currency = "USD",
+                        initialBalance = 1000.0,
+                        createdAt = now,
+                        updatedAt = now,
+                    ),
+                    Account(
+                        id = 2L,
+                        name = "Savings Account",
+                        type = AccountType.SAVINGS,
+                        currency = "USD",
+                        initialBalance = 5000.0,
+                        createdAt = now,
+                        updatedAt = now,
+                    ),
+                )
+            val repository = FakeAccountRepository(accounts)
+
+            // When
+            setContent {
+                AccountsScreen(accountRepository = repository)
+            }
+
+            // Then
+            onNodeWithText("Checking Account").assertIsDisplayed()
+            onNodeWithText("Savings Account").assertIsDisplayed()
+            onNodeWithText("USD 1000.00").assertIsDisplayed()
+            onNodeWithText("USD 5000.00").assertIsDisplayed()
+        }
 
     @Test
-    fun accountsScreen_displaysAccounts_whenAccountsExist() = runComposeUiTest {
-        // Given
-        val now = Clock.System.now()
-        val accounts =
-            listOf(
+    fun accountsScreen_displaysFloatingActionButton() =
+        runComposeUiTest {
+            // Given
+            val repository = FakeAccountRepository(emptyList())
+
+            // When
+            setContent {
+                AccountsScreen(accountRepository = repository)
+            }
+
+            // Then
+            onNodeWithText("+").assertIsDisplayed()
+        }
+
+    @Test
+    fun accountsScreen_opensCreateDialog_whenFabClicked() =
+        runComposeUiTest {
+            // Given
+            val repository = FakeAccountRepository(emptyList())
+
+            // When
+            setContent {
+                AccountsScreen(accountRepository = repository)
+            }
+
+            onNodeWithText("+").performClick()
+
+            // Then
+            onNodeWithText("Create New Account").assertIsDisplayed()
+            onNodeWithText("Account Name").assertIsDisplayed()
+            onNodeWithText("Account Type").assertIsDisplayed()
+        }
+
+    @Test
+    fun accountCard_displaysAccountInformation() =
+        runComposeUiTest {
+            // Given
+            val now = Clock.System.now()
+            val account =
                 Account(
                     id = 1L,
-                    name = "Checking Account",
+                    name = "My Checking",
                     type = AccountType.CHECKING,
-                    currency = "USD",
-                    initialBalance = 1000.0,
+                    currency = "EUR",
+                    initialBalance = 2500.50,
                     createdAt = now,
                     updatedAt = now,
-                ),
-                Account(
-                    id = 2L,
-                    name = "Savings Account",
-                    type = AccountType.SAVINGS,
-                    currency = "USD",
-                    initialBalance = 5000.0,
-                    createdAt = now,
-                    updatedAt = now,
-                ),
-            )
-        val repository = FakeAccountRepository(accounts)
+                )
+            val repository = FakeAccountRepository(listOf(account))
 
-        // When
-        setContent {
-            AccountsScreen(accountRepository = repository)
+            // When
+            setContent {
+                AccountsScreen(accountRepository = repository)
+            }
+
+            // Then
+            onNodeWithText("My Checking").assertIsDisplayed()
+            onNodeWithText("CHECKING").assertIsDisplayed()
+            onNodeWithText("EUR 2500.50").assertIsDisplayed()
         }
 
-        // Then
-        onNodeWithText("Checking Account").assertIsDisplayed()
-        onNodeWithText("Savings Account").assertIsDisplayed()
-        onNodeWithText("USD 1000.00").assertIsDisplayed()
-        onNodeWithText("USD 5000.00").assertIsDisplayed()
-    }
-
     @Test
-    fun accountsScreen_displaysFloatingActionButton() = runComposeUiTest {
-        // Given
-        val repository = FakeAccountRepository(emptyList())
-
-        // When
-        setContent {
-            AccountsScreen(accountRepository = repository)
-        }
-
-        // Then
-        onNodeWithText("+").assertIsDisplayed()
-    }
-
-    @Test
-    fun accountsScreen_opensCreateDialog_whenFabClicked() = runComposeUiTest {
-        // Given
-        val repository = FakeAccountRepository(emptyList())
-
-        // When
-        setContent {
-            AccountsScreen(accountRepository = repository)
-        }
-
-        onNodeWithText("+").performClick()
-
-        // Then
-        onNodeWithText("Create New Account").assertIsDisplayed()
-        onNodeWithText("Account Name").assertIsDisplayed()
-        onNodeWithText("Account Type").assertIsDisplayed()
-    }
-
-    @Test
-    fun accountCard_displaysAccountInformation() = runComposeUiTest {
-        // Given
-        val now = Clock.System.now()
-        val account =
-            Account(
-                id = 1L,
-                name = "My Checking",
-                type = AccountType.CHECKING,
-                currency = "EUR",
-                initialBalance = 2500.50,
-                createdAt = now,
-                updatedAt = now,
-            )
-        val repository = FakeAccountRepository(listOf(account))
-
-        // When
-        setContent {
-            AccountsScreen(accountRepository = repository)
-        }
-
-        // Then
-        onNodeWithText("My Checking").assertIsDisplayed()
-        onNodeWithText("CHECKING").assertIsDisplayed()
-        onNodeWithText("EUR 2500.50").assertIsDisplayed()
-    }
-
-    @Test
-    fun accountCard_displaysNegativeBalance_inErrorColor() = runComposeUiTest {
-        // Given
-        val now = Clock.System.now()
-        val account =
-            Account(
-                id = 1L,
-                name = "Credit Card",
-                type = AccountType.CREDIT_CARD,
-                currency = "USD",
-                initialBalance = -500.0,
-                createdAt = now,
-                updatedAt = now,
-            )
-        val repository = FakeAccountRepository(listOf(account))
-
-        // When
-        setContent {
-            AccountsScreen(accountRepository = repository)
-        }
-
-        // Then
-        onNodeWithText("USD -500.00").assertIsDisplayed()
-    }
-
-    @Test
-    fun accountCard_opensDeleteDialog_whenDeleteButtonClicked() = runComposeUiTest {
-        // Given
-        val now = Clock.System.now()
-        val account =
-            Account(
-                id = 1L,
-                name = "Test Account",
-                type = AccountType.CHECKING,
-                currency = "USD",
-                initialBalance = 100.0,
-                createdAt = now,
-                updatedAt = now,
-            )
-        val repository = FakeAccountRepository(listOf(account))
-
-        // When
-        setContent {
-            AccountsScreen(accountRepository = repository)
-        }
-
-        // Click the delete button (trash icon)
-        onNodeWithText("🗑️").performClick()
-
-        // Then
-        onNodeWithText("Delete Account?").assertIsDisplayed()
-        onNodeWithText("Are you sure you want to delete \"Test Account\"?").assertIsDisplayed()
-    }
-
-    @Test
-    fun createAccountDialog_validatesRequiredFields() = runComposeUiTest {
-        // Given
-        val repository = FakeAccountRepository(emptyList())
-
-        // When
-        setContent {
-            AccountsScreen(accountRepository = repository)
-        }
-
-        // Open dialog
-        onNodeWithText("+").performClick()
-
-        // Try to create without filling fields
-        onNodeWithText("Create").performClick()
-
-        // Then
-        onNodeWithText("Account name is required").assertIsDisplayed()
-    }
-
-    @Test
-    fun createAccountDialog_canBeDismissed() = runComposeUiTest {
-        // Given
-        val repository = FakeAccountRepository(emptyList())
-
-        // When
-        setContent {
-            AccountsScreen(accountRepository = repository)
-        }
-
-        // Open dialog
-        onNodeWithText("+").performClick()
-        onNodeWithText("Create New Account").assertIsDisplayed()
-
-        // Click cancel
-        onNodeWithText("Cancel").performClick()
-
-        // Then - dialog should be dismissed
-        onNodeWithText("Create New Account").assertDoesNotExist()
-    }
-
-    @Test
-    fun deleteAccountDialog_canBeDismissed() = runComposeUiTest {
-        // Given
-        val now = Clock.System.now()
-        val account =
-            Account(
-                id = 1L,
-                name = "Test Account",
-                type = AccountType.CHECKING,
-                currency = "USD",
-                initialBalance = 100.0,
-                createdAt = now,
-                updatedAt = now,
-            )
-        val repository = FakeAccountRepository(listOf(account))
-
-        // When
-        setContent {
-            AccountsScreen(accountRepository = repository)
-        }
-
-        // Open delete dialog
-        onNodeWithText("🗑️").performClick()
-        onNodeWithText("Delete Account?").assertIsDisplayed()
-
-        // Click cancel
-        onNodeWithText("Cancel").performClick()
-
-        // Then - dialog should be dismissed
-        onNodeWithText("Delete Account?").assertDoesNotExist()
-    }
-
-    @Test
-    fun accountsScreen_displaysMultipleAccounts() = runComposeUiTest {
-        // Given
-        val now = Clock.System.now()
-        val accounts =
-            listOf(
+    fun accountCard_displaysNegativeBalance_inErrorColor() =
+        runComposeUiTest {
+            // Given
+            val now = Clock.System.now()
+            val account =
                 Account(
                     id = 1L,
-                    name = "Account 1",
+                    name = "Credit Card",
+                    type = AccountType.CREDIT_CARD,
+                    currency = "USD",
+                    initialBalance = -500.0,
+                    createdAt = now,
+                    updatedAt = now,
+                )
+            val repository = FakeAccountRepository(listOf(account))
+
+            // When
+            setContent {
+                AccountsScreen(accountRepository = repository)
+            }
+
+            // Then
+            onNodeWithText("USD -500.00").assertIsDisplayed()
+        }
+
+    @Test
+    fun accountCard_opensDeleteDialog_whenDeleteButtonClicked() =
+        runComposeUiTest {
+            // Given
+            val now = Clock.System.now()
+            val account =
+                Account(
+                    id = 1L,
+                    name = "Test Account",
                     type = AccountType.CHECKING,
                     currency = "USD",
                     initialBalance = 100.0,
                     createdAt = now,
                     updatedAt = now,
-                ),
-                Account(
-                    id = 2L,
-                    name = "Account 2",
-                    type = AccountType.SAVINGS,
-                    currency = "EUR",
-                    initialBalance = 200.0,
-                    createdAt = now,
-                    updatedAt = now,
-                ),
-                Account(
-                    id = 3L,
-                    name = "Account 3",
-                    type = AccountType.CASH,
-                    currency = "GBP",
-                    initialBalance = 300.0,
-                    createdAt = now,
-                    updatedAt = now,
-                ),
-            )
-        val repository = FakeAccountRepository(accounts)
+                )
+            val repository = FakeAccountRepository(listOf(account))
 
-        // When
-        setContent {
-            AccountsScreen(accountRepository = repository)
+            // When
+            setContent {
+                AccountsScreen(accountRepository = repository)
+            }
+
+            // Click the delete button (trash icon)
+            onNodeWithText("🗑️").performClick()
+
+            // Then
+            onNodeWithText("Delete Account?").assertIsDisplayed()
+            onNodeWithText("Are you sure you want to delete \"Test Account\"?").assertIsDisplayed()
         }
 
-        // Then - all accounts should be visible
-        onNodeWithText("Account 1").assertIsDisplayed()
-        onNodeWithText("Account 2").assertIsDisplayed()
-        onNodeWithText("Account 3").assertIsDisplayed()
-    }
+    @Test
+    fun createAccountDialog_validatesRequiredFields() =
+        runComposeUiTest {
+            // Given
+            val repository = FakeAccountRepository(emptyList())
+
+            // When
+            setContent {
+                AccountsScreen(accountRepository = repository)
+            }
+
+            // Open dialog
+            onNodeWithText("+").performClick()
+
+            // Try to create without filling fields
+            onNodeWithText("Create").performClick()
+
+            // Then
+            onNodeWithText("Account name is required").assertIsDisplayed()
+        }
+
+    @Test
+    fun createAccountDialog_canBeDismissed() =
+        runComposeUiTest {
+            // Given
+            val repository = FakeAccountRepository(emptyList())
+
+            // When
+            setContent {
+                AccountsScreen(accountRepository = repository)
+            }
+
+            // Open dialog
+            onNodeWithText("+").performClick()
+            onNodeWithText("Create New Account").assertIsDisplayed()
+
+            // Click cancel
+            onNodeWithText("Cancel").performClick()
+
+            // Then - dialog should be dismissed
+            onNodeWithText("Create New Account").assertDoesNotExist()
+        }
+
+    @Test
+    fun deleteAccountDialog_canBeDismissed() =
+        runComposeUiTest {
+            // Given
+            val now = Clock.System.now()
+            val account =
+                Account(
+                    id = 1L,
+                    name = "Test Account",
+                    type = AccountType.CHECKING,
+                    currency = "USD",
+                    initialBalance = 100.0,
+                    createdAt = now,
+                    updatedAt = now,
+                )
+            val repository = FakeAccountRepository(listOf(account))
+
+            // When
+            setContent {
+                AccountsScreen(accountRepository = repository)
+            }
+
+            // Open delete dialog
+            onNodeWithText("🗑️").performClick()
+            onNodeWithText("Delete Account?").assertIsDisplayed()
+
+            // Click cancel
+            onNodeWithText("Cancel").performClick()
+
+            // Then - dialog should be dismissed
+            onNodeWithText("Delete Account?").assertDoesNotExist()
+        }
+
+    @Test
+    fun accountsScreen_displaysMultipleAccounts() =
+        runComposeUiTest {
+            // Given
+            val now = Clock.System.now()
+            val accounts =
+                listOf(
+                    Account(
+                        id = 1L,
+                        name = "Account 1",
+                        type = AccountType.CHECKING,
+                        currency = "USD",
+                        initialBalance = 100.0,
+                        createdAt = now,
+                        updatedAt = now,
+                    ),
+                    Account(
+                        id = 2L,
+                        name = "Account 2",
+                        type = AccountType.SAVINGS,
+                        currency = "EUR",
+                        initialBalance = 200.0,
+                        createdAt = now,
+                        updatedAt = now,
+                    ),
+                    Account(
+                        id = 3L,
+                        name = "Account 3",
+                        type = AccountType.CASH,
+                        currency = "GBP",
+                        initialBalance = 300.0,
+                        createdAt = now,
+                        updatedAt = now,
+                    ),
+                )
+            val repository = FakeAccountRepository(accounts)
+
+            // When
+            setContent {
+                AccountsScreen(accountRepository = repository)
+            }
+
+            // Then - all accounts should be visible
+            onNodeWithText("Account 1").assertIsDisplayed()
+            onNodeWithText("Account 2").assertIsDisplayed()
+            onNodeWithText("Account 3").assertIsDisplayed()
+        }
 
     // Fake repository for testing
     private class FakeAccountRepository(
