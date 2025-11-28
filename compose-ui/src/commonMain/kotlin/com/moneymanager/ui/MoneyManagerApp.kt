@@ -4,10 +4,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import com.moneymanager.database.DbLocation
+import com.moneymanager.database.RepositorySet
 import com.moneymanager.domain.model.AppVersion
-import com.moneymanager.domain.repository.AccountRepository
-import com.moneymanager.domain.repository.CategoryRepository
-import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.ui.navigation.Screen
 import com.moneymanager.ui.screens.AccountsScreen
 import com.moneymanager.ui.screens.CategoriesScreen
@@ -16,11 +15,9 @@ import com.moneymanager.ui.screens.TransactionsScreen
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MoneyManagerApp(
-    accountRepository: AccountRepository,
-    categoryRepository: CategoryRepository,
-    transactionRepository: TransactionRepository,
+    repositorySet: RepositorySet,
     appVersion: AppVersion,
-    databasePath: String? = null,
+    databaseLocation: DbLocation,
 ) {
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Accounts) }
 
@@ -36,13 +33,11 @@ fun MoneyManagerApp(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
                             )
-                            databasePath?.let { path ->
-                                Text(
-                                    text = "Database: $path",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
-                                )
-                            }
+                            Text(
+                                text = "Database: $databaseLocation",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                            )
                         }
                     },
                     colors =
@@ -77,9 +72,9 @@ fun MoneyManagerApp(
         ) { paddingValues ->
             Box(modifier = Modifier.padding(paddingValues)) {
                 when (currentScreen) {
-                    is Screen.Accounts -> AccountsScreen(accountRepository)
-                    is Screen.Categories -> CategoriesScreen(categoryRepository)
-                    is Screen.Transactions -> TransactionsScreen(transactionRepository)
+                    is Screen.Accounts -> AccountsScreen(repositorySet.accountRepository)
+                    is Screen.Categories -> CategoriesScreen(repositorySet.categoryRepository)
+                    is Screen.Transactions -> TransactionsScreen(repositorySet.transactionRepository)
                 }
             }
         }

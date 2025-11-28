@@ -3,11 +3,19 @@ package com.moneymanager.android
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import com.moneymanager.database.DefaultLocationMissingListener
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.moneymanager.database.DatabaseState
+import com.moneymanager.database.RepositorySet
 import com.moneymanager.di.AppComponent
 import com.moneymanager.di.AppComponentParams
 import com.moneymanager.di.initializeVersionReader
 import com.moneymanager.ui.MoneyManagerApp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -17,34 +25,46 @@ class MainActivity : ComponentActivity() {
         initializeVersionReader(applicationContext)
 
         // Initialize DI component with Android context
-        // Metro DI will handle DatabaseDriverFactory creation and database initialization
         val params = AppComponentParams(context = applicationContext)
         val component: AppComponent = AppComponent.create(params)
 
-        // Get repository factory and version from the component
-        val repositoryFactory = component.repositoryFactory
+        val databaseManager = component.databaseManager
         val appVersion = component.appVersion
 
-        // Create repositories from factory with default listener
-        val listener =
-            DefaultLocationMissingListener {
-                com.moneymanager.database.DbLocation(com.moneymanager.database.DEFAULT_DATABASE_NAME)
-            }
-        val accountRepository = repositoryFactory.createAccountRepository(listener)
-        val categoryRepository = repositoryFactory.createCategoryRepository(listener)
-        val transactionRepository = repositoryFactory.createTransactionRepository(listener)
-
-        // Get the actual database path on Android
-        val dbPath = applicationContext.getDatabasePath("money_manager.db").absolutePath
-
         setContent {
-            MoneyManagerApp(
-                accountRepository = accountRepository,
-                categoryRepository = categoryRepository,
-                transactionRepository = transactionRepository,
-                appVersion = appVersion,
-                databasePath = dbPath,
-            )
+            var databaseState by remember { mutableStateOf<DatabaseState>(DatabaseState.NoDatabaseSelected) }
+
+            // Open default database on startup
+            LaunchedEffect(Unit) {
+                try {
+                    val defaultLocation = databaseManager.getDefaultLocation()
+                    val repositories =
+                        withContext(Dispatchers.IO) {
+                            val database = databaseManager.openDatabase(defaultLocation)
+                            RepositorySet(database)
+                        }
+                    databaseState = DatabaseState.DatabaseLoaded(defaultLocation, repositories)
+                } catch (e: Exception) {
+                    databaseState = DatabaseState.Error(e)
+                }
+            }
+
+            // Show main app once database is loaded
+            when (val state = databaseState) {
+                is DatabaseState.DatabaseLoaded -> {
+                    MoneyManagerApp(
+                        repositorySet = state.repositories,
+                        appVersion = appVersion,
+                        databaseLocation = state.location,
+                    )
+                }
+                is DatabaseState.NoDatabaseSelected -> {
+                    // Loading...
+                }
+                is DatabaseState.Error -> {
+                    // TODO: Show error UI
+                }
+            }
         }
     }
 }

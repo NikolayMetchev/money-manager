@@ -5,21 +5,20 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
-import com.moneymanager.database.DEFAULT_DATABASE_PATH
+import com.moneymanager.database.DatabaseState
 import com.moneymanager.database.DbLocation
+import com.moneymanager.database.RepositorySet
 import com.moneymanager.di.AppComponent
 import com.moneymanager.di.AppComponentParams
-import com.moneymanager.domain.model.AppVersion
-import com.moneymanager.domain.repository.AccountRepository
-import com.moneymanager.domain.repository.CategoryRepository
-import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.ui.DatabaseSelectionDialog
 import com.moneymanager.ui.MoneyManagerApp
+import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
 import java.awt.FileDialog
 import java.awt.Frame
@@ -35,25 +34,45 @@ fun main() {
     }
 }
 
-@Suppress("LongMethod", "FunctionName")
+@Suppress("LongMethod", "FunctionName", "CyclomaticComplexMethod", "TooGenericExceptionCaught")
 @Composable
 private fun MainWindow(onExit: () -> Unit) {
-    var databasePath by remember { mutableStateOf<DbLocation?>(null) }
+    val coroutineScope = rememberCoroutineScope()
+
+    // Initialize DI component once
+    val component =
+        remember {
+            logger.info { "Creating DI component..." }
+            val params = AppComponentParams()
+            AppComponent.create(params).also {
+                logger.info { "DI component created successfully" }
+            }
+        }
+
+    val databaseManager = component.databaseManager
+    val appVersion = component.appVersion
+
+    var databaseState by remember { mutableStateOf<DatabaseState>(DatabaseState.NoDatabaseSelected) }
     var showDatabaseDialog by remember { mutableStateOf(false) }
-    var appState by remember { mutableStateOf<AppState?>(null) }
 
     // Initialize on startup
     LaunchedEffect(Unit) {
         logger.info { "LaunchedEffect: Starting initialization" }
-        val defaultDbPath = DEFAULT_DATABASE_PATH
-        val dbExists = defaultDbPath.exists()
-        logger.debug { "Default database path: $defaultDbPath, exists: $dbExists" }
+        val defaultLocation = databaseManager.getDefaultLocation()
+        val dbExists = databaseManager.databaseExists(defaultLocation)
+        logger.debug { "Default database location: $defaultLocation, exists: $dbExists" }
 
         if (dbExists) {
-            databasePath = defaultDbPath
-            logger.info { "Existing database found, initializing..." }
-            appState = initializeApplication(defaultDbPath)
-            logger.info { "Initialization complete" }
+            logger.info { "Existing database found, opening..." }
+            try {
+                val database = databaseManager.openDatabase(defaultLocation)
+                val repositories = RepositorySet(database)
+                databaseState = DatabaseState.DatabaseLoaded(defaultLocation, repositories)
+                logger.info { "Database opened successfully" }
+            } catch (e: Exception) {
+                logger.error { "Failed to open database: ${e.message}" }
+                databaseState = DatabaseState.Error(e)
+            }
         } else {
             logger.info { "No existing database, showing dialog" }
             showDatabaseDialog = true
@@ -61,9 +80,10 @@ private fun MainWindow(onExit: () -> Unit) {
     }
 
     val windowTitle =
-        when {
-            databasePath != null -> "Money Manager - $databasePath"
-            else -> "Money Manager - Setup"
+        when (val state = databaseState) {
+            is DatabaseState.DatabaseLoaded -> "Money Manager - ${state.location}"
+            is DatabaseState.NoDatabaseSelected -> "Money Manager - No Database"
+            is DatabaseState.Error -> "Money Manager - Error"
         }
 
     Window(
@@ -72,19 +92,30 @@ private fun MainWindow(onExit: () -> Unit) {
         state = rememberWindowState(width = 1000.dp, height = 700.dp),
     ) {
         // Show database selection dialog if needed
-        if (showDatabaseDialog && appState == null) {
+        if (showDatabaseDialog && databaseState is DatabaseState.NoDatabaseSelected) {
             DatabaseSelectionDialog(
-                defaultPath = DEFAULT_DATABASE_PATH,
+                defaultPath = databaseManager.getDefaultLocation(),
                 onDatabaseSelected = { selectedPath ->
                     logger.info { "User selected database path: $selectedPath" }
-                    databasePath = DbLocation(selectedPath)
                     showDatabaseDialog = false
-                    logger.info { "Database path set successfully" }
-                    appState = initializeApplication(DbLocation(selectedPath))
+                    coroutineScope.launch {
+                        try {
+                            val location = DbLocation(selectedPath)
+                            logger.info { "Opening database at: $location" }
+                            val database = databaseManager.openDatabase(location)
+                            val repositories = RepositorySet(database)
+                            databaseState = DatabaseState.DatabaseLoaded(location, repositories)
+                            logger.info { "Database initialized successfully" }
+                        } catch (e: Exception) {
+                            logger.error { "Failed to open database: ${e.message}" }
+                            databaseState = DatabaseState.Error(e)
+                        }
+                    }
                 },
                 onCancel = {
-                    logger.info { "User cancelled database selection - exiting application" }
-                    onExit()
+                    logger.info { "User cancelled database selection - staying in no database state" }
+                    showDatabaseDialog = false
+                    // Keep databaseState as NoDatabaseSelected
                 },
                 onShowFileChooser = {
                     val fileDialog = FileDialog(null as Frame?, "Choose Database Location", FileDialog.SAVE)
@@ -103,43 +134,22 @@ private fun MainWindow(onExit: () -> Unit) {
             )
         }
 
-        // Show main app once initialized
-        appState?.let { state ->
-            val currentDbPath = databasePath
-            MoneyManagerApp(
-                accountRepository = state.accountRepository,
-                categoryRepository = state.categoryRepository,
-                transactionRepository = state.transactionRepository,
-                appVersion = state.appVersion,
-                databasePath = currentDbPath?.toString() ?: "Unknown",
-            )
+        // Show main app once database is loaded
+        when (val state = databaseState) {
+            is DatabaseState.DatabaseLoaded -> {
+                MoneyManagerApp(
+                    repositorySet = state.repositories,
+                    appVersion = appVersion,
+                    databaseLocation = state.location,
+                )
+            }
+            is DatabaseState.NoDatabaseSelected -> {
+                // Show UI with option to open/create database in future
+            }
+            is DatabaseState.Error -> {
+                // Show error UI in future
+                logger.error { "Database error: ${state.error.message}" }
+            }
         }
     }
-}
-
-private data class AppState(
-    val accountRepository: AccountRepository,
-    val categoryRepository: CategoryRepository,
-    val transactionRepository: TransactionRepository,
-    val appVersion: AppVersion,
-)
-
-private fun initializeApplication(dbLocation: DbLocation): AppState {
-    logger.info { "=== Starting Application Initialization ===" }
-    logger.info { "Database path: $dbLocation" }
-
-    logger.info { "Creating DI component..." }
-    val params = AppComponentParams()
-    val component: AppComponent = AppComponent.create(params)
-    logger.info { "DI component created successfully" }
-
-    val accountRepository = component.repositoryFactory.createAccountRepository({ DEFAULT_DATABASE_PATH })
-    val categoryRepository = component.repositoryFactory.createCategoryRepository({ DEFAULT_DATABASE_PATH })
-    val transactionRepository = component.repositoryFactory.createTransactionRepository({ DEFAULT_DATABASE_PATH })
-    val appVersion = component.appVersion
-    logger.info { "App version: ${appVersion.value}" }
-    logger.info { "All repositories initialized successfully" }
-    logger.info { "=== Initialization Complete ===" }
-
-    return AppState(accountRepository, categoryRepository, transactionRepository, appVersion)
 }

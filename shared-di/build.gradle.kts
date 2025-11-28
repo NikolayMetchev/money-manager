@@ -12,5 +12,11 @@ kotlin {
                 implementation(projects.sharedDatabase)
             }
         }
+
+        val androidMain by getting {
+            dependencies {
+                implementation(libs.androidx.test.core)
+            }
+        }
     }
 }

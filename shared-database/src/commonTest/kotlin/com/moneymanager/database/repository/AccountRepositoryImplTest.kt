@@ -2,10 +2,10 @@
 
 package com.moneymanager.database.repository
 
-import com.moneymanager.database.DEFAULT_DATABASE_PATH
-import com.moneymanager.database.DefaultLocationMissingListener
-import com.moneymanager.di.database.DbTestComponent
-import com.moneymanager.di.database.DbTestComponentParams
+import com.moneymanager.database.IN_MEMORY_DATABASE
+import com.moneymanager.database.RepositorySet
+import com.moneymanager.di.AppComponent
+import com.moneymanager.di.createTestAppComponentParams
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountType
 import com.moneymanager.domain.repository.AccountRepository
@@ -24,12 +24,18 @@ class AccountRepositoryImplTest {
     private lateinit var repository: AccountRepository
 
     @BeforeTest
-    fun setup() {
-        // Create test component with in-memory database
-        val component = DbTestComponent.create(DbTestComponentParams())
-        val listener = DefaultLocationMissingListener { DEFAULT_DATABASE_PATH }
-        repository = component.repositoryFactory.createAccountRepository(listener)
-    }
+    fun setup() =
+        runTest {
+            // Create app component
+            val component = AppComponent.create(createTestAppComponentParams())
+            val databaseManager = component.databaseManager
+
+            // Open in-memory database for testing
+            val database = databaseManager.openDatabase(IN_MEMORY_DATABASE)
+            val repositories = RepositorySet(database)
+
+            repository = repositories.accountRepository
+        }
 
     // CREATE ACCOUNT TESTS
 
