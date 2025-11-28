@@ -18,7 +18,7 @@ kotlin {
         minSdk = libs.findVersion("android-minSdk").get().toString().toInt()
 
         compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_24)
+            jvmTarget.set(JvmTarget.fromTarget(libs.findVersion("jvm-target").get().toString()))
         }
 
         // Enable instrumented tests with Gradle Managed Device
