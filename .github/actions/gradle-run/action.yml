@@ -22,16 +22,6 @@ runs:
       shell: bash
       run: ./gradlew ${{ inputs.command }} --no-daemon
 
-    - name: Upload test results
-      if: failure()
-      uses: actions/upload-artifact@v4
-      with:
-        name: test-results
-        path: |
-          **/build/reports/tests/**
-          **/build/test-results/**
-        retention-days: 7
-
     - name: Upload build reports
       if: failure()
       uses: actions/upload-artifact@v4

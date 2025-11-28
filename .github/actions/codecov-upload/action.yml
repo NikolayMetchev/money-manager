@@ -1,0 +1,32 @@
+name: 'Codecov Upload'
+description: 'Upload both coverage and test results to Codecov'
+
+inputs:
+  token:
+    description: 'Codecov token for authentication'
+    required: true
+  flags:
+    description: 'Flags to identify coverage reports (e.g., unit, instrumented)'
+    required: false
+    default: ''
+  coverage-file:
+    description: 'Path pattern to coverage files (e.g., **/*.xml for XML reports)'
+    required: false
+    default: ''
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v5
+      with:
+        token: ${{ inputs.token }}
+        flags: ${{ inputs.flags }}
+        files: ${{ inputs.coverage-file }}
+
+    - name: Upload test results to Codecov
+      if: ${{ !cancelled() }}
+      uses: codecov/test-results-action@v1
+      with:
+        token: ${{ inputs.token }}
+        flags: ${{ inputs.flags }}

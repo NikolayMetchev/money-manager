@@ -21,15 +21,11 @@ jobs:
           command: build koverXmlReport --stacktrace
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+      - name: Upload coverage and test results to Codecov
+        uses: ./.github/actions/codecov-upload
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-      - name: Upload test results to Codecov
-        if: ${{ !cancelled() }}
-        uses: codecov/test-results-action@v1
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: unit
 
   android-test:
     name: Android Instrumented Tests
@@ -83,7 +79,15 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true
-          script: ./gradlew pixel6api34AndroidDeviceTest --stacktrace
+          script: ./gradlew connectedAndroidDeviceTest createAndroidDeviceTestCoverageReport --stacktrace
+
+      - name: Upload coverage and test results to Codecov
+        if: always()
+        uses: ./.github/actions/codecov-upload
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: instrumented
+          coverage-file: '**/build/reports/coverage/**/*.xml'
 
       - name: Upload test results
         if: always()
