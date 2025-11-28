@@ -5,6 +5,7 @@ import app.cash.sqldelight.driver.android.AndroidSqliteDriver
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+private val DEFAULT_DB_LOCATION = DbLocation(DEFAULT_DATABASE_NAME)
 /**
  * Android implementation of DatabaseManager.
  * Manages SQLite databases using Android's built-in database support.
@@ -24,13 +25,11 @@ class AndroidDatabaseManager(private val context: Context) : DatabaseManager {
             MoneyManagerDatabase(driver)
         }
 
-    override suspend fun databaseExists(location: DbLocation): Boolean {
+    override suspend fun databaseExists(location: DbLocation) =
         // On Android, we can check if the database file exists in the databases directory
-        val dbFile = context.getDatabasePath(location.name)
-        return dbFile.exists()
-    }
+        context.getDatabasePath(location.name).exists()
 
-    override fun getDefaultLocation(): DbLocation {
-        return DbLocation(DEFAULT_DATABASE_NAME)
-    }
+    override fun getDefaultLocation() = DEFAULT_DB_LOCATION
 }
+
+

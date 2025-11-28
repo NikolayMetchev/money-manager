@@ -45,7 +45,5 @@ class JvmDatabaseManager : DatabaseManager {
             location.exists()
         }
 
-    override fun getDefaultLocation(): DbLocation {
-        return DEFAULT_DATABASE_PATH
-    }
+    override fun getDefaultLocation() = DEFAULT_DATABASE_PATH
 }

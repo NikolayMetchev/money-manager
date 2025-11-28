@@ -4,6 +4,4 @@ import com.moneymanager.database.AndroidDatabaseManager
 import com.moneymanager.database.DatabaseManager
 import com.moneymanager.di.AppComponentParams
 
-actual fun createDatabaseManager(params: AppComponentParams): DatabaseManager {
-    return AndroidDatabaseManager(params.context)
-}
+actual fun createDatabaseManager(params: AppComponentParams): DatabaseManager = AndroidDatabaseManager(params.context)
