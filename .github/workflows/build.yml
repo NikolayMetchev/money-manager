@@ -79,7 +79,7 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true
-          script: ./gradlew pixel6api34AndroidDeviceTest --stacktrace
+          script: ./gradlew pixel6api34AndroidDeviceTest createManagedDeviceAndroidDeviceTestCoverageReport --stacktrace
 
       - name: Upload coverage and test results to Codecov
         if: always()
