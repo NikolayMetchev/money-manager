@@ -45,11 +45,18 @@ kotlin {
             }
         }
         val androidDeviceTest by getting {
+            // Note: Cannot use dependsOn(commonTest) due to source set tree restrictions
+            // Tests are shared via kotlin.srcDir() below
             dependencies {
+                @OptIn(org.jetbrains.compose.ExperimentalComposeLibrary::class)
+                implementation(compose.uiTest)
+
                 implementation(libs.androidx.test.core)
-                // Compose UI testing for Android
                 implementation(libs.androidx.test.runner)
+                implementation(libs.kotlinx.coroutines.test)
+                implementation(libs.turbine)
             }
+            kotlin.srcDir("src/commonTest/kotlin")
         }
     }
 }
