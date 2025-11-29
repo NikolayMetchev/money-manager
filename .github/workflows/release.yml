@@ -76,19 +76,19 @@ jobs:
         include:
           - platform: Windows
             os: windows-latest
-            task: :jvm-app:packageMsi
+            task: :app:main:jvm:packageMsi
             artifact-name: windows-installer
-            artifact-path: jvm-app/build/compose/binaries/main/msi/*.msi
+            artifact-path: app/main/jvm/build/compose/binaries/main/msi/*.msi
           - platform: macOS
             os: macos-latest
-            task: :jvm-app:packageDmg
+            task: :app:main:jvm:packageDmg
             artifact-name: macos-installer
-            artifact-path: jvm-app/build/compose/binaries/main/dmg/*.dmg
+            artifact-path: app/main/jvm/build/compose/binaries/main/dmg/*.dmg
           - platform: Linux
             os: ubuntu-latest
-            task: :jvm-app:packageDeb
+            task: :app:main:jvm:packageDeb
             artifact-name: linux-installer
-            artifact-path: jvm-app/build/compose/binaries/main/deb/*.deb
+            artifact-path: app/main/jvm/build/compose/binaries/main/deb/*.deb
           - platform: Android
             os: ubuntu-latest
             task: :android-app:assembleRelease
