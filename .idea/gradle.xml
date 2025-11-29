@@ -21,13 +21,12 @@
         <option name="modules">
           <set>
             <option value="$PROJECT_DIR$" />
-            <option value="$PROJECT_DIR$/app/main/android" />
-            <option value="$PROJECT_DIR$/compose-ui" />
-            <option value="$PROJECT_DIR$/gradle" />
-            <option value="$PROJECT_DIR$/gradle/build-logic" />
             <option value="$PROJECT_DIR$/app" />
             <option value="$PROJECT_DIR$/app/main" />
+            <option value="$PROJECT_DIR$/app/main/android" />
             <option value="$PROJECT_DIR$/app/main/jvm" />
+            <option value="$PROJECT_DIR$/compose-ui" />
+            <option value="$PROJECT_DIR$/gradle/build-logic" />
             <option value="$PROJECT_DIR$/shared" />
             <option value="$PROJECT_DIR$/shared-database" />
             <option value="$PROJECT_DIR$/shared-di" />
