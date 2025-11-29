@@ -15,6 +15,7 @@ jobs:
   lint-format:
     name: Auto-format PR
     runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event.pull_request.mergeable_state != 'dirty'
 
     steps:
       - name: Checkout code
