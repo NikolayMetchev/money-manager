@@ -1,14 +1,9 @@
 CREATE TABLE Account (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
-    type TEXT NOT NULL, -- CHECKING, SAVINGS, CREDIT_CARD, CASH, INVESTMENT
-    currency TEXT NOT NULL DEFAULT 'USD',
+    asset TEXT NOT NULL,
     initialBalance REAL NOT NULL DEFAULT 0.0,
-    color TEXT,
-    icon TEXT,
-    isActive INTEGER NOT NULL DEFAULT 1,
-    createdAt INTEGER NOT NULL,
-    updatedAt INTEGER NOT NULL
+    openingDate INTEGER NOT NULL
 );
 
 selectAll:
@@ -17,18 +12,14 @@ SELECT * FROM Account;
 selectById:
 SELECT * FROM Account WHERE id = ?;
 
-selectActive:
-SELECT * FROM Account WHERE isActive = 1;
-
 insert:
-INSERT INTO Account(name, type, currency, initialBalance, color, icon, isActive, createdAt, updatedAt)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+INSERT INTO Account(name, asset, initialBalance, openingDate)
+VALUES (?, ?, ?, ?);
 
 update:
 UPDATE Account
-SET name = ?, type = ?, currency = ?, color = ?, icon = ?, isActive = ?, updatedAt = ?
+SET name = ?, asset = ?, initialBalance = ?
 WHERE id = ?;
-
 
 delete:
 DELETE FROM Account WHERE id = ?;

@@ -31,24 +31,13 @@ class AccountRepositoryImpl(
             .mapToOneOrNull(Dispatchers.Default)
             .map { it?.let(AccountMapper::map) }
 
-    override fun getActiveAccounts(): Flow<List<Account>> =
-        queries.selectActive()
-            .asFlow()
-            .mapToList(Dispatchers.Default)
-            .map(AccountMapper::mapList)
-
     override suspend fun createAccount(account: Account): Long =
         withContext(Dispatchers.Default) {
             queries.insert(
                 name = account.name,
-                type = account.type.name,
-                currency = account.currency,
+                asset = account.asset,
                 initialBalance = account.initialBalance,
-                color = account.color,
-                icon = account.icon,
-                isActive = if (account.isActive) 1 else 0,
-                createdAt = account.createdAt.toEpochMilliseconds(),
-                updatedAt = account.updatedAt.toEpochMilliseconds(),
+                openingDate = account.openingDate.toEpochMilliseconds(),
             )
             queries.lastInsertRowId().executeAsOne()
         }
@@ -57,12 +46,8 @@ class AccountRepositoryImpl(
         withContext(Dispatchers.Default) {
             queries.update(
                 name = account.name,
-                type = account.type.name,
-                currency = account.currency,
-                color = account.color,
-                icon = account.icon,
-                isActive = if (account.isActive) 1 else 0,
-                updatedAt = account.updatedAt.toEpochMilliseconds(),
+                asset = account.asset,
+                initialBalance = account.initialBalance,
                 id = account.id,
             )
         }

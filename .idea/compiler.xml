@@ -11,6 +11,10 @@
       <module name="money-manager.jvm-app.test" target="24" />
       <module name="money-manager.shared-database-test.jvmMain" target="24" />
       <module name="money-manager.shared-database-test.jvmTest" target="24" />
+      <module name="money-manager.shared-database.jvmMain" target="24" />
+      <module name="money-manager.shared-database.jvmTest" target="24" />
+      <module name="money-manager.shared-di.jvmMain" target="24" />
+      <module name="money-manager.shared-di.jvmTest" target="24" />
       <module name="money-manager.shared.jvmMain" target="24" />
       <module name="money-manager.shared.jvmTest" target="24" />
     </bytecodeTargetLevel>

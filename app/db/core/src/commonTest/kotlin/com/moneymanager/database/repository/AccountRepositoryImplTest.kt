@@ -7,14 +7,12 @@ import com.moneymanager.database.RepositorySet
 import com.moneymanager.di.AppComponent
 import com.moneymanager.di.createTestAppComponentParams
 import com.moneymanager.domain.model.Account
-import com.moneymanager.domain.model.AccountType
 import com.moneymanager.domain.repository.AccountRepository
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -46,11 +44,9 @@ class AccountRepositoryImplTest {
             val account =
                 Account(
                     name = "Test Checking",
-                    type = AccountType.CHECKING,
-                    currency = "USD",
+                    asset = "USD",
                     initialBalance = 1000.0,
-                    createdAt = now,
-                    updatedAt = now,
+                    openingDate = now,
                 )
 
             val accountId = repository.createAccount(account)
@@ -60,65 +56,30 @@ class AccountRepositoryImplTest {
             val retrieved = repository.getAccountById(accountId).first()
             assertNotNull(retrieved)
             assertEquals(account.name, retrieved.name)
-            assertEquals(account.type, retrieved.type)
-            assertEquals(account.currency, retrieved.currency)
+            assertEquals(account.asset, retrieved.asset)
             assertEquals(account.initialBalance, retrieved.initialBalance)
         }
 
     @Test
-    fun `createAccount should handle different account types`() =
+    fun `createAccount should handle different assets`() =
         runTest {
             val now = Clock.System.now()
-            val accountTypes =
-                listOf(
-                    AccountType.CHECKING,
-                    AccountType.SAVINGS,
-                    AccountType.CREDIT_CARD,
-                    AccountType.CASH,
-                    AccountType.INVESTMENT,
-                )
+            val assets = listOf("USD", "EUR", "GBP", "JPY", "BTC", "ETH")
 
-            accountTypes.forEach { type ->
-                val account =
-                    Account(
-                        name = "Test ${type.name}",
-                        type = type,
-                        currency = "USD",
-                        initialBalance = 0.0,
-                        createdAt = now,
-                        updatedAt = now,
-                    )
-
-                val accountId = repository.createAccount(account)
-                val retrieved = repository.getAccountById(accountId).first()
-
-                assertNotNull(retrieved)
-                assertEquals(type, retrieved.type)
-            }
-        }
-
-    @Test
-    fun `createAccount should handle different currencies`() =
-        runTest {
-            val now = Clock.System.now()
-            val currencies = listOf("USD", "EUR", "GBP", "JPY")
-
-            currencies.forEach { currency ->
+            assets.forEach { asset ->
                 val account =
                     Account(
                         name = "Test Account",
-                        type = AccountType.CHECKING,
-                        currency = currency,
+                        asset = asset,
                         initialBalance = 0.0,
-                        createdAt = now,
-                        updatedAt = now,
+                        openingDate = now,
                     )
 
                 val accountId = repository.createAccount(account)
                 val retrieved = repository.getAccountById(accountId).first()
 
                 assertNotNull(retrieved)
-                assertEquals(currency, retrieved.currency)
+                assertEquals(asset, retrieved.asset)
             }
         }
 
@@ -129,11 +90,9 @@ class AccountRepositoryImplTest {
             val account =
                 Account(
                     name = "Credit Card",
-                    type = AccountType.CREDIT_CARD,
-                    currency = "USD",
+                    asset = "USD",
                     initialBalance = -500.0,
-                    createdAt = now,
-                    updatedAt = now,
+                    openingDate = now,
                 )
 
             val accountId = repository.createAccount(account)
@@ -150,11 +109,9 @@ class AccountRepositoryImplTest {
             val account =
                 Account(
                     name = "New Account",
-                    type = AccountType.CHECKING,
-                    currency = "USD",
+                    asset = "USD",
                     initialBalance = 0.0,
-                    createdAt = now,
-                    updatedAt = now,
+                    openingDate = now,
                 )
 
             val accountId = repository.createAccount(account)
@@ -162,54 +119,6 @@ class AccountRepositoryImplTest {
 
             assertNotNull(retrieved)
             assertEquals(0.0, retrieved.initialBalance)
-        }
-
-    @Test
-    fun `createAccount should handle optional fields`() =
-        runTest {
-            val now = Clock.System.now()
-            val account =
-                Account(
-                    name = "Test Account",
-                    type = AccountType.CHECKING,
-                    currency = "USD",
-                    initialBalance = 100.0,
-                    color = "#FF5733",
-                    icon = "💰",
-                    isActive = true,
-                    createdAt = now,
-                    updatedAt = now,
-                )
-
-            val accountId = repository.createAccount(account)
-            val retrieved = repository.getAccountById(accountId).first()
-
-            assertNotNull(retrieved)
-            assertEquals("#FF5733", retrieved.color)
-            assertEquals("💰", retrieved.icon)
-            assertTrue(retrieved.isActive)
-        }
-
-    @Test
-    fun `createAccount should handle inactive account`() =
-        runTest {
-            val now = Clock.System.now()
-            val account =
-                Account(
-                    name = "Inactive Account",
-                    type = AccountType.CHECKING,
-                    currency = "USD",
-                    initialBalance = 100.0,
-                    isActive = false,
-                    createdAt = now,
-                    updatedAt = now,
-                )
-
-            val accountId = repository.createAccount(account)
-            val retrieved = repository.getAccountById(accountId).first()
-
-            assertNotNull(retrieved)
-            assertFalse(retrieved.isActive)
         }
 
     // GET ALL ACCOUNTS TESTS
@@ -228,56 +137,20 @@ class AccountRepositoryImplTest {
             val account1 =
                 Account(
                     name = "Account 1",
-                    type = AccountType.CHECKING,
-                    currency = "USD",
+                    asset = "USD",
                     initialBalance = 100.0,
-                    createdAt = now,
-                    updatedAt = now,
+                    openingDate = now,
                 )
             val account2 =
                 Account(
                     name = "Account 2",
-                    type = AccountType.SAVINGS,
-                    currency = "EUR",
+                    asset = "EUR",
                     initialBalance = 200.0,
-                    createdAt = now,
-                    updatedAt = now,
+                    openingDate = now,
                 )
 
             repository.createAccount(account1)
             repository.createAccount(account2)
-
-            val accounts = repository.getAllAccounts().first()
-            assertEquals(2, accounts.size)
-        }
-
-    @Test
-    fun `getAllAccounts should return both active and inactive accounts`() =
-        runTest {
-            val now = Clock.System.now()
-            val activeAccount =
-                Account(
-                    name = "Active Account",
-                    type = AccountType.CHECKING,
-                    currency = "USD",
-                    initialBalance = 100.0,
-                    isActive = true,
-                    createdAt = now,
-                    updatedAt = now,
-                )
-            val inactiveAccount =
-                Account(
-                    name = "Inactive Account",
-                    type = AccountType.SAVINGS,
-                    currency = "USD",
-                    initialBalance = 200.0,
-                    isActive = false,
-                    createdAt = now,
-                    updatedAt = now,
-                )
-
-            repository.createAccount(activeAccount)
-            repository.createAccount(inactiveAccount)
 
             val accounts = repository.getAllAccounts().first()
             assertEquals(2, accounts.size)
@@ -299,11 +172,9 @@ class AccountRepositoryImplTest {
             val account =
                 Account(
                     name = "Test Account",
-                    type = AccountType.CHECKING,
-                    currency = "USD",
+                    asset = "USD",
                     initialBalance = 100.0,
-                    createdAt = now,
-                    updatedAt = now,
+                    openingDate = now,
                 )
 
             val accountId = repository.createAccount(account)
@@ -312,102 +183,6 @@ class AccountRepositoryImplTest {
             assertNotNull(retrieved)
             assertEquals(accountId, retrieved.id)
             assertEquals(account.name, retrieved.name)
-        }
-
-    @Test
-    fun `getAccountById should return inactive account`() =
-        runTest {
-            val now = Clock.System.now()
-            val account =
-                Account(
-                    name = "Inactive Account",
-                    type = AccountType.CHECKING,
-                    currency = "USD",
-                    initialBalance = 100.0,
-                    isActive = false,
-                    createdAt = now,
-                    updatedAt = now,
-                )
-
-            val accountId = repository.createAccount(account)
-            val retrieved = repository.getAccountById(accountId).first()
-
-            assertNotNull(retrieved)
-            assertFalse(retrieved.isActive)
-        }
-
-    // GET ACTIVE ACCOUNTS TESTS
-
-    @Test
-    fun `getActiveAccounts should return empty list when no active accounts exist`() =
-        runTest {
-            val now = Clock.System.now()
-            val inactiveAccount =
-                Account(
-                    name = "Inactive Account",
-                    type = AccountType.CHECKING,
-                    currency = "USD",
-                    initialBalance = 100.0,
-                    isActive = false,
-                    createdAt = now,
-                    updatedAt = now,
-                )
-
-            repository.createAccount(inactiveAccount)
-            val accounts = repository.getActiveAccounts().first()
-
-            assertTrue(accounts.isEmpty())
-        }
-
-    @Test
-    fun `getActiveAccounts should return only active accounts`() =
-        runTest {
-            val now = Clock.System.now()
-            val activeAccount1 =
-                Account(
-                    name = "Active Account 1",
-                    type = AccountType.CHECKING,
-                    currency = "USD",
-                    initialBalance = 100.0,
-                    isActive = true,
-                    createdAt = now,
-                    updatedAt = now,
-                )
-            val activeAccount2 =
-                Account(
-                    name = "Active Account 2",
-                    type = AccountType.SAVINGS,
-                    currency = "USD",
-                    initialBalance = 200.0,
-                    isActive = true,
-                    createdAt = now,
-                    updatedAt = now,
-                )
-            val inactiveAccount =
-                Account(
-                    name = "Inactive Account",
-                    type = AccountType.CASH,
-                    currency = "USD",
-                    initialBalance = 300.0,
-                    isActive = false,
-                    createdAt = now,
-                    updatedAt = now,
-                )
-
-            repository.createAccount(activeAccount1)
-            repository.createAccount(activeAccount2)
-            repository.createAccount(inactiveAccount)
-
-            val accounts = repository.getActiveAccounts().first()
-            assertEquals(2, accounts.size)
-            assertTrue(accounts.all { it.isActive })
-        }
-
-    @Test
-    fun `getActiveAccounts should return empty list when no accounts exist`() =
-        runTest {
-            val accounts = repository.getActiveAccounts().first()
-            assertTrue(accounts.isEmpty())
         }
 
     // UPDATE ACCOUNT TESTS
@@ -419,25 +194,19 @@ class AccountRepositoryImplTest {
             val account =
                 Account(
                     name = "Original Name",
-                    type = AccountType.CHECKING,
-                    currency = "USD",
+                    asset = "USD",
                     initialBalance = 100.0,
-                    createdAt = now,
-                    updatedAt = now,
+                    openingDate = now,
                 )
 
             val accountId = repository.createAccount(account)
             val retrieved = repository.getAccountById(accountId).first()!!
 
-            val later = Clock.System.now()
             val updated =
                 retrieved.copy(
                     name = "Updated Name",
-                    type = AccountType.SAVINGS,
-                    currency = "EUR",
-                    color = "#FF0000",
-                    icon = "🏦",
-                    updatedAt = later,
+                    asset = "EUR",
+                    initialBalance = 200.0,
                 )
 
             repository.updateAccount(updated)
@@ -445,100 +214,8 @@ class AccountRepositoryImplTest {
 
             assertNotNull(result)
             assertEquals("Updated Name", result.name)
-            assertEquals(AccountType.SAVINGS, result.type)
-            assertEquals("EUR", result.currency)
-            assertEquals("#FF0000", result.color)
-            assertEquals("🏦", result.icon)
-        }
-
-    @Test
-    fun `updateAccount should not modify initial balance`() =
-        runTest {
-            val now = Clock.System.now()
-            val account =
-                Account(
-                    name = "Test Account",
-                    type = AccountType.CHECKING,
-                    currency = "USD",
-                    initialBalance = 100.0,
-                    createdAt = now,
-                    updatedAt = now,
-                )
-
-            val accountId = repository.createAccount(account)
-            val retrieved = repository.getAccountById(accountId).first()!!
-
-            // Note: The update query does not include initialBalance
-            val updated = retrieved.copy(name = "Updated Name")
-            repository.updateAccount(updated)
-
-            val result = repository.getAccountById(accountId).first()
-            assertNotNull(result)
-            assertEquals(100.0, result.initialBalance)
-        }
-
-    @Test
-    fun `updateAccount should toggle isActive status`() =
-        runTest {
-            val now = Clock.System.now()
-            val account =
-                Account(
-                    name = "Test Account",
-                    type = AccountType.CHECKING,
-                    currency = "USD",
-                    initialBalance = 100.0,
-                    isActive = true,
-                    createdAt = now,
-                    updatedAt = now,
-                )
-
-            val accountId = repository.createAccount(account)
-            val retrieved = repository.getAccountById(accountId).first()!!
-
-            val later = Clock.System.now()
-            val deactivated = retrieved.copy(isActive = false, updatedAt = later)
-            repository.updateAccount(deactivated)
-
-            val result = repository.getAccountById(accountId).first()
-            assertNotNull(result)
-            assertFalse(result.isActive)
-
-            // Should not appear in active accounts
-            val activeAccounts = repository.getActiveAccounts().first()
-            assertFalse(activeAccounts.any { it.id == accountId })
-
-            // But should still appear in all accounts
-            val allAccounts = repository.getAllAccounts().first()
-            assertTrue(allAccounts.any { it.id == accountId })
-        }
-
-    @Test
-    fun `updateAccount should handle clearing optional fields`() =
-        runTest {
-            val now = Clock.System.now()
-            val account =
-                Account(
-                    name = "Test Account",
-                    type = AccountType.CHECKING,
-                    currency = "USD",
-                    initialBalance = 100.0,
-                    color = "#FF0000",
-                    icon = "🏦",
-                    createdAt = now,
-                    updatedAt = now,
-                )
-
-            val accountId = repository.createAccount(account)
-            val retrieved = repository.getAccountById(accountId).first()!!
-
-            val later = Clock.System.now()
-            val updated = retrieved.copy(color = null, icon = null, updatedAt = later)
-            repository.updateAccount(updated)
-
-            val result = repository.getAccountById(accountId).first()
-            assertNotNull(result)
-            assertNull(result.color)
-            assertNull(result.icon)
+            assertEquals("EUR", result.asset)
+            assertEquals(200.0, result.initialBalance)
         }
 
     // DELETE ACCOUNT TESTS
@@ -550,11 +227,9 @@ class AccountRepositoryImplTest {
             val account =
                 Account(
                     name = "Test Account",
-                    type = AccountType.CHECKING,
-                    currency = "USD",
+                    asset = "USD",
                     initialBalance = 100.0,
-                    createdAt = now,
-                    updatedAt = now,
+                    openingDate = now,
                 )
 
             val accountId = repository.createAccount(account)
@@ -571,20 +246,16 @@ class AccountRepositoryImplTest {
             val account1 =
                 Account(
                     name = "Account 1",
-                    type = AccountType.CHECKING,
-                    currency = "USD",
+                    asset = "USD",
                     initialBalance = 100.0,
-                    createdAt = now,
-                    updatedAt = now,
+                    openingDate = now,
                 )
             val account2 =
                 Account(
                     name = "Account 2",
-                    type = AccountType.SAVINGS,
-                    currency = "USD",
+                    asset = "USD",
                     initialBalance = 200.0,
-                    createdAt = now,
-                    updatedAt = now,
+                    openingDate = now,
                 )
 
             val accountId1 = repository.createAccount(account1)
@@ -621,48 +292,15 @@ class AccountRepositoryImplTest {
             val account =
                 Account(
                     name = "New Account",
-                    type = AccountType.CHECKING,
-                    currency = "USD",
+                    asset = "USD",
                     initialBalance = 100.0,
-                    createdAt = now,
-                    updatedAt = now,
+                    openingDate = now,
                 )
             repository.createAccount(account)
 
             // Should now contain the account
             val updated = repository.getAllAccounts().first()
             assertEquals(1, updated.size)
-        }
-
-    @Test
-    fun `getActiveAccounts flow should emit updated list after deactivation`() =
-        runTest {
-            val now = Clock.System.now()
-            val account =
-                Account(
-                    name = "Test Account",
-                    type = AccountType.CHECKING,
-                    currency = "USD",
-                    initialBalance = 100.0,
-                    isActive = true,
-                    createdAt = now,
-                    updatedAt = now,
-                )
-
-            val accountId = repository.createAccount(account)
-
-            // Should appear in active accounts
-            val active1 = repository.getActiveAccounts().first()
-            assertEquals(1, active1.size)
-
-            // Deactivate
-            val retrieved = repository.getAccountById(accountId).first()!!
-            val later = Clock.System.now()
-            repository.updateAccount(retrieved.copy(isActive = false, updatedAt = later))
-
-            // Should no longer appear in active accounts
-            val active2 = repository.getActiveAccounts().first()
-            assertTrue(active2.isEmpty())
         }
 
     // EDGE CASES AND INTEGRATION TESTS
@@ -677,11 +315,9 @@ class AccountRepositoryImplTest {
                 val account =
                     Account(
                         name = "Account $index",
-                        type = AccountType.entries[index % AccountType.entries.size],
-                        currency = "USD",
+                        asset = "USD",
                         initialBalance = index * 100.0,
-                        createdAt = now,
-                        updatedAt = now,
+                        openingDate = now,
                     )
                 repository.createAccount(account)
             }
@@ -707,11 +343,9 @@ class AccountRepositoryImplTest {
                 val account =
                     Account(
                         name = name,
-                        type = AccountType.CHECKING,
-                        currency = "USD",
+                        asset = "USD",
                         initialBalance = 100.0,
-                        createdAt = now,
-                        updatedAt = now,
+                        openingDate = now,
                     )
 
                 val accountId = repository.createAccount(account)
@@ -730,11 +364,9 @@ class AccountRepositoryImplTest {
             val account =
                 Account(
                     name = "Test Account",
-                    type = AccountType.CHECKING,
-                    currency = "USD",
+                    asset = "USD",
                     initialBalance = preciseBalance,
-                    createdAt = now,
-                    updatedAt = now,
+                    openingDate = now,
                 )
 
             val accountId = repository.createAccount(account)
@@ -752,11 +384,9 @@ class AccountRepositoryImplTest {
             val account =
                 Account(
                     name = "Rich Account",
-                    type = AccountType.INVESTMENT,
-                    currency = "USD",
+                    asset = "USD",
                     initialBalance = largeBalance,
-                    createdAt = now,
-                    updatedAt = now,
+                    openingDate = now,
                 )
 
             val accountId = repository.createAccount(account)
@@ -776,11 +406,9 @@ class AccountRepositoryImplTest {
                 val account =
                     Account(
                         name = "Account $index",
-                        type = AccountType.CHECKING,
-                        currency = "USD",
+                        asset = "USD",
                         initialBalance = 100.0,
-                        createdAt = now,
-                        updatedAt = now,
+                        openingDate = now,
                     )
                 accountIds.add(repository.createAccount(account))
             }
