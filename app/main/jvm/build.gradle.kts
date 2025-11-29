@@ -8,13 +8,14 @@ plugins {
 dependencies {
     api(libs.androidx.compose.runtime.desktop)
     api(libs.compose.ui.desktop)
+
     implementation(libs.compose.ui.graphics.desktop)
     implementation(libs.compose.ui.unit.desktop)
     implementation(libs.diamondedge.logging)
     implementation(libs.kmlogging)
     implementation(libs.kotlinx.coroutines.core)
+    implementation(projects.app.db.core)
     implementation(projects.app.ui.core)
-    implementation(projects.sharedDatabase)
     implementation(projects.sharedDi)
 
     runtimeOnly(compose.desktop.currentOs)
