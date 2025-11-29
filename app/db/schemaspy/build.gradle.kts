@@ -71,7 +71,7 @@ tasks.register<JavaExec>("generateSchemaSpyDocs") {
         "-s", "main",
         "-u", "",
         "-sso",
-        "-norows"
+        "-norows",
     )
 
     inputs.file(dbFile)
