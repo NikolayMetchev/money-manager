@@ -18,8 +18,8 @@ kotlin {
                 implementation(libs.kotlinx.datetime)
                 implementation(libs.metro.runtime)
                 implementation(projects.app.db.core)
+                implementation(projects.app.di.core)
                 implementation(projects.app.model.core)
-                implementation(projects.sharedDi)
             }
         }
         val commonTest by getting {

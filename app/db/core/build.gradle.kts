@@ -19,7 +19,7 @@ kotlin {
         val commonTest by getting {
             dependencies {
                 implementation(libs.kotlinx.coroutines.test)
-                implementation(projects.sharedDi)
+                implementation(projects.app.di.core)
             }
         }
 
@@ -43,7 +43,7 @@ kotlin {
                 implementation(libs.androidx.test.core)
                 implementation(libs.androidx.test.runner)
                 implementation(libs.kotlinx.coroutines.test)
-                implementation(projects.sharedDi)
+                implementation(projects.app.di.core)
             }
             kotlin.srcDir("src/commonTest/kotlin")
         }

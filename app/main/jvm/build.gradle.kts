@@ -15,8 +15,8 @@ dependencies {
     implementation(libs.kmlogging)
     implementation(libs.kotlinx.coroutines.core)
     implementation(projects.app.db.core)
+    implementation(projects.app.di.core)
     implementation(projects.app.ui.core)
-    implementation(projects.sharedDi)
 
     runtimeOnly(compose.desktop.currentOs)
     runtimeOnly(libs.log4j.core)

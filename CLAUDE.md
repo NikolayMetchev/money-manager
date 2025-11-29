@@ -53,7 +53,7 @@ Money Manager is a personal finance management application built with Kotlin Mul
 ```bash
 ./gradlew :app:model:core:build      # Build core domain module
 ./gradlew :app:db:core:build         # Build database module
-./gradlew :shared-di:build           # Build DI module
+./gradlew :app:di:core:build         # Build DI module
 ./gradlew :app:ui:core:build         # Build Compose UI module
 ./gradlew :app:main:jvm:build        # Build JVM application
 ./gradlew :app:main:android:build    # Build Android application
@@ -204,7 +204,7 @@ The project follows a modular architecture with clear separation of concerns:
   - `src/jvmMain/`: JVM DatabaseDriverFactory (JDBC SQLite driver)
   - `src/androidMain/`: Android DatabaseDriverFactory (AndroidSqliteDriver)
 
-- **shared-di/**: Dependency injection module (multiplatform: JVM, Android)
+- **app/di/core/**: Dependency injection module (multiplatform: JVM, Android)
   - `src/commonMain/kotlin/com/moneymanager/di/`:
     - `AppScope.kt`: Scope marker for application-wide singletons
     - `AppComponent.kt`: Main DI component interface
@@ -281,7 +281,7 @@ Mappie automatically generates mapping code based on matching property names and
 **Repository Implementations** are located in `app/db/core/src/commonMain/kotlin/com/moneymanager/repository/`:
 - Plain Kotlin classes with constructor dependencies
 - No DI annotations on the classes themselves
-- Registered via `@Provides` functions in `RepositoryModule` (in `shared-di`)
+- Registered via `@Provides` functions in `RepositoryModule` (in `app/di/core`)
 - All repositories use Kotlin Flow for reactive data streams
 - Depend on SQLDelight's `MoneyManagerDatabase` and Mappie mappers
 
@@ -299,7 +299,7 @@ class AccountRepositoryImpl(
             .map { entities -> entities.map(mapper::toDomain) }
 }
 
-// Registration in RepositoryModule (in shared-di)
+// Registration in RepositoryModule (in app/di/core)
 @Provides
 @SingleIn(AppScope::class)
 fun provideAccountRepository(
@@ -310,9 +310,9 @@ fun provideAccountRepository(
 
 ### Dependency Injection with Metro
 
-The project uses Metro for compile-time dependency injection. All DI configuration is in the `shared-di` module:
+The project uses Metro for compile-time dependency injection. All DI configuration is in the `app/di/core` module:
 
-**DI Components** (`shared-di/src/commonMain/kotlin/com/moneymanager/di/`):
+**DI Components** (`app/di/core/src/commonMain/kotlin/com/moneymanager/di/`):
 - `AppScope.kt`: Scope marker for application-wide singletons
 - `AppComponent.kt`: Main DI component (interface) annotated with `@DependencyGraph(AppScope::class)`
 - `DatabaseModule.kt`: Provides database instance via `@Provides` function
@@ -661,7 +661,7 @@ The project currently supports:
 
 To add iOS or Web support:
 
-1. Add platform targets to multiplatform modules (`app/model/core`, `app/db/core`, `shared-di`)
+1. Add platform targets to multiplatform modules (`app/model/core`, `app/db/core`, `app/di/core`)
 2. Implement platform-specific `DatabaseDriverFactory` in the corresponding source set
 3. For iOS: Use NativeSqliteDriver from SQLDelight
 4. For Web: Use a browser-compatible SQLite driver (e.g., SQL.js wrapper)
@@ -750,7 +750,7 @@ The project uses modern Gradle practices for maintainability:
 **Module Build Files**:
 - `app/model/core/build.gradle.kts`: Applies coroutines convention for domain models
 - `app/db/core/build.gradle.kts`: Applies coroutines, mappie conventions, and SQLDelight plugin
-- `shared-di/build.gradle.kts`: Applies coroutines and metro conventions
+- `app/di/core/build.gradle.kts`: Applies coroutines and metro conventions
 - `app/ui/core/build.gradle.kts`: Applies android, coroutines, and compose-multiplatform conventions
 - `app/main/jvm/build.gradle.kts`: JVM application with Compose Desktop
 - `app/main/android/build.gradle.kts`: Android application with Compose
@@ -817,7 +817,7 @@ The project uses modern Gradle practices for maintainability:
 12. **Multiplatform Module Structure**:
     - `app/model/core`: Domain models and repository interfaces only (no implementations)
     - `app/db/core`: Database implementations, mappers, and platform-specific drivers
-    - `shared-di`: DI configuration and component definitions
+    - `app/di/core`: DI configuration and component definitions
     - `app/ui/core`: UI components (JVM and Android only - Compose doesn't support native)
 
 13. **Codecov Configuration Validation**:
