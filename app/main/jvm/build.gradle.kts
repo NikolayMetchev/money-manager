@@ -82,3 +82,17 @@ tasks.withType<Tar>().configureEach {
 tasks.withType<Zip>().configureEach {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
+
+// Ignore false positives from dependency-analysis plugin
+// These dependencies ARE used directly via imports in Main.kt
+dependencyAnalysis {
+    issues {
+        onUnusedDependencies {
+            exclude(
+                ":app:ui:core",
+                ":shared-database",
+                ":shared-di",
+            )
+        }
+    }
+}

@@ -5,10 +5,14 @@
       <module name="build-logic" target="24" />
       <module name="build-logic.main" target="24" />
       <module name="build-logic.test" target="24" />
+      <module name="money-manager.compose-ui.jvmMain" target="24" />
+      <module name="money-manager.compose-ui.jvmTest" target="24" />
       <module name="money-manager.jvm-app.main" target="24" />
       <module name="money-manager.jvm-app.test" target="24" />
       <module name="money-manager.shared-database-test.jvmMain" target="24" />
       <module name="money-manager.shared-database-test.jvmTest" target="24" />
+      <module name="money-manager.shared.jvmMain" target="24" />
+      <module name="money-manager.shared.jvmTest" target="24" />
     </bytecodeTargetLevel>
   </component>
 </project>

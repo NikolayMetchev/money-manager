@@ -66,3 +66,17 @@ dependencies {
     implementation(projects.sharedDatabase)
     implementation(projects.sharedDi)
 }
+
+// Ignore false positives from dependency-analysis plugin
+// These dependencies ARE used directly via imports in MainActivity.kt
+dependencyAnalysis {
+    issues {
+        onUnusedDependencies {
+            exclude(
+                ":app:ui:core",
+                ":shared-database",
+                ":shared-di",
+            )
+        }
+    }
+}
