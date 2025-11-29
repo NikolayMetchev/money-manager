@@ -23,6 +23,10 @@ runs:
         token: ${{ inputs.token }}
         flags: ${{ inputs.flags }}
         files: ${{ inputs.coverage-file }}
+        name: ${{ inputs.flags }}
+        fail_ci_if_error: false
+        verbose: true
+        disable_search: ${{ inputs.coverage-file != '' }}
 
     - name: Upload test results to Codecov
       if: ${{ !cancelled() }}
@@ -30,3 +34,5 @@ runs:
       with:
         token: ${{ inputs.token }}
         flags: ${{ inputs.flags }}
+        name: ${{ inputs.flags }}
+        verbose: true

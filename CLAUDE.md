@@ -123,10 +123,17 @@ The JVM application can be packaged as native installers for Windows, macOS, and
 ./gradlew build
 ```
 
+This single command now runs:
+- Compiles all code
+- Runs all tests (JVM unit tests)
+- Generates code coverage reports (`koverXmlReport`)
+- Checks dependency health (`buildHealth`)
+
 This practice:
 - Catches compilation errors before CI
 - Runs all tests locally
 - Verifies changes work on your environment
+- Ensures dependency hygiene
 - Saves CI minutes and time
 - Prevents broken builds on main branch
 
@@ -341,6 +348,233 @@ The `compose-ui` module provides a Material 3-based user interface for both JVM 
 - Multiplatform support (JVM and Android only - Compose doesn't support native)
 - Consistent UI across platforms
 
+### UI Testing
+
+The `compose-ui` module includes comprehensive UI tests using Compose Multiplatform's testing framework.
+
+**Test Location**: `compose-ui/src/commonTest/kotlin/com/moneymanager/ui/`
+
+**Test Framework**: Uses `runComposeUiTest` - the multiplatform approach (not JUnit 4-specific)
+
+**Running Tests**:
+```bash
+# Run JVM unit tests
+./gradlew :compose-ui:jvmTest
+
+# Run Android instrumented tests (requires device/emulator or managed device)
+./gradlew :compose-ui:connectedAndroidDeviceTest
+
+# Run on managed device (Pixel 6 API 34 - no physical device needed)
+./gradlew :compose-ui:pixel6api34AndroidDeviceTest
+
+# Run all tests (JVM + Android if available)
+./gradlew :compose-ui:test
+```
+
+#### Test Structure
+
+Tests are written in `commonTest` and automatically run on both JVM and Android:
+
+```kotlin
+@OptIn(ExperimentalTestApi::class)
+class ErrorScreenTest {
+    @Test
+    fun errorScreen_displaysErrorMessage() = runComposeUiTest {
+        // Given
+        val errorMessage = "Database connection failed"
+
+        // When
+        setContent {
+            ErrorScreen(errorMessage = errorMessage, fullException = null)
+        }
+
+        // Then
+        onNodeWithText("Application Error").assertIsDisplayed()
+        onNodeWithText(errorMessage).assertIsDisplayed()
+    }
+}
+```
+
+#### Test Dependencies
+
+**commonTest** (`compose-ui/build.gradle.kts`):
+```kotlin
+val commonTest by getting {
+    dependencies {
+        @OptIn(org.jetbrains.compose.ExperimentalComposeLibrary::class)
+        implementation(compose.uiTest)  // Compose UI testing framework
+
+        implementation(libs.kotlinx.coroutines.test)  // Coroutine testing
+        implementation(libs.turbine)  // Flow testing utilities
+    }
+}
+```
+
+**jvmTest** - Additional JVM-specific dependencies:
+```kotlin
+val jvmTest by getting {
+    dependencies {
+        // Skiko native libraries for desktop UI tests
+        implementation(compose.desktop.currentOs)
+    }
+}
+```
+
+**androidDeviceTest** - Android instrumented test configuration:
+```kotlin
+val androidDeviceTest by getting {
+    // Note: Cannot use dependsOn(commonTest) due to source set tree restrictions
+    // Tests are shared via kotlin.srcDir() below
+    dependencies {
+        @OptIn(org.jetbrains.compose.ExperimentalComposeLibrary::class)
+        implementation(compose.uiTest)
+
+        implementation(kotlin("test"))  // Required for @Test annotation
+        implementation(libs.androidx.test.core)
+        implementation(libs.androidx.test.runner)
+        implementation(libs.kotlinx.coroutines.test)
+        implementation(libs.turbine)
+    }
+    kotlin.srcDir("src/commonTest/kotlin")  // Share tests from commonTest
+}
+```
+
+#### Android Test Manifest
+
+Android instrumented tests require a manifest to launch activities. Located at `compose-ui/src/androidDeviceTest/AndroidManifest.xml`:
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <activity
+            android:name="androidx.activity.ComponentActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
+```
+
+**Why this is needed**:
+- `runComposeUiTest` on Android needs an Activity to host Compose UI
+- Uses `ComponentActivity` from `androidx.activity:activity-compose`
+- Must be declared with MAIN/LAUNCHER intent filter for test framework to launch it
+
+#### Source Set Sharing for Android Tests
+
+**Important**: Kotlin Multiplatform has source set tree restrictions that prevent using `dependsOn(commonTest)` for `androidDeviceTest`. Instead:
+
+1. **Duplicate all test dependencies** in `androidDeviceTest` (see above)
+2. **Use `kotlin.srcDir()`** to share test sources:
+   ```kotlin
+   kotlin.srcDir("src/commonTest/kotlin")
+   ```
+
+This pattern is used across all modules with Android device tests (e.g., `shared-database`).
+
+#### Testing Best Practices
+
+**Test User Interactions**:
+```kotlin
+@Test
+fun accountsScreen_opensCreateDialog_whenFabClicked() = runComposeUiTest {
+    setContent { AccountsScreen(accountRepository = repository) }
+
+    onNodeWithText("+").performClick()
+
+    onNodeWithText("Create New Account").assertIsDisplayed()
+}
+```
+
+**Use Fake Implementations**:
+```kotlin
+private class FakeAccountRepository(
+    private val accounts: List<Account>
+) : AccountRepository {
+    private val accountsFlow = MutableStateFlow(accounts)
+
+    override fun getAllAccounts(): Flow<List<Account>> = accountsFlow
+
+    override suspend fun createAccount(account: Account): Long {
+        val newId = (accounts.maxOfOrNull { it.id } ?: 0L) + 1
+        accountsFlow.value = accountsFlow.value + account.copy(id = newId)
+        return newId
+    }
+}
+```
+
+**Test Different States**:
+```kotlin
+@Test
+fun accountsScreen_displaysEmptyState_whenNoAccounts() = runComposeUiTest {
+    val repository = FakeAccountRepository(emptyList())
+    setContent { AccountsScreen(accountRepository = repository) }
+
+    onNodeWithText("No accounts yet. Add your first account!").assertIsDisplayed()
+}
+
+@Test
+fun accountsScreen_displaysAccounts_whenAccountsExist() = runComposeUiTest {
+    val repository = FakeAccountRepository(listOf(testAccount))
+    setContent { AccountsScreen(accountRepository = repository) }
+
+    onNodeWithText("Checking Account").assertIsDisplayed()
+}
+```
+
+#### Common Test Utilities
+
+**Turbine** - For testing Flows:
+```kotlin
+@Test
+fun repository_emitsUpdates_whenDataChanges() = runTest {
+    repository.getAllAccounts().test {
+        assertEquals(emptyList(), awaitItem())  // Initial state
+
+        repository.createAccount(testAccount)
+
+        val accounts = awaitItem()  // Updated state
+        assertEquals(1, accounts.size)
+    }
+}
+```
+
+#### Platform Differences
+
+**JVM Tests**:
+- Run with headless mode configured in `build.gradle.kts`:
+  ```kotlin
+  tasks.withType<Test> {
+      systemProperty("java.awt.headless", "true")
+      systemProperty("skiko.test.harness", "true")
+  }
+  ```
+- Require `compose.desktop.currentOs` dependency for Skiko native libraries
+- Fast execution (no device/emulator needed)
+
+**Android Tests**:
+- Run on physical devices, emulators, or managed devices
+- Require Android test manifest with ComponentActivity declaration
+- Test real Android UI behavior
+- Can test Android-specific features (accessibility, screen sizes, etc.)
+
+#### CI/CD Integration
+
+Tests are automatically run in GitHub Actions:
+
+**Unit tests** (JVM):
+- Part of `./gradlew build` task
+- Coverage reported to Codecov with "unit" flag
+
+**Instrumented tests** (Android):
+- Run on Gradle Managed Device (Pixel 6 API 34, AOSP ATD)
+- Separate workflow job with AVD caching
+- Coverage reported to Codecov with "instrumented" flag
+
 ## Development Notes
 
 ### Code Quality Tools
@@ -477,9 +711,9 @@ The project uses modern Gradle practices for maintainability:
 - `moneymanager.kotlin-convention`: Base Kotlin setup with detekt, ktlint, sort-dependencies
 - `moneymanager.kotlin-multiplatform-convention`: Base KMP setup (JVM toolchain 25, test dependencies)
 - `moneymanager.coroutines-convention`: Adds coroutines support on top of base convention
-- `moneymanager.android-convention`: Android library multiplatform setup with Kotlin and compose conventions
+- `moneymanager.android-convention`: Android library multiplatform setup (includes JVM + Android targets, managed device configuration)
 - `moneymanager.android-application-convention`: Android application setup with compose convention
-- `moneymanager.compose-multiplatform-convention`: Compose multiplatform with Material 3
+- `moneymanager.compose-multiplatform-convention`: Compose multiplatform with Material 3 (applies android-convention for Android support)
 - `moneymanager.mappie-convention`: Mappie plugin and API dependencies
 - `moneymanager.metro-convention`: Metro plugin and runtime dependencies
 - Benefits: DRY principle, consistent configuration across modules, reduced build file duplication

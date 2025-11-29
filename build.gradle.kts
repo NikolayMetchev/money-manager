@@ -29,6 +29,15 @@ subprojects {
     }
 }
 
+// Create root build task that builds all subprojects and runs buildHealth
+tasks.register("build") {
+    description = "Builds all subprojects and runs buildHealth"
+    group = "build"
+    dependsOn(subprojects.mapNotNull { it.tasks.findByName("build") })
+    dependsOn("buildHealth")
+    dependsOn("koverXmlReport")
+}
+
 tasks.register("lintFormat") {
     description = "Runs all formatting tasks"
     group = "formatting"
