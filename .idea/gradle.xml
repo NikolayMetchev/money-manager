@@ -21,7 +21,7 @@
         <option name="modules">
           <set>
             <option value="$PROJECT_DIR$" />
-            <option value="$PROJECT_DIR$/android-app" />
+            <option value="$PROJECT_DIR$/app/main/android" />
             <option value="$PROJECT_DIR$/build-logic" />
             <option value="$PROJECT_DIR$/compose-ui" />
             <option value="$PROJECT_DIR$/app" />
