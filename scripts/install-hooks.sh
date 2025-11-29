@@ -4,9 +4,17 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 HOOKS_DIR="$SCRIPT_DIR/hooks"
-GIT_HOOKS_DIR="$SCRIPT_DIR/../.git/hooks"
+
+# Determine the correct Git hooks directory, robust to worktrees and repo location
+GIT_HOOKS_DIR="$(git -C "$SCRIPT_DIR/.." rev-parse --git-path hooks)"
 
 echo "Installing Git hooks..."
+
+# Ensure .git/hooks directory exists
+if [ ! -d "$GIT_HOOKS_DIR" ]; then
+    mkdir -p "$GIT_HOOKS_DIR"
+    echo "Created hooks directory at $GIT_HOOKS_DIR"
+fi
 
 # Install pre-commit hook
 if [ -f "$HOOKS_DIR/pre-commit" ]; then

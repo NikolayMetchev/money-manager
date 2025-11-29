@@ -141,7 +141,9 @@ Only push to remote after a successful local build.
 
 ### Git Hooks Setup
 
-**IMPORTANT**: Install Git hooks to automatically validate configuration files before committing:
+**IMPORTANT**: Install Git hooks to automatically validate configuration files before committing.
+
+**⚠️ Note**: Git hooks are not tracked by version control and must be installed by each developer after cloning the repository. Run the installation script once after cloning:
 
 ```bash
 # On Windows (using Git Bash or Command Prompt)
@@ -153,7 +155,9 @@ Only push to remote after a successful local build.
 
 **Installed Hooks:**
 - **pre-commit**: Validates `codecov.yml` when it changes
-  - Uses curl to call Codecov validation API
+  - Reads staged version of the file (works from any directory)
+  - Uses curl to call Codecov validation API with 10-second timeout
+  - Handles network failures gracefully
   - Prevents committing invalid codecov configuration
   - Works cross-platform (Windows/Linux/macOS)
 

@@ -6,10 +6,27 @@
 if git diff --cached --name-only | grep -q "^codecov\.yml$"; then
     echo "Validating codecov.yml..."
 
+    # Get the repository root directory
+    REPO_ROOT=$(git rev-parse --show-toplevel)
+
+    # Read the staged version of codecov.yml (not the working directory version)
+    STAGED_CONTENT=$(git show :codecov.yml)
+
     # Use curl to validate the configuration (cross-platform)
-    response=$(curl -s -X POST https://codecov.io/validate \
+    # --max-time 10: timeout after 10 seconds to prevent hanging
+    response=$(echo "$STAGED_CONTENT" | curl -s --max-time 10 -X POST https://codecov.io/validate \
         -H "Content-Type: application/x-yaml" \
-        --data-binary @codecov.yml)
+        --data-binary @-)
+    curl_exit=$?
+
+    # Check if curl succeeded
+    if [ $curl_exit -ne 0 ]; then
+        echo "✗ Network or API error: curl failed with exit code $curl_exit"
+        echo "Please check your internet connection or try again later."
+        echo "You can manually validate with:"
+        echo "  curl -X POST https://codecov.io/validate -H 'Content-Type: application/x-yaml' --data-binary @codecov.yml"
+        exit 1
+    fi
 
     # Check if validation was successful
     if echo "$response" | grep -q "Valid!"; then
