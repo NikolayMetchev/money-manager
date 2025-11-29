@@ -4,6 +4,7 @@ plugins {
 }
 
 dependencies {
+    implementation(libs.sqldelight.runtime)
     implementation(libs.sqldelight.sqlite.driver)
     implementation(projects.app.db.core)
 }
