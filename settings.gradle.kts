@@ -1,7 +1,7 @@
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 pluginManagement {
-    includeBuild("build-logic")
+    includeBuild("gradle/build-logic")
     repositories {
         google()
         mavenCentral()
@@ -38,7 +38,7 @@ develocity {
 }
 
 autoInclude {
-    ignore(":build-logic")
+    ignore(":gradle:build-logic")
 }
 
 rootProject.name = "money-manager"

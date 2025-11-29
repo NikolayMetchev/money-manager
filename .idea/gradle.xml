@@ -7,9 +7,9 @@
         <compositeConfiguration>
           <compositeBuild compositeDefinitionSource="SCRIPT">
             <builds>
-              <build path="$PROJECT_DIR$/build-logic" name="build-logic">
+              <build path="$PROJECT_DIR$/gradle/build-logic" name="build-logic">
                 <projects>
-                  <project path="$PROJECT_DIR$/build-logic" />
+                  <project path="$PROJECT_DIR$/gradle/build-logic" />
                 </projects>
               </build>
             </builds>
@@ -22,8 +22,9 @@
           <set>
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/app/main/android" />
-            <option value="$PROJECT_DIR$/build-logic" />
             <option value="$PROJECT_DIR$/compose-ui" />
+            <option value="$PROJECT_DIR$/gradle" />
+            <option value="$PROJECT_DIR$/gradle/build-logic" />
             <option value="$PROJECT_DIR$/app" />
             <option value="$PROJECT_DIR$/app/main" />
             <option value="$PROJECT_DIR$/app/main/jvm" />

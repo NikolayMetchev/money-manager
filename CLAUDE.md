@@ -145,7 +145,7 @@ Only push to remote after a successful local build.
 
 The project follows a modular architecture with clear separation of concerns:
 
-- **build-logic/**: Gradle convention plugins for shared build configuration
+- **gradle/build-logic/**: Gradle convention plugins for shared build configuration
   - `src/main/kotlin/`:
     - `moneymanager.kotlin-convention.gradle.kts`: Base Kotlin setup with detekt, ktlint, sort-dependencies
     - `moneymanager.kotlin-multiplatform-convention.gradle.kts`: Base KMP setup with JVM toolchain
@@ -707,7 +707,7 @@ The project uses modern Gradle practices for maintainability:
 - Accessed via `libs` in build files (e.g., `libs.metro.runtime`)
 - **IMPORTANT**: ALL dependencies MUST be defined in `libs.versions.toml` and referenced via `libs.*`. NEVER hardcode dependencies with version numbers directly in build files (e.g., `implementation("group:artifact:version")`). Always add them to the version catalog first.
 
-**Convention Plugins** (`build-logic/`):
+**Convention Plugins** (`gradle/build-logic/`):
 - `moneymanager.kotlin-convention`: Base Kotlin setup with detekt, ktlint, sort-dependencies
 - `moneymanager.kotlin-multiplatform-convention`: Base KMP setup (JVM toolchain 25, test dependencies)
 - `moneymanager.coroutines-convention`: Adds coroutines support on top of base convention
