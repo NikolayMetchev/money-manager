@@ -37,7 +37,7 @@ jobs:
           gradle-version: 9.2.0
 
       - name: Run lintFormat
-        run: ./gradlew lintFormat --no-daemon -Dktlint.ignoreFailures=true
+        run: ./gradlew lintFormat --no-daemon -Dktlint.ignoreFailures=true --continue
 
       - name: Check for changes
         id: git-check
