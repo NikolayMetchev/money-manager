@@ -17,8 +17,8 @@ kotlin {
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.datetime)
                 implementation(libs.metro.runtime)
+                implementation(projects.app.db.core)
                 implementation(projects.app.model.core)
-                implementation(projects.sharedDatabase)
                 implementation(projects.sharedDi)
             }
         }

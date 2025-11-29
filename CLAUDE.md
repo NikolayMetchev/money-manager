@@ -52,7 +52,7 @@ Money Manager is a personal finance management application built with Kotlin Mul
 ### Building Specific Modules
 ```bash
 ./gradlew :app:model:core:build      # Build core domain module
-./gradlew :shared-database:build     # Build database module
+./gradlew :app:db:core:build         # Build database module
 ./gradlew :shared-di:build           # Build DI module
 ./gradlew :app:ui:core:build         # Build Compose UI module
 ./gradlew :app:main:jvm:build        # Build JVM application
@@ -191,7 +191,7 @@ The project follows a modular architecture with clear separation of concerns:
     - `repository/`: Repository interfaces (AccountRepository, CategoryRepository, TransactionRepository)
   - Platform-independent domain logic only, no implementations
 
-- **shared-database/**: Database module (multiplatform: JVM, Android)
+- **app/db/core/**: Database module (multiplatform: JVM, Android)
   - `src/commonMain/`:
     - `sqldelight/com/moneymanager/database/`: SQLDelight schema definitions
       - `Account.sq`: Account table and queries
@@ -245,7 +245,7 @@ The application follows a clean architecture pattern with three main entities:
 ### Database Schema
 
 SQLDelight is used for type-safe database access. Schema files are located in:
-- `shared-database/src/commonMain/sqldelight/com/moneymanager/database/`
+- `app/db/core/src/commonMain/sqldelight/com/moneymanager/database/`
   - `Account.sq`: Account table and queries
   - `Category.sq`: Category table and queries
   - `Transaction.sq`: TransactionRecord table and queries
@@ -256,7 +256,7 @@ SQLDelight is used for type-safe database access. Schema files are located in:
 
 The project uses **Mappie** for type-safe object mapping between database types and domain types:
 
-- Mapper interfaces are located in `shared-database/src/commonMain/kotlin/com/moneymanager/mapper/`
+- Mapper interfaces are located in `app/db/core/src/commonMain/kotlin/com/moneymanager/mapper/`
 - Mappie generates implementation code at compile time
 - Mappers convert SQLDelight-generated types to domain models
 - Example: `AccountEntity` (database) → `Account` (domain)
@@ -278,7 +278,7 @@ Mappie automatically generates mapping code based on matching property names and
 - `CategoryRepository`
 - `TransactionRepository`
 
-**Repository Implementations** are located in `shared-database/src/commonMain/kotlin/com/moneymanager/repository/`:
+**Repository Implementations** are located in `app/db/core/src/commonMain/kotlin/com/moneymanager/repository/`:
 - Plain Kotlin classes with constructor dependencies
 - No DI annotations on the classes themselves
 - Registered via `@Provides` functions in `RepositoryModule` (in `shared-di`)
@@ -287,7 +287,7 @@ Mappie automatically generates mapping code based on matching property names and
 
 **Example**:
 ```kotlin
-// Repository implementation (in shared-database)
+// Repository implementation (in app/db/core)
 class AccountRepositoryImpl(
     private val database: MoneyManagerDatabase,
     private val mapper: AccountMapper
@@ -503,7 +503,7 @@ Android instrumented tests require a manifest to launch activities. Located at `
    kotlin.srcDir("src/commonTest/kotlin")
    ```
 
-This pattern is used across all modules with Android device tests (e.g., `shared-database`).
+This pattern is used across all modules with Android device tests (e.g., `app/db/core`).
 
 #### Testing Best Practices
 
@@ -648,7 +648,7 @@ The project currently supports:
   - minSdk 28, targetSdk 35, compileSdk 36
   - Platform-specific `DatabaseDriverFactory` using AndroidSqliteDriver
 - **iOS** ⚠️: Not yet implemented (planned)
-  - Database layer ready (can add iOS targets to `app/model/core` and `shared-database`)
+  - Database layer ready (can add iOS targets to `app/model/core` and `app/db/core`)
   - UI would need native iOS implementation (Compose Multiplatform supports iOS but not yet integrated)
 - **Web** ⚠️: Not yet implemented (planned)
   - Would use `@OptIn(ExperimentalWasmDsl::class) wasmJs { browser() }`
@@ -661,7 +661,7 @@ The project currently supports:
 
 To add iOS or Web support:
 
-1. Add platform targets to multiplatform modules (`app/model/core`, `shared-database`, `shared-di`)
+1. Add platform targets to multiplatform modules (`app/model/core`, `app/db/core`, `shared-di`)
 2. Implement platform-specific `DatabaseDriverFactory` in the corresponding source set
 3. For iOS: Use NativeSqliteDriver from SQLDelight
 4. For Web: Use a browser-compatible SQLite driver (e.g., SQL.js wrapper)
@@ -684,7 +684,7 @@ interface DatabaseModule {
 
 The `AppComponent` is created with a `SqlDriver`, which is platform-specific:
 
-**JVM** (`shared-database/src/jvmMain/kotlin/com/moneymanager/DatabaseDriverFactory.kt`):
+**JVM** (`app/db/core/src/jvmMain/kotlin/com/moneymanager/DatabaseDriverFactory.kt`):
 ```kotlin
 actual class DatabaseDriverFactory {
     actual fun createDriver(databasePath: String?): SqlDriver {
@@ -699,7 +699,7 @@ actual class DatabaseDriverFactory {
 - In-memory database if no path provided: `createDriver()`
 - Persistent database with path: `createDriver("/path/to/database.db")`
 
-**Android** (`shared-database/src/androidMain/kotlin/com/moneymanager/DatabaseDriverFactory.kt`):
+**Android** (`app/db/core/src/androidMain/kotlin/com/moneymanager/DatabaseDriverFactory.kt`):
 ```kotlin
 actual class DatabaseDriverFactory(private val context: Context) {
     actual fun createDriver(databasePath: String?): SqlDriver {
@@ -749,7 +749,7 @@ The project uses modern Gradle practices for maintainability:
 
 **Module Build Files**:
 - `app/model/core/build.gradle.kts`: Applies coroutines convention for domain models
-- `shared-database/build.gradle.kts`: Applies coroutines, mappie conventions, and SQLDelight plugin
+- `app/db/core/build.gradle.kts`: Applies coroutines, mappie conventions, and SQLDelight plugin
 - `shared-di/build.gradle.kts`: Applies coroutines and metro conventions
 - `app/ui/core/build.gradle.kts`: Applies android, coroutines, and compose-multiplatform conventions
 - `app/main/jvm/build.gradle.kts`: JVM application with Compose Desktop
@@ -816,7 +816,7 @@ The project uses modern Gradle practices for maintainability:
 
 12. **Multiplatform Module Structure**:
     - `app/model/core`: Domain models and repository interfaces only (no implementations)
-    - `shared-database`: Database implementations, mappers, and platform-specific drivers
+    - `app/db/core`: Database implementations, mappers, and platform-specific drivers
     - `shared-di`: DI configuration and component definitions
     - `app/ui/core`: UI components (JVM and Android only - Compose doesn't support native)
 
