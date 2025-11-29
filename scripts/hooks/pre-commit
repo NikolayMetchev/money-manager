@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# Pre-commit hook to validate codecov.yml changes
+# Works on Windows (Git Bash), Linux, and macOS
+
+# Check if codecov.yml is being committed
+if git diff --cached --name-only | grep -q "^codecov\.yml$"; then
+    echo "Validating codecov.yml..."
+
+    # Get the repository root directory
+    REPO_ROOT=$(git rev-parse --show-toplevel)
+
+    # Read the staged version of codecov.yml (not the working directory version)
+    STAGED_CONTENT=$(git show :codecov.yml)
+
+    # Use curl to validate the configuration (cross-platform)
+    # --max-time 10: timeout after 10 seconds to prevent hanging
+    response=$(echo "$STAGED_CONTENT" | curl -s --max-time 10 -X POST https://codecov.io/validate \
+        -H "Content-Type: application/x-yaml" \
+        --data-binary @-)
+    curl_exit=$?
+
+    # Check if curl succeeded
+    if [ $curl_exit -ne 0 ]; then
+        echo "✗ Network or API error: curl failed with exit code $curl_exit"
+        echo "Please check your internet connection or try again later."
+        echo "You can manually validate with:"
+        echo "  curl -X POST https://codecov.io/validate -H 'Content-Type: application/x-yaml' --data-binary @codecov.yml"
+        exit 1
+    fi
+
+    # Check if validation was successful
+    if echo "$response" | grep -q "Valid!"; then
+        echo "✓ codecov.yml is valid"
+        exit 0
+    else
+        echo "✗ codecov.yml validation failed:"
+        echo "$response"
+        echo ""
+        echo "Please fix the errors above before committing."
+        echo "You can manually validate with:"
+        echo "  curl -X POST https://codecov.io/validate -H 'Content-Type: application/x-yaml' --data-binary @codecov.yml"
+        exit 1
+    fi
+fi
+
+exit 0

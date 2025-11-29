@@ -139,6 +139,33 @@ This practice:
 
 Only push to remote after a successful local build.
 
+### Git Hooks Setup
+
+**IMPORTANT**: Install Git hooks to automatically validate configuration files before committing.
+
+**⚠️ Note**: Git hooks are not tracked by version control and must be installed by each developer after cloning the repository. Run the installation script once after cloning:
+
+```bash
+# On Windows (using Git Bash or Command Prompt)
+.\scripts\install-hooks.bat
+
+# On Linux/macOS
+./scripts/install-hooks.sh
+```
+
+**Installed Hooks:**
+- **pre-commit**: Validates `codecov.yml` when it changes
+  - Reads staged version of the file (works from any directory)
+  - Uses curl to call Codecov validation API with 10-second timeout
+  - Handles network failures gracefully
+  - Prevents committing invalid codecov configuration
+  - Works cross-platform (Windows/Linux/macOS)
+
+**Manual Validation** (if hooks not installed):
+```bash
+curl -X POST https://codecov.io/validate -H 'Content-Type: application/x-yaml' --data-binary @codecov.yml
+```
+
 ## Project Structure
 
 ### Module Organization
@@ -790,3 +817,17 @@ The project uses modern Gradle practices for maintainability:
     - `shared-database`: Database implementations, mappers, and platform-specific drivers
     - `shared-di`: DI configuration and component definitions
     - `compose-ui`: UI components (JVM and Android only - Compose doesn't support native)
+
+13. **Codecov Configuration Validation**:
+    - **ALWAYS** validate `codecov.yml` changes before committing
+    - Use the Codecov validation API to check for configuration errors
+    - Validation command (PowerShell on Windows):
+      ```powershell
+      Invoke-RestMethod -Uri https://codecov.io/validate -Body (Get-Content -Raw -LiteralPath .\codecov.yml) -Method Post
+      ```
+    - Common issues:
+      - `after_n_builds` must be under `codecov.notify` (not under `coverage.status` or `comment`)
+      - Flag definitions go under top-level `flags` section
+      - Invalid fields will be reported by the validator
+    - The project uses two flags: `unit` (JVM tests) and `instrumented` (Android tests)
+    - Configuration waits for both uploads before sending notifications: `codecov.notify.after_n_builds: 2`
