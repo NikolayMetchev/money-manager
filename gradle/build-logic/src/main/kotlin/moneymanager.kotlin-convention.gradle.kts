@@ -10,6 +10,10 @@ plugins {
 
 val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
 
+// Set group based on project path
+// Example: :app:model:core -> app.model.core
+group = project.path.removePrefix(":").replace(":", ".")
+
 // Configure JVM target for all Kotlin compilation tasks
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     compilerOptions {

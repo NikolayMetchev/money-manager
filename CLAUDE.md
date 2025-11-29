@@ -51,7 +51,7 @@ Money Manager is a personal finance management application built with Kotlin Mul
 
 ### Building Specific Modules
 ```bash
-./gradlew :shared:build              # Build shared domain module
+./gradlew :app:model:core:build      # Build core domain module
 ./gradlew :shared-database:build     # Build database module
 ./gradlew :shared-di:build           # Build DI module
 ./gradlew :app:ui:core:build         # Build Compose UI module
@@ -175,15 +175,17 @@ The project follows a modular architecture with clear separation of concerns:
 - **gradle/build-logic/**: Gradle convention plugins for shared build configuration
   - `src/main/kotlin/`:
     - `moneymanager.kotlin-convention.gradle.kts`: Base Kotlin setup with detekt, ktlint, sort-dependencies
+      - Automatically sets `group` based on project path (e.g., `:app:model:core` → `app.model.core`)
     - `moneymanager.kotlin-multiplatform-convention.gradle.kts`: Base KMP setup with JVM toolchain
     - `moneymanager.coroutines-convention.gradle.kts`: Adds coroutines support
     - `moneymanager.android-convention.gradle.kts`: Android library multiplatform setup
+      - Automatically sets Android `namespace` based on group (e.g., `app.model.core` → `com.moneymanager.app.model.core`)
     - `moneymanager.android-application-convention.gradle.kts`: Android application setup
     - `moneymanager.compose-multiplatform-convention.gradle.kts`: Compose multiplatform with Material 3
     - `moneymanager.mappie-convention.gradle.kts`: Mappie object mapping
     - `moneymanager.metro-convention.gradle.kts`: Metro DI plugin and runtime
 
-- **shared/**: Core domain module (multiplatform: JVM, Android)
+- **app/model/core/**: Core domain module (multiplatform: JVM, Android)
   - `src/commonMain/kotlin/com/moneymanager/domain/`:
     - `model/`: Domain models (Account, Category, Transaction)
     - `repository/`: Repository interfaces (AccountRepository, CategoryRepository, TransactionRepository)
@@ -271,7 +273,7 @@ Mappie automatically generates mapping code based on matching property names and
 
 ### Repository Pattern
 
-**Repository Interfaces** are defined in `shared/src/commonMain/kotlin/com/moneymanager/domain/repository/`:
+**Repository Interfaces** are defined in `app/model/core/src/commonMain/kotlin/com/moneymanager/domain/repository/`:
 - `AccountRepository`
 - `CategoryRepository`
 - `TransactionRepository`
@@ -646,7 +648,7 @@ The project currently supports:
   - minSdk 28, targetSdk 35, compileSdk 36
   - Platform-specific `DatabaseDriverFactory` using AndroidSqliteDriver
 - **iOS** ⚠️: Not yet implemented (planned)
-  - Database layer ready (can add iOS targets to `shared` and `shared-database`)
+  - Database layer ready (can add iOS targets to `app/model/core` and `shared-database`)
   - UI would need native iOS implementation (Compose Multiplatform supports iOS but not yet integrated)
 - **Web** ⚠️: Not yet implemented (planned)
   - Would use `@OptIn(ExperimentalWasmDsl::class) wasmJs { browser() }`
@@ -659,7 +661,7 @@ The project currently supports:
 
 To add iOS or Web support:
 
-1. Add platform targets to multiplatform modules (`shared`, `shared-database`, `shared-di`)
+1. Add platform targets to multiplatform modules (`app/model/core`, `shared-database`, `shared-di`)
 2. Implement platform-specific `DatabaseDriverFactory` in the corresponding source set
 3. For iOS: Use NativeSqliteDriver from SQLDelight
 4. For Web: Use a browser-compatible SQLite driver (e.g., SQL.js wrapper)
@@ -746,7 +748,7 @@ The project uses modern Gradle practices for maintainability:
 - Benefits: DRY principle, consistent configuration across modules, reduced build file duplication
 
 **Module Build Files**:
-- `shared/build.gradle.kts`: Applies coroutines convention for domain models
+- `app/model/core/build.gradle.kts`: Applies coroutines convention for domain models
 - `shared-database/build.gradle.kts`: Applies coroutines, mappie conventions, and SQLDelight plugin
 - `shared-di/build.gradle.kts`: Applies coroutines and metro conventions
 - `app/ui/core/build.gradle.kts`: Applies android, coroutines, and compose-multiplatform conventions
@@ -813,7 +815,7 @@ The project uses modern Gradle practices for maintainability:
     - ktlint and sort-dependencies maintain consistent code style
 
 12. **Multiplatform Module Structure**:
-    - `shared`: Domain models and repository interfaces only (no implementations)
+    - `app/model/core`: Domain models and repository interfaces only (no implementations)
     - `shared-database`: Database implementations, mappers, and platform-specific drivers
     - `shared-di`: DI configuration and component definitions
     - `app/ui/core`: UI components (JVM and Android only - Compose doesn't support native)
