@@ -8,7 +8,7 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 implementation(libs.metro.runtime)
-                implementation(projects.shared)
+                implementation(projects.app.model.core)
                 implementation(projects.sharedDatabase)
             }
         }
