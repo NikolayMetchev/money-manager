@@ -8,7 +8,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import com.moneymanager.domain.model.Account
-import com.moneymanager.domain.model.AccountType
 import com.moneymanager.domain.repository.AccountRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -44,20 +43,16 @@ class AccountsScreenTest {
                     Account(
                         id = 1L,
                         name = "Checking Account",
-                        type = AccountType.CHECKING,
-                        currency = "USD",
+                        asset = "USD",
                         initialBalance = 1000.0,
-                        createdAt = now,
-                        updatedAt = now,
+                        openingDate = now,
                     ),
                     Account(
                         id = 2L,
                         name = "Savings Account",
-                        type = AccountType.SAVINGS,
-                        currency = "USD",
+                        asset = "USD",
                         initialBalance = 5000.0,
-                        createdAt = now,
-                        updatedAt = now,
+                        openingDate = now,
                     ),
                 )
             val repository = FakeAccountRepository(accounts)
@@ -105,7 +100,7 @@ class AccountsScreenTest {
             // Then
             onNodeWithText("Create New Account").assertIsDisplayed()
             onNodeWithText("Account Name").assertIsDisplayed()
-            onNodeWithText("Account Type").assertIsDisplayed()
+            onNodeWithText("Asset").assertIsDisplayed()
         }
 
     @Test
@@ -117,11 +112,9 @@ class AccountsScreenTest {
                 Account(
                     id = 1L,
                     name = "My Checking",
-                    type = AccountType.CHECKING,
-                    currency = "EUR",
+                    asset = "EUR",
                     initialBalance = 2500.50,
-                    createdAt = now,
-                    updatedAt = now,
+                    openingDate = now,
                 )
             val repository = FakeAccountRepository(listOf(account))
 
@@ -132,7 +125,6 @@ class AccountsScreenTest {
 
             // Then
             onNodeWithText("My Checking").assertIsDisplayed()
-            onNodeWithText("CHECKING").assertIsDisplayed()
             onNodeWithText("EUR 2500.50").assertIsDisplayed()
         }
 
@@ -145,11 +137,9 @@ class AccountsScreenTest {
                 Account(
                     id = 1L,
                     name = "Credit Card",
-                    type = AccountType.CREDIT_CARD,
-                    currency = "USD",
+                    asset = "USD",
                     initialBalance = -500.0,
-                    createdAt = now,
-                    updatedAt = now,
+                    openingDate = now,
                 )
             val repository = FakeAccountRepository(listOf(account))
 
@@ -171,11 +161,9 @@ class AccountsScreenTest {
                 Account(
                     id = 1L,
                     name = "Test Account",
-                    type = AccountType.CHECKING,
-                    currency = "USD",
+                    asset = "USD",
                     initialBalance = 100.0,
-                    createdAt = now,
-                    updatedAt = now,
+                    openingDate = now,
                 )
             val repository = FakeAccountRepository(listOf(account))
 
@@ -244,11 +232,9 @@ class AccountsScreenTest {
                 Account(
                     id = 1L,
                     name = "Test Account",
-                    type = AccountType.CHECKING,
-                    currency = "USD",
+                    asset = "USD",
                     initialBalance = 100.0,
-                    createdAt = now,
-                    updatedAt = now,
+                    openingDate = now,
                 )
             val repository = FakeAccountRepository(listOf(account))
 
@@ -278,29 +264,23 @@ class AccountsScreenTest {
                     Account(
                         id = 1L,
                         name = "Account 1",
-                        type = AccountType.CHECKING,
-                        currency = "USD",
+                        asset = "USD",
                         initialBalance = 100.0,
-                        createdAt = now,
-                        updatedAt = now,
+                        openingDate = now,
                     ),
                     Account(
                         id = 2L,
                         name = "Account 2",
-                        type = AccountType.SAVINGS,
-                        currency = "EUR",
+                        asset = "EUR",
                         initialBalance = 200.0,
-                        createdAt = now,
-                        updatedAt = now,
+                        openingDate = now,
                     ),
                     Account(
                         id = 3L,
                         name = "Account 3",
-                        type = AccountType.CASH,
-                        currency = "GBP",
+                        asset = "GBP",
                         initialBalance = 300.0,
-                        createdAt = now,
-                        updatedAt = now,
+                        openingDate = now,
                     ),
                 )
             val repository = FakeAccountRepository(accounts)
@@ -324,8 +304,6 @@ class AccountsScreenTest {
         private val deletedAccounts = mutableListOf<Long>()
 
         override fun getAllAccounts(): Flow<List<Account>> = accountsFlow
-
-        override fun getActiveAccounts(): Flow<List<Account>> = flowOf(accounts.filter { it.isActive })
 
         override fun getAccountById(id: Long): Flow<Account?> = flowOf(accounts.find { it.id == id })
 

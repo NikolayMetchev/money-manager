@@ -11,7 +11,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.Account
-import com.moneymanager.domain.model.AccountType
 import com.moneymanager.domain.repository.AccountRepository
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
@@ -21,7 +20,7 @@ private val logger = logging()
 
 @Composable
 fun AccountsScreen(accountRepository: AccountRepository) {
-    val accounts by accountRepository.getActiveAccounts().collectAsState(initial = emptyList())
+    val accounts by accountRepository.getAllAccounts().collectAsState(initial = emptyList())
     var showCreateDialog by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -103,17 +102,11 @@ fun AccountCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = account.name,
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Text(
-                        text = account.type.name,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                Text(
+                    text = account.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f),
+                )
                 IconButton(
                     onClick = { showDeleteDialog = true },
                 ) {
@@ -125,7 +118,7 @@ fun AccountCard(
             }
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "${account.currency} ${String.format("%.2f", account.initialBalance)}",
+                text = "${account.asset} ${String.format("%.2f", account.initialBalance)}",
                 style = MaterialTheme.typography.headlineSmall,
                 color =
                     if (account.initialBalance >= 0) {
@@ -146,17 +139,14 @@ fun AccountCard(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreateAccountDialog(
     accountRepository: AccountRepository,
     onDismiss: () -> Unit,
 ) {
     var name by remember { mutableStateOf("") }
-    var selectedType by remember { mutableStateOf(AccountType.CHECKING) }
-    var currency by remember { mutableStateOf("USD") }
+    var asset by remember { mutableStateOf("") }
     var initialBalance by remember { mutableStateOf("0.00") }
-    var isTypeDropdownExpanded by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
 
@@ -182,42 +172,10 @@ fun CreateAccountDialog(
                     enabled = !isSaving,
                 )
 
-                ExposedDropdownMenuBox(
-                    expanded = isTypeDropdownExpanded,
-                    onExpandedChange = { if (!isSaving) isTypeDropdownExpanded = it },
-                ) {
-                    OutlinedTextField(
-                        value = selectedType.name.replace("_", " "),
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Account Type") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = isTypeDropdownExpanded) },
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .menuAnchor(),
-                        enabled = !isSaving,
-                    )
-                    ExposedDropdownMenu(
-                        expanded = isTypeDropdownExpanded,
-                        onDismissRequest = { isTypeDropdownExpanded = false },
-                    ) {
-                        AccountType.entries.forEach { type ->
-                            DropdownMenuItem(
-                                text = { Text(type.name.replace("_", " ")) },
-                                onClick = {
-                                    selectedType = type
-                                    isTypeDropdownExpanded = false
-                                },
-                            )
-                        }
-                    }
-                }
-
                 OutlinedTextField(
-                    value = currency,
-                    onValueChange = { currency = it.uppercase().take(3) },
-                    label = { Text("Currency") },
+                    value = asset,
+                    onValueChange = { asset = it.uppercase() },
+                    label = { Text("Asset") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     placeholder = { Text("USD") },
@@ -254,8 +212,8 @@ fun CreateAccountDialog(
                         name.isBlank() -> {
                             errorMessage = "Account name is required"
                         }
-                        currency.isBlank() -> {
-                            errorMessage = "Currency is required"
+                        asset.isBlank() -> {
+                            errorMessage = "Asset is required"
                         }
                         initialBalance.isBlank() -> {
                             errorMessage = "Initial balance is required"
@@ -270,11 +228,9 @@ fun CreateAccountDialog(
                                     val newAccount =
                                         Account(
                                             name = name.trim(),
-                                            type = selectedType,
-                                            currency = currency.trim().uppercase(),
+                                            asset = asset.trim().uppercase(),
                                             initialBalance = balance,
-                                            createdAt = now,
-                                            updatedAt = now,
+                                            openingDate = now,
                                         )
                                     accountRepository.createAccount(newAccount)
                                     onDismiss()

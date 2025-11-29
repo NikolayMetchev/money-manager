@@ -8,8 +8,6 @@ interface AccountRepository {
 
     fun getAccountById(id: Long): Flow<Account?>
 
-    fun getActiveAccounts(): Flow<List<Account>>
-
     suspend fun createAccount(account: Account): Long
 
     suspend fun updateAccount(account: Account)

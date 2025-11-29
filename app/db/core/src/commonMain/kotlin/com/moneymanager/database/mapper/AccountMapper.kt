@@ -3,16 +3,12 @@
 package com.moneymanager.database.mapper
 
 import com.moneymanager.domain.model.Account
-import com.moneymanager.domain.model.AccountType
 import tech.mappie.api.ObjectMappie
 import kotlin.time.Instant
 
 object AccountMapper : ObjectMappie<com.moneymanager.database.sql.Account, Account>() {
     override fun map(from: com.moneymanager.database.sql.Account) =
         mapping {
-            Account::type fromValue AccountType.valueOf(from.type)
-            Account::isActive fromValue (from.isActive == 1L)
-            Account::createdAt fromValue Instant.fromEpochMilliseconds(from.createdAt)
-            Account::updatedAt fromValue Instant.fromEpochMilliseconds(from.updatedAt)
+            Account::openingDate fromValue Instant.fromEpochMilliseconds(from.openingDate)
         }
 }
