@@ -14,7 +14,8 @@ kotlin {
     // Configure Android target using the new plugin's DSL
     androidLibrary {
         // Use group (set by kotlin-convention based on project path)
-        namespace = "com.moneymanager.${project.group.toString()}"
+        // Sanitize hyphens in group name for valid Android package name
+        namespace = "com.moneymanager.${project.group.toString().replace("-", ".")}"
         compileSdk = libs.findVersion("android-compileSdk").get().toString().toInt()
         minSdk = libs.findVersion("android-minSdk").get().toString().toInt()
 
