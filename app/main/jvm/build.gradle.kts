@@ -13,7 +13,7 @@ dependencies {
     implementation(libs.diamondedge.logging)
     implementation(libs.kmlogging)
     implementation(libs.kotlinx.coroutines.core)
-    implementation(projects.composeUi)
+    implementation(projects.app.ui.core)
     implementation(projects.sharedDatabase)
     implementation(projects.sharedDi)
 

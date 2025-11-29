@@ -54,7 +54,7 @@ Money Manager is a personal finance management application built with Kotlin Mul
 ./gradlew :shared:build              # Build shared domain module
 ./gradlew :shared-database:build     # Build database module
 ./gradlew :shared-di:build           # Build DI module
-./gradlew :compose-ui:build          # Build Compose UI module
+./gradlew :app:ui:core:build         # Build Compose UI module
 ./gradlew :app:main:jvm:build        # Build JVM application
 ./gradlew :app:main:android:build    # Build Android application
 ```
@@ -182,7 +182,7 @@ The project follows a modular architecture with clear separation of concerns:
     - `DatabaseModule.kt`: Provides database instance
     - `RepositoryModule.kt`: Provides repository implementations
 
-- **compose-ui/**: Compose Multiplatform UI module (JVM, Android)
+- **app/ui/core/**: Compose Multiplatform UI module (JVM, Android)
   - `src/commonMain/kotlin/com/moneymanager/ui/`:
     - `screens/`: Main screens (AccountsScreen, CategoriesScreen, TransactionsScreen)
     - `components/`: Reusable UI components (ErrorScreen, ErrorDialog, MinimalErrorScreen)
@@ -327,19 +327,19 @@ Metro generates the implementation classes at compile time via compiler plugin. 
 
 ### Compose UI Module
 
-The `compose-ui` module provides a Material 3-based user interface for both JVM and Android platforms:
+The `app/ui/core` module provides a Material 3-based user interface for both JVM and Android platforms:
 
-**Common Screens** (`compose-ui/src/commonMain/kotlin/com/moneymanager/ui/screens/`):
+**Common Screens** (`app/ui/core/src/commonMain/kotlin/com/moneymanager/ui/screens/`):
 - `AccountsScreen`: Display and manage financial accounts
 - `CategoriesScreen`: Display and manage transaction categories
 - `TransactionsScreen`: Display and manage transactions
 
-**Error Handling Components** (`compose-ui/src/commonMain/kotlin/com/moneymanager/ui/components/`):
+**Error Handling Components** (`app/ui/core/src/commonMain/kotlin/com/moneymanager/ui/components/`):
 - `ErrorScreen`: Full-screen error display
 - `ErrorDialog`: Modal error dialog
 - `MinimalErrorScreen`: Compact error display
 
-**Platform-Specific UI** (`compose-ui/src/jvmMain/kotlin/com/moneymanager/ui/`):
+**Platform-Specific UI** (`app/ui/core/src/jvmMain/kotlin/com/moneymanager/ui/`):
 - `DebugLoggingWindow`: JVM-only debug logging console
 - `DatabaseSelectionDialog`: JVM-only database file picker
 
@@ -350,25 +350,25 @@ The `compose-ui` module provides a Material 3-based user interface for both JVM 
 
 ### UI Testing
 
-The `compose-ui` module includes comprehensive UI tests using Compose Multiplatform's testing framework.
+The `app/ui/core` module includes comprehensive UI tests using Compose Multiplatform's testing framework.
 
-**Test Location**: `compose-ui/src/commonTest/kotlin/com/moneymanager/ui/`
+**Test Location**: `app/ui/core/src/commonTest/kotlin/com/moneymanager/ui/`
 
 **Test Framework**: Uses `runComposeUiTest` - the multiplatform approach (not JUnit 4-specific)
 
 **Running Tests**:
 ```bash
 # Run JVM unit tests
-./gradlew :compose-ui:jvmTest
+./gradlew :app/ui/core:jvmTest
 
 # Run Android instrumented tests (requires device/emulator or managed device)
-./gradlew :compose-ui:connectedAndroidDeviceTest
+./gradlew :app/ui/core:connectedAndroidDeviceTest
 
 # Run on managed device (Pixel 6 API 34 - no physical device needed)
-./gradlew :compose-ui:pixel6api34AndroidDeviceTest
+./gradlew :app/ui/core:pixel6api34AndroidDeviceTest
 
 # Run all tests (JVM + Android if available)
-./gradlew :compose-ui:test
+./gradlew :app/ui/core:test
 ```
 
 #### Test Structure
@@ -397,7 +397,7 @@ class ErrorScreenTest {
 
 #### Test Dependencies
 
-**commonTest** (`compose-ui/build.gradle.kts`):
+**commonTest** (`app/ui/core/build.gradle.kts`):
 ```kotlin
 val commonTest by getting {
     dependencies {
@@ -441,7 +441,7 @@ val androidDeviceTest by getting {
 
 #### Android Test Manifest
 
-Android instrumented tests require a manifest to launch activities. Located at `compose-ui/src/androidDeviceTest/AndroidManifest.xml`:
+Android instrumented tests require a manifest to launch activities. Located at `app/ui/core/src/androidDeviceTest/AndroidManifest.xml`:
 
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
@@ -626,7 +626,7 @@ The project currently supports:
   - Database would need browser-compatible driver (e.g., SQL.js)
 - **Native** ❌: Not supported
   - Compose Multiplatform doesn't support native targets
-  - `compose-ui` module is limited to JVM and Android only
+  - `app/ui/core` module is limited to JVM and Android only
 
 ### Adding New Platforms
 
@@ -722,7 +722,7 @@ The project uses modern Gradle practices for maintainability:
 - `shared/build.gradle.kts`: Applies coroutines convention for domain models
 - `shared-database/build.gradle.kts`: Applies coroutines, mappie conventions, and SQLDelight plugin
 - `shared-di/build.gradle.kts`: Applies coroutines and metro conventions
-- `compose-ui/build.gradle.kts`: Applies android, coroutines, and compose-multiplatform conventions
+- `app/ui/core/build.gradle.kts`: Applies android, coroutines, and compose-multiplatform conventions
 - `app/main/jvm/build.gradle.kts`: JVM application with Compose Desktop
 - `app/main/android/build.gradle.kts`: Android application with Compose
 - `settings.gradle.kts`: Plugin management, auto module discovery via `com.pablisco.gradle.auto.include`
@@ -789,4 +789,4 @@ The project uses modern Gradle practices for maintainability:
     - `shared`: Domain models and repository interfaces only (no implementations)
     - `shared-database`: Database implementations, mappers, and platform-specific drivers
     - `shared-di`: DI configuration and component definitions
-    - `compose-ui`: UI components (JVM and Android only - Compose doesn't support native)
+    - `app/ui/core`: UI components (JVM and Android only - Compose doesn't support native)

@@ -17,7 +17,7 @@ kotlin {
                 implementation(libs.androidx.compose.runtime)
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.sqldelight.runtime)
-                implementation(projects.composeUi)
+                implementation(projects.app.ui.core)
                 implementation(projects.sharedDatabase)
                 implementation(projects.sharedDi)
             }
@@ -62,7 +62,7 @@ dependencies {
     implementation(kotlin("stdlib"))
     implementation(libs.androidx.activity)
     implementation(libs.androidx.activity.compose)
-    implementation(projects.composeUi)
+    implementation(projects.app.ui.core)
     implementation(projects.sharedDatabase)
     implementation(projects.sharedDi)
 }
