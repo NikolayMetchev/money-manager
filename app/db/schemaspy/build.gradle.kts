@@ -4,8 +4,8 @@ plugins {
 }
 
 dependencies {
-    implementation(projects.app.db.core)
     implementation(libs.sqldelight.sqlite.driver)
+    implementation(projects.app.db.core)
 }
 
 // SchemaSpy configuration for database documentation
