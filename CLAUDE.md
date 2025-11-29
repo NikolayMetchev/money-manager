@@ -36,7 +36,7 @@ Money Manager is a personal finance management application built with Kotlin Mul
 
 ### Running the JVM Application
 ```bash
-./gradlew :jvm-app:run
+./gradlew :app:main:jvm:run
 ```
 
 ### Cleaning Build Artifacts
@@ -55,7 +55,7 @@ Money Manager is a personal finance management application built with Kotlin Mul
 ./gradlew :shared-database:build     # Build database module
 ./gradlew :shared-di:build           # Build DI module
 ./gradlew :compose-ui:build          # Build Compose UI module
-./gradlew :jvm-app:build             # Build JVM application
+./gradlew :app:main:jvm:build        # Build JVM application
 ./gradlew :android-app:build         # Build Android application
 ```
 
@@ -97,21 +97,21 @@ The JVM application can be packaged as native installers for Windows, macOS, and
 
 ```bash
 # Package for the current platform
-./gradlew :jvm-app:packageDistributionForCurrentOS
+./gradlew :app:main:jvm:packageDistributionForCurrentOS
 
 # Create release binaries for the current platform
-./gradlew :jvm-app:packageReleaseDistributionForCurrentOS
+./gradlew :app:main:jvm:packageReleaseDistributionForCurrentOS
 
 # Platform-specific installers:
-./gradlew :jvm-app:packageMsi     # Windows MSI installer
-./gradlew :jvm-app:packageDmg     # macOS DMG installer
-./gradlew :jvm-app:packageDeb     # Linux DEB package
+./gradlew :app:main:jvm:packageMsi     # Windows MSI installer
+./gradlew :app:main:jvm:packageDmg     # macOS DMG installer
+./gradlew :app:main:jvm:packageDeb     # Linux DEB package
 
 # Create an uber JAR (runnable on any platform with JRE)
-./gradlew :jvm-app:packageUberJarForCurrentOS
+./gradlew :app:main:jvm:packageUberJarForCurrentOS
 ```
 
-**Output location**: Built packages will be in `jvm-app/build/compose/binaries/main/`
+**Output location**: Built packages will be in `app/main/jvm/build/compose/binaries/main/`
 
 **Note**: The installers include a bundled Java Runtime, so users don't need Java installed. Cross-platform building may require the target platform (e.g., creating macOS .dmg typically requires a Mac).
 
@@ -189,7 +189,7 @@ The project follows a modular architecture with clear separation of concerns:
   - `src/jvmMain/`: JVM-specific UI (Debug logging window, database selection dialog)
   - Material 3 design system
 
-- **jvm-app/**: JVM Desktop application
+- **app/main/jvm/**: JVM Desktop application
   - `src/main/kotlin/com/moneymanager/`: JVM application entry point
   - Compose Desktop with native installers support
 
@@ -723,7 +723,7 @@ The project uses modern Gradle practices for maintainability:
 - `shared-database/build.gradle.kts`: Applies coroutines, mappie conventions, and SQLDelight plugin
 - `shared-di/build.gradle.kts`: Applies coroutines and metro conventions
 - `compose-ui/build.gradle.kts`: Applies android, coroutines, and compose-multiplatform conventions
-- `jvm-app/build.gradle.kts`: JVM application with Compose Desktop
+- `app/main/jvm/build.gradle.kts`: JVM application with Compose Desktop
 - `android-app/build.gradle.kts`: Android application with Compose
 - `settings.gradle.kts`: Plugin management, auto module discovery via `com.pablisco.gradle.auto.include`
 - Root `build.gradle.kts`: Minimal, defines shared repositories and lintFormat task

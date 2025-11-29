@@ -56,10 +56,13 @@ dependencyAnalysis {
 }
 
 // Aggregate Kover coverage from all subprojects
+// Only include projects that have actual source code (not intermediate directories)
 dependencies {
-    subprojects.forEach { subproject ->
-        kover(subproject)
-    }
+    subprojects
+        .filter { it.buildFile.exists() && it.file("src").exists() }
+        .forEach { subproject ->
+            kover(subproject)
+        }
 }
 
 kover {

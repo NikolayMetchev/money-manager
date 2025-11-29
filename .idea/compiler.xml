@@ -2,6 +2,8 @@
 <project version="4">
   <component name="CompilerConfiguration">
     <bytecodeTargetLevel target="25">
+      <module name="money-manager.jvm-app.main" target="24" />
+      <module name="money-manager.jvm-app.test" target="24" />
       <module name="money-manager.shared-database-test.jvmMain" target="24" />
       <module name="money-manager.shared-database-test.jvmTest" target="24" />
     </bytecodeTargetLevel>
