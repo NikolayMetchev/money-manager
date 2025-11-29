@@ -10,6 +10,7 @@ kotlinx-datetime = "0.7.1"
 kmlogging = "2.0.3"
 log4j = "2.25.2"
 slf4j = "2.0.17"
+schemaspy = "7.0.2"
 compose = "1.7.5"
 compose-plugin = "1.9.3"
 androidx-compose = "1.9.5"
@@ -46,6 +47,7 @@ log4j-core = { module = "org.apache.logging.log4j:log4j-core", version.ref = "lo
 log4j-slf4j2-impl = { module = "org.apache.logging.log4j:log4j-slf4j2-impl", version.ref = "log4j" }
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
 sqldelight-runtime = { module = "app.cash.sqldelight:runtime", version.ref = "sqldelight" }
+schemaspy = { module = "org.schemaspy:schemaspy", version.ref = "schemaspy" }
 diamondedge-logging = { module = "com.diamondedge:logging", version.ref = "kmlogging" }
 androidx-compose-runtime-desktop = { module = "androidx.compose.runtime:runtime-desktop", version.ref = "androidx-compose" }
 compose-runtime-desktop = { module = "org.jetbrains.compose.runtime:runtime-desktop", version.ref = "compose-plugin" }
