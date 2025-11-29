@@ -14,9 +14,15 @@ jobs:
   build:
     name: Build and Test
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' || github.event.pull_request.mergeable != false
 
     steps:
+      - name: Debug GitHub context
+        run: |
+          echo "Event name: ${{ github.event_name }}"
+          echo "Mergeable: ${{ github.event.pull_request.mergeable }}"
+          echo "Mergeable state: ${{ github.event.pull_request.mergeable_state }}"
+          echo "PR number: ${{ github.event.pull_request.number }}"
+
       - name: Checkout code
         uses: actions/checkout@v6
 
@@ -35,7 +41,6 @@ jobs:
   android-test:
     name: Android Instrumented Tests
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' || github.event.pull_request.mergeable != false
 
     steps:
       - name: Free disk space
