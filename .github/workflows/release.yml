@@ -91,9 +91,9 @@ jobs:
             artifact-path: app/main/jvm/build/compose/binaries/main/deb/*.deb
           - platform: Android
             os: ubuntu-latest
-            task: :android-app:assembleRelease
+            task: :app:main:android:assembleRelease
             artifact-name: android-apk
-            artifact-path: android-app/build/outputs/apk/release/*.apk
+            artifact-path: app/main/android/build/outputs/apk/release/*.apk
 
     steps:
       - name: Checkout code

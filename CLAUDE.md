@@ -56,22 +56,22 @@ Money Manager is a personal finance management application built with Kotlin Mul
 ./gradlew :shared-di:build           # Build DI module
 ./gradlew :compose-ui:build          # Build Compose UI module
 ./gradlew :app:main:jvm:build        # Build JVM application
-./gradlew :android-app:build         # Build Android application
+./gradlew :app:main:android:build    # Build Android application
 ```
 
 ### Running the Android Application
 ```bash
 # Build and install debug APK on connected device/emulator
-./gradlew :android-app:installDebug
+./gradlew :app:main:android:installDebug
 
-# Build debug APK (output: android-app/build/outputs/apk/debug/)
-./gradlew :android-app:assembleDebug
+# Build debug APK (output: app/main/android/build/outputs/apk/debug/)
+./gradlew :app:main:android:assembleDebug
 
 # Build release APK
-./gradlew :android-app:assembleRelease
+./gradlew :app:main:android:assembleRelease
 
 # Build Android App Bundle (for Play Store)
-./gradlew :android-app:bundleRelease
+./gradlew :app:main:android:bundleRelease
 ```
 
 **Android Requirements**:
@@ -193,7 +193,7 @@ The project follows a modular architecture with clear separation of concerns:
   - `src/main/kotlin/com/moneymanager/`: JVM application entry point
   - Compose Desktop with native installers support
 
-- **android-app/**: Android application
+- **app/main/android/**: Android application
   - `src/main/kotlin/com/moneymanager/`: Android MainActivity
   - `src/main/AndroidManifest.xml`: App manifest
   - minSdk 28, targetSdk 35, compileSdk 36
@@ -724,7 +724,7 @@ The project uses modern Gradle practices for maintainability:
 - `shared-di/build.gradle.kts`: Applies coroutines and metro conventions
 - `compose-ui/build.gradle.kts`: Applies android, coroutines, and compose-multiplatform conventions
 - `app/main/jvm/build.gradle.kts`: JVM application with Compose Desktop
-- `android-app/build.gradle.kts`: Android application with Compose
+- `app/main/android/build.gradle.kts`: Android application with Compose
 - `settings.gradle.kts`: Plugin management, auto module discovery via `com.pablisco.gradle.auto.include`
 - Root `build.gradle.kts`: Minimal, defines shared repositories and lintFormat task
 

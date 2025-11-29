@@ -29,7 +29,7 @@ local.properties
 # All generated files in build/ are already ignored above
 
 # Generated VERSION file (copied during build)
-android-app/src/main/assets/VERSION
+app/main/android/src/main/assets/VERSION
 
 # Claude
 .claude/
