@@ -13,7 +13,7 @@ selectByName:
 SELECT * FROM Asset WHERE name = ?;
 
 insert:
-INSERT OR IGNORE INTO Asset(name)
+INSERT INTO Asset(name)
 VALUES (?);
 
 update:

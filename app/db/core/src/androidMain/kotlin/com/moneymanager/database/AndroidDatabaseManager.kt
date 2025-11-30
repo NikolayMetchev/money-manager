@@ -38,8 +38,6 @@ class AndroidDatabaseManager(private val context: Context) : DatabaseManager {
         }
 
     override suspend fun databaseExists(location: DbLocation): Boolean {
-        // In-memory databases always "exist"
-        if (location.isInMemory()) return true
         // On Android, we can check if the database file exists in the databases directory
         return context.getDatabasePath(location.name).exists()
     }

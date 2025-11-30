@@ -35,8 +35,10 @@ class AssetRepositoryImpl(
             if (existing != null) {
                 existing.id
             } else {
-                queries.insert(name)
-                queries.lastInsertRowId().executeAsOne()
+                queries.insert(name).await()
+                val id = queries.lastInsertRowId().executeAsOne()
+                println("DEBUG: upsertAssetByName('$name') - inserted, lastInsertRowId returned: $id")
+                id
             }
         }
 
