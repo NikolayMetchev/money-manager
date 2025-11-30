@@ -23,4 +23,3 @@ suspend fun main(args: Array<String>) {
 
     println("Database created successfully!")
 }
-
