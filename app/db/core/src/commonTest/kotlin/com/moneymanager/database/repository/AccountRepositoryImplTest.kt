@@ -8,9 +8,7 @@ import com.moneymanager.database.deleteTestDatabase
 import com.moneymanager.di.AppComponent
 import com.moneymanager.di.createTestAppComponentParams
 import com.moneymanager.domain.model.Account
-import com.moneymanager.domain.model.Asset
 import com.moneymanager.domain.repository.AccountRepository
-import com.moneymanager.domain.repository.AssetRepository
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.AfterTest
@@ -23,8 +21,6 @@ import kotlin.time.Clock
 
 class AccountRepositoryImplTest {
     private lateinit var repository: AccountRepository
-    private lateinit var assetRepository: AssetRepository
-    private lateinit var testAsset: Asset
     private lateinit var testDbLocation: com.moneymanager.database.DbLocation
 
     @BeforeTest
@@ -42,11 +38,6 @@ class AccountRepositoryImplTest {
             val repositories = RepositorySet(database)
 
             repository = repositories.accountRepository
-            assetRepository = repositories.assetRepository
-
-            // Create a test asset for use in tests
-            val assetId = assetRepository.upsertAssetByName("USD")
-            testAsset = Asset(id = assetId, name = "USD")
         }
 
     @AfterTest
@@ -63,8 +54,6 @@ class AccountRepositoryImplTest {
             val account =
                 Account(
                     name = "Test Checking",
-                    asset = testAsset,
-                    initialBalance = 1000.0,
                     openingDate = now,
                 )
 
@@ -75,24 +64,18 @@ class AccountRepositoryImplTest {
             val retrieved = repository.getAccountById(accountId).first()
             assertNotNull(retrieved)
             assertEquals(account.name, retrieved.name)
-            assertEquals(account.asset, retrieved.asset)
-            assertEquals(account.initialBalance, retrieved.initialBalance)
         }
 
     @Test
-    fun `createAccount should handle different assets`() =
+    fun `createAccount should create multiple accounts`() =
         runTest {
             val now = Clock.System.now()
-            val assetNames = listOf("USD", "EUR", "GBP", "JPY", "BTC", "ETH")
+            val accountNames = listOf("Checking", "Savings", "Credit Card", "Investment")
 
-            assetNames.forEach { assetName ->
-                val assetId = assetRepository.upsertAssetByName(assetName)
-                val asset = Asset(id = assetId, name = assetName)
+            accountNames.forEach { name ->
                 val account =
                     Account(
-                        name = "Test Account",
-                        asset = asset,
-                        initialBalance = 0.0,
+                        name = name,
                         openingDate = now,
                     )
 
@@ -100,94 +83,48 @@ class AccountRepositoryImplTest {
                 val retrieved = repository.getAccountById(accountId).first()
 
                 assertNotNull(retrieved)
-                assertEquals(asset, retrieved.asset)
+                assertEquals(name, retrieved.name)
             }
+
+            val allAccounts = repository.getAllAccounts().first()
+            assertEquals(accountNames.size, allAccounts.size)
         }
 
-    // FOREIGN KEY CONSTRAINT TESTS
-
     @Test
-    fun `createAccount should fail with invalid asset ID of 0`() =
+    fun `updateAccount should update account name`() =
         runTest {
             val now = Clock.System.now()
-            val invalidAsset = Asset(id = 0L, name = "Invalid")
             val account =
                 Account(
-                    name = "Test Account",
-                    asset = invalidAsset,
-                    initialBalance = 100.0,
+                    name = "Original Name",
                     openingDate = now,
                 )
-
-            try {
-                repository.createAccount(account)
-                throw AssertionError("Expected foreign key constraint violation but account was created")
-            } catch (e: Exception) {
-                // Expected: Should throw exception due to foreign key constraint
-                assertTrue(
-                    e.message?.contains("foreign key", ignoreCase = true) == true ||
-                        e.message?.contains("constraint", ignoreCase = true) == true,
-                    "Expected foreign key constraint error but got: ${e.message}",
-                )
-            }
-        }
-
-    @Test
-    fun `createAccount should fail with non-existent asset ID`() =
-        runTest {
-            val now = Clock.System.now()
-            val nonExistentAsset = Asset(id = 999L, name = "Non-existent")
-            val account =
-                Account(
-                    name = "Test Account",
-                    asset = nonExistentAsset,
-                    initialBalance = 100.0,
-                    openingDate = now,
-                )
-
-            try {
-                repository.createAccount(account)
-                throw AssertionError("Expected foreign key constraint violation but account was created")
-            } catch (e: Exception) {
-                // Expected: Should throw exception due to foreign key constraint
-                assertTrue(
-                    e.message?.contains("foreign key", ignoreCase = true) == true ||
-                        e.message?.contains("constraint", ignoreCase = true) == true,
-                    "Expected foreign key constraint error but got: ${e.message}",
-                )
-            }
-        }
-
-    @Test
-    fun `updateAccount should fail with invalid asset ID`() =
-        runTest {
-            // Given: Create a valid account first
-            val now = Clock.System.now()
-            val validAccount =
-                Account(
-                    name = "Valid Account",
-                    asset = testAsset,
-                    initialBalance = 100.0,
-                    openingDate = now,
-                )
-            val accountId = repository.createAccount(validAccount)
+            val accountId = repository.createAccount(account)
             val retrieved = repository.getAccountById(accountId).first()
             assertNotNull(retrieved)
 
-            // When: Try to update with an invalid asset
-            val invalidAsset = Asset(id = 999L, name = "Invalid")
-            val updatedAccount = retrieved.copy(asset = invalidAsset)
+            val updatedAccount = retrieved.copy(name = "Updated Name")
+            repository.updateAccount(updatedAccount)
 
-            try {
-                repository.updateAccount(updatedAccount)
-                throw AssertionError("Expected foreign key constraint violation but account was updated")
-            } catch (e: Exception) {
-                // Expected: Should throw exception due to foreign key constraint
-                assertTrue(
-                    e.message?.contains("foreign key", ignoreCase = true) == true ||
-                        e.message?.contains("constraint", ignoreCase = true) == true,
-                    "Expected foreign key constraint error but got: ${e.message}",
+            val updated = repository.getAccountById(accountId).first()
+            assertNotNull(updated)
+            assertEquals("Updated Name", updated.name)
+        }
+
+    @Test
+    fun `deleteAccount should remove account`() =
+        runTest {
+            val now = Clock.System.now()
+            val account =
+                Account(
+                    name = "To Delete",
+                    openingDate = now,
                 )
-            }
+            val accountId = repository.createAccount(account)
+
+            repository.deleteAccount(accountId)
+
+            val deleted = repository.getAccountById(accountId).first()
+            assertEquals(null, deleted)
         }
 }
