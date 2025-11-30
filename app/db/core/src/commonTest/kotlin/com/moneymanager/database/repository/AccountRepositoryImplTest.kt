@@ -7,7 +7,9 @@ import com.moneymanager.database.RepositorySet
 import com.moneymanager.di.AppComponent
 import com.moneymanager.di.createTestAppComponentParams
 import com.moneymanager.domain.model.Account
+import com.moneymanager.domain.model.Asset
 import com.moneymanager.domain.repository.AccountRepository
+import com.moneymanager.domain.repository.AssetRepository
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.BeforeTest
@@ -20,6 +22,8 @@ import kotlin.time.Clock
 
 class AccountRepositoryImplTest {
     private lateinit var repository: AccountRepository
+    private lateinit var assetRepository: AssetRepository
+    private lateinit var testAsset: Asset
 
     @BeforeTest
     fun setup() =
@@ -33,6 +37,11 @@ class AccountRepositoryImplTest {
             val repositories = RepositorySet(database)
 
             repository = repositories.accountRepository
+            assetRepository = repositories.assetRepository
+
+            // Create a test asset for use in tests
+            val assetId = assetRepository.upsertAssetByName("USD")
+            testAsset = Asset(id = assetId, name = "USD")
         }
 
     // CREATE ACCOUNT TESTS
@@ -44,7 +53,7 @@ class AccountRepositoryImplTest {
             val account =
                 Account(
                     name = "Test Checking",
-                    asset = "USD",
+                    asset = testAsset,
                     initialBalance = 1000.0,
                     openingDate = now,
                 )
@@ -64,9 +73,11 @@ class AccountRepositoryImplTest {
     fun `createAccount should handle different assets`() =
         runTest {
             val now = Clock.System.now()
-            val assets = listOf("USD", "EUR", "GBP", "JPY", "BTC", "ETH")
+            val assetNames = listOf("USD", "EUR", "GBP", "JPY", "BTC", "ETH")
 
-            assets.forEach { asset ->
+            assetNames.forEach { assetName ->
+                val assetId = assetRepository.upsertAssetByName(assetName)
+                val asset = Asset(id = assetId, name = assetName)
                 val account =
                     Account(
                         name = "Test Account",
@@ -90,7 +101,7 @@ class AccountRepositoryImplTest {
             val account =
                 Account(
                     name = "Credit Card",
-                    asset = "USD",
+                    asset = testAsset,
                     initialBalance = -500.0,
                     openingDate = now,
                 )
@@ -109,7 +120,7 @@ class AccountRepositoryImplTest {
             val account =
                 Account(
                     name = "New Account",
-                    asset = "USD",
+                    asset = testAsset,
                     initialBalance = 0.0,
                     openingDate = now,
                 )
@@ -134,17 +145,20 @@ class AccountRepositoryImplTest {
     fun `getAllAccounts should return all accounts`() =
         runTest {
             val now = Clock.System.now()
+            val eurAssetId = assetRepository.upsertAssetByName("EUR")
+            val eurAsset = Asset(id = eurAssetId, name = "EUR")
+
             val account1 =
                 Account(
                     name = "Account 1",
-                    asset = "USD",
+                    asset = testAsset,
                     initialBalance = 100.0,
                     openingDate = now,
                 )
             val account2 =
                 Account(
                     name = "Account 2",
-                    asset = "EUR",
+                    asset = eurAsset,
                     initialBalance = 200.0,
                     openingDate = now,
                 )
@@ -172,7 +186,7 @@ class AccountRepositoryImplTest {
             val account =
                 Account(
                     name = "Test Account",
-                    asset = "USD",
+                    asset = testAsset,
                     initialBalance = 100.0,
                     openingDate = now,
                 )
@@ -194,7 +208,7 @@ class AccountRepositoryImplTest {
             val account =
                 Account(
                     name = "Original Name",
-                    asset = "USD",
+                    asset = testAsset,
                     initialBalance = 100.0,
                     openingDate = now,
                 )
@@ -202,10 +216,13 @@ class AccountRepositoryImplTest {
             val accountId = repository.createAccount(account)
             val retrieved = repository.getAccountById(accountId).first()!!
 
+            val eurAssetId = assetRepository.upsertAssetByName("EUR")
+            val eurAsset = Asset(id = eurAssetId, name = "EUR")
+
             val updated =
                 retrieved.copy(
                     name = "Updated Name",
-                    asset = "EUR",
+                    asset = eurAsset,
                     initialBalance = 200.0,
                 )
 
@@ -214,7 +231,7 @@ class AccountRepositoryImplTest {
 
             assertNotNull(result)
             assertEquals("Updated Name", result.name)
-            assertEquals("EUR", result.asset)
+            assertEquals(eurAsset, result.asset)
             assertEquals(200.0, result.initialBalance)
         }
 
@@ -227,7 +244,7 @@ class AccountRepositoryImplTest {
             val account =
                 Account(
                     name = "Test Account",
-                    asset = "USD",
+                    asset = testAsset,
                     initialBalance = 100.0,
                     openingDate = now,
                 )
@@ -246,14 +263,14 @@ class AccountRepositoryImplTest {
             val account1 =
                 Account(
                     name = "Account 1",
-                    asset = "USD",
+                    asset = testAsset,
                     initialBalance = 100.0,
                     openingDate = now,
                 )
             val account2 =
                 Account(
                     name = "Account 2",
-                    asset = "USD",
+                    asset = testAsset,
                     initialBalance = 200.0,
                     openingDate = now,
                 )
@@ -292,7 +309,7 @@ class AccountRepositoryImplTest {
             val account =
                 Account(
                     name = "New Account",
-                    asset = "USD",
+                    asset = testAsset,
                     initialBalance = 100.0,
                     openingDate = now,
                 )
@@ -315,7 +332,7 @@ class AccountRepositoryImplTest {
                 val account =
                     Account(
                         name = "Account $index",
-                        asset = "USD",
+                        asset = testAsset,
                         initialBalance = index * 100.0,
                         openingDate = now,
                     )
@@ -343,7 +360,7 @@ class AccountRepositoryImplTest {
                 val account =
                     Account(
                         name = name,
-                        asset = "USD",
+                        asset = testAsset,
                         initialBalance = 100.0,
                         openingDate = now,
                     )
@@ -364,7 +381,7 @@ class AccountRepositoryImplTest {
             val account =
                 Account(
                     name = "Test Account",
-                    asset = "USD",
+                    asset = testAsset,
                     initialBalance = preciseBalance,
                     openingDate = now,
                 )
@@ -384,7 +401,7 @@ class AccountRepositoryImplTest {
             val account =
                 Account(
                     name = "Rich Account",
-                    asset = "USD",
+                    asset = testAsset,
                     initialBalance = largeBalance,
                     openingDate = now,
                 )
@@ -406,7 +423,7 @@ class AccountRepositoryImplTest {
                 val account =
                     Account(
                         name = "Account $index",
-                        asset = "USD",
+                        asset = testAsset,
                         initialBalance = 100.0,
                         openingDate = now,
                     )

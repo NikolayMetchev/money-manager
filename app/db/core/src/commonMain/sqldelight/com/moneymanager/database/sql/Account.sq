@@ -1,24 +1,36 @@
 CREATE TABLE Account (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
-    asset TEXT NOT NULL,
+    assetId INTEGER NOT NULL,
     initialBalance REAL NOT NULL DEFAULT 0.0,
-    openingDate INTEGER NOT NULL
+    openingDate INTEGER NOT NULL,
+    FOREIGN KEY (assetId) REFERENCES Asset(id)
 );
 
+CREATE VIEW AccountView AS
+SELECT
+    Account.id AS id,
+    Account.name AS name,
+    Account.initialBalance AS initialBalance,
+    Account.openingDate AS openingDate,
+    Asset.id AS assetId,
+    Asset.name AS assetName
+FROM Account
+INNER JOIN Asset ON Account.assetId = Asset.id;
+
 selectAll:
-SELECT * FROM Account;
+SELECT * FROM AccountView;
 
 selectById:
-SELECT * FROM Account WHERE id = ?;
+SELECT * FROM AccountView WHERE id = ?;
 
 insert:
-INSERT INTO Account(name, asset, initialBalance, openingDate)
+INSERT INTO Account(name, assetId, initialBalance, openingDate)
 VALUES (?, ?, ?, ?);
 
 update:
 UPDATE Account
-SET name = ?, asset = ?, initialBalance = ?
+SET name = ?, assetId = ?, initialBalance = ?
 WHERE id = ?;
 
 delete:

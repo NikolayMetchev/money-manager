@@ -35,7 +35,7 @@ class AccountRepositoryImpl(
         withContext(Dispatchers.Default) {
             queries.insert(
                 name = account.name,
-                asset = account.asset,
+                assetId = account.asset.id,
                 initialBalance = account.initialBalance,
                 openingDate = account.openingDate.toEpochMilliseconds(),
             )
@@ -46,7 +46,7 @@ class AccountRepositoryImpl(
         withContext(Dispatchers.Default) {
             queries.update(
                 name = account.name,
-                asset = account.asset,
+                assetId = account.asset.id,
                 initialBalance = account.initialBalance,
                 id = account.id,
             )
