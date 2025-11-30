@@ -32,9 +32,10 @@ class JvmDatabaseManager : DatabaseManager {
             // Create driver with JDBC URL and properties to enable foreign keys
             // Note: foreign_keys must be set via Properties for file-based databases
             // See: https://github.com/sqldelight/sqldelight/issues/2421
-            val properties = Properties().apply {
-                put("foreign_keys", "true")
-            }
+            val properties =
+                Properties().apply {
+                    put("foreign_keys", "true")
+                }
             val driver = JdbcSqliteDriver(location.jdbcUrl, properties)
 
             // Apply additional connection-level PRAGMA settings (if any beyond foreign_keys)
