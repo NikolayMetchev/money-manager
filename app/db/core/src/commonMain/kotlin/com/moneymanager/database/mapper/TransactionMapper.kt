@@ -6,9 +6,9 @@ import com.moneymanager.domain.model.Transaction
 import tech.mappie.api.ObjectMappie
 import kotlin.time.Instant
 
-object TransactionMapper : ObjectMappie<com.moneymanager.database.sql.TransactionRecord, Transaction>() {
-    override fun map(from: com.moneymanager.database.sql.TransactionRecord) =
+object TransactionMapper : ObjectMappie<com.moneymanager.database.sql.Transaction, com.moneymanager.domain.model.Transaction>() {
+    override fun map(from: com.moneymanager.database.sql.Transaction) =
         mapping {
-            Transaction::timestamp fromValue Instant.fromEpochMilliseconds(from.timestamp)
+            com.moneymanager.domain.model.Transaction::timestamp fromValue Instant.fromEpochMilliseconds(from.timestamp)
         }
 }

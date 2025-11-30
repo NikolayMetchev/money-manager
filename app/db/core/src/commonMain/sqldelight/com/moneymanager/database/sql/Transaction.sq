@@ -1,4 +1,4 @@
-CREATE TABLE TransactionRecord (
+CREATE TABLE `Transaction` (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     sourceAccountId INTEGER NOT NULL,
     targetAccountId INTEGER NOT NULL,
@@ -10,36 +10,36 @@ CREATE TABLE TransactionRecord (
 );
 
 selectAll:
-SELECT * FROM TransactionRecord ORDER BY timestamp DESC;
+SELECT * FROM `Transaction` ORDER BY timestamp DESC;
 
 selectById:
-SELECT * FROM TransactionRecord WHERE id = ?;
+SELECT * FROM `Transaction` WHERE id = ?;
 
 selectByAccount:
-SELECT * FROM TransactionRecord WHERE sourceAccountId = ? OR targetAccountId = ? ORDER BY timestamp DESC;
+SELECT * FROM `Transaction` WHERE sourceAccountId = ? OR targetAccountId = ? ORDER BY timestamp DESC;
 
 selectByDateRange:
-SELECT * FROM TransactionRecord
+SELECT * FROM `Transaction`
 WHERE timestamp >= ? AND timestamp <= ?
 ORDER BY timestamp DESC;
 
 selectByAccountAndDateRange:
-SELECT * FROM TransactionRecord
+SELECT * FROM `Transaction`
 WHERE (sourceAccountId = ? OR targetAccountId = ?)
 AND timestamp >= ? AND timestamp <= ?
 ORDER BY timestamp DESC;
 
 insert:
-INSERT INTO TransactionRecord(sourceAccountId, targetAccountId, assetId, timestamp)
+INSERT INTO `Transaction`(sourceAccountId, targetAccountId, assetId, timestamp)
 VALUES (?, ?, ?, ?);
 
 update:
-UPDATE TransactionRecord
+UPDATE `Transaction`
 SET sourceAccountId = ?, targetAccountId = ?, assetId = ?, timestamp = ?
 WHERE id = ?;
 
 delete:
-DELETE FROM TransactionRecord WHERE id = ?;
+DELETE FROM `Transaction` WHERE id = ?;
 
 lastInsertRowId:
 SELECT last_insert_rowid();
