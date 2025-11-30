@@ -7,7 +7,7 @@ import kotlin.time.Instant
 data class Transaction(
     val id: Long = 0,
     val sourceAccountId: Long,
-    val targetAccountId: Long? = null,
+    val targetAccountId: Long,
     val assetId: Long,
     val timestamp: Instant,
 )

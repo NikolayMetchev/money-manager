@@ -1,7 +1,7 @@
 CREATE TABLE TransactionRecord (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     sourceAccountId INTEGER NOT NULL,
-    targetAccountId INTEGER,
+    targetAccountId INTEGER NOT NULL,
     assetId INTEGER NOT NULL,
     timestamp INTEGER NOT NULL,
     FOREIGN KEY (sourceAccountId) REFERENCES Account(id) ON DELETE CASCADE,

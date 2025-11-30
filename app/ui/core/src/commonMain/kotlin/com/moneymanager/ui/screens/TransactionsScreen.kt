@@ -73,7 +73,7 @@ fun TransactionCard(transaction: Transaction) {
             ) {
                 Column {
                     Text(
-                        text = if (transaction.targetAccountId != null) "Transfer" else "Transaction",
+                        text = "Transaction",
                         style = MaterialTheme.typography.titleMedium,
                     )
                     Spacer(modifier = Modifier.height(4.dp))
@@ -82,13 +82,11 @@ fun TransactionCard(transaction: Transaction) {
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    transaction.targetAccountId?.let { targetId ->
-                        Text(
-                            text = "Target Account: $targetId",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+                    Text(
+                        text = "Target Account: ${transaction.targetAccountId}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                     Text(
                         text = "Asset: ${transaction.assetId}",
                         style = MaterialTheme.typography.bodySmall,
