@@ -8,7 +8,6 @@ import com.moneymanager.database.deleteTestDatabase
 import com.moneymanager.di.AppComponent
 import com.moneymanager.di.createTestAppComponentParams
 import com.moneymanager.domain.model.Account
-import com.moneymanager.domain.model.Asset
 import com.moneymanager.domain.model.Transaction
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AssetRepository
