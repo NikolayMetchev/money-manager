@@ -4,8 +4,6 @@ plugins {
 }
 
 dependencies {
-    implementation(libs.sqldelight.runtime)
-    implementation(libs.sqldelight.sqlite.driver)
     implementation(projects.app.db.core)
 }
 
@@ -26,7 +24,8 @@ val createDatabaseForSchemaSpy by tasks.registering(JavaExec::class) {
     // Use the runtime classpath which includes SQLDelight generated code
     classpath = sourceSets["main"].runtimeClasspath
 
-    mainClass.set("com.moneymanager.schemaspy.SchemaSpyDatabaseCreator")
+    // SchemaSpyDatabaseCreatorKt is the generated class for the top-level suspend main function
+    mainClass.set("com.moneymanager.schemaspy.SchemaSpyDatabaseCreatorKt")
     args(dbFile.absolutePath)
 
     // Depend on compilation to ensure the helper class and SQLDelight code are available

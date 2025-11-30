@@ -24,6 +24,7 @@
             <option value="$PROJECT_DIR$/app" />
             <option value="$PROJECT_DIR$/app/db" />
             <option value="$PROJECT_DIR$/app/db/core" />
+            <option value="$PROJECT_DIR$/app/db/schemaspy" />
             <option value="$PROJECT_DIR$/app/di" />
             <option value="$PROJECT_DIR$/app/di/core" />
             <option value="$PROJECT_DIR$/app/main" />

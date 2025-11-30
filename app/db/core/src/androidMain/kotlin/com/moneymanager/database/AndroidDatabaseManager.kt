@@ -22,6 +22,16 @@ class AndroidDatabaseManager(private val context: Context) : DatabaseManager {
                     schema = MoneyManagerDatabase.Schema,
                     context = context,
                     name = location.name,
+                    callback =
+                        object : AndroidSqliteDriver.Callback(MoneyManagerDatabase.Schema) {
+                            override fun onOpen(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                                super.onOpen(db)
+                                // Apply connection-level PRAGMA settings
+                                DatabaseConfig.connectionPragmas.forEach { pragma ->
+                                    db.execSQL(pragma)
+                                }
+                            }
+                        },
                 )
 
             MoneyManagerDatabase(driver)

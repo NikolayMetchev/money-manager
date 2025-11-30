@@ -38,6 +38,11 @@ class JvmDatabaseManager : DatabaseManager {
             // Create driver with JDBC URL
             val driver = JdbcSqliteDriver(location.jdbcUrl)
 
+            // Apply connection-level PRAGMA settings
+            DatabaseConfig.connectionPragmas.forEach { pragma ->
+                driver.execute(null, pragma, 0)
+            }
+
             if (isNewDatabase) {
                 // Create schema for new database
                 MoneyManagerDatabase.Schema.create(driver)

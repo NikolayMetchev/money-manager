@@ -8,7 +8,7 @@ import com.moneymanager.di.AppComponent
 import com.moneymanager.di.createTestAppComponentParams
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.Asset
-import com.moneymanager.domain.repository.AccountRepository
+import com.moneymanager.domain. repository.AccountRepository
 import com.moneymanager.domain.repository.AssetRepository
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -436,6 +436,93 @@ class AccountRepositoryImplTest {
             // Verify all created accounts are present
             accountIds.forEach { id ->
                 assertTrue(accounts.any { it.id == id })
+            }
+        }
+
+    // FOREIGN KEY CONSTRAINT TESTS
+
+    @Test
+    fun `createAccount should fail with invalid asset ID of 0`() =
+        runTest {
+            val now = Clock.System.now()
+            val invalidAsset = Asset(id = 0L, name = "Invalid")
+            val account =
+                Account(
+                    name = "Test Account",
+                    asset = invalidAsset,
+                    initialBalance = 100.0,
+                    openingDate = now,
+                )
+
+            try {
+                repository.createAccount(account)
+                throw AssertionError("Expected foreign key constraint violation but account was created")
+            } catch (e: Exception) {
+                // Expected: Should throw exception due to foreign key constraint
+                assertTrue(
+                    e.message?.contains("foreign key", ignoreCase = true) == true ||
+                        e.message?.contains("constraint", ignoreCase = true) == true,
+                    "Expected foreign key constraint error but got: ${e.message}",
+                )
+            }
+        }
+
+    @Test
+    fun `createAccount should fail with non-existent asset ID`() =
+        runTest {
+            val now = Clock.System.now()
+            val nonExistentAsset = Asset(id = 999L, name = "Non-existent")
+            val account =
+                Account(
+                    name = "Test Account",
+                    asset = nonExistentAsset,
+                    initialBalance = 100.0,
+                    openingDate = now,
+                )
+
+            try {
+                repository.createAccount(account)
+                throw AssertionError("Expected foreign key constraint violation but account was created")
+            } catch (e: Exception) {
+                // Expected: Should throw exception due to foreign key constraint
+                assertTrue(
+                    e.message?.contains("foreign key", ignoreCase = true) == true ||
+                        e.message?.contains("constraint", ignoreCase = true) == true,
+                    "Expected foreign key constraint error but got: ${e.message}",
+                )
+            }
+        }
+
+    @Test
+    fun `updateAccount should fail with invalid asset ID`() =
+        runTest {
+            // Given: Create a valid account first
+            val now = Clock.System.now()
+            val validAccount =
+                Account(
+                    name = "Valid Account",
+                    asset = testAsset,
+                    initialBalance = 100.0,
+                    openingDate = now,
+                )
+            val accountId = repository.createAccount(validAccount)
+            val retrieved = repository.getAccountById(accountId).first()
+            assertNotNull(retrieved)
+
+            // When: Try to update with an invalid asset
+            val invalidAsset = Asset(id = 999L, name = "Invalid")
+            val updatedAccount = retrieved.copy(asset = invalidAsset)
+
+            try {
+                repository.updateAccount(updatedAccount)
+                throw AssertionError("Expected foreign key constraint violation but account was updated")
+            } catch (e: Exception) {
+                // Expected: Should throw exception due to foreign key constraint
+                assertTrue(
+                    e.message?.contains("foreign key", ignoreCase = true) == true ||
+                        e.message?.contains("constraint", ignoreCase = true) == true,
+                    "Expected foreign key constraint error but got: ${e.message}",
+                )
             }
         }
 }
