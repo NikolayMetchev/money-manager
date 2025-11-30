@@ -38,12 +38,6 @@ class TransactionRepositoryImpl(
             .mapToList(Dispatchers.Default)
             .map(TransactionMapper::mapList)
 
-    override fun getTransactionsByCategory(categoryId: Long): Flow<List<Transaction>> =
-        queries.selectByCategory(categoryId)
-            .asFlow()
-            .mapToList(Dispatchers.Default)
-            .map(TransactionMapper::mapList)
-
     override fun getTransactionsByDateRange(
         startDate: Instant,
         endDate: Instant,
@@ -74,17 +68,10 @@ class TransactionRepositoryImpl(
     override suspend fun createTransaction(transaction: Transaction): Long =
         withContext(Dispatchers.Default) {
             queries.insert(
-                accountId = transaction.accountId,
-                categoryId = transaction.categoryId,
-                type = transaction.type.name,
-                amount = transaction.amount,
-                currency = transaction.currency,
-                description = transaction.description,
-                note = transaction.note,
-                transactionDate = transaction.transactionDate.toEpochMilliseconds(),
-                toAccountId = transaction.toAccountId,
-                createdAt = transaction.createdAt.toEpochMilliseconds(),
-                updatedAt = transaction.updatedAt.toEpochMilliseconds(),
+                sourceAccountId = transaction.sourceAccountId,
+                targetAccountId = transaction.targetAccountId,
+                assetId = transaction.assetId,
+                timestamp = transaction.timestamp.toEpochMilliseconds(),
             )
             queries.lastInsertRowId().executeAsOne()
         }
@@ -92,16 +79,10 @@ class TransactionRepositoryImpl(
     override suspend fun updateTransaction(transaction: Transaction): Unit =
         withContext(Dispatchers.Default) {
             queries.update(
-                accountId = transaction.accountId,
-                categoryId = transaction.categoryId,
-                type = transaction.type.name,
-                amount = transaction.amount,
-                currency = transaction.currency,
-                description = transaction.description,
-                note = transaction.note,
-                transactionDate = transaction.transactionDate.toEpochMilliseconds(),
-                toAccountId = transaction.toAccountId,
-                updatedAt = transaction.updatedAt.toEpochMilliseconds(),
+                sourceAccountId = transaction.sourceAccountId,
+                targetAccountId = transaction.targetAccountId,
+                assetId = transaction.assetId,
+                timestamp = transaction.timestamp.toEpochMilliseconds(),
                 id = transaction.id,
             )
             Unit

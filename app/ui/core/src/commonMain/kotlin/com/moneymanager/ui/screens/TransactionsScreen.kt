@@ -73,40 +73,34 @@ fun TransactionCard(transaction: Transaction) {
             ) {
                 Column {
                     Text(
-                        text = transaction.description ?: "Transaction",
+                        text = if (transaction.targetAccountId != null) "Transfer" else "Transaction",
                         style = MaterialTheme.typography.titleMedium,
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = transaction.type.name,
+                        text = "Source Account: ${transaction.sourceAccountId}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    val dateTime = transaction.transactionDate.toLocalDateTime(TimeZone.currentSystemDefault())
+                    transaction.targetAccountId?.let { targetId ->
+                        Text(
+                            text = "Target Account: $targetId",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     Text(
-                        text = "${dateTime.date}",
+                        text = "Asset: ${transaction.assetId}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    val dateTime = transaction.timestamp.toLocalDateTime(TimeZone.currentSystemDefault())
+                    Text(
+                        text = "${dateTime.date} ${dateTime.time}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Text(
-                    text = "${transaction.currency} ${String.format("%.2f", transaction.amount)}",
-                    style = MaterialTheme.typography.headlineSmall,
-                    color =
-                        when (transaction.type.name.uppercase()) {
-                            "INCOME" -> MaterialTheme.colorScheme.primary
-                            "EXPENSE" -> MaterialTheme.colorScheme.error
-                            else -> MaterialTheme.colorScheme.onSurface
-                        },
-                )
-            }
-            transaction.note?.let { note ->
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = note,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
         }
     }
