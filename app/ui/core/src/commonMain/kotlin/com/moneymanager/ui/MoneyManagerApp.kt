@@ -82,7 +82,12 @@ fun MoneyManagerApp(
                     is Screen.Accounts -> AccountsScreen(repositorySet.accountRepository)
                     is Screen.Assets -> AssetsScreen(repositorySet.assetRepository)
                     is Screen.Categories -> CategoriesScreen(repositorySet.categoryRepository)
-                    is Screen.Transactions -> TransactionsScreen(repositorySet.transactionRepository)
+                    is Screen.Transactions ->
+                        TransactionsScreen(
+                            transactionRepository = repositorySet.transactionRepository,
+                            accountRepository = repositorySet.accountRepository,
+                            assetRepository = repositorySet.assetRepository,
+                        )
                 }
             }
         }
