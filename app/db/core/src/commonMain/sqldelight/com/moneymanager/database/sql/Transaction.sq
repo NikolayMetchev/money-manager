@@ -3,6 +3,7 @@ CREATE TABLE `Transaction` (
     sourceAccountId INTEGER NOT NULL,
     targetAccountId INTEGER NOT NULL,
     assetId INTEGER NOT NULL,
+    amount REAL NOT NULL,
     timestamp INTEGER NOT NULL,
     FOREIGN KEY (sourceAccountId) REFERENCES Account(id) ON DELETE CASCADE,
     FOREIGN KEY (targetAccountId) REFERENCES Account(id) ON DELETE CASCADE,
@@ -30,12 +31,12 @@ AND timestamp >= ? AND timestamp <= ?
 ORDER BY timestamp DESC;
 
 insert:
-INSERT INTO `Transaction`(sourceAccountId, targetAccountId, assetId, timestamp)
-VALUES (?, ?, ?, ?);
+INSERT INTO `Transaction`(sourceAccountId, targetAccountId, assetId, amount, timestamp)
+VALUES (?, ?, ?, ?, ?);
 
 update:
 UPDATE `Transaction`
-SET sourceAccountId = ?, targetAccountId = ?, assetId = ?, timestamp = ?
+SET sourceAccountId = ?, targetAccountId = ?, assetId = ?, amount = ?, timestamp = ?
 WHERE id = ?;
 
 delete:

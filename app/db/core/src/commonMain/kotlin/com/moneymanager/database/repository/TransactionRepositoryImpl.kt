@@ -71,6 +71,7 @@ class TransactionRepositoryImpl(
                 sourceAccountId = transaction.sourceAccountId,
                 targetAccountId = transaction.targetAccountId,
                 assetId = transaction.assetId,
+                amount = transaction.amount,
                 timestamp = transaction.timestamp.toEpochMilliseconds(),
             )
             queries.lastInsertRowId().executeAsOne()
@@ -82,6 +83,7 @@ class TransactionRepositoryImpl(
                 sourceAccountId = transaction.sourceAccountId,
                 targetAccountId = transaction.targetAccountId,
                 assetId = transaction.assetId,
+                amount = transaction.amount,
                 timestamp = transaction.timestamp.toEpochMilliseconds(),
                 id = transaction.id,
             )

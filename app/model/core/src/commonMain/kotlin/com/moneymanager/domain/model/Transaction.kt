@@ -9,5 +9,6 @@ data class Transaction(
     val sourceAccountId: Long,
     val targetAccountId: Long,
     val assetId: Long,
+    val amount: Double,
     val timestamp: Instant,
 )
