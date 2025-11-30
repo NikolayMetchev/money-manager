@@ -13,8 +13,6 @@ interface TransactionRepository {
 
     fun getTransactionsByAccount(accountId: Long): Flow<List<Transaction>>
 
-    fun getTransactionsByCategory(categoryId: Long): Flow<List<Transaction>>
-
     fun getTransactionsByDateRange(
         startDate: Instant,
         endDate: Instant,
