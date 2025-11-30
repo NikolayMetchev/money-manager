@@ -20,6 +20,7 @@ kotlin {
             dependencies {
                 implementation(libs.kotlinx.coroutines.test)
                 implementation(projects.app.di.core)
+                implementation(projects.app.model.core)
             }
         }
 
@@ -37,7 +38,8 @@ kotlin {
 
         val androidDeviceTest by getting {
             // Note: Cannot use dependsOn(commonTest) due to source set tree restrictions
-            // Tests are shared via kotlin.srcDir() below
+            // Tests are shared via srcDir() below, but we exclude the expect declarations
+            // file since androidDeviceTest provides its own implementation
             dependencies {
                 implementation(kotlin("test"))
                 implementation(libs.androidx.test.core)
@@ -45,7 +47,8 @@ kotlin {
                 implementation(libs.kotlinx.coroutines.test)
                 implementation(projects.app.di.core)
             }
-            kotlin.srcDir("src/commonTest/kotlin")
+            // Include repository tests from commonTest (not the expect declarations file)
+            kotlin.srcDir("src/commonTest/kotlin/com/moneymanager/database/repository")
         }
     }
 }

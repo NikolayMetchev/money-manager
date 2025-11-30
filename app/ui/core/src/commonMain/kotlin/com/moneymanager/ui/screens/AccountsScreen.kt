@@ -11,7 +11,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.Account
+import com.moneymanager.domain.model.Asset
 import com.moneymanager.domain.repository.AccountRepository
+import com.moneymanager.domain.repository.AssetRepository
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
 import kotlin.time.Clock
@@ -19,7 +21,10 @@ import kotlin.time.Clock
 private val logger = logging()
 
 @Composable
-fun AccountsScreen(accountRepository: AccountRepository) {
+fun AccountsScreen(
+    accountRepository: AccountRepository,
+    assetRepository: AssetRepository,
+) {
     val accounts by accountRepository.getAllAccounts().collectAsState(initial = emptyList())
     var showCreateDialog by remember { mutableStateOf(false) }
 
@@ -74,6 +79,7 @@ fun AccountsScreen(accountRepository: AccountRepository) {
         if (showCreateDialog) {
             CreateAccountDialog(
                 accountRepository = accountRepository,
+                assetRepository = assetRepository,
                 onDismiss = { showCreateDialog = false },
             )
         }
@@ -118,7 +124,7 @@ fun AccountCard(
             }
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "${account.asset} ${String.format("%.2f", account.initialBalance)}",
+                text = "${account.asset.name} ${String.format("%.2f", account.initialBalance)}",
                 style = MaterialTheme.typography.headlineSmall,
                 color =
                     if (account.initialBalance >= 0) {
@@ -142,6 +148,7 @@ fun AccountCard(
 @Composable
 fun CreateAccountDialog(
     accountRepository: AccountRepository,
+    assetRepository: AssetRepository,
     onDismiss: () -> Unit,
 ) {
     var name by remember { mutableStateOf("") }
@@ -225,10 +232,13 @@ fun CreateAccountDialog(
                                 try {
                                     val balance = initialBalance.toDoubleOrNull() ?: 0.0
                                     val now = Clock.System.now()
+                                    val assetName = asset.trim().uppercase()
+                                    val assetId = assetRepository.upsertAssetByName(assetName)
+                                    val assetObj = Asset(id = assetId, name = assetName)
                                     val newAccount =
                                         Account(
                                             name = name.trim(),
-                                            asset = asset.trim().uppercase(),
+                                            asset = assetObj,
                                             initialBalance = balance,
                                             openingDate = now,
                                         )

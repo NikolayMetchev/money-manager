@@ -22,14 +22,22 @@ class AndroidDatabaseManager(private val context: Context) : DatabaseManager {
                     schema = MoneyManagerDatabase.Schema,
                     context = context,
                     name = location.name,
+                    callback =
+                        object : AndroidSqliteDriver.Callback(MoneyManagerDatabase.Schema) {
+                            override fun onOpen(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                                super.onOpen(db)
+                                // Apply connection-level PRAGMA settings
+                                DatabaseConfig.connectionPragmas.forEach { pragma ->
+                                    db.execSQL(pragma)
+                                }
+                            }
+                        },
                 )
 
             MoneyManagerDatabase(driver)
         }
 
     override suspend fun databaseExists(location: DbLocation): Boolean {
-        // In-memory databases always "exist"
-        if (location.isInMemory()) return true
         // On Android, we can check if the database file exists in the databases directory
         return context.getDatabasePath(location.name).exists()
     }

@@ -1,0 +1,28 @@
+CREATE TABLE Asset (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE
+);
+
+selectAll:
+SELECT * FROM Asset;
+
+selectById:
+SELECT * FROM Asset WHERE id = ?;
+
+selectByName:
+SELECT * FROM Asset WHERE name = ?;
+
+insert:
+INSERT INTO Asset(name)
+VALUES (?);
+
+update:
+UPDATE Asset
+SET name = ?
+WHERE id = ?;
+
+delete:
+DELETE FROM Asset WHERE id = ?;
+
+lastInsertRowId:
+SELECT last_insert_rowid();

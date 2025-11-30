@@ -33,20 +33,22 @@ class AccountRepositoryImpl(
 
     override suspend fun createAccount(account: Account): Long =
         withContext(Dispatchers.Default) {
-            queries.insert(
-                name = account.name,
-                asset = account.asset,
-                initialBalance = account.initialBalance,
-                openingDate = account.openingDate.toEpochMilliseconds(),
-            )
-            queries.lastInsertRowId().executeAsOne()
+            queries.transactionWithResult {
+                queries.insert(
+                    name = account.name,
+                    assetId = account.asset.id,
+                    initialBalance = account.initialBalance,
+                    openingDate = account.openingDate.toEpochMilliseconds(),
+                )
+                queries.lastInsertRowId().executeAsOne()
+            }
         }
 
     override suspend fun updateAccount(account: Account): Unit =
         withContext(Dispatchers.Default) {
             queries.update(
                 name = account.name,
-                asset = account.asset,
+                assetId = account.asset.id,
                 initialBalance = account.initialBalance,
                 id = account.id,
             )

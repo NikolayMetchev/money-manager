@@ -62,3 +62,8 @@ kotlin {
 ktlint {
     android.set(true)
 }
+
+// Include instrumented test compilation in the build task to catch compile errors early
+tasks.named("build") {
+    dependsOn("compileAndroidDeviceTest")
+}

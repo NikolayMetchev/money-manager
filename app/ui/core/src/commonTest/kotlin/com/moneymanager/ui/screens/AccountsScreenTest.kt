@@ -8,7 +8,9 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import com.moneymanager.domain.model.Account
+import com.moneymanager.domain.model.Asset
 import com.moneymanager.domain.repository.AccountRepository
+import com.moneymanager.domain.repository.AssetRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
@@ -17,6 +19,12 @@ import kotlin.time.Clock
 
 @OptIn(ExperimentalTestApi::class)
 class AccountsScreenTest {
+    // Test assets
+    private val testUSD = Asset(id = 1L, name = "USD")
+    private val testEUR = Asset(id = 2L, name = "EUR")
+    private val testGBP = Asset(id = 3L, name = "GBP")
+    private val fakeAssetRepository = FakeAssetRepository()
+
     @Test
     fun accountsScreen_displaysEmptyState_whenNoAccounts() =
         runComposeUiTest {
@@ -25,7 +33,7 @@ class AccountsScreenTest {
 
             // When
             setContent {
-                AccountsScreen(accountRepository = repository)
+                AccountsScreen(accountRepository = repository, assetRepository = fakeAssetRepository)
             }
 
             // Then
@@ -43,14 +51,14 @@ class AccountsScreenTest {
                     Account(
                         id = 1L,
                         name = "Checking Account",
-                        asset = "USD",
+                        asset = testUSD,
                         initialBalance = 1000.0,
                         openingDate = now,
                     ),
                     Account(
                         id = 2L,
                         name = "Savings Account",
-                        asset = "USD",
+                        asset = testUSD,
                         initialBalance = 5000.0,
                         openingDate = now,
                     ),
@@ -59,7 +67,7 @@ class AccountsScreenTest {
 
             // When
             setContent {
-                AccountsScreen(accountRepository = repository)
+                AccountsScreen(accountRepository = repository, assetRepository = fakeAssetRepository)
             }
 
             // Then
@@ -77,7 +85,7 @@ class AccountsScreenTest {
 
             // When
             setContent {
-                AccountsScreen(accountRepository = repository)
+                AccountsScreen(accountRepository = repository, assetRepository = fakeAssetRepository)
             }
 
             // Then
@@ -92,7 +100,7 @@ class AccountsScreenTest {
 
             // When
             setContent {
-                AccountsScreen(accountRepository = repository)
+                AccountsScreen(accountRepository = repository, assetRepository = fakeAssetRepository)
             }
 
             onNodeWithText("+").performClick()
@@ -112,7 +120,7 @@ class AccountsScreenTest {
                 Account(
                     id = 1L,
                     name = "My Checking",
-                    asset = "EUR",
+                    asset = testEUR,
                     initialBalance = 2500.50,
                     openingDate = now,
                 )
@@ -120,7 +128,7 @@ class AccountsScreenTest {
 
             // When
             setContent {
-                AccountsScreen(accountRepository = repository)
+                AccountsScreen(accountRepository = repository, assetRepository = fakeAssetRepository)
             }
 
             // Then
@@ -137,7 +145,7 @@ class AccountsScreenTest {
                 Account(
                     id = 1L,
                     name = "Credit Card",
-                    asset = "USD",
+                    asset = testUSD,
                     initialBalance = -500.0,
                     openingDate = now,
                 )
@@ -145,7 +153,7 @@ class AccountsScreenTest {
 
             // When
             setContent {
-                AccountsScreen(accountRepository = repository)
+                AccountsScreen(accountRepository = repository, assetRepository = fakeAssetRepository)
             }
 
             // Then
@@ -161,7 +169,7 @@ class AccountsScreenTest {
                 Account(
                     id = 1L,
                     name = "Test Account",
-                    asset = "USD",
+                    asset = testUSD,
                     initialBalance = 100.0,
                     openingDate = now,
                 )
@@ -169,7 +177,7 @@ class AccountsScreenTest {
 
             // When
             setContent {
-                AccountsScreen(accountRepository = repository)
+                AccountsScreen(accountRepository = repository, assetRepository = fakeAssetRepository)
             }
 
             // Click the delete button (trash icon)
@@ -188,7 +196,7 @@ class AccountsScreenTest {
 
             // When
             setContent {
-                AccountsScreen(accountRepository = repository)
+                AccountsScreen(accountRepository = repository, assetRepository = fakeAssetRepository)
             }
 
             // Open dialog
@@ -209,7 +217,7 @@ class AccountsScreenTest {
 
             // When
             setContent {
-                AccountsScreen(accountRepository = repository)
+                AccountsScreen(accountRepository = repository, assetRepository = fakeAssetRepository)
             }
 
             // Open dialog
@@ -232,7 +240,7 @@ class AccountsScreenTest {
                 Account(
                     id = 1L,
                     name = "Test Account",
-                    asset = "USD",
+                    asset = testUSD,
                     initialBalance = 100.0,
                     openingDate = now,
                 )
@@ -240,7 +248,7 @@ class AccountsScreenTest {
 
             // When
             setContent {
-                AccountsScreen(accountRepository = repository)
+                AccountsScreen(accountRepository = repository, assetRepository = fakeAssetRepository)
             }
 
             // Open delete dialog
@@ -264,21 +272,21 @@ class AccountsScreenTest {
                     Account(
                         id = 1L,
                         name = "Account 1",
-                        asset = "USD",
+                        asset = testUSD,
                         initialBalance = 100.0,
                         openingDate = now,
                     ),
                     Account(
                         id = 2L,
                         name = "Account 2",
-                        asset = "EUR",
+                        asset = testEUR,
                         initialBalance = 200.0,
                         openingDate = now,
                     ),
                     Account(
                         id = 3L,
                         name = "Account 3",
-                        asset = "GBP",
+                        asset = testGBP,
                         initialBalance = 300.0,
                         openingDate = now,
                     ),
@@ -287,7 +295,7 @@ class AccountsScreenTest {
 
             // When
             setContent {
-                AccountsScreen(accountRepository = repository)
+                AccountsScreen(accountRepository = repository, assetRepository = fakeAssetRepository)
             }
 
             // Then - all accounts should be visible
@@ -296,7 +304,7 @@ class AccountsScreenTest {
             onNodeWithText("Account 3").assertIsDisplayed()
         }
 
-    // Fake repository for testing
+    // Fake repositories for testing
     private class FakeAccountRepository(
         private val accounts: List<Account>,
     ) : AccountRepository {
@@ -324,6 +332,30 @@ class AccountsScreenTest {
         override suspend fun deleteAccount(id: Long) {
             deletedAccounts.add(id)
             accountsFlow.value = accountsFlow.value.filter { it.id != id }
+        }
+    }
+
+    private class FakeAssetRepository : AssetRepository {
+        private val assets = mutableMapOf<String, Long>()
+        private var nextId = 1L
+
+        override fun getAllAssets(): Flow<List<Asset>> = flowOf(assets.map { (name, id) -> Asset(id = id, name = name) })
+
+        override fun getAssetById(id: Long): Flow<Asset?> =
+            flowOf(assets.entries.find { it.value == id }?.let { Asset(id = it.value, name = it.key) })
+
+        override suspend fun upsertAssetByName(name: String): Long {
+            return assets.getOrPut(name) {
+                nextId++
+            }
+        }
+
+        override suspend fun updateAsset(asset: Asset) {
+            assets[asset.name] = asset.id
+        }
+
+        override suspend fun deleteAsset(id: Long) {
+            assets.entries.find { it.value == id }?.let { assets.remove(it.key) }
         }
     }
 }

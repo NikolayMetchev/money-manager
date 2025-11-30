@@ -8,5 +8,12 @@
       <jdbc-url>jdbc:sqlite:$USER_HOME$/.dbmanager/default.db</jdbc-url>
       <working-dir>$ProjectFileDir$</working-dir>
     </data-source>
+    <data-source source="LOCAL" name="money_manager.db" uuid="42147222-7eb0-4849-9ee6-1b646251106e">
+      <driver-ref>sqlite.xerial</driver-ref>
+      <synchronize>true</synchronize>
+      <jdbc-driver>org.sqlite.JDBC</jdbc-driver>
+      <jdbc-url>jdbc:sqlite:$USER_HOME$/.moneymanager/money_manager.db</jdbc-url>
+      <working-dir>$ProjectFileDir$</working-dir>
+    </data-source>
   </component>
 </project>
