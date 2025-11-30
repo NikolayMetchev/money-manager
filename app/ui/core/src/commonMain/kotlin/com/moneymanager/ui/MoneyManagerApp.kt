@@ -9,6 +9,7 @@ import com.moneymanager.database.RepositorySet
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.ui.navigation.Screen
 import com.moneymanager.ui.screens.AccountsScreen
+import com.moneymanager.ui.screens.AssetsScreen
 import com.moneymanager.ui.screens.CategoriesScreen
 import com.moneymanager.ui.screens.TransactionsScreen
 
@@ -56,6 +57,12 @@ fun MoneyManagerApp(
                         onClick = { currentScreen = Screen.Accounts },
                     )
                     NavigationBarItem(
+                        icon = { Text("💎") },
+                        label = { Text("Assets") },
+                        selected = currentScreen is Screen.Assets,
+                        onClick = { currentScreen = Screen.Assets },
+                    )
+                    NavigationBarItem(
                         icon = { Text("📁") },
                         label = { Text("Categories") },
                         selected = currentScreen is Screen.Categories,
@@ -73,6 +80,7 @@ fun MoneyManagerApp(
             Box(modifier = Modifier.padding(paddingValues)) {
                 when (currentScreen) {
                     is Screen.Accounts -> AccountsScreen(repositorySet.accountRepository)
+                    is Screen.Assets -> AssetsScreen(repositorySet.assetRepository)
                     is Screen.Categories -> CategoriesScreen(repositorySet.categoryRepository)
                     is Screen.Transactions -> TransactionsScreen(repositorySet.transactionRepository)
                 }
