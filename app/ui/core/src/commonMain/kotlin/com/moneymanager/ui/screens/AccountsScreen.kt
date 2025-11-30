@@ -11,9 +11,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.Account
-import com.moneymanager.domain.model.Asset
 import com.moneymanager.domain.repository.AccountRepository
-import com.moneymanager.domain.repository.AssetRepository
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
 import kotlin.time.Clock
@@ -21,10 +19,7 @@ import kotlin.time.Clock
 private val logger = logging()
 
 @Composable
-fun AccountsScreen(
-    accountRepository: AccountRepository,
-    assetRepository: AssetRepository,
-) {
+fun AccountsScreen(accountRepository: AccountRepository) {
     val accounts by accountRepository.getAllAccounts().collectAsState(initial = emptyList())
     var showCreateDialog by remember { mutableStateOf(false) }
 
@@ -79,7 +74,6 @@ fun AccountsScreen(
         if (showCreateDialog) {
             CreateAccountDialog(
                 accountRepository = accountRepository,
-                assetRepository = assetRepository,
                 onDismiss = { showCreateDialog = false },
             )
         }
@@ -97,42 +91,27 @@ fun AccountCard(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
-        Column(
+        Row(
             modifier =
                 Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
+            Text(
+                text = account.name,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f),
+            )
+            IconButton(
+                onClick = { showDeleteDialog = true },
             ) {
                 Text(
-                    text = account.name,
+                    text = "🗑️",
                     style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.weight(1f),
                 )
-                IconButton(
-                    onClick = { showDeleteDialog = true },
-                ) {
-                    Text(
-                        text = "🗑️",
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                }
             }
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "${account.asset.name} ${String.format("%.2f", account.initialBalance)}",
-                style = MaterialTheme.typography.headlineSmall,
-                color =
-                    if (account.initialBalance >= 0) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.error
-                    },
-            )
         }
     }
 
@@ -148,12 +127,9 @@ fun AccountCard(
 @Composable
 fun CreateAccountDialog(
     accountRepository: AccountRepository,
-    assetRepository: AssetRepository,
     onDismiss: () -> Unit,
 ) {
     var name by remember { mutableStateOf("") }
-    var asset by remember { mutableStateOf("") }
-    var initialBalance by remember { mutableStateOf("0.00") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
 
@@ -179,30 +155,6 @@ fun CreateAccountDialog(
                     enabled = !isSaving,
                 )
 
-                OutlinedTextField(
-                    value = asset,
-                    onValueChange = { asset = it.uppercase() },
-                    label = { Text("Asset") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    placeholder = { Text("USD") },
-                    enabled = !isSaving,
-                )
-
-                OutlinedTextField(
-                    value = initialBalance,
-                    onValueChange = { value ->
-                        if (value.isEmpty() || value.matches(Regex("^-?\\d*\\.?\\d{0,2}$"))) {
-                            initialBalance = value
-                        }
-                    },
-                    label = { Text("Initial Balance") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    placeholder = { Text("0.00") },
-                    enabled = !isSaving,
-                )
-
                 errorMessage?.let { error ->
                     Text(
                         text = error,
@@ -215,40 +167,25 @@ fun CreateAccountDialog(
         confirmButton = {
             TextButton(
                 onClick = {
-                    when {
-                        name.isBlank() -> {
-                            errorMessage = "Account name is required"
-                        }
-                        asset.isBlank() -> {
-                            errorMessage = "Asset is required"
-                        }
-                        initialBalance.isBlank() -> {
-                            errorMessage = "Initial balance is required"
-                        }
-                        else -> {
-                            isSaving = true
-                            errorMessage = null
-                            scope.launch {
-                                try {
-                                    val balance = initialBalance.toDoubleOrNull() ?: 0.0
-                                    val now = Clock.System.now()
-                                    val assetName = asset.trim().uppercase()
-                                    val assetId = assetRepository.upsertAssetByName(assetName)
-                                    val assetObj = Asset(id = assetId, name = assetName)
-                                    val newAccount =
-                                        Account(
-                                            name = name.trim(),
-                                            asset = assetObj,
-                                            initialBalance = balance,
-                                            openingDate = now,
-                                        )
-                                    accountRepository.createAccount(newAccount)
-                                    onDismiss()
-                                } catch (e: Exception) {
-                                    logger.error(e) { "Failed to create account: ${e.message}" }
-                                    errorMessage = "Failed to create account: ${e.message}"
-                                    isSaving = false
-                                }
+                    if (name.isBlank()) {
+                        errorMessage = "Account name is required"
+                    } else {
+                        isSaving = true
+                        errorMessage = null
+                        scope.launch {
+                            try {
+                                val now = Clock.System.now()
+                                val newAccount =
+                                    Account(
+                                        name = name.trim(),
+                                        openingDate = now,
+                                    )
+                                accountRepository.createAccount(newAccount)
+                                onDismiss()
+                            } catch (e: Exception) {
+                                logger.error(e) { "Failed to create account: ${e.message}" }
+                                errorMessage = "Failed to create account: ${e.message}"
+                                isSaving = false
                             }
                         }
                     }

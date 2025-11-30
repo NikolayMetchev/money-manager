@@ -36,8 +36,6 @@ class AccountRepositoryImpl(
             queries.transactionWithResult {
                 queries.insert(
                     name = account.name,
-                    assetId = account.asset.id,
-                    initialBalance = account.initialBalance,
                     openingDate = account.openingDate.toEpochMilliseconds(),
                 )
                 queries.lastInsertRowId().executeAsOne()
@@ -48,8 +46,6 @@ class AccountRepositoryImpl(
         withContext(Dispatchers.Default) {
             queries.update(
                 name = account.name,
-                assetId = account.asset.id,
-                initialBalance = account.initialBalance,
                 id = account.id,
             )
         }
