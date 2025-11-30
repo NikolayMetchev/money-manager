@@ -7,6 +7,7 @@ import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
 import com.moneymanager.database.mapper.TransactionMapper
 import com.moneymanager.database.sql.MoneyManagerDatabase
+import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.Transaction
 import com.moneymanager.domain.repository.TransactionRepository
 import kotlinx.coroutines.Dispatchers
@@ -65,16 +66,41 @@ class TransactionRepositoryImpl(
             .mapToList(Dispatchers.Default)
             .map(TransactionMapper::mapList)
 
+    override fun getAccountBalances(): Flow<List<AccountBalance>> =
+        getAllTransactions().map { transactions ->
+            val balanceMap = mutableMapOf<Pair<Long, Long>, Double>()
+
+            transactions.forEach { transaction ->
+                // Add to target account (incoming)
+                val targetKey = Pair(transaction.targetAccountId, transaction.assetId)
+                balanceMap[targetKey] = balanceMap.getOrDefault(targetKey, 0.0) + transaction.amount
+
+                // Subtract from source account (outgoing)
+                val sourceKey = Pair(transaction.sourceAccountId, transaction.assetId)
+                balanceMap[sourceKey] = balanceMap.getOrDefault(sourceKey, 0.0) - transaction.amount
+            }
+
+            balanceMap.map { (key, balance) ->
+                AccountBalance(
+                    accountId = key.first,
+                    assetId = key.second,
+                    balance = balance,
+                )
+            }
+        }
+
     override suspend fun createTransaction(transaction: Transaction): Long =
         withContext(Dispatchers.Default) {
-            queries.insert(
-                sourceAccountId = transaction.sourceAccountId,
-                targetAccountId = transaction.targetAccountId,
-                assetId = transaction.assetId,
-                amount = transaction.amount,
-                timestamp = transaction.timestamp.toEpochMilliseconds(),
-            )
-            queries.lastInsertRowId().executeAsOne()
+            queries.transactionWithResult {
+                queries.insert(
+                    sourceAccountId = transaction.sourceAccountId,
+                    targetAccountId = transaction.targetAccountId,
+                    assetId = transaction.assetId,
+                    amount = transaction.amount,
+                    timestamp = transaction.timestamp.toEpochMilliseconds(),
+                )
+                queries.lastInsertRowId().executeAsOne()
+            }
         }
 
     override suspend fun updateTransaction(transaction: Transaction): Unit =

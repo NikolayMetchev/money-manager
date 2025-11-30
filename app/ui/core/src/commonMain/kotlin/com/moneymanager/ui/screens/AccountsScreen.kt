@@ -11,7 +11,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.Account
+import com.moneymanager.domain.model.AccountBalance
+import com.moneymanager.domain.model.Asset
 import com.moneymanager.domain.repository.AccountRepository
+import com.moneymanager.domain.repository.AssetRepository
+import com.moneymanager.domain.repository.TransactionRepository
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
 import kotlin.time.Clock
@@ -19,8 +23,14 @@ import kotlin.time.Clock
 private val logger = logging()
 
 @Composable
-fun AccountsScreen(accountRepository: AccountRepository) {
+fun AccountsScreen(
+    accountRepository: AccountRepository,
+    transactionRepository: TransactionRepository,
+    assetRepository: AssetRepository,
+) {
     val accounts by accountRepository.getAllAccounts().collectAsState(initial = emptyList())
+    val balances by transactionRepository.getAccountBalances().collectAsState(initial = emptyList())
+    val assets by assetRepository.getAllAssets().collectAsState(initial = emptyList())
     var showCreateDialog by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -52,8 +62,11 @@ fun AccountsScreen(accountRepository: AccountRepository) {
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(accounts) { account ->
+                        val accountBalances = balances.filter { it.accountId == account.id }
                         AccountCard(
                             account = account,
+                            balances = accountBalances,
+                            assets = assets,
                             accountRepository = accountRepository,
                         )
                     }
@@ -83,6 +96,8 @@ fun AccountsScreen(accountRepository: AccountRepository) {
 @Composable
 fun AccountCard(
     account: Account,
+    balances: List<AccountBalance>,
+    assets: List<Asset>,
     accountRepository: AccountRepository,
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
@@ -91,25 +106,67 @@ fun AccountCard(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
-        Row(
+        Column(
             modifier =
                 Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = account.name,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.weight(1f),
-            )
-            IconButton(
-                onClick = { showDeleteDialog = true },
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "🗑️",
+                    text = account.name,
                     style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f),
+                )
+                IconButton(
+                    onClick = { showDeleteDialog = true },
+                ) {
+                    Text(
+                        text = "🗑️",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                }
+            }
+
+            if (balances.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                balances.forEach { balance ->
+                    val asset = assets.find { it.id == balance.assetId }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = asset?.name ?: "Unknown Asset",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            text = String.format("%.2f", balance.balance),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color =
+                                when {
+                                    balance.balance > 0 -> MaterialTheme.colorScheme.primary
+                                    balance.balance < 0 -> MaterialTheme.colorScheme.error
+                                    else -> MaterialTheme.colorScheme.onSurface
+                                },
+                        )
+                    }
+                    if (balance != balances.last()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                    }
+                }
+            } else {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "No transactions yet",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }

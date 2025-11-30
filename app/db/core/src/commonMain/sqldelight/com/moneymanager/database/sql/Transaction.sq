@@ -5,10 +5,37 @@ CREATE TABLE `Transaction` (
     assetId INTEGER NOT NULL,
     amount REAL NOT NULL,
     timestamp INTEGER NOT NULL,
+    CHECK (sourceAccountId != targetAccountId),
     FOREIGN KEY (sourceAccountId) REFERENCES Account(id) ON DELETE CASCADE,
     FOREIGN KEY (targetAccountId) REFERENCES Account(id) ON DELETE CASCADE,
     FOREIGN KEY (assetId) REFERENCES Asset(id) ON DELETE RESTRICT
 );
+
+CREATE VIEW AccountBalanceView AS
+SELECT
+    accountId,
+    assetId,
+    SUM(COALESCE(incoming, 0) - COALESCE(outgoing, 0)) AS balance
+FROM (
+    SELECT
+        targetAccountId AS accountId,
+        assetId,
+        SUM(amount) AS incoming,
+        0 AS outgoing
+    FROM `Transaction`
+    GROUP BY targetAccountId, assetId
+
+    UNION ALL
+
+    SELECT
+        sourceAccountId AS accountId,
+        assetId,
+        0 AS incoming,
+        SUM(amount) AS outgoing
+    FROM `Transaction`
+    GROUP BY sourceAccountId, assetId
+)
+GROUP BY accountId, assetId;
 
 selectAll:
 SELECT * FROM `Transaction` ORDER BY timestamp DESC;
@@ -44,3 +71,6 @@ DELETE FROM `Transaction` WHERE id = ?;
 
 lastInsertRowId:
 SELECT last_insert_rowid();
+
+selectAllBalances:
+SELECT * FROM AccountBalanceView;

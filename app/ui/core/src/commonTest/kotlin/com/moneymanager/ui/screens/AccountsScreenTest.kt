@@ -8,12 +8,18 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import com.moneymanager.domain.model.Account
+import com.moneymanager.domain.model.AccountBalance
+import com.moneymanager.domain.model.Asset
+import com.moneymanager.domain.model.Transaction
 import com.moneymanager.domain.repository.AccountRepository
+import com.moneymanager.domain.repository.AssetRepository
+import com.moneymanager.domain.repository.TransactionRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlin.test.Test
 import kotlin.time.Clock
+import kotlin.time.Instant
 
 @OptIn(ExperimentalTestApi::class)
 class AccountsScreenTest {
@@ -25,7 +31,11 @@ class AccountsScreenTest {
 
             // When
             setContent {
-                AccountsScreen(accountRepository = repository)
+                AccountsScreen(
+                    accountRepository = repository,
+                    transactionRepository = FakeTransactionRepository(),
+                    assetRepository = FakeAssetRepository(),
+                )
             }
 
             // Then
@@ -55,7 +65,11 @@ class AccountsScreenTest {
 
             // When
             setContent {
-                AccountsScreen(accountRepository = repository)
+                AccountsScreen(
+                    accountRepository = repository,
+                    transactionRepository = FakeTransactionRepository(),
+                    assetRepository = FakeAssetRepository(),
+                )
             }
 
             // Then
@@ -71,7 +85,11 @@ class AccountsScreenTest {
 
             // When
             setContent {
-                AccountsScreen(accountRepository = repository)
+                AccountsScreen(
+                    accountRepository = repository,
+                    transactionRepository = FakeTransactionRepository(),
+                    assetRepository = FakeAssetRepository(),
+                )
             }
 
             // Then
@@ -86,7 +104,11 @@ class AccountsScreenTest {
 
             // When
             setContent {
-                AccountsScreen(accountRepository = repository)
+                AccountsScreen(
+                    accountRepository = repository,
+                    transactionRepository = FakeTransactionRepository(),
+                    assetRepository = FakeAssetRepository(),
+                )
             }
 
             onNodeWithText("+").performClick()
@@ -111,7 +133,11 @@ class AccountsScreenTest {
 
             // When
             setContent {
-                AccountsScreen(accountRepository = repository)
+                AccountsScreen(
+                    accountRepository = repository,
+                    transactionRepository = FakeTransactionRepository(),
+                    assetRepository = FakeAssetRepository(),
+                )
             }
 
             // Then
@@ -133,7 +159,11 @@ class AccountsScreenTest {
 
             // When
             setContent {
-                AccountsScreen(accountRepository = repository)
+                AccountsScreen(
+                    accountRepository = repository,
+                    transactionRepository = FakeTransactionRepository(),
+                    assetRepository = FakeAssetRepository(),
+                )
             }
 
             // Click the delete button (trash icon)
@@ -152,7 +182,11 @@ class AccountsScreenTest {
 
             // When
             setContent {
-                AccountsScreen(accountRepository = repository)
+                AccountsScreen(
+                    accountRepository = repository,
+                    transactionRepository = FakeTransactionRepository(),
+                    assetRepository = FakeAssetRepository(),
+                )
             }
 
             // Open dialog
@@ -173,7 +207,11 @@ class AccountsScreenTest {
 
             // When
             setContent {
-                AccountsScreen(accountRepository = repository)
+                AccountsScreen(
+                    accountRepository = repository,
+                    transactionRepository = FakeTransactionRepository(),
+                    assetRepository = FakeAssetRepository(),
+                )
             }
 
             // Open dialog
@@ -202,7 +240,11 @@ class AccountsScreenTest {
 
             // When
             setContent {
-                AccountsScreen(accountRepository = repository)
+                AccountsScreen(
+                    accountRepository = repository,
+                    transactionRepository = FakeTransactionRepository(),
+                    assetRepository = FakeAssetRepository(),
+                )
             }
 
             // Open delete dialog
@@ -243,7 +285,11 @@ class AccountsScreenTest {
 
             // When
             setContent {
-                AccountsScreen(accountRepository = repository)
+                AccountsScreen(
+                    accountRepository = repository,
+                    transactionRepository = FakeTransactionRepository(),
+                    assetRepository = FakeAssetRepository(),
+                )
             }
 
             // Then - all accounts should be visible
@@ -252,7 +298,7 @@ class AccountsScreenTest {
             onNodeWithText("Account 3").assertIsDisplayed()
         }
 
-    // Fake repository for testing
+    // Fake repositories for testing
     private class FakeAccountRepository(
         private val accounts: List<Account>,
     ) : AccountRepository {
@@ -281,5 +327,44 @@ class AccountsScreenTest {
             deletedAccounts.add(id)
             accountsFlow.value = accountsFlow.value.filter { it.id != id }
         }
+    }
+
+    private class FakeTransactionRepository : TransactionRepository {
+        override fun getAllTransactions(): Flow<List<Transaction>> = flowOf(emptyList())
+
+        override fun getTransactionById(id: Long): Flow<Transaction?> = flowOf(null)
+
+        override fun getTransactionsByAccount(accountId: Long): Flow<List<Transaction>> = flowOf(emptyList())
+
+        override fun getTransactionsByDateRange(
+            startDate: Instant,
+            endDate: Instant,
+        ): Flow<List<Transaction>> = flowOf(emptyList())
+
+        override fun getTransactionsByAccountAndDateRange(
+            accountId: Long,
+            startDate: Instant,
+            endDate: Instant,
+        ): Flow<List<Transaction>> = flowOf(emptyList())
+
+        override fun getAccountBalances(): Flow<List<AccountBalance>> = flowOf(emptyList())
+
+        override suspend fun createTransaction(transaction: Transaction): Long = 0L
+
+        override suspend fun updateTransaction(transaction: Transaction) {}
+
+        override suspend fun deleteTransaction(id: Long) {}
+    }
+
+    private class FakeAssetRepository : AssetRepository {
+        override fun getAllAssets(): Flow<List<Asset>> = flowOf(emptyList())
+
+        override fun getAssetById(id: Long): Flow<Asset?> = flowOf(null)
+
+        override suspend fun upsertAssetByName(name: String): Long = 0L
+
+        override suspend fun updateAsset(asset: Asset) {}
+
+        override suspend fun deleteAsset(id: Long) {}
     }
 }

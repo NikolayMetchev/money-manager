@@ -79,7 +79,12 @@ fun MoneyManagerApp(
         ) { paddingValues ->
             Box(modifier = Modifier.padding(paddingValues)) {
                 when (currentScreen) {
-                    is Screen.Accounts -> AccountsScreen(repositorySet.accountRepository)
+                    is Screen.Accounts ->
+                        AccountsScreen(
+                            accountRepository = repositorySet.accountRepository,
+                            transactionRepository = repositorySet.transactionRepository,
+                            assetRepository = repositorySet.assetRepository,
+                        )
                     is Screen.Assets -> AssetsScreen(repositorySet.assetRepository)
                     is Screen.Categories -> CategoriesScreen(repositorySet.categoryRepository)
                     is Screen.Transactions ->
