@@ -208,7 +208,7 @@ fun TransactionEntryDialog(
                         expanded = sourceAccountExpanded,
                         onDismissRequest = { sourceAccountExpanded = false },
                     ) {
-                        accounts.forEach { account ->
+                        accounts.filter { it.id != targetAccountId }.forEach { account ->
                             DropdownMenuItem(
                                 text = { Text(account.name) },
                                 onClick = {
@@ -249,7 +249,7 @@ fun TransactionEntryDialog(
                         expanded = targetAccountExpanded,
                         onDismissRequest = { targetAccountExpanded = false },
                     ) {
-                        accounts.forEach { account ->
+                        accounts.filter { it.id != sourceAccountId }.forEach { account ->
                             DropdownMenuItem(
                                 text = { Text(account.name) },
                                 onClick = {
@@ -335,6 +335,7 @@ fun TransactionEntryDialog(
                     when {
                         sourceAccountId == null -> errorMessage = "Please select a source account"
                         targetAccountId == null -> errorMessage = "Please select a target account"
+                        sourceAccountId == targetAccountId -> errorMessage = "Source and target accounts must be different"
                         assetId == null -> errorMessage = "Please select an asset"
                         amount.isBlank() -> errorMessage = "Amount is required"
                         amount.toDoubleOrNull() == null -> errorMessage = "Invalid amount"
