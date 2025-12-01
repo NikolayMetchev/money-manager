@@ -7,4 +7,6 @@ actual data class DbLocation(val name: String) {
      * This returns true (assumed to exist or will be created).
      */
     actual fun exists() = true
+
+    override fun toString() = name
 }
