@@ -7,5 +7,6 @@ sealed class Screen(val route: String, val title: String) {
 
     data object Categories : Screen("categories", "Categories")
 
-    data object Transactions : Screen("transactions", "Transactions")
+    data class AccountTransactions(val accountId: Long, val accountName: String) :
+        Screen("account-transactions", accountName)
 }

@@ -27,70 +27,119 @@ import kotlin.time.Clock
 private val logger = logging()
 
 @Composable
-fun TransactionsScreen(
+fun AccountTransactionsScreen(
+    accountId: Long,
     transactionRepository: TransactionRepository,
     accountRepository: AccountRepository,
     assetRepository: AssetRepository,
 ) {
-    val transactions by transactionRepository.getAllTransactions().collectAsState(initial = emptyList())
+    val allTransactions by transactionRepository.getAllTransactions().collectAsState(initial = emptyList())
     val accounts by accountRepository.getAllAccounts().collectAsState(initial = emptyList())
     val assets by assetRepository.getAllAssets().collectAsState(initial = emptyList())
-    var showCreateDialog by remember { mutableStateOf(false) }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
-        ) {
-            Text(
-                text = "Your Transactions",
-                style = MaterialTheme.typography.headlineMedium,
-                modifier = Modifier.padding(bottom = 16.dp),
-            )
+    // Filter transactions where this account is source or target
+    val transactions =
+        allTransactions.filter {
+            it.sourceAccountId == accountId || it.targetAccountId == accountId
+        }
 
-            if (transactions.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = "No transactions yet. Add your first transaction!",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+    ) {
+        if (transactions.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "No transactions yet for this account.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else {
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                items(transactions) { transaction ->
+                    AccountTransactionCard(
+                        transaction = transaction,
+                        currentAccountId = accountId,
+                        accounts = accounts,
+                        assets = assets,
                     )
-                }
-            } else {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    items(transactions) { transaction ->
-                        TransactionCard(transaction, accounts, assets)
-                    }
                 }
             }
         }
+    }
+}
 
-        FloatingActionButton(
-            onClick = { showCreateDialog = true },
+@Composable
+fun AccountTransactionCard(
+    transaction: Transaction,
+    currentAccountId: Long,
+    accounts: List<Account>,
+    assets: List<Asset>,
+) {
+    val sourceAccount = accounts.find { it.id == transaction.sourceAccountId }
+    val targetAccount = accounts.find { it.id == transaction.targetAccountId }
+    val asset = assets.find { it.id == transaction.assetId }
+
+    // If this account is the source, amount is negative (outgoing)
+    // If this account is the target, amount is positive (incoming)
+    val isOutgoing = transaction.sourceAccountId == currentAccountId
+    val signedAmount = if (isOutgoing) -transaction.amount else transaction.amount
+    val otherAccount = if (isOutgoing) targetAccount else sourceAccount
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+    ) {
+        Column(
             modifier =
                 Modifier
-                    .align(Alignment.BottomEnd)
+                    .fillMaxWidth()
                     .padding(16.dp),
         ) {
-            Text("+", style = MaterialTheme.typography.headlineLarge)
-        }
-
-        if (showCreateDialog) {
-            TransactionEntryDialog(
-                transactionRepository = transactionRepository,
-                accountRepository = accountRepository,
-                assetRepository = assetRepository,
-                accounts = accounts,
-                assets = assets,
-                onDismiss = { showCreateDialog = false },
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (isOutgoing) "To: ${otherAccount?.name ?: "Unknown"}" else "From: ${otherAccount?.name ?: "Unknown"}",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    val dateTime = transaction.timestamp.toLocalDateTime(TimeZone.currentSystemDefault())
+                    Text(
+                        text = "${dateTime.date} ${dateTime.time}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = String.format("%+.2f", signedAmount),
+                        style = MaterialTheme.typography.titleLarge,
+                        color =
+                            if (signedAmount >= 0) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.error
+                            },
+                    )
+                    Text(
+                        text = asset?.name ?: "Unknown",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
         }
     }
 }
@@ -157,9 +206,10 @@ fun TransactionEntryDialog(
     assetRepository: AssetRepository,
     accounts: List<Account>,
     assets: List<Asset>,
+    preSelectedSourceAccountId: Long? = null,
     onDismiss: () -> Unit,
 ) {
-    var sourceAccountId by remember { mutableStateOf<Long?>(null) }
+    var sourceAccountId by remember { mutableStateOf(preSelectedSourceAccountId) }
     var targetAccountId by remember { mutableStateOf<Long?>(null) }
     var assetId by remember { mutableStateOf<Long?>(null) }
     var amount by remember { mutableStateOf("") }
