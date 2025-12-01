@@ -113,7 +113,8 @@ class TransactionRepositoryImplTest {
             val transaction =
                 Transaction(
                     sourceAccountId = accountId,
-                    targetAccountId = accountId, // Same as source - violates CHECK constraint
+                    // Same as source - violates CHECK constraint
+                    targetAccountId = accountId,
                     assetId = assetId,
                     amount = 100.0,
                     timestamp = now,
