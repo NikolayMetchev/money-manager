@@ -37,6 +37,34 @@ FROM (
 )
 GROUP BY accountId, assetId;
 
+CREATE VIEW RunningBalanceView AS
+SELECT
+    m.transactionId,
+    m.timestamp,
+    m.accountId,
+    m.assetId,
+    m.transactionAmount,
+    (
+        SELECT SUM(m2.transactionAmount)
+        FROM (
+            SELECT id AS transactionId, timestamp, targetAccountId AS accountId, assetId, amount AS transactionAmount
+            FROM `Transaction`
+            UNION ALL
+            SELECT id AS transactionId, timestamp, sourceAccountId AS accountId, assetId, -amount AS transactionAmount
+            FROM `Transaction`
+        ) m2
+        WHERE m2.accountId = m.accountId
+          AND m2.assetId = m.assetId
+          AND (m2.timestamp < m.timestamp OR (m2.timestamp = m.timestamp AND m2.transactionId <= m.transactionId))
+    ) AS runningBalance
+FROM (
+    SELECT id AS transactionId, timestamp, targetAccountId AS accountId, assetId, amount AS transactionAmount
+    FROM `Transaction`
+    UNION ALL
+    SELECT id AS transactionId, timestamp, sourceAccountId AS accountId, assetId, -amount AS transactionAmount
+    FROM `Transaction`
+) m;
+
 selectAll:
 SELECT * FROM `Transaction` ORDER BY timestamp DESC;
 
@@ -74,3 +102,8 @@ SELECT last_insert_rowid();
 
 selectAllBalances:
 SELECT * FROM AccountBalanceView;
+
+selectRunningBalanceByAccount:
+SELECT * FROM RunningBalanceView
+WHERE accountId = ?
+ORDER BY timestamp DESC, transactionId DESC;

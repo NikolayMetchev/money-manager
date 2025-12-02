@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.Asset
 import com.moneymanager.domain.model.Transaction
+import com.moneymanager.domain.model.TransactionWithRunningBalance
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AssetRepository
 import com.moneymanager.domain.repository.TransactionRepository
@@ -33,15 +34,14 @@ fun AccountTransactionsScreen(
     accountRepository: AccountRepository,
     assetRepository: AssetRepository,
 ) {
+    val runningBalances by transactionRepository.getRunningBalanceByAccount(accountId)
+        .collectAsState(initial = emptyList())
     val allTransactions by transactionRepository.getAllTransactions().collectAsState(initial = emptyList())
     val accounts by accountRepository.getAllAccounts().collectAsState(initial = emptyList())
     val assets by assetRepository.getAllAssets().collectAsState(initial = emptyList())
 
-    // Filter transactions where this account is source or target
-    val transactions =
-        allTransactions.filter {
-            it.sourceAccountId == accountId || it.targetAccountId == accountId
-        }
+    // Build a map of transactionId -> full Transaction for additional details
+    val transactionMap = allTransactions.associateBy { it.id }
 
     Column(
         modifier =
@@ -49,7 +49,7 @@ fun AccountTransactionsScreen(
                 .fillMaxSize()
                 .padding(16.dp),
     ) {
-        if (transactions.isEmpty()) {
+        if (runningBalances.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,
@@ -64,8 +64,10 @@ fun AccountTransactionsScreen(
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                items(transactions) { transaction ->
+                items(runningBalances) { runningBalance ->
+                    val transaction = transactionMap[runningBalance.transactionId]
                     AccountTransactionCard(
+                        runningBalance = runningBalance,
                         transaction = transaction,
                         currentAccountId = accountId,
                         accounts = accounts,
@@ -79,19 +81,18 @@ fun AccountTransactionsScreen(
 
 @Composable
 fun AccountTransactionCard(
-    transaction: Transaction,
+    runningBalance: TransactionWithRunningBalance,
+    transaction: Transaction?,
     currentAccountId: Long,
     accounts: List<Account>,
     assets: List<Asset>,
 ) {
-    val sourceAccount = accounts.find { it.id == transaction.sourceAccountId }
-    val targetAccount = accounts.find { it.id == transaction.targetAccountId }
-    val asset = assets.find { it.id == transaction.assetId }
+    val sourceAccount = transaction?.let { accounts.find { a -> a.id == it.sourceAccountId } }
+    val targetAccount = transaction?.let { accounts.find { a -> a.id == it.targetAccountId } }
+    val asset = assets.find { it.id == runningBalance.assetId }
 
-    // If this account is the source, amount is negative (outgoing)
-    // If this account is the target, amount is positive (incoming)
-    val isOutgoing = transaction.sourceAccountId == currentAccountId
-    val signedAmount = if (isOutgoing) -transaction.amount else transaction.amount
+    // Determine the other account based on transaction direction
+    val isOutgoing = runningBalance.transactionAmount < 0
     val otherAccount = if (isOutgoing) targetAccount else sourceAccount
 
     Card(
@@ -111,11 +112,16 @@ fun AccountTransactionCard(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = if (isOutgoing) "To: ${otherAccount?.name ?: "Unknown"}" else "From: ${otherAccount?.name ?: "Unknown"}",
+                        text =
+                            if (isOutgoing) {
+                                "To: ${otherAccount?.name ?: "Unknown"}"
+                            } else {
+                                "From: ${otherAccount?.name ?: "Unknown"}"
+                            },
                         style = MaterialTheme.typography.titleMedium,
                     )
                     Spacer(modifier = Modifier.height(4.dp))
-                    val dateTime = transaction.timestamp.toLocalDateTime(TimeZone.currentSystemDefault())
+                    val dateTime = runningBalance.timestamp.toLocalDateTime(TimeZone.currentSystemDefault())
                     Text(
                         text = "${dateTime.date} ${dateTime.time}",
                         style = MaterialTheme.typography.bodySmall,
@@ -124,10 +130,20 @@ fun AccountTransactionCard(
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
-                        text = String.format("%+.2f", signedAmount),
+                        text = String.format("%+.2f", runningBalance.transactionAmount),
                         style = MaterialTheme.typography.titleLarge,
                         color =
-                            if (signedAmount >= 0) {
+                            if (runningBalance.transactionAmount >= 0) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.error
+                            },
+                    )
+                    Text(
+                        text = "Balance: ${String.format("%.2f", runningBalance.runningBalance)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color =
+                            if (runningBalance.runningBalance >= 0) {
                                 MaterialTheme.colorScheme.primary
                             } else {
                                 MaterialTheme.colorScheme.error
