@@ -683,7 +683,7 @@ fun TransactionEntryDialog(
             rememberTimePickerState(
                 initialHour = selectedHour,
                 initialMinute = selectedMinute,
-                is24Hour = true,
+                is24Hour = false,
             )
         AlertDialog(
             onDismissRequest = { showTimePicker = false },
