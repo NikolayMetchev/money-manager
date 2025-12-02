@@ -135,6 +135,49 @@ fun AccountTransactionsScreen(
                 )
             }
         } else {
+            // Column Headers
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Date/Time",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(0.2f),
+                )
+                Text(
+                    text = "Account",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(0.25f).padding(horizontal = 8.dp),
+                )
+                Text(
+                    text = "Description",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(0.3f).padding(horizontal = 8.dp),
+                )
+                Text(
+                    text = "Amount",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                    modifier = Modifier.weight(0.15f),
+                )
+                Text(
+                    text = "Balance",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                    modifier = Modifier.weight(0.15f).padding(start = 8.dp),
+                )
+            }
+
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
@@ -224,48 +267,32 @@ fun AccountTransactionCard(
             } ?: Spacer(modifier = Modifier.weight(0.3f))
 
             // Fourth column: Transaction amount
-            Column(
-                horizontalAlignment = Alignment.End,
+            Text(
+                text = String.format("%+.2f", runningBalance.transactionAmount),
+                style = MaterialTheme.typography.titleLarge,
+                color =
+                    if (runningBalance.transactionAmount >= 0) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.error
+                    },
+                textAlign = androidx.compose.ui.text.style.TextAlign.End,
                 modifier = Modifier.weight(0.15f),
-            ) {
-                Text(
-                    text = String.format("%+.2f", runningBalance.transactionAmount),
-                    style = MaterialTheme.typography.titleLarge,
-                    color =
-                        if (runningBalance.transactionAmount >= 0) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.error
-                        },
-                )
-                Text(
-                    text = asset?.name ?: "Unknown",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            )
 
             // Rightmost column: Running balance
-            Column(
-                horizontalAlignment = Alignment.End,
+            Text(
+                text = String.format("%.2f", runningBalance.runningBalance),
+                style = MaterialTheme.typography.titleMedium,
+                color =
+                    if (runningBalance.runningBalance >= 0) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.error
+                    },
+                textAlign = androidx.compose.ui.text.style.TextAlign.End,
                 modifier = Modifier.weight(0.15f).padding(start = 8.dp),
-            ) {
-                Text(
-                    text = String.format("%.2f", runningBalance.runningBalance),
-                    style = MaterialTheme.typography.titleMedium,
-                    color =
-                        if (runningBalance.runningBalance >= 0) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.error
-                        },
-                )
-                Text(
-                    text = "Balance",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            )
         }
     }
 }
