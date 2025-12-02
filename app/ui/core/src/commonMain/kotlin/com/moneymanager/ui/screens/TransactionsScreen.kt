@@ -2,6 +2,7 @@
 
 package com.moneymanager.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -40,6 +41,9 @@ fun AccountTransactionsScreen(
 
     // Selected account state - default to the provided accountId
     var selectedAccountId by remember { mutableStateOf(accountId) }
+
+    // Highlighted transaction state
+    var highlightedTransactionId by remember { mutableStateOf<Long?>(null) }
 
     // Get running balances for the selected account
     val runningBalances by transactionRepository.getRunningBalanceByAccount(selectedAccountId)
@@ -189,6 +193,11 @@ fun AccountTransactionsScreen(
                         currentAccountId = selectedAccountId,
                         accounts = allAccounts,
                         assets = assets,
+                        isHighlighted = highlightedTransactionId == runningBalance.transactionId,
+                        onAccountClick = { accountId ->
+                            highlightedTransactionId = runningBalance.transactionId
+                            selectedAccountId = accountId
+                        },
                     )
                 }
             }
@@ -203,6 +212,8 @@ fun AccountTransactionCard(
     currentAccountId: Long,
     accounts: List<Account>,
     assets: List<Asset>,
+    isHighlighted: Boolean = false,
+    onAccountClick: (Long) -> Unit = {},
 ) {
     val sourceAccount = transaction?.let { accounts.find { a -> a.id == it.sourceAccountId } }
     val targetAccount = transaction?.let { accounts.find { a -> a.id == it.targetAccountId } }
@@ -215,6 +226,14 @@ fun AccountTransactionCard(
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors =
+            if (isHighlighted) {
+                CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                )
+            } else {
+                CardDefaults.cardColors()
+            },
     ) {
         Row(
             modifier =
@@ -240,16 +259,23 @@ fun AccountTransactionCard(
                 )
             }
 
-            // Second column: Account name
+            // Second column: Account name (clickable)
             Text(
-                text =
-                    if (isOutgoing) {
-                        "To: ${otherAccount?.name ?: "Unknown"}"
-                    } else {
-                        "From: ${otherAccount?.name ?: "Unknown"}"
-                    },
+                text = otherAccount?.name ?: "Unknown",
                 style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.weight(0.25f).padding(horizontal = 8.dp),
+                color =
+                    if (otherAccount != null) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+                modifier =
+                    Modifier
+                        .weight(0.25f)
+                        .padding(horizontal = 8.dp)
+                        .clickable(enabled = otherAccount != null) {
+                            otherAccount?.id?.let { onAccountClick(it) }
+                        },
             )
 
             // Third column: Description
