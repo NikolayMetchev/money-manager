@@ -2,6 +2,7 @@
 
 package com.moneymanager.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -27,69 +28,68 @@ fun AccountsScreen(
     accountRepository: AccountRepository,
     transactionRepository: TransactionRepository,
     assetRepository: AssetRepository,
+    onAccountClick: (Account) -> Unit,
 ) {
     val accounts by accountRepository.getAllAccounts().collectAsState(initial = emptyList())
     val balances by transactionRepository.getAccountBalances().collectAsState(initial = emptyList())
     val assets by assetRepository.getAllAssets().collectAsState(initial = emptyList())
     var showCreateDialog by remember { mutableStateOf(false) }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
                 text = "Your Accounts",
                 style = MaterialTheme.typography.headlineMedium,
-                modifier = Modifier.padding(bottom = 16.dp),
             )
+            TextButton(onClick = { showCreateDialog = true }) {
+                Text("+ Add Account")
+            }
+        }
+        Spacer(modifier = Modifier.height(16.dp))
 
-            if (accounts.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = "No accounts yet. Add your first account!",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        if (accounts.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "No accounts yet. Add your first account!",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else {
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                items(accounts) { account ->
+                    val accountBalances = balances.filter { it.accountId == account.id }
+                    AccountCard(
+                        account = account,
+                        balances = accountBalances,
+                        assets = assets,
+                        accountRepository = accountRepository,
+                        onClick = { onAccountClick(account) },
                     )
-                }
-            } else {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    items(accounts) { account ->
-                        val accountBalances = balances.filter { it.accountId == account.id }
-                        AccountCard(
-                            account = account,
-                            balances = accountBalances,
-                            assets = assets,
-                            accountRepository = accountRepository,
-                        )
-                    }
                 }
             }
         }
+    }
 
-        FloatingActionButton(
-            onClick = { showCreateDialog = true },
-            modifier =
-                Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(16.dp),
-        ) {
-            Text("+", style = MaterialTheme.typography.headlineLarge)
-        }
-
-        if (showCreateDialog) {
-            CreateAccountDialog(
-                accountRepository = accountRepository,
-                onDismiss = { showCreateDialog = false },
-            )
-        }
+    if (showCreateDialog) {
+        CreateAccountDialog(
+            accountRepository = accountRepository,
+            onDismiss = { showCreateDialog = false },
+        )
     }
 }
 
@@ -99,11 +99,15 @@ fun AccountCard(
     balances: List<AccountBalance>,
     assets: List<Asset>,
     accountRepository: AccountRepository,
+    onClick: () -> Unit,
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
         Column(

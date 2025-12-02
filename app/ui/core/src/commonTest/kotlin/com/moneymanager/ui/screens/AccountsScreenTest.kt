@@ -35,6 +35,7 @@ class AccountsScreenTest {
                     accountRepository = repository,
                     transactionRepository = FakeTransactionRepository(),
                     assetRepository = FakeAssetRepository(),
+                    onAccountClick = {},
                 )
             }
 
@@ -69,6 +70,7 @@ class AccountsScreenTest {
                     accountRepository = repository,
                     transactionRepository = FakeTransactionRepository(),
                     assetRepository = FakeAssetRepository(),
+                    onAccountClick = {},
                 )
             }
 
@@ -78,7 +80,7 @@ class AccountsScreenTest {
         }
 
     @Test
-    fun accountsScreen_displaysFloatingActionButton() =
+    fun accountsScreen_displaysAddAccountButton() =
         runComposeUiTest {
             // Given
             val repository = FakeAccountRepository(emptyList())
@@ -89,15 +91,16 @@ class AccountsScreenTest {
                     accountRepository = repository,
                     transactionRepository = FakeTransactionRepository(),
                     assetRepository = FakeAssetRepository(),
+                    onAccountClick = {},
                 )
             }
 
             // Then
-            onNodeWithText("+").assertIsDisplayed()
+            onNodeWithText("+ Add Account").assertIsDisplayed()
         }
 
     @Test
-    fun accountsScreen_opensCreateDialog_whenFabClicked() =
+    fun accountsScreen_opensCreateDialog_whenAddAccountClicked() =
         runComposeUiTest {
             // Given
             val repository = FakeAccountRepository(emptyList())
@@ -108,10 +111,11 @@ class AccountsScreenTest {
                     accountRepository = repository,
                     transactionRepository = FakeTransactionRepository(),
                     assetRepository = FakeAssetRepository(),
+                    onAccountClick = {},
                 )
             }
 
-            onNodeWithText("+").performClick()
+            onNodeWithText("+ Add Account").performClick()
 
             // Then
             onNodeWithText("Create New Account").assertIsDisplayed()
@@ -137,6 +141,7 @@ class AccountsScreenTest {
                     accountRepository = repository,
                     transactionRepository = FakeTransactionRepository(),
                     assetRepository = FakeAssetRepository(),
+                    onAccountClick = {},
                 )
             }
 
@@ -163,6 +168,7 @@ class AccountsScreenTest {
                     accountRepository = repository,
                     transactionRepository = FakeTransactionRepository(),
                     assetRepository = FakeAssetRepository(),
+                    onAccountClick = {},
                 )
             }
 
@@ -186,11 +192,12 @@ class AccountsScreenTest {
                     accountRepository = repository,
                     transactionRepository = FakeTransactionRepository(),
                     assetRepository = FakeAssetRepository(),
+                    onAccountClick = {},
                 )
             }
 
             // Open dialog
-            onNodeWithText("+").performClick()
+            onNodeWithText("+ Add Account").performClick()
 
             // Try to create without filling fields
             onNodeWithText("Create").performClick()
@@ -211,11 +218,12 @@ class AccountsScreenTest {
                     accountRepository = repository,
                     transactionRepository = FakeTransactionRepository(),
                     assetRepository = FakeAssetRepository(),
+                    onAccountClick = {},
                 )
             }
 
             // Open dialog
-            onNodeWithText("+").performClick()
+            onNodeWithText("+ Add Account").performClick()
             onNodeWithText("Create New Account").assertIsDisplayed()
 
             // Click cancel
@@ -244,6 +252,7 @@ class AccountsScreenTest {
                     accountRepository = repository,
                     transactionRepository = FakeTransactionRepository(),
                     assetRepository = FakeAssetRepository(),
+                    onAccountClick = {},
                 )
             }
 
@@ -289,6 +298,7 @@ class AccountsScreenTest {
                     accountRepository = repository,
                     transactionRepository = FakeTransactionRepository(),
                     assetRepository = FakeAssetRepository(),
+                    onAccountClick = {},
                 )
             }
 
