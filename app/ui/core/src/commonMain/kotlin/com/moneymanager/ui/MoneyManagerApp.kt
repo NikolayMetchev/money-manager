@@ -31,35 +31,30 @@ fun MoneyManagerApp(
     MaterialTheme {
         Scaffold(
             topBar = {
-                TopAppBar(
-                    navigationIcon = {
-                        if (currentScreen is Screen.AccountTransactions) {
-                            TextButton(onClick = { currentScreen = Screen.Accounts }) {
-                                Text("< Back")
+                if (currentScreen !is Screen.AccountTransactions) {
+                    TopAppBar(
+                        title = {
+                            Column {
+                                Text(currentScreen.title)
+                                Text(
+                                    text = "v${appVersion.value}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                                )
+                                Text(
+                                    text = "Database: $databaseLocation",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                                )
                             }
-                        }
-                    },
-                    title = {
-                        Column {
-                            Text(currentScreen.title)
-                            Text(
-                                text = "v${appVersion.value}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
-                            )
-                            Text(
-                                text = "Database: $databaseLocation",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
-                            )
-                        }
-                    },
-                    colors =
-                        TopAppBarDefaults.topAppBarColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer,
-                            titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                        ),
-                )
+                        },
+                        colors =
+                            TopAppBarDefaults.topAppBarColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            ),
+                    )
+                }
             },
             bottomBar = {
                 NavigationBar {
