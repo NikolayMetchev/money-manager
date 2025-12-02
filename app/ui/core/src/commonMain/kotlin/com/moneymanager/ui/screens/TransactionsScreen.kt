@@ -181,44 +181,52 @@ fun AccountTransactionCard(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Left column: Account and date info
-            Column(modifier = Modifier.weight(0.25f)) {
+            // Leftmost column: Date and time
+            val dateTime = runningBalance.timestamp.toLocalDateTime(TimeZone.currentSystemDefault())
+            Column(modifier = Modifier.weight(0.2f)) {
                 Text(
-                    text =
-                        if (isOutgoing) {
-                            "To: ${otherAccount?.name ?: "Unknown"}"
-                        } else {
-                            "From: ${otherAccount?.name ?: "Unknown"}"
-                        },
-                    style = MaterialTheme.typography.titleMedium,
+                    text = "${dateTime.date}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 Spacer(modifier = Modifier.height(4.dp))
-                val dateTime = runningBalance.timestamp.toLocalDateTime(TimeZone.currentSystemDefault())
                 Text(
-                    text = "${dateTime.date} ${dateTime.time}",
+                    text = "${dateTime.time}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
-            // Middle column: Description
+            // Second column: Account name
+            Text(
+                text =
+                    if (isOutgoing) {
+                        "To: ${otherAccount?.name ?: "Unknown"}"
+                    } else {
+                        "From: ${otherAccount?.name ?: "Unknown"}"
+                    },
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(0.25f).padding(horizontal = 8.dp),
+            )
+
+            // Third column: Description
             transaction?.description?.let { desc ->
                 if (desc.isNotBlank()) {
                     Text(
                         text = desc,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.weight(0.35f).padding(horizontal = 8.dp),
+                        modifier = Modifier.weight(0.3f).padding(horizontal = 8.dp),
                     )
                 } else {
-                    Spacer(modifier = Modifier.weight(0.35f))
+                    Spacer(modifier = Modifier.weight(0.3f))
                 }
-            } ?: Spacer(modifier = Modifier.weight(0.35f))
+            } ?: Spacer(modifier = Modifier.weight(0.3f))
 
-            // Middle-right column: Transaction amount
+            // Fourth column: Transaction amount
             Column(
                 horizontalAlignment = Alignment.End,
-                modifier = Modifier.weight(0.2f),
+                modifier = Modifier.weight(0.15f),
             ) {
                 Text(
                     text = String.format("%+.2f", runningBalance.transactionAmount),
@@ -237,10 +245,10 @@ fun AccountTransactionCard(
                 )
             }
 
-            // Right column: Running balance
+            // Rightmost column: Running balance
             Column(
                 horizontalAlignment = Alignment.End,
-                modifier = Modifier.weight(0.2f).padding(start = 8.dp),
+                modifier = Modifier.weight(0.15f).padding(start = 8.dp),
             ) {
                 Text(
                     text = String.format("%.2f", runningBalance.runningBalance),
@@ -284,37 +292,45 @@ fun TransactionCard(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Left column: Accounts and date info
-            Column(modifier = Modifier.weight(0.35f)) {
+            // Leftmost column: Date and time
+            val dateTime = transaction.timestamp.toLocalDateTime(TimeZone.currentSystemDefault())
+            Column(modifier = Modifier.weight(0.2f)) {
                 Text(
-                    text = "${sourceAccount?.name ?: "Unknown"} → ${targetAccount?.name ?: "Unknown"}",
-                    style = MaterialTheme.typography.titleMedium,
+                    text = "${dateTime.date}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 Spacer(modifier = Modifier.height(4.dp))
-                val dateTime = transaction.timestamp.toLocalDateTime(TimeZone.currentSystemDefault())
                 Text(
-                    text = "${dateTime.date} ${dateTime.time}",
+                    text = "${dateTime.time}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
 
-            // Middle column: Description
+            // Second column: Accounts
+            Text(
+                text = "${sourceAccount?.name ?: "Unknown"} → ${targetAccount?.name ?: "Unknown"}",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(0.3f).padding(horizontal = 8.dp),
+            )
+
+            // Third column: Description
             if (transaction.description.isNotBlank()) {
                 Text(
                     text = transaction.description,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.weight(0.45f).padding(horizontal = 8.dp),
+                    modifier = Modifier.weight(0.35f).padding(horizontal = 8.dp),
                 )
             } else {
-                Spacer(modifier = Modifier.weight(0.45f))
+                Spacer(modifier = Modifier.weight(0.35f))
             }
 
-            // Right column: Amount
+            // Rightmost column: Amount
             Column(
                 horizontalAlignment = Alignment.End,
-                modifier = Modifier.weight(0.2f),
+                modifier = Modifier.weight(0.15f),
             ) {
                 Text(
                     text = String.format("%.2f", transaction.amount),
