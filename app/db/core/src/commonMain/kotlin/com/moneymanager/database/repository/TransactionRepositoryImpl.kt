@@ -117,6 +117,7 @@ class TransactionRepositoryImpl(
                     assetId = transaction.assetId,
                     amount = transaction.amount,
                     timestamp = transaction.timestamp.toEpochMilliseconds(),
+                    description = transaction.description,
                 )
                 queries.lastInsertRowId().executeAsOne()
             }
@@ -130,6 +131,7 @@ class TransactionRepositoryImpl(
                 assetId = transaction.assetId,
                 amount = transaction.amount,
                 timestamp = transaction.timestamp.toEpochMilliseconds(),
+                description = transaction.description,
                 id = transaction.id,
             )
             Unit

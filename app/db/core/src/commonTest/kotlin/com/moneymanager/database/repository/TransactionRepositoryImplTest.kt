@@ -81,6 +81,7 @@ class TransactionRepositoryImplTest {
                     assetId = assetId,
                     amount = 100.0,
                     timestamp = now,
+                    description = "Test transaction",
                 )
 
             val transactionId = transactionRepository.createTransaction(transaction)
@@ -118,6 +119,7 @@ class TransactionRepositoryImplTest {
                     assetId = assetId,
                     amount = 100.0,
                     timestamp = now,
+                    description = "Invalid transaction",
                 )
 
             // Should throw exception due to CHECK constraint
@@ -152,6 +154,7 @@ class TransactionRepositoryImplTest {
                     assetId = assetId,
                     amount = 100.0,
                     timestamp = now,
+                    description = "Test transaction",
                 )
             val transactionId = transactionRepository.createTransaction(transaction)
 
@@ -198,6 +201,7 @@ class TransactionRepositoryImplTest {
                     assetId = usdId,
                     amount = 100.0,
                     timestamp = now,
+                    description = "Transfer to savings",
                 )
             transactionRepository.createTransaction(transaction)
 
@@ -246,6 +250,7 @@ class TransactionRepositoryImplTest {
                     assetId = usdId,
                     amount = 100.0,
                     timestamp = now,
+                    description = "Transfer to savings",
                 ),
             )
 
@@ -257,6 +262,7 @@ class TransactionRepositoryImplTest {
                     assetId = usdId,
                     amount = 50.0,
                     timestamp = now,
+                    description = "Credit card payment",
                 ),
             )
 
@@ -268,6 +274,7 @@ class TransactionRepositoryImplTest {
                     assetId = usdId,
                     amount = 30.0,
                     timestamp = now,
+                    description = "Transfer from savings",
                 ),
             )
 
@@ -322,6 +329,7 @@ class TransactionRepositoryImplTest {
                     assetId = usdId,
                     amount = 100.0,
                     timestamp = now,
+                    description = "Transfer USD to savings",
                 ),
             )
 
@@ -333,6 +341,7 @@ class TransactionRepositoryImplTest {
                     assetId = eurId,
                     amount = 50.0,
                     timestamp = now,
+                    description = "Transfer EUR to savings",
                 ),
             )
 
@@ -400,6 +409,7 @@ class TransactionRepositoryImplTest {
                     assetId = assetId,
                     amount = 100.0,
                     timestamp = now,
+                    description = "Test transaction to delete",
                 )
             val transactionId = transactionRepository.createTransaction(transaction)
 
@@ -436,6 +446,7 @@ class TransactionRepositoryImplTest {
                     assetId = assetId,
                     amount = 100.0,
                     timestamp = now - kotlin.time.Duration.parse("1h"),
+                    description = "Earlier transaction",
                 )
             val transaction2 =
                 Transaction(
@@ -444,6 +455,7 @@ class TransactionRepositoryImplTest {
                     assetId = assetId,
                     amount = 200.0,
                     timestamp = now,
+                    description = "Later transaction",
                 )
 
             transactionRepository.createTransaction(transaction1)

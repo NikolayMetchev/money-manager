@@ -173,73 +173,89 @@ fun AccountTransactionCard(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
-        Row(
+        Column(
             modifier =
                 Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Left column: Account and date info
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text =
-                        if (isOutgoing) {
-                            "To: ${otherAccount?.name ?: "Unknown"}"
-                        } else {
-                            "From: ${otherAccount?.name ?: "Unknown"}"
-                        },
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                val dateTime = runningBalance.timestamp.toLocalDateTime(TimeZone.currentSystemDefault())
-                Text(
-                    text = "${dateTime.date} ${dateTime.time}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-            // Middle column: Transaction amount
-            Column(
-                horizontalAlignment = Alignment.End,
-                modifier = Modifier.padding(horizontal = 16.dp),
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    text = String.format("%+.2f", runningBalance.transactionAmount),
-                    style = MaterialTheme.typography.titleLarge,
-                    color =
-                        if (runningBalance.transactionAmount >= 0) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.error
-                        },
-                )
-                Text(
-                    text = asset?.name ?: "Unknown",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                // Left column: Account and date info
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text =
+                            if (isOutgoing) {
+                                "To: ${otherAccount?.name ?: "Unknown"}"
+                            } else {
+                                "From: ${otherAccount?.name ?: "Unknown"}"
+                            },
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    val dateTime = runningBalance.timestamp.toLocalDateTime(TimeZone.currentSystemDefault())
+                    Text(
+                        text = "${dateTime.date} ${dateTime.time}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                // Middle column: Transaction amount
+                Column(
+                    horizontalAlignment = Alignment.End,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                ) {
+                    Text(
+                        text = String.format("%+.2f", runningBalance.transactionAmount),
+                        style = MaterialTheme.typography.titleLarge,
+                        color =
+                            if (runningBalance.transactionAmount >= 0) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.error
+                            },
+                    )
+                    Text(
+                        text = asset?.name ?: "Unknown",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+
+                // Right column: Running balance
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = String.format("%.2f", runningBalance.runningBalance),
+                        style = MaterialTheme.typography.titleMedium,
+                        color =
+                            if (runningBalance.runningBalance >= 0) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.error
+                            },
+                    )
+                    Text(
+                        text = "Balance",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
 
-            // Right column: Running balance
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    text = String.format("%.2f", runningBalance.runningBalance),
-                    style = MaterialTheme.typography.titleMedium,
-                    color =
-                        if (runningBalance.runningBalance >= 0) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.error
-                        },
-                )
-                Text(
-                    text = "Balance",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            // Description row
+            transaction?.description?.let { desc ->
+                if (desc.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = desc,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
             }
         }
     }
@@ -295,6 +311,16 @@ fun TransactionCard(
                     )
                 }
             }
+
+            // Description row
+            if (transaction.description.isNotBlank()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = transaction.description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
         }
     }
 }
@@ -314,6 +340,7 @@ fun TransactionEntryDialog(
     var targetAccountId by remember { mutableStateOf<Long?>(null) }
     var assetId by remember { mutableStateOf<Long?>(null) }
     var amount by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
 
@@ -539,6 +566,16 @@ fun TransactionEntryDialog(
                     enabled = !isSaving,
                 )
 
+                // Description Input
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("Description") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    enabled = !isSaving,
+                )
+
                 errorMessage?.let { error ->
                     Text(
                         text = error,
@@ -559,6 +596,7 @@ fun TransactionEntryDialog(
                         amount.isBlank() -> errorMessage = "Amount is required"
                         amount.toDoubleOrNull() == null -> errorMessage = "Invalid amount"
                         amount.toDouble() <= 0 -> errorMessage = "Amount must be greater than 0"
+                        description.isBlank() -> errorMessage = "Description is required"
                         else -> {
                             isSaving = true
                             errorMessage = null
@@ -576,6 +614,7 @@ fun TransactionEntryDialog(
                                             assetId = assetId!!,
                                             amount = amount.toDouble(),
                                             timestamp = timestamp,
+                                            description = description.trim(),
                                         )
                                     transactionRepository.createTransaction(newTransaction)
                                     onDismiss()
