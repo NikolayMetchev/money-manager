@@ -20,8 +20,7 @@ import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AssetRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import kotlinx.coroutines.launch
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
+import kotlinx.datetime.*
 import org.lighthousegames.logging.logging
 import kotlin.time.Clock
 
@@ -318,6 +317,14 @@ fun TransactionEntryDialog(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
 
+    // Date and time picker state
+    val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
+    var selectedDate by remember { mutableStateOf(now.date) }
+    var selectedHour by remember { mutableStateOf(now.hour) }
+    var selectedMinute by remember { mutableStateOf(now.minute) }
+    var showDatePicker by remember { mutableStateOf(false) }
+    var showTimePicker by remember { mutableStateOf(false) }
+
     var showCreateAccountDialog by remember { mutableStateOf(false) }
     var showCreateAssetDialog by remember { mutableStateOf(false) }
     var creatingForSource by remember { mutableStateOf(true) }
@@ -461,6 +468,66 @@ fun TransactionEntryDialog(
                     }
                 }
 
+                // Date and Time Pickers
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    // Date Picker
+                    OutlinedTextField(
+                        value = selectedDate.toString(),
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Date") },
+                        trailingIcon = {
+                            IconButton(
+                                onClick = { showDatePicker = true },
+                                enabled = !isSaving,
+                            ) {
+                                Text(
+                                    text = "\uD83D\uDCC5",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                )
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                        enabled = false,
+                        colors =
+                            OutlinedTextFieldDefaults.colors(
+                                disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                                disabledBorderColor = MaterialTheme.colorScheme.outline,
+                                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            ),
+                    )
+
+                    // Time Picker
+                    OutlinedTextField(
+                        value = String.format("%02d:%02d", selectedHour, selectedMinute),
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Time") },
+                        trailingIcon = {
+                            IconButton(
+                                onClick = { showTimePicker = true },
+                                enabled = !isSaving,
+                            ) {
+                                Text(
+                                    text = "\uD83D\uDD54",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                )
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                        enabled = false,
+                        colors =
+                            OutlinedTextFieldDefaults.colors(
+                                disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                                disabledBorderColor = MaterialTheme.colorScheme.outline,
+                                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            ),
+                    )
+                }
+
                 // Amount Input
                 OutlinedTextField(
                     value = amount,
@@ -497,14 +564,18 @@ fun TransactionEntryDialog(
                             errorMessage = null
                             scope.launch {
                                 try {
-                                    val now = Clock.System.now()
+                                    // Convert selected date and time to Instant
+                                    val timestamp =
+                                        selectedDate
+                                            .atTime(selectedHour, selectedMinute, 0)
+                                            .toInstant(TimeZone.currentSystemDefault())
                                     val newTransaction =
                                         Transaction(
                                             sourceAccountId = sourceAccountId!!,
                                             targetAccountId = targetAccountId!!,
                                             assetId = assetId!!,
                                             amount = amount.toDouble(),
-                                            timestamp = now,
+                                            timestamp = timestamp,
                                         )
                                     transactionRepository.createTransaction(newTransaction)
                                     onDismiss()
@@ -564,6 +635,77 @@ fun TransactionEntryDialog(
                 showCreateAssetDialog = false
             },
             onDismiss = { showCreateAssetDialog = false },
+        )
+    }
+
+    // Date Picker Dialog
+    if (showDatePicker) {
+        val datePickerState =
+            rememberDatePickerState(
+                initialSelectedDateMillis =
+                    selectedDate
+                        .atTime(0, 0)
+                        .toInstant(TimeZone.UTC)
+                        .toEpochMilliseconds(),
+            )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        datePickerState.selectedDateMillis?.let { millis ->
+                            // Convert milliseconds to LocalDate
+                            selectedDate =
+                                Instant
+                                    .fromEpochMilliseconds(millis)
+                                    .toLocalDateTime(TimeZone.UTC)
+                                    .date
+                        }
+                        showDatePicker = false
+                    },
+                ) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text("Cancel")
+                }
+            },
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
+    // Time Picker Dialog
+    if (showTimePicker) {
+        val timePickerState =
+            rememberTimePickerState(
+                initialHour = selectedHour,
+                initialMinute = selectedMinute,
+                is24Hour = false,
+            )
+        AlertDialog(
+            onDismissRequest = { showTimePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        selectedHour = timePickerState.hour
+                        selectedMinute = timePickerState.minute
+                        showTimePicker = false
+                    },
+                ) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTimePicker = false }) {
+                    Text("Cancel")
+                }
+            },
+            text = {
+                TimePicker(state = timePickerState)
+            },
         )
     }
 }
