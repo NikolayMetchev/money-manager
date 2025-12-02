@@ -70,9 +70,10 @@ fun AccountTransactionsScreen(
     }
 
     // Filter running balances by selected asset
-    val filteredRunningBalances = selectedAssetId?.let { assetId ->
-        runningBalances.filter { it.assetId == assetId }
-    } ?: emptyList()
+    val filteredRunningBalances =
+        selectedAssetId?.let { assetId ->
+            runningBalances.filter { it.assetId == assetId }
+        } ?: emptyList()
 
     Column(
         modifier =
