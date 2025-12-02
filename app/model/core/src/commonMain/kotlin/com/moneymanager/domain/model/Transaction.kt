@@ -11,4 +11,5 @@ data class Transaction(
     val assetId: Long,
     val amount: Double,
     val timestamp: Instant,
+    val description: String,
 )
