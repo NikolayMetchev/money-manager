@@ -4,6 +4,7 @@ package com.moneymanager.domain.repository
 
 import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.Transaction
+import com.moneymanager.domain.model.TransactionWithRunningBalance
 import kotlinx.coroutines.flow.Flow
 import kotlin.time.Instant
 
@@ -26,6 +27,8 @@ interface TransactionRepository {
     ): Flow<List<Transaction>>
 
     fun getAccountBalances(): Flow<List<AccountBalance>>
+
+    fun getRunningBalanceByAccount(accountId: Long): Flow<List<TransactionWithRunningBalance>>
 
     suspend fun createTransaction(transaction: Transaction): Long
 

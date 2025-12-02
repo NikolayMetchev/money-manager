@@ -11,6 +11,7 @@ import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.Asset
 import com.moneymanager.domain.model.Transaction
+import com.moneymanager.domain.model.TransactionWithRunningBalance
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AssetRepository
 import com.moneymanager.domain.repository.TransactionRepository
@@ -358,6 +359,8 @@ class AccountsScreenTest {
         ): Flow<List<Transaction>> = flowOf(emptyList())
 
         override fun getAccountBalances(): Flow<List<AccountBalance>> = flowOf(emptyList())
+
+        override fun getRunningBalanceByAccount(accountId: Long): Flow<List<TransactionWithRunningBalance>> = flowOf(emptyList())
 
         override suspend fun createTransaction(transaction: Transaction): Long = 0L
 

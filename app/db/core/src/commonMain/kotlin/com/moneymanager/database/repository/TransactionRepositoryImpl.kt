@@ -9,12 +9,14 @@ import com.moneymanager.database.mapper.TransactionMapper
 import com.moneymanager.database.sql.MoneyManagerDatabase
 import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.Transaction
+import com.moneymanager.domain.model.TransactionWithRunningBalance
 import com.moneymanager.domain.repository.TransactionRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlin.time.Instant
+import kotlin.time.Instant.Companion.fromEpochMilliseconds
 
 class TransactionRepositoryImpl(
     private val database: MoneyManagerDatabase,
@@ -88,6 +90,23 @@ class TransactionRepositoryImpl(
                 )
             }
         }
+
+    override fun getRunningBalanceByAccount(accountId: Long): Flow<List<TransactionWithRunningBalance>> =
+        queries.selectRunningBalanceByAccount(accountId)
+            .asFlow()
+            .mapToList(Dispatchers.Default)
+            .map { list ->
+                list.map { row ->
+                    TransactionWithRunningBalance(
+                        transactionId = row.transactionId,
+                        timestamp = fromEpochMilliseconds(row.timestamp),
+                        accountId = row.accountId,
+                        assetId = row.assetId,
+                        transactionAmount = row.transactionAmount,
+                        runningBalance = row.runningBalance ?: 0.0,
+                    )
+                }
+            }
 
     override suspend fun createTransaction(transaction: Transaction): Long =
         withContext(Dispatchers.Default) {
