@@ -27,6 +27,7 @@ import kotlin.time.Clock
 
 private val logger = logging()
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AccountTransactionsScreen(
     accountId: Long,
@@ -34,14 +35,45 @@ fun AccountTransactionsScreen(
     accountRepository: AccountRepository,
     assetRepository: AssetRepository,
 ) {
-    val runningBalances by transactionRepository.getRunningBalanceByAccount(accountId)
-        .collectAsState(initial = emptyList())
+    val allAccounts by accountRepository.getAllAccounts().collectAsState(initial = emptyList())
     val allTransactions by transactionRepository.getAllTransactions().collectAsState(initial = emptyList())
-    val accounts by accountRepository.getAllAccounts().collectAsState(initial = emptyList())
     val assets by assetRepository.getAllAssets().collectAsState(initial = emptyList())
+
+    // Selected account state - default to the provided accountId
+    var selectedAccountId by remember { mutableStateOf(accountId) }
+
+    // Get running balances for the selected account
+    val runningBalances by transactionRepository.getRunningBalanceByAccount(selectedAccountId)
+        .collectAsState(initial = emptyList())
 
     // Build a map of transactionId -> full Transaction for additional details
     val transactionMap = allTransactions.associateBy { it.id }
+
+    // Get unique asset IDs from running balances for this account
+    val accountAssetIds = runningBalances.map { it.assetId }.distinct()
+    val accountAssets = assets.filter { it.id in accountAssetIds }
+
+    // Selected asset state - default to first asset if available
+    var selectedAssetId by remember { mutableStateOf<Long?>(null) }
+
+    // Update selected asset when account assets change
+    LaunchedEffect(accountAssets) {
+        if (accountAssets.isNotEmpty()) {
+            // If currently selected asset exists in the new account's assets, keep it
+            // Otherwise, select the first available asset
+            if (selectedAssetId == null || accountAssets.none { it.id == selectedAssetId }) {
+                selectedAssetId = accountAssets.first().id
+            }
+        } else {
+            selectedAssetId = null
+        }
+    }
+
+    // Filter running balances by selected asset
+    val filteredRunningBalances =
+        selectedAssetId?.let { assetId ->
+            runningBalances.filter { it.assetId == assetId }
+        } ?: emptyList()
 
     Column(
         modifier =
@@ -49,6 +81,38 @@ fun AccountTransactionsScreen(
                 .fillMaxSize()
                 .padding(16.dp),
     ) {
+        // Account Picker - Buttons
+        if (allAccounts.isNotEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                allAccounts.forEach { account ->
+                    FilterChip(
+                        selected = selectedAccountId == account.id,
+                        onClick = { selectedAccountId = account.id },
+                        label = { Text(account.name) },
+                    )
+                }
+            }
+        }
+
+        // Asset Picker - Buttons
+        if (accountAssets.isNotEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                accountAssets.forEach { asset ->
+                    FilterChip(
+                        selected = selectedAssetId == asset.id,
+                        onClick = { selectedAssetId = asset.id },
+                        label = { Text(asset.name) },
+                    )
+                }
+            }
+        }
+
         if (runningBalances.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxSize(),
@@ -60,17 +124,28 @@ fun AccountTransactionsScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+        } else if (filteredRunningBalances.isEmpty() && selectedAssetId != null) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "No transactions for selected asset.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         } else {
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                items(runningBalances) { runningBalance ->
+                items(filteredRunningBalances) { runningBalance ->
                     val transaction = transactionMap[runningBalance.transactionId]
                     AccountTransactionCard(
                         runningBalance = runningBalance,
                         transaction = transaction,
-                        currentAccountId = accountId,
-                        accounts = accounts,
+                        currentAccountId = selectedAccountId,
+                        accounts = allAccounts,
                         assets = assets,
                     )
                 }
@@ -99,62 +174,73 @@ fun AccountTransactionCard(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
-        Column(
+        Row(
             modifier =
                 Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
+            // Left column: Account and date info
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text =
+                        if (isOutgoing) {
+                            "To: ${otherAccount?.name ?: "Unknown"}"
+                        } else {
+                            "From: ${otherAccount?.name ?: "Unknown"}"
+                        },
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                val dateTime = runningBalance.timestamp.toLocalDateTime(TimeZone.currentSystemDefault())
+                Text(
+                    text = "${dateTime.date} ${dateTime.time}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            // Middle column: Transaction amount
+            Column(
+                horizontalAlignment = Alignment.End,
+                modifier = Modifier.padding(horizontal = 16.dp),
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text =
-                            if (isOutgoing) {
-                                "To: ${otherAccount?.name ?: "Unknown"}"
-                            } else {
-                                "From: ${otherAccount?.name ?: "Unknown"}"
-                            },
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    val dateTime = runningBalance.timestamp.toLocalDateTime(TimeZone.currentSystemDefault())
-                    Text(
-                        text = "${dateTime.date} ${dateTime.time}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        text = String.format("%+.2f", runningBalance.transactionAmount),
-                        style = MaterialTheme.typography.titleLarge,
-                        color =
-                            if (runningBalance.transactionAmount >= 0) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.error
-                            },
-                    )
-                    Text(
-                        text = "Balance: ${String.format("%.2f", runningBalance.runningBalance)}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color =
-                            if (runningBalance.runningBalance >= 0) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.error
-                            },
-                    )
-                    Text(
-                        text = asset?.name ?: "Unknown",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                Text(
+                    text = String.format("%+.2f", runningBalance.transactionAmount),
+                    style = MaterialTheme.typography.titleLarge,
+                    color =
+                        if (runningBalance.transactionAmount >= 0) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.error
+                        },
+                )
+                Text(
+                    text = asset?.name ?: "Unknown",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            // Right column: Running balance
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = String.format("%.2f", runningBalance.runningBalance),
+                    style = MaterialTheme.typography.titleMedium,
+                    color =
+                        if (runningBalance.runningBalance >= 0) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.error
+                        },
+                )
+                Text(
+                    text = "Balance",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }
