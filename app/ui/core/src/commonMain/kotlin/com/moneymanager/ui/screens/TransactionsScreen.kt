@@ -15,8 +15,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.Asset
-import com.moneymanager.domain.model.Transaction
 import com.moneymanager.domain.model.TransactionWithRunningBalance
+import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AssetRepository
 import com.moneymanager.domain.repository.TransactionRepository
@@ -282,7 +282,7 @@ fun AccountTransactionsScreen(
 @Composable
 fun AccountTransactionCard(
     runningBalance: TransactionWithRunningBalance,
-    transaction: Transaction?,
+    transaction: Transfer?,
     currentAccountId: Long,
     accounts: List<Account>,
     assets: List<Asset>,
@@ -399,7 +399,7 @@ fun AccountTransactionCard(
 
 @Composable
 fun TransactionCard(
-    transaction: Transaction,
+    transaction: Transfer,
     accounts: List<Account>,
     assets: List<Asset>,
 ) {
@@ -755,16 +755,14 @@ fun TransactionEntryDialog(
                                         selectedDate
                                             .atTime(selectedHour, selectedMinute, 0)
                                             .toInstant(TimeZone.currentSystemDefault())
-                                    val newTransaction =
-                                        Transaction(
-                                            sourceAccountId = sourceAccountId!!,
-                                            targetAccountId = targetAccountId!!,
-                                            assetId = assetId!!,
-                                            amount = amount.toDouble(),
-                                            timestamp = timestamp,
-                                            description = description.trim(),
-                                        )
-                                    transactionRepository.createTransaction(newTransaction)
+                                    transactionRepository.createTransfer(
+                                        timestamp = timestamp,
+                                        description = description.trim(),
+                                        sourceAccountId = sourceAccountId!!,
+                                        targetAccountId = targetAccountId!!,
+                                        assetId = assetId!!,
+                                        amount = amount.toDouble(),
+                                    )
                                     onDismiss()
                                 } catch (e: Exception) {
                                     logger.error(e) { "Failed to create transaction: ${e.message}" }

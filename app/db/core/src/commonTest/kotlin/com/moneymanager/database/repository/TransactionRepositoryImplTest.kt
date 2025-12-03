@@ -8,7 +8,6 @@ import com.moneymanager.database.deleteTestDatabase
 import com.moneymanager.di.AppComponent
 import com.moneymanager.di.createTestAppComponentParams
 import com.moneymanager.domain.model.Account
-import com.moneymanager.domain.model.Transaction
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AssetRepository
 import com.moneymanager.domain.repository.TransactionRepository
@@ -56,7 +55,7 @@ class TransactionRepositoryImplTest {
     // CREATE TRANSACTION TESTS
 
     @Test
-    fun `createTransaction should insert transaction and return generated id`() =
+    fun `createTransfer should insert transaction and transfer and return generated id`() =
         runTest {
             val now = Clock.System.now()
 
@@ -73,18 +72,16 @@ class TransactionRepositoryImplTest {
             // Create test asset
             val assetId = assetRepository.upsertAssetByName("USD")
 
-            // Create transaction
-            val transaction =
-                Transaction(
+            // Create transfer
+            val transactionId =
+                transactionRepository.createTransfer(
+                    timestamp = now,
+                    description = "Test transaction",
                     sourceAccountId = sourceAccountId,
                     targetAccountId = targetAccountId,
                     assetId = assetId,
                     amount = 100.0,
-                    timestamp = now,
-                    description = "Test transaction",
                 )
-
-            val transactionId = transactionRepository.createTransaction(transaction)
 
             assertTrue(transactionId > 0, "Generated ID should be positive, but was: $transactionId")
 
@@ -97,7 +94,7 @@ class TransactionRepositoryImplTest {
         }
 
     @Test
-    fun `createTransaction should fail when source and target accounts are the same`() =
+    fun `createTransfer should fail when source and target accounts are the same`() =
         runTest {
             val now = Clock.System.now()
 
@@ -110,26 +107,22 @@ class TransactionRepositoryImplTest {
             // Create test asset
             val assetId = assetRepository.upsertAssetByName("USD")
 
-            // Attempt to create transaction with same source and target
-            val transaction =
-                Transaction(
+            // Should throw exception due to CHECK constraint
+            // Same as source - violates CHECK constraint
+            assertFailsWith<Exception> {
+                transactionRepository.createTransfer(
+                    timestamp = now,
+                    description = "Invalid transaction",
                     sourceAccountId = accountId,
-                    // Same as source - violates CHECK constraint
                     targetAccountId = accountId,
                     assetId = assetId,
                     amount = 100.0,
-                    timestamp = now,
-                    description = "Invalid transaction",
                 )
-
-            // Should throw exception due to CHECK constraint
-            assertFailsWith<Exception> {
-                transactionRepository.createTransaction(transaction)
             }
         }
 
     @Test
-    fun `updateTransaction should fail when changing to same source and target accounts`() =
+    fun `updateTransfer should fail when changing to same source and target accounts`() =
         runTest {
             val now = Clock.System.now()
 
@@ -146,30 +139,32 @@ class TransactionRepositoryImplTest {
             // Create test asset
             val assetId = assetRepository.upsertAssetByName("USD")
 
-            // Create valid transaction
-            val transaction =
-                Transaction(
+            // Create valid transfer
+            val transactionId =
+                transactionRepository.createTransfer(
+                    timestamp = now,
+                    description = "Test transaction",
                     sourceAccountId = sourceAccountId,
                     targetAccountId = targetAccountId,
                     assetId = assetId,
                     amount = 100.0,
-                    timestamp = now,
-                    description = "Test transaction",
                 )
-            val transactionId = transactionRepository.createTransaction(transaction)
 
             // Verify transaction was created
             assertTrue(transactionId > 0, "Transaction ID should be positive, but was: $transactionId")
 
-            // Attempt to update to invalid state (same source and target)
-            val retrieved = transactionRepository.getTransactionById(transactionId).first()
-            assertNotNull(retrieved, "Retrieved transaction should not be null for ID: $transactionId")
-
-            val invalidUpdate = retrieved.copy(targetAccountId = sourceAccountId) // Same as source
-
             // Should throw exception due to CHECK constraint
+            // Same as source - violates CHECK constraint
             assertFailsWith<Exception> {
-                transactionRepository.updateTransaction(invalidUpdate)
+                transactionRepository.updateTransfer(
+                    id = transactionId,
+                    timestamp = now,
+                    description = "Test transaction",
+                    sourceAccountId = sourceAccountId,
+                    targetAccountId = sourceAccountId,
+                    assetId = assetId,
+                    amount = 100.0,
+                )
             }
         }
 
@@ -194,16 +189,14 @@ class TransactionRepositoryImplTest {
             val usdId = assetRepository.upsertAssetByName("USD")
 
             // Create transaction: Checking -> Savings, 100 USD
-            val transaction =
-                Transaction(
-                    sourceAccountId = checkingAccountId,
-                    targetAccountId = savingsAccountId,
-                    assetId = usdId,
-                    amount = 100.0,
-                    timestamp = now,
-                    description = "Transfer to savings",
-                )
-            transactionRepository.createTransaction(transaction)
+            transactionRepository.createTransfer(
+                timestamp = now,
+                description = "Transfer to savings",
+                sourceAccountId = checkingAccountId,
+                targetAccountId = savingsAccountId,
+                assetId = usdId,
+                amount = 100.0,
+            )
 
             // Get balances
             val balances = transactionRepository.getAccountBalances().first()
@@ -243,39 +236,33 @@ class TransactionRepositoryImplTest {
 
             // Create multiple transactions
             // 1. Checking -> Savings: 100
-            transactionRepository.createTransaction(
-                Transaction(
-                    sourceAccountId = checkingAccountId,
-                    targetAccountId = savingsAccountId,
-                    assetId = usdId,
-                    amount = 100.0,
-                    timestamp = now,
-                    description = "Transfer to savings",
-                ),
+            transactionRepository.createTransfer(
+                timestamp = now,
+                description = "Transfer to savings",
+                sourceAccountId = checkingAccountId,
+                targetAccountId = savingsAccountId,
+                assetId = usdId,
+                amount = 100.0,
             )
 
             // 2. Checking -> Credit Card: 50 (payment)
-            transactionRepository.createTransaction(
-                Transaction(
-                    sourceAccountId = checkingAccountId,
-                    targetAccountId = creditCardAccountId,
-                    assetId = usdId,
-                    amount = 50.0,
-                    timestamp = now,
-                    description = "Credit card payment",
-                ),
+            transactionRepository.createTransfer(
+                timestamp = now,
+                description = "Credit card payment",
+                sourceAccountId = checkingAccountId,
+                targetAccountId = creditCardAccountId,
+                assetId = usdId,
+                amount = 50.0,
             )
 
             // 3. Savings -> Checking: 30
-            transactionRepository.createTransaction(
-                Transaction(
-                    sourceAccountId = savingsAccountId,
-                    targetAccountId = checkingAccountId,
-                    assetId = usdId,
-                    amount = 30.0,
-                    timestamp = now,
-                    description = "Transfer from savings",
-                ),
+            transactionRepository.createTransfer(
+                timestamp = now,
+                description = "Transfer from savings",
+                sourceAccountId = savingsAccountId,
+                targetAccountId = checkingAccountId,
+                assetId = usdId,
+                amount = 30.0,
             )
 
             // Get balances
@@ -322,27 +309,23 @@ class TransactionRepositoryImplTest {
 
             // Create transactions in different currencies
             // USD: Checking -> Savings, 100
-            transactionRepository.createTransaction(
-                Transaction(
-                    sourceAccountId = checkingAccountId,
-                    targetAccountId = savingsAccountId,
-                    assetId = usdId,
-                    amount = 100.0,
-                    timestamp = now,
-                    description = "Transfer USD to savings",
-                ),
+            transactionRepository.createTransfer(
+                timestamp = now,
+                description = "Transfer USD to savings",
+                sourceAccountId = checkingAccountId,
+                targetAccountId = savingsAccountId,
+                assetId = usdId,
+                amount = 100.0,
             )
 
             // EUR: Checking -> Savings, 50
-            transactionRepository.createTransaction(
-                Transaction(
-                    sourceAccountId = checkingAccountId,
-                    targetAccountId = savingsAccountId,
-                    assetId = eurId,
-                    amount = 50.0,
-                    timestamp = now,
-                    description = "Transfer EUR to savings",
-                ),
+            transactionRepository.createTransfer(
+                timestamp = now,
+                description = "Transfer EUR to savings",
+                sourceAccountId = checkingAccountId,
+                targetAccountId = savingsAccountId,
+                assetId = eurId,
+                amount = 50.0,
             )
 
             // Get balances
@@ -402,16 +385,15 @@ class TransactionRepositoryImplTest {
             val assetId = assetRepository.upsertAssetByName("USD")
 
             // Create transaction
-            val transaction =
-                Transaction(
+            val transactionId =
+                transactionRepository.createTransfer(
+                    timestamp = now,
+                    description = "Test transaction to delete",
                     sourceAccountId = sourceAccountId,
                     targetAccountId = targetAccountId,
                     assetId = assetId,
                     amount = 100.0,
-                    timestamp = now,
-                    description = "Test transaction to delete",
                 )
-            val transactionId = transactionRepository.createTransaction(transaction)
 
             // Delete transaction
             transactionRepository.deleteTransaction(transactionId)
@@ -439,27 +421,23 @@ class TransactionRepositoryImplTest {
             val assetId = assetRepository.upsertAssetByName("USD")
 
             // Create multiple transactions with different timestamps
-            val transaction1 =
-                Transaction(
-                    sourceAccountId = sourceAccountId,
-                    targetAccountId = targetAccountId,
-                    assetId = assetId,
-                    amount = 100.0,
-                    timestamp = now - kotlin.time.Duration.parse("1h"),
-                    description = "Earlier transaction",
-                )
-            val transaction2 =
-                Transaction(
-                    sourceAccountId = sourceAccountId,
-                    targetAccountId = targetAccountId,
-                    assetId = assetId,
-                    amount = 200.0,
-                    timestamp = now,
-                    description = "Later transaction",
-                )
+            transactionRepository.createTransfer(
+                timestamp = now - kotlin.time.Duration.parse("1h"),
+                description = "Earlier transaction",
+                sourceAccountId = sourceAccountId,
+                targetAccountId = targetAccountId,
+                assetId = assetId,
+                amount = 100.0,
+            )
 
-            transactionRepository.createTransaction(transaction1)
-            transactionRepository.createTransaction(transaction2)
+            transactionRepository.createTransfer(
+                timestamp = now,
+                description = "Later transaction",
+                sourceAccountId = sourceAccountId,
+                targetAccountId = targetAccountId,
+                assetId = assetId,
+                amount = 200.0,
+            )
 
             val allTransactions = transactionRepository.getAllTransactions().first()
             assertEquals(2, allTransactions.size)
