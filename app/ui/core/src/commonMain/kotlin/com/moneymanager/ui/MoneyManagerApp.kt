@@ -24,6 +24,7 @@ fun MoneyManagerApp(
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Accounts) }
     var showTransactionDialog by remember { mutableStateOf(false) }
     var preSelectedAccountId by remember { mutableStateOf<Long?>(null) }
+    var currentlyViewedAccountId by remember { mutableStateOf<Long?>(null) }
 
     val accounts by repositorySet.accountRepository.getAllAccounts().collectAsState(initial = emptyList())
     val assets by repositorySet.assetRepository.getAllAssets().collectAsState(initial = emptyList())
@@ -81,7 +82,7 @@ fun MoneyManagerApp(
             floatingActionButton = {
                 FloatingActionButton(
                     onClick = {
-                        preSelectedAccountId = (currentScreen as? Screen.AccountTransactions)?.accountId
+                        preSelectedAccountId = currentlyViewedAccountId
                         showTransactionDialog = true
                     },
                 ) {
@@ -91,7 +92,11 @@ fun MoneyManagerApp(
         ) { paddingValues ->
             Box(modifier = Modifier.padding(paddingValues)) {
                 when (val screen = currentScreen) {
-                    is Screen.Accounts ->
+                    is Screen.Accounts -> {
+                        // Reset currentlyViewedAccountId when on other screens
+                        LaunchedEffect(Unit) {
+                            currentlyViewedAccountId = null
+                        }
                         AccountsScreen(
                             accountRepository = repositorySet.accountRepository,
                             transactionRepository = repositorySet.transactionRepository,
@@ -100,15 +105,36 @@ fun MoneyManagerApp(
                                 currentScreen = Screen.AccountTransactions(account.id, account.name)
                             },
                         )
-                    is Screen.Assets -> AssetsScreen(repositorySet.assetRepository)
-                    is Screen.Categories -> CategoriesScreen(repositorySet.categoryRepository)
-                    is Screen.AccountTransactions ->
+                    }
+                    is Screen.Assets -> {
+                        // Reset currentlyViewedAccountId when on other screens
+                        LaunchedEffect(Unit) {
+                            currentlyViewedAccountId = null
+                        }
+                        AssetsScreen(repositorySet.assetRepository)
+                    }
+                    is Screen.Categories -> {
+                        // Reset currentlyViewedAccountId when on other screens
+                        LaunchedEffect(Unit) {
+                            currentlyViewedAccountId = null
+                        }
+                        CategoriesScreen(repositorySet.categoryRepository)
+                    }
+                    is Screen.AccountTransactions -> {
+                        // Initialize currentlyViewedAccountId when first entering the screen
+                        LaunchedEffect(screen.accountId) {
+                            currentlyViewedAccountId = screen.accountId
+                        }
                         AccountTransactionsScreen(
                             accountId = screen.accountId,
                             transactionRepository = repositorySet.transactionRepository,
                             accountRepository = repositorySet.accountRepository,
                             assetRepository = repositorySet.assetRepository,
+                            onAccountIdChange = { accountId ->
+                                currentlyViewedAccountId = accountId
+                            },
                         )
+                    }
                 }
             }
         }
