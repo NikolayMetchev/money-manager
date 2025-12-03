@@ -39,6 +39,7 @@ fun AccountTransactionsScreen(
     val allAccounts by accountRepository.getAllAccounts().collectAsState(initial = emptyList())
     val allTransactions by transactionRepository.getAllTransactions().collectAsState(initial = emptyList())
     val assets by assetRepository.getAllAssets().collectAsState(initial = emptyList())
+    val accountBalances by transactionRepository.getAccountBalances().collectAsState(initial = emptyList())
 
     // Selected account state - default to the provided accountId
     var selectedAccountId by remember { mutableStateOf(accountId) }
@@ -90,18 +91,85 @@ fun AccountTransactionsScreen(
                 .fillMaxSize()
                 .padding(16.dp),
     ) {
-        // Account Picker - Buttons
+        // Account Picker - Buttons with balances underneath in table format
         if (allAccounts.isNotEmpty()) {
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                allAccounts.forEach { account ->
-                    FilterChip(
-                        selected = selectedAccountId == account.id,
-                        onClick = { selectedAccountId = account.id },
-                        label = { Text(account.name) },
-                    )
+                // Row of account buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    // Empty space for asset name column
+                    Spacer(modifier = Modifier.width(60.dp))
+
+                    allAccounts.forEach { account ->
+                        Box(
+                            modifier = Modifier.weight(1f),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            FilterChip(
+                                selected = selectedAccountId == account.id,
+                                onClick = { selectedAccountId = account.id },
+                                label = { Text(account.name) },
+                            )
+                        }
+                    }
+                }
+
+                // Get all unique assets from account balances
+                val uniqueAssetIds = accountBalances.map { it.assetId }.distinct()
+
+                // Row for each asset
+                uniqueAssetIds.forEach { assetId ->
+                    val asset = assets.find { it.id == assetId }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        // Asset name as row header
+                        Text(
+                            text = "${asset?.name ?: "?"}:",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.width(60.dp),
+                        )
+
+                        // Balance for each account
+                        allAccounts.forEach { account ->
+                            val balance =
+                                accountBalances.find {
+                                    it.accountId == account.id && it.assetId == assetId
+                                }
+                            Box(
+                                modifier = Modifier.weight(1f),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                if (balance != null) {
+                                    Text(
+                                        text = String.format("%.2f", balance.balance),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color =
+                                            if (balance.balance >= 0) {
+                                                MaterialTheme.colorScheme.primary
+                                            } else {
+                                                MaterialTheme.colorScheme.error
+                                            },
+                                    )
+                                } else {
+                                    // Empty cell if account doesn't have this asset
+                                    Text(
+                                        text = "-",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
