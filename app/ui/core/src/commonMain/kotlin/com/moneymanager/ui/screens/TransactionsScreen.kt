@@ -34,6 +34,7 @@ fun AccountTransactionsScreen(
     transactionRepository: TransactionRepository,
     accountRepository: AccountRepository,
     assetRepository: AssetRepository,
+    onAccountIdChange: (Long) -> Unit = {},
 ) {
     val allAccounts by accountRepository.getAllAccounts().collectAsState(initial = emptyList())
     val allTransactions by transactionRepository.getAllTransactions().collectAsState(initial = emptyList())
@@ -41,6 +42,11 @@ fun AccountTransactionsScreen(
 
     // Selected account state - default to the provided accountId
     var selectedAccountId by remember { mutableStateOf(accountId) }
+
+    // Notify parent when selected account changes
+    LaunchedEffect(selectedAccountId) {
+        onAccountIdChange(selectedAccountId)
+    }
 
     // Highlighted transaction state
     var highlightedTransactionId by remember { mutableStateOf<Long?>(null) }
