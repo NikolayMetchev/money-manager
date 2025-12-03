@@ -1,0 +1,162 @@
+CREATE TABLE Transfer (
+    transactionId INTEGER PRIMARY KEY NOT NULL,
+    sourceAccountId INTEGER NOT NULL,
+    targetAccountId INTEGER NOT NULL,
+    assetId INTEGER NOT NULL,
+    amount REAL NOT NULL,
+    CHECK (sourceAccountId != targetAccountId),
+    FOREIGN KEY (transactionId) REFERENCES `Transaction`(id) ON DELETE CASCADE,
+    FOREIGN KEY (sourceAccountId) REFERENCES Account(id) ON DELETE CASCADE,
+    FOREIGN KEY (targetAccountId) REFERENCES Account(id) ON DELETE CASCADE,
+    FOREIGN KEY (assetId) REFERENCES Asset(id) ON DELETE RESTRICT
+);
+
+CREATE VIEW AccountBalanceView AS
+SELECT
+    accountId,
+    assetId,
+    SUM(COALESCE(incoming, 0) - COALESCE(outgoing, 0)) AS balance
+FROM (
+    SELECT
+        targetAccountId AS accountId,
+        assetId,
+        SUM(amount) AS incoming,
+        0 AS outgoing
+    FROM Transfer
+    GROUP BY targetAccountId, assetId
+
+    UNION ALL
+
+    SELECT
+        sourceAccountId AS accountId,
+        assetId,
+        0 AS incoming,
+        SUM(amount) AS outgoing
+    FROM Transfer
+    GROUP BY sourceAccountId, assetId
+)
+GROUP BY accountId, assetId;
+
+CREATE VIEW RunningBalanceView AS
+SELECT
+    m.transactionId,
+    m.timestamp,
+    m.description,
+    m.accountId,
+    m.assetId,
+    m.transactionAmount,
+    (
+        SELECT SUM(m2.transactionAmount)
+        FROM (
+            SELECT t.id AS transactionId, t.timestamp, tr.targetAccountId AS accountId, tr.assetId, tr.amount AS transactionAmount
+            FROM `Transaction` t
+            JOIN Transfer tr ON t.id = tr.transactionId
+            UNION ALL
+            SELECT t.id AS transactionId, t.timestamp, tr.sourceAccountId AS accountId, tr.assetId, -tr.amount AS transactionAmount
+            FROM `Transaction` t
+            JOIN Transfer tr ON t.id = tr.transactionId
+        ) m2
+        WHERE m2.accountId = m.accountId
+          AND m2.assetId = m.assetId
+          AND (m2.timestamp < m.timestamp OR (m2.timestamp = m.timestamp AND m2.transactionId <= m.transactionId))
+    ) AS runningBalance
+FROM (
+    SELECT t.id AS transactionId, t.timestamp, t.description, tr.targetAccountId AS accountId, tr.assetId, tr.amount AS transactionAmount
+    FROM `Transaction` t
+    JOIN Transfer tr ON t.id = tr.transactionId
+    UNION ALL
+    SELECT t.id AS transactionId, t.timestamp, t.description, tr.sourceAccountId AS accountId, tr.assetId, -tr.amount AS transactionAmount
+    FROM `Transaction` t
+    JOIN Transfer tr ON t.id = tr.transactionId
+) m;
+
+selectAll:
+SELECT * FROM Transfer;
+
+selectById:
+SELECT * FROM Transfer WHERE transactionId = ?;
+
+selectByAccount:
+SELECT * FROM Transfer WHERE sourceAccountId = ? OR targetAccountId = ?;
+
+selectByAccountAndDateRange:
+SELECT tr.*
+FROM Transfer tr
+JOIN `Transaction` t ON tr.transactionId = t.id
+WHERE (tr.sourceAccountId = ? OR tr.targetAccountId = ?)
+AND t.timestamp >= ? AND t.timestamp <= ?;
+
+insert:
+INSERT INTO Transfer(transactionId, sourceAccountId, targetAccountId, assetId, amount)
+VALUES (?, ?, ?, ?, ?);
+
+update:
+UPDATE Transfer
+SET sourceAccountId = ?, targetAccountId = ?, assetId = ?, amount = ?
+WHERE transactionId = ?;
+
+delete:
+DELETE FROM Transfer WHERE transactionId = ?;
+
+selectAllBalances:
+SELECT * FROM AccountBalanceView;
+
+selectRunningBalanceByAccount:
+SELECT * FROM RunningBalanceView
+WHERE accountId = ?
+ORDER BY timestamp DESC, transactionId DESC;
+
+selectAllWithTransaction:
+SELECT
+    t.id AS transactionId,
+    t.timestamp,
+    t.description,
+    tr.sourceAccountId,
+    tr.targetAccountId,
+    tr.assetId,
+    tr.amount
+FROM `Transaction` t
+JOIN Transfer tr ON t.id = tr.transactionId
+ORDER BY t.timestamp DESC;
+
+selectByIdWithTransaction:
+SELECT
+    t.id AS transactionId,
+    t.timestamp,
+    t.description,
+    tr.sourceAccountId,
+    tr.targetAccountId,
+    tr.assetId,
+    tr.amount
+FROM `Transaction` t
+JOIN Transfer tr ON t.id = tr.transactionId
+WHERE t.id = ?;
+
+selectByAccountWithTransaction:
+SELECT
+    t.id AS transactionId,
+    t.timestamp,
+    t.description,
+    tr.sourceAccountId,
+    tr.targetAccountId,
+    tr.assetId,
+    tr.amount
+FROM `Transaction` t
+JOIN Transfer tr ON t.id = tr.transactionId
+WHERE tr.sourceAccountId = ? OR tr.targetAccountId = ?
+ORDER BY t.timestamp DESC;
+
+selectByAccountAndDateRangeWithTransaction:
+SELECT
+    t.id AS transactionId,
+    t.timestamp,
+    t.description,
+    tr.sourceAccountId,
+    tr.targetAccountId,
+    tr.assetId,
+    tr.amount
+FROM `Transaction` t
+JOIN Transfer tr ON t.id = tr.transactionId
+WHERE (tr.sourceAccountId = ? OR tr.targetAccountId = ?)
+AND t.timestamp >= ? AND t.timestamp <= ?
+ORDER BY t.timestamp DESC;

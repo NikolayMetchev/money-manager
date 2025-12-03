@@ -10,8 +10,8 @@ import androidx.compose.ui.test.runComposeUiTest
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.Asset
-import com.moneymanager.domain.model.Transaction
 import com.moneymanager.domain.model.TransactionWithRunningBalance
+import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AssetRepository
 import com.moneymanager.domain.repository.TransactionRepository
@@ -341,30 +341,45 @@ class AccountsScreenTest {
     }
 
     private class FakeTransactionRepository : TransactionRepository {
-        override fun getAllTransactions(): Flow<List<Transaction>> = flowOf(emptyList())
+        override fun getAllTransactions(): Flow<List<Transfer>> = flowOf(emptyList())
 
-        override fun getTransactionById(id: Long): Flow<Transaction?> = flowOf(null)
+        override fun getTransactionById(id: Long): Flow<Transfer?> = flowOf(null)
 
-        override fun getTransactionsByAccount(accountId: Long): Flow<List<Transaction>> = flowOf(emptyList())
+        override fun getTransactionsByAccount(accountId: Long): Flow<List<Transfer>> = flowOf(emptyList())
 
         override fun getTransactionsByDateRange(
             startDate: Instant,
             endDate: Instant,
-        ): Flow<List<Transaction>> = flowOf(emptyList())
+        ): Flow<List<Transfer>> = flowOf(emptyList())
 
         override fun getTransactionsByAccountAndDateRange(
             accountId: Long,
             startDate: Instant,
             endDate: Instant,
-        ): Flow<List<Transaction>> = flowOf(emptyList())
+        ): Flow<List<Transfer>> = flowOf(emptyList())
 
         override fun getAccountBalances(): Flow<List<AccountBalance>> = flowOf(emptyList())
 
         override fun getRunningBalanceByAccount(accountId: Long): Flow<List<TransactionWithRunningBalance>> = flowOf(emptyList())
 
-        override suspend fun createTransaction(transaction: Transaction): Long = 0L
+        override suspend fun createTransfer(
+            timestamp: Instant,
+            description: String,
+            sourceAccountId: Long,
+            targetAccountId: Long,
+            assetId: Long,
+            amount: Double,
+        ): Long = 0L
 
-        override suspend fun updateTransaction(transaction: Transaction) {}
+        override suspend fun updateTransfer(
+            id: Long,
+            timestamp: Instant,
+            description: String,
+            sourceAccountId: Long,
+            targetAccountId: Long,
+            assetId: Long,
+            amount: Double,
+        ) {}
 
         override suspend fun deleteTransaction(id: Long) {}
     }

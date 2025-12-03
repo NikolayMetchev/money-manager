@@ -1,70 +1,8 @@
 CREATE TABLE `Transaction` (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    sourceAccountId INTEGER NOT NULL,
-    targetAccountId INTEGER NOT NULL,
-    assetId INTEGER NOT NULL,
-    amount REAL NOT NULL,
     timestamp INTEGER NOT NULL,
-    description TEXT NOT NULL,
-    CHECK (sourceAccountId != targetAccountId),
-    FOREIGN KEY (sourceAccountId) REFERENCES Account(id) ON DELETE CASCADE,
-    FOREIGN KEY (targetAccountId) REFERENCES Account(id) ON DELETE CASCADE,
-    FOREIGN KEY (assetId) REFERENCES Asset(id) ON DELETE RESTRICT
+    description TEXT NOT NULL
 );
-
-CREATE VIEW AccountBalanceView AS
-SELECT
-    accountId,
-    assetId,
-    SUM(COALESCE(incoming, 0) - COALESCE(outgoing, 0)) AS balance
-FROM (
-    SELECT
-        targetAccountId AS accountId,
-        assetId,
-        SUM(amount) AS incoming,
-        0 AS outgoing
-    FROM `Transaction`
-    GROUP BY targetAccountId, assetId
-
-    UNION ALL
-
-    SELECT
-        sourceAccountId AS accountId,
-        assetId,
-        0 AS incoming,
-        SUM(amount) AS outgoing
-    FROM `Transaction`
-    GROUP BY sourceAccountId, assetId
-)
-GROUP BY accountId, assetId;
-
-CREATE VIEW RunningBalanceView AS
-SELECT
-    m.transactionId,
-    m.timestamp,
-    m.accountId,
-    m.assetId,
-    m.transactionAmount,
-    (
-        SELECT SUM(m2.transactionAmount)
-        FROM (
-            SELECT id AS transactionId, timestamp, targetAccountId AS accountId, assetId, amount AS transactionAmount
-            FROM `Transaction`
-            UNION ALL
-            SELECT id AS transactionId, timestamp, sourceAccountId AS accountId, assetId, -amount AS transactionAmount
-            FROM `Transaction`
-        ) m2
-        WHERE m2.accountId = m.accountId
-          AND m2.assetId = m.assetId
-          AND (m2.timestamp < m.timestamp OR (m2.timestamp = m.timestamp AND m2.transactionId <= m.transactionId))
-    ) AS runningBalance
-FROM (
-    SELECT id AS transactionId, timestamp, targetAccountId AS accountId, assetId, amount AS transactionAmount
-    FROM `Transaction`
-    UNION ALL
-    SELECT id AS transactionId, timestamp, sourceAccountId AS accountId, assetId, -amount AS transactionAmount
-    FROM `Transaction`
-) m;
 
 selectAll:
 SELECT * FROM `Transaction` ORDER BY timestamp DESC;
@@ -72,27 +10,18 @@ SELECT * FROM `Transaction` ORDER BY timestamp DESC;
 selectById:
 SELECT * FROM `Transaction` WHERE id = ?;
 
-selectByAccount:
-SELECT * FROM `Transaction` WHERE sourceAccountId = ? OR targetAccountId = ? ORDER BY timestamp DESC;
-
 selectByDateRange:
 SELECT * FROM `Transaction`
 WHERE timestamp >= ? AND timestamp <= ?
 ORDER BY timestamp DESC;
 
-selectByAccountAndDateRange:
-SELECT * FROM `Transaction`
-WHERE (sourceAccountId = ? OR targetAccountId = ?)
-AND timestamp >= ? AND timestamp <= ?
-ORDER BY timestamp DESC;
-
 insert:
-INSERT INTO `Transaction`(sourceAccountId, targetAccountId, assetId, amount, timestamp, description)
-VALUES (?, ?, ?, ?, ?, ?);
+INSERT INTO `Transaction`(timestamp, description)
+VALUES (?, ?);
 
 update:
 UPDATE `Transaction`
-SET sourceAccountId = ?, targetAccountId = ?, assetId = ?, amount = ?, timestamp = ?, description = ?
+SET timestamp = ?, description = ?
 WHERE id = ?;
 
 delete:
@@ -100,11 +29,3 @@ DELETE FROM `Transaction` WHERE id = ?;
 
 lastInsertRowId:
 SELECT last_insert_rowid();
-
-selectAllBalances:
-SELECT * FROM AccountBalanceView;
-
-selectRunningBalanceByAccount:
-SELECT * FROM RunningBalanceView
-WHERE accountId = ?
-ORDER BY timestamp DESC, transactionId DESC;
