@@ -111,10 +111,15 @@ fun AccountTransactionsScreen(
                             modifier = Modifier.weight(1f),
                             contentAlignment = Alignment.Center,
                         ) {
-                            FilterChip(
-                                selected = selectedAccountId == account.id,
-                                onClick = { },
-                                label = { Text(account.name) },
+                            Text(
+                                text = account.name,
+                                style = MaterialTheme.typography.labelLarge,
+                                color =
+                                    if (selectedAccountId == account.id) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurface
+                                    },
                             )
                         }
                     }
