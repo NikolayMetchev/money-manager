@@ -2,6 +2,7 @@
 
 package com.moneymanager.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -110,10 +111,15 @@ fun AccountTransactionsScreen(
                             modifier = Modifier.weight(1f),
                             contentAlignment = Alignment.Center,
                         ) {
-                            FilterChip(
-                                selected = selectedAccountId == account.id,
-                                onClick = { selectedAccountId = account.id },
-                                label = { Text(account.name) },
+                            Text(
+                                text = account.name,
+                                style = MaterialTheme.typography.labelLarge,
+                                color =
+                                    if (selectedAccountId == account.id) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurface
+                                    },
                             )
                         }
                     }
@@ -144,8 +150,27 @@ fun AccountTransactionsScreen(
                                 accountBalances.find {
                                     it.accountId == account.id && it.assetId == assetId
                                 }
+                            val isSelectedCell = selectedAccountId == account.id && selectedAssetId == assetId
+                            val isSelectedRow = selectedAssetId == assetId
+                            val isSelectedColumn = selectedAccountId == account.id
+
+                            val backgroundColor =
+                                when {
+                                    isSelectedCell -> MaterialTheme.colorScheme.primaryContainer
+                                    isSelectedRow || isSelectedColumn -> MaterialTheme.colorScheme.surfaceVariant
+                                    else -> MaterialTheme.colorScheme.surface
+                                }
+
                             Box(
-                                modifier = Modifier.weight(1f),
+                                modifier =
+                                    Modifier
+                                        .weight(1f)
+                                        .background(backgroundColor)
+                                        .clickable(enabled = balance != null) {
+                                            selectedAccountId = account.id
+                                            selectedAssetId = assetId
+                                        }
+                                        .padding(vertical = 4.dp),
                                 contentAlignment = Alignment.Center,
                             ) {
                                 if (balance != null) {
@@ -170,22 +195,6 @@ fun AccountTransactionsScreen(
                             }
                         }
                     }
-                }
-            }
-        }
-
-        // Asset Picker - Buttons
-        if (accountAssets.isNotEmpty()) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                accountAssets.forEach { asset ->
-                    FilterChip(
-                        selected = selectedAssetId == asset.id,
-                        onClick = { selectedAssetId = asset.id },
-                        label = { Text(asset.name) },
-                    )
                 }
             }
         }
