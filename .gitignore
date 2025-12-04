@@ -13,6 +13,7 @@ gradle-9.2.0/
 .idea/discord.xml
 .idea/deploymentTargetSelector.xml
 .idea/artifacts/
+.idea/caches/
 *.iws
 *.iml
 out/

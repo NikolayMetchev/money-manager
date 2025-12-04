@@ -8,12 +8,15 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.Asset
 import com.moneymanager.domain.model.TransactionWithRunningBalance
@@ -27,6 +30,31 @@ import org.lighthousegames.logging.logging
 import kotlin.time.Clock
 
 private val logger = logging()
+
+/**
+ * Screen size classification for responsive layouts.
+ * Based on Material Design 3 window size classes.
+ */
+enum class ScreenSizeClass {
+    /** Compact: phones in portrait (width < 600dp) */
+    Compact,
+
+    /** Medium: tablets in portrait, foldables (600dp <= width < 840dp) */
+    Medium,
+
+    /** Expanded: tablets in landscape, desktops (width >= 840dp) */
+    Expanded,
+    ;
+
+    companion object {
+        fun fromWidth(width: androidx.compose.ui.unit.Dp): ScreenSizeClass =
+            when {
+                width < 600.dp -> Compact
+                width < 840.dp -> Medium
+                else -> Expanded
+            }
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -86,202 +114,227 @@ fun AccountTransactionsScreen(
             runningBalances.filter { it.assetId == assetId }
         } ?: emptyList()
 
-    Column(
+    BoxWithConstraints(
         modifier =
             Modifier
                 .fillMaxSize()
                 .padding(16.dp),
     ) {
-        // Account Picker - Buttons with balances underneath in table format
-        if (allAccounts.isNotEmpty()) {
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                // Row of account buttons
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+        val screenSizeClass = ScreenSizeClass.fromWidth(maxWidth)
+
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Account Picker - Buttons with balances underneath in table format
+            if (allAccounts.isNotEmpty()) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    // Empty space for asset name column
-                    Spacer(modifier = Modifier.width(60.dp))
-
-                    allAccounts.forEach { account ->
-                        Box(
-                            modifier = Modifier.weight(1f),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                text = account.name,
-                                style = MaterialTheme.typography.labelLarge,
-                                color =
-                                    if (selectedAccountId == account.id) {
-                                        MaterialTheme.colorScheme.primary
-                                    } else {
-                                        MaterialTheme.colorScheme.onSurface
-                                    },
-                            )
-                        }
-                    }
-                }
-
-                // Get all unique assets from account balances
-                val uniqueAssetIds = accountBalances.map { it.assetId }.distinct()
-
-                // Row for each asset
-                uniqueAssetIds.forEach { assetId ->
-                    val asset = assets.find { it.id == assetId }
+                    // Row of account buttons
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        // Asset name as row header
-                        Text(
-                            text = "${asset?.name ?: "?"}:",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.width(60.dp),
-                        )
+                        // Empty space for asset name column
+                        Spacer(modifier = Modifier.width(60.dp))
 
-                        // Balance for each account
                         allAccounts.forEach { account ->
-                            val balance =
-                                accountBalances.find {
-                                    it.accountId == account.id && it.assetId == assetId
-                                }
-                            val isSelectedCell = selectedAccountId == account.id && selectedAssetId == assetId
-                            val isSelectedRow = selectedAssetId == assetId
-                            val isSelectedColumn = selectedAccountId == account.id
-
-                            val backgroundColor =
-                                when {
-                                    isSelectedCell -> MaterialTheme.colorScheme.primaryContainer
-                                    isSelectedRow || isSelectedColumn -> MaterialTheme.colorScheme.surfaceVariant
-                                    else -> MaterialTheme.colorScheme.surface
-                                }
-
                             Box(
-                                modifier =
-                                    Modifier
-                                        .weight(1f)
-                                        .background(backgroundColor)
-                                        .clickable(enabled = balance != null) {
-                                            selectedAccountId = account.id
-                                            selectedAssetId = assetId
-                                        }
-                                        .padding(vertical = 4.dp),
+                                modifier = Modifier.weight(1f),
                                 contentAlignment = Alignment.Center,
                             ) {
-                                if (balance != null) {
-                                    Text(
-                                        text = String.format("%.2f", balance.balance),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color =
-                                            if (balance.balance >= 0) {
-                                                MaterialTheme.colorScheme.primary
-                                            } else {
-                                                MaterialTheme.colorScheme.error
-                                            },
-                                    )
-                                } else {
-                                    // Empty cell if account doesn't have this asset
-                                    Text(
-                                        text = "-",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
+                                Text(
+                                    text = account.name,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color =
+                                        if (selectedAccountId == account.id) {
+                                            MaterialTheme.colorScheme.primary
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurface
+                                        },
+                                )
+                            }
+                        }
+                    }
+
+                    // Get all unique assets from account balances
+                    val uniqueAssetIds = accountBalances.map { it.assetId }.distinct()
+
+                    // Row for each asset
+                    uniqueAssetIds.forEach { assetId ->
+                        val asset = assets.find { it.id == assetId }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            // Asset name as row header
+                            Text(
+                                text = "${asset?.name ?: "?"}:",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.width(60.dp),
+                            )
+
+                            // Balance for each account
+                            allAccounts.forEach { account ->
+                                val balance =
+                                    accountBalances.find {
+                                        it.accountId == account.id && it.assetId == assetId
+                                    }
+                                val isSelectedCell = selectedAccountId == account.id && selectedAssetId == assetId
+                                val isSelectedRow = selectedAssetId == assetId
+                                val isSelectedColumn = selectedAccountId == account.id
+
+                                val backgroundColor =
+                                    when {
+                                        isSelectedCell -> MaterialTheme.colorScheme.primaryContainer
+                                        isSelectedRow || isSelectedColumn -> MaterialTheme.colorScheme.surfaceVariant
+                                        else -> MaterialTheme.colorScheme.surface
+                                    }
+
+                                Box(
+                                    modifier =
+                                        Modifier
+                                            .weight(1f)
+                                            .background(backgroundColor)
+                                            .clickable(enabled = balance != null) {
+                                                selectedAccountId = account.id
+                                                selectedAssetId = assetId
+                                            }
+                                            .padding(vertical = 4.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    if (balance != null) {
+                                        Text(
+                                            text = String.format("%.2f", balance.balance),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color =
+                                                if (balance.balance >= 0) {
+                                                    MaterialTheme.colorScheme.primary
+                                                } else {
+                                                    MaterialTheme.colorScheme.error
+                                                },
+                                        )
+                                    } else {
+                                        // Empty cell if account doesn't have this asset
+                                        Text(
+                                            text = "-",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
-        }
 
-        if (runningBalances.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = "No transactions yet for this account.",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        } else if (filteredRunningBalances.isEmpty() && selectedAssetId != null) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = "No transactions for selected asset.",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        } else {
-            // Column Headers
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "Date/Time",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(0.2f),
-                )
-                Text(
-                    text = "Account",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(0.25f).padding(horizontal = 8.dp),
-                )
-                Text(
-                    text = "Description",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(0.3f).padding(horizontal = 8.dp),
-                )
-                Text(
-                    text = "Amount",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.End,
-                    modifier = Modifier.weight(0.15f),
-                )
-                Text(
-                    text = "Balance",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.End,
-                    modifier = Modifier.weight(0.15f).padding(start = 8.dp),
-                )
-            }
-
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                items(filteredRunningBalances) { runningBalance ->
-                    val transaction = transactionMap[runningBalance.transactionId]
-                    AccountTransactionCard(
-                        runningBalance = runningBalance,
-                        transaction = transaction,
-                        currentAccountId = selectedAccountId,
-                        accounts = allAccounts,
-                        assets = assets,
-                        isHighlighted = highlightedTransactionId == runningBalance.transactionId,
-                        onAccountClick = { accountId ->
-                            highlightedTransactionId = runningBalance.transactionId
-                            selectedAccountId = accountId
-                        },
+            if (runningBalances.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "No transactions yet for this account.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+            } else if (filteredRunningBalances.isEmpty() && selectedAssetId != null) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "No transactions for selected asset.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            } else {
+                // Column Headers - use fixed font size to ensure consistency
+                val headerStyle = MaterialTheme.typography.labelSmall
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "Date",
+                        style = headerStyle,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        softWrap = false,
+                        modifier = Modifier.weight(0.15f),
+                    )
+                    if (screenSizeClass != ScreenSizeClass.Compact) {
+                        Text(
+                            text = "Time",
+                            style = headerStyle,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            softWrap = false,
+                            modifier = Modifier.weight(0.1f),
+                        )
+                    }
+                    Text(
+                        text = "Account",
+                        style = headerStyle,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        softWrap = false,
+                        modifier = Modifier.weight(0.2f).padding(horizontal = 8.dp),
+                    )
+                    Text(
+                        text = "Description",
+                        style = headerStyle,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        softWrap = false,
+                        modifier = Modifier.weight(0.25f).padding(horizontal = 8.dp),
+                    )
+                    Text(
+                        text = "Amount",
+                        style = headerStyle,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.End,
+                        maxLines = 1,
+                        softWrap = false,
+                        modifier = Modifier.weight(0.15f),
+                    )
+                    Text(
+                        text = "Balance",
+                        style = headerStyle,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.End,
+                        maxLines = 1,
+                        softWrap = false,
+                        modifier = Modifier.weight(0.15f).padding(start = 8.dp),
+                    )
+                }
+
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(filteredRunningBalances) { runningBalance ->
+                        val transaction = transactionMap[runningBalance.transactionId]
+                        AccountTransactionCard(
+                            runningBalance = runningBalance,
+                            transaction = transaction,
+                            accounts = allAccounts,
+                            assets = assets,
+                            screenSizeClass = screenSizeClass,
+                            isHighlighted = highlightedTransactionId == runningBalance.transactionId,
+                            onAccountClick = { accountId ->
+                                highlightedTransactionId = runningBalance.transactionId
+                                selectedAccountId = accountId
+                            },
+                        )
+                    }
                 }
             }
         }
@@ -292,15 +345,14 @@ fun AccountTransactionsScreen(
 fun AccountTransactionCard(
     runningBalance: TransactionWithRunningBalance,
     transaction: Transfer?,
-    currentAccountId: Long,
     accounts: List<Account>,
     assets: List<Asset>,
+    screenSizeClass: ScreenSizeClass,
     isHighlighted: Boolean = false,
     onAccountClick: (Long) -> Unit = {},
 ) {
     val sourceAccount = transaction?.let { accounts.find { a -> a.id == it.sourceAccountId } }
     val targetAccount = transaction?.let { accounts.find { a -> a.id == it.targetAccountId } }
-    val asset = assets.find { it.id == runningBalance.assetId }
 
     // Determine the other account based on transaction direction
     val isOutgoing = runningBalance.transactionAmount < 0
@@ -318,6 +370,10 @@ fun AccountTransactionCard(
                 CardDefaults.cardColors()
             },
     ) {
+        // Use consistent style and autoSize for all columns
+        val cellStyle = MaterialTheme.typography.bodyMedium
+        val cellAutoSize = TextAutoSize.StepBased(minFontSize = 8.sp, maxFontSize = 14.sp)
+
         Row(
             modifier =
                 Modifier
@@ -326,80 +382,95 @@ fun AccountTransactionCard(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Leftmost column: Date and time
+            // Date column
             val dateTime = runningBalance.timestamp.toLocalDateTime(TimeZone.currentSystemDefault())
-            Column(modifier = Modifier.weight(0.2f)) {
-                Text(
-                    text = "${dateTime.date}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "${dateTime.date}",
+                style = cellStyle,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                autoSize = cellAutoSize,
+                modifier = Modifier.weight(0.15f),
+            )
+
+            // Time column (only on medium/expanded screens)
+            if (screenSizeClass != ScreenSizeClass.Compact) {
                 Text(
                     text = "${dateTime.time}",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = cellStyle,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    autoSize = cellAutoSize,
+                    modifier = Modifier.weight(0.1f),
                 )
             }
 
-            // Second column: Account name (clickable)
+            // Account name column (clickable)
             Text(
                 text = otherAccount?.name ?: "Unknown",
-                style = MaterialTheme.typography.titleMedium,
+                style = cellStyle,
                 color =
                     if (otherAccount != null) {
                         MaterialTheme.colorScheme.primary
                     } else {
                         MaterialTheme.colorScheme.onSurface
                     },
+                maxLines = 1,
+                autoSize = cellAutoSize,
                 modifier =
                     Modifier
-                        .weight(0.25f)
+                        .weight(0.2f)
                         .padding(horizontal = 8.dp)
                         .clickable(enabled = otherAccount != null) {
                             otherAccount?.id?.let { onAccountClick(it) }
                         },
             )
 
-            // Third column: Description
+            // Description column
             transaction?.description?.let { desc ->
                 if (desc.isNotBlank()) {
                     Text(
                         text = desc,
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = cellStyle,
                         color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.weight(0.3f).padding(horizontal = 8.dp),
+                        maxLines = 1,
+                        autoSize = cellAutoSize,
+                        modifier = Modifier.weight(0.25f).padding(horizontal = 8.dp),
                     )
                 } else {
-                    Spacer(modifier = Modifier.weight(0.3f))
+                    Spacer(modifier = Modifier.weight(0.25f))
                 }
-            } ?: Spacer(modifier = Modifier.weight(0.3f))
+            } ?: Spacer(modifier = Modifier.weight(0.25f))
 
-            // Fourth column: Transaction amount
+            // Amount column
             Text(
                 text = String.format("%+.2f", runningBalance.transactionAmount),
-                style = MaterialTheme.typography.titleLarge,
+                style = cellStyle,
                 color =
                     if (runningBalance.transactionAmount >= 0) {
                         MaterialTheme.colorScheme.primary
                     } else {
                         MaterialTheme.colorScheme.error
                     },
-                textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                textAlign = TextAlign.End,
+                maxLines = 1,
+                autoSize = cellAutoSize,
                 modifier = Modifier.weight(0.15f),
             )
 
-            // Rightmost column: Running balance
+            // Balance column
             Text(
                 text = String.format("%.2f", runningBalance.runningBalance),
-                style = MaterialTheme.typography.titleMedium,
+                style = cellStyle,
                 color =
                     if (runningBalance.runningBalance >= 0) {
                         MaterialTheme.colorScheme.primary
                     } else {
                         MaterialTheme.colorScheme.error
                     },
-                textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                textAlign = TextAlign.End,
+                maxLines = 1,
+                autoSize = cellAutoSize,
                 modifier = Modifier.weight(0.15f).padding(start = 8.dp),
             )
         }
@@ -435,12 +506,16 @@ fun TransactionCard(
                     text = "${dateTime.date}",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    autoSize = TextAutoSize.StepBased(minFontSize = 8.sp),
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = "${dateTime.time}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    autoSize = TextAutoSize.StepBased(minFontSize = 6.sp, maxFontSize = 12.sp),
                 )
             }
 
@@ -471,11 +546,15 @@ fun TransactionCard(
                 Text(
                     text = String.format("%.2f", transaction.amount),
                     style = MaterialTheme.typography.titleLarge,
+                    maxLines = 1,
+                    autoSize = TextAutoSize.StepBased(minFontSize = 8.sp),
                 )
                 Text(
                     text = asset?.name ?: "Unknown",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    autoSize = TextAutoSize.StepBased(minFontSize = 8.sp),
                 )
             }
         }
@@ -653,16 +732,18 @@ fun TransactionEntryDialog(
                 }
 
                 // Date and Time Pickers
+                val dateTimeTextStyle = MaterialTheme.typography.bodySmall
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    // Date Picker
+                    // Date Picker - ISO format (YYYY-MM-DD)
                     OutlinedTextField(
                         value = selectedDate.toString(),
                         onValueChange = {},
                         readOnly = true,
                         label = { Text("Date") },
+                        textStyle = dateTimeTextStyle,
                         trailingIcon = {
                             IconButton(
                                 onClick = { showDatePicker = true },
@@ -674,8 +755,9 @@ fun TransactionEntryDialog(
                                 )
                             }
                         },
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1.5f),
                         enabled = false,
+                        singleLine = true,
                         colors =
                             OutlinedTextFieldDefaults.colors(
                                 disabledTextColor = MaterialTheme.colorScheme.onSurface,
@@ -684,12 +766,14 @@ fun TransactionEntryDialog(
                             ),
                     )
 
-                    // Time Picker
+                    // Time Picker - ISO format (HH:MM:SS)
+                    val time = LocalTime(selectedHour, selectedMinute)
                     OutlinedTextField(
-                        value = String.format("%02d:%02d", selectedHour, selectedMinute),
+                        value = time.toString(),
                         onValueChange = {},
                         readOnly = true,
                         label = { Text("Time") },
+                        textStyle = dateTimeTextStyle,
                         trailingIcon = {
                             IconButton(
                                 onClick = { showTimePicker = true },
@@ -703,6 +787,7 @@ fun TransactionEntryDialog(
                         },
                         modifier = Modifier.weight(1f),
                         enabled = false,
+                        singleLine = true,
                         colors =
                             OutlinedTextFieldDefaults.colors(
                                 disabledTextColor = MaterialTheme.colorScheme.onSurface,
