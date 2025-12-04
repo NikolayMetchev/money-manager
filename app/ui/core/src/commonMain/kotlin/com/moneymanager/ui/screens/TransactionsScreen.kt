@@ -113,7 +113,7 @@ fun AccountTransactionsScreen(
                         ) {
                             FilterChip(
                                 selected = selectedAccountId == account.id,
-                                onClick = { selectedAccountId = account.id },
+                                onClick = { },
                                 label = { Text(account.name) },
                             )
                         }
