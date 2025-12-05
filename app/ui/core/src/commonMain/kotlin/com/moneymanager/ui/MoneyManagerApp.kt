@@ -1,3 +1,5 @@
+@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
+
 package com.moneymanager.ui
 
 import androidx.compose.foundation.layout.*
@@ -25,6 +27,8 @@ fun MoneyManagerApp(
     var showTransactionDialog by remember { mutableStateOf(false) }
     var preSelectedAccountId by remember { mutableStateOf<Long?>(null) }
     var currentlyViewedAccountId by remember { mutableStateOf<Long?>(null) }
+    var preSelectedCurrencyId by remember { mutableStateOf<kotlin.uuid.Uuid?>(null) }
+    var currentlyViewedCurrencyId by remember { mutableStateOf<kotlin.uuid.Uuid?>(null) }
 
     val accounts by repositorySet.accountRepository.getAllAccounts().collectAsState(initial = emptyList())
     val currencies by repositorySet.currencyRepository.getAllCurrencies().collectAsState(initial = emptyList())
@@ -83,6 +87,7 @@ fun MoneyManagerApp(
                 FloatingActionButton(
                     onClick = {
                         preSelectedAccountId = currentlyViewedAccountId
+                        preSelectedCurrencyId = currentlyViewedCurrencyId
                         showTransactionDialog = true
                     },
                 ) {
@@ -93,9 +98,10 @@ fun MoneyManagerApp(
             Box(modifier = Modifier.padding(paddingValues)) {
                 when (val screen = currentScreen) {
                     is Screen.Accounts -> {
-                        // Reset currentlyViewedAccountId when on other screens
+                        // Reset currentlyViewedAccountId and currentlyViewedCurrencyId when on other screens
                         LaunchedEffect(Unit) {
                             currentlyViewedAccountId = null
+                            currentlyViewedCurrencyId = null
                         }
                         AccountsScreen(
                             accountRepository = repositorySet.accountRepository,
@@ -107,16 +113,18 @@ fun MoneyManagerApp(
                         )
                     }
                     is Screen.Currencies -> {
-                        // Reset currentlyViewedAccountId when on other screens
+                        // Reset currentlyViewedAccountId and currentlyViewedCurrencyId when on other screens
                         LaunchedEffect(Unit) {
                             currentlyViewedAccountId = null
+                            currentlyViewedCurrencyId = null
                         }
                         CurrenciesScreen(repositorySet.currencyRepository)
                     }
                     is Screen.Categories -> {
-                        // Reset currentlyViewedAccountId when on other screens
+                        // Reset currentlyViewedAccountId and currentlyViewedCurrencyId when on other screens
                         LaunchedEffect(Unit) {
                             currentlyViewedAccountId = null
+                            currentlyViewedCurrencyId = null
                         }
                         CategoriesScreen(repositorySet.categoryRepository)
                     }
@@ -133,6 +141,9 @@ fun MoneyManagerApp(
                             onAccountIdChange = { accountId ->
                                 currentlyViewedAccountId = accountId
                             },
+                            onCurrencyIdChange = { currencyId ->
+                                currentlyViewedCurrencyId = currencyId
+                            },
                         )
                     }
                 }
@@ -147,9 +158,11 @@ fun MoneyManagerApp(
                 accounts = accounts,
                 currencies = currencies,
                 preSelectedSourceAccountId = preSelectedAccountId,
+                preSelectedCurrencyId = preSelectedCurrencyId,
                 onDismiss = {
                     showTransactionDialog = false
                     preSelectedAccountId = null
+                    preSelectedCurrencyId = null
                 },
             )
         }
