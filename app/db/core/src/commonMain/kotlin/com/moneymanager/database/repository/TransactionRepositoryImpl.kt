@@ -1,4 +1,4 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
+@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
 
 package com.moneymanager.database.repository
 
@@ -16,21 +16,21 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlin.time.Instant
 import kotlin.time.Instant.Companion.fromEpochMilliseconds
+import kotlin.uuid.Uuid
 
 class TransactionRepositoryImpl(
     private val database: MoneyManagerDatabase,
 ) : TransactionRepository {
-    private val transactionQueries = database.transactionQueries
     private val transferQueries = database.transferQueries
 
     override fun getAllTransactions(): Flow<List<Transfer>> =
-        transferQueries.selectAllWithTransaction()
+        transferQueries.selectAll()
             .asFlow()
             .mapToList(Dispatchers.Default)
             .map { list ->
                 list.map { row ->
                     Transfer(
-                        id = row.transactionId,
+                        id = Uuid.parse(row.id),
                         timestamp = fromEpochMilliseconds(row.timestamp),
                         description = row.description,
                         sourceAccountId = row.sourceAccountId,
@@ -41,14 +41,14 @@ class TransactionRepositoryImpl(
                 }
             }
 
-    override fun getTransactionById(id: Long): Flow<Transfer?> =
-        transferQueries.selectByIdWithTransaction(id)
+    override fun getTransactionById(id: Uuid): Flow<Transfer?> =
+        transferQueries.selectById(id.toString())
             .asFlow()
             .mapToOneOrNull(Dispatchers.Default)
             .map { row ->
                 row?.let {
                     Transfer(
-                        id = it.transactionId,
+                        id = Uuid.parse(it.id),
                         timestamp = fromEpochMilliseconds(it.timestamp),
                         description = it.description,
                         sourceAccountId = it.sourceAccountId,
@@ -60,13 +60,13 @@ class TransactionRepositoryImpl(
             }
 
     override fun getTransactionsByAccount(accountId: Long): Flow<List<Transfer>> =
-        transferQueries.selectByAccountWithTransaction(accountId, accountId)
+        transferQueries.selectByAccount(accountId, accountId)
             .asFlow()
             .mapToList(Dispatchers.Default)
             .map { list ->
                 list.map { row ->
                     Transfer(
-                        id = row.transactionId,
+                        id = Uuid.parse(row.id),
                         timestamp = fromEpochMilliseconds(row.timestamp),
                         description = row.description,
                         sourceAccountId = row.sourceAccountId,
@@ -81,16 +81,32 @@ class TransactionRepositoryImpl(
         startDate: Instant,
         endDate: Instant,
     ): Flow<List<Transfer>> =
-        getAllTransactions().map { transactions ->
-            transactions.filter { it.timestamp in startDate..endDate }
-        }
+        transferQueries.selectByDateRange(
+            startDate.toEpochMilliseconds(),
+            endDate.toEpochMilliseconds(),
+        )
+            .asFlow()
+            .mapToList(Dispatchers.Default)
+            .map { list ->
+                list.map { row ->
+                    Transfer(
+                        id = Uuid.parse(row.id),
+                        timestamp = fromEpochMilliseconds(row.timestamp),
+                        description = row.description,
+                        sourceAccountId = row.sourceAccountId,
+                        targetAccountId = row.targetAccountId,
+                        assetId = row.assetId,
+                        amount = row.amount,
+                    )
+                }
+            }
 
     override fun getTransactionsByAccountAndDateRange(
         accountId: Long,
         startDate: Instant,
         endDate: Instant,
     ): Flow<List<Transfer>> =
-        transferQueries.selectByAccountAndDateRangeWithTransaction(
+        transferQueries.selectByAccountAndDateRange(
             accountId,
             accountId,
             startDate.toEpochMilliseconds(),
@@ -101,7 +117,7 @@ class TransactionRepositoryImpl(
             .map { list ->
                 list.map { row ->
                     Transfer(
-                        id = row.transactionId,
+                        id = Uuid.parse(row.id),
                         timestamp = fromEpochMilliseconds(row.timestamp),
                         description = row.description,
                         sourceAccountId = row.sourceAccountId,
@@ -133,7 +149,7 @@ class TransactionRepositoryImpl(
             .map { list ->
                 list.map { row ->
                     TransactionWithRunningBalance(
-                        transactionId = row.transactionId,
+                        transactionId = Uuid.parse(row.id),
                         timestamp = fromEpochMilliseconds(row.timestamp),
                         description = row.description,
                         accountId = row.accountId,
@@ -144,70 +160,37 @@ class TransactionRepositoryImpl(
                 }
             }
 
-    override suspend fun createTransfer(
-        timestamp: Instant,
-        description: String,
-        sourceAccountId: Long,
-        targetAccountId: Long,
-        assetId: Long,
-        amount: Double,
-    ): Long =
+    override suspend fun createTransfer(transfer: Transfer): Unit =
         withContext(Dispatchers.Default) {
-            transactionQueries.transactionWithResult {
-                // Insert transaction first
-                transactionQueries.insert(
-                    timestamp = timestamp.toEpochMilliseconds(),
-                    description = description,
-                )
-                val transactionId = transactionQueries.lastInsertRowId().executeAsOne()
-
-                // Then insert transfer with the transaction ID
-                transferQueries.insert(
-                    transactionId = transactionId,
-                    sourceAccountId = sourceAccountId,
-                    targetAccountId = targetAccountId,
-                    assetId = assetId,
-                    amount = amount,
-                )
-
-                transactionId
-            }
-        }
-
-    override suspend fun updateTransfer(
-        id: Long,
-        timestamp: Instant,
-        description: String,
-        sourceAccountId: Long,
-        targetAccountId: Long,
-        assetId: Long,
-        amount: Double,
-    ): Unit =
-        withContext(Dispatchers.Default) {
-            transactionQueries.transaction {
-                // Update transaction
-                transactionQueries.update(
-                    timestamp = timestamp.toEpochMilliseconds(),
-                    description = description,
-                    id = id,
-                )
-
-                // Update transfer
-                transferQueries.update(
-                    sourceAccountId = sourceAccountId,
-                    targetAccountId = targetAccountId,
-                    assetId = assetId,
-                    amount = amount,
-                    transactionId = id,
-                )
-            }
+            transferQueries.insert(
+                id = transfer.id.toString(),
+                timestamp = transfer.timestamp.toEpochMilliseconds(),
+                description = transfer.description,
+                sourceAccountId = transfer.sourceAccountId,
+                targetAccountId = transfer.targetAccountId,
+                assetId = transfer.assetId,
+                amount = transfer.amount,
+            )
             Unit
         }
 
-    override suspend fun deleteTransaction(id: Long): Unit =
+    override suspend fun updateTransfer(transfer: Transfer): Unit =
         withContext(Dispatchers.Default) {
-            // Due to CASCADE, deleting the transaction will also delete the transfer
-            transactionQueries.delete(id)
+            transferQueries.update(
+                timestamp = transfer.timestamp.toEpochMilliseconds(),
+                description = transfer.description,
+                sourceAccountId = transfer.sourceAccountId,
+                targetAccountId = transfer.targetAccountId,
+                assetId = transfer.assetId,
+                amount = transfer.amount,
+                id = transfer.id.toString(),
+            )
+            Unit
+        }
+
+    override suspend fun deleteTransaction(id: Uuid): Unit =
+        withContext(Dispatchers.Default) {
+            transferQueries.delete(id.toString())
             Unit
         }
 }

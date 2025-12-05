@@ -1,4 +1,4 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
+@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
 
 package com.moneymanager.ui.screens
 
@@ -29,6 +29,7 @@ import kotlinx.coroutines.launch
 import kotlinx.datetime.*
 import org.lighthousegames.logging.logging
 import kotlin.time.Clock
+import kotlin.uuid.Uuid
 
 private val logger = logging()
 
@@ -80,7 +81,7 @@ fun AccountTransactionsScreen(
     }
 
     // Highlighted transaction state
-    var highlightedTransactionId by remember { mutableStateOf<Long?>(null) }
+    var highlightedTransactionId by remember { mutableStateOf<Uuid?>(null) }
 
     // Get running balances for the selected account
     val runningBalances by transactionRepository.getRunningBalanceByAccount(selectedAccountId)
@@ -870,14 +871,17 @@ fun TransactionEntryDialog(
                                         selectedDate
                                             .atTime(selectedHour, selectedMinute, 0)
                                             .toInstant(TimeZone.currentSystemDefault())
-                                    transactionRepository.createTransfer(
-                                        timestamp = timestamp,
-                                        description = description.trim(),
-                                        sourceAccountId = sourceAccountId!!,
-                                        targetAccountId = targetAccountId!!,
-                                        assetId = assetId!!,
-                                        amount = amount.toDouble(),
-                                    )
+                                    val transfer =
+                                        Transfer(
+                                            id = Uuid.random(),
+                                            timestamp = timestamp,
+                                            description = description.trim(),
+                                            sourceAccountId = sourceAccountId!!,
+                                            targetAccountId = targetAccountId!!,
+                                            assetId = assetId!!,
+                                            amount = amount.toDouble(),
+                                        )
+                                    transactionRepository.createTransfer(transfer)
                                     onDismiss()
                                 } catch (e: Exception) {
                                     logger.error(e) { "Failed to create transaction: ${e.message}" }
