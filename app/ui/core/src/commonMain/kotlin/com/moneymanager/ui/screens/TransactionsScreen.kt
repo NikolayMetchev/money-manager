@@ -18,11 +18,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moneymanager.domain.model.Account
-import com.moneymanager.domain.model.Asset
+import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.TransactionWithRunningBalance
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.repository.AccountRepository
-import com.moneymanager.domain.repository.AssetRepository
+import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.ui.util.formatAmount
 import kotlinx.coroutines.launch
@@ -64,12 +64,12 @@ fun AccountTransactionsScreen(
     accountId: Long,
     transactionRepository: TransactionRepository,
     accountRepository: AccountRepository,
-    assetRepository: AssetRepository,
+    currencyRepository: CurrencyRepository,
     onAccountIdChange: (Long) -> Unit = {},
 ) {
     val allAccounts by accountRepository.getAllAccounts().collectAsState(initial = emptyList())
     val allTransactions by transactionRepository.getAllTransactions().collectAsState(initial = emptyList())
-    val assets by assetRepository.getAllAssets().collectAsState(initial = emptyList())
+    val currencies by currencyRepository.getAllCurrencies().collectAsState(initial = emptyList())
     val accountBalances by transactionRepository.getAccountBalances().collectAsState(initial = emptyList())
 
     // Selected account state - default to the provided accountId
@@ -90,30 +90,30 @@ fun AccountTransactionsScreen(
     // Build a map of transactionId -> full Transaction for additional details
     val transactionMap = allTransactions.associateBy { it.id }
 
-    // Get unique asset IDs from running balances for this account
-    val accountAssetIds = runningBalances.map { it.assetId }.distinct()
-    val accountAssets = assets.filter { it.id in accountAssetIds }
+    // Get unique currency IDs from running balances for this account
+    val accountCurrencyIds = runningBalances.map { it.currencyId }.distinct()
+    val accountCurrencies = currencies.filter { it.id in accountCurrencyIds }
 
-    // Selected asset state - default to first asset if available
-    var selectedAssetId by remember { mutableStateOf<Long?>(null) }
+    // Selected currency state - default to first currency if available
+    var selectedCurrencyId by remember { mutableStateOf<Uuid?>(null) }
 
-    // Update selected asset when account assets change
-    LaunchedEffect(accountAssets) {
-        if (accountAssets.isNotEmpty()) {
-            // If currently selected asset exists in the new account's assets, keep it
-            // Otherwise, select the first available asset
-            if (selectedAssetId == null || accountAssets.none { it.id == selectedAssetId }) {
-                selectedAssetId = accountAssets.first().id
+    // Update selected currency when account currencies change
+    LaunchedEffect(accountCurrencies) {
+        if (accountCurrencies.isNotEmpty()) {
+            // If currently selected currency exists in the new account's currencies, keep it
+            // Otherwise, select the first available currency
+            if (selectedCurrencyId == null || accountCurrencies.none { it.id == selectedCurrencyId }) {
+                selectedCurrencyId = accountCurrencies.first().id
             }
         } else {
-            selectedAssetId = null
+            selectedCurrencyId = null
         }
     }
 
-    // Filter running balances by selected asset (or show all if no asset selected)
+    // Filter running balances by selected currency (or show all if no currency selected)
     val filteredRunningBalances =
-        selectedAssetId?.let { assetId ->
-            runningBalances.filter { it.assetId == assetId }
+        selectedCurrencyId?.let { currencyId ->
+            runningBalances.filter { it.currencyId == currencyId }
         } ?: runningBalances
 
     BoxWithConstraints(
@@ -136,12 +136,12 @@ fun AccountTransactionsScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        // Empty space for asset name column
+                        // Empty space for currency name column
                         Spacer(modifier = Modifier.width(60.dp))
 
                         allAccounts.forEach { account ->
                             val isSelectedColumn = selectedAccountId == account.id
-                            val isColumnSelected = isSelectedColumn && selectedAssetId == null
+                            val isColumnSelected = isSelectedColumn && selectedCurrencyId == null
                             Box(
                                 modifier =
                                     Modifier
@@ -155,7 +155,7 @@ fun AccountTransactionsScreen(
                                         )
                                         .clickable {
                                             selectedAccountId = account.id
-                                            selectedAssetId = null // Clear asset to show all currencies
+                                            selectedCurrencyId = null // Clear currency to show all currencies
                                         }
                                         .padding(vertical = 4.dp),
                                 contentAlignment = Alignment.Center,
@@ -174,20 +174,20 @@ fun AccountTransactionsScreen(
                         }
                     }
 
-                    // Get all unique assets from account balances
-                    val uniqueAssetIds = accountBalances.map { it.assetId }.distinct()
+                    // Get all unique currencies from account balances
+                    val uniqueCurrencyIds = accountBalances.map { it.currencyId }.distinct()
 
-                    // Row for each asset
-                    uniqueAssetIds.forEach { assetId ->
-                        val asset = assets.find { it.id == assetId }
+                    // Row for each currency
+                    uniqueCurrencyIds.forEach { currencyId ->
+                        val currency = currencies.find { it.id == currencyId }
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            // Asset name as row header
+                            // Currency code as row header
                             Text(
-                                text = "${asset?.name ?: "?"}:",
+                                text = "${currency?.code ?: "?"}:",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.width(60.dp),
@@ -197,12 +197,12 @@ fun AccountTransactionsScreen(
                             allAccounts.forEach { account ->
                                 val balance =
                                     accountBalances.find {
-                                        it.accountId == account.id && it.assetId == assetId
+                                        it.accountId == account.id && it.currencyId == currencyId
                                     }
-                                val isSelectedCell = selectedAccountId == account.id && selectedAssetId == assetId
-                                val isSelectedRow = selectedAssetId == assetId
+                                val isSelectedCell = selectedAccountId == account.id && selectedCurrencyId == currencyId
+                                val isSelectedRow = selectedCurrencyId == currencyId
                                 val isSelectedColumn = selectedAccountId == account.id
-                                val isColumnSelected = isSelectedColumn && selectedAssetId == null
+                                val isColumnSelected = isSelectedColumn && selectedCurrencyId == null
 
                                 val backgroundColor =
                                     when {
@@ -219,7 +219,7 @@ fun AccountTransactionsScreen(
                                             .background(backgroundColor)
                                             .clickable(enabled = balance != null) {
                                                 selectedAccountId = account.id
-                                                selectedAssetId = assetId
+                                                selectedCurrencyId = currencyId
                                             }
                                             .padding(vertical = 4.dp),
                                     contentAlignment = Alignment.Center,
@@ -227,7 +227,7 @@ fun AccountTransactionsScreen(
                                     if (balance != null) {
                                         Text(
                                             text =
-                                                asset?.let { formatAmount(balance.balance, it) }
+                                                currency?.let { formatAmount(balance.balance, it) }
                                                     ?: String.format("%.2f", balance.balance),
                                             style = MaterialTheme.typography.bodySmall,
                                             color =
@@ -238,7 +238,7 @@ fun AccountTransactionsScreen(
                                                 },
                                         )
                                     } else {
-                                        // Empty cell if account doesn't have this asset
+                                        // Empty cell if account doesn't have this currency
                                         Text(
                                             text = "-",
                                             style = MaterialTheme.typography.bodySmall,
@@ -263,13 +263,13 @@ fun AccountTransactionsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-            } else if (filteredRunningBalances.isEmpty() && selectedAssetId != null) {
+            } else if (filteredRunningBalances.isEmpty() && selectedCurrencyId != null) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = "No transactions for selected asset.",
+                        text = "No transactions for selected currency.",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -348,7 +348,7 @@ fun AccountTransactionsScreen(
                             runningBalance = runningBalance,
                             transaction = transaction,
                             accounts = allAccounts,
-                            assets = assets,
+                            currencies = currencies,
                             screenSizeClass = screenSizeClass,
                             isHighlighted = highlightedTransactionId == runningBalance.transactionId,
                             onAccountClick = { accountId ->
@@ -368,14 +368,14 @@ fun AccountTransactionCard(
     runningBalance: TransactionWithRunningBalance,
     transaction: Transfer?,
     accounts: List<Account>,
-    assets: List<Asset>,
+    currencies: List<Currency>,
     screenSizeClass: ScreenSizeClass,
     isHighlighted: Boolean = false,
     onAccountClick: (Long) -> Unit = {},
 ) {
     val sourceAccount = transaction?.let { accounts.find { a -> a.id == it.sourceAccountId } }
     val targetAccount = transaction?.let { accounts.find { a -> a.id == it.targetAccountId } }
-    val asset = assets.find { it.id == runningBalance.assetId }
+    val currency = currencies.find { it.id == runningBalance.currencyId }
 
     // Determine the other account based on transaction direction
     val isOutgoing = runningBalance.transactionAmount < 0
@@ -468,7 +468,7 @@ fun AccountTransactionCard(
             // Amount column
             Text(
                 text =
-                    asset?.let { formatAmount(runningBalance.transactionAmount, it) }
+                    currency?.let { formatAmount(runningBalance.transactionAmount, it) }
                         ?: String.format("%.2f", runningBalance.transactionAmount),
                 style = cellStyle,
                 color =
@@ -486,7 +486,7 @@ fun AccountTransactionCard(
             // Balance column
             Text(
                 text =
-                    asset?.let { formatAmount(runningBalance.runningBalance, it) }
+                    currency?.let { formatAmount(runningBalance.runningBalance, it) }
                         ?: String.format("%.2f", runningBalance.runningBalance),
                 style = cellStyle,
                 color =
@@ -508,11 +508,11 @@ fun AccountTransactionCard(
 fun TransactionCard(
     transaction: Transfer,
     accounts: List<Account>,
-    assets: List<Asset>,
+    currencies: List<Currency>,
 ) {
     val sourceAccount = accounts.find { it.id == transaction.sourceAccountId }
     val targetAccount = accounts.find { it.id == transaction.targetAccountId }
-    val asset = assets.find { it.id == transaction.assetId }
+    val currency = currencies.find { it.id == transaction.currencyId }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -572,7 +572,7 @@ fun TransactionCard(
             ) {
                 Text(
                     text =
-                        asset?.let { formatAmount(transaction.amount, it) }
+                        currency?.let { formatAmount(transaction.amount, it) }
                             ?: String.format("%.2f", transaction.amount),
                     style = MaterialTheme.typography.titleLarge,
                     maxLines = 1,
@@ -588,15 +588,15 @@ fun TransactionCard(
 fun TransactionEntryDialog(
     transactionRepository: TransactionRepository,
     accountRepository: AccountRepository,
-    assetRepository: AssetRepository,
+    currencyRepository: CurrencyRepository,
     accounts: List<Account>,
-    assets: List<Asset>,
+    currencies: List<Currency>,
     preSelectedSourceAccountId: Long? = null,
     onDismiss: () -> Unit,
 ) {
     var sourceAccountId by remember { mutableStateOf(preSelectedSourceAccountId) }
     var targetAccountId by remember { mutableStateOf<Long?>(null) }
-    var assetId by remember { mutableStateOf<Long?>(null) }
+    var currencyId by remember { mutableStateOf<Uuid?>(null) }
     var amount by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -611,12 +611,12 @@ fun TransactionEntryDialog(
     var showTimePicker by remember { mutableStateOf(false) }
 
     var showCreateAccountDialog by remember { mutableStateOf(false) }
-    var showCreateAssetDialog by remember { mutableStateOf(false) }
+    var showCreateCurrencyDialog by remember { mutableStateOf(false) }
     var creatingForSource by remember { mutableStateOf(true) }
 
     var sourceAccountExpanded by remember { mutableStateOf(false) }
     var targetAccountExpanded by remember { mutableStateOf(false) }
-    var assetExpanded by remember { mutableStateOf(false) }
+    var currencyExpanded by remember { mutableStateOf(false) }
 
     val scope = rememberCoroutineScope()
 
@@ -713,41 +713,67 @@ fun TransactionEntryDialog(
                     }
                 }
 
-                // Asset Dropdown
+                // Currency Dropdown with search
+                var currencySearchQuery by remember { mutableStateOf("") }
+                val filteredCurrencies =
+                    remember(currencies, currencySearchQuery) {
+                        if (currencySearchQuery.isBlank()) {
+                            currencies
+                        } else {
+                            currencies.filter { currency ->
+                                currency.code.contains(currencySearchQuery, ignoreCase = true) ||
+                                    currency.name.contains(currencySearchQuery, ignoreCase = true)
+                            }
+                        }
+                    }
+
                 ExposedDropdownMenuBox(
-                    expanded = assetExpanded,
-                    onExpandedChange = { assetExpanded = it },
+                    expanded = currencyExpanded,
+                    onExpandedChange = { currencyExpanded = it },
                 ) {
                     OutlinedTextField(
-                        value = assets.find { it.id == assetId }?.name ?: "",
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Asset/Currency") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = assetExpanded) },
+                        value =
+                            if (currencyExpanded) {
+                                currencySearchQuery
+                            } else {
+                                currencies.find { it.id == currencyId }?.let { "${it.code} - ${it.name}" } ?: ""
+                            },
+                        onValueChange = { currencySearchQuery = it },
+                        label = { Text("Currency") },
+                        placeholder = { Text("Type to search...") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = currencyExpanded) },
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .menuAnchor(),
+                                .menuAnchor(MenuAnchorType.PrimaryEditable),
                         enabled = !isSaving,
+                        singleLine = true,
                     )
                     ExposedDropdownMenu(
-                        expanded = assetExpanded,
-                        onDismissRequest = { assetExpanded = false },
+                        expanded = currencyExpanded,
+                        onDismissRequest = {
+                            currencyExpanded = false
+                            currencySearchQuery = ""
+                        },
                     ) {
-                        assets.forEach { asset ->
+                        filteredCurrencies.forEach { currency ->
                             DropdownMenuItem(
-                                text = { Text(asset.name) },
+                                text = { Text("${currency.code} - ${currency.name}") },
                                 onClick = {
-                                    assetId = asset.id
-                                    assetExpanded = false
+                                    currencyId = currency.id
+                                    currencyExpanded = false
+                                    currencySearchQuery = ""
                                 },
                             )
                         }
+                        // Always show "Create New Currency" option
+                        HorizontalDivider()
                         DropdownMenuItem(
-                            text = { Text("+ Create New Asset") },
+                            text = { Text("+ Create New Currency") },
                             onClick = {
-                                showCreateAssetDialog = true
-                                assetExpanded = false
+                                showCreateCurrencyDialog = true
+                                currencyExpanded = false
+                                currencySearchQuery = ""
                             },
                         )
                     }
@@ -856,7 +882,7 @@ fun TransactionEntryDialog(
                         sourceAccountId == null -> errorMessage = "Please select a source account"
                         targetAccountId == null -> errorMessage = "Please select a target account"
                         sourceAccountId == targetAccountId -> errorMessage = "Source and target accounts must be different"
-                        assetId == null -> errorMessage = "Please select an asset"
+                        currencyId == null -> errorMessage = "Please select a currency"
                         amount.isBlank() -> errorMessage = "Amount is required"
                         amount.toDoubleOrNull() == null -> errorMessage = "Invalid amount"
                         amount.toDouble() <= 0 -> errorMessage = "Amount must be greater than 0"
@@ -878,7 +904,7 @@ fun TransactionEntryDialog(
                                             description = description.trim(),
                                             sourceAccountId = sourceAccountId!!,
                                             targetAccountId = targetAccountId!!,
-                                            assetId = assetId!!,
+                                            currencyId = currencyId!!,
                                             amount = amount.toDouble(),
                                         )
                                     transactionRepository.createTransfer(transfer)
@@ -930,15 +956,15 @@ fun TransactionEntryDialog(
         )
     }
 
-    // Asset Creation Dialog
-    if (showCreateAssetDialog) {
-        CreateAssetDialogInline(
-            assetRepository = assetRepository,
-            onAssetCreated = { newAssetId ->
-                assetId = newAssetId
-                showCreateAssetDialog = false
+    // Currency Creation Dialog
+    if (showCreateCurrencyDialog) {
+        CreateCurrencyDialogInline(
+            currencyRepository = currencyRepository,
+            onCurrencyCreated = { newCurrencyId ->
+                currencyId = newCurrencyId
+                showCreateCurrencyDialog = false
             },
-            onDismiss = { showCreateAssetDialog = false },
+            onDismiss = { showCreateCurrencyDialog = false },
         )
     }
 
@@ -1105,11 +1131,12 @@ fun CreateAccountDialogInline(
 }
 
 @Composable
-fun CreateAssetDialogInline(
-    assetRepository: AssetRepository,
-    onAssetCreated: (Long) -> Unit,
+fun CreateCurrencyDialogInline(
+    currencyRepository: CurrencyRepository,
+    onCurrencyCreated: (Uuid) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    var code by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
@@ -1118,7 +1145,7 @@ fun CreateAssetDialogInline(
 
     AlertDialog(
         onDismissRequest = { if (!isSaving) onDismiss() },
-        title = { Text("Create New Asset") },
+        title = { Text("Create New Currency") },
         text = {
             Column(
                 modifier =
@@ -1128,9 +1155,18 @@ fun CreateAssetDialogInline(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 OutlinedTextField(
+                    value = code,
+                    onValueChange = { code = it.uppercase().take(3) },
+                    label = { Text("Currency Code (e.g., USD)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    enabled = !isSaving,
+                )
+
+                OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Asset Name (e.g., USD, EUR)") },
+                    label = { Text("Currency Name (e.g., US Dollar)") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     enabled = !isSaving,
@@ -1148,19 +1184,22 @@ fun CreateAssetDialogInline(
         confirmButton = {
             TextButton(
                 onClick = {
-                    if (name.isBlank()) {
-                        errorMessage = "Asset name is required"
-                    } else {
-                        isSaving = true
-                        errorMessage = null
-                        scope.launch {
-                            try {
-                                val assetId = assetRepository.upsertAssetByName(name.trim())
-                                onAssetCreated(assetId)
-                            } catch (e: Exception) {
-                                logger.error(e) { "Failed to create asset: ${e.message}" }
-                                errorMessage = "Failed to create asset: ${e.message}"
-                                isSaving = false
+                    when {
+                        code.isBlank() -> errorMessage = "Currency code is required"
+                        code.length != 3 -> errorMessage = "Currency code must be 3 characters"
+                        name.isBlank() -> errorMessage = "Currency name is required"
+                        else -> {
+                            isSaving = true
+                            errorMessage = null
+                            scope.launch {
+                                try {
+                                    val currencyId = currencyRepository.upsertCurrencyByCode(code.trim(), name.trim())
+                                    onCurrencyCreated(currencyId)
+                                } catch (e: Exception) {
+                                    logger.error(e) { "Failed to create currency: ${e.message}" }
+                                    errorMessage = "Failed to create currency: ${e.message}"
+                                    isSaving = false
+                                }
                             }
                         }
                     }

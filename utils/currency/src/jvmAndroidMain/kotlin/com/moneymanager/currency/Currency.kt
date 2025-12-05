@@ -9,5 +9,15 @@ actual class Currency actual constructor(actual val code: String) {
             currency = javaCurrency
         }
 
+    actual val displayName: String
+        get() = javaCurrency.displayName
+
     actual fun format(amount: Number): String = formatter.format(amount)
+
+    actual companion object {
+        actual fun getAllCurrencies(): List<Currency> =
+            java.util.Currency.getAvailableCurrencies()
+                .map { Currency(it.currencyCode) }
+                .sortedBy { it.code }
+    }
 }

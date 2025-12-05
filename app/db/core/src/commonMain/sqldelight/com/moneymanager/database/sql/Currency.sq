@@ -1,0 +1,35 @@
+CREATE TABLE Currency (
+    id TEXT PRIMARY KEY NOT NULL
+        CHECK (
+            length(id) = 36
+            AND substr(id, 9, 1) = '-'
+            AND substr(id, 14, 1) = '-'
+            AND substr(id, 19, 1) = '-'
+            AND substr(id, 24, 1) = '-'
+            AND substr(id, 15, 1) IN ('1','2','3','4','5','6','7','8')
+            AND lower(substr(id, 20, 1)) IN ('8','9','a','b')
+        ),
+    code TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL
+);
+
+selectAll:
+SELECT * FROM Currency;
+
+selectById:
+SELECT * FROM Currency WHERE id = ?;
+
+selectByCode:
+SELECT * FROM Currency WHERE code = ?;
+
+insert:
+INSERT INTO Currency(id, code, name)
+VALUES (?, ?, ?);
+
+update:
+UPDATE Currency
+SET code = ?, name = ?
+WHERE id = ?;
+
+delete:
+DELETE FROM Currency WHERE id = ?;

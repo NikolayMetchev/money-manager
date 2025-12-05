@@ -35,7 +35,7 @@ class TransactionRepositoryImpl(
                         description = row.description,
                         sourceAccountId = row.sourceAccountId,
                         targetAccountId = row.targetAccountId,
-                        assetId = row.assetId,
+                        currencyId = Uuid.parse(row.currencyId),
                         amount = row.amount,
                     )
                 }
@@ -53,7 +53,7 @@ class TransactionRepositoryImpl(
                         description = it.description,
                         sourceAccountId = it.sourceAccountId,
                         targetAccountId = it.targetAccountId,
-                        assetId = it.assetId,
+                        currencyId = Uuid.parse(it.currencyId),
                         amount = it.amount,
                     )
                 }
@@ -71,7 +71,7 @@ class TransactionRepositoryImpl(
                         description = row.description,
                         sourceAccountId = row.sourceAccountId,
                         targetAccountId = row.targetAccountId,
-                        assetId = row.assetId,
+                        currencyId = Uuid.parse(row.currencyId),
                         amount = row.amount,
                     )
                 }
@@ -95,7 +95,7 @@ class TransactionRepositoryImpl(
                         description = row.description,
                         sourceAccountId = row.sourceAccountId,
                         targetAccountId = row.targetAccountId,
-                        assetId = row.assetId,
+                        currencyId = Uuid.parse(row.currencyId),
                         amount = row.amount,
                     )
                 }
@@ -122,7 +122,7 @@ class TransactionRepositoryImpl(
                         description = row.description,
                         sourceAccountId = row.sourceAccountId,
                         targetAccountId = row.targetAccountId,
-                        assetId = row.assetId,
+                        currencyId = Uuid.parse(row.currencyId),
                         amount = row.amount,
                     )
                 }
@@ -136,7 +136,7 @@ class TransactionRepositoryImpl(
                 list.map { row ->
                     AccountBalance(
                         accountId = row.accountId,
-                        assetId = row.assetId,
+                        currencyId = Uuid.parse(row.currencyId),
                         balance = row.balance ?: 0.0,
                     )
                 }
@@ -153,7 +153,7 @@ class TransactionRepositoryImpl(
                         timestamp = fromEpochMilliseconds(row.timestamp),
                         description = row.description,
                         accountId = row.accountId,
-                        assetId = row.assetId,
+                        currencyId = Uuid.parse(row.currencyId),
                         transactionAmount = row.transactionAmount,
                         runningBalance = row.runningBalance ?: 0.0,
                     )
@@ -168,7 +168,7 @@ class TransactionRepositoryImpl(
                 description = transfer.description,
                 sourceAccountId = transfer.sourceAccountId,
                 targetAccountId = transfer.targetAccountId,
-                assetId = transfer.assetId,
+                currencyId = transfer.currencyId.toString(),
                 amount = transfer.amount,
             )
             Unit
@@ -181,7 +181,7 @@ class TransactionRepositoryImpl(
                 description = transfer.description,
                 sourceAccountId = transfer.sourceAccountId,
                 targetAccountId = transfer.targetAccountId,
-                assetId = transfer.assetId,
+                currencyId = transfer.currencyId.toString(),
                 amount = transfer.amount,
                 id = transfer.id.toString(),
             )

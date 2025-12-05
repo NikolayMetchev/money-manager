@@ -1,23 +1,23 @@
 package com.moneymanager.ui.util
 
-import com.moneymanager.currency.Currency
-import com.moneymanager.domain.model.Asset
+import com.moneymanager.domain.model.Currency
+import com.moneymanager.currency.Currency as CurrencyFormatter
 
 /**
- * Formats an amount using the currency symbol from the asset.
+ * Formats an amount using the currency symbol from the currency.
  *
  * @param amount The amount to format
- * @param asset The asset containing the currency code
+ * @param currency The currency containing the ISO 4217 code
  * @return Formatted currency string (e.g., "$1,234.56" for USD)
  */
 fun formatAmount(
     amount: Number,
-    asset: Asset,
+    currency: Currency,
 ): String {
     return try {
-        Currency(asset.name).format(amount)
+        CurrencyFormatter(currency.code).format(amount)
     } catch (e: IllegalArgumentException) {
-        // Fallback for unknown currency codes - just format as number with asset name
-        String.format("%.2f %s", amount.toDouble(), asset.name)
+        // Fallback for unknown currency codes - just format as number with currency code
+        String.format("%.2f %s", amount.toDouble(), currency.code)
     }
 }
