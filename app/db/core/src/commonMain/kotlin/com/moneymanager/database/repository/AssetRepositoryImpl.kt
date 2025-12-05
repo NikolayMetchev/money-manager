@@ -31,14 +31,13 @@ class AssetRepositoryImpl(
 
     override suspend fun upsertAssetByName(name: String): Long =
         withContext(Dispatchers.Default) {
-            val existing = queries.selectByName(name).executeAsOneOrNull()
-            if (existing != null) {
-                existing.id
-            } else {
-                queries.transactionWithResult {
-                    queries.insert(name)
-                    queries.lastInsertRowId().executeAsOne()
-                }
+            queries.transactionWithResult {
+                val existing = queries.selectByName(name).executeAsOneOrNull()
+                existing?.id
+                    ?: run {
+                        queries.insert(name)
+                        queries.lastInsertRowId().executeAsOne()
+                    }
             }
         }
 

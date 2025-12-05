@@ -17,6 +17,7 @@ import com.moneymanager.domain.model.Asset
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AssetRepository
 import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.ui.util.formatAmount
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
 import kotlin.time.Clock
@@ -151,7 +152,9 @@ fun AccountCard(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Text(
-                            text = String.format("%.2f", balance.balance),
+                            text =
+                                asset?.let { formatAmount(balance.balance, it) }
+                                    ?: String.format("%.2f", balance.balance),
                             style = MaterialTheme.typography.bodyLarge,
                             color =
                                 when {

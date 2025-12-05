@@ -24,6 +24,7 @@ import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AssetRepository
 import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.ui.util.formatAmount
 import kotlinx.coroutines.launch
 import kotlinx.datetime.*
 import org.lighthousegames.logging.logging
@@ -206,7 +207,9 @@ fun AccountTransactionsScreen(
                                 ) {
                                     if (balance != null) {
                                         Text(
-                                            text = String.format("%.2f", balance.balance),
+                                            text =
+                                                asset?.let { formatAmount(balance.balance, it) }
+                                                    ?: String.format("%.2f", balance.balance),
                                             style = MaterialTheme.typography.bodySmall,
                                             color =
                                                 if (balance.balance >= 0) {
@@ -353,6 +356,7 @@ fun AccountTransactionCard(
 ) {
     val sourceAccount = transaction?.let { accounts.find { a -> a.id == it.sourceAccountId } }
     val targetAccount = transaction?.let { accounts.find { a -> a.id == it.targetAccountId } }
+    val asset = assets.find { it.id == runningBalance.assetId }
 
     // Determine the other account based on transaction direction
     val isOutgoing = runningBalance.transactionAmount < 0
@@ -444,7 +448,9 @@ fun AccountTransactionCard(
 
             // Amount column
             Text(
-                text = String.format("%+.2f", runningBalance.transactionAmount),
+                text =
+                    asset?.let { formatAmount(runningBalance.transactionAmount, it) }
+                        ?: String.format("%.2f", runningBalance.transactionAmount),
                 style = cellStyle,
                 color =
                     if (runningBalance.transactionAmount >= 0) {
@@ -460,7 +466,9 @@ fun AccountTransactionCard(
 
             // Balance column
             Text(
-                text = String.format("%.2f", runningBalance.runningBalance),
+                text =
+                    asset?.let { formatAmount(runningBalance.runningBalance, it) }
+                        ?: String.format("%.2f", runningBalance.runningBalance),
                 style = cellStyle,
                 color =
                     if (runningBalance.runningBalance >= 0) {
@@ -544,15 +552,10 @@ fun TransactionCard(
                 modifier = Modifier.weight(0.15f),
             ) {
                 Text(
-                    text = String.format("%.2f", transaction.amount),
+                    text =
+                        asset?.let { formatAmount(transaction.amount, it) }
+                            ?: String.format("%.2f", transaction.amount),
                     style = MaterialTheme.typography.titleLarge,
-                    maxLines = 1,
-                    autoSize = TextAutoSize.StepBased(minFontSize = 8.sp),
-                )
-                Text(
-                    text = asset?.name ?: "Unknown",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     autoSize = TextAutoSize.StepBased(minFontSize = 8.sp),
                 )

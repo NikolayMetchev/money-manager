@@ -51,7 +51,14 @@ class JvmDatabaseManager : DatabaseManager {
                 MoneyManagerDatabase.Schema.create(driver)
             }
 
-            MoneyManagerDatabase(driver)
+            val database = MoneyManagerDatabase(driver)
+
+            if (isNewDatabase) {
+                // Seed with default data
+                DatabaseConfig.seedDatabase(database)
+            }
+
+            database
         }
 
     override suspend fun databaseExists(location: DbLocation): Boolean =
