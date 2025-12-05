@@ -109,11 +109,11 @@ fun AccountTransactionsScreen(
         }
     }
 
-    // Filter running balances by selected asset
+    // Filter running balances by selected asset (or show all if no asset selected)
     val filteredRunningBalances =
         selectedAssetId?.let { assetId ->
             runningBalances.filter { it.assetId == assetId }
-        } ?: emptyList()
+        } ?: runningBalances
 
     BoxWithConstraints(
         modifier =
@@ -139,15 +139,31 @@ fun AccountTransactionsScreen(
                         Spacer(modifier = Modifier.width(60.dp))
 
                         allAccounts.forEach { account ->
+                            val isSelectedColumn = selectedAccountId == account.id
+                            val isColumnSelected = isSelectedColumn && selectedAssetId == null
                             Box(
-                                modifier = Modifier.weight(1f),
+                                modifier =
+                                    Modifier
+                                        .weight(1f)
+                                        .background(
+                                            if (isColumnSelected) {
+                                                MaterialTheme.colorScheme.primaryContainer
+                                            } else {
+                                                MaterialTheme.colorScheme.surface
+                                            },
+                                        )
+                                        .clickable {
+                                            selectedAccountId = account.id
+                                            selectedAssetId = null // Clear asset to show all currencies
+                                        }
+                                        .padding(vertical = 4.dp),
                                 contentAlignment = Alignment.Center,
                             ) {
                                 Text(
                                     text = account.name,
                                     style = MaterialTheme.typography.labelLarge,
                                     color =
-                                        if (selectedAccountId == account.id) {
+                                        if (isSelectedColumn) {
                                             MaterialTheme.colorScheme.primary
                                         } else {
                                             MaterialTheme.colorScheme.onSurface
@@ -185,10 +201,12 @@ fun AccountTransactionsScreen(
                                 val isSelectedCell = selectedAccountId == account.id && selectedAssetId == assetId
                                 val isSelectedRow = selectedAssetId == assetId
                                 val isSelectedColumn = selectedAccountId == account.id
+                                val isColumnSelected = isSelectedColumn && selectedAssetId == null
 
                                 val backgroundColor =
                                     when {
                                         isSelectedCell -> MaterialTheme.colorScheme.primaryContainer
+                                        isColumnSelected -> MaterialTheme.colorScheme.primaryContainer
                                         isSelectedRow || isSelectedColumn -> MaterialTheme.colorScheme.surfaceVariant
                                         else -> MaterialTheme.colorScheme.surface
                                     }
