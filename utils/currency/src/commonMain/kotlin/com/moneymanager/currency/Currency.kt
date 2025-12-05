@@ -12,10 +12,24 @@ expect class Currency(code: String) {
     val code: String
 
     /**
+     * The display name of the currency (e.g., "US Dollar" for USD).
+     */
+    val displayName: String
+
+    /**
      * Formats the given amount as a currency string.
      *
      * @param amount The numeric amount to format
      * @return The formatted currency string (e.g., "$1,234.56" for USD)
      */
     fun format(amount: Number): String
+
+    companion object {
+        /**
+         * Returns all available ISO 4217 currencies.
+         *
+         * @return List of all available currencies sorted by code
+         */
+        fun getAllCurrencies(): List<Currency>
+    }
 }
