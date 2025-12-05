@@ -9,11 +9,11 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountBalance
-import com.moneymanager.domain.model.Asset
+import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.TransactionWithRunningBalance
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.repository.AccountRepository
-import com.moneymanager.domain.repository.AssetRepository
+import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,7 +36,7 @@ class AccountsScreenTest {
                 AccountsScreen(
                     accountRepository = repository,
                     transactionRepository = FakeTransactionRepository(),
-                    assetRepository = FakeAssetRepository(),
+                    currencyRepository = FakeCurrencyRepository(),
                     onAccountClick = {},
                 )
             }
@@ -71,7 +71,7 @@ class AccountsScreenTest {
                 AccountsScreen(
                     accountRepository = repository,
                     transactionRepository = FakeTransactionRepository(),
-                    assetRepository = FakeAssetRepository(),
+                    currencyRepository = FakeCurrencyRepository(),
                     onAccountClick = {},
                 )
             }
@@ -92,7 +92,7 @@ class AccountsScreenTest {
                 AccountsScreen(
                     accountRepository = repository,
                     transactionRepository = FakeTransactionRepository(),
-                    assetRepository = FakeAssetRepository(),
+                    currencyRepository = FakeCurrencyRepository(),
                     onAccountClick = {},
                 )
             }
@@ -112,7 +112,7 @@ class AccountsScreenTest {
                 AccountsScreen(
                     accountRepository = repository,
                     transactionRepository = FakeTransactionRepository(),
-                    assetRepository = FakeAssetRepository(),
+                    currencyRepository = FakeCurrencyRepository(),
                     onAccountClick = {},
                 )
             }
@@ -142,7 +142,7 @@ class AccountsScreenTest {
                 AccountsScreen(
                     accountRepository = repository,
                     transactionRepository = FakeTransactionRepository(),
-                    assetRepository = FakeAssetRepository(),
+                    currencyRepository = FakeCurrencyRepository(),
                     onAccountClick = {},
                 )
             }
@@ -169,7 +169,7 @@ class AccountsScreenTest {
                 AccountsScreen(
                     accountRepository = repository,
                     transactionRepository = FakeTransactionRepository(),
-                    assetRepository = FakeAssetRepository(),
+                    currencyRepository = FakeCurrencyRepository(),
                     onAccountClick = {},
                 )
             }
@@ -193,7 +193,7 @@ class AccountsScreenTest {
                 AccountsScreen(
                     accountRepository = repository,
                     transactionRepository = FakeTransactionRepository(),
-                    assetRepository = FakeAssetRepository(),
+                    currencyRepository = FakeCurrencyRepository(),
                     onAccountClick = {},
                 )
             }
@@ -219,7 +219,7 @@ class AccountsScreenTest {
                 AccountsScreen(
                     accountRepository = repository,
                     transactionRepository = FakeTransactionRepository(),
-                    assetRepository = FakeAssetRepository(),
+                    currencyRepository = FakeCurrencyRepository(),
                     onAccountClick = {},
                 )
             }
@@ -253,7 +253,7 @@ class AccountsScreenTest {
                 AccountsScreen(
                     accountRepository = repository,
                     transactionRepository = FakeTransactionRepository(),
-                    assetRepository = FakeAssetRepository(),
+                    currencyRepository = FakeCurrencyRepository(),
                     onAccountClick = {},
                 )
             }
@@ -299,7 +299,7 @@ class AccountsScreenTest {
                 AccountsScreen(
                     accountRepository = repository,
                     transactionRepository = FakeTransactionRepository(),
-                    assetRepository = FakeAssetRepository(),
+                    currencyRepository = FakeCurrencyRepository(),
                     onAccountClick = {},
                 )
             }
@@ -370,15 +370,20 @@ class AccountsScreenTest {
         override suspend fun deleteTransaction(id: Uuid) {}
     }
 
-    private class FakeAssetRepository : AssetRepository {
-        override fun getAllAssets(): Flow<List<Asset>> = flowOf(emptyList())
+    private class FakeCurrencyRepository : CurrencyRepository {
+        override fun getAllCurrencies(): Flow<List<Currency>> = flowOf(emptyList())
 
-        override fun getAssetById(id: Long): Flow<Asset?> = flowOf(null)
+        override fun getCurrencyById(id: Uuid): Flow<Currency?> = flowOf(null)
 
-        override suspend fun upsertAssetByName(name: String): Long = 0L
+        override fun getCurrencyByCode(code: String): Flow<Currency?> = flowOf(null)
 
-        override suspend fun updateAsset(asset: Asset) {}
+        override suspend fun upsertCurrencyByCode(
+            code: String,
+            name: String,
+        ): Uuid = Uuid.random()
 
-        override suspend fun deleteAsset(id: Long) {}
+        override suspend fun updateCurrency(currency: Currency) {}
+
+        override suspend fun deleteCurrency(id: Uuid) {}
     }
 }

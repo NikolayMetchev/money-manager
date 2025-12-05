@@ -1,4 +1,4 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
+@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
 
 package com.moneymanager.ui.screens
 
@@ -13,9 +13,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountBalance
-import com.moneymanager.domain.model.Asset
+import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.repository.AccountRepository
-import com.moneymanager.domain.repository.AssetRepository
+import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.ui.util.formatAmount
 import kotlinx.coroutines.launch
@@ -28,12 +28,12 @@ private val logger = logging()
 fun AccountsScreen(
     accountRepository: AccountRepository,
     transactionRepository: TransactionRepository,
-    assetRepository: AssetRepository,
+    currencyRepository: CurrencyRepository,
     onAccountClick: (Account) -> Unit,
 ) {
     val accounts by accountRepository.getAllAccounts().collectAsState(initial = emptyList())
     val balances by transactionRepository.getAccountBalances().collectAsState(initial = emptyList())
-    val assets by assetRepository.getAllAssets().collectAsState(initial = emptyList())
+    val currencies by currencyRepository.getAllCurrencies().collectAsState(initial = emptyList())
     var showCreateDialog by remember { mutableStateOf(false) }
 
     Column(
@@ -77,7 +77,7 @@ fun AccountsScreen(
                     AccountCard(
                         account = account,
                         balances = accountBalances,
-                        assets = assets,
+                        currencies = currencies,
                         accountRepository = accountRepository,
                         onClick = { onAccountClick(account) },
                     )
@@ -98,7 +98,7 @@ fun AccountsScreen(
 fun AccountCard(
     account: Account,
     balances: List<AccountBalance>,
-    assets: List<Asset>,
+    currencies: List<Currency>,
     accountRepository: AccountRepository,
     onClick: () -> Unit,
 ) {
@@ -140,20 +140,20 @@ fun AccountCard(
             if (balances.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
                 balances.forEach { balance ->
-                    val asset = assets.find { it.id == balance.assetId }
+                    val currency = currencies.find { it.id == balance.currencyId }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            text = asset?.name ?: "Unknown Asset",
+                            text = currency?.code ?: "Unknown Currency",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Text(
                             text =
-                                asset?.let { formatAmount(balance.balance, it) }
+                                currency?.let { formatAmount(balance.balance, it) }
                                     ?: String.format("%.2f", balance.balance),
                             style = MaterialTheme.typography.bodyLarge,
                             color =

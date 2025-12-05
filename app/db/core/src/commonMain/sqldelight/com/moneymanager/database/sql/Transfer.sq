@@ -13,39 +13,48 @@ CREATE TABLE Transfer (
     description TEXT NOT NULL,
     sourceAccountId INTEGER NOT NULL,
     targetAccountId INTEGER NOT NULL,
-    assetId INTEGER NOT NULL,
+    currencyId TEXT NOT NULL
+        CHECK (
+            length(currencyId) = 36
+            AND substr(currencyId, 9, 1) = '-'
+            AND substr(currencyId, 14, 1) = '-'
+            AND substr(currencyId, 19, 1) = '-'
+            AND substr(currencyId, 24, 1) = '-'
+            AND substr(currencyId, 15, 1) IN ('1','2','3','4','5','6','7','8')
+            AND lower(substr(currencyId, 20, 1)) IN ('8','9','a','b')
+        ),
     amount REAL NOT NULL,
     CHECK (sourceAccountId != targetAccountId),
     FOREIGN KEY (sourceAccountId) REFERENCES Account(id) ON DELETE CASCADE,
     FOREIGN KEY (targetAccountId) REFERENCES Account(id) ON DELETE CASCADE,
-    FOREIGN KEY (assetId) REFERENCES Asset(id) ON DELETE RESTRICT
+    FOREIGN KEY (currencyId) REFERENCES Currency(id) ON DELETE RESTRICT
 );
 
 CREATE VIEW AccountBalanceView AS
 SELECT
     accountId,
-    assetId,
+    currencyId,
     SUM(COALESCE(incoming, 0) - COALESCE(outgoing, 0)) AS balance
 FROM (
     SELECT
         targetAccountId AS accountId,
-        assetId,
+        currencyId,
         SUM(amount) AS incoming,
         0 AS outgoing
     FROM Transfer
-    GROUP BY targetAccountId, assetId
+    GROUP BY targetAccountId, currencyId
 
     UNION ALL
 
     SELECT
         sourceAccountId AS accountId,
-        assetId,
+        currencyId,
         0 AS incoming,
         SUM(amount) AS outgoing
     FROM Transfer
-    GROUP BY sourceAccountId, assetId
+    GROUP BY sourceAccountId, currencyId
 )
-GROUP BY accountId, assetId;
+GROUP BY accountId, currencyId;
 
 CREATE VIEW RunningBalanceView AS
 SELECT
@@ -53,26 +62,26 @@ SELECT
     m.timestamp,
     m.description,
     m.accountId,
-    m.assetId,
+    m.currencyId,
     m.transactionAmount,
     (
         SELECT SUM(m2.transactionAmount)
         FROM (
-            SELECT tr.id, tr.timestamp, tr.targetAccountId AS accountId, tr.assetId, tr.amount AS transactionAmount
+            SELECT tr.id, tr.timestamp, tr.targetAccountId AS accountId, tr.currencyId, tr.amount AS transactionAmount
             FROM Transfer tr
             UNION ALL
-            SELECT tr.id, tr.timestamp, tr.sourceAccountId AS accountId, tr.assetId, -tr.amount AS transactionAmount
+            SELECT tr.id, tr.timestamp, tr.sourceAccountId AS accountId, tr.currencyId, -tr.amount AS transactionAmount
             FROM Transfer tr
         ) m2
         WHERE m2.accountId = m.accountId
-          AND m2.assetId = m.assetId
+          AND m2.currencyId = m.currencyId
           AND (m2.timestamp < m.timestamp OR (m2.timestamp = m.timestamp AND m2.id <= m.id))
     ) AS runningBalance
 FROM (
-    SELECT tr.id, tr.timestamp, tr.description, tr.targetAccountId AS accountId, tr.assetId, tr.amount AS transactionAmount
+    SELECT tr.id, tr.timestamp, tr.description, tr.targetAccountId AS accountId, tr.currencyId, tr.amount AS transactionAmount
     FROM Transfer tr
     UNION ALL
-    SELECT tr.id, tr.timestamp, tr.description, tr.sourceAccountId AS accountId, tr.assetId, -tr.amount AS transactionAmount
+    SELECT tr.id, tr.timestamp, tr.description, tr.sourceAccountId AS accountId, tr.currencyId, -tr.amount AS transactionAmount
     FROM Transfer tr
 ) m;
 
@@ -99,12 +108,12 @@ AND timestamp >= ? AND timestamp <= ?
 ORDER BY timestamp DESC;
 
 insert:
-INSERT INTO Transfer(id, timestamp, description, sourceAccountId, targetAccountId, assetId, amount)
+INSERT INTO Transfer(id, timestamp, description, sourceAccountId, targetAccountId, currencyId, amount)
 VALUES (?, ?, ?, ?, ?, ?, ?);
 
 update:
 UPDATE Transfer
-SET timestamp = ?, description = ?, sourceAccountId = ?, targetAccountId = ?, assetId = ?, amount = ?
+SET timestamp = ?, description = ?, sourceAccountId = ?, targetAccountId = ?, currencyId = ?, amount = ?
 WHERE id = ?;
 
 delete:

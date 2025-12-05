@@ -10,8 +10,8 @@ import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.ui.navigation.Screen
 import com.moneymanager.ui.screens.AccountTransactionsScreen
 import com.moneymanager.ui.screens.AccountsScreen
-import com.moneymanager.ui.screens.AssetsScreen
 import com.moneymanager.ui.screens.CategoriesScreen
+import com.moneymanager.ui.screens.CurrenciesScreen
 import com.moneymanager.ui.screens.TransactionEntryDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -27,7 +27,7 @@ fun MoneyManagerApp(
     var currentlyViewedAccountId by remember { mutableStateOf<Long?>(null) }
 
     val accounts by repositorySet.accountRepository.getAllAccounts().collectAsState(initial = emptyList())
-    val assets by repositorySet.assetRepository.getAllAssets().collectAsState(initial = emptyList())
+    val currencies by repositorySet.currencyRepository.getAllCurrencies().collectAsState(initial = emptyList())
 
     MaterialTheme {
         Scaffold(
@@ -66,10 +66,10 @@ fun MoneyManagerApp(
                         onClick = { currentScreen = Screen.Accounts },
                     )
                     NavigationBarItem(
-                        icon = { Text("💎") },
-                        label = { Text("Assets") },
-                        selected = currentScreen is Screen.Assets,
-                        onClick = { currentScreen = Screen.Assets },
+                        icon = { Text("💱") },
+                        label = { Text("Currencies") },
+                        selected = currentScreen is Screen.Currencies,
+                        onClick = { currentScreen = Screen.Currencies },
                     )
                     NavigationBarItem(
                         icon = { Text("📁") },
@@ -100,18 +100,18 @@ fun MoneyManagerApp(
                         AccountsScreen(
                             accountRepository = repositorySet.accountRepository,
                             transactionRepository = repositorySet.transactionRepository,
-                            assetRepository = repositorySet.assetRepository,
+                            currencyRepository = repositorySet.currencyRepository,
                             onAccountClick = { account ->
                                 currentScreen = Screen.AccountTransactions(account.id, account.name)
                             },
                         )
                     }
-                    is Screen.Assets -> {
+                    is Screen.Currencies -> {
                         // Reset currentlyViewedAccountId when on other screens
                         LaunchedEffect(Unit) {
                             currentlyViewedAccountId = null
                         }
-                        AssetsScreen(repositorySet.assetRepository)
+                        CurrenciesScreen(repositorySet.currencyRepository)
                     }
                     is Screen.Categories -> {
                         // Reset currentlyViewedAccountId when on other screens
@@ -129,7 +129,7 @@ fun MoneyManagerApp(
                             accountId = screen.accountId,
                             transactionRepository = repositorySet.transactionRepository,
                             accountRepository = repositorySet.accountRepository,
-                            assetRepository = repositorySet.assetRepository,
+                            currencyRepository = repositorySet.currencyRepository,
                             onAccountIdChange = { accountId ->
                                 currentlyViewedAccountId = accountId
                             },
@@ -143,9 +143,9 @@ fun MoneyManagerApp(
             TransactionEntryDialog(
                 transactionRepository = repositorySet.transactionRepository,
                 accountRepository = repositorySet.accountRepository,
-                assetRepository = repositorySet.assetRepository,
+                currencyRepository = repositorySet.currencyRepository,
                 accounts = accounts,
-                assets = assets,
+                currencies = currencies,
                 preSelectedSourceAccountId = preSelectedAccountId,
                 onDismiss = {
                     showTransactionDialog = false

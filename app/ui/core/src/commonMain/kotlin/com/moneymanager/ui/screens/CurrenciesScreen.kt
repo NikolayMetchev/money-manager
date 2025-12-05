@@ -1,3 +1,5 @@
+@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
+
 package com.moneymanager.ui.screens
 
 import androidx.compose.foundation.layout.*
@@ -8,16 +10,16 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.moneymanager.domain.model.Asset
-import com.moneymanager.domain.repository.AssetRepository
+import com.moneymanager.domain.model.Currency
+import com.moneymanager.domain.repository.CurrencyRepository
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
 
 private val logger = logging()
 
 @Composable
-fun AssetsScreen(assetRepository: AssetRepository) {
-    val assets by assetRepository.getAllAssets().collectAsState(initial = emptyList())
+fun CurrenciesScreen(currencyRepository: CurrencyRepository) {
+    val currencies by currencyRepository.getAllCurrencies().collectAsState(initial = emptyList())
     var showCreateDialog by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -28,18 +30,18 @@ fun AssetsScreen(assetRepository: AssetRepository) {
                     .padding(16.dp),
         ) {
             Text(
-                text = "Your Assets",
+                text = "Your Currencies",
                 style = MaterialTheme.typography.headlineMedium,
                 modifier = Modifier.padding(bottom = 16.dp),
             )
 
-            if (assets.isEmpty()) {
+            if (currencies.isEmpty()) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = "No assets yet. Add your first asset!",
+                        text = "No currencies yet. Add your first currency!",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -48,10 +50,10 @@ fun AssetsScreen(assetRepository: AssetRepository) {
                 LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    items(assets) { asset ->
-                        AssetCard(
-                            asset = asset,
-                            assetRepository = assetRepository,
+                    items(currencies) { currency ->
+                        CurrencyCard(
+                            currency = currency,
+                            currencyRepository = currencyRepository,
                         )
                     }
                 }
@@ -69,8 +71,8 @@ fun AssetsScreen(assetRepository: AssetRepository) {
         }
 
         if (showCreateDialog) {
-            CreateAssetDialog(
-                assetRepository = assetRepository,
+            CreateCurrencyDialog(
+                currencyRepository = currencyRepository,
                 onDismiss = { showCreateDialog = false },
             )
         }
@@ -78,9 +80,9 @@ fun AssetsScreen(assetRepository: AssetRepository) {
 }
 
 @Composable
-fun AssetCard(
-    asset: Asset,
-    assetRepository: AssetRepository,
+fun CurrencyCard(
+    currency: Currency,
+    currencyRepository: CurrencyRepository,
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
 
@@ -96,11 +98,17 @@ fun AssetCard(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                text = asset.name,
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.weight(1f),
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = currency.code,
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Text(
+                    text = currency.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             IconButton(
                 onClick = { showDeleteDialog = true },
             ) {
@@ -113,19 +121,20 @@ fun AssetCard(
     }
 
     if (showDeleteDialog) {
-        DeleteAssetDialog(
-            asset = asset,
-            assetRepository = assetRepository,
+        DeleteCurrencyDialog(
+            currency = currency,
+            currencyRepository = currencyRepository,
             onDismiss = { showDeleteDialog = false },
         )
     }
 }
 
 @Composable
-fun CreateAssetDialog(
-    assetRepository: AssetRepository,
+fun CreateCurrencyDialog(
+    currencyRepository: CurrencyRepository,
     onDismiss: () -> Unit,
 ) {
+    var code by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
@@ -134,7 +143,7 @@ fun CreateAssetDialog(
 
     AlertDialog(
         onDismissRequest = { if (!isSaving) onDismiss() },
-        title = { Text("Create New Asset") },
+        title = { Text("Create New Currency") },
         text = {
             Column(
                 modifier =
@@ -144,9 +153,18 @@ fun CreateAssetDialog(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 OutlinedTextField(
+                    value = code,
+                    onValueChange = { code = it.uppercase().take(3) },
+                    label = { Text("Currency Code (e.g., USD)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    enabled = !isSaving,
+                )
+
+                OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("Asset Name") },
+                    label = { Text("Currency Name (e.g., US Dollar)") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     enabled = !isSaving,
@@ -164,19 +182,22 @@ fun CreateAssetDialog(
         confirmButton = {
             TextButton(
                 onClick = {
-                    if (name.isBlank()) {
-                        errorMessage = "Asset name is required"
-                    } else {
-                        isSaving = true
-                        errorMessage = null
-                        scope.launch {
-                            try {
-                                assetRepository.upsertAssetByName(name.trim())
-                                onDismiss()
-                            } catch (e: Exception) {
-                                logger.error(e) { "Failed to create asset: ${e.message}" }
-                                errorMessage = "Failed to create asset: ${e.message}"
-                                isSaving = false
+                    when {
+                        code.isBlank() -> errorMessage = "Currency code is required"
+                        code.length != 3 -> errorMessage = "Currency code must be 3 characters"
+                        name.isBlank() -> errorMessage = "Currency name is required"
+                        else -> {
+                            isSaving = true
+                            errorMessage = null
+                            scope.launch {
+                                try {
+                                    currencyRepository.upsertCurrencyByCode(code.trim(), name.trim())
+                                    onDismiss()
+                                } catch (e: Exception) {
+                                    logger.error(e) { "Failed to create currency: ${e.message}" }
+                                    errorMessage = "Failed to create currency: ${e.message}"
+                                    isSaving = false
+                                }
                             }
                         }
                     }
@@ -205,9 +226,9 @@ fun CreateAssetDialog(
 }
 
 @Composable
-fun DeleteAssetDialog(
-    asset: Asset,
-    assetRepository: AssetRepository,
+fun DeleteCurrencyDialog(
+    currency: Currency,
+    currencyRepository: CurrencyRepository,
     onDismiss: () -> Unit,
 ) {
     var isDeleting by remember { mutableStateOf(false) }
@@ -222,17 +243,17 @@ fun DeleteAssetDialog(
                 style = MaterialTheme.typography.headlineMedium,
             )
         },
-        title = { Text("Delete Asset?") },
+        title = { Text("Delete Currency?") },
         text = {
             Column(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    text = "Are you sure you want to delete \"${asset.name}\"?",
+                    text = "Are you sure you want to delete \"${currency.code} - ${currency.name}\"?",
                     style = MaterialTheme.typography.bodyLarge,
                 )
                 Text(
-                    text = "This action cannot be undone. All accounts using this asset will be affected.",
+                    text = "This action cannot be undone. All accounts using this currency will be affected.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -253,11 +274,11 @@ fun DeleteAssetDialog(
                     errorMessage = null
                     scope.launch {
                         try {
-                            assetRepository.deleteAsset(asset.id)
+                            currencyRepository.deleteCurrency(currency.id)
                             onDismiss()
                         } catch (e: Exception) {
-                            logger.error(e) { "Failed to delete asset: ${e.message}" }
-                            errorMessage = "Failed to delete asset: ${e.message}"
+                            logger.error(e) { "Failed to delete currency: ${e.message}" }
+                            errorMessage = "Failed to delete currency: ${e.message}"
                             isDeleting = false
                         }
                     }

@@ -10,7 +10,7 @@ import com.moneymanager.di.createTestAppComponentParams
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.repository.AccountRepository
-import com.moneymanager.domain.repository.AssetRepository
+import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -27,7 +27,7 @@ import kotlin.uuid.Uuid
 class TransactionRepositoryImplTest {
     private lateinit var transactionRepository: TransactionRepository
     private lateinit var accountRepository: AccountRepository
-    private lateinit var assetRepository: AssetRepository
+    private lateinit var currencyRepository: CurrencyRepository
     private lateinit var testDbLocation: com.moneymanager.database.DbLocation
 
     @BeforeTest
@@ -46,7 +46,7 @@ class TransactionRepositoryImplTest {
 
             transactionRepository = repositories.transactionRepository
             accountRepository = repositories.accountRepository
-            assetRepository = repositories.assetRepository
+            currencyRepository = repositories.currencyRepository
         }
 
     @AfterTest
@@ -71,8 +71,8 @@ class TransactionRepositoryImplTest {
                     Account(name = "Target Account", openingDate = now),
                 )
 
-            // Create test asset
-            val assetId = assetRepository.upsertAssetByName("USD")
+            // Create test currency
+            val currencyId = currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
 
             // Create transfer
             val transferId = Uuid.random()
@@ -83,7 +83,7 @@ class TransactionRepositoryImplTest {
                     description = "Test transaction",
                     sourceAccountId = sourceAccountId,
                     targetAccountId = targetAccountId,
-                    assetId = assetId,
+                    currencyId = currencyId,
                     amount = 100.0,
                 )
             transactionRepository.createTransfer(transfer)
@@ -92,7 +92,7 @@ class TransactionRepositoryImplTest {
             assertNotNull(retrieved, "Retrieved transaction should not be null for ID: $transferId")
             assertEquals(sourceAccountId, retrieved.sourceAccountId)
             assertEquals(targetAccountId, retrieved.targetAccountId)
-            assertEquals(assetId, retrieved.assetId)
+            assertEquals(currencyId, retrieved.currencyId)
             assertEquals(100.0, retrieved.amount)
         }
 
@@ -107,8 +107,8 @@ class TransactionRepositoryImplTest {
                     Account(name = "Test Account", openingDate = now),
                 )
 
-            // Create test asset
-            val assetId = assetRepository.upsertAssetByName("USD")
+            // Create test currency
+            val currencyId = currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
 
             // Should throw exception due to CHECK constraint
             // Same as source - violates CHECK constraint
@@ -120,7 +120,7 @@ class TransactionRepositoryImplTest {
                         description = "Invalid transaction",
                         sourceAccountId = accountId,
                         targetAccountId = accountId,
-                        assetId = assetId,
+                        currencyId = currencyId,
                         amount = 100.0,
                     )
                 transactionRepository.createTransfer(transfer)
@@ -142,8 +142,8 @@ class TransactionRepositoryImplTest {
                     Account(name = "Target Account", openingDate = now),
                 )
 
-            // Create test asset
-            val assetId = assetRepository.upsertAssetByName("USD")
+            // Create test currency
+            val currencyId = currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
 
             // Create valid transfer
             val transferId = Uuid.random()
@@ -154,7 +154,7 @@ class TransactionRepositoryImplTest {
                     description = "Test transaction",
                     sourceAccountId = sourceAccountId,
                     targetAccountId = targetAccountId,
-                    assetId = assetId,
+                    currencyId = currencyId,
                     amount = 100.0,
                 )
             transactionRepository.createTransfer(transfer)
@@ -173,7 +173,7 @@ class TransactionRepositoryImplTest {
                         description = "Test transaction",
                         sourceAccountId = sourceAccountId,
                         targetAccountId = sourceAccountId,
-                        assetId = assetId,
+                        currencyId = currencyId,
                         amount = 100.0,
                     )
                 transactionRepository.updateTransfer(invalidTransfer)
@@ -197,8 +197,8 @@ class TransactionRepositoryImplTest {
                     Account(name = "Savings", openingDate = now),
                 )
 
-            // Create test asset
-            val usdId = assetRepository.upsertAssetByName("USD")
+            // Create test currency
+            val usdId = currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
 
             // Create transaction: Checking -> Savings, 100 USD
             val transfer =
@@ -208,7 +208,7 @@ class TransactionRepositoryImplTest {
                     description = "Transfer to savings",
                     sourceAccountId = checkingAccountId,
                     targetAccountId = savingsAccountId,
-                    assetId = usdId,
+                    currencyId = usdId,
                     amount = 100.0,
                 )
             transactionRepository.createTransfer(transfer)
@@ -217,8 +217,8 @@ class TransactionRepositoryImplTest {
             val balances = transactionRepository.getAccountBalances().first()
 
             // Find balances for each account
-            val checkingBalance = balances.find { it.accountId == checkingAccountId && it.assetId == usdId }
-            val savingsBalance = balances.find { it.accountId == savingsAccountId && it.assetId == usdId }
+            val checkingBalance = balances.find { it.accountId == checkingAccountId && it.currencyId == usdId }
+            val savingsBalance = balances.find { it.accountId == savingsAccountId && it.currencyId == usdId }
 
             // Verify balances
             assertNotNull(checkingBalance, "Checking account should have a balance")
@@ -246,8 +246,8 @@ class TransactionRepositoryImplTest {
                     Account(name = "Credit Card", openingDate = now),
                 )
 
-            // Create test asset
-            val usdId = assetRepository.upsertAssetByName("USD")
+            // Create test currency
+            val usdId = currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
 
             // Create multiple transactions
             // 1. Checking -> Savings: 100
@@ -258,7 +258,7 @@ class TransactionRepositoryImplTest {
                     description = "Transfer to savings",
                     sourceAccountId = checkingAccountId,
                     targetAccountId = savingsAccountId,
-                    assetId = usdId,
+                    currencyId = usdId,
                     amount = 100.0,
                 ),
             )
@@ -271,7 +271,7 @@ class TransactionRepositoryImplTest {
                     description = "Credit card payment",
                     sourceAccountId = checkingAccountId,
                     targetAccountId = creditCardAccountId,
-                    assetId = usdId,
+                    currencyId = usdId,
                     amount = 50.0,
                 ),
             )
@@ -284,7 +284,7 @@ class TransactionRepositoryImplTest {
                     description = "Transfer from savings",
                     sourceAccountId = savingsAccountId,
                     targetAccountId = checkingAccountId,
-                    assetId = usdId,
+                    currencyId = usdId,
                     amount = 30.0,
                 ),
             )
@@ -293,9 +293,9 @@ class TransactionRepositoryImplTest {
             val balances = transactionRepository.getAccountBalances().first()
 
             // Find balances for each account
-            val checkingBalance = balances.find { it.accountId == checkingAccountId && it.assetId == usdId }
-            val savingsBalance = balances.find { it.accountId == savingsAccountId && it.assetId == usdId }
-            val creditCardBalance = balances.find { it.accountId == creditCardAccountId && it.assetId == usdId }
+            val checkingBalance = balances.find { it.accountId == checkingAccountId && it.currencyId == usdId }
+            val savingsBalance = balances.find { it.accountId == savingsAccountId && it.currencyId == usdId }
+            val creditCardBalance = balances.find { it.accountId == creditCardAccountId && it.currencyId == usdId }
 
             // Verify balances
             assertNotNull(checkingBalance)
@@ -313,7 +313,7 @@ class TransactionRepositoryImplTest {
         }
 
     @Test
-    fun `getAccountBalances should handle multiple assets per account`() =
+    fun `getAccountBalances should handle multiple currencies per account`() =
         runTest {
             val now = Clock.System.now()
 
@@ -327,9 +327,9 @@ class TransactionRepositoryImplTest {
                     Account(name = "Savings", openingDate = now),
                 )
 
-            // Create test assets
-            val usdId = assetRepository.upsertAssetByName("USD")
-            val eurId = assetRepository.upsertAssetByName("EUR")
+            // Create test currencies
+            val usdId = currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
+            val eurId = currencyRepository.upsertCurrencyByCode("EUR", "Euro")
 
             // Create transactions in different currencies
             // USD: Checking -> Savings, 100
@@ -340,7 +340,7 @@ class TransactionRepositoryImplTest {
                     description = "Transfer USD to savings",
                     sourceAccountId = checkingAccountId,
                     targetAccountId = savingsAccountId,
-                    assetId = usdId,
+                    currencyId = usdId,
                     amount = 100.0,
                 ),
             )
@@ -353,7 +353,7 @@ class TransactionRepositoryImplTest {
                     description = "Transfer EUR to savings",
                     sourceAccountId = checkingAccountId,
                     targetAccountId = savingsAccountId,
-                    assetId = eurId,
+                    currencyId = eurId,
                     amount = 50.0,
                 ),
             )
@@ -362,12 +362,12 @@ class TransactionRepositoryImplTest {
             val balances = transactionRepository.getAccountBalances().first()
 
             // Find balances for checking account
-            val checkingUsdBalance = balances.find { it.accountId == checkingAccountId && it.assetId == usdId }
-            val checkingEurBalance = balances.find { it.accountId == checkingAccountId && it.assetId == eurId }
+            val checkingUsdBalance = balances.find { it.accountId == checkingAccountId && it.currencyId == usdId }
+            val checkingEurBalance = balances.find { it.accountId == checkingAccountId && it.currencyId == eurId }
 
             // Find balances for savings account
-            val savingsUsdBalance = balances.find { it.accountId == savingsAccountId && it.assetId == usdId }
-            val savingsEurBalance = balances.find { it.accountId == savingsAccountId && it.assetId == eurId }
+            val savingsUsdBalance = balances.find { it.accountId == savingsAccountId && it.currencyId == usdId }
+            val savingsEurBalance = balances.find { it.accountId == savingsAccountId && it.currencyId == eurId }
 
             // Verify balances
             assertNotNull(checkingUsdBalance)
@@ -411,8 +411,8 @@ class TransactionRepositoryImplTest {
                     Account(name = "Target Account", openingDate = now),
                 )
 
-            // Create test asset
-            val assetId = assetRepository.upsertAssetByName("USD")
+            // Create test currency
+            val currencyId = currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
 
             // Create transaction
             val transferId = Uuid.random()
@@ -423,7 +423,7 @@ class TransactionRepositoryImplTest {
                     description = "Test transaction to delete",
                     sourceAccountId = sourceAccountId,
                     targetAccountId = targetAccountId,
-                    assetId = assetId,
+                    currencyId = currencyId,
                     amount = 100.0,
                 )
             transactionRepository.createTransfer(transfer)
@@ -450,8 +450,8 @@ class TransactionRepositoryImplTest {
                     Account(name = "Target Account", openingDate = now),
                 )
 
-            // Create test asset
-            val assetId = assetRepository.upsertAssetByName("USD")
+            // Create test currency
+            val currencyId = currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
 
             // Create multiple transactions with different timestamps
             transactionRepository.createTransfer(
@@ -461,7 +461,7 @@ class TransactionRepositoryImplTest {
                     description = "Earlier transaction",
                     sourceAccountId = sourceAccountId,
                     targetAccountId = targetAccountId,
-                    assetId = assetId,
+                    currencyId = currencyId,
                     amount = 100.0,
                 ),
             )
@@ -473,7 +473,7 @@ class TransactionRepositoryImplTest {
                     description = "Later transaction",
                     sourceAccountId = sourceAccountId,
                     targetAccountId = targetAccountId,
-                    assetId = assetId,
+                    currencyId = currencyId,
                     amount = 200.0,
                 ),
             )

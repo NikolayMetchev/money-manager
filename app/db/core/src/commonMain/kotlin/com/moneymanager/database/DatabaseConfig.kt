@@ -1,3 +1,5 @@
+@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
+
 package com.moneymanager.database
 
 import com.moneymanager.database.sql.MoneyManagerDatabase
@@ -19,14 +21,14 @@ object DatabaseConfig {
 
     /**
      * Default currencies to seed when creating a new database.
-     * These are ISO 4217 currency codes: USD, GBP, EUR, JPY.
+     * Each entry is a pair of (ISO 4217 code, human-readable name).
      */
     val defaultCurrencies =
         listOf(
-            "USD",
-            "GBP",
-            "EUR",
-            "JPY",
+            "USD" to "US Dollar",
+            "GBP" to "British Pound",
+            "EUR" to "Euro",
+            "JPY" to "Japanese Yen",
         )
 
     /**
@@ -34,9 +36,9 @@ object DatabaseConfig {
      * Should be called once after creating a new database.
      */
     suspend fun seedDatabase(database: MoneyManagerDatabase) {
-        val assetRepository = RepositorySet(database).assetRepository
-        defaultCurrencies.forEach { currency ->
-            assetRepository.upsertAssetByName(currency)
+        val currencyRepository = RepositorySet(database).currencyRepository
+        defaultCurrencies.forEach { (code, name) ->
+            currencyRepository.upsertCurrencyByCode(code, name)
         }
     }
 }
