@@ -2,7 +2,7 @@
 <Configuration status="WARN" monitorInterval="30">
     <Properties>
         <!-- Log directory in user home next to database -->
-        <Property name="LOG_DIR">${sys:user.home}/.dbmanager/logs</Property>
+        <Property name="LOG_DIR">${sys:user.home}/.moneymanager/logs</Property>
         <Property name="LOG_PATTERN">%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n</Property>
     </Properties>
 
