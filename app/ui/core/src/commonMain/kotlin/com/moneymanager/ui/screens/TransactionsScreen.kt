@@ -713,41 +713,67 @@ fun TransactionEntryDialog(
                     }
                 }
 
-                // Currency Dropdown
+                // Currency Dropdown with search
+                var currencySearchQuery by remember { mutableStateOf("") }
+                val filteredCurrencies =
+                    remember(currencies, currencySearchQuery) {
+                        if (currencySearchQuery.isBlank()) {
+                            currencies
+                        } else {
+                            currencies.filter { currency ->
+                                currency.code.contains(currencySearchQuery, ignoreCase = true) ||
+                                    currency.name.contains(currencySearchQuery, ignoreCase = true)
+                            }
+                        }
+                    }
+
                 ExposedDropdownMenuBox(
                     expanded = currencyExpanded,
                     onExpandedChange = { currencyExpanded = it },
                 ) {
                     OutlinedTextField(
-                        value = currencies.find { it.id == currencyId }?.let { "${it.code} - ${it.name}" } ?: "",
-                        onValueChange = {},
-                        readOnly = true,
+                        value =
+                            if (currencyExpanded) {
+                                currencySearchQuery
+                            } else {
+                                currencies.find { it.id == currencyId }?.let { "${it.code} - ${it.name}" } ?: ""
+                            },
+                        onValueChange = { currencySearchQuery = it },
                         label = { Text("Currency") },
+                        placeholder = { Text("Type to search...") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = currencyExpanded) },
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .menuAnchor(),
+                                .menuAnchor(MenuAnchorType.PrimaryEditable),
                         enabled = !isSaving,
+                        singleLine = true,
                     )
                     ExposedDropdownMenu(
                         expanded = currencyExpanded,
-                        onDismissRequest = { currencyExpanded = false },
+                        onDismissRequest = {
+                            currencyExpanded = false
+                            currencySearchQuery = ""
+                        },
                     ) {
-                        currencies.forEach { currency ->
+                        filteredCurrencies.forEach { currency ->
                             DropdownMenuItem(
                                 text = { Text("${currency.code} - ${currency.name}") },
                                 onClick = {
                                     currencyId = currency.id
                                     currencyExpanded = false
+                                    currencySearchQuery = ""
                                 },
                             )
                         }
+                        // Always show "Create New Currency" option
+                        HorizontalDivider()
                         DropdownMenuItem(
                             text = { Text("+ Create New Currency") },
                             onClick = {
                                 showCreateCurrencyDialog = true
                                 currencyExpanded = false
+                                currencySearchQuery = ""
                             },
                         )
                     }

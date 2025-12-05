@@ -45,23 +45,23 @@ class CurrencyRepositoryImplTest {
     }
 
     // Number of seeded currencies from DatabaseConfig
-    private val seededCurrencyCount = DatabaseConfig.defaultCurrencies.size
+    private val seededCurrencyCount = DatabaseConfig.allCurrencies.size
 
     // UPSERT TESTS
 
     @Test
     fun `upsertCurrencyByCode should create new currency when code does not exist`() =
         runTest {
-            // When - use a currency not in the seeded list
-            val currencyId = repository.upsertCurrencyByCode("CHF", "Swiss Franc")
+            // When - use a currency not in the seeded list (non-ISO code)
+            val currencyId = repository.upsertCurrencyByCode("XYZ", "Test Currency")
 
             // Then
             assertNotNull(currencyId)
 
             val currency = repository.getCurrencyById(currencyId).first()
             assertNotNull(currency)
-            assertEquals("CHF", currency.code)
-            assertEquals("Swiss Franc", currency.name)
+            assertEquals("XYZ", currency.code)
+            assertEquals("Test Currency", currency.name)
         }
 
     @Test
@@ -176,15 +176,15 @@ class CurrencyRepositoryImplTest {
             assertEquals(seededCurrencyCount, currencies.size)
 
             val codes = currencies.map { it.code }.toSet()
-            val seededCodes = DatabaseConfig.defaultCurrencies.map { it.first }.toSet()
+            val seededCodes = DatabaseConfig.allCurrencies.map { it.code }.toSet()
             assertEquals(seededCodes, codes)
         }
 
     @Test
     fun `getAllCurrencies should return all currencies including seeded and new`() =
         runTest {
-            // Given - add a new currency not in seeded list
-            repository.upsertCurrencyByCode("CHF", "Swiss Franc")
+            // Given - add a new currency not in seeded list (use a non-ISO code)
+            repository.upsertCurrencyByCode("XYZ", "Test Currency")
 
             // When
             val currencies = repository.getAllCurrencies().first()
@@ -192,8 +192,8 @@ class CurrencyRepositoryImplTest {
             // Then - should have seeded currencies plus the new one
             assertEquals(seededCurrencyCount + 1, currencies.size)
             val codes = currencies.map { it.code }.toSet()
-            val seededCodes = DatabaseConfig.defaultCurrencies.map { it.first }.toSet()
+            val seededCodes = DatabaseConfig.allCurrencies.map { it.code }.toSet()
             assertTrue(codes.containsAll(seededCodes))
-            assertTrue(codes.contains("CHF"))
+            assertTrue(codes.contains("XYZ"))
         }
 }

@@ -2,6 +2,7 @@
 
 package com.moneymanager.database
 
+import com.moneymanager.currency.Currency
 import com.moneymanager.database.sql.MoneyManagerDatabase
 
 /**
@@ -20,25 +21,19 @@ object DatabaseConfig {
         )
 
     /**
-     * Default currencies to seed when creating a new database.
-     * Each entry is a pair of (ISO 4217 code, human-readable name).
+     * All available ISO 4217 currencies from the platform.
      */
-    val defaultCurrencies =
-        listOf(
-            "USD" to "US Dollar",
-            "GBP" to "British Pound",
-            "EUR" to "Euro",
-            "JPY" to "Japanese Yen",
-        )
+    val allCurrencies: List<Currency>
+        get() = Currency.getAllCurrencies()
 
     /**
-     * Seeds the database with default data.
+     * Seeds the database with all available currencies.
      * Should be called once after creating a new database.
      */
     suspend fun seedDatabase(database: MoneyManagerDatabase) {
         val currencyRepository = RepositorySet(database).currencyRepository
-        defaultCurrencies.forEach { (code, name) ->
-            currencyRepository.upsertCurrencyByCode(code, name)
+        allCurrencies.forEach { currency ->
+            currencyRepository.upsertCurrencyByCode(currency.code, currency.displayName)
         }
     }
 }
