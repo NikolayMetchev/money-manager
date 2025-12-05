@@ -1,11 +1,21 @@
 CREATE TABLE Transfer (
-    transactionId INTEGER PRIMARY KEY NOT NULL,
+    id TEXT PRIMARY KEY NOT NULL
+        CHECK (
+            length(id) = 36
+            AND substr(id, 9, 1) = '-'
+            AND substr(id, 14, 1) = '-'
+            AND substr(id, 19, 1) = '-'
+            AND substr(id, 24, 1) = '-'
+            AND substr(id, 15, 1) IN ('1','2','3','4','5','6','7','8')
+            AND lower(substr(id, 20, 1)) IN ('8','9','a','b')
+        ),
+    timestamp INTEGER NOT NULL,
+    description TEXT NOT NULL,
     sourceAccountId INTEGER NOT NULL,
     targetAccountId INTEGER NOT NULL,
     assetId INTEGER NOT NULL,
     amount REAL NOT NULL,
     CHECK (sourceAccountId != targetAccountId),
-    FOREIGN KEY (transactionId) REFERENCES `Transaction`(id) ON DELETE CASCADE,
     FOREIGN KEY (sourceAccountId) REFERENCES Account(id) ON DELETE CASCADE,
     FOREIGN KEY (targetAccountId) REFERENCES Account(id) ON DELETE CASCADE,
     FOREIGN KEY (assetId) REFERENCES Asset(id) ON DELETE RESTRICT
@@ -39,7 +49,7 @@ GROUP BY accountId, assetId;
 
 CREATE VIEW RunningBalanceView AS
 SELECT
-    m.transactionId,
+    m.id,
     m.timestamp,
     m.description,
     m.accountId,
@@ -48,55 +58,57 @@ SELECT
     (
         SELECT SUM(m2.transactionAmount)
         FROM (
-            SELECT t.id AS transactionId, t.timestamp, tr.targetAccountId AS accountId, tr.assetId, tr.amount AS transactionAmount
-            FROM `Transaction` t
-            JOIN Transfer tr ON t.id = tr.transactionId
+            SELECT tr.id, tr.timestamp, tr.targetAccountId AS accountId, tr.assetId, tr.amount AS transactionAmount
+            FROM Transfer tr
             UNION ALL
-            SELECT t.id AS transactionId, t.timestamp, tr.sourceAccountId AS accountId, tr.assetId, -tr.amount AS transactionAmount
-            FROM `Transaction` t
-            JOIN Transfer tr ON t.id = tr.transactionId
+            SELECT tr.id, tr.timestamp, tr.sourceAccountId AS accountId, tr.assetId, -tr.amount AS transactionAmount
+            FROM Transfer tr
         ) m2
         WHERE m2.accountId = m.accountId
           AND m2.assetId = m.assetId
-          AND (m2.timestamp < m.timestamp OR (m2.timestamp = m.timestamp AND m2.transactionId <= m.transactionId))
+          AND (m2.timestamp < m.timestamp OR (m2.timestamp = m.timestamp AND m2.id <= m.id))
     ) AS runningBalance
 FROM (
-    SELECT t.id AS transactionId, t.timestamp, t.description, tr.targetAccountId AS accountId, tr.assetId, tr.amount AS transactionAmount
-    FROM `Transaction` t
-    JOIN Transfer tr ON t.id = tr.transactionId
+    SELECT tr.id, tr.timestamp, tr.description, tr.targetAccountId AS accountId, tr.assetId, tr.amount AS transactionAmount
+    FROM Transfer tr
     UNION ALL
-    SELECT t.id AS transactionId, t.timestamp, t.description, tr.sourceAccountId AS accountId, tr.assetId, -tr.amount AS transactionAmount
-    FROM `Transaction` t
-    JOIN Transfer tr ON t.id = tr.transactionId
+    SELECT tr.id, tr.timestamp, tr.description, tr.sourceAccountId AS accountId, tr.assetId, -tr.amount AS transactionAmount
+    FROM Transfer tr
 ) m;
 
 selectAll:
-SELECT * FROM Transfer;
+SELECT * FROM Transfer ORDER BY timestamp DESC;
 
 selectById:
-SELECT * FROM Transfer WHERE transactionId = ?;
+SELECT * FROM Transfer WHERE id = ?;
 
 selectByAccount:
-SELECT * FROM Transfer WHERE sourceAccountId = ? OR targetAccountId = ?;
+SELECT * FROM Transfer
+WHERE sourceAccountId = ? OR targetAccountId = ?
+ORDER BY timestamp DESC;
+
+selectByDateRange:
+SELECT * FROM Transfer
+WHERE timestamp >= ? AND timestamp <= ?
+ORDER BY timestamp DESC;
 
 selectByAccountAndDateRange:
-SELECT tr.*
-FROM Transfer tr
-JOIN `Transaction` t ON tr.transactionId = t.id
-WHERE (tr.sourceAccountId = ? OR tr.targetAccountId = ?)
-AND t.timestamp >= ? AND t.timestamp <= ?;
+SELECT * FROM Transfer
+WHERE (sourceAccountId = ? OR targetAccountId = ?)
+AND timestamp >= ? AND timestamp <= ?
+ORDER BY timestamp DESC;
 
 insert:
-INSERT INTO Transfer(transactionId, sourceAccountId, targetAccountId, assetId, amount)
-VALUES (?, ?, ?, ?, ?);
+INSERT INTO Transfer(id, timestamp, description, sourceAccountId, targetAccountId, assetId, amount)
+VALUES (?, ?, ?, ?, ?, ?, ?);
 
 update:
 UPDATE Transfer
-SET sourceAccountId = ?, targetAccountId = ?, assetId = ?, amount = ?
-WHERE transactionId = ?;
+SET timestamp = ?, description = ?, sourceAccountId = ?, targetAccountId = ?, assetId = ?, amount = ?
+WHERE id = ?;
 
 delete:
-DELETE FROM Transfer WHERE transactionId = ?;
+DELETE FROM Transfer WHERE id = ?;
 
 selectAllBalances:
 SELECT * FROM AccountBalanceView;
@@ -104,59 +116,4 @@ SELECT * FROM AccountBalanceView;
 selectRunningBalanceByAccount:
 SELECT * FROM RunningBalanceView
 WHERE accountId = ?
-ORDER BY timestamp DESC, transactionId DESC;
-
-selectAllWithTransaction:
-SELECT
-    t.id AS transactionId,
-    t.timestamp,
-    t.description,
-    tr.sourceAccountId,
-    tr.targetAccountId,
-    tr.assetId,
-    tr.amount
-FROM `Transaction` t
-JOIN Transfer tr ON t.id = tr.transactionId
-ORDER BY t.timestamp DESC;
-
-selectByIdWithTransaction:
-SELECT
-    t.id AS transactionId,
-    t.timestamp,
-    t.description,
-    tr.sourceAccountId,
-    tr.targetAccountId,
-    tr.assetId,
-    tr.amount
-FROM `Transaction` t
-JOIN Transfer tr ON t.id = tr.transactionId
-WHERE t.id = ?;
-
-selectByAccountWithTransaction:
-SELECT
-    t.id AS transactionId,
-    t.timestamp,
-    t.description,
-    tr.sourceAccountId,
-    tr.targetAccountId,
-    tr.assetId,
-    tr.amount
-FROM `Transaction` t
-JOIN Transfer tr ON t.id = tr.transactionId
-WHERE tr.sourceAccountId = ? OR tr.targetAccountId = ?
-ORDER BY t.timestamp DESC;
-
-selectByAccountAndDateRangeWithTransaction:
-SELECT
-    t.id AS transactionId,
-    t.timestamp,
-    t.description,
-    tr.sourceAccountId,
-    tr.targetAccountId,
-    tr.assetId,
-    tr.amount
-FROM `Transaction` t
-JOIN Transfer tr ON t.id = tr.transactionId
-WHERE (tr.sourceAccountId = ? OR tr.targetAccountId = ?)
-AND t.timestamp >= ? AND t.timestamp <= ?
-ORDER BY t.timestamp DESC;
+ORDER BY timestamp DESC, id DESC;

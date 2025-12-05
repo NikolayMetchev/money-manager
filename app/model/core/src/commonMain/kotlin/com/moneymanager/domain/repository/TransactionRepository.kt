@@ -1,4 +1,4 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
+@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
 
 package com.moneymanager.domain.repository
 
@@ -7,11 +7,12 @@ import com.moneymanager.domain.model.TransactionWithRunningBalance
 import com.moneymanager.domain.model.Transfer
 import kotlinx.coroutines.flow.Flow
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 interface TransactionRepository {
     fun getAllTransactions(): Flow<List<Transfer>>
 
-    fun getTransactionById(id: Long): Flow<Transfer?>
+    fun getTransactionById(id: Uuid): Flow<Transfer?>
 
     fun getTransactionsByAccount(accountId: Long): Flow<List<Transfer>>
 
@@ -30,24 +31,9 @@ interface TransactionRepository {
 
     fun getRunningBalanceByAccount(accountId: Long): Flow<List<TransactionWithRunningBalance>>
 
-    suspend fun createTransfer(
-        timestamp: Instant,
-        description: String,
-        sourceAccountId: Long,
-        targetAccountId: Long,
-        assetId: Long,
-        amount: Double,
-    ): Long
+    suspend fun createTransfer(transfer: Transfer)
 
-    suspend fun updateTransfer(
-        id: Long,
-        timestamp: Instant,
-        description: String,
-        sourceAccountId: Long,
-        targetAccountId: Long,
-        assetId: Long,
-        amount: Double,
-    )
+    suspend fun updateTransfer(transfer: Transfer)
 
-    suspend fun deleteTransaction(id: Long)
+    suspend fun deleteTransaction(id: Uuid)
 }

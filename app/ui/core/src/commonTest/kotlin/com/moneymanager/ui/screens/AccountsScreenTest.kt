@@ -1,4 +1,4 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
+@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
 
 package com.moneymanager.ui.screens
 
@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlin.test.Test
 import kotlin.time.Clock
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalTestApi::class)
 class AccountsScreenTest {
@@ -343,7 +344,7 @@ class AccountsScreenTest {
     private class FakeTransactionRepository : TransactionRepository {
         override fun getAllTransactions(): Flow<List<Transfer>> = flowOf(emptyList())
 
-        override fun getTransactionById(id: Long): Flow<Transfer?> = flowOf(null)
+        override fun getTransactionById(id: Uuid): Flow<Transfer?> = flowOf(null)
 
         override fun getTransactionsByAccount(accountId: Long): Flow<List<Transfer>> = flowOf(emptyList())
 
@@ -362,26 +363,11 @@ class AccountsScreenTest {
 
         override fun getRunningBalanceByAccount(accountId: Long): Flow<List<TransactionWithRunningBalance>> = flowOf(emptyList())
 
-        override suspend fun createTransfer(
-            timestamp: Instant,
-            description: String,
-            sourceAccountId: Long,
-            targetAccountId: Long,
-            assetId: Long,
-            amount: Double,
-        ): Long = 0L
+        override suspend fun createTransfer(transfer: Transfer) {}
 
-        override suspend fun updateTransfer(
-            id: Long,
-            timestamp: Instant,
-            description: String,
-            sourceAccountId: Long,
-            targetAccountId: Long,
-            assetId: Long,
-            amount: Double,
-        ) {}
+        override suspend fun updateTransfer(transfer: Transfer) {}
 
-        override suspend fun deleteTransaction(id: Long) {}
+        override suspend fun deleteTransaction(id: Uuid) {}
     }
 
     private class FakeAssetRepository : AssetRepository {
