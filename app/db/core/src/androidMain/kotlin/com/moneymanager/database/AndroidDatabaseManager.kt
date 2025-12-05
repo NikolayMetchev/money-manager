@@ -16,8 +16,8 @@ private val DEFAULT_DB_LOCATION = DbLocation(DEFAULT_DATABASE_NAME)
 class AndroidDatabaseManager(private val context: Context) : DatabaseManager {
     override suspend fun openDatabase(location: DbLocation): MoneyManagerDatabase =
         withContext(Dispatchers.IO) {
-            // Track if this is a new database for seeding
-            var isNewDatabase = false
+            // Check if this is a new database before opening
+            val isNewDatabase = !context.getDatabasePath(location.name).exists()
 
             // AndroidSqliteDriver automatically handles schema creation
             val driver =
@@ -27,11 +27,6 @@ class AndroidDatabaseManager(private val context: Context) : DatabaseManager {
                     name = location.name,
                     callback =
                         object : AndroidSqliteDriver.Callback(MoneyManagerDatabase.Schema) {
-                            override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
-                                super.onCreate(db)
-                                isNewDatabase = true
-                            }
-
                             override fun onOpen(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                                 super.onOpen(db)
                                 // Apply connection-level PRAGMA settings
