@@ -10,6 +10,7 @@ import androidx.compose.ui.test.runComposeUiTest
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.Currency
+import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.TransactionWithRunningBalance
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.repository.AccountRepository
@@ -373,17 +374,17 @@ class AccountsScreenTest {
     private class FakeCurrencyRepository : CurrencyRepository {
         override fun getAllCurrencies(): Flow<List<Currency>> = flowOf(emptyList())
 
-        override fun getCurrencyById(id: Uuid): Flow<Currency?> = flowOf(null)
+        override fun getCurrencyById(id: CurrencyId): Flow<Currency?> = flowOf(null)
 
         override fun getCurrencyByCode(code: String): Flow<Currency?> = flowOf(null)
 
         override suspend fun upsertCurrencyByCode(
             code: String,
             name: String,
-        ): Uuid = Uuid.random()
+        ): CurrencyId = CurrencyId(Uuid.random())
 
         override suspend fun updateCurrency(currency: Currency) {}
 
-        override suspend fun deleteCurrency(id: Uuid) {}
+        override suspend fun deleteCurrency(id: CurrencyId) {}
     }
 }

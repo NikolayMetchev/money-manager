@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import com.moneymanager.domain.model.Currency
+import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.repository.CurrencyRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,7 +24,7 @@ class CurrenciesScreenTest {
 
         override fun getAllCurrencies(): Flow<List<Currency>> = currenciesFlow
 
-        override fun getCurrencyById(id: Uuid): Flow<Currency?> {
+        override fun getCurrencyById(id: CurrencyId): Flow<Currency?> {
             TODO("Not needed for this test")
         }
 
@@ -34,7 +35,7 @@ class CurrenciesScreenTest {
         override suspend fun upsertCurrencyByCode(
             code: String,
             name: String,
-        ): Uuid {
+        ): CurrencyId {
             TODO("Not needed for this test")
         }
 
@@ -42,7 +43,7 @@ class CurrenciesScreenTest {
             TODO("Not needed for this test")
         }
 
-        override suspend fun deleteCurrency(id: Uuid) {
+        override suspend fun deleteCurrency(id: CurrencyId) {
             TODO("Not needed for this test")
         }
     }
@@ -64,7 +65,7 @@ class CurrenciesScreenTest {
         runComposeUiTest {
             val testCurrency =
                 Currency(
-                    id = Uuid.random(),
+                    id = CurrencyId(Uuid.random()),
                     code = "USD",
                     name = "US Dollar",
                 )
@@ -83,9 +84,9 @@ class CurrenciesScreenTest {
         runComposeUiTest {
             val currencies =
                 listOf(
-                    Currency(id = Uuid.random(), code = "USD", name = "US Dollar"),
-                    Currency(id = Uuid.random(), code = "EUR", name = "Euro"),
-                    Currency(id = Uuid.random(), code = "GBP", name = "British Pound"),
+                    Currency(id = CurrencyId(Uuid.random()), code = "USD", name = "US Dollar"),
+                    Currency(id = CurrencyId(Uuid.random()), code = "EUR", name = "Euro"),
+                    Currency(id = CurrencyId(Uuid.random()), code = "GBP", name = "British Pound"),
                 )
             val repository = FakeCurrencyRepository(currencies)
 

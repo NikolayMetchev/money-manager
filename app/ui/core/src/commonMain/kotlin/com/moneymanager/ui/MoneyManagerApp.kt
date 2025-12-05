@@ -27,8 +27,8 @@ fun MoneyManagerApp(
     var showTransactionDialog by remember { mutableStateOf(false) }
     var preSelectedAccountId by remember { mutableStateOf<Long?>(null) }
     var currentlyViewedAccountId by remember { mutableStateOf<Long?>(null) }
-    var preSelectedCurrencyId by remember { mutableStateOf<kotlin.uuid.Uuid?>(null) }
-    var currentlyViewedCurrencyId by remember { mutableStateOf<kotlin.uuid.Uuid?>(null) }
+    var preSelectedCurrencyId by remember { mutableStateOf<com.moneymanager.domain.model.CurrencyId?>(null) }
+    var currentlyViewedCurrencyId by remember { mutableStateOf<com.moneymanager.domain.model.CurrencyId?>(null) }
 
     val accounts by repositorySet.accountRepository.getAllAccounts().collectAsState(initial = emptyList())
     val currencies by repositorySet.currencyRepository.getAllCurrencies().collectAsState(initial = emptyList())
@@ -141,8 +141,8 @@ fun MoneyManagerApp(
                             onAccountIdChange = { accountId ->
                                 currentlyViewedAccountId = accountId
                             },
-                            onCurrencyIdChange = { currencyId ->
-                                currentlyViewedCurrencyId = currencyId
+                            onCurrencyIdChange = { uuid ->
+                                currentlyViewedCurrencyId = uuid?.let { com.moneymanager.domain.model.CurrencyId(it) }
                             },
                         )
                     }

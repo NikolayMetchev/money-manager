@@ -12,7 +12,10 @@ import kotlin.uuid.Uuid
  * @property name Human-readable name of the currency (e.g., "US Dollar")
  */
 data class Currency(
-    val id: Uuid = Uuid.random(),
+    val id: CurrencyId,
     val code: String,
     val name: String,
 )
+
+@JvmInline
+value class CurrencyId(val uuid: Uuid)
