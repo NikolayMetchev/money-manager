@@ -101,7 +101,7 @@ fun AccountTransactionsScreen(
 
     // Notify parent when selected currency changes
     LaunchedEffect(selectedCurrencyId) {
-        onCurrencyIdChange(selectedCurrencyId?.uuid)
+        onCurrencyIdChange(selectedCurrencyId)
     }
 
     // Update selected currency when account currencies change
