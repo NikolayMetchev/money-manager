@@ -66,6 +66,7 @@ fun AccountTransactionsScreen(
     accountRepository: AccountRepository,
     currencyRepository: CurrencyRepository,
     onAccountIdChange: (Long) -> Unit = {},
+    onCurrencyIdChange: (Uuid?) -> Unit = {},
 ) {
     val allAccounts by accountRepository.getAllAccounts().collectAsState(initial = emptyList())
     val allTransactions by transactionRepository.getAllTransactions().collectAsState(initial = emptyList())
@@ -96,6 +97,11 @@ fun AccountTransactionsScreen(
 
     // Selected currency state - default to first currency if available
     var selectedCurrencyId by remember { mutableStateOf<Uuid?>(null) }
+
+    // Notify parent when selected currency changes
+    LaunchedEffect(selectedCurrencyId) {
+        onCurrencyIdChange(selectedCurrencyId)
+    }
 
     // Update selected currency when account currencies change
     LaunchedEffect(accountCurrencies) {
@@ -592,11 +598,12 @@ fun TransactionEntryDialog(
     accounts: List<Account>,
     currencies: List<Currency>,
     preSelectedSourceAccountId: Long? = null,
+    preSelectedCurrencyId: Uuid? = null,
     onDismiss: () -> Unit,
 ) {
     var sourceAccountId by remember { mutableStateOf(preSelectedSourceAccountId) }
     var targetAccountId by remember { mutableStateOf<Long?>(null) }
-    var currencyId by remember { mutableStateOf<Uuid?>(null) }
+    var currencyId by remember { mutableStateOf<Uuid?>(preSelectedCurrencyId) }
     var amount by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
