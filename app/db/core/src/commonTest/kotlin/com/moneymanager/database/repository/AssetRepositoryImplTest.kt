@@ -1,5 +1,6 @@
 package com.moneymanager.database.repository
 
+import com.moneymanager.database.DatabaseConfig
 import com.moneymanager.database.RepositorySet
 import com.moneymanager.database.createTestDatabaseLocation
 import com.moneymanager.database.deleteTestDatabase
@@ -41,37 +42,42 @@ class AssetRepositoryImplTest {
         deleteTestDatabase(testDbLocation)
     }
 
+    // Number of seeded currencies from DatabaseConfig
+    private val seededCurrencyCount = DatabaseConfig.defaultCurrencies.size
+
     // UPSERT TESTS
 
     @Test
     fun `upsertAssetByName should create new asset when name does not exist`() =
         runTest {
-            // When
-            val assetId = repository.upsertAssetByName("USD")
+            // When - use a currency not in the seeded list
+            val assetId = repository.upsertAssetByName("CHF")
 
             // Then
             assertTrue(assetId > 0, "Generated ID should be positive")
 
-            val assets = repository.getAllAssets().first()
-            assertEquals(1, assets.size)
-            assertEquals("USD", assets[0].name)
-            assertEquals(assetId, assets[0].id)
+            val asset = repository.getAssetById(assetId).first()
+            assertNotNull(asset)
+            assertEquals("CHF", asset.name)
         }
 
     @Test
     fun `upsertAssetByName should return existing ID when asset already exists`() =
         runTest {
-            // Given
-            val firstId = repository.upsertAssetByName("EUR")
+            // Given - EUR is already seeded
+            val initialAssets = repository.getAllAssets().first()
+            val initialCount = initialAssets.size
 
-            // When
-            val secondId = repository.upsertAssetByName("EUR")
+            // When - upsert an already seeded currency
+            val eurId = repository.upsertAssetByName("EUR")
 
             // Then
-            assertEquals(firstId, secondId, "Should return same ID for existing asset")
+            val assetsAfter = repository.getAllAssets().first()
+            assertEquals(initialCount, assetsAfter.size, "Should not create duplicate asset")
 
-            val assets = repository.getAllAssets().first()
-            assertEquals(1, assets.size, "Should not create duplicate asset")
+            // Upsert again should return same ID
+            val secondEurId = repository.upsertAssetByName("EUR")
+            assertEquals(eurId, secondEurId, "Should return same ID for existing asset")
         }
 
     @Test
@@ -97,14 +103,14 @@ class AssetRepositoryImplTest {
     @Test
     fun `upsertAssetByName should handle multiple different assets`() =
         runTest {
-            // When
+            // When - upsert seeded currencies (should return existing IDs)
             val usdId = repository.upsertAssetByName("USD")
             val eurId = repository.upsertAssetByName("EUR")
             val gbpId = repository.upsertAssetByName("GBP")
 
-            // Then
+            // Then - should have at least the seeded currencies
             val assets = repository.getAllAssets().first()
-            assertEquals(3, assets.size)
+            assertEquals(seededCurrencyCount, assets.size)
 
             val ids = assets.map { it.id }.toSet()
             assertTrue(ids.contains(usdId))
@@ -112,26 +118,36 @@ class AssetRepositoryImplTest {
             assertTrue(ids.contains(gbpId))
 
             val names = assets.map { it.name }.toSet()
-            assertEquals(setOf("USD", "EUR", "GBP"), names)
+            assertTrue(names.containsAll(setOf("USD", "EUR", "GBP")))
         }
 
     @Test
     fun `upsertAssetByName should be case sensitive`() =
         runTest {
+            // Given - USD is already seeded
+            val initialCount = repository.getAllAssets().first().size
+
             // When
             val lowercaseId = repository.upsertAssetByName("usd")
             val uppercaseId = repository.upsertAssetByName("USD")
 
-            // Then
+            // Then - lowercase should be new, uppercase should be existing
             val assets = repository.getAllAssets().first()
-            assertEquals(2, assets.size, "Should create two separate assets for different cases")
+            assertEquals(
+                initialCount + 1,
+                assets.size,
+                "Should create one new asset for lowercase (USD already exists)",
+            )
             assertTrue(lowercaseId != uppercaseId, "IDs should be different")
         }
 
     @Test
     fun `upsertAssetByName should handle rapid consecutive calls for same name`() =
         runTest {
-            // When - simulate rapid upserts
+            // Given
+            val initialCount = repository.getAllAssets().first().size
+
+            // When - simulate rapid upserts for a new currency
             val id1 = repository.upsertAssetByName("BTC")
             val id2 = repository.upsertAssetByName("BTC")
             val id3 = repository.upsertAssetByName("BTC")
@@ -141,32 +157,38 @@ class AssetRepositoryImplTest {
             assertEquals(id2, id3)
 
             val assets = repository.getAllAssets().first()
-            assertEquals(1, assets.size, "Should only have one asset despite multiple upserts")
+            assertEquals(
+                initialCount + 1,
+                assets.size,
+                "Should only add one new asset despite multiple upserts",
+            )
         }
 
     // GET ALL ASSETS TESTS
 
     @Test
-    fun `getAllAssets should return empty list when no assets exist`() =
+    fun `getAllAssets should return seeded currencies for new database`() =
         runTest {
             val assets = repository.getAllAssets().first()
-            assertTrue(assets.isEmpty())
+            assertEquals(seededCurrencyCount, assets.size)
+
+            val names = assets.map { it.name }.toSet()
+            assertEquals(DatabaseConfig.defaultCurrencies.toSet(), names)
         }
 
     @Test
-    fun `getAllAssets should return all assets`() =
+    fun `getAllAssets should return all assets including seeded and new`() =
         runTest {
-            // Given
-            repository.upsertAssetByName("USD")
-            repository.upsertAssetByName("EUR")
-            repository.upsertAssetByName("GBP")
+            // Given - add a new currency not in seeded list
+            repository.upsertAssetByName("CHF")
 
             // When
             val assets = repository.getAllAssets().first()
 
-            // Then
-            assertEquals(3, assets.size)
+            // Then - should have seeded currencies plus the new one
+            assertEquals(seededCurrencyCount + 1, assets.size)
             val names = assets.map { it.name }.toSet()
-            assertEquals(setOf("USD", "EUR", "GBP"), names)
+            assertTrue(names.containsAll(DatabaseConfig.defaultCurrencies))
+            assertTrue(names.contains("CHF"))
         }
 }

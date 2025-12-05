@@ -35,6 +35,8 @@
             <option value="$PROJECT_DIR$/app/ui" />
             <option value="$PROJECT_DIR$/app/ui/core" />
             <option value="$PROJECT_DIR$/gradle/build-logic" />
+            <option value="$PROJECT_DIR$/utils" />
+            <option value="$PROJECT_DIR$/utils/currency" />
           </set>
         </option>
       </GradleProjectSettings>

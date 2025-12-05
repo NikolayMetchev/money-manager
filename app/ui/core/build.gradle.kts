@@ -20,6 +20,7 @@ kotlin {
                 implementation(projects.app.db.core)
                 implementation(projects.app.di.core)
                 implementation(projects.app.model.core)
+                implementation(projects.utils.currency)
             }
         }
         val commonTest by getting {
