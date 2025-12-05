@@ -141,8 +141,8 @@ fun MoneyManagerApp(
                             onAccountIdChange = { accountId ->
                                 currentlyViewedAccountId = accountId
                             },
-                            onCurrencyIdChange = { uuid ->
-                                currentlyViewedCurrencyId = uuid?.let { com.moneymanager.domain.model.CurrencyId(it) }
+                            onCurrencyIdChange = { currencyId ->
+                                currentlyViewedCurrencyId = currencyId
                             },
                         )
                     }

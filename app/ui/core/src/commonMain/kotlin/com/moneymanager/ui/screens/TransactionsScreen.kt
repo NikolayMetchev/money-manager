@@ -67,7 +67,7 @@ fun AccountTransactionsScreen(
     accountRepository: AccountRepository,
     currencyRepository: CurrencyRepository,
     onAccountIdChange: (Long) -> Unit = {},
-    onCurrencyIdChange: (Uuid?) -> Unit = {},
+    onCurrencyIdChange: (CurrencyId?) -> Unit = {},
 ) {
     val allAccounts by accountRepository.getAllAccounts().collectAsState(initial = emptyList())
     val allTransactions by transactionRepository.getAllTransactions().collectAsState(initial = emptyList())
@@ -101,7 +101,7 @@ fun AccountTransactionsScreen(
 
     // Notify parent when selected currency changes
     LaunchedEffect(selectedCurrencyId) {
-        onCurrencyIdChange(selectedCurrencyId?.uuid)
+        onCurrencyIdChange(selectedCurrencyId)
     }
 
     // Update selected currency when account currencies change
