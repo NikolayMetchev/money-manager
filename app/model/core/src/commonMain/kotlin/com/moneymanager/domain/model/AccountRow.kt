@@ -3,10 +3,9 @@
 package com.moneymanager.domain.model
 
 import kotlin.time.Instant
-import kotlin.uuid.Uuid
 
 data class AccountRow(
-    val transactionId: Uuid,
+    val transactionId: TransactionId,
     val timestamp: Instant,
     val description: String,
     val accountId: AccountId,
