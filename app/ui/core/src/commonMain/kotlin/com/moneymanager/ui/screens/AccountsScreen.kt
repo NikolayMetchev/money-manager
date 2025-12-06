@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountBalance
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.CurrencyRepository
@@ -239,8 +240,10 @@ fun CreateAccountDialog(
                         scope.launch {
                             try {
                                 val now = Clock.System.now()
+                                // Placeholder ID, repository will assign actual ID
                                 val newAccount =
                                     Account(
+                                        id = AccountId(0),
                                         name = name.trim(),
                                         openingDate = now,
                                     )

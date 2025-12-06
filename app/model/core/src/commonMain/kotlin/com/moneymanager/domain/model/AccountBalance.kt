@@ -3,7 +3,7 @@
 package com.moneymanager.domain.model
 
 data class AccountBalance(
-    val accountId: Long,
+    val accountId: AccountId,
     val currencyId: CurrencyId,
     val balance: Double,
 )

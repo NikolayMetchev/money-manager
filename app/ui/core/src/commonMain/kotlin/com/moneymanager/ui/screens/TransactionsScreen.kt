@@ -18,9 +18,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moneymanager.domain.model.Account
+import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.AccountRow
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
-import com.moneymanager.domain.model.TransactionWithRunningBalance
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.CurrencyRepository
@@ -62,11 +63,11 @@ enum class ScreenSizeClass {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AccountTransactionsScreen(
-    accountId: Long,
+    accountId: AccountId,
     transactionRepository: TransactionRepository,
     accountRepository: AccountRepository,
     currencyRepository: CurrencyRepository,
-    onAccountIdChange: (Long) -> Unit = {},
+    onAccountIdChange: (AccountId) -> Unit = {},
     onCurrencyIdChange: (CurrencyId?) -> Unit = {},
 ) {
     val allAccounts by accountRepository.getAllAccounts().collectAsState(initial = emptyList())
@@ -372,13 +373,13 @@ fun AccountTransactionsScreen(
 
 @Composable
 fun AccountTransactionCard(
-    runningBalance: TransactionWithRunningBalance,
+    runningBalance: AccountRow,
     transaction: Transfer?,
     accounts: List<Account>,
     currencies: List<Currency>,
     screenSizeClass: ScreenSizeClass,
     isHighlighted: Boolean = false,
-    onAccountClick: (Long) -> Unit = {},
+    onAccountClick: (AccountId) -> Unit = {},
 ) {
     val sourceAccount = transaction?.let { accounts.find { a -> a.id == it.sourceAccountId } }
     val targetAccount = transaction?.let { accounts.find { a -> a.id == it.targetAccountId } }
@@ -598,12 +599,12 @@ fun TransactionEntryDialog(
     currencyRepository: CurrencyRepository,
     accounts: List<Account>,
     currencies: List<Currency>,
-    preSelectedSourceAccountId: Long? = null,
+    preSelectedSourceAccountId: AccountId? = null,
     preSelectedCurrencyId: CurrencyId? = null,
     onDismiss: () -> Unit,
 ) {
     var sourceAccountId by remember { mutableStateOf(preSelectedSourceAccountId) }
-    var targetAccountId by remember { mutableStateOf<Long?>(null) }
+    var targetAccountId by remember { mutableStateOf<AccountId?>(null) }
     var currencyId by remember { mutableStateOf<CurrencyId?>(preSelectedCurrencyId) }
     var amount by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
@@ -1051,7 +1052,7 @@ fun TransactionEntryDialog(
 @Composable
 fun CreateAccountDialogInline(
     accountRepository: AccountRepository,
-    onAccountCreated: (Long) -> Unit,
+    onAccountCreated: (AccountId) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var name by remember { mutableStateOf("") }
@@ -1100,8 +1101,10 @@ fun CreateAccountDialogInline(
                         scope.launch {
                             try {
                                 val now = Clock.System.now()
+                                // Placeholder ID, repository will assign actual ID
                                 val newAccount =
                                     Account(
+                                        id = AccountId(0),
                                         name = name.trim(),
                                         openingDate = now,
                                     )

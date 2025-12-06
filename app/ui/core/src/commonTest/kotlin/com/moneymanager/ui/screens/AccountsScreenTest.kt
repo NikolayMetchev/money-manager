@@ -9,9 +9,10 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountBalance
+import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.AccountRow
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
-import com.moneymanager.domain.model.TransactionWithRunningBalance
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.CurrencyRepository
@@ -55,12 +56,12 @@ class AccountsScreenTest {
             val accounts =
                 listOf(
                     Account(
-                        id = 1L,
+                        id = AccountId(1L),
                         name = "Checking Account",
                         openingDate = now,
                     ),
                     Account(
-                        id = 2L,
+                        id = AccountId(2L),
                         name = "Savings Account",
                         openingDate = now,
                     ),
@@ -132,7 +133,7 @@ class AccountsScreenTest {
             val now = Clock.System.now()
             val account =
                 Account(
-                    id = 1L,
+                    id = AccountId(1L),
                     name = "My Checking",
                     openingDate = now,
                 )
@@ -159,7 +160,7 @@ class AccountsScreenTest {
             val now = Clock.System.now()
             val account =
                 Account(
-                    id = 1L,
+                    id = AccountId(1L),
                     name = "Test Account",
                     openingDate = now,
                 )
@@ -243,7 +244,7 @@ class AccountsScreenTest {
             val now = Clock.System.now()
             val account =
                 Account(
-                    id = 1L,
+                    id = AccountId(1L),
                     name = "Test Account",
                     openingDate = now,
                 )
@@ -278,17 +279,17 @@ class AccountsScreenTest {
             val accounts =
                 listOf(
                     Account(
-                        id = 1L,
+                        id = AccountId(1L),
                         name = "Account 1",
                         openingDate = now,
                     ),
                     Account(
-                        id = 2L,
+                        id = AccountId(2L),
                         name = "Account 2",
                         openingDate = now,
                     ),
                     Account(
-                        id = 3L,
+                        id = AccountId(3L),
                         name = "Account 3",
                         openingDate = now,
                     ),
@@ -316,14 +317,14 @@ class AccountsScreenTest {
         private val accounts: List<Account>,
     ) : AccountRepository {
         private val accountsFlow = MutableStateFlow(accounts)
-        private val deletedAccounts = mutableListOf<Long>()
+        private val deletedAccounts = mutableListOf<AccountId>()
 
         override fun getAllAccounts(): Flow<List<Account>> = accountsFlow
 
-        override fun getAccountById(id: Long): Flow<Account?> = flowOf(accounts.find { it.id == id })
+        override fun getAccountById(id: AccountId): Flow<Account?> = flowOf(accounts.find { it.id == id })
 
-        override suspend fun createAccount(account: Account): Long {
-            val newId = (accounts.maxOfOrNull { it.id } ?: 0L) + 1
+        override suspend fun createAccount(account: Account): AccountId {
+            val newId = AccountId((accounts.maxOfOrNull { it.id.id } ?: 0L) + 1)
             val newAccount = account.copy(id = newId)
             accountsFlow.value = accountsFlow.value + newAccount
             return newId
@@ -336,7 +337,7 @@ class AccountsScreenTest {
                 }
         }
 
-        override suspend fun deleteAccount(id: Long) {
+        override suspend fun deleteAccount(id: AccountId) {
             deletedAccounts.add(id)
             accountsFlow.value = accountsFlow.value.filter { it.id != id }
         }
@@ -347,7 +348,7 @@ class AccountsScreenTest {
 
         override fun getTransactionById(id: Uuid): Flow<Transfer?> = flowOf(null)
 
-        override fun getTransactionsByAccount(accountId: Long): Flow<List<Transfer>> = flowOf(emptyList())
+        override fun getTransactionsByAccount(accountId: AccountId): Flow<List<Transfer>> = flowOf(emptyList())
 
         override fun getTransactionsByDateRange(
             startDate: Instant,
@@ -355,14 +356,14 @@ class AccountsScreenTest {
         ): Flow<List<Transfer>> = flowOf(emptyList())
 
         override fun getTransactionsByAccountAndDateRange(
-            accountId: Long,
+            accountId: AccountId,
             startDate: Instant,
             endDate: Instant,
         ): Flow<List<Transfer>> = flowOf(emptyList())
 
         override fun getAccountBalances(): Flow<List<AccountBalance>> = flowOf(emptyList())
 
-        override fun getRunningBalanceByAccount(accountId: Long): Flow<List<TransactionWithRunningBalance>> = flowOf(emptyList())
+        override fun getRunningBalanceByAccount(accountId: AccountId): Flow<List<AccountRow>> = flowOf(emptyList())
 
         override suspend fun createTransfer(transfer: Transfer) {}
 
