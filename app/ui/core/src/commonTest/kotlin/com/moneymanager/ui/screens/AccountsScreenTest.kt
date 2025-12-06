@@ -330,6 +330,10 @@ class AccountsScreenTest {
             return newId
         }
 
+        override suspend fun createAccountsBatch(accounts: List<Account>): List<AccountId> {
+            return accounts.map { createAccount(it) }
+        }
+
         override suspend fun updateAccount(account: Account) {
             accountsFlow.value =
                 accountsFlow.value.map {
@@ -366,6 +370,8 @@ class AccountsScreenTest {
         override fun getRunningBalanceByAccount(accountId: AccountId): Flow<List<AccountRow>> = flowOf(emptyList())
 
         override suspend fun createTransfer(transfer: Transfer) {}
+
+        override suspend fun createTransfersBatch(transfers: List<Transfer>) {}
 
         override suspend fun updateTransfer(transfer: Transfer) {}
 

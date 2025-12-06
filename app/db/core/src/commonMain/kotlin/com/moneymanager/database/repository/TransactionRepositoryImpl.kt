@@ -176,6 +176,23 @@ class TransactionRepositoryImpl(
             )
         }
 
+    override suspend fun createTransfersBatch(transfers: List<Transfer>): Unit =
+        withContext(Dispatchers.Default) {
+            transferQueries.transaction {
+                transfers.forEach { transfer ->
+                    transferQueries.insert(
+                        id = transfer.id.toString(),
+                        timestamp = transfer.timestamp.toEpochMilliseconds(),
+                        description = transfer.description,
+                        sourceAccountId = transfer.sourceAccountId.id,
+                        targetAccountId = transfer.targetAccountId.id,
+                        currencyId = transfer.currencyId.toString(),
+                        amount = transfer.amount,
+                    )
+                }
+            }
+        }
+
     override suspend fun updateTransfer(transfer: Transfer): Unit =
         withContext(Dispatchers.Default) {
             transferQueries.update(

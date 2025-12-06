@@ -32,6 +32,7 @@ import com.moneymanager.ui.screens.AccountTransactionsScreen
 import com.moneymanager.ui.screens.AccountsScreen
 import com.moneymanager.ui.screens.CategoriesScreen
 import com.moneymanager.ui.screens.CurrenciesScreen
+import com.moneymanager.ui.screens.SettingsScreen
 import com.moneymanager.ui.screens.TransactionEntryDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -99,6 +100,12 @@ fun MoneyManagerApp(
                         selected = currentScreen is Screen.Categories,
                         onClick = { currentScreen = Screen.Categories },
                     )
+                    NavigationBarItem(
+                        icon = { Text("⚙️") },
+                        label = { Text("Settings") },
+                        selected = currentScreen is Screen.Settings,
+                        onClick = { currentScreen = Screen.Settings },
+                    )
                 }
             },
             floatingActionButton = {
@@ -145,6 +152,14 @@ fun MoneyManagerApp(
                             currentlyViewedCurrencyId = null
                         }
                         CategoriesScreen(repositorySet.categoryRepository)
+                    }
+                    is Screen.Settings -> {
+                        // Reset currentlyViewedAccountId and currentlyViewedCurrencyId when on other screens
+                        LaunchedEffect(Unit) {
+                            currentlyViewedAccountId = null
+                            currentlyViewedCurrencyId = null
+                        }
+                        SettingsScreen(repositorySet = repositorySet)
                     }
                     is Screen.AccountTransactions -> {
                         // Initialize currentlyViewedAccountId when first entering the screen

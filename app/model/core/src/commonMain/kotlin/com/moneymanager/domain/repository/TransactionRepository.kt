@@ -34,6 +34,8 @@ interface TransactionRepository {
 
     suspend fun createTransfer(transfer: Transfer)
 
+    suspend fun createTransfersBatch(transfers: List<Transfer>)
+
     suspend fun updateTransfer(transfer: Transfer)
 
     suspend fun deleteTransaction(id: Uuid)

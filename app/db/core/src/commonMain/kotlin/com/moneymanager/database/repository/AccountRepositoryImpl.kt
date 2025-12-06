@@ -45,6 +45,20 @@ class AccountRepositoryImpl(
             AccountId(id)
         }
 
+    override suspend fun createAccountsBatch(accounts: List<Account>): List<AccountId> =
+        withContext(Dispatchers.Default) {
+            queries.transactionWithResult {
+                accounts.map { account ->
+                    queries.insert(
+                        name = account.name,
+                        openingDate = account.openingDate.toEpochMilliseconds(),
+                    )
+                    val id = queries.lastInsertRowId().executeAsOne()
+                    AccountId(id)
+                }
+            }
+        }
+
     override suspend fun updateAccount(account: Account): Unit =
         withContext(Dispatchers.Default) {
             queries.update(
