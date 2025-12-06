@@ -169,7 +169,7 @@ class TransactionRepositoryImpl(
                 description = transfer.description,
                 sourceAccountId = transfer.sourceAccountId,
                 targetAccountId = transfer.targetAccountId,
-                currencyId = transfer.currencyId.uuid.toString(),
+                currencyId = transfer.currencyId.toString(),
                 amount = transfer.amount,
             )
             Unit
@@ -182,7 +182,7 @@ class TransactionRepositoryImpl(
                 description = transfer.description,
                 sourceAccountId = transfer.sourceAccountId,
                 targetAccountId = transfer.targetAccountId,
-                currencyId = transfer.currencyId.uuid.toString(),
+                currencyId = transfer.currencyId.toString(),
                 amount = transfer.amount,
                 id = transfer.id.toString(),
             )
