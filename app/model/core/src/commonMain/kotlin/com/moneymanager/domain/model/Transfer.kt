@@ -16,4 +16,6 @@ data class Transfer(
 )
 
 @JvmInline
-value class TransferId(override val id: Uuid) : TransactionId
+value class TransferId(override val id: Uuid) : TransactionId {
+    override fun toString() = id.toString()
+}
