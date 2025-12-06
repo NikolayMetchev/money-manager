@@ -55,13 +55,8 @@ class MainActivity : ComponentActivity() {
                             val repos = RepositorySet(database)
                             // Test that we can actually query the database
                             // This will catch schema errors like missing views/tables
-                            try {
-                                // Try to get all accounts - this uses AccountBalanceView
-                                repos.accountRepository.getAllAccounts().first()
-                            } catch (e: Exception) {
-                                // If querying fails, throw the error to trigger the dialog
-                                throw e
-                            }
+                            // Try to get all accounts - this uses AccountBalanceView
+                            repos.accountRepository.getAllAccounts().first()
                             repos
                         }
                     databaseState = DatabaseState.DatabaseLoaded(defaultLocation, repositories)

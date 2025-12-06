@@ -72,12 +72,7 @@ private fun MainWindow(onExit: () -> Unit) {
                 val repositories = RepositorySet(database)
                 // Test that we can actually query the database
                 // This will catch schema errors like missing views/tables
-                try {
-                    repositories.accountRepository.getAllAccounts().first()
-                } catch (e: Exception) {
-                    logger.error { "Failed to query database: ${e.message}" }
-                    throw e
-                }
+                repositories.accountRepository.getAllAccounts().first()
                 databaseState = DatabaseState.DatabaseLoaded(defaultLocation, repositories)
                 logger.info { "Database opened successfully" }
             } catch (e: Exception) {
