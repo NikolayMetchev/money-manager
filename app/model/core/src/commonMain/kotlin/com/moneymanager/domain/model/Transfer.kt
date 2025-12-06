@@ -11,6 +11,6 @@ data class Transfer(
     val description: String,
     val sourceAccountId: Long,
     val targetAccountId: Long,
-    val currencyId: Uuid,
+    val currencyId: CurrencyId,
     val amount: Double,
 )

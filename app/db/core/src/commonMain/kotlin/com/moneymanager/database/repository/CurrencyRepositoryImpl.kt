@@ -8,6 +8,7 @@ import app.cash.sqldelight.coroutines.mapToOneOrNull
 import com.moneymanager.database.mapper.CurrencyMapper
 import com.moneymanager.database.sql.MoneyManagerDatabase
 import com.moneymanager.domain.model.Currency
+import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.repository.CurrencyRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -26,8 +27,8 @@ class CurrencyRepositoryImpl(
             .mapToList(Dispatchers.Default)
             .map(CurrencyMapper::mapList)
 
-    override fun getCurrencyById(id: Uuid): Flow<Currency?> =
-        queries.selectById(id.toString())
+    override fun getCurrencyById(id: CurrencyId): Flow<Currency?> =
+        queries.selectById(id.uuid.toString())
             .asFlow()
             .mapToOneOrNull(Dispatchers.Default)
             .map { it?.let(CurrencyMapper::map) }
@@ -41,15 +42,15 @@ class CurrencyRepositoryImpl(
     override suspend fun upsertCurrencyByCode(
         code: String,
         name: String,
-    ): Uuid =
+    ): CurrencyId =
         withContext(Dispatchers.Default) {
             queries.transactionWithResult {
                 val existing = queries.selectByCode(code).executeAsOneOrNull()
-                existing?.let { Uuid.parse(it.id) }
+                existing?.let { CurrencyId(Uuid.parse(it.id)) }
                     ?: run {
                         val newId = Uuid.random()
                         queries.insert(newId.toString(), code, name)
-                        newId
+                        CurrencyId(newId)
                     }
             }
         }
@@ -63,7 +64,7 @@ class CurrencyRepositoryImpl(
             )
         }
 
-    override suspend fun deleteCurrency(id: Uuid): Unit =
+    override suspend fun deleteCurrency(id: CurrencyId): Unit =
         withContext(Dispatchers.Default) {
             queries.delete(id.toString())
         }

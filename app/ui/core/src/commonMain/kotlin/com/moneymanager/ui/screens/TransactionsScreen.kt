@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.Currency
+import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.TransactionWithRunningBalance
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.repository.AccountRepository
@@ -66,7 +67,7 @@ fun AccountTransactionsScreen(
     accountRepository: AccountRepository,
     currencyRepository: CurrencyRepository,
     onAccountIdChange: (Long) -> Unit = {},
-    onCurrencyIdChange: (Uuid?) -> Unit = {},
+    onCurrencyIdChange: (CurrencyId?) -> Unit = {},
 ) {
     val allAccounts by accountRepository.getAllAccounts().collectAsState(initial = emptyList())
     val allTransactions by transactionRepository.getAllTransactions().collectAsState(initial = emptyList())
@@ -96,7 +97,7 @@ fun AccountTransactionsScreen(
     val accountCurrencies = currencies.filter { it.id in accountCurrencyIds }
 
     // Selected currency state - default to first currency if available
-    var selectedCurrencyId by remember { mutableStateOf<Uuid?>(null) }
+    var selectedCurrencyId by remember { mutableStateOf<CurrencyId?>(null) }
 
     // Notify parent when selected currency changes
     LaunchedEffect(selectedCurrencyId) {
@@ -106,10 +107,10 @@ fun AccountTransactionsScreen(
     // Update selected currency when account currencies change
     LaunchedEffect(accountCurrencies) {
         if (accountCurrencies.isNotEmpty()) {
-            // If currently selected currency exists in the new account's currencies, keep it
-            // Otherwise, select the first available currency
-            if (selectedCurrencyId == null || accountCurrencies.none { it.id == selectedCurrencyId }) {
-                selectedCurrencyId = accountCurrencies.first().id
+            // If currently selected currency doesn't exist in the new account's currencies, clear it
+            // This allows showing all currencies (null) or keeps a valid selected currency
+            if (selectedCurrencyId != null && accountCurrencies.none { it.id == selectedCurrencyId }) {
+                selectedCurrencyId = null
             }
         } else {
             selectedCurrencyId = null
@@ -598,12 +599,12 @@ fun TransactionEntryDialog(
     accounts: List<Account>,
     currencies: List<Currency>,
     preSelectedSourceAccountId: Long? = null,
-    preSelectedCurrencyId: Uuid? = null,
+    preSelectedCurrencyId: CurrencyId? = null,
     onDismiss: () -> Unit,
 ) {
     var sourceAccountId by remember { mutableStateOf(preSelectedSourceAccountId) }
     var targetAccountId by remember { mutableStateOf<Long?>(null) }
-    var currencyId by remember { mutableStateOf<Uuid?>(preSelectedCurrencyId) }
+    var currencyId by remember { mutableStateOf<CurrencyId?>(preSelectedCurrencyId) }
     var amount by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -1140,7 +1141,7 @@ fun CreateAccountDialogInline(
 @Composable
 fun CreateCurrencyDialogInline(
     currencyRepository: CurrencyRepository,
-    onCurrencyCreated: (Uuid) -> Unit,
+    onCurrencyCreated: (CurrencyId) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var code by remember { mutableStateOf("") }

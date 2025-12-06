@@ -10,7 +10,7 @@ data class TransactionWithRunningBalance(
     val timestamp: Instant,
     val description: String,
     val accountId: Long,
-    val currencyId: Uuid,
+    val currencyId: CurrencyId,
     val transactionAmount: Double,
     val runningBalance: Double,
 )
