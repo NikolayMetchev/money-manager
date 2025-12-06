@@ -186,156 +186,155 @@ fun AccountTransactionsScreen(
                     Column(
                         modifier = Modifier.fillMaxSize(),
                     ) {
-                        // Get all unique currencies from account balances
-                        val uniqueCurrencyIds = accountBalances.map { it.currencyId }.distinct()
-                        val horizontalScrollState = rememberScrollState()
-                        val verticalScrollState = rememberScrollState()
+                    // Get all unique currencies from account balances
+                    val uniqueCurrencyIds = accountBalances.map { it.currencyId }.distinct()
+                    val horizontalScrollState = rememberScrollState()
+                    val verticalScrollState = rememberScrollState()
 
-                        // Top row: Empty corner + Account names (always visible, scrolls horizontally)
-                        Row(modifier = Modifier.fillMaxWidth()) {
-                            // Empty corner space for currency label column
-                            Spacer(modifier = Modifier.width(60.dp))
+                    // Top row: Empty corner + Account names (always visible, scrolls horizontally)
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        // Empty corner space for currency label column
+                        Spacer(modifier = Modifier.width(60.dp))
 
-                            // Account names row (horizontally scrollable)
-                            Row(
-                                modifier =
-                                    Modifier
-                                        .weight(1f)
-                                        .horizontalScroll(horizontalScrollState),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                allAccounts.forEach { account ->
-                                    val isSelectedColumn = selectedAccountId == account.id
-                                    val isColumnSelected = isSelectedColumn && selectedCurrencyId == null
-                                    Box(
-                                        modifier =
-                                            Modifier
-                                                .width(120.dp)
-                                                .background(
-                                                    if (isColumnSelected) {
-                                                        MaterialTheme.colorScheme.primaryContainer
-                                                    } else {
-                                                        MaterialTheme.colorScheme.surface
-                                                    },
-                                                )
-                                                .clickable {
-                                                    selectedAccountId = account.id
-                                                    selectedCurrencyId = null // Clear currency to show all currencies
-                                                }
-                                                .padding(vertical = 4.dp),
-                                        contentAlignment = Alignment.Center,
-                                    ) {
-                                        Text(
-                                            text = account.name,
-                                            style = MaterialTheme.typography.labelLarge,
-                                            color =
+                        // Account names row (horizontally scrollable)
+                        Row(
+                            modifier =
+                                Modifier
+                                    .weight(1f)
+                                    .horizontalScroll(horizontalScrollState),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            allAccounts.forEach { account ->
+                                val isSelectedColumn = selectedAccountId == account.id
+                                val isColumnSelected = isSelectedColumn && selectedCurrencyId == null
+                                Box(
+                                    modifier =
+                                        Modifier
+                                            .width(120.dp)
+                                            .background(
                                                 if (isColumnSelected) {
-                                                    MaterialTheme.colorScheme.primary
+                                                    MaterialTheme.colorScheme.primaryContainer
                                                 } else {
-                                                    MaterialTheme.colorScheme.onSurface
+                                                    MaterialTheme.colorScheme.surface
                                                 },
-                                            maxLines = 1,
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        // Bottom area: Currency labels + Balance grid (vertically scrollable)
-                        Row(modifier = Modifier.weight(1f)) {
-                            // Left column: Currency labels (always visible, scrolls vertically in sync)
-                            Column(
-                                modifier =
-                                    Modifier
-                                        .width(60.dp)
-                                        .verticalScroll(verticalScrollState),
-                                verticalArrangement = Arrangement.spacedBy(4.dp),
-                            ) {
-                                uniqueCurrencyIds.forEach { currencyId ->
-                                    val currency = currencies.find { it.id == currencyId }
+                                            )
+                                            .clickable {
+                                                selectedAccountId = account.id
+                                                selectedCurrencyId = null // Clear currency to show all currencies
+                                            }
+                                            .padding(vertical = 4.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) {
                                     Text(
-                                        text = "${currency?.code ?: "?"}:",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier =
-                                            Modifier
-                                                .width(60.dp)
-                                                .padding(vertical = 4.dp),
+                                        text = account.name,
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color =
+                                            if (isColumnSelected) {
+                                                MaterialTheme.colorScheme.primary
+                                            } else {
+                                                MaterialTheme.colorScheme.onSurface
+                                            },
+                                        maxLines = 1,
                                     )
                                 }
                             }
+                        }
+                    }
 
-                            // Right side: Balance grid (scrolls both vertically and horizontally)
-                            Column(
-                                modifier =
-                                    Modifier
-                                        .weight(1f)
-                                        .verticalScroll(verticalScrollState)
-                                        .horizontalScroll(horizontalScrollState),
-                                verticalArrangement = Arrangement.spacedBy(4.dp),
-                            ) {
-                                // Row for each currency
-                                uniqueCurrencyIds.forEach { currencyId ->
-                                    val currency = currencies.find { it.id == currencyId }
-                                    Row(
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                    ) {
-                                        // Balance for each account
-                                        allAccounts.forEach { account ->
-                                            val balance =
-                                                accountBalances.find {
-                                                    it.accountId == account.id && it.currencyId == currencyId
-                                                }
-                                            val isSelectedCell = selectedAccountId == account.id && selectedCurrencyId == currencyId
-                                            val isSelectedRow = selectedCurrencyId == currencyId
-                                            val isSelectedColumn = selectedAccountId == account.id
-                                            val isColumnSelected = isSelectedColumn && selectedCurrencyId == null
+                    Spacer(modifier = Modifier.height(4.dp))
 
-                                            val backgroundColor =
-                                                when {
-                                                    isSelectedCell -> MaterialTheme.colorScheme.primaryContainer
-                                                    isColumnSelected -> MaterialTheme.colorScheme.primaryContainer
-                                                    isSelectedRow || isSelectedColumn -> MaterialTheme.colorScheme.surfaceVariant
-                                                    else -> MaterialTheme.colorScheme.surface
-                                                }
+                    // Bottom area: Currency labels + Balance grid (vertically scrollable)
+                    Row(modifier = Modifier.weight(1f)) {
+                        // Left column: Currency labels (always visible, scrolls vertically in sync)
+                        Column(
+                            modifier =
+                                Modifier
+                                    .width(60.dp)
+                                    .verticalScroll(verticalScrollState),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            uniqueCurrencyIds.forEach { currencyId ->
+                                val currency = currencies.find { it.id == currencyId }
+                                Text(
+                                    text = "${currency?.code ?: "?"}:",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier =
+                                        Modifier
+                                            .width(60.dp)
+                                            .padding(vertical = 4.dp),
+                                )
+                            }
+                        }
 
-                                            Box(
-                                                modifier =
-                                                    Modifier
-                                                        .width(120.dp)
-                                                        .background(backgroundColor)
-                                                        .clickable(enabled = balance != null) {
-                                                            selectedAccountId = account.id
-                                                            selectedCurrencyId = currencyId
-                                                        }
-                                                        .padding(vertical = 4.dp),
-                                                contentAlignment = Alignment.Center,
-                                            ) {
-                                                if (balance != null) {
-                                                    Text(
-                                                        text =
-                                                            currency?.let { formatAmount(balance.balance, it) }
-                                                                ?: String.format("%.2f", balance.balance),
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        color =
-                                                            if (balance.balance >= 0) {
-                                                                MaterialTheme.colorScheme.primary
-                                                            } else {
-                                                                MaterialTheme.colorScheme.error
-                                                            },
-                                                        maxLines = 1,
-                                                    )
-                                                } else {
-                                                    // Empty cell if account doesn't have this currency
-                                                    Text(
-                                                        text = "-",
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                    )
-                                                }
+                        // Right side: Balance grid (scrolls both vertically and horizontally)
+                        Column(
+                            modifier =
+                                Modifier
+                                    .weight(1f)
+                                    .verticalScroll(verticalScrollState)
+                                    .horizontalScroll(horizontalScrollState),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            // Row for each currency
+                            uniqueCurrencyIds.forEach { currencyId ->
+                                val currency = currencies.find { it.id == currencyId }
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    // Balance for each account
+                                    allAccounts.forEach { account ->
+                                        val balance =
+                                            accountBalances.find {
+                                                it.accountId == account.id && it.currencyId == currencyId
+                                            }
+                                        val isSelectedCell = selectedAccountId == account.id && selectedCurrencyId == currencyId
+                                        val isSelectedRow = selectedCurrencyId == currencyId
+                                        val isSelectedColumn = selectedAccountId == account.id
+                                        val isColumnSelected = isSelectedColumn && selectedCurrencyId == null
+
+                                        val backgroundColor =
+                                            when {
+                                                isSelectedCell -> MaterialTheme.colorScheme.primaryContainer
+                                                isColumnSelected -> MaterialTheme.colorScheme.primaryContainer
+                                                isSelectedRow || isSelectedColumn -> MaterialTheme.colorScheme.surfaceVariant
+                                                else -> MaterialTheme.colorScheme.surface
+                                            }
+
+                                        Box(
+                                            modifier =
+                                                Modifier
+                                                    .width(120.dp)
+                                                    .background(backgroundColor)
+                                                    .clickable(enabled = balance != null) {
+                                                        selectedAccountId = account.id
+                                                        selectedCurrencyId = currencyId
+                                                    }
+                                                    .padding(vertical = 4.dp),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            if (balance != null) {
+                                                Text(
+                                                    text =
+                                                        currency?.let { formatAmount(balance.balance, it) }
+                                                            ?: String.format("%.2f", balance.balance),
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color =
+                                                        if (balance.balance >= 0) {
+                                                            MaterialTheme.colorScheme.primary
+                                                        } else {
+                                                            MaterialTheme.colorScheme.error
+                                                        },
+                                                    maxLines = 1,
+                                                )
+                                            } else {
+                                                // Empty cell if account doesn't have this currency
+                                                Text(
+                                                    text = "-",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                )
                                             }
                                         }
                                     }
@@ -344,6 +343,7 @@ fun AccountTransactionsScreen(
                         }
                     }
                 }
+            }
             }
 
             // Transactions Section (70% of screen) - with independent loading
