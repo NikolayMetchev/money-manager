@@ -67,4 +67,31 @@ class JvmDatabaseManager : DatabaseManager {
         }
 
     override fun getDefaultLocation() = DEFAULT_DATABASE_PATH
+
+    override suspend fun backupDatabase(location: DbLocation): DbLocation =
+        withContext(Dispatchers.IO) {
+            if (!location.exists()) {
+                throw IllegalArgumentException("Database does not exist at: $location")
+            }
+
+            val backupPath = location.path.resolveSibling("${location.path.fileName}.backup")
+            val backupLocation = DbLocation(backupPath)
+
+            // Delete existing backup if it exists
+            if (backupLocation.exists()) {
+                Files.delete(backupLocation.path)
+            }
+
+            // Move the database file to backup
+            Files.move(location.path, backupLocation.path)
+
+            backupLocation
+        }
+
+    override suspend fun deleteDatabase(location: DbLocation): Unit =
+        withContext(Dispatchers.IO) {
+            if (location.exists()) {
+                Files.delete(location.path)
+            }
+        }
 }

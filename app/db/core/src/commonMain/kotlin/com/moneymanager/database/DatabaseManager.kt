@@ -39,4 +39,22 @@ interface DatabaseManager {
      * @return The default database location
      */
     fun getDefaultLocation(): DbLocation
+
+    /**
+     * Backs up the database at the specified location by renaming it with a .backup extension.
+     * If a backup already exists, it will be overwritten.
+     *
+     * @param location Platform-specific database location to backup
+     * @return The location of the backup file
+     * @throws Exception if backup fails
+     */
+    suspend fun backupDatabase(location: DbLocation): DbLocation
+
+    /**
+     * Deletes the database at the specified location.
+     *
+     * @param location Platform-specific database location to delete
+     * @throws Exception if deletion fails
+     */
+    suspend fun deleteDatabase(location: DbLocation)
 }
