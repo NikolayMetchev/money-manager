@@ -3,7 +3,8 @@
 package com.moneymanager.domain.repository
 
 import com.moneymanager.domain.model.AccountBalance
-import com.moneymanager.domain.model.TransactionWithRunningBalance
+import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.AccountRow
 import com.moneymanager.domain.model.Transfer
 import kotlinx.coroutines.flow.Flow
 import kotlin.time.Instant
@@ -14,7 +15,7 @@ interface TransactionRepository {
 
     fun getTransactionById(id: Uuid): Flow<Transfer?>
 
-    fun getTransactionsByAccount(accountId: Long): Flow<List<Transfer>>
+    fun getTransactionsByAccount(accountId: AccountId): Flow<List<Transfer>>
 
     fun getTransactionsByDateRange(
         startDate: Instant,
@@ -22,14 +23,14 @@ interface TransactionRepository {
     ): Flow<List<Transfer>>
 
     fun getTransactionsByAccountAndDateRange(
-        accountId: Long,
+        accountId: AccountId,
         startDate: Instant,
         endDate: Instant,
     ): Flow<List<Transfer>>
 
     fun getAccountBalances(): Flow<List<AccountBalance>>
 
-    fun getRunningBalanceByAccount(accountId: Long): Flow<List<TransactionWithRunningBalance>>
+    fun getRunningBalanceByAccount(accountId: AccountId): Flow<List<AccountRow>>
 
     suspend fun createTransfer(transfer: Transfer)
 

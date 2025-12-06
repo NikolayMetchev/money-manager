@@ -8,6 +8,7 @@ import com.moneymanager.database.deleteTestDatabase
 import com.moneymanager.di.AppComponent
 import com.moneymanager.di.createTestAppComponentParams
 import com.moneymanager.domain.model.Account
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.CurrencyRepository
@@ -64,11 +65,11 @@ class TransactionRepositoryImplTest {
             // Create test accounts
             val sourceAccountId =
                 accountRepository.createAccount(
-                    Account(name = "Source Account", openingDate = now),
+                    Account(id = AccountId(0), name = "Source Account", openingDate = now),
                 )
             val targetAccountId =
                 accountRepository.createAccount(
-                    Account(name = "Target Account", openingDate = now),
+                    Account(id = AccountId(0), name = "Target Account", openingDate = now),
                 )
 
             // Create test currency
@@ -104,7 +105,7 @@ class TransactionRepositoryImplTest {
             // Create test account
             val accountId =
                 accountRepository.createAccount(
-                    Account(name = "Test Account", openingDate = now),
+                    Account(id = AccountId(0), name = "Test Account", openingDate = now),
                 )
 
             // Create test currency
@@ -135,11 +136,11 @@ class TransactionRepositoryImplTest {
             // Create test accounts
             val sourceAccountId =
                 accountRepository.createAccount(
-                    Account(name = "Source Account", openingDate = now),
+                    Account(id = AccountId(0), name = "Source Account", openingDate = now),
                 )
             val targetAccountId =
                 accountRepository.createAccount(
-                    Account(name = "Target Account", openingDate = now),
+                    Account(id = AccountId(0), name = "Target Account", openingDate = now),
                 )
 
             // Create test currency
@@ -190,11 +191,11 @@ class TransactionRepositoryImplTest {
             // Create test accounts
             val checkingAccountId =
                 accountRepository.createAccount(
-                    Account(name = "Checking", openingDate = now),
+                    Account(id = AccountId(0), name = "Checking", openingDate = now),
                 )
             val savingsAccountId =
                 accountRepository.createAccount(
-                    Account(name = "Savings", openingDate = now),
+                    Account(id = AccountId(0), name = "Savings", openingDate = now),
                 )
 
             // Create test currency
@@ -235,15 +236,15 @@ class TransactionRepositoryImplTest {
             // Create test accounts
             val checkingAccountId =
                 accountRepository.createAccount(
-                    Account(name = "Checking", openingDate = now),
+                    Account(id = AccountId(0), name = "Checking", openingDate = now),
                 )
             val savingsAccountId =
                 accountRepository.createAccount(
-                    Account(name = "Savings", openingDate = now),
+                    Account(id = AccountId(0), name = "Savings", openingDate = now),
                 )
             val creditCardAccountId =
                 accountRepository.createAccount(
-                    Account(name = "Credit Card", openingDate = now),
+                    Account(id = AccountId(0), name = "Credit Card", openingDate = now),
                 )
 
             // Create test currency
@@ -320,11 +321,11 @@ class TransactionRepositoryImplTest {
             // Create test accounts
             val checkingAccountId =
                 accountRepository.createAccount(
-                    Account(name = "Checking", openingDate = now),
+                    Account(id = AccountId(0), name = "Checking", openingDate = now),
                 )
             val savingsAccountId =
                 accountRepository.createAccount(
-                    Account(name = "Savings", openingDate = now),
+                    Account(id = AccountId(0), name = "Savings", openingDate = now),
                 )
 
             // Create test currencies
@@ -386,8 +387,8 @@ class TransactionRepositoryImplTest {
         runTest {
             // Create accounts but no transactions
             val now = Clock.System.now()
-            accountRepository.createAccount(Account(name = "Checking", openingDate = now))
-            accountRepository.createAccount(Account(name = "Savings", openingDate = now))
+            accountRepository.createAccount(Account(id = AccountId(0), name = "Checking", openingDate = now))
+            accountRepository.createAccount(Account(id = AccountId(0), name = "Savings", openingDate = now))
 
             val balances = transactionRepository.getAccountBalances().first()
 
@@ -404,11 +405,11 @@ class TransactionRepositoryImplTest {
             // Create test accounts
             val sourceAccountId =
                 accountRepository.createAccount(
-                    Account(name = "Source Account", openingDate = now),
+                    Account(id = AccountId(0), name = "Source Account", openingDate = now),
                 )
             val targetAccountId =
                 accountRepository.createAccount(
-                    Account(name = "Target Account", openingDate = now),
+                    Account(id = AccountId(0), name = "Target Account", openingDate = now),
                 )
 
             // Create test currency
@@ -443,11 +444,11 @@ class TransactionRepositoryImplTest {
             // Create test accounts
             val sourceAccountId =
                 accountRepository.createAccount(
-                    Account(name = "Source Account", openingDate = now),
+                    Account(id = AccountId(0), name = "Source Account", openingDate = now),
                 )
             val targetAccountId =
                 accountRepository.createAccount(
-                    Account(name = "Target Account", openingDate = now),
+                    Account(id = AccountId(0), name = "Target Account", openingDate = now),
                 )
 
             // Create test currency

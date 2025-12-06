@@ -24,6 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.moneymanager.database.DbLocation
 import com.moneymanager.database.RepositorySet
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.ui.navigation.Screen
@@ -42,8 +43,8 @@ fun MoneyManagerApp(
 ) {
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Accounts) }
     var showTransactionDialog by remember { mutableStateOf(false) }
-    var preSelectedAccountId by remember { mutableStateOf<Long?>(null) }
-    var currentlyViewedAccountId by remember { mutableStateOf<Long?>(null) }
+    var preSelectedAccountId by remember { mutableStateOf<AccountId?>(null) }
+    var currentlyViewedAccountId by remember { mutableStateOf<AccountId?>(null) }
     var preSelectedCurrencyId by remember { mutableStateOf<CurrencyId?>(null) }
     var currentlyViewedCurrencyId by remember { mutableStateOf<CurrencyId?>(null) }
 

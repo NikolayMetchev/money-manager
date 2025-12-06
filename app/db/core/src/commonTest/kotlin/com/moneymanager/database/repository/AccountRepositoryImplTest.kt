@@ -8,6 +8,7 @@ import com.moneymanager.database.deleteTestDatabase
 import com.moneymanager.di.AppComponent
 import com.moneymanager.di.createTestAppComponentParams
 import com.moneymanager.domain.model.Account
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.repository.AccountRepository
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -53,13 +54,14 @@ class AccountRepositoryImplTest {
             val now = Clock.System.now()
             val account =
                 Account(
+                    id = AccountId(0),
                     name = "Test Checking",
                     openingDate = now,
                 )
 
             val accountId = repository.createAccount(account)
 
-            assertTrue(accountId > 0, "Generated ID should be positive")
+            assertTrue(accountId.id > 0, "Generated ID should be positive")
 
             val retrieved = repository.getAccountById(accountId).first()
             assertNotNull(retrieved)
@@ -75,6 +77,7 @@ class AccountRepositoryImplTest {
             accountNames.forEach { name ->
                 val account =
                     Account(
+                        id = AccountId(0),
                         name = name,
                         openingDate = now,
                     )
@@ -96,6 +99,7 @@ class AccountRepositoryImplTest {
             val now = Clock.System.now()
             val account =
                 Account(
+                    id = AccountId(0),
                     name = "Original Name",
                     openingDate = now,
                 )
@@ -117,6 +121,7 @@ class AccountRepositoryImplTest {
             val now = Clock.System.now()
             val account =
                 Account(
+                    id = AccountId(0),
                     name = "To Delete",
                     openingDate = now,
                 )

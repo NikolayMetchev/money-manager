@@ -7,8 +7,9 @@ import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
 import com.moneymanager.database.sql.MoneyManagerDatabase
 import com.moneymanager.domain.model.AccountBalance
+import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.AccountRow
 import com.moneymanager.domain.model.CurrencyId
-import com.moneymanager.domain.model.TransactionWithRunningBalance
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.repository.TransactionRepository
 import kotlinx.coroutines.Dispatchers
@@ -34,8 +35,8 @@ class TransactionRepositoryImpl(
                         id = Uuid.parse(row.id),
                         timestamp = fromEpochMilliseconds(row.timestamp),
                         description = row.description,
-                        sourceAccountId = row.sourceAccountId,
-                        targetAccountId = row.targetAccountId,
+                        sourceAccountId = AccountId(row.sourceAccountId),
+                        targetAccountId = AccountId(row.targetAccountId),
                         currencyId = CurrencyId(Uuid.parse(row.currencyId)),
                         amount = row.amount,
                     )
@@ -52,16 +53,16 @@ class TransactionRepositoryImpl(
                         id = Uuid.parse(it.id),
                         timestamp = fromEpochMilliseconds(it.timestamp),
                         description = it.description,
-                        sourceAccountId = it.sourceAccountId,
-                        targetAccountId = it.targetAccountId,
+                        sourceAccountId = AccountId(it.sourceAccountId),
+                        targetAccountId = AccountId(it.targetAccountId),
                         currencyId = CurrencyId(Uuid.parse(it.currencyId)),
                         amount = it.amount,
                     )
                 }
             }
 
-    override fun getTransactionsByAccount(accountId: Long): Flow<List<Transfer>> =
-        transferQueries.selectByAccount(accountId, accountId)
+    override fun getTransactionsByAccount(accountId: AccountId): Flow<List<Transfer>> =
+        transferQueries.selectByAccount(accountId.id, accountId.id)
             .asFlow()
             .mapToList(Dispatchers.Default)
             .map { list ->
@@ -70,8 +71,8 @@ class TransactionRepositoryImpl(
                         id = Uuid.parse(row.id),
                         timestamp = fromEpochMilliseconds(row.timestamp),
                         description = row.description,
-                        sourceAccountId = row.sourceAccountId,
-                        targetAccountId = row.targetAccountId,
+                        sourceAccountId = AccountId(row.sourceAccountId),
+                        targetAccountId = AccountId(row.targetAccountId),
                         currencyId = CurrencyId(Uuid.parse(row.currencyId)),
                         amount = row.amount,
                     )
@@ -94,8 +95,8 @@ class TransactionRepositoryImpl(
                         id = Uuid.parse(row.id),
                         timestamp = fromEpochMilliseconds(row.timestamp),
                         description = row.description,
-                        sourceAccountId = row.sourceAccountId,
-                        targetAccountId = row.targetAccountId,
+                        sourceAccountId = AccountId(row.sourceAccountId),
+                        targetAccountId = AccountId(row.targetAccountId),
                         currencyId = CurrencyId(Uuid.parse(row.currencyId)),
                         amount = row.amount,
                     )
@@ -103,13 +104,13 @@ class TransactionRepositoryImpl(
             }
 
     override fun getTransactionsByAccountAndDateRange(
-        accountId: Long,
+        accountId: AccountId,
         startDate: Instant,
         endDate: Instant,
     ): Flow<List<Transfer>> =
         transferQueries.selectByAccountAndDateRange(
-            accountId,
-            accountId,
+            accountId.id,
+            accountId.id,
             startDate.toEpochMilliseconds(),
             endDate.toEpochMilliseconds(),
         )
@@ -121,8 +122,8 @@ class TransactionRepositoryImpl(
                         id = Uuid.parse(row.id),
                         timestamp = fromEpochMilliseconds(row.timestamp),
                         description = row.description,
-                        sourceAccountId = row.sourceAccountId,
-                        targetAccountId = row.targetAccountId,
+                        sourceAccountId = AccountId(row.sourceAccountId),
+                        targetAccountId = AccountId(row.targetAccountId),
                         currencyId = CurrencyId(Uuid.parse(row.currencyId)),
                         amount = row.amount,
                     )
@@ -136,24 +137,24 @@ class TransactionRepositoryImpl(
             .map { list ->
                 list.map { row ->
                     AccountBalance(
-                        accountId = row.accountId,
+                        accountId = AccountId(row.accountId),
                         currencyId = CurrencyId(Uuid.parse(row.currencyId)),
                         balance = row.balance ?: 0.0,
                     )
                 }
             }
 
-    override fun getRunningBalanceByAccount(accountId: Long): Flow<List<TransactionWithRunningBalance>> =
-        transferQueries.selectRunningBalanceByAccount(accountId)
+    override fun getRunningBalanceByAccount(accountId: AccountId): Flow<List<AccountRow>> =
+        transferQueries.selectRunningBalanceByAccount(accountId.id)
             .asFlow()
             .mapToList(Dispatchers.Default)
             .map { list ->
                 list.map { row ->
-                    TransactionWithRunningBalance(
+                    AccountRow(
                         transactionId = Uuid.parse(row.id),
                         timestamp = fromEpochMilliseconds(row.timestamp),
                         description = row.description,
-                        accountId = row.accountId,
+                        accountId = AccountId(row.accountId),
                         currencyId = CurrencyId(Uuid.parse(row.currencyId)),
                         transactionAmount = row.transactionAmount,
                         runningBalance = row.runningBalance ?: 0.0,
@@ -167,8 +168,8 @@ class TransactionRepositoryImpl(
                 id = transfer.id.toString(),
                 timestamp = transfer.timestamp.toEpochMilliseconds(),
                 description = transfer.description,
-                sourceAccountId = transfer.sourceAccountId,
-                targetAccountId = transfer.targetAccountId,
+                sourceAccountId = transfer.sourceAccountId.id,
+                targetAccountId = transfer.targetAccountId.id,
                 currencyId = transfer.currencyId.toString(),
                 amount = transfer.amount,
             )
@@ -180,8 +181,8 @@ class TransactionRepositoryImpl(
             transferQueries.update(
                 timestamp = transfer.timestamp.toEpochMilliseconds(),
                 description = transfer.description,
-                sourceAccountId = transfer.sourceAccountId,
-                targetAccountId = transfer.targetAccountId,
+                sourceAccountId = transfer.sourceAccountId.id,
+                targetAccountId = transfer.targetAccountId.id,
                 currencyId = transfer.currencyId.toString(),
                 amount = transfer.amount,
                 id = transfer.id.toString(),

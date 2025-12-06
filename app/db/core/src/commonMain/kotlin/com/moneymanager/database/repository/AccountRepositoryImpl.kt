@@ -8,6 +8,7 @@ import app.cash.sqldelight.coroutines.mapToOneOrNull
 import com.moneymanager.database.mapper.AccountMapper
 import com.moneymanager.database.sql.MoneyManagerDatabase
 import com.moneymanager.domain.model.Account
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.repository.AccountRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -25,33 +26,35 @@ class AccountRepositoryImpl(
             .mapToList(Dispatchers.Default)
             .map(AccountMapper::mapList)
 
-    override fun getAccountById(id: Long): Flow<Account?> =
-        queries.selectById(id)
+    override fun getAccountById(id: AccountId): Flow<Account?> =
+        queries.selectById(id.id)
             .asFlow()
             .mapToOneOrNull(Dispatchers.Default)
             .map { it?.let(AccountMapper::map) }
 
-    override suspend fun createAccount(account: Account): Long =
+    override suspend fun createAccount(account: Account): AccountId =
         withContext(Dispatchers.Default) {
-            queries.transactionWithResult {
-                queries.insert(
-                    name = account.name,
-                    openingDate = account.openingDate.toEpochMilliseconds(),
-                )
-                queries.lastInsertRowId().executeAsOne()
-            }
+            val id =
+                queries.transactionWithResult {
+                    queries.insert(
+                        name = account.name,
+                        openingDate = account.openingDate.toEpochMilliseconds(),
+                    )
+                    queries.lastInsertRowId().executeAsOne()
+                }
+            AccountId(id)
         }
 
     override suspend fun updateAccount(account: Account): Unit =
         withContext(Dispatchers.Default) {
             queries.update(
                 name = account.name,
-                id = account.id,
+                id = account.id.id,
             )
         }
 
-    override suspend fun deleteAccount(id: Long): Unit =
+    override suspend fun deleteAccount(id: AccountId): Unit =
         withContext(Dispatchers.Default) {
-            queries.delete(id)
+            queries.delete(id.id)
         }
 }

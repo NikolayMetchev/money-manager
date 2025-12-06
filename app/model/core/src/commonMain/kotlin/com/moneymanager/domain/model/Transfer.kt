@@ -9,8 +9,8 @@ data class Transfer(
     val id: Uuid,
     val timestamp: Instant,
     val description: String,
-    val sourceAccountId: Long,
-    val targetAccountId: Long,
+    val sourceAccountId: AccountId,
+    val targetAccountId: AccountId,
     val currencyId: CurrencyId,
     val amount: Double,
 )
