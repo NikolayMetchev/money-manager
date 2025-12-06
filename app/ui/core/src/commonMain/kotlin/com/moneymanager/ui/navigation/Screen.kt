@@ -9,6 +9,8 @@ sealed class Screen(val route: String, val title: String) {
 
     data object Categories : Screen("categories", "Categories")
 
+    data object Settings : Screen("settings", "Settings")
+
     data class AccountTransactions(val accountId: AccountId, val accountName: String) :
         Screen("account-transactions", accountName)
 }

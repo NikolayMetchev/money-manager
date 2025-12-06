@@ -11,6 +11,8 @@ interface AccountRepository {
 
     suspend fun createAccount(account: Account): AccountId
 
+    suspend fun createAccountsBatch(accounts: List<Account>): List<AccountId>
+
     suspend fun updateAccount(account: Account)
 
     suspend fun deleteAccount(id: AccountId)
