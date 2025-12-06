@@ -60,12 +60,12 @@ class CurrencyRepositoryImpl(
             queries.update(
                 code = currency.code,
                 name = currency.name,
-                id = currency.id.uuid.toString(),
+                id = currency.id.toString(),
             )
         }
 
     override suspend fun deleteCurrency(id: CurrencyId): Unit =
         withContext(Dispatchers.Default) {
-            queries.delete(id.uuid.toString())
+            queries.delete(id.toString())
         }
 }
