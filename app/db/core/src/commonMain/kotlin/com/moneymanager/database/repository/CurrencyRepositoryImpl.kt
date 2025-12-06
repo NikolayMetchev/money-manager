@@ -28,7 +28,7 @@ class CurrencyRepositoryImpl(
             .map(CurrencyMapper::mapList)
 
     override fun getCurrencyById(id: CurrencyId): Flow<Currency?> =
-        queries.selectById(id.uuid.toString())
+        queries.selectById(id.id.toString())
             .asFlow()
             .mapToOneOrNull(Dispatchers.Default)
             .map { it?.let(CurrencyMapper::map) }

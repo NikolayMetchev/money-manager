@@ -22,7 +22,9 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
+import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.TransactionRepository
@@ -84,7 +86,7 @@ fun AccountTransactionsScreen(
     }
 
     // Highlighted transaction state
-    var highlightedTransactionId by remember { mutableStateOf<Uuid?>(null) }
+    var highlightedTransactionId by remember { mutableStateOf<TransactionId?>(null) }
 
     // Get running balances for the selected account
     val runningBalances by transactionRepository.getRunningBalanceByAccount(selectedAccountId)
@@ -908,7 +910,7 @@ fun TransactionEntryDialog(
                                             .toInstant(TimeZone.currentSystemDefault())
                                     val transfer =
                                         Transfer(
-                                            id = Uuid.random(),
+                                            id = TransferId(Uuid.random()),
                                             timestamp = timestamp,
                                             description = description.trim(),
                                             sourceAccountId = sourceAccountId!!,

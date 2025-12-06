@@ -18,6 +18,6 @@ data class Currency(
 )
 
 @JvmInline
-value class CurrencyId(val uuid: Uuid) {
-    override fun toString() = uuid.toString()
+value class CurrencyId(val id: Uuid) {
+    override fun toString() = id.toString()
 }

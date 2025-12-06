@@ -11,6 +11,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Transfer
+import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.TransactionRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -21,7 +22,7 @@ import kotlin.time.Instant.Companion.fromEpochMilliseconds
 import kotlin.uuid.Uuid
 
 class TransactionRepositoryImpl(
-    private val database: MoneyManagerDatabase,
+    database: MoneyManagerDatabase,
 ) : TransactionRepository {
     private val transferQueries = database.transferQueries
 
@@ -32,7 +33,7 @@ class TransactionRepositoryImpl(
             .map { list ->
                 list.map { row ->
                     Transfer(
-                        id = Uuid.parse(row.id),
+                        id = TransferId(Uuid.parse(row.id)),
                         timestamp = fromEpochMilliseconds(row.timestamp),
                         description = row.description,
                         sourceAccountId = AccountId(row.sourceAccountId),
@@ -50,7 +51,7 @@ class TransactionRepositoryImpl(
             .map { row ->
                 row?.let {
                     Transfer(
-                        id = Uuid.parse(it.id),
+                        id = TransferId(Uuid.parse(row.id)),
                         timestamp = fromEpochMilliseconds(it.timestamp),
                         description = it.description,
                         sourceAccountId = AccountId(it.sourceAccountId),
@@ -68,7 +69,7 @@ class TransactionRepositoryImpl(
             .map { list ->
                 list.map { row ->
                     Transfer(
-                        id = Uuid.parse(row.id),
+                        id = TransferId(Uuid.parse(row.id)),
                         timestamp = fromEpochMilliseconds(row.timestamp),
                         description = row.description,
                         sourceAccountId = AccountId(row.sourceAccountId),
@@ -92,7 +93,7 @@ class TransactionRepositoryImpl(
             .map { list ->
                 list.map { row ->
                     Transfer(
-                        id = Uuid.parse(row.id),
+                        id = TransferId(Uuid.parse(row.id)),
                         timestamp = fromEpochMilliseconds(row.timestamp),
                         description = row.description,
                         sourceAccountId = AccountId(row.sourceAccountId),
@@ -119,7 +120,7 @@ class TransactionRepositoryImpl(
             .map { list ->
                 list.map { row ->
                     Transfer(
-                        id = Uuid.parse(row.id),
+                        id = TransferId(Uuid.parse(row.id)),
                         timestamp = fromEpochMilliseconds(row.timestamp),
                         description = row.description,
                         sourceAccountId = AccountId(row.sourceAccountId),
@@ -151,7 +152,7 @@ class TransactionRepositoryImpl(
             .map { list ->
                 list.map { row ->
                     AccountRow(
-                        transactionId = Uuid.parse(row.id),
+                        transactionId = TransferId(Uuid.parse(row.id)),
                         timestamp = fromEpochMilliseconds(row.timestamp),
                         description = row.description,
                         accountId = AccountId(row.accountId),
@@ -173,7 +174,6 @@ class TransactionRepositoryImpl(
                 currencyId = transfer.currencyId.toString(),
                 amount = transfer.amount,
             )
-            Unit
         }
 
     override suspend fun updateTransfer(transfer: Transfer): Unit =
@@ -187,12 +187,10 @@ class TransactionRepositoryImpl(
                 amount = transfer.amount,
                 id = transfer.id.toString(),
             )
-            Unit
         }
 
     override suspend fun deleteTransaction(id: Uuid): Unit =
         withContext(Dispatchers.Default) {
             transferQueries.delete(id.toString())
-            Unit
         }
 }

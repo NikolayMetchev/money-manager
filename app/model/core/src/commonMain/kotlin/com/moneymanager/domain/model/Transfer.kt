@@ -6,7 +6,7 @@ import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 data class Transfer(
-    val id: Uuid,
+    val id: TransferId,
     val timestamp: Instant,
     val description: String,
     val sourceAccountId: AccountId,
@@ -14,3 +14,8 @@ data class Transfer(
     val currencyId: CurrencyId,
     val amount: Double,
 )
+
+@JvmInline
+value class TransferId(override val id: Uuid) : TransactionId {
+    override fun toString() = id.toString()
+}
