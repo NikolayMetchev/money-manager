@@ -45,13 +45,9 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(Unit) {
                 val defaultLocation = databaseManager.getDefaultLocation()
                 try {
-                    val database =
-                        withContext(Dispatchers.IO) {
-                            databaseManager.openDatabase(defaultLocation)
-                        }
-                    // Try to create repositories and test queries - this will fail if schema is wrong
                     val repositories =
                         withContext(Dispatchers.IO) {
+                            val database = databaseManager.openDatabase(defaultLocation)
                             val repos = RepositorySet(database)
                             // Test that we can actually query the database
                             // This will catch schema errors like missing views/tables
