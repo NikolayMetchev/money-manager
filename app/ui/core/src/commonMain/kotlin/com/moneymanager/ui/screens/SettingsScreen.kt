@@ -1,7 +1,10 @@
+@file:OptIn(kotlin.time.ExperimentalTime::class)
+
 package com.moneymanager.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -14,6 +17,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -22,6 +26,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.database.RepositorySet
@@ -29,6 +34,20 @@ import com.moneymanager.ui.util.GenerationProgress
 import com.moneymanager.ui.util.generateSampleData
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import nl.jacobras.humanreadable.HumanReadable
+import kotlin.time.Duration
+
+private enum class MaintenanceOperation {
+    REINDEX,
+    VACUUM,
+    ANALYZE,
+}
+
+private data class MaintenanceState(
+    val runningOperation: MaintenanceOperation? = null,
+    val lastResults: Map<MaintenanceOperation, Duration> = emptyMap(),
+    val error: String? = null,
+)
 
 @Composable
 fun SettingsScreen(repositorySet: RepositorySet) {
@@ -39,6 +58,9 @@ fun SettingsScreen(repositorySet: RepositorySet) {
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var successMessage by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+
+    // Maintenance state
+    var maintenanceState by remember { mutableStateOf(MaintenanceState()) }
 
     Column(
         modifier =
@@ -52,6 +74,80 @@ fun SettingsScreen(repositorySet: RepositorySet) {
             text = "Settings",
             style = MaterialTheme.typography.headlineMedium,
         )
+
+        // Maintenance Section
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = "Maintenance",
+                    style = MaterialTheme.typography.titleMedium,
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    MaintenanceOperation.entries.forEach { operation ->
+                        MaintenanceButton(
+                            modifier = Modifier.weight(1f),
+                            operation = operation,
+                            isRunning = maintenanceState.runningOperation == operation,
+                            isDisabled = maintenanceState.runningOperation != null,
+                            lastDuration = maintenanceState.lastResults[operation],
+                            onClick = {
+                                maintenanceState =
+                                    maintenanceState.copy(
+                                        runningOperation = operation,
+                                        error = null,
+                                    )
+                                scope.launch {
+                                    try {
+                                        val duration =
+                                            when (operation) {
+                                                MaintenanceOperation.REINDEX ->
+                                                    repositorySet.maintenanceService.reindex()
+
+                                                MaintenanceOperation.VACUUM ->
+                                                    repositorySet.maintenanceService.vacuum()
+
+                                                MaintenanceOperation.ANALYZE ->
+                                                    repositorySet.maintenanceService.analyze()
+                                            }
+                                        maintenanceState =
+                                            maintenanceState.copy(
+                                                runningOperation = null,
+                                                lastResults = maintenanceState.lastResults + (operation to duration),
+                                            )
+                                    } catch (e: Exception) {
+                                        maintenanceState =
+                                            maintenanceState.copy(
+                                                runningOperation = null,
+                                                error = "${operation.name} failed: ${e.message}",
+                                            )
+                                    }
+                                }
+                            },
+                        )
+                    }
+                }
+
+                maintenanceState.error?.let { error ->
+                    Text(
+                        text = error,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+        }
 
         // Developer Section
         Card(
@@ -218,3 +314,40 @@ fun SettingsScreen(repositorySet: RepositorySet) {
         )
     }
 }
+
+@Composable
+private fun MaintenanceButton(
+    operation: MaintenanceOperation,
+    isRunning: Boolean,
+    isDisabled: Boolean,
+    lastDuration: Duration?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        OutlinedButton(
+            onClick = onClick,
+            enabled = !isDisabled,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            if (isRunning) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    strokeWidth = 2.dp,
+                )
+            } else {
+                Text(operation.name)
+            }
+        }
+        Text(
+            text = lastDuration?.let { formatDuration(it) } ?: "-",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.primary,
+        )
+    }
+}
+
+private fun formatDuration(duration: Duration): String = HumanReadable.duration(duration)
