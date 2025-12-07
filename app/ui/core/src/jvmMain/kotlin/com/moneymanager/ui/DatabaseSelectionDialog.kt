@@ -40,7 +40,9 @@ fun DatabaseSelectionDialog(
     require(defaultPath.path != null) { "Database selection dialog requires a non-null path" }
     var selectedPath by remember { mutableStateOf<Path?>(defaultPath.path) }
 
-    Dialog(onDismissRequest = onCancel) {
+    Dialog(
+        onDismissRequest = { /* Prevent dismissal by clicking outside */ },
+    ) {
         Surface(
             modifier =
                 Modifier
