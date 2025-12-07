@@ -9,10 +9,10 @@ import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.datetime.Instant
 import kotlin.random.Random
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 data class GenerationProgress(
