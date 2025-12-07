@@ -26,6 +26,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.database.RepositorySet
@@ -100,6 +101,7 @@ fun SettingsScreen(repositorySet: RepositorySet) {
                             operation = operation,
                             isRunning = maintenanceState.runningOperation == operation,
                             isDisabled = maintenanceState.runningOperation != null,
+                            lastDuration = maintenanceState.lastResults[operation],
                             onClick = {
                                 maintenanceState =
                                     maintenanceState.copy(
@@ -135,15 +137,6 @@ fun SettingsScreen(repositorySet: RepositorySet) {
                             },
                         )
                     }
-                }
-
-                // Show last result or error
-                maintenanceState.lastResults.entries.lastOrNull()?.let { (op, duration) ->
-                    Text(
-                        text = "${op.name}: ${formatDuration(duration)}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
                 }
 
                 maintenanceState.error?.let { error ->
@@ -327,22 +320,33 @@ private fun MaintenanceButton(
     operation: MaintenanceOperation,
     isRunning: Boolean,
     isDisabled: Boolean,
+    lastDuration: Duration?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    OutlinedButton(
-        onClick = onClick,
-        enabled = !isDisabled,
+    Column(
         modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        if (isRunning) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(16.dp),
-                strokeWidth = 2.dp,
-            )
-        } else {
-            Text(operation.name)
+        OutlinedButton(
+            onClick = onClick,
+            enabled = !isDisabled,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            if (isRunning) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    strokeWidth = 2.dp,
+                )
+            } else {
+                Text(operation.name)
+            }
         }
+        Text(
+            text = lastDuration?.let { formatDuration(it) } ?: "-",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.primary,
+        )
     }
 }
 
