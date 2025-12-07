@@ -3,6 +3,10 @@ plugins {
 }
 
 kotlin {
+    compilerOptions {
+        freeCompilerArgs.add("-Xexpect-actual-classes")
+    }
+
     sourceSets {
         // Shared source set for JVM and Android (both have access to java.text.NumberFormat)
         val jvmAndroidMain by creating {

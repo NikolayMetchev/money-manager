@@ -36,6 +36,7 @@ import kotlinx.coroutines.launch
 import kotlinx.datetime.*
 import org.lighthousegames.logging.logging
 import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 private val logger = logging()
@@ -827,7 +828,7 @@ fun TransactionEntryDialog(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .menuAnchor(),
+                                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
                         enabled = !isSaving,
                     )
                     ExposedDropdownMenu(
@@ -868,7 +869,7 @@ fun TransactionEntryDialog(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .menuAnchor(),
+                                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
                         enabled = !isSaving,
                     )
                     ExposedDropdownMenu(
@@ -927,7 +928,7 @@ fun TransactionEntryDialog(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .menuAnchor(MenuAnchorType.PrimaryEditable),
+                                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable),
                         enabled = !isSaving,
                         singleLine = true,
                     )

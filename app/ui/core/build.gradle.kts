@@ -65,17 +65,6 @@ kotlin {
     }
 }
 
-// Compose-specific ktlint configuration
-ktlint {
-    // Allow wildcard imports and uppercase function names (standard in Compose)
-    disabledRules.set(
-        setOf(
-            "standard:no-wildcard-imports",
-            "standard:function-naming",
-        ),
-    )
-}
-
 // Configure tests to run in headless mode for Compose Desktop
 tasks.withType<Test> {
     systemProperty("java.awt.headless", "true")
