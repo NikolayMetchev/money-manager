@@ -19,4 +19,5 @@ class RepositorySet(database: MoneyManagerDatabase) {
     val accountRepository: AccountRepository = AccountRepositoryImpl(database)
     val categoryRepository: CategoryRepository = CategoryRepositoryImpl(database)
     val transactionRepository: TransactionRepository = TransactionRepositoryImpl(database)
+    val maintenanceService: DatabaseMaintenanceService = DatabaseMaintenanceServiceImpl(database)
 }

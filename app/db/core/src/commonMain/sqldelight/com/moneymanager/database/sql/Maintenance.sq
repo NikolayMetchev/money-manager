@@ -1,0 +1,10 @@
+-- Database maintenance operations
+
+reindex:
+REINDEX;
+
+vacuum:
+VACUUM;
+
+analyze:
+ANALYZE;
