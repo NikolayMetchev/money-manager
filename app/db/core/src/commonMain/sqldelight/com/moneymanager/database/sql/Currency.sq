@@ -14,7 +14,7 @@ CREATE TABLE Currency (
 );
 
 selectAll:
-SELECT * FROM Currency;
+SELECT * FROM Currency ORDER BY code;
 
 selectById:
 SELECT * FROM Currency WHERE id = ?;

@@ -11,6 +11,8 @@ CREATE TABLE Category (
     FOREIGN KEY (parentId) REFERENCES Category(id) ON DELETE SET NULL
 );
 
+CREATE INDEX IF NOT EXISTS idx_category_parent ON Category(parentId);
+
 selectAll:
 SELECT * FROM Category;
 

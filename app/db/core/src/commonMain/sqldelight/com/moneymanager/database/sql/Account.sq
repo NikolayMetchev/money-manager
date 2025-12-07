@@ -5,7 +5,7 @@ CREATE TABLE Account (
 );
 
 selectAll:
-SELECT * FROM Account;
+SELECT * FROM Account ORDER BY name;
 
 selectById:
 SELECT * FROM Account WHERE id = ?;

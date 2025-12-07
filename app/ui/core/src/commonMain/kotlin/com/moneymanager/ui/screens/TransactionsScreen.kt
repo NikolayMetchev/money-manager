@@ -91,6 +91,9 @@ fun AccountTransactionsScreen(
     // Highlighted transaction state
     var highlightedTransactionId by remember { mutableStateOf<TransactionId?>(null) }
 
+    // Coroutine scope for scroll animations
+    val scrollScope = rememberCoroutineScope()
+
     // Get running balances for the selected account
     val runningBalances by transactionRepository.getRunningBalanceByAccount(selectedAccountId)
         .collectAsState(initial = emptyList())
@@ -153,6 +156,13 @@ fun AccountTransactionsScreen(
             runningBalances.filter { it.currencyId == currencyId }
         } ?: runningBalances
 
+    // Get all unique currencies from account balances for matrix
+    val uniqueCurrencyIds = accountBalances.map { it.currencyId }.distinct()
+
+    // Hoist scroll states to enable auto-scrolling from transaction clicks
+    val horizontalScrollState = rememberScrollState()
+    val verticalScrollState = rememberScrollState()
+
     BoxWithConstraints(
         modifier =
             Modifier
@@ -160,6 +170,13 @@ fun AccountTransactionsScreen(
                 .padding(16.dp),
     ) {
         val screenSizeClass = ScreenSizeClass.fromWidth(maxWidth)
+
+        // Get density for dp to pixel conversion
+        val density = androidx.compose.ui.platform.LocalDensity.current
+
+        // Capture container dimensions for centering calculations
+        val containerWidthDp = maxWidth
+        val containerHeightDp = maxHeight
 
         Column(modifier = Modifier.fillMaxSize()) {
             // Account Matrix Section (30% of screen) - with independent loading
@@ -186,11 +203,6 @@ fun AccountTransactionsScreen(
                     Column(
                         modifier = Modifier.fillMaxSize(),
                     ) {
-                        // Get all unique currencies from account balances
-                        val uniqueCurrencyIds = accountBalances.map { it.currencyId }.distinct()
-                        val horizontalScrollState = rememberScrollState()
-                        val verticalScrollState = rememberScrollState()
-
                         // Top row: Empty corner + Account names (always visible, scrolls horizontally)
                         Row(modifier = Modifier.fillMaxWidth()) {
                             // Empty corner space for currency label column
@@ -207,15 +219,16 @@ fun AccountTransactionsScreen(
                                 allAccounts.forEach { account ->
                                     val isSelectedColumn = selectedAccountId == account.id
                                     val isColumnSelected = isSelectedColumn && selectedCurrencyId == null
+                                    val isCellSelected = isSelectedColumn && selectedCurrencyId != null
                                     Box(
                                         modifier =
                                             Modifier
                                                 .width(120.dp)
                                                 .background(
-                                                    if (isColumnSelected) {
-                                                        MaterialTheme.colorScheme.primaryContainer
-                                                    } else {
-                                                        MaterialTheme.colorScheme.surface
+                                                    when {
+                                                        isColumnSelected -> MaterialTheme.colorScheme.primaryContainer
+                                                        isCellSelected -> MaterialTheme.colorScheme.secondaryContainer
+                                                        else -> MaterialTheme.colorScheme.surface
                                                     },
                                                 )
                                                 .clickable {
@@ -229,10 +242,10 @@ fun AccountTransactionsScreen(
                                             text = account.name,
                                             style = MaterialTheme.typography.labelLarge,
                                             color =
-                                                if (isColumnSelected) {
-                                                    MaterialTheme.colorScheme.primary
-                                                } else {
-                                                    MaterialTheme.colorScheme.onSurface
+                                                when {
+                                                    isColumnSelected -> MaterialTheme.colorScheme.primary
+                                                    isCellSelected -> MaterialTheme.colorScheme.secondary
+                                                    else -> MaterialTheme.colorScheme.onSurface
                                                 },
                                             maxLines = 1,
                                         )
@@ -255,15 +268,31 @@ fun AccountTransactionsScreen(
                             ) {
                                 uniqueCurrencyIds.forEach { currencyId ->
                                     val currency = currencies.find { it.id == currencyId }
-                                    Text(
-                                        text = "${currency?.code ?: "?"}:",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    val isCurrencySelected = selectedCurrencyId == currencyId
+                                    Box(
                                         modifier =
                                             Modifier
                                                 .width(60.dp)
+                                                .background(
+                                                    if (isCurrencySelected) {
+                                                        MaterialTheme.colorScheme.secondaryContainer
+                                                    } else {
+                                                        MaterialTheme.colorScheme.surface
+                                                    },
+                                                )
                                                 .padding(vertical = 4.dp),
-                                    )
+                                    ) {
+                                        Text(
+                                            text = "${currency?.code ?: "?"}:",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color =
+                                                if (isCurrencySelected) {
+                                                    MaterialTheme.colorScheme.secondary
+                                                } else {
+                                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                                },
+                                        )
+                                    }
                                 }
                             }
 
@@ -290,15 +319,12 @@ fun AccountTransactionsScreen(
                                                     it.accountId == account.id && it.currencyId == currencyId
                                                 }
                                             val isSelectedCell = selectedAccountId == account.id && selectedCurrencyId == currencyId
-                                            val isSelectedRow = selectedCurrencyId == currencyId
-                                            val isSelectedColumn = selectedAccountId == account.id
-                                            val isColumnSelected = isSelectedColumn && selectedCurrencyId == null
+                                            val isColumnSelected = selectedAccountId == account.id && selectedCurrencyId == null
 
                                             val backgroundColor =
                                                 when {
                                                     isSelectedCell -> MaterialTheme.colorScheme.primaryContainer
                                                     isColumnSelected -> MaterialTheme.colorScheme.primaryContainer
-                                                    isSelectedRow || isSelectedColumn -> MaterialTheme.colorScheme.surfaceVariant
                                                     else -> MaterialTheme.colorScheme.surface
                                                 }
 
@@ -460,6 +486,55 @@ fun AccountTransactionsScreen(
                             onAccountClick = { accountId ->
                                 highlightedTransactionId = runningBalance.transactionId
                                 selectedAccountId = accountId
+                                selectedCurrencyId = runningBalance.currencyId
+
+                                // Auto-scroll matrix to the clicked account and transaction currency
+                                scrollScope.launch {
+                                    // Calculate horizontal scroll position for the account
+                                    val accountIndex = allAccounts.indexOfFirst { it.id == accountId }
+                                    if (accountIndex >= 0) {
+                                        // Convert dp to pixels using density
+                                        with(density) {
+                                            // Each account column: 120.dp width + 8.dp spacing
+                                            val columnWidthPx = 120.dp.toPx()
+                                            val spacingPx = 8.dp.toPx()
+
+                                            // Calculate viewport width (total width - currency label column - padding)
+                                            val currencyLabelWidthPx = 60.dp.toPx()
+                                            val viewportWidthPx = containerWidthDp.toPx() - currencyLabelWidthPx
+
+                                            // Calculate column position
+                                            val columnStartPx = accountIndex * (columnWidthPx + spacingPx)
+                                            val columnCenterPx = columnStartPx + (columnWidthPx / 2)
+
+                                            // Center the column in the viewport
+                                            val targetScrollX = (columnCenterPx - (viewportWidthPx / 2)).coerceAtLeast(0f).toInt()
+
+                                            // Calculate vertical scroll position for the currency
+                                            val currencyIndex = uniqueCurrencyIds.indexOfFirst { it == runningBalance.currencyId }
+                                            if (currencyIndex >= 0) {
+                                                // Each currency row: text + padding + spacing ≈ 28.dp
+                                                val rowHeightPx = 28.dp.toPx()
+
+                                                // Calculate viewport height (30% of container height - account header row - spacing)
+                                                val matrixHeightPx = containerHeightDp.toPx() * 0.3f
+                                                val accountHeaderHeightPx = 24.dp.toPx() // Account name header row
+                                                val viewportHeightPx = matrixHeightPx - accountHeaderHeightPx
+
+                                                // Calculate row position
+                                                val rowStartPx = currencyIndex * rowHeightPx
+                                                val rowCenterPx = rowStartPx + (rowHeightPx / 2)
+
+                                                // Center the row in the viewport
+                                                val targetScrollY = (rowCenterPx - (viewportHeightPx / 2)).coerceAtLeast(0f).toInt()
+
+                                                // Animate both scrolls concurrently
+                                                launch { horizontalScrollState.animateScrollTo(targetScrollX) }
+                                                launch { verticalScrollState.animateScrollTo(targetScrollY) }
+                                            }
+                                        }
+                                    }
+                                }
                             },
                         )
                     }
