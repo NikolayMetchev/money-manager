@@ -30,6 +30,10 @@ CREATE TABLE Transfer (
     FOREIGN KEY (currencyId) REFERENCES Currency(id) ON DELETE RESTRICT
 );
 
+CREATE INDEX IF NOT EXISTS idx_transfer_source_account ON Transfer(sourceAccountId);
+CREATE INDEX IF NOT EXISTS idx_transfer_target_account ON Transfer(targetAccountId);
+CREATE INDEX IF NOT EXISTS idx_transfer_currency ON Transfer(currencyId);
+
 CREATE VIEW AccountBalanceView AS
 SELECT
     accountId,
@@ -120,7 +124,14 @@ delete:
 DELETE FROM Transfer WHERE id = ?;
 
 selectAllBalances:
-SELECT * FROM AccountBalanceView;
+SELECT
+    AccountBalanceView.accountId,
+    AccountBalanceView.currencyId,
+    AccountBalanceView.balance
+FROM AccountBalanceView
+JOIN Account ON AccountBalanceView.accountId = Account.id
+JOIN Currency ON AccountBalanceView.currencyId = Currency.id
+ORDER BY Currency.code, Account.name;
 
 selectRunningBalanceByAccount:
 SELECT * FROM RunningBalanceView
