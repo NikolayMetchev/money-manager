@@ -195,6 +195,18 @@ suspend fun generateSampleData(
         )
     }
 
+    // Refresh materialized views
+    progressFlow.emit(
+        GenerationProgress(
+            accountsCreated = 100,
+            totalAccounts = 100,
+            transactionsCreated = transactionsCreated,
+            totalTransactions = totalExpectedTransactions,
+            currentOperation = "Refreshing materialized views...",
+        ),
+    )
+    repositorySet.maintenanceService.refreshMaterializedViews()
+
     // Final progress update
     progressFlow.emit(
         GenerationProgress(

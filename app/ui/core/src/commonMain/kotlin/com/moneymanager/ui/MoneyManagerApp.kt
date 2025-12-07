@@ -20,13 +20,17 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.moneymanager.database.DatabaseManager
+import com.moneymanager.database.DatabaseState
 import com.moneymanager.database.DbLocation
 import com.moneymanager.database.RepositorySet
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.ui.components.DatabaseSchemaErrorDialog
 import com.moneymanager.ui.navigation.Screen
 import com.moneymanager.ui.screens.AccountTransactionsScreen
 import com.moneymanager.ui.screens.AccountsScreen
@@ -34,10 +38,124 @@ import com.moneymanager.ui.screens.CategoriesScreen
 import com.moneymanager.ui.screens.CurrenciesScreen
 import com.moneymanager.ui.screens.SettingsScreen
 import com.moneymanager.ui.screens.TransactionEntryDialog
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MoneyManagerApp(
+    databaseManager: DatabaseManager,
+    appVersion: AppVersion,
+    onLog: (String, Throwable?) -> Unit = { _, _ -> },
+) {
+    val scope = rememberCoroutineScope()
+    var databaseState by remember { mutableStateOf<DatabaseState>(DatabaseState.NoDatabaseSelected) }
+    var schemaErrorInfo by remember { mutableStateOf<Pair<DbLocation, Throwable>?>(null) }
+
+    // Initialize database on startup
+    LaunchedEffect(Unit) {
+        val defaultLocation = databaseManager.getDefaultLocation()
+        val dbExists = databaseManager.databaseExists(defaultLocation)
+        onLog("Default database location: $defaultLocation, exists: $dbExists", null)
+
+        if (dbExists) {
+            onLog("Existing database found, opening...", null)
+            try {
+                val database = databaseManager.openDatabase(defaultLocation)
+                val repositories = RepositorySet(database)
+                // Test that we can actually query the database
+                // This will catch schema errors like missing views/tables
+                // Test both regular tables and materialized views
+                repositories.accountRepository.getAllAccounts().first()
+                repositories.transactionRepository.getAccountBalances().first()
+                databaseState = DatabaseState.DatabaseLoaded(defaultLocation, repositories)
+                onLog("Database opened successfully", null)
+            } catch (e: Exception) {
+                onLog("Failed to open database: ${e.message}", e)
+                // Store error info to show schema error dialog
+                schemaErrorInfo = defaultLocation to e
+                databaseState = DatabaseState.Error(e)
+            }
+        } else {
+            onLog("No existing database, creating new one...", null)
+            try {
+                val database = databaseManager.openDatabase(defaultLocation)
+                val repositories = RepositorySet(database)
+                databaseState = DatabaseState.DatabaseLoaded(defaultLocation, repositories)
+                onLog("New database created successfully", null)
+            } catch (e: Exception) {
+                onLog("Failed to create database: ${e.message}", e)
+                schemaErrorInfo = defaultLocation to e
+                databaseState = DatabaseState.Error(e)
+            }
+        }
+    }
+
+    // Show database schema error dialog if there's an error
+    schemaErrorInfo?.let { (location, error) ->
+        DatabaseSchemaErrorDialog(
+            databaseLocation = location.toString(),
+            error = error,
+            onBackupAndCreateNew = {
+                scope.launch {
+                    try {
+                        onLog("Backing up database and creating new one...", null)
+                        val backupLocation = databaseManager.backupDatabase(location)
+                        onLog("Database backed up to: $backupLocation", null)
+
+                        val database = databaseManager.openDatabase(location)
+                        val repositories = RepositorySet(database)
+                        databaseState = DatabaseState.DatabaseLoaded(location, repositories)
+                        schemaErrorInfo = null
+                        onLog("New database created successfully", null)
+                    } catch (e: Exception) {
+                        onLog("Failed to backup and create new database: ${e.message}", e)
+                        schemaErrorInfo = location to e
+                    }
+                }
+            },
+            onDeleteAndCreateNew = {
+                scope.launch {
+                    try {
+                        onLog("Deleting database and creating new one...", null)
+                        databaseManager.deleteDatabase(location)
+                        onLog("Database deleted", null)
+
+                        val database = databaseManager.openDatabase(location)
+                        val repositories = RepositorySet(database)
+                        databaseState = DatabaseState.DatabaseLoaded(location, repositories)
+                        schemaErrorInfo = null
+                        onLog("New database created successfully", null)
+                    } catch (e: Exception) {
+                        onLog("Failed to delete and create new database: ${e.message}", e)
+                        schemaErrorInfo = location to e
+                    }
+                }
+            },
+        )
+    }
+
+    // Show main app once database is loaded
+    when (val state = databaseState) {
+        is DatabaseState.DatabaseLoaded -> {
+            MoneyManagerAppContent(
+                repositorySet = state.repositories,
+                appVersion = appVersion,
+                databaseLocation = state.location,
+            )
+        }
+        is DatabaseState.NoDatabaseSelected -> {
+            // Loading...
+        }
+        is DatabaseState.Error -> {
+            // Error dialog is shown above
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MoneyManagerAppContent(
     repositorySet: RepositorySet,
     appVersion: AppVersion,
     databaseLocation: DbLocation,
@@ -188,6 +306,7 @@ fun MoneyManagerApp(
                 transactionRepository = repositorySet.transactionRepository,
                 accountRepository = repositorySet.accountRepository,
                 currencyRepository = repositorySet.currencyRepository,
+                maintenanceService = repositorySet.maintenanceService,
                 accounts = accounts,
                 currencies = currencies,
                 preSelectedSourceAccountId = preSelectedAccountId,

@@ -34,7 +34,44 @@ CREATE INDEX IF NOT EXISTS idx_transfer_source_account ON Transfer(sourceAccount
 CREATE INDEX IF NOT EXISTS idx_transfer_target_account ON Transfer(targetAccountId);
 CREATE INDEX IF NOT EXISTS idx_transfer_currency ON Transfer(currencyId);
 
-CREATE VIEW AccountBalanceView AS
+-- Materialized table for account balances (manually refreshed)
+CREATE TABLE AccountBalanceMaterializedView (
+    accountId INTEGER NOT NULL,
+    currencyId TEXT NOT NULL,
+    balance REAL NOT NULL,
+    PRIMARY KEY (accountId, currencyId),
+    FOREIGN KEY (accountId) REFERENCES Account(id) ON DELETE CASCADE,
+    FOREIGN KEY (currencyId) REFERENCES Currency(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_account_balance_mv_account ON AccountBalanceMaterializedView(accountId);
+CREATE INDEX IF NOT EXISTS idx_account_balance_mv_currency ON AccountBalanceMaterializedView(currencyId);
+
+-- Materialized table for running balances (manually refreshed)
+CREATE TABLE RunningBalanceMaterializedView (
+    id TEXT NOT NULL,
+    timestamp INTEGER NOT NULL,
+    description TEXT NOT NULL,
+    accountId INTEGER NOT NULL,
+    currencyId TEXT NOT NULL,
+    transactionAmount REAL NOT NULL,
+    runningBalance REAL NOT NULL,
+    PRIMARY KEY (id, accountId),
+    FOREIGN KEY (accountId) REFERENCES Account(id) ON DELETE CASCADE,
+    FOREIGN KEY (currencyId) REFERENCES Currency(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_running_balance_mv_account ON RunningBalanceMaterializedView(accountId);
+CREATE INDEX IF NOT EXISTS idx_running_balance_mv_timestamp ON RunningBalanceMaterializedView(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_running_balance_mv_account_timestamp ON RunningBalanceMaterializedView(accountId, timestamp DESC);
+
+-- Queries to manually refresh materialized views
+
+refreshAccountBalances:
+DELETE FROM AccountBalanceMaterializedView;
+
+populateAccountBalances:
+INSERT INTO AccountBalanceMaterializedView (accountId, currencyId, balance)
 SELECT
     accountId,
     currencyId,
@@ -60,7 +97,11 @@ FROM (
 )
 GROUP BY accountId, currencyId;
 
-CREATE VIEW RunningBalanceView AS
+refreshRunningBalances:
+DELETE FROM RunningBalanceMaterializedView;
+
+populateRunningBalances:
+INSERT INTO RunningBalanceMaterializedView (id, timestamp, description, accountId, currencyId, transactionAmount, runningBalance)
 SELECT
     m.id,
     m.timestamp,
@@ -125,15 +166,15 @@ DELETE FROM Transfer WHERE id = ?;
 
 selectAllBalances:
 SELECT
-    AccountBalanceView.accountId,
-    AccountBalanceView.currencyId,
-    AccountBalanceView.balance
-FROM AccountBalanceView
-JOIN Account ON AccountBalanceView.accountId = Account.id
-JOIN Currency ON AccountBalanceView.currencyId = Currency.id
+    AccountBalanceMaterializedView.accountId,
+    AccountBalanceMaterializedView.currencyId,
+    AccountBalanceMaterializedView.balance
+FROM AccountBalanceMaterializedView
+JOIN Account ON AccountBalanceMaterializedView.accountId = Account.id
+JOIN Currency ON AccountBalanceMaterializedView.currencyId = Currency.id
 ORDER BY Currency.code, Account.name;
 
 selectRunningBalanceByAccount:
-SELECT * FROM RunningBalanceView
+SELECT * FROM RunningBalanceMaterializedView
 WHERE accountId = ?
 ORDER BY timestamp DESC, id DESC;
