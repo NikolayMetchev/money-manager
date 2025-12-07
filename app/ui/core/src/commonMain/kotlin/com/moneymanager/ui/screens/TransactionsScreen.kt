@@ -1099,7 +1099,13 @@ fun TransactionEntryDialog(
 
                 // Refresh materialized views checkbox
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable(enabled = !isSaving) {
+                                refreshMaterializedViews = !refreshMaterializedViews
+                            }
+                            .padding(vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Checkbox(
