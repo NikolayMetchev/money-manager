@@ -27,6 +27,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -59,6 +60,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
@@ -815,6 +817,7 @@ fun TransactionEntryDialog(
     transactionRepository: TransactionRepository,
     accountRepository: AccountRepository,
     currencyRepository: CurrencyRepository,
+    maintenanceService: DatabaseMaintenanceService,
     accounts: List<Account>,
     currencies: List<Currency>,
     preSelectedSourceAccountId: AccountId? = null,
@@ -828,6 +831,7 @@ fun TransactionEntryDialog(
     var description by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
+    var refreshMaterializedViews by remember { mutableStateOf(false) }
 
     // Date and time picker state
     val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
@@ -855,6 +859,7 @@ fun TransactionEntryDialog(
                 modifier =
                     Modifier
                         .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
                         .padding(vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
@@ -1093,6 +1098,29 @@ fun TransactionEntryDialog(
                     enabled = !isSaving,
                 )
 
+                // Refresh materialized views checkbox
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable(enabled = !isSaving) {
+                                refreshMaterializedViews = !refreshMaterializedViews
+                            }
+                            .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Checkbox(
+                        checked = refreshMaterializedViews,
+                        onCheckedChange = { refreshMaterializedViews = it },
+                        enabled = !isSaving,
+                    )
+                    Text(
+                        text = "Refresh materialized views after insert",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(start = 8.dp),
+                    )
+                }
+
                 errorMessage?.let { error ->
                     Text(
                         text = error,
@@ -1135,6 +1163,12 @@ fun TransactionEntryDialog(
                                             amount = amount.toDouble(),
                                         )
                                     transactionRepository.createTransfer(transfer)
+
+                                    // Refresh materialized views if checkbox is checked
+                                    if (refreshMaterializedViews) {
+                                        maintenanceService.refreshMaterializedViews()
+                                    }
+
                                     onDismiss()
                                 } catch (e: Exception) {
                                     logger.error(e) { "Failed to create transaction: ${e.message}" }

@@ -33,4 +33,15 @@ interface DatabaseMaintenanceService {
      * @return The duration the operation took to complete
      */
     suspend fun analyze(): Duration
+
+    /**
+     * Refreshes all materialized views in the database.
+     * This rebuilds AccountBalanceMaterializedView and RunningBalanceMaterializedView
+     * from the Transfer table data.
+     *
+     * Call this after bulk inserts or when materialized view data becomes stale.
+     *
+     * @return The duration the operation took to complete
+     */
+    suspend fun refreshMaterializedViews(): Duration
 }

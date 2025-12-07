@@ -2,6 +2,7 @@
 
 package com.moneymanager.database.repository
 
+import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.database.RepositorySet
 import com.moneymanager.database.createTestDatabaseLocation
 import com.moneymanager.database.deleteTestDatabase
@@ -30,6 +31,7 @@ class TransactionRepositoryImplTest {
     private lateinit var transactionRepository: TransactionRepository
     private lateinit var accountRepository: AccountRepository
     private lateinit var currencyRepository: CurrencyRepository
+    private lateinit var maintenanceService: DatabaseMaintenanceService
     private lateinit var testDbLocation: com.moneymanager.database.DbLocation
 
     @BeforeTest
@@ -49,6 +51,7 @@ class TransactionRepositoryImplTest {
             transactionRepository = repositories.transactionRepository
             accountRepository = repositories.accountRepository
             currencyRepository = repositories.currencyRepository
+            maintenanceService = repositories.maintenanceService
         }
 
     @AfterTest
@@ -215,6 +218,9 @@ class TransactionRepositoryImplTest {
                 )
             transactionRepository.createTransfer(transfer)
 
+            // Refresh materialized views
+            maintenanceService.refreshMaterializedViews()
+
             // Get balances
             val balances = transactionRepository.getAccountBalances().first()
 
@@ -291,6 +297,9 @@ class TransactionRepositoryImplTest {
                 ),
             )
 
+            // Refresh materialized views
+            maintenanceService.refreshMaterializedViews()
+
             // Get balances
             val balances = transactionRepository.getAccountBalances().first()
 
@@ -359,6 +368,9 @@ class TransactionRepositoryImplTest {
                     amount = 50.0,
                 ),
             )
+
+            // Refresh materialized views
+            maintenanceService.refreshMaterializedViews()
 
             // Get balances
             val balances = transactionRepository.getAccountBalances().first()

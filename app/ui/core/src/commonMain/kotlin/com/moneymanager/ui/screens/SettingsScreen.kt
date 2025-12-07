@@ -146,6 +146,62 @@ fun SettingsScreen(repositorySet: RepositorySet) {
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
+
+                // Refresh Materialized Views
+                var isRefreshingViews by remember { mutableStateOf(false) }
+                var refreshViewsError by remember { mutableStateOf<String?>(null) }
+                var refreshViewsDuration by remember { mutableStateOf<Duration?>(null) }
+
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            isRefreshingViews = true
+                            refreshViewsError = null
+                            scope.launch {
+                                try {
+                                    refreshViewsDuration = repositorySet.maintenanceService.refreshMaterializedViews()
+                                } catch (e: Exception) {
+                                    refreshViewsError = "Refresh failed: ${e.message}"
+                                } finally {
+                                    isRefreshingViews = false
+                                }
+                            }
+                        },
+                        enabled = !isRefreshingViews && maintenanceState.runningOperation == null,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        if (isRefreshingViews) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                            )
+                        } else {
+                            Text("Refresh Materialized Views")
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                    ) {
+                        Text(
+                            text = refreshViewsDuration?.let { formatDuration(it) } ?: "-",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+
+                    refreshViewsError?.let { error ->
+                        Text(
+                            text = error,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
             }
         }
 

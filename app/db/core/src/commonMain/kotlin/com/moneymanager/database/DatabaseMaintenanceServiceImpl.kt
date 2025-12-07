@@ -15,26 +15,39 @@ import kotlin.time.measureTime
 class DatabaseMaintenanceServiceImpl(
     database: MoneyManagerDatabase,
 ) : DatabaseMaintenanceService {
-    private val queries = database.maintenanceQueries
+    private val maintenanceQueries = database.maintenanceQueries
+    private val transferQueries = database.transferQueries
 
     override suspend fun reindex(): Duration =
         withContext(Dispatchers.Default) {
             measureTime {
-                queries.reindex()
+                maintenanceQueries.reindex()
             }
         }
 
     override suspend fun vacuum(): Duration =
         withContext(Dispatchers.Default) {
             measureTime {
-                queries.vacuum()
+                maintenanceQueries.vacuum()
             }
         }
 
     override suspend fun analyze(): Duration =
         withContext(Dispatchers.Default) {
             measureTime {
-                queries.analyze()
+                maintenanceQueries.analyze()
+            }
+        }
+
+    override suspend fun refreshMaterializedViews(): Duration =
+        withContext(Dispatchers.Default) {
+            measureTime {
+                transferQueries.transaction {
+                    transferQueries.refreshAccountBalances()
+                    transferQueries.populateAccountBalances()
+                    transferQueries.refreshRunningBalances()
+                    transferQueries.populateRunningBalances()
+                }
             }
         }
 }

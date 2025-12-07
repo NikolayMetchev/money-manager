@@ -19,7 +19,6 @@ kotlin {
                 implementation(libs.sqldelight.runtime)
                 implementation(projects.app.db.core)
                 implementation(projects.app.di.core)
-                implementation(projects.app.model.core)
                 implementation(projects.app.ui.core)
             }
         }
@@ -65,6 +64,5 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(projects.app.db.core)
     implementation(projects.app.di.core)
-    implementation(projects.app.model.core)
     implementation(projects.app.ui.core)
 }
