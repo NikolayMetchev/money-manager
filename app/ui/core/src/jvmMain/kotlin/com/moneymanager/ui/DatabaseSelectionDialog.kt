@@ -36,8 +36,6 @@ fun DatabaseSelectionDialog(
     onCancel: () -> Unit,
     onShowFileChooser: () -> Path?,
 ) {
-    // UI always needs a real path for database selection dialog
-    require(defaultPath.path != null) { "Database selection dialog requires a non-null path" }
     var selectedPath by remember { mutableStateOf<Path?>(defaultPath.path) }
 
     Dialog(

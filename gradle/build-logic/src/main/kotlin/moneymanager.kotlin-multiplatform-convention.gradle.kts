@@ -12,6 +12,10 @@ configure<KotlinMultiplatformExtension> {
 
     jvmToolchain(libs.findVersion("jvm-toolchain").get().toString().toInt())
 
+    compilerOptions {
+        freeCompilerArgs.add("-Xexpect-actual-classes")
+    }
+
     sourceSets {
         val commonTest by getting {
             dependencies {
