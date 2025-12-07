@@ -1,6 +1,7 @@
 plugins {
     id("moneymanager.android-convention")
     id("moneymanager.mappie-convention")
+    id("moneymanager.kotlin-multiplatform-convention")
     alias(libs.plugins.sqldelight)
 }
 
