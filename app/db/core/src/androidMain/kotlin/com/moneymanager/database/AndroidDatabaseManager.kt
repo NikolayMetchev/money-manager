@@ -53,4 +53,32 @@ class AndroidDatabaseManager(private val context: Context) : DatabaseManager {
     }
 
     override fun getDefaultLocation() = DEFAULT_DB_LOCATION
+
+    override suspend fun backupDatabase(location: DbLocation): DbLocation =
+        withContext(Dispatchers.IO) {
+            val dbFile = context.getDatabasePath(location.name)
+            if (!dbFile.exists()) {
+                throw IllegalArgumentException("Database does not exist: ${location.name}")
+            }
+
+            val backupName = "${location.name}.backup"
+            val backupFile = context.getDatabasePath(backupName)
+            val backupLocation = DbLocation(backupName)
+
+            // Delete existing backup if it exists
+            if (backupFile.exists()) {
+                backupFile.delete()
+            }
+
+            // Copy the database file to backup
+            dbFile.copyTo(backupFile, overwrite = true)
+
+            backupLocation
+        }
+
+    override suspend fun deleteDatabase(location: DbLocation): Unit =
+        withContext(Dispatchers.IO) {
+            // Use Android's deleteDatabase method for proper cleanup
+            context.deleteDatabase(location.name)
+        }
 }

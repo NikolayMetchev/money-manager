@@ -18,6 +18,8 @@ import com.moneymanager.di.AppComponent
 import com.moneymanager.di.AppComponentParams
 import com.moneymanager.ui.DatabaseSelectionDialog
 import com.moneymanager.ui.MoneyManagerApp
+import com.moneymanager.ui.components.DatabaseSchemaErrorDialog
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
 import java.awt.FileDialog
@@ -54,6 +56,7 @@ private fun MainWindow(onExit: () -> Unit) {
 
     var databaseState by remember { mutableStateOf<DatabaseState>(DatabaseState.NoDatabaseSelected) }
     var showDatabaseDialog by remember { mutableStateOf(false) }
+    var schemaErrorInfo by remember { mutableStateOf<Pair<DbLocation, Throwable>?>(null) }
 
     // Initialize on startup
     LaunchedEffect(Unit) {
@@ -67,10 +70,15 @@ private fun MainWindow(onExit: () -> Unit) {
             try {
                 val database = databaseManager.openDatabase(defaultLocation)
                 val repositories = RepositorySet(database)
+                // Test that we can actually query the database
+                // This will catch schema errors like missing views/tables
+                repositories.accountRepository.getAllAccounts().first()
                 databaseState = DatabaseState.DatabaseLoaded(defaultLocation, repositories)
                 logger.info { "Database opened successfully" }
             } catch (e: Exception) {
                 logger.error { "Failed to open database: ${e.message}" }
+                // Store error info to show schema error dialog
+                schemaErrorInfo = defaultLocation to e
                 databaseState = DatabaseState.Error(e)
             }
         } else {
@@ -91,6 +99,50 @@ private fun MainWindow(onExit: () -> Unit) {
         title = windowTitle,
         state = rememberWindowState(width = 1000.dp, height = 700.dp),
     ) {
+        // Show database schema error dialog if there's an error
+        schemaErrorInfo?.let { (location, error) ->
+            DatabaseSchemaErrorDialog(
+                databaseLocation = location.toString(),
+                error = error,
+                onBackupAndCreateNew = {
+                    coroutineScope.launch {
+                        try {
+                            logger.info { "Backing up database and creating new one..." }
+                            val backupLocation = databaseManager.backupDatabase(location)
+                            logger.info { "Database backed up to: $backupLocation" }
+
+                            val database = databaseManager.openDatabase(location)
+                            val repositories = RepositorySet(database)
+                            databaseState = DatabaseState.DatabaseLoaded(location, repositories)
+                            schemaErrorInfo = null
+                            logger.info { "New database created successfully" }
+                        } catch (e: Exception) {
+                            logger.error { "Failed to backup and create new database: ${e.message}" }
+                            schemaErrorInfo = location to e
+                        }
+                    }
+                },
+                onDeleteAndCreateNew = {
+                    coroutineScope.launch {
+                        try {
+                            logger.info { "Deleting database and creating new one..." }
+                            databaseManager.deleteDatabase(location)
+                            logger.info { "Database deleted" }
+
+                            val database = databaseManager.openDatabase(location)
+                            val repositories = RepositorySet(database)
+                            databaseState = DatabaseState.DatabaseLoaded(location, repositories)
+                            schemaErrorInfo = null
+                            logger.info { "New database created successfully" }
+                        } catch (e: Exception) {
+                            logger.error { "Failed to delete and create new database: ${e.message}" }
+                            schemaErrorInfo = location to e
+                        }
+                    }
+                },
+            )
+        }
+
         // Show database selection dialog if needed
         if (showDatabaseDialog && databaseState is DatabaseState.NoDatabaseSelected) {
             DatabaseSelectionDialog(
@@ -99,8 +151,8 @@ private fun MainWindow(onExit: () -> Unit) {
                     logger.info { "User selected database path: $selectedPath" }
                     showDatabaseDialog = false
                     coroutineScope.launch {
+                        val location = DbLocation(selectedPath)
                         try {
-                            val location = DbLocation(selectedPath)
                             logger.info { "Opening database at: $location" }
                             val database = databaseManager.openDatabase(location)
                             val repositories = RepositorySet(database)
@@ -108,6 +160,8 @@ private fun MainWindow(onExit: () -> Unit) {
                             logger.info { "Database initialized successfully" }
                         } catch (e: Exception) {
                             logger.error { "Failed to open database: ${e.message}" }
+                            // Store error info to show schema error dialog
+                            schemaErrorInfo = location to e
                             databaseState = DatabaseState.Error(e)
                         }
                     }
