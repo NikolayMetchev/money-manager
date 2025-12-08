@@ -39,9 +39,8 @@ class AndroidDatabaseManager(private val context: Context) : DatabaseManager {
 
             val database = MoneyManagerDatabase(driver)
 
-            // Seed data after database is created
             if (isNewDatabase) {
-                DatabaseConfig.seedDatabase(database)
+                DatabaseConfig.seedDatabase(database, driver)
             }
 
             database

@@ -149,49 +149,92 @@ fun SettingsScreen(repositorySet: RepositorySet) {
 
                 // Refresh Materialized Views
                 var isRefreshingViews by remember { mutableStateOf(false) }
+                var isFullRefreshingViews by remember { mutableStateOf(false) }
                 var refreshViewsError by remember { mutableStateOf<String?>(null) }
-                var refreshViewsDuration by remember { mutableStateOf<Duration?>(null) }
+                var incrementalRefreshDuration by remember { mutableStateOf<Duration?>(null) }
+                var fullRefreshDuration by remember { mutableStateOf<Duration?>(null) }
 
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    OutlinedButton(
-                        onClick = {
-                            isRefreshingViews = true
-                            refreshViewsError = null
-                            scope.launch {
-                                try {
-                                    refreshViewsDuration = repositorySet.maintenanceService.refreshMaterializedViews()
-                                } catch (e: Exception) {
-                                    refreshViewsError = "Refresh failed: ${e.message}"
-                                } finally {
-                                    isRefreshingViews = false
-                                }
-                            }
-                        },
-                        enabled = !isRefreshingViews && maintenanceState.runningOperation == null,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        if (isRefreshingViews) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(16.dp),
-                                strokeWidth = 2.dp,
-                            )
-                        } else {
-                            Text("Refresh Materialized Views")
-                        }
-                    }
-
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Text(
-                            text = refreshViewsDuration?.let { formatDuration(it) } ?: "-",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            OutlinedButton(
+                                onClick = {
+                                    isRefreshingViews = true
+                                    refreshViewsError = null
+                                    scope.launch {
+                                        try {
+                                            incrementalRefreshDuration = repositorySet.maintenanceService.refreshMaterializedViews()
+                                        } catch (e: Exception) {
+                                            refreshViewsError = "Incremental refresh failed: ${e.message}"
+                                        } finally {
+                                            isRefreshingViews = false
+                                        }
+                                    }
+                                },
+                                enabled = !isRefreshingViews && !isFullRefreshingViews && maintenanceState.runningOperation == null,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                if (isRefreshingViews) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        strokeWidth = 2.dp,
+                                    )
+                                } else {
+                                    Text("Incremental Refresh")
+                                }
+                            }
+                            Text(
+                                text = incrementalRefreshDuration?.let { formatDuration(it) } ?: "-",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            OutlinedButton(
+                                onClick = {
+                                    isFullRefreshingViews = true
+                                    refreshViewsError = null
+                                    scope.launch {
+                                        try {
+                                            fullRefreshDuration = repositorySet.maintenanceService.fullRefreshMaterializedViews()
+                                        } catch (e: Exception) {
+                                            refreshViewsError = "Full refresh failed: ${e.message}"
+                                        } finally {
+                                            isFullRefreshingViews = false
+                                        }
+                                    }
+                                },
+                                enabled = !isRefreshingViews && !isFullRefreshingViews && maintenanceState.runningOperation == null,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                if (isFullRefreshingViews) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        strokeWidth = 2.dp,
+                                    )
+                                } else {
+                                    Text("Full Refresh")
+                                }
+                            }
+                            Text(
+                                text = fullRefreshDuration?.let { formatDuration(it) } ?: "-",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
                     }
 
                     refreshViewsError?.let { error ->

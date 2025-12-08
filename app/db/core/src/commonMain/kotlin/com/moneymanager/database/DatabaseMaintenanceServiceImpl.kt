@@ -43,10 +43,28 @@ class DatabaseMaintenanceServiceImpl(
         withContext(Dispatchers.Default) {
             measureTime {
                 transferQueries.transaction {
+                    // Incremental refresh - only update affected account-currency pairs
+                    transferQueries.incrementalRefreshAccountBalances()
+                    transferQueries.incrementalPopulateAccountBalances()
+                    transferQueries.incrementalRefreshRunningBalances()
+                    transferQueries.incrementalPopulateRunningBalances()
+                    // Clear pending changes after both views are refreshed
+                    transferQueries.clearPendingChanges()
+                }
+            }
+        }
+
+    override suspend fun fullRefreshMaterializedViews(): Duration =
+        withContext(Dispatchers.Default) {
+            measureTime {
+                transferQueries.transaction {
+                    // Full refresh - delete and rebuild all data
                     transferQueries.refreshAccountBalances()
                     transferQueries.populateAccountBalances()
                     transferQueries.refreshRunningBalances()
                     transferQueries.populateRunningBalances()
+                    // Clear pending changes to avoid redundant work
+                    transferQueries.clearPendingChanges()
                 }
             }
         }

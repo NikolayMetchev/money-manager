@@ -2,6 +2,7 @@
 
 package com.moneymanager.database
 
+import app.cash.sqldelight.db.SqlDriver
 import com.moneymanager.currency.Currency
 import com.moneymanager.database.sql.MoneyManagerDatabase
 
@@ -27,10 +28,139 @@ object DatabaseConfig {
         get() = Currency.getAllCurrencies()
 
     /**
-     * Seeds the database with all available currencies.
-     * Should be called once after creating a new database.
+     * Creates triggers for incremental materialized view refresh.
+     * These triggers track changes to the Transfer table in PendingMaterializedViewChanges.
+     *
+     * NOTE: Triggers are created at runtime (not in schema) due to SQLDelight 2.2.1 parser limitations.
+     * Called automatically from seedDatabase() during database initialization.
+     *
+     * @param driver The SQLite driver to use for executing the CREATE TRIGGER statements
      */
-    suspend fun seedDatabase(database: MoneyManagerDatabase) {
+    private fun createIncrementalRefreshTriggers(driver: SqlDriver) {
+        // INSERT trigger - tracks both source and target account-currency pairs
+        driver.execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_transfer_insert_track_changes
+            AFTER INSERT ON Transfer
+            FOR EACH ROW
+            BEGIN
+                INSERT OR IGNORE INTO PendingMaterializedViewChanges (accountId, currencyId, minTimestamp)
+                VALUES (NEW.sourceAccountId, NEW.currencyId, NEW.timestamp);
+
+                UPDATE PendingMaterializedViewChanges
+                SET minTimestamp = NEW.timestamp
+                WHERE accountId = NEW.sourceAccountId
+                  AND currencyId = NEW.currencyId
+                  AND minTimestamp > NEW.timestamp;
+
+                INSERT OR IGNORE INTO PendingMaterializedViewChanges (accountId, currencyId, minTimestamp)
+                VALUES (NEW.targetAccountId, NEW.currencyId, NEW.timestamp);
+
+                UPDATE PendingMaterializedViewChanges
+                SET minTimestamp = NEW.timestamp
+                WHERE accountId = NEW.targetAccountId
+                  AND currencyId = NEW.currencyId
+                  AND minTimestamp > NEW.timestamp;
+            END
+            """.trimIndent(),
+            0,
+        )
+
+        // UPDATE trigger - tracks all 4 possible account-currency pairs (old/new source/target)
+        driver.execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_transfer_update_track_changes
+            AFTER UPDATE ON Transfer
+            FOR EACH ROW
+            BEGIN
+                INSERT OR IGNORE INTO PendingMaterializedViewChanges (accountId, currencyId, minTimestamp)
+                VALUES (OLD.sourceAccountId, OLD.currencyId, MIN(OLD.timestamp, NEW.timestamp));
+
+                UPDATE PendingMaterializedViewChanges
+                SET minTimestamp = MIN(OLD.timestamp, NEW.timestamp)
+                WHERE accountId = OLD.sourceAccountId
+                  AND currencyId = OLD.currencyId
+                  AND minTimestamp > MIN(OLD.timestamp, NEW.timestamp);
+
+                INSERT OR IGNORE INTO PendingMaterializedViewChanges (accountId, currencyId, minTimestamp)
+                VALUES (NEW.sourceAccountId, NEW.currencyId, MIN(OLD.timestamp, NEW.timestamp));
+
+                UPDATE PendingMaterializedViewChanges
+                SET minTimestamp = MIN(OLD.timestamp, NEW.timestamp)
+                WHERE accountId = NEW.sourceAccountId
+                  AND currencyId = NEW.currencyId
+                  AND minTimestamp > MIN(OLD.timestamp, NEW.timestamp);
+
+                INSERT OR IGNORE INTO PendingMaterializedViewChanges (accountId, currencyId, minTimestamp)
+                VALUES (OLD.targetAccountId, OLD.currencyId, MIN(OLD.timestamp, NEW.timestamp));
+
+                UPDATE PendingMaterializedViewChanges
+                SET minTimestamp = MIN(OLD.timestamp, NEW.timestamp)
+                WHERE accountId = OLD.targetAccountId
+                  AND currencyId = OLD.currencyId
+                  AND minTimestamp > MIN(OLD.timestamp, NEW.timestamp);
+
+                INSERT OR IGNORE INTO PendingMaterializedViewChanges (accountId, currencyId, minTimestamp)
+                VALUES (NEW.targetAccountId, NEW.currencyId, MIN(OLD.timestamp, NEW.timestamp));
+
+                UPDATE PendingMaterializedViewChanges
+                SET minTimestamp = MIN(OLD.timestamp, NEW.timestamp)
+                WHERE accountId = NEW.targetAccountId
+                  AND currencyId = NEW.currencyId
+                  AND minTimestamp > MIN(OLD.timestamp, NEW.timestamp);
+            END
+            """.trimIndent(),
+            0,
+        )
+
+        // DELETE trigger - tracks old source and target account-currency pairs
+        driver.execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_transfer_delete_track_changes
+            AFTER DELETE ON Transfer
+            FOR EACH ROW
+            BEGIN
+                INSERT OR IGNORE INTO PendingMaterializedViewChanges (accountId, currencyId, minTimestamp)
+                VALUES (OLD.sourceAccountId, OLD.currencyId, OLD.timestamp);
+
+                UPDATE PendingMaterializedViewChanges
+                SET minTimestamp = OLD.timestamp
+                WHERE accountId = OLD.sourceAccountId
+                  AND currencyId = OLD.currencyId
+                  AND minTimestamp > OLD.timestamp;
+
+                INSERT OR IGNORE INTO PendingMaterializedViewChanges (accountId, currencyId, minTimestamp)
+                VALUES (OLD.targetAccountId, OLD.currencyId, OLD.timestamp);
+
+                UPDATE PendingMaterializedViewChanges
+                SET minTimestamp = OLD.timestamp
+                WHERE accountId = OLD.targetAccountId
+                  AND currencyId = OLD.currencyId
+                  AND minTimestamp > OLD.timestamp;
+            END
+            """.trimIndent(),
+            0,
+        )
+    }
+
+    /**
+     * Seeds the database with all available currencies and creates incremental refresh triggers.
+     * Should be called once after creating a new database.
+     *
+     * @param database The database to seed
+     * @param driver The SQLite driver (needed for creating triggers)
+     */
+    suspend fun seedDatabase(
+        database: MoneyManagerDatabase,
+        driver: SqlDriver,
+    ) {
+        // Create triggers for incremental materialized view refresh
+        createIncrementalRefreshTriggers(driver)
+
+        // Seed currencies
         val currencyRepository = RepositorySet(database).currencyRepository
         allCurrencies.forEach { currency ->
             currencyRepository.upsertCurrencyByCode(currency.code, currency.displayName)
