@@ -35,6 +35,9 @@
             <option value="$PROJECT_DIR$/app/ui" />
             <option value="$PROJECT_DIR$/app/ui/core" />
             <option value="$PROJECT_DIR$/gradle/build-logic" />
+            <option value="$PROJECT_DIR$/test" />
+            <option value="$PROJECT_DIR$/test/app" />
+            <option value="$PROJECT_DIR$/test/app/db" />
             <option value="$PROJECT_DIR$/utils" />
             <option value="$PROJECT_DIR$/utils/currency" />
           </set>
