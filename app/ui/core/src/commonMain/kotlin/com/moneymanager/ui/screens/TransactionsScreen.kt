@@ -861,83 +861,133 @@ fun TransactionEntryDialog(
                         .padding(vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                // Source Account Dropdown
+                // Source Account Dropdown with search
+                var sourceAccountSearchQuery by remember { mutableStateOf("") }
+                val filteredSourceAccounts =
+                    remember(accounts, sourceAccountSearchQuery, targetAccountId) {
+                        val available = accounts.filter { it.id != targetAccountId }
+                        if (sourceAccountSearchQuery.isBlank()) {
+                            available
+                        } else {
+                            available.filter { account ->
+                                account.name.contains(sourceAccountSearchQuery, ignoreCase = true)
+                            }
+                        }
+                    }
+
                 ExposedDropdownMenuBox(
                     expanded = sourceAccountExpanded,
                     onExpandedChange = { sourceAccountExpanded = it },
                 ) {
                     OutlinedTextField(
-                        value = accounts.find { it.id == sourceAccountId }?.name ?: "",
-                        onValueChange = {},
-                        readOnly = true,
+                        value =
+                            if (sourceAccountExpanded) {
+                                sourceAccountSearchQuery
+                            } else {
+                                accounts.find { it.id == sourceAccountId }?.name ?: ""
+                            },
+                        onValueChange = { sourceAccountSearchQuery = it },
                         label = { Text("From Account") },
+                        placeholder = { Text("Type to search...") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = sourceAccountExpanded) },
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+                                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable),
                         enabled = !isSaving,
+                        singleLine = true,
                     )
                     ExposedDropdownMenu(
                         expanded = sourceAccountExpanded,
-                        onDismissRequest = { sourceAccountExpanded = false },
+                        onDismissRequest = {
+                            sourceAccountExpanded = false
+                            sourceAccountSearchQuery = ""
+                        },
                     ) {
-                        accounts.filter { it.id != targetAccountId }.forEach { account ->
+                        filteredSourceAccounts.forEach { account ->
                             DropdownMenuItem(
                                 text = { Text(account.name) },
                                 onClick = {
                                     sourceAccountId = account.id
                                     sourceAccountExpanded = false
+                                    sourceAccountSearchQuery = ""
                                 },
                             )
                         }
+                        HorizontalDivider()
                         DropdownMenuItem(
                             text = { Text("+ Create New Account") },
                             onClick = {
                                 creatingForSource = true
                                 showCreateAccountDialog = true
                                 sourceAccountExpanded = false
+                                sourceAccountSearchQuery = ""
                             },
                         )
                     }
                 }
 
-                // Target Account Dropdown
+                // Target Account Dropdown with search
+                var targetAccountSearchQuery by remember { mutableStateOf("") }
+                val filteredTargetAccounts =
+                    remember(accounts, targetAccountSearchQuery, sourceAccountId) {
+                        val available = accounts.filter { it.id != sourceAccountId }
+                        if (targetAccountSearchQuery.isBlank()) {
+                            available
+                        } else {
+                            available.filter { account ->
+                                account.name.contains(targetAccountSearchQuery, ignoreCase = true)
+                            }
+                        }
+                    }
+
                 ExposedDropdownMenuBox(
                     expanded = targetAccountExpanded,
                     onExpandedChange = { targetAccountExpanded = it },
                 ) {
                     OutlinedTextField(
-                        value = accounts.find { it.id == targetAccountId }?.name ?: "",
-                        onValueChange = {},
-                        readOnly = true,
+                        value =
+                            if (targetAccountExpanded) {
+                                targetAccountSearchQuery
+                            } else {
+                                accounts.find { it.id == targetAccountId }?.name ?: ""
+                            },
+                        onValueChange = { targetAccountSearchQuery = it },
                         label = { Text("To Account") },
+                        placeholder = { Text("Type to search...") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = targetAccountExpanded) },
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+                                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable),
                         enabled = !isSaving,
+                        singleLine = true,
                     )
                     ExposedDropdownMenu(
                         expanded = targetAccountExpanded,
-                        onDismissRequest = { targetAccountExpanded = false },
+                        onDismissRequest = {
+                            targetAccountExpanded = false
+                            targetAccountSearchQuery = ""
+                        },
                     ) {
-                        accounts.filter { it.id != sourceAccountId }.forEach { account ->
+                        filteredTargetAccounts.forEach { account ->
                             DropdownMenuItem(
                                 text = { Text(account.name) },
                                 onClick = {
                                     targetAccountId = account.id
                                     targetAccountExpanded = false
+                                    targetAccountSearchQuery = ""
                                 },
                             )
                         }
+                        HorizontalDivider()
                         DropdownMenuItem(
                             text = { Text("+ Create New Account") },
                             onClick = {
                                 creatingForSource = false
                                 showCreateAccountDialog = true
                                 targetAccountExpanded = false
+                                targetAccountSearchQuery = ""
                             },
                         )
                     }
