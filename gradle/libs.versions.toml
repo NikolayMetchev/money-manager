@@ -3,8 +3,8 @@ android-compileSdk = "36"
 android-gradle-plugin = "8.13.1"
 android-minSdk = "30"
 android-targetSdk = "35"
-androidx-activity-compose = "1.12.0"
-androidx-compose = "1.9.5"
+androidx-activity-compose = "1.12.1"
+androidx-compose = "1.10.0"
 androidx-test-core = "1.7.0"
 androidx-test-runner = "1.7.0"
 compose = "1.7.5"
@@ -34,7 +34,7 @@ turbine = "1.2.1"
 android-gradle-plugin = { module = "com.android.tools.build:gradle", version.ref = "android-gradle-plugin" }
 androidx-activity = { module = "androidx.activity:activity", version.ref = "androidx-activity-compose" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity-compose" }
-androidx-compose-runtime = { module = "androidx.compose.runtime:runtime", version = "1.9.5" }
+androidx-compose-runtime = { module = "androidx.compose.runtime:runtime", version = "1.10.0" }
 androidx-compose-runtime-desktop = { module = "androidx.compose.runtime:runtime-desktop", version.ref = "androidx-compose" }
 androidx-test-core = { module = "androidx.test:core", version.ref = "androidx-test-core" }
 androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidx-test-runner" }
