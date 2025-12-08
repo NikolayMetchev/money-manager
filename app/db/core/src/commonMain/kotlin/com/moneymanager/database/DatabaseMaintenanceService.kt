@@ -35,13 +35,25 @@ interface DatabaseMaintenanceService {
     suspend fun analyze(): Duration
 
     /**
-     * Refreshes all materialized views in the database.
-     * This rebuilds AccountBalanceMaterializedView and RunningBalanceMaterializedView
-     * from the Transfer table data.
+     * Refreshes all materialized views in the database incrementally.
+     * This updates only the affected account-currency pairs tracked in PendingMaterializedViewChanges.
      *
-     * Call this after bulk inserts or when materialized view data becomes stale.
+     * This is the default refresh method and should be called after normal operations.
+     * It's much faster than fullRefreshMaterializedViews for typical changes.
      *
      * @return The duration the operation took to complete
      */
     suspend fun refreshMaterializedViews(): Duration
+
+    /**
+     * Performs a full rebuild of all materialized views in the database.
+     * This completely deletes and rebuilds AccountBalanceMaterializedView and
+     * RunningBalanceMaterializedView from the Transfer table data.
+     *
+     * Use this for data integrity verification or after bulk operations.
+     * For normal operations, use refreshMaterializedViews() instead (much faster).
+     *
+     * @return The duration the operation took to complete
+     */
+    suspend fun fullRefreshMaterializedViews(): Duration
 }

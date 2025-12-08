@@ -54,8 +54,7 @@ class JvmDatabaseManager : DatabaseManager {
             val database = MoneyManagerDatabase(driver)
 
             if (isNewDatabase) {
-                // Seed with default data
-                DatabaseConfig.seedDatabase(database)
+                DatabaseConfig.seedDatabase(database, driver)
             }
 
             database

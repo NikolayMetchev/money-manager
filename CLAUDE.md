@@ -639,6 +639,55 @@ The project uses multiple tools to maintain code quality and consistency:
 - Reports appear in `build/reports/dependency-analysis/`
 - **Important**: Never exclude modules from this task
 
+### Code Comments
+
+Use comments sparingly and strategically. Good code should be self-documenting through clear naming and structure.
+
+**Avoid**:
+- Stating obvious details that the code already expresses clearly
+- Comments that duplicate what the code does (e.g., `// Create a list` before `val list = mutableListOf()`)
+- Comments that require updating when implementation changes
+- Exposing implementation details that may change
+
+**Prefer**:
+- Self-documenting code with descriptive function and variable names
+- Comments that explain "why" rather than "what"
+- Comments for non-obvious behavior, constraints, or design decisions
+- KDoc for public APIs explaining purpose, parameters, and return values
+- Comments referencing external issues, bugs, or workarounds (e.g., "// Workaround for SQLDelight 2.2.1 parser limitations")
+
+**Examples**:
+
+❌ **Bad** - Obvious detail that will need updating:
+```kotlin
+if (isNewDatabase) {
+    // Seed with default data (also creates incremental refresh triggers)
+    DatabaseConfig.seedDatabase(database, driver)
+}
+```
+
+✅ **Good** - No comment needed, code is self-explanatory:
+```kotlin
+if (isNewDatabase) {
+    DatabaseConfig.seedDatabase(database, driver)
+}
+```
+
+❌ **Bad** - Duplicates what code says:
+```kotlin
+// Loop through all currencies
+allCurrencies.forEach { currency ->
+    // Insert the currency
+    currencyRepository.upsertCurrencyByCode(currency.code, currency.displayName)
+}
+```
+
+✅ **Good** - Explains why, not what:
+```kotlin
+// NOTE: Triggers are created at runtime (not in schema) due to SQLDelight 2.2.1 parser limitations.
+createIncrementalRefreshTriggers(driver)
+```
+
 ### Platform Support Status
 
 The project currently supports:
