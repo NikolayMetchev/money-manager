@@ -63,6 +63,8 @@ kotlin {
                 implementation(projects.test.app.db)
             }
             kotlin.srcDir("src/commonTest/kotlin")
+            // Include commonTest resources for test database files
+            resources.srcDir("src/commonTest/resources")
         }
     }
 }
