@@ -23,6 +23,7 @@ kotlin {
                 implementation(libs.kotlinx.coroutines.test)
                 implementation(projects.app.di.core)
                 implementation(projects.app.model.core)
+                implementation(projects.test.app.db)
             }
         }
 
@@ -48,6 +49,7 @@ kotlin {
                 implementation(libs.androidx.test.runner)
                 implementation(libs.kotlinx.coroutines.test)
                 implementation(projects.app.di.core)
+                implementation(projects.test.app.db)
             }
             // Include repository tests from commonTest (not the expect declarations file)
             kotlin.srcDir("src/commonTest/kotlin/com/moneymanager/database/repository")

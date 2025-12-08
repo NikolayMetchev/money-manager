@@ -72,6 +72,9 @@ class AndroidDatabaseManager(private val context: Context) : DatabaseManager {
             // Copy the database file to backup
             dbFile.copyTo(backupFile, overwrite = true)
 
+            // Delete the original database so a fresh one can be created
+            context.deleteDatabase(location.name)
+
             backupLocation
         }
 

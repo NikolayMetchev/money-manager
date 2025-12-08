@@ -32,6 +32,7 @@ kotlin {
 
                 implementation(libs.kotlinx.coroutines.test)
                 implementation(libs.turbine)
+                implementation(projects.test.app.db)
             }
         }
         val jvmMain by getting {
@@ -59,8 +60,11 @@ kotlin {
                 implementation(libs.androidx.test.runner)
                 implementation(libs.kotlinx.coroutines.test)
                 implementation(libs.turbine)
+                implementation(projects.test.app.db)
             }
             kotlin.srcDir("src/commonTest/kotlin")
+            // Include commonTest resources for test database files
+            resources.srcDir("src/commonTest/resources")
         }
     }
 }
