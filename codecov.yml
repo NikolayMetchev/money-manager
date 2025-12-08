@@ -2,9 +2,13 @@
 # https://docs.codecov.com/docs/codecovyml-reference
 
 # Wait for both unit and instrumented uploads before sending notifications
+# Disable default path fixes to let Codecov search the entire repo for files
+# This is needed for multi-module Kotlin projects where files can be in various
+# subdirectories (app/*, utils/*, test/*, etc.)
 codecov:
   notify:
     after_n_builds: 2
+  disable_default_path_fixes: true
 
 # Define flags for unit and instrumented tests
 flags:
