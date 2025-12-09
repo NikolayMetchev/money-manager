@@ -69,13 +69,8 @@ fun CategoryCard(category: Category) {
                     text = category.name,
                     style = MaterialTheme.typography.titleMedium,
                 )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = category.type.name,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
                 if (category.parentId != null) {
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "Subcategory",
                         style = MaterialTheme.typography.bodySmall,
