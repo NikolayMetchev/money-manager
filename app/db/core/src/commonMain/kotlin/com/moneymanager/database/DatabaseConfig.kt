@@ -160,6 +160,13 @@ object DatabaseConfig {
         // Create triggers for incremental materialized view refresh
         createIncrementalRefreshTriggers(driver)
 
+        // Seed default "Uncategorized" category
+        database.categoryQueries.insertWithId(
+            id = -1,
+            name = "Uncategorized",
+            parentId = null,
+        )
+
         // Seed currencies
         val currencyRepository = RepositorySet(database).currencyRepository
         allCurrencies.forEach { currency ->
