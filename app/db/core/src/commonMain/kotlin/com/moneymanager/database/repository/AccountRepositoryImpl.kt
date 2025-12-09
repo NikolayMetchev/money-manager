@@ -39,6 +39,7 @@ class AccountRepositoryImpl(
                     queries.insert(
                         name = account.name,
                         openingDate = account.openingDate.toEpochMilliseconds(),
+                        categoryId = account.categoryId,
                     )
                     queries.lastInsertRowId().executeAsOne()
                 }
@@ -52,6 +53,7 @@ class AccountRepositoryImpl(
                     queries.insert(
                         name = account.name,
                         openingDate = account.openingDate.toEpochMilliseconds(),
+                        categoryId = account.categoryId,
                     )
                     val id = queries.lastInsertRowId().executeAsOne()
                     AccountId(id)
@@ -63,6 +65,7 @@ class AccountRepositoryImpl(
         withContext(Dispatchers.Default) {
             queries.update(
                 name = account.name,
+                categoryId = account.categoryId,
                 id = account.id.id,
             )
         }

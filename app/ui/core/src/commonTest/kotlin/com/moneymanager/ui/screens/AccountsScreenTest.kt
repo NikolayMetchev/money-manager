@@ -11,10 +11,12 @@ import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
+import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.repository.AccountRepository
+import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import kotlinx.coroutines.flow.Flow
@@ -37,6 +39,7 @@ class AccountsScreenTest {
             setContent {
                 AccountsScreen(
                     accountRepository = repository,
+                    categoryRepository = FakeCategoryRepository(),
                     transactionRepository = FakeTransactionRepository(),
                     currencyRepository = FakeCurrencyRepository(),
                     onAccountClick = {},
@@ -72,6 +75,7 @@ class AccountsScreenTest {
             setContent {
                 AccountsScreen(
                     accountRepository = repository,
+                    categoryRepository = FakeCategoryRepository(),
                     transactionRepository = FakeTransactionRepository(),
                     currencyRepository = FakeCurrencyRepository(),
                     onAccountClick = {},
@@ -93,6 +97,7 @@ class AccountsScreenTest {
             setContent {
                 AccountsScreen(
                     accountRepository = repository,
+                    categoryRepository = FakeCategoryRepository(),
                     transactionRepository = FakeTransactionRepository(),
                     currencyRepository = FakeCurrencyRepository(),
                     onAccountClick = {},
@@ -113,6 +118,7 @@ class AccountsScreenTest {
             setContent {
                 AccountsScreen(
                     accountRepository = repository,
+                    categoryRepository = FakeCategoryRepository(),
                     transactionRepository = FakeTransactionRepository(),
                     currencyRepository = FakeCurrencyRepository(),
                     onAccountClick = {},
@@ -143,6 +149,7 @@ class AccountsScreenTest {
             setContent {
                 AccountsScreen(
                     accountRepository = repository,
+                    categoryRepository = FakeCategoryRepository(),
                     transactionRepository = FakeTransactionRepository(),
                     currencyRepository = FakeCurrencyRepository(),
                     onAccountClick = {},
@@ -170,6 +177,7 @@ class AccountsScreenTest {
             setContent {
                 AccountsScreen(
                     accountRepository = repository,
+                    categoryRepository = FakeCategoryRepository(),
                     transactionRepository = FakeTransactionRepository(),
                     currencyRepository = FakeCurrencyRepository(),
                     onAccountClick = {},
@@ -194,6 +202,7 @@ class AccountsScreenTest {
             setContent {
                 AccountsScreen(
                     accountRepository = repository,
+                    categoryRepository = FakeCategoryRepository(),
                     transactionRepository = FakeTransactionRepository(),
                     currencyRepository = FakeCurrencyRepository(),
                     onAccountClick = {},
@@ -220,6 +229,7 @@ class AccountsScreenTest {
             setContent {
                 AccountsScreen(
                     accountRepository = repository,
+                    categoryRepository = FakeCategoryRepository(),
                     transactionRepository = FakeTransactionRepository(),
                     currencyRepository = FakeCurrencyRepository(),
                     onAccountClick = {},
@@ -254,6 +264,7 @@ class AccountsScreenTest {
             setContent {
                 AccountsScreen(
                     accountRepository = repository,
+                    categoryRepository = FakeCategoryRepository(),
                     transactionRepository = FakeTransactionRepository(),
                     currencyRepository = FakeCurrencyRepository(),
                     onAccountClick = {},
@@ -300,6 +311,7 @@ class AccountsScreenTest {
             setContent {
                 AccountsScreen(
                     accountRepository = repository,
+                    categoryRepository = FakeCategoryRepository(),
                     transactionRepository = FakeTransactionRepository(),
                     currencyRepository = FakeCurrencyRepository(),
                     onAccountClick = {},
@@ -393,5 +405,28 @@ class AccountsScreenTest {
         override suspend fun updateCurrency(currency: Currency) {}
 
         override suspend fun deleteCurrency(id: CurrencyId) {}
+    }
+
+    private class FakeCategoryRepository : CategoryRepository {
+        private val categories =
+            listOf(
+                Category(id = -1L, name = "Uncategorized", parentId = null),
+                Category(id = 1L, name = "Food", parentId = null),
+                Category(id = 2L, name = "Transport", parentId = null),
+            )
+
+        override fun getAllCategories(): Flow<List<Category>> = flowOf(categories)
+
+        override fun getCategoryById(id: Long): Flow<Category?> = flowOf(categories.find { it.id == id })
+
+        override fun getTopLevelCategories(): Flow<List<Category>> = flowOf(categories.filter { it.parentId == null })
+
+        override fun getCategoriesByParent(parentId: Long): Flow<List<Category>> = flowOf(categories.filter { it.parentId == parentId })
+
+        override suspend fun createCategory(category: Category): Long = 0L
+
+        override suspend fun updateCategory(category: Category) {}
+
+        override suspend fun deleteCategory(id: Long) {}
     }
 }

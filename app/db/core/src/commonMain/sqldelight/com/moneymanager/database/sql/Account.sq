@@ -1,7 +1,8 @@
 CREATE TABLE Account (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
-    openingDate INTEGER NOT NULL
+    openingDate INTEGER NOT NULL,
+    categoryId INTEGER NOT NULL DEFAULT -1
 );
 
 selectAll:
@@ -11,12 +12,13 @@ selectById:
 SELECT * FROM Account WHERE id = ?;
 
 insert:
-INSERT INTO Account(name, openingDate)
-VALUES (?, ?);
+INSERT INTO Account(name, openingDate, categoryId)
+VALUES (?, ?, ?);
 
 update:
 UPDATE Account
-SET name = ?
+SET name = ?,
+    categoryId = ?
 WHERE id = ?;
 
 delete:

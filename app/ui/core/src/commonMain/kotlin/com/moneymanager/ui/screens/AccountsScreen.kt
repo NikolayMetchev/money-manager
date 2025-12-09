@@ -1,4 +1,8 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
+@file:OptIn(
+    kotlin.time.ExperimentalTime::class,
+    kotlin.uuid.ExperimentalUuidApi::class,
+    androidx.compose.material3.ExperimentalMaterial3Api::class,
+)
 
 package com.moneymanager.ui.screens
 
@@ -14,8 +18,10 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.repository.AccountRepository
+import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.ui.util.formatAmount
@@ -28,6 +34,7 @@ private val logger = logging()
 @Composable
 fun AccountsScreen(
     accountRepository: AccountRepository,
+    categoryRepository: CategoryRepository,
     transactionRepository: TransactionRepository,
     currencyRepository: CurrencyRepository,
     onAccountClick: (Account) -> Unit,
@@ -90,6 +97,7 @@ fun AccountsScreen(
     if (showCreateDialog) {
         CreateAccountDialog(
             accountRepository = accountRepository,
+            categoryRepository = categoryRepository,
             onDismiss = { showCreateDialog = false },
         )
     }
@@ -192,12 +200,17 @@ fun AccountCard(
 @Composable
 fun CreateAccountDialog(
     accountRepository: AccountRepository,
+    categoryRepository: CategoryRepository,
     onDismiss: () -> Unit,
 ) {
     var name by remember { mutableStateOf("") }
+    var selectedCategoryId by remember { mutableStateOf(-1L) }
+    var expanded by remember { mutableStateOf(false) }
+    var showCreateCategoryDialog by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
 
+    val categories by categoryRepository.getAllCategories().collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
 
     AlertDialog(
@@ -219,6 +232,43 @@ fun CreateAccountDialog(
                     singleLine = true,
                     enabled = !isSaving,
                 )
+
+                ExposedDropdownMenuBox(
+                    expanded = expanded,
+                    onExpandedChange = { expanded = !expanded && !isSaving },
+                ) {
+                    OutlinedTextField(
+                        value = categories.find { it.id == selectedCategoryId }?.name ?: "Uncategorized",
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Category") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                        enabled = !isSaving,
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false },
+                    ) {
+                        categories.forEach { category ->
+                            DropdownMenuItem(
+                                text = { Text(category.name) },
+                                onClick = {
+                                    selectedCategoryId = category.id
+                                    expanded = false
+                                },
+                            )
+                        }
+                        HorizontalDivider()
+                        DropdownMenuItem(
+                            text = { Text("+ Create New Category") },
+                            onClick = {
+                                expanded = false
+                                showCreateCategoryDialog = true
+                            },
+                        )
+                    }
+                }
 
                 errorMessage?.let { error ->
                     Text(
@@ -246,6 +296,7 @@ fun CreateAccountDialog(
                                         id = AccountId(0),
                                         name = name.trim(),
                                         openingDate = now,
+                                        categoryId = selectedCategoryId,
                                     )
                                 accountRepository.createAccount(newAccount)
                                 onDismiss()
@@ -278,6 +329,17 @@ fun CreateAccountDialog(
             }
         },
     )
+
+    if (showCreateCategoryDialog) {
+        CreateCategoryDialog(
+            categoryRepository = categoryRepository,
+            onCategoryCreated = { categoryId ->
+                selectedCategoryId = categoryId
+                showCreateCategoryDialog = false
+            },
+            onDismiss = { showCreateCategoryDialog = false },
+        )
+    }
 }
 
 @Composable
@@ -358,6 +420,140 @@ fun DeleteAccountDialog(
             TextButton(
                 onClick = onDismiss,
                 enabled = !isDeleting,
+            ) {
+                Text("Cancel")
+            }
+        },
+    )
+}
+
+@Composable
+fun CreateCategoryDialog(
+    categoryRepository: CategoryRepository,
+    onCategoryCreated: (Long) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var name by remember { mutableStateOf("") }
+    var selectedParentId by remember { mutableStateOf<Long?>(null) }
+    var expanded by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var isSaving by remember { mutableStateOf(false) }
+
+    val categories by categoryRepository.getAllCategories().collectAsState(initial = emptyList())
+    val scope = rememberCoroutineScope()
+
+    AlertDialog(
+        onDismissRequest = { if (!isSaving) onDismiss() },
+        title = { Text("Create New Category") },
+        text = {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Category Name") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    enabled = !isSaving,
+                )
+
+                ExposedDropdownMenuBox(
+                    expanded = expanded,
+                    onExpandedChange = { expanded = !expanded && !isSaving },
+                ) {
+                    OutlinedTextField(
+                        value =
+                            if (selectedParentId == null) {
+                                "None (Top Level)"
+                            } else {
+                                categories.find { it.id == selectedParentId }?.name ?: "None (Top Level)"
+                            },
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Parent Category") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                        enabled = !isSaving,
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false },
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("None (Top Level)") },
+                            onClick = {
+                                selectedParentId = null
+                                expanded = false
+                            },
+                        )
+                        categories.forEach { category ->
+                            DropdownMenuItem(
+                                text = { Text(category.name) },
+                                onClick = {
+                                    selectedParentId = category.id
+                                    expanded = false
+                                },
+                            )
+                        }
+                    }
+                }
+
+                errorMessage?.let { error ->
+                    Text(
+                        text = error,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (name.isBlank()) {
+                        errorMessage = "Category name is required"
+                    } else {
+                        isSaving = true
+                        errorMessage = null
+                        scope.launch {
+                            try {
+                                val newCategory =
+                                    Category(
+                                        id = 0,
+                                        name = name.trim(),
+                                        parentId = selectedParentId,
+                                    )
+                                val categoryId = categoryRepository.createCategory(newCategory)
+                                onCategoryCreated(categoryId)
+                            } catch (e: Exception) {
+                                logger.error(e) { "Failed to create category: ${e.message}" }
+                                errorMessage = "Failed to create category: ${e.message}"
+                                isSaving = false
+                            }
+                        }
+                    }
+                },
+                enabled = !isSaving,
+            ) {
+                if (isSaving) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Text("Create")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !isSaving,
             ) {
                 Text("Cancel")
             }

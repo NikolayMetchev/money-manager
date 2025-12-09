@@ -248,6 +248,7 @@ private fun MoneyManagerAppContent(
                         }
                         AccountsScreen(
                             accountRepository = repositorySet.accountRepository,
+                            categoryRepository = repositorySet.categoryRepository,
                             transactionRepository = repositorySet.transactionRepository,
                             currencyRepository = repositorySet.currencyRepository,
                             onAccountClick = { account ->
@@ -305,6 +306,7 @@ private fun MoneyManagerAppContent(
             TransactionEntryDialog(
                 transactionRepository = repositorySet.transactionRepository,
                 accountRepository = repositorySet.accountRepository,
+                categoryRepository = repositorySet.categoryRepository,
                 currencyRepository = repositorySet.currencyRepository,
                 maintenanceService = repositorySet.maintenanceService,
                 accounts = accounts,
