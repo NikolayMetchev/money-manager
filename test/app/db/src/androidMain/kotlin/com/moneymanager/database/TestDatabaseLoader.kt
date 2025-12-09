@@ -3,27 +3,27 @@ package com.moneymanager.database
 import androidx.test.platform.app.InstrumentationRegistry
 
 actual fun copyDatabaseFromResources(resourcePath: String): DbLocation {
-    val context = InstrumentationRegistry.getInstrumentation().targetContext
+    val targetContext = InstrumentationRegistry.getInstrumentation().targetContext
 
-    // Load database from assets (in Android, test resources are in assets)
-    val assetManager = context.assets
+    // Load database from classpath resources (works with commonTest/resources)
+    val normalizedPath = resourcePath.trimStart('/')
     val inputStream =
-        try {
-            // Try without leading slash
-            assetManager.open(resourcePath.trimStart('/'))
-        } catch (e: Exception) {
-            // Try with leading slash removed differently
-            assetManager.open(resourcePath.removePrefix("/"))
-        }
+        Thread.currentThread().contextClassLoader?.getResourceAsStream(normalizedPath)
+            ?: TestDatabaseLoader::class.java.getResourceAsStream(resourcePath)
+            ?: TestDatabaseLoader::class.java.classLoader?.getResourceAsStream(normalizedPath)
+            ?: throw IllegalStateException(
+                "Test database not found at $resourcePath. " +
+                    "Tried classpath paths: $normalizedPath, $resourcePath",
+            )
 
     // Create unique database name
     val dbName = "test-${System.currentTimeMillis()}.db"
 
     // Clean up if exists
-    context.deleteDatabase(dbName)
+    targetContext.deleteDatabase(dbName)
 
     // Copy to database directory
-    val dbFile = context.getDatabasePath(dbName)
+    val dbFile = targetContext.getDatabasePath(dbName)
     dbFile.parentFile?.mkdirs()
 
     inputStream.use { input ->
@@ -34,3 +34,6 @@ actual fun copyDatabaseFromResources(resourcePath: String): DbLocation {
 
     return DbLocation(dbName)
 }
+
+// Helper class for accessing class loader
+private object TestDatabaseLoader
