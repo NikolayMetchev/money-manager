@@ -23,6 +23,10 @@ insert:
 INSERT INTO Category(name, parentId)
 VALUES (?, ?);
 
+insertWithId:
+INSERT INTO Category(id, name, parentId)
+VALUES (?, ?, ?);
+
 update:
 UPDATE Category
 SET name = ?, parentId = ?
