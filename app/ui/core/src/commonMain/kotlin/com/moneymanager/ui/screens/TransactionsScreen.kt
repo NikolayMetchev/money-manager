@@ -1,4 +1,8 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
+@file:OptIn(
+    kotlin.time.ExperimentalTime::class,
+    kotlin.uuid.ExperimentalUuidApi::class,
+    androidx.compose.material3.ExperimentalMaterial3Api::class,
+)
 
 package com.moneymanager.ui.screens
 
@@ -69,6 +73,7 @@ import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.AccountRepository
+import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.ui.util.formatAmount
@@ -146,7 +151,7 @@ fun AccountTransactionsScreen(
 
     // Loading state - separate tracking for matrix (top) and transactions (bottom)
     var hasLoadedMatrix by remember { mutableStateOf(false) }
-    var hasLoadedTransactions by remember { mutableStateOf(false) }
+    var loadedAccountId by remember { mutableStateOf<AccountId?>(null) }
 
     // Track when matrix data (accounts, currencies, balances) has loaded
     LaunchedEffect(allAccounts, currencies, accountBalances) {
@@ -155,18 +160,14 @@ fun AccountTransactionsScreen(
         }
     }
 
-    // Track when transaction data has loaded
-    LaunchedEffect(runningBalances) {
-        hasLoadedTransactions = true
-    }
-
-    // Reset transaction loading state when account changes
-    LaunchedEffect(selectedAccountId) {
-        hasLoadedTransactions = false
+    // Track when transaction data has loaded for the current account
+    // Mark as loaded when we have data for the currently selected account
+    LaunchedEffect(selectedAccountId, runningBalances) {
+        loadedAccountId = selectedAccountId
     }
 
     val isMatrixLoading = !hasLoadedMatrix
-    val isTransactionsLoading = !hasLoadedTransactions
+    val isTransactionsLoading = loadedAccountId != selectedAccountId
 
     // Build a map of transactionId -> full Transaction for additional details
     val transactionMap = allTransactions.associateBy { it.id }
@@ -815,6 +816,7 @@ fun TransactionCard(
 fun TransactionEntryDialog(
     transactionRepository: TransactionRepository,
     accountRepository: AccountRepository,
+    categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
     maintenanceService: DatabaseMaintenanceService,
     accounts: List<Account>,
@@ -1227,6 +1229,7 @@ fun TransactionEntryDialog(
     if (showCreateAccountDialog) {
         CreateAccountDialogInline(
             accountRepository = accountRepository,
+            categoryRepository = categoryRepository,
             onAccountCreated = { accountId ->
                 if (creatingForSource) {
                     sourceAccountId = accountId
@@ -1326,13 +1329,18 @@ fun TransactionEntryDialog(
 @Composable
 fun CreateAccountDialogInline(
     accountRepository: AccountRepository,
+    categoryRepository: CategoryRepository,
     onAccountCreated: (AccountId) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var name by remember { mutableStateOf("") }
+    var selectedCategoryId by remember { mutableStateOf(-1L) }
+    var expanded by remember { mutableStateOf(false) }
+    var showCreateCategoryDialog by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
 
+    val categories by categoryRepository.getAllCategories().collectAsState(initial = emptyList())
     val scope = rememberCoroutineScope()
 
     AlertDialog(
@@ -1354,6 +1362,43 @@ fun CreateAccountDialogInline(
                     singleLine = true,
                     enabled = !isSaving,
                 )
+
+                ExposedDropdownMenuBox(
+                    expanded = expanded,
+                    onExpandedChange = { expanded = !expanded && !isSaving },
+                ) {
+                    OutlinedTextField(
+                        value = categories.find { it.id == selectedCategoryId }?.name ?: "Uncategorized",
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Category") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                        enabled = !isSaving,
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false },
+                    ) {
+                        categories.forEach { category ->
+                            DropdownMenuItem(
+                                text = { Text(category.name) },
+                                onClick = {
+                                    selectedCategoryId = category.id
+                                    expanded = false
+                                },
+                            )
+                        }
+                        HorizontalDivider()
+                        DropdownMenuItem(
+                            text = { Text("+ Create New Category") },
+                            onClick = {
+                                expanded = false
+                                showCreateCategoryDialog = true
+                            },
+                        )
+                    }
+                }
 
                 errorMessage?.let { error ->
                     Text(
@@ -1381,6 +1426,7 @@ fun CreateAccountDialogInline(
                                         id = AccountId(0),
                                         name = name.trim(),
                                         openingDate = now,
+                                        categoryId = selectedCategoryId,
                                     )
                                 val accountId = accountRepository.createAccount(newAccount)
                                 onAccountCreated(accountId)
@@ -1413,6 +1459,17 @@ fun CreateAccountDialogInline(
             }
         },
     )
+
+    if (showCreateCategoryDialog) {
+        CreateCategoryDialog(
+            categoryRepository = categoryRepository,
+            onCategoryCreated = { categoryId ->
+                selectedCategoryId = categoryId
+                showCreateCategoryDialog = false
+            },
+            onDismiss = { showCreateCategoryDialog = false },
+        )
+    }
 }
 
 @Composable

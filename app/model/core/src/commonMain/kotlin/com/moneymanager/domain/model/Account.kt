@@ -8,6 +8,7 @@ data class Account(
     val id: AccountId,
     val name: String,
     val openingDate: Instant,
+    val categoryId: Long = Category.UNCATEGORIZED_ID,
 )
 
 @JvmInline
