@@ -1,15 +1,12 @@
 package com.moneymanager.domain.repository
 
 import com.moneymanager.domain.model.Category
-import com.moneymanager.domain.model.CategoryType
 import kotlinx.coroutines.flow.Flow
 
 interface CategoryRepository {
     fun getAllCategories(): Flow<List<Category>>
 
     fun getCategoryById(id: Long): Flow<Category?>
-
-    fun getCategoriesByType(type: CategoryType): Flow<List<Category>>
 
     fun getTopLevelCategories(): Flow<List<Category>>
 
