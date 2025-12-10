@@ -105,7 +105,6 @@ class CreateAccountWithNewCategoryE2ETest {
             // Step 8: Verify the account was created and appears in the list
             onNodeWithText("Test Checking Account").assertIsDisplayed()
         }
-
 }
 
 /**
