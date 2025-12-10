@@ -147,6 +147,29 @@ object DatabaseConfig {
     }
 
     /**
+     * Creates a trigger to update children's parentId when a category is deleted.
+     * Children inherit the deleted category's parent (grandparent becomes parent).
+     *
+     * @param driver The SQLite driver to use for executing the CREATE TRIGGER statement
+     */
+    private fun createCategoryDeleteTrigger(driver: SqlDriver) {
+        driver.execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_category_delete_update_children
+            BEFORE DELETE ON Category
+            FOR EACH ROW
+            BEGIN
+                UPDATE Category
+                SET parentId = OLD.parentId
+                WHERE parentId = OLD.id;
+            END
+            """.trimIndent(),
+            0,
+        )
+    }
+
+    /**
      * Seeds the database with all available currencies and creates incremental refresh triggers.
      * Should be called once after creating a new database.
      *
@@ -159,6 +182,9 @@ object DatabaseConfig {
     ) {
         // Create triggers for incremental materialized view refresh
         createIncrementalRefreshTriggers(driver)
+
+        // Create trigger for category deletion (children inherit grandparent)
+        createCategoryDeleteTrigger(driver)
 
         // Seed default "Uncategorized" category
         database.categoryQueries.insertWithId(
