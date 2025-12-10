@@ -7,7 +7,6 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
 import com.moneymanager.domain.model.Category
@@ -731,8 +730,7 @@ class CategoriesScreenTest {
 
         override fun getAllCategories(): Flow<List<Category>> = categoriesFlow
 
-        override fun getCategoryById(id: Long): Flow<Category?> =
-            categoriesFlow.map { categories -> categories.find { it.id == id } }
+        override fun getCategoryById(id: Long): Flow<Category?> = categoriesFlow.map { categories -> categories.find { it.id == id } }
 
         override fun getTopLevelCategories(): Flow<List<Category>> =
             categoriesFlow.map { categories -> categories.filter { it.parentId == null } }

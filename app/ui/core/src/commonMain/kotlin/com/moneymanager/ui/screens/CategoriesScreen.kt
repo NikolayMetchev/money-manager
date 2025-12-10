@@ -594,11 +594,12 @@ fun EditCategoryDialog(
                     var searchQuery by remember { mutableStateOf("") }
                     val filteredCategories =
                         remember(categories, searchQuery, category.id, descendantIds) {
-                            val available = categories.filter {
-                                it.id != category.id &&
-                                    it.id !in descendantIds &&
-                                    it.id != Category.UNCATEGORIZED_ID
-                            }
+                            val available =
+                                categories.filter {
+                                    it.id != category.id &&
+                                        it.id !in descendantIds &&
+                                        it.id != Category.UNCATEGORIZED_ID
+                                }
                             if (searchQuery.isBlank()) {
                                 available
                             } else {
