@@ -767,7 +767,9 @@ fun DeleteCategoryDialog(
                     style = MaterialTheme.typography.bodyLarge,
                 )
                 Text(
-                    text = "Child categories will be moved to the parent of this category. Transactions using this category will become uncategorized.",
+                    text =
+                        "Child categories will be moved to the parent of this category. " +
+                            "Transactions using this category will become uncategorized.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
