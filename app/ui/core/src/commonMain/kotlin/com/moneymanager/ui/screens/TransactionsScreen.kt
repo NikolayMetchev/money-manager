@@ -823,12 +823,16 @@ fun TransactionEntryDialog(
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
     maintenanceService: DatabaseMaintenanceService,
-    accounts: List<Account>,
-    currencies: List<Currency>,
     preSelectedSourceAccountId: AccountId? = null,
     preSelectedCurrencyId: CurrencyId? = null,
     onDismiss: () -> Unit,
 ) {
+    // Collect accounts and currencies from Flows so newly created items appear immediately
+    val accounts by accountRepository.getAllAccounts()
+        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val currencies by currencyRepository.getAllCurrencies()
+        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+
     var sourceAccountId by remember { mutableStateOf(preSelectedSourceAccountId) }
     var targetAccountId by remember { mutableStateOf<AccountId?>(null) }
     var currencyId by remember { mutableStateOf<CurrencyId?>(preSelectedCurrencyId) }
@@ -1339,6 +1343,7 @@ fun CreateAccountDialogInline(
 ) {
     var name by remember { mutableStateOf("") }
     var selectedCategoryId by remember { mutableStateOf(-1L) }
+    var selectedCategoryName by remember { mutableStateOf<String?>(null) }
     var expanded by remember { mutableStateOf(false) }
     var showCreateCategoryDialog by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -1373,7 +1378,9 @@ fun CreateAccountDialogInline(
                     onExpandedChange = { expanded = !expanded && !isSaving },
                 ) {
                     OutlinedTextField(
-                        value = categories.find { it.id == selectedCategoryId }?.name ?: "Uncategorized",
+                        value = selectedCategoryName
+                            ?: categories.find { it.id == selectedCategoryId }?.name
+                            ?: "Uncategorized",
                         onValueChange = {},
                         readOnly = true,
                         label = { Text("Category") },
@@ -1390,6 +1397,7 @@ fun CreateAccountDialogInline(
                                 text = { Text(category.name) },
                                 onClick = {
                                     selectedCategoryId = category.id
+                                    selectedCategoryName = null
                                     expanded = false
                                 },
                             )
@@ -1468,8 +1476,9 @@ fun CreateAccountDialogInline(
     if (showCreateCategoryDialog) {
         CreateCategoryDialog(
             categoryRepository = categoryRepository,
-            onCategoryCreated = { categoryId ->
+            onCategoryCreated = { categoryId, categoryName ->
                 selectedCategoryId = categoryId
+                selectedCategoryName = categoryName
                 showCreateCategoryDialog = false
             },
             onDismiss = { showCreateCategoryDialog = false },
