@@ -1,3 +1,5 @@
+@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
+
 package com.moneymanager.ui.screens
 
 import androidx.compose.ui.test.ExperimentalTestApi
@@ -10,15 +12,22 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
 import com.moneymanager.domain.model.Category
+import com.moneymanager.domain.model.CategoryBalance
+import com.moneymanager.domain.model.Currency
+import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.repository.CategoryRepository
+import com.moneymanager.domain.repository.CurrencyRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalTestApi::class)
 class CategoriesScreenTest {
+    private val fakeCurrencyRepository = FakeCurrencyRepository()
+
     // region Display Tests
 
     @Test
@@ -29,7 +38,10 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(categoryRepository = repository)
+                CategoriesScreen(
+                    categoryRepository = repository,
+                    currencyRepository = fakeCurrencyRepository,
+                )
             }
 
             // Then
@@ -50,7 +62,10 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(categoryRepository = repository)
+                CategoriesScreen(
+                    categoryRepository = repository,
+                    currencyRepository = fakeCurrencyRepository,
+                )
             }
 
             // Then
@@ -66,7 +81,10 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(categoryRepository = repository)
+                CategoriesScreen(
+                    categoryRepository = repository,
+                    currencyRepository = fakeCurrencyRepository,
+                )
             }
 
             // Then
@@ -86,7 +104,10 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(categoryRepository = repository)
+                CategoriesScreen(
+                    categoryRepository = repository,
+                    currencyRepository = fakeCurrencyRepository,
+                )
             }
 
             // Then
@@ -108,7 +129,10 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(categoryRepository = repository)
+                CategoriesScreen(
+                    categoryRepository = repository,
+                    currencyRepository = fakeCurrencyRepository,
+                )
             }
 
             // Then
@@ -129,7 +153,10 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(categoryRepository = repository)
+                CategoriesScreen(
+                    categoryRepository = repository,
+                    currencyRepository = fakeCurrencyRepository,
+                )
             }
 
             // Children should not be visible initially
@@ -154,7 +181,10 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(categoryRepository = repository)
+                CategoriesScreen(
+                    categoryRepository = repository,
+                    currencyRepository = fakeCurrencyRepository,
+                )
             }
 
             onNodeWithText("Add Category").performClick()
@@ -173,7 +203,10 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(categoryRepository = repository)
+                CategoriesScreen(
+                    categoryRepository = repository,
+                    currencyRepository = fakeCurrencyRepository,
+                )
             }
 
             // Open dialog
@@ -194,7 +227,10 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(categoryRepository = repository)
+                CategoriesScreen(
+                    categoryRepository = repository,
+                    currencyRepository = fakeCurrencyRepository,
+                )
             }
 
             // Open dialog
@@ -216,7 +252,10 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(categoryRepository = repository)
+                CategoriesScreen(
+                    categoryRepository = repository,
+                    currencyRepository = fakeCurrencyRepository,
+                )
             }
 
             // Open dialog
@@ -248,7 +287,10 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(categoryRepository = repository)
+                CategoriesScreen(
+                    categoryRepository = repository,
+                    currencyRepository = fakeCurrencyRepository,
+                )
             }
 
             // Open dialog
@@ -279,7 +321,10 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(categoryRepository = repository)
+                CategoriesScreen(
+                    categoryRepository = repository,
+                    currencyRepository = fakeCurrencyRepository,
+                )
             }
 
             // Click edit button (there's only one, so use content description "Edit")
@@ -301,7 +346,10 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(categoryRepository = repository)
+                CategoriesScreen(
+                    categoryRepository = repository,
+                    currencyRepository = fakeCurrencyRepository,
+                )
             }
 
             // Click edit button
@@ -331,7 +379,10 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(categoryRepository = repository)
+                CategoriesScreen(
+                    categoryRepository = repository,
+                    currencyRepository = fakeCurrencyRepository,
+                )
             }
 
             // Click edit button
@@ -358,7 +409,10 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(categoryRepository = repository)
+                CategoriesScreen(
+                    categoryRepository = repository,
+                    currencyRepository = fakeCurrencyRepository,
+                )
             }
 
             // Click edit button
@@ -384,7 +438,10 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(categoryRepository = repository)
+                CategoriesScreen(
+                    categoryRepository = repository,
+                    currencyRepository = fakeCurrencyRepository,
+                )
             }
 
             // Click edit button
@@ -406,7 +463,10 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(categoryRepository = repository)
+                CategoriesScreen(
+                    categoryRepository = repository,
+                    currencyRepository = fakeCurrencyRepository,
+                )
             }
 
             // Click edit button
@@ -432,7 +492,10 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(categoryRepository = repository)
+                CategoriesScreen(
+                    categoryRepository = repository,
+                    currencyRepository = fakeCurrencyRepository,
+                )
             }
 
             // Click edit button
@@ -461,7 +524,10 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(categoryRepository = repository)
+                CategoriesScreen(
+                    categoryRepository = repository,
+                    currencyRepository = fakeCurrencyRepository,
+                )
             }
 
             // Click edit button
@@ -497,7 +563,10 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(categoryRepository = repository)
+                CategoriesScreen(
+                    categoryRepository = repository,
+                    currencyRepository = fakeCurrencyRepository,
+                )
             }
 
             // Then - Uncategorized should be displayed but no edit button
@@ -518,7 +587,10 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(categoryRepository = repository)
+                CategoriesScreen(
+                    categoryRepository = repository,
+                    currencyRepository = fakeCurrencyRepository,
+                )
             }
 
             // Then - both displayed, but only one edit button (for Food)
@@ -545,7 +617,10 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(categoryRepository = repository)
+                CategoriesScreen(
+                    categoryRepository = repository,
+                    currencyRepository = fakeCurrencyRepository,
+                )
             }
 
             // Click first edit button (for Food)
@@ -574,7 +649,10 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(categoryRepository = repository)
+                CategoriesScreen(
+                    categoryRepository = repository,
+                    currencyRepository = fakeCurrencyRepository,
+                )
             }
 
             // Click first edit button (for Food - top level)
@@ -600,7 +678,10 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(categoryRepository = repository)
+                CategoriesScreen(
+                    categoryRepository = repository,
+                    currencyRepository = fakeCurrencyRepository,
+                )
             }
 
             // Click second edit button (for Groceries)
@@ -639,7 +720,10 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(categoryRepository = repository)
+                CategoriesScreen(
+                    categoryRepository = repository,
+                    currencyRepository = fakeCurrencyRepository,
+                )
             }
 
             // Open create dialog
@@ -674,7 +758,10 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(categoryRepository = repository)
+                CategoriesScreen(
+                    categoryRepository = repository,
+                    currencyRepository = fakeCurrencyRepository,
+                )
             }
 
             // Then
@@ -698,7 +785,10 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(categoryRepository = repository)
+                CategoriesScreen(
+                    categoryRepository = repository,
+                    currencyRepository = fakeCurrencyRepository,
+                )
             }
 
             // Initially only top-level visible
@@ -723,12 +813,15 @@ class CategoriesScreenTest {
         initialCategories: List<Category>,
     ) : CategoryRepository {
         private val categoriesFlow = MutableStateFlow(initialCategories)
+        private val categoryBalancesFlow = MutableStateFlow<List<CategoryBalance>>(emptyList())
 
         val createdCategories = mutableListOf<Category>()
         val updatedCategories = mutableListOf<Category>()
         val deletedCategoryIds = mutableListOf<Long>()
 
         override fun getAllCategories(): Flow<List<Category>> = categoriesFlow
+
+        override fun getCategoryBalances(): Flow<List<CategoryBalance>> = categoryBalancesFlow
 
         override fun getCategoryById(id: Long): Flow<Category?> = categoriesFlow.map { categories -> categories.find { it.id == id } }
 
@@ -757,6 +850,42 @@ class CategoriesScreenTest {
         override suspend fun deleteCategory(id: Long) {
             deletedCategoryIds.add(id)
             categoriesFlow.value = categoriesFlow.value.filter { it.id != id }
+        }
+    }
+
+    // Fake currency repository for testing
+    class FakeCurrencyRepository : CurrencyRepository {
+        private val currenciesFlow = MutableStateFlow<List<Currency>>(emptyList())
+
+        override fun getAllCurrencies(): Flow<List<Currency>> = currenciesFlow
+
+        override fun getCurrencyById(id: CurrencyId): Flow<Currency?> = currenciesFlow.map { currencies -> currencies.find { it.id == id } }
+
+        override fun getCurrencyByCode(code: String): Flow<Currency?> =
+            currenciesFlow.map { currencies -> currencies.find { it.code == code } }
+
+        override suspend fun upsertCurrencyByCode(
+            code: String,
+            name: String,
+        ): CurrencyId {
+            val existing = currenciesFlow.value.find { it.code == code }
+            if (existing != null) return existing.id
+
+            val newId = CurrencyId(Uuid.random())
+            val newCurrency = Currency(id = newId, code = code, name = name)
+            currenciesFlow.value = currenciesFlow.value + newCurrency
+            return newId
+        }
+
+        override suspend fun updateCurrency(currency: Currency) {
+            currenciesFlow.value =
+                currenciesFlow.value.map {
+                    if (it.id == currency.id) currency else it
+                }
+        }
+
+        override suspend fun deleteCurrency(id: CurrencyId) {
+            currenciesFlow.value = currenciesFlow.value.filter { it.id != id }
         }
     }
 }

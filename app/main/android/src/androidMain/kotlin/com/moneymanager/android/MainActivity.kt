@@ -8,12 +8,30 @@ import com.moneymanager.di.AppComponent
 import com.moneymanager.di.AppComponentParams
 import com.moneymanager.di.initializeVersionReader
 import com.moneymanager.ui.MoneyManagerApp
+import com.moneymanager.ui.error.GlobalSchemaErrorState
+import com.moneymanager.ui.error.SchemaErrorDetector
 
 private const val TAG = "MainActivity"
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Set up global exception handler for schema errors
+        val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            if (SchemaErrorDetector.isSchemaError(throwable)) {
+                Log.e(TAG, "Schema error detected: ${throwable.message}", throwable)
+                GlobalSchemaErrorState.reportError(
+                    databaseLocation = "default",
+                    error = throwable,
+                )
+            } else {
+                // Delegate to default handler for non-schema errors
+                Log.e(TAG, "Uncaught exception on thread ${thread.name}: ${throwable.message}", throwable)
+                defaultHandler?.uncaughtException(thread, throwable)
+            }
+        }
 
         // Initialize version reader with application context
         initializeVersionReader(applicationContext)

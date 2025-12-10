@@ -215,6 +215,7 @@ The project follows a modular architecture with clear separation of concerns:
   - `src/commonMain/kotlin/com/moneymanager/ui/`:
     - `screens/`: Main screens (AccountsScreen, CategoriesScreen, TransactionsScreen)
     - `components/`: Reusable UI components (ErrorScreen, ErrorDialog, MinimalErrorScreen)
+    - `error/`: Global schema error handling (GlobalSchemaErrorState, SchemaErrorDetector, collectAsStateWithSchemaErrorHandling)
   - `src/jvmMain/`: JVM-specific UI (Debug logging window, database selection dialog)
   - Material 3 design system
 
@@ -882,3 +883,27 @@ The project uses modern Gradle practices for maintainability:
       - Invalid fields will be reported by the validator
     - The project uses two flags: `unit` (JVM tests) and `instrumented` (Android tests)
     - Configuration waits for both uploads before sending notifications: `codecov.notify.after_n_builds: 2`
+
+14. **Schema Error Handling in Compose UI**:
+    - **ALWAYS** use `collectAsStateWithSchemaErrorHandling()` instead of `collectAsState()` for repository Flow collection
+    - This ensures schema errors (missing tables, views, columns) are caught and displayed via `DatabaseSchemaErrorDialog`
+    - Without this, schema errors will crash the app instead of showing the recovery dialog
+    - The pattern:
+      ```kotlin
+      // WRONG - will crash on schema errors
+      val accounts by accountRepository.getAllAccounts().collectAsState(initial = emptyList())
+
+      // CORRECT - catches schema errors and reports to global state
+      val accounts by accountRepository.getAllAccounts()
+          .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+      ```
+    - Import: `import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling`
+    - How it works:
+      - `SchemaErrorDetector` checks if exception message contains "no such table", "no such view", etc.
+      - If schema error detected, it's reported to `GlobalSchemaErrorState`
+      - `MoneyManagerApp` observes this state and shows `DatabaseSchemaErrorDialog`
+      - User can backup and recreate or delete and recreate the database
+    - Files involved:
+      - `app/ui/core/src/commonMain/.../error/GlobalSchemaErrorState.kt` - Global MutableStateFlow holder
+      - `app/ui/core/src/commonMain/.../error/SchemaErrorDetector.kt` - Detection logic
+      - `app/ui/core/src/commonMain/.../error/SchemaErrorAwareFlow.kt` - The `collectAsStateWithSchemaErrorHandling` extension

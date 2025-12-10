@@ -31,6 +31,8 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.ui.components.DatabaseSchemaErrorDialog
+import com.moneymanager.ui.error.GlobalSchemaErrorState
+import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.navigation.Screen
 import com.moneymanager.ui.screens.AccountTransactionsScreen
 import com.moneymanager.ui.screens.AccountsScreen
@@ -38,7 +40,6 @@ import com.moneymanager.ui.screens.CategoriesScreen
 import com.moneymanager.ui.screens.CurrenciesScreen
 import com.moneymanager.ui.screens.SettingsScreen
 import com.moneymanager.ui.screens.TransactionEntryDialog
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -52,6 +53,9 @@ fun MoneyManagerApp(
     var databaseState by remember { mutableStateOf<DatabaseState>(DatabaseState.NoDatabaseSelected) }
     var schemaErrorInfo by remember { mutableStateOf<Pair<DbLocation, Throwable>?>(null) }
 
+    // Observe global schema error state from Flow collection error handlers
+    val globalSchemaError by GlobalSchemaErrorState.schemaError.collectAsState()
+
     // Initialize database on startup
     LaunchedEffect(Unit) {
         val defaultLocation = databaseManager.getDefaultLocation()
@@ -63,11 +67,8 @@ fun MoneyManagerApp(
             try {
                 val database = databaseManager.openDatabase(defaultLocation)
                 val repositories = RepositorySet(database)
-                // Test that we can actually query the database
-                // This will catch schema errors like missing views/tables
-                // Test both regular tables and materialized views
-                repositories.accountRepository.getAllAccounts().first()
-                repositories.transactionRepository.getAccountBalances().first()
+                // Schema errors at runtime are now caught globally by the uncaught exception handler
+                // which updates GlobalSchemaErrorState - no need for explicit validation queries here
                 databaseState = DatabaseState.DatabaseLoaded(defaultLocation, repositories)
                 onLog("Database opened successfully", null)
             } catch (e: Exception) {
@@ -91,8 +92,35 @@ fun MoneyManagerApp(
         }
     }
 
-    // Show database schema error dialog if there's an error
-    schemaErrorInfo?.let { (location, error) ->
+    // Determine which error to show - prioritize global errors (runtime) over local (startup)
+    val effectiveSchemaError: Pair<DbLocation, Throwable>? =
+        globalSchemaError?.let { info ->
+            // For global errors, get the current database location from state if available
+            val location =
+                (databaseState as? DatabaseState.DatabaseLoaded)?.location
+                    ?: databaseManager.getDefaultLocation()
+            location to info.error
+        } ?: schemaErrorInfo
+
+    // Show main app once database is loaded
+    when (val state = databaseState) {
+        is DatabaseState.DatabaseLoaded -> {
+            MoneyManagerAppContent(
+                repositorySet = state.repositories,
+                appVersion = appVersion,
+                databaseLocation = state.location,
+            )
+        }
+        is DatabaseState.NoDatabaseSelected -> {
+            // Loading...
+        }
+        is DatabaseState.Error -> {
+            // Error dialog is shown below
+        }
+    }
+
+    // Show database schema error dialog if there's an error (rendered AFTER content to appear on top)
+    effectiveSchemaError?.let { (location, error) ->
         DatabaseSchemaErrorDialog(
             databaseLocation = location.toString(),
             error = error,
@@ -107,6 +135,7 @@ fun MoneyManagerApp(
                         val repositories = RepositorySet(database)
                         databaseState = DatabaseState.DatabaseLoaded(location, repositories)
                         schemaErrorInfo = null
+                        GlobalSchemaErrorState.clearError()
                         onLog("New database created successfully", null)
                     } catch (e: Exception) {
                         onLog("Failed to backup and create new database: ${e.message}", e)
@@ -125,6 +154,7 @@ fun MoneyManagerApp(
                         val repositories = RepositorySet(database)
                         databaseState = DatabaseState.DatabaseLoaded(location, repositories)
                         schemaErrorInfo = null
+                        GlobalSchemaErrorState.clearError()
                         onLog("New database created successfully", null)
                     } catch (e: Exception) {
                         onLog("Failed to delete and create new database: ${e.message}", e)
@@ -133,23 +163,6 @@ fun MoneyManagerApp(
                 }
             },
         )
-    }
-
-    // Show main app once database is loaded
-    when (val state = databaseState) {
-        is DatabaseState.DatabaseLoaded -> {
-            MoneyManagerAppContent(
-                repositorySet = state.repositories,
-                appVersion = appVersion,
-                databaseLocation = state.location,
-            )
-        }
-        is DatabaseState.NoDatabaseSelected -> {
-            // Loading...
-        }
-        is DatabaseState.Error -> {
-            // Error dialog is shown above
-        }
     }
 }
 
@@ -167,8 +180,11 @@ private fun MoneyManagerAppContent(
     var preSelectedCurrencyId by remember { mutableStateOf<CurrencyId?>(null) }
     var currentlyViewedCurrencyId by remember { mutableStateOf<CurrencyId?>(null) }
 
-    val accounts by repositorySet.accountRepository.getAllAccounts().collectAsState(initial = emptyList())
-    val currencies by repositorySet.currencyRepository.getAllCurrencies().collectAsState(initial = emptyList())
+    // Use schema-error-aware collection for flows that may fail on old databases
+    val accounts by repositorySet.accountRepository.getAllAccounts()
+        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val currencies by repositorySet.currencyRepository.getAllCurrencies()
+        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
 
     MaterialTheme {
         Scaffold(
@@ -270,7 +286,10 @@ private fun MoneyManagerAppContent(
                             currentlyViewedAccountId = null
                             currentlyViewedCurrencyId = null
                         }
-                        CategoriesScreen(repositorySet.categoryRepository)
+                        CategoriesScreen(
+                            categoryRepository = repositorySet.categoryRepository,
+                            currencyRepository = repositorySet.currencyRepository,
+                        )
                     }
                     is Screen.Settings -> {
                         // Reset currentlyViewedAccountId and currentlyViewedCurrencyId when on other screens

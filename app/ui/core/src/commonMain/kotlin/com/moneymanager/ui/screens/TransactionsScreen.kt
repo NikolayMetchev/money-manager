@@ -51,7 +51,6 @@ import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -76,6 +75,7 @@ import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.util.formatAmount
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalTime
@@ -126,10 +126,14 @@ fun AccountTransactionsScreen(
     onAccountIdChange: (AccountId) -> Unit = {},
     onCurrencyIdChange: (CurrencyId?) -> Unit = {},
 ) {
-    val allAccounts by accountRepository.getAllAccounts().collectAsState(initial = emptyList())
-    val allTransactions by transactionRepository.getAllTransactions().collectAsState(initial = emptyList())
-    val currencies by currencyRepository.getAllCurrencies().collectAsState(initial = emptyList())
-    val accountBalances by transactionRepository.getAccountBalances().collectAsState(initial = emptyList())
+    val allAccounts by accountRepository.getAllAccounts()
+        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val allTransactions by transactionRepository.getAllTransactions()
+        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val currencies by currencyRepository.getAllCurrencies()
+        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val accountBalances by transactionRepository.getAccountBalances()
+        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
 
     // Selected account state - default to the provided accountId
     var selectedAccountId by remember { mutableStateOf(accountId) }
@@ -147,7 +151,7 @@ fun AccountTransactionsScreen(
 
     // Get running balances for the selected account
     val runningBalances by transactionRepository.getRunningBalanceByAccount(selectedAccountId)
-        .collectAsState(initial = emptyList())
+        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
 
     // Loading state - separate tracking for matrix (top) and transactions (bottom)
     var hasLoadedMatrix by remember { mutableStateOf(false) }
@@ -1340,7 +1344,8 @@ fun CreateAccountDialogInline(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
 
-    val categories by categoryRepository.getAllCategories().collectAsState(initial = emptyList())
+    val categories by categoryRepository.getAllCategories()
+        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
     val scope = rememberCoroutineScope()
 
     AlertDialog(
@@ -1373,7 +1378,7 @@ fun CreateAccountDialogInline(
                         readOnly = true,
                         label = { Text("Category") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                        modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
                         enabled = !isSaving,
                     )
                     ExposedDropdownMenu(

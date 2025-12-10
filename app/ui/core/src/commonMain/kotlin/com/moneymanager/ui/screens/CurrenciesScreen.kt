@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
 
@@ -19,7 +20,8 @@ private val logger = logging()
 
 @Composable
 fun CurrenciesScreen(currencyRepository: CurrencyRepository) {
-    val currencies by currencyRepository.getAllCurrencies().collectAsState(initial = emptyList())
+    val currencies by currencyRepository.getAllCurrencies()
+        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
     var showCreateDialog by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {

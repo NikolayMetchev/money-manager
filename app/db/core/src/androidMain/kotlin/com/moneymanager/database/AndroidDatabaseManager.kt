@@ -19,7 +19,7 @@ class AndroidDatabaseManager(private val context: Context) : DatabaseManager {
             // Check if this is a new database before opening
             val isNewDatabase = !context.getDatabasePath(location.name).exists()
 
-            // AndroidSqliteDriver automatically handles schema creation
+            // Use custom callback that handles existing databases gracefully
             val driver =
                 AndroidSqliteDriver(
                     schema = MoneyManagerDatabase.Schema,
@@ -27,6 +27,25 @@ class AndroidDatabaseManager(private val context: Context) : DatabaseManager {
                     name = location.name,
                     callback =
                         object : AndroidSqliteDriver.Callback(MoneyManagerDatabase.Schema) {
+                            override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                                // Only create schema for truly new databases
+                                if (isNewDatabase) {
+                                    super.onCreate(db)
+                                }
+                                // For existing databases (e.g., copied test DBs), skip schema creation
+                                // This allows opening databases with potentially incompatible schemas
+                                // which will be detected at runtime via schema error handling
+                            }
+
+                            override fun onUpgrade(
+                                db: androidx.sqlite.db.SupportSQLiteDatabase,
+                                oldVersion: Int,
+                                newVersion: Int,
+                            ) {
+                                // Skip automatic migration - let schema errors surface at runtime
+                                // The global schema error handler will show DatabaseSchemaErrorDialog
+                            }
+
                             override fun onOpen(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                                 super.onOpen(db)
                                 // Apply connection-level PRAGMA settings

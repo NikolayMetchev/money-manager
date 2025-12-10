@@ -1,3 +1,5 @@
+@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
+
 package com.moneymanager.database.repository
 
 import app.cash.sqldelight.coroutines.asFlow
@@ -6,11 +8,14 @@ import app.cash.sqldelight.coroutines.mapToOneOrNull
 import com.moneymanager.database.mapper.CategoryMapper
 import com.moneymanager.database.sql.MoneyManagerDatabase
 import com.moneymanager.domain.model.Category
+import com.moneymanager.domain.model.CategoryBalance
+import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.repository.CategoryRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import kotlin.uuid.Uuid
 
 class CategoryRepositoryImpl(
     private val database: MoneyManagerDatabase,
@@ -22,6 +27,20 @@ class CategoryRepositoryImpl(
             .asFlow()
             .mapToList(Dispatchers.Default)
             .map(CategoryMapper::mapList)
+
+    override fun getCategoryBalances(): Flow<List<CategoryBalance>> =
+        queries.selectAllCategoryBalances()
+            .asFlow()
+            .mapToList(Dispatchers.Default)
+            .map { list ->
+                list.map { row ->
+                    CategoryBalance(
+                        categoryId = row.categoryId,
+                        currencyId = CurrencyId(Uuid.parse(row.currencyId)),
+                        balance = row.balance ?: 0.0,
+                    )
+                }
+            }
 
     override fun getCategoryById(id: Long): Flow<Category?> =
         queries.selectById(id)
