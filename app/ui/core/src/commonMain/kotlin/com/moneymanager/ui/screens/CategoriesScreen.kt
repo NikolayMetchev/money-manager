@@ -1,6 +1,7 @@
 @file:OptIn(
     androidx.compose.material3.ExperimentalMaterial3Api::class,
     androidx.compose.foundation.ExperimentalFoundationApi::class,
+    kotlin.uuid.ExperimentalUuidApi::class,
 )
 
 package com.moneymanager.ui.screens
@@ -29,10 +30,15 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.moneymanager.domain.model.Category
+import com.moneymanager.domain.model.CategoryBalance
+import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.repository.CategoryRepository
+import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.util.CategoryNode
 import com.moneymanager.ui.util.buildCategoryForest
 import com.moneymanager.ui.util.flattenCategoryForest
+import com.moneymanager.ui.util.formatAmount
 import com.moneymanager.ui.util.getDescendantIds
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
@@ -40,8 +46,17 @@ import org.lighthousegames.logging.logging
 private val logger = logging()
 
 @Composable
-fun CategoriesScreen(categoryRepository: CategoryRepository) {
-    val categories by categoryRepository.getAllCategories().collectAsState(initial = emptyList())
+fun CategoriesScreen(
+    categoryRepository: CategoryRepository,
+    currencyRepository: CurrencyRepository,
+) {
+    val categories by categoryRepository.getAllCategories()
+        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val categoryBalances by categoryRepository.getCategoryBalances()
+        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val currencies by currencyRepository.getAllCurrencies()
+        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+
     var expandedIds by remember { mutableStateOf(emptySet<Long>()) }
     var showCreateDialog by remember { mutableStateOf(false) }
     var editingCategory by remember { mutableStateOf<Category?>(null) }
@@ -54,6 +69,12 @@ fun CategoriesScreen(categoryRepository: CategoryRepository) {
 
     val forest = remember(categories) { buildCategoryForest(categories) }
     val flattenedNodes = remember(forest, expandedIds) { flattenCategoryForest(forest, expandedIds) }
+
+    // Group balances by categoryId for efficient lookup
+    val balancesByCategoryId =
+        remember(categoryBalances) {
+            categoryBalances.groupBy { it.categoryId }
+        }
 
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
@@ -147,6 +168,8 @@ fun CategoriesScreen(categoryRepository: CategoryRepository) {
 
                     CategoryTreeItem(
                         node = node,
+                        balances = balancesByCategoryId[node.category.id] ?: emptyList(),
+                        currencies = currencies,
                         isExpanded = node.category.id in expandedIds,
                         onToggleExpand = {
                             expandedIds =
@@ -246,6 +269,8 @@ fun CategoriesScreen(categoryRepository: CategoryRepository) {
 @Composable
 fun CategoryTreeItem(
     node: CategoryNode,
+    balances: List<CategoryBalance>,
+    currencies: List<Currency>,
     isExpanded: Boolean,
     onToggleExpand: () -> Unit,
     onEditClick: () -> Unit,
@@ -361,7 +386,16 @@ fun CategoryTreeItem(
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                // Display category balances
+                if (balances.isNotEmpty()) {
+                    CategoryBalanceDisplay(
+                        balances = balances,
+                        currencies = currencies,
+                    )
+                }
+
                 if (node.category.id != Category.UNCATEGORIZED_ID) {
                     IconButton(
                         onClick = onEditClick,
@@ -390,6 +424,33 @@ fun CategoryTreeItem(
 }
 
 @Composable
+private fun CategoryBalanceDisplay(
+    balances: List<CategoryBalance>,
+    currencies: List<Currency>,
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        balances.forEach { balance ->
+            val currency = currencies.find { it.id == balance.currencyId }
+            if (currency != null) {
+                Text(
+                    text = formatAmount(balance.balance, currency),
+                    style = MaterialTheme.typography.labelMedium,
+                    color =
+                        when {
+                            balance.balance > 0 -> MaterialTheme.colorScheme.primary
+                            balance.balance < 0 -> MaterialTheme.colorScheme.error
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                )
+            }
+        }
+    }
+}
+
+@Composable
 fun CreateCategoryDialogInCategories(
     categoryRepository: CategoryRepository,
     onDismiss: () -> Unit,
@@ -400,7 +461,8 @@ fun CreateCategoryDialogInCategories(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
 
-    val categories by categoryRepository.getAllCategories().collectAsState(initial = emptyList())
+    val categories by categoryRepository.getAllCategories()
+        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
     val scope = rememberCoroutineScope()
 
     AlertDialog(

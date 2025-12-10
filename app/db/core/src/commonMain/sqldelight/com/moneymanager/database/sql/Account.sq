@@ -2,7 +2,8 @@ CREATE TABLE Account (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     openingDate INTEGER NOT NULL,
-    categoryId INTEGER NOT NULL DEFAULT -1
+    categoryId INTEGER NOT NULL DEFAULT -1,
+    FOREIGN KEY (categoryId) REFERENCES Category(id)
 );
 
 selectAll:

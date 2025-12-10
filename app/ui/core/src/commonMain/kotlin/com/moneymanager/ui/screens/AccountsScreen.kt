@@ -24,6 +24,7 @@ import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.util.formatAmount
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
@@ -39,9 +40,15 @@ fun AccountsScreen(
     currencyRepository: CurrencyRepository,
     onAccountClick: (Account) -> Unit,
 ) {
-    val accounts by accountRepository.getAllAccounts().collectAsState(initial = emptyList())
-    val balances by transactionRepository.getAccountBalances().collectAsState(initial = emptyList())
-    val currencies by currencyRepository.getAllCurrencies().collectAsState(initial = emptyList())
+    // Use schema-error-aware collection for flows that may fail on old databases
+    val accounts by accountRepository.getAllAccounts()
+        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val balances by transactionRepository.getAccountBalances()
+        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val currencies by currencyRepository.getAllCurrencies()
+        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val categories by categoryRepository.getAllCategories()
+        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
     var showCreateDialog by remember { mutableStateOf(false) }
 
     Column(
@@ -82,8 +89,10 @@ fun AccountsScreen(
             ) {
                 items(accounts) { account ->
                     val accountBalances = balances.filter { it.accountId == account.id }
+                    val category = categories.find { it.id == account.categoryId }
                     AccountCard(
                         account = account,
+                        category = category,
                         balances = accountBalances,
                         currencies = currencies,
                         accountRepository = accountRepository,
@@ -106,6 +115,7 @@ fun AccountsScreen(
 @Composable
 fun AccountCard(
     account: Account,
+    category: Category?,
     balances: List<AccountBalance>,
     currencies: List<Currency>,
     accountRepository: AccountRepository,
@@ -131,11 +141,19 @@ fun AccountCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    text = account.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.weight(1f),
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = account.name,
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    if (category != null && category.id != -1L) {
+                        Text(
+                            text = category.name,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
                 IconButton(
                     onClick = { showDeleteDialog = true },
                 ) {
@@ -210,7 +228,8 @@ fun CreateAccountDialog(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
 
-    val categories by categoryRepository.getAllCategories().collectAsState(initial = emptyList())
+    val categories by categoryRepository.getAllCategories()
+        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
     val scope = rememberCoroutineScope()
 
     AlertDialog(
@@ -243,7 +262,7 @@ fun CreateAccountDialog(
                         readOnly = true,
                         label = { Text("Category") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                        modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
                         enabled = !isSaving,
                     )
                     ExposedDropdownMenu(
@@ -439,7 +458,8 @@ fun CreateCategoryDialog(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
 
-    val categories by categoryRepository.getAllCategories().collectAsState(initial = emptyList())
+    val categories by categoryRepository.getAllCategories()
+        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
     val scope = rememberCoroutineScope()
 
     AlertDialog(
@@ -477,7 +497,7 @@ fun CreateCategoryDialog(
                         readOnly = true,
                         label = { Text("Parent Category") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                        modifier = Modifier.fillMaxWidth().menuAnchor(),
+                        modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
                         enabled = !isSaving,
                     )
                     ExposedDropdownMenu(

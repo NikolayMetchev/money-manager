@@ -12,6 +12,7 @@ import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
 import com.moneymanager.domain.model.Category
+import com.moneymanager.domain.model.CategoryBalance
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Transfer
@@ -416,6 +417,8 @@ class AccountsScreenTest {
             )
 
         override fun getAllCategories(): Flow<List<Category>> = flowOf(categories)
+
+        override fun getCategoryBalances(): Flow<List<CategoryBalance>> = flowOf(emptyList())
 
         override fun getCategoryById(id: Long): Flow<Category?> = flowOf(categories.find { it.id == id })
 

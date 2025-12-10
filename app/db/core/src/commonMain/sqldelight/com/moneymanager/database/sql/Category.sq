@@ -7,6 +7,30 @@ CREATE TABLE Category (
 
 CREATE INDEX IF NOT EXISTS idx_category_parent ON Category(parentId);
 
+-- View that shows balances aggregated by category (including all descendant categories)
+-- Uses a recursive CTE to traverse the category hierarchy
+CREATE VIEW CategoryBalanceView AS
+WITH RECURSIVE CategoryHierarchy AS (
+    -- Base case: each category includes itself
+    SELECT id AS ancestorId, id AS descendantId
+    FROM Category
+
+    UNION ALL
+
+    -- Recursive case: find all descendants
+    SELECT ch.ancestorId, c.id AS descendantId
+    FROM CategoryHierarchy ch
+    JOIN Category c ON c.parentId = ch.descendantId
+)
+SELECT
+    ch.ancestorId AS categoryId,
+    abv.currencyId,
+    SUM(abv.balance) AS balance
+FROM CategoryHierarchy ch
+JOIN Account a ON a.categoryId = ch.descendantId
+JOIN AccountBalanceMaterializedView abv ON abv.accountId = a.id
+GROUP BY ch.ancestorId, abv.currencyId;
+
 selectAll:
 SELECT * FROM Category ORDER BY name;
 
@@ -37,3 +61,13 @@ DELETE FROM Category WHERE id = ?;
 
 lastInsertRowId:
 SELECT last_insert_rowid();
+
+selectAllCategoryBalances:
+SELECT categoryId, currencyId, balance
+FROM CategoryBalanceView
+ORDER BY categoryId, currencyId;
+
+selectCategoryBalanceById:
+SELECT categoryId, currencyId, balance
+FROM CategoryBalanceView
+WHERE categoryId = ?;
