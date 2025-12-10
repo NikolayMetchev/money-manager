@@ -823,12 +823,16 @@ fun TransactionEntryDialog(
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
     maintenanceService: DatabaseMaintenanceService,
-    accounts: List<Account>,
-    currencies: List<Currency>,
     preSelectedSourceAccountId: AccountId? = null,
     preSelectedCurrencyId: CurrencyId? = null,
     onDismiss: () -> Unit,
 ) {
+    // Collect accounts and currencies from Flows so newly created items appear immediately
+    val accounts by accountRepository.getAllAccounts()
+        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val currencies by currencyRepository.getAllCurrencies()
+        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+
     var sourceAccountId by remember { mutableStateOf(preSelectedSourceAccountId) }
     var targetAccountId by remember { mutableStateOf<AccountId?>(null) }
     var currencyId by remember { mutableStateOf<CurrencyId?>(preSelectedCurrencyId) }

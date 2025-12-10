@@ -328,8 +328,6 @@ private fun MoneyManagerAppContent(
                 categoryRepository = repositorySet.categoryRepository,
                 currencyRepository = repositorySet.currencyRepository,
                 maintenanceService = repositorySet.maintenanceService,
-                accounts = accounts,
-                currencies = currencies,
                 preSelectedSourceAccountId = preSelectedAccountId,
                 preSelectedCurrencyId = preSelectedCurrencyId,
                 onDismiss = {
