@@ -223,6 +223,7 @@ fun CreateAccountDialog(
 ) {
     var name by remember { mutableStateOf("") }
     var selectedCategoryId by remember { mutableStateOf(-1L) }
+    var selectedCategoryName by remember { mutableStateOf<String?>(null) }
     var expanded by remember { mutableStateOf(false) }
     var showCreateCategoryDialog by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -257,7 +258,10 @@ fun CreateAccountDialog(
                     onExpandedChange = { expanded = !expanded && !isSaving },
                 ) {
                     OutlinedTextField(
-                        value = categories.find { it.id == selectedCategoryId }?.name ?: "Uncategorized",
+                        value =
+                            selectedCategoryName
+                                ?: categories.find { it.id == selectedCategoryId }?.name
+                                ?: "Uncategorized",
                         onValueChange = {},
                         readOnly = true,
                         label = { Text("Category") },
@@ -274,6 +278,7 @@ fun CreateAccountDialog(
                                 text = { Text(category.name) },
                                 onClick = {
                                     selectedCategoryId = category.id
+                                    selectedCategoryName = null
                                     expanded = false
                                 },
                             )
@@ -352,8 +357,9 @@ fun CreateAccountDialog(
     if (showCreateCategoryDialog) {
         CreateCategoryDialog(
             categoryRepository = categoryRepository,
-            onCategoryCreated = { categoryId ->
+            onCategoryCreated = { categoryId, categoryName ->
                 selectedCategoryId = categoryId
+                selectedCategoryName = categoryName
                 showCreateCategoryDialog = false
             },
             onDismiss = { showCreateCategoryDialog = false },
@@ -449,7 +455,7 @@ fun DeleteAccountDialog(
 @Composable
 fun CreateCategoryDialog(
     categoryRepository: CategoryRepository,
-    onCategoryCreated: (Long) -> Unit,
+    onCategoryCreated: (id: Long, name: String) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var name by remember { mutableStateOf("") }
@@ -549,7 +555,7 @@ fun CreateCategoryDialog(
                                         parentId = selectedParentId,
                                     )
                                 val categoryId = categoryRepository.createCategory(newCategory)
-                                onCategoryCreated(categoryId)
+                                onCategoryCreated(categoryId, name.trim())
                             } catch (e: Exception) {
                                 logger.error(e) { "Failed to create category: ${e.message}" }
                                 errorMessage = "Failed to create category: ${e.message}"
