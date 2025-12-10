@@ -1343,6 +1343,7 @@ fun CreateAccountDialogInline(
 ) {
     var name by remember { mutableStateOf("") }
     var selectedCategoryId by remember { mutableStateOf(-1L) }
+    var selectedCategoryName by remember { mutableStateOf<String?>(null) }
     var expanded by remember { mutableStateOf(false) }
     var showCreateCategoryDialog by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -1377,7 +1378,9 @@ fun CreateAccountDialogInline(
                     onExpandedChange = { expanded = !expanded && !isSaving },
                 ) {
                     OutlinedTextField(
-                        value = categories.find { it.id == selectedCategoryId }?.name ?: "Uncategorized",
+                        value = selectedCategoryName
+                            ?: categories.find { it.id == selectedCategoryId }?.name
+                            ?: "Uncategorized",
                         onValueChange = {},
                         readOnly = true,
                         label = { Text("Category") },
@@ -1394,6 +1397,7 @@ fun CreateAccountDialogInline(
                                 text = { Text(category.name) },
                                 onClick = {
                                     selectedCategoryId = category.id
+                                    selectedCategoryName = null
                                     expanded = false
                                 },
                             )
@@ -1472,8 +1476,9 @@ fun CreateAccountDialogInline(
     if (showCreateCategoryDialog) {
         CreateCategoryDialog(
             categoryRepository = categoryRepository,
-            onCategoryCreated = { categoryId ->
+            onCategoryCreated = { categoryId, categoryName ->
                 selectedCategoryId = categoryId
+                selectedCategoryName = categoryName
                 showCreateCategoryDialog = false
             },
             onDismiss = { showCreateCategoryDialog = false },
