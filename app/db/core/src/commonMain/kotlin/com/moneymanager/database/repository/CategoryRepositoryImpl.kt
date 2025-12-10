@@ -57,12 +57,11 @@ class CategoryRepositoryImpl(
                 parentId = category.parentId,
                 id = category.id,
             )
-            Unit
         }
 
     override suspend fun deleteCategory(id: Long): Unit =
         withContext(Dispatchers.Default) {
+            // Trigger handles updating children's parentId before delete
             queries.delete(id)
-            Unit
         }
 }

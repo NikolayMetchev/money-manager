@@ -1,31 +1,68 @@
+@file:OptIn(
+    androidx.compose.material3.ExperimentalMaterial3Api::class,
+    androidx.compose.foundation.ExperimentalFoundationApi::class,
+)
+
 package com.moneymanager.ui.screens
 
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.ui.util.CategoryNode
 import com.moneymanager.ui.util.buildCategoryForest
 import com.moneymanager.ui.util.flattenCategoryForest
+import com.moneymanager.ui.util.getDescendantIds
+import kotlinx.coroutines.launch
+import org.lighthousegames.logging.logging
+
+private val logger = logging()
 
 @Composable
 fun CategoriesScreen(categoryRepository: CategoryRepository) {
     val categories by categoryRepository.getAllCategories().collectAsState(initial = emptyList())
     var expandedIds by remember { mutableStateOf(emptySet<Long>()) }
+    var showCreateDialog by remember { mutableStateOf(false) }
+    var editingCategory by remember { mutableStateOf<Category?>(null) }
+
+    // Drag state
+    var draggedCategoryId by remember { mutableStateOf<Long?>(null) }
+    var dragOffset by remember { mutableStateOf(Offset.Zero) }
+    var dropTargetId by remember { mutableStateOf<Long?>(null) }
+    val itemPositions = remember { mutableStateMapOf<Long, Pair<Float, Float>>() }
 
     val forest = remember(categories) { buildCategoryForest(categories) }
     val flattenedNodes = remember(forest, expandedIds) { flattenCategoryForest(forest, expandedIds) }
+
+    val scope = rememberCoroutineScope()
+    val listState = rememberLazyListState()
+
+    // Get descendants of dragged item to prevent invalid drops
+    val draggedDescendants =
+        remember(draggedCategoryId, forest) {
+            draggedCategoryId?.let { getDescendantIds(it, forest) } ?: emptySet()
+        }
 
     Column(
         modifier =
@@ -33,11 +70,27 @@ fun CategoriesScreen(categoryRepository: CategoryRepository) {
                 .fillMaxSize()
                 .padding(16.dp),
     ) {
-        Text(
-            text = "Your Categories",
-            style = MaterialTheme.typography.headlineMedium,
-            modifier = Modifier.padding(bottom = 16.dp),
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "Your Categories",
+                style = MaterialTheme.typography.headlineMedium,
+            )
+            TextButton(onClick = { showCreateDialog = true }) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Add Category")
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
 
         if (categories.isEmpty()) {
             Box(
@@ -51,10 +104,47 @@ fun CategoriesScreen(categoryRepository: CategoryRepository) {
                 )
             }
         } else {
+            // Drop zone for making items top-level
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(if (draggedCategoryId != null) 48.dp else 0.dp)
+                        .background(
+                            if (draggedCategoryId != null && dropTargetId == null) {
+                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                            } else {
+                                MaterialTheme.colorScheme.surface
+                            },
+                        ),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (draggedCategoryId != null) {
+                    Text(
+                        text = "Drop here to make top-level",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
             LazyColumn(
+                state = listState,
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                items(flattenedNodes, key = { it.category.id }) { node ->
+                itemsIndexed(
+                    items = flattenedNodes,
+                    key = { _, node -> node.category.id },
+                ) { index, node ->
+                    val isDragging = node.category.id == draggedCategoryId
+                    val isValidDropTarget =
+                        draggedCategoryId != null &&
+                            node.category.id != draggedCategoryId &&
+                            node.category.id !in draggedDescendants
+                    val isDropTarget = dropTargetId == node.category.id && isValidDropTarget
+
+                    val isUncategorized = node.category.id == Category.UNCATEGORIZED_ID
+
                     CategoryTreeItem(
                         node = node,
                         isExpanded = node.category.id in expandedIds,
@@ -66,10 +156,90 @@ fun CategoriesScreen(categoryRepository: CategoryRepository) {
                                     expandedIds + node.category.id
                                 }
                         },
+                        onEditClick = { editingCategory = node.category },
+                        isDraggable = !isUncategorized,
+                        isDragging = isDragging,
+                        isDropTarget = isDropTarget && !isUncategorized,
+                        dragOffset = if (isDragging) dragOffset else Offset.Zero,
+                        onPositionChanged = { top, bottom ->
+                            itemPositions[node.category.id] = top to bottom
+                        },
+                        onDragStart = {
+                            draggedCategoryId = node.category.id
+                            dragOffset = Offset.Zero
+                        },
+                        onDrag = { change ->
+                            dragOffset += change
+
+                            // Determine drop target based on position
+                            val currentY = (itemPositions[node.category.id]?.first ?: 0f) + dragOffset.y
+                            var newDropTarget: Long? = null
+
+                            for ((id, positions) in itemPositions) {
+                                if (id != draggedCategoryId && id !in draggedDescendants) {
+                                    val (top, bottom) = positions
+                                    if (currentY >= top && currentY <= bottom) {
+                                        newDropTarget = id
+                                        break
+                                    }
+                                }
+                            }
+
+                            dropTargetId = newDropTarget
+                        },
+                        onDragEnd = {
+                            val draggedId = draggedCategoryId
+                            val targetId = dropTargetId
+
+                            if (draggedId != null) {
+                                val draggedCategory = categories.find { it.id == draggedId }
+                                if (draggedCategory != null) {
+                                    val newParentId = targetId // null means top-level
+                                    if (draggedCategory.parentId != newParentId) {
+                                        scope.launch {
+                                            try {
+                                                categoryRepository.updateCategory(
+                                                    draggedCategory.copy(parentId = newParentId),
+                                                )
+                                            } catch (e: Exception) {
+                                                logger.error(e) {
+                                                    "Failed to update category hierarchy: ${e.message}"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            draggedCategoryId = null
+                            dragOffset = Offset.Zero
+                            dropTargetId = null
+                        },
+                        onDragCancel = {
+                            draggedCategoryId = null
+                            dragOffset = Offset.Zero
+                            dropTargetId = null
+                        },
                     )
                 }
             }
         }
+    }
+
+    if (showCreateDialog) {
+        CreateCategoryDialogInCategories(
+            categoryRepository = categoryRepository,
+            onDismiss = { showCreateDialog = false },
+        )
+    }
+
+    editingCategory?.let { category ->
+        EditCategoryDialog(
+            category = category,
+            categories = categories,
+            categoryRepository = categoryRepository,
+            onDismiss = { editingCategory = null },
+        )
     }
 }
 
@@ -78,6 +248,16 @@ fun CategoryTreeItem(
     node: CategoryNode,
     isExpanded: Boolean,
     onToggleExpand: () -> Unit,
+    onEditClick: () -> Unit,
+    isDraggable: Boolean,
+    isDragging: Boolean,
+    isDropTarget: Boolean,
+    dragOffset: Offset,
+    onPositionChanged: (Float, Float) -> Unit,
+    onDragStart: () -> Unit,
+    onDrag: (Offset) -> Unit,
+    onDragEnd: () -> Unit,
+    onDragCancel: () -> Unit,
 ) {
     val hasChildren = node.children.isNotEmpty()
     val rotationAngle by animateFloatAsState(
@@ -89,15 +269,49 @@ fun CategoryTreeItem(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(start = (node.depth * 24).dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (node.depth == 0) 2.dp else 1.dp),
+                .padding(start = (node.depth * 24).dp)
+                .zIndex(if (isDragging) 1f else 0f)
+                .onGloballyPositioned { coordinates ->
+                    val position = coordinates.positionInRoot()
+                    onPositionChanged(position.y, position.y + coordinates.size.height)
+                }
+                .graphicsLayer {
+                    if (isDragging) {
+                        translationY = dragOffset.y
+                        scaleX = 1.05f
+                        scaleY = 1.05f
+                        alpha = 0.9f
+                        shadowElevation = 16f
+                    }
+                }
+                .then(
+                    if (isDraggable) {
+                        Modifier.pointerInput(node.category.id) {
+                            detectDragGestures(
+                                onDragStart = { onDragStart() },
+                                onDrag = { change, dragAmount ->
+                                    change.consume()
+                                    onDrag(dragAmount)
+                                },
+                                onDragEnd = { onDragEnd() },
+                                onDragCancel = { onDragCancel() },
+                            )
+                        }
+                    } else {
+                        Modifier
+                    },
+                ),
+        elevation =
+            CardDefaults.cardElevation(
+                defaultElevation = if (node.depth == 0) 2.dp else 1.dp,
+            ),
         colors =
             CardDefaults.cardColors(
                 containerColor =
-                    if (node.depth == 0) {
-                        MaterialTheme.colorScheme.surface
-                    } else {
-                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    when {
+                        isDropTarget -> MaterialTheme.colorScheme.primaryContainer
+                        node.depth == 0 -> MaterialTheme.colorScheme.surface
+                        else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                     },
             ),
     ) {
@@ -105,24 +319,29 @@ fun CategoryTreeItem(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .clickable(enabled = hasChildren) { onToggleExpand() }
                     .padding(12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f),
             ) {
                 if (hasChildren) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                        contentDescription = if (isExpanded) "Collapse" else "Expand",
-                        modifier =
-                            Modifier
-                                .size(24.dp)
-                                .rotate(rotationAngle),
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
+                    IconButton(
+                        onClick = onToggleExpand,
+                        modifier = Modifier.size(24.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = if (isExpanded) "Collapse" else "Expand",
+                            modifier =
+                                Modifier
+                                    .size(24.dp)
+                                    .rotate(rotationAngle),
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    }
                 } else {
                     Spacer(modifier = Modifier.width(24.dp))
                 }
@@ -140,15 +359,468 @@ fun CategoryTreeItem(
                 )
             }
 
-            if (hasChildren) {
-                Text(
-                    text = "${node.children.size}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (node.category.id != Category.UNCATEGORIZED_ID) {
+                    IconButton(
+                        onClick = onEditClick,
+                        modifier = Modifier.size(32.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Edit",
+                            modifier = Modifier.size(18.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+
+                if (hasChildren) {
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "${node.children.size}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
     }
+}
+
+@Composable
+fun CreateCategoryDialogInCategories(
+    categoryRepository: CategoryRepository,
+    onDismiss: () -> Unit,
+) {
+    var name by remember { mutableStateOf("") }
+    var selectedParentId by remember { mutableStateOf<Long?>(null) }
+    var expanded by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var isSaving by remember { mutableStateOf(false) }
+
+    val categories by categoryRepository.getAllCategories().collectAsState(initial = emptyList())
+    val scope = rememberCoroutineScope()
+
+    AlertDialog(
+        onDismissRequest = { if (!isSaving) onDismiss() },
+        title = { Text("Create New Category") },
+        text = {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Category Name") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    enabled = !isSaving,
+                )
+
+                var searchQuery by remember { mutableStateOf("") }
+                val filteredCategories =
+                    remember(categories, searchQuery) {
+                        val available = categories.filter { it.id != Category.UNCATEGORIZED_ID }
+                        if (searchQuery.isBlank()) {
+                            available
+                        } else {
+                            available.filter { category ->
+                                category.name.contains(searchQuery, ignoreCase = true)
+                            }
+                        }
+                    }
+
+                ExposedDropdownMenuBox(
+                    expanded = expanded,
+                    onExpandedChange = { expanded = !expanded && !isSaving },
+                ) {
+                    OutlinedTextField(
+                        value =
+                            if (expanded) {
+                                searchQuery
+                            } else if (selectedParentId == null) {
+                                "None (Top Level)"
+                            } else {
+                                categories.find { it.id == selectedParentId }?.name ?: "None (Top Level)"
+                            },
+                        onValueChange = { searchQuery = it },
+                        label = { Text("Parent Category") },
+                        placeholder = { Text("Type to search...") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                        modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable),
+                        enabled = !isSaving,
+                        singleLine = true,
+                    )
+                    ExposedDropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = {
+                            expanded = false
+                            searchQuery = ""
+                        },
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("None (Top Level)") },
+                            onClick = {
+                                selectedParentId = null
+                                expanded = false
+                                searchQuery = ""
+                            },
+                        )
+                        filteredCategories.forEach { category ->
+                            DropdownMenuItem(
+                                text = { Text(category.name) },
+                                onClick = {
+                                    selectedParentId = category.id
+                                    expanded = false
+                                    searchQuery = ""
+                                },
+                            )
+                        }
+                    }
+                }
+
+                errorMessage?.let { error ->
+                    Text(
+                        text = error,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (name.isBlank()) {
+                        errorMessage = "Category name is required"
+                    } else {
+                        isSaving = true
+                        errorMessage = null
+                        scope.launch {
+                            try {
+                                val newCategory =
+                                    Category(
+                                        id = 0,
+                                        name = name.trim(),
+                                        parentId = selectedParentId,
+                                    )
+                                categoryRepository.createCategory(newCategory)
+                                onDismiss()
+                            } catch (e: Exception) {
+                                logger.error(e) { "Failed to create category: ${e.message}" }
+                                errorMessage = "Failed to create category: ${e.message}"
+                                isSaving = false
+                            }
+                        }
+                    }
+                },
+                enabled = !isSaving,
+            ) {
+                if (isSaving) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Text("Create")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !isSaving,
+            ) {
+                Text("Cancel")
+            }
+        },
+    )
+}
+
+@Composable
+fun EditCategoryDialog(
+    category: Category,
+    categories: List<Category>,
+    categoryRepository: CategoryRepository,
+    onDismiss: () -> Unit,
+) {
+    var name by remember { mutableStateOf(category.name) }
+    var selectedParentId by remember { mutableStateOf(category.parentId) }
+    var expanded by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var isSaving by remember { mutableStateOf(false) }
+    var showDeleteConfirmation by remember { mutableStateOf(false) }
+
+    val scope = rememberCoroutineScope()
+
+    // Get descendants to prevent selecting them as parent (would create cycle)
+    val forest = remember(categories) { buildCategoryForest(categories) }
+    val descendantIds = remember(category.id, forest) { getDescendantIds(category.id, forest) }
+    val isUncategorized = category.id == Category.UNCATEGORIZED_ID
+
+    AlertDialog(
+        onDismissRequest = { if (!isSaving) onDismiss() },
+        title = { Text("Edit Category") },
+        text = {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Category Name") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    enabled = !isSaving && !isUncategorized,
+                )
+
+                if (isUncategorized) {
+                    Text(
+                        text = "The Uncategorized category cannot be modified.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    var searchQuery by remember { mutableStateOf("") }
+                    val filteredCategories =
+                        remember(categories, searchQuery, category.id, descendantIds) {
+                            val available = categories.filter {
+                                it.id != category.id &&
+                                    it.id !in descendantIds &&
+                                    it.id != Category.UNCATEGORIZED_ID
+                            }
+                            if (searchQuery.isBlank()) {
+                                available
+                            } else {
+                                available.filter { cat ->
+                                    cat.name.contains(searchQuery, ignoreCase = true)
+                                }
+                            }
+                        }
+
+                    ExposedDropdownMenuBox(
+                        expanded = expanded,
+                        onExpandedChange = { expanded = !expanded && !isSaving },
+                    ) {
+                        OutlinedTextField(
+                            value =
+                                if (expanded) {
+                                    searchQuery
+                                } else if (selectedParentId == null) {
+                                    "None (Top Level)"
+                                } else {
+                                    categories.find { it.id == selectedParentId }?.name ?: "None (Top Level)"
+                                },
+                            onValueChange = { searchQuery = it },
+                            label = { Text("Parent Category") },
+                            placeholder = { Text("Type to search...") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                            modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable),
+                            enabled = !isSaving,
+                            singleLine = true,
+                        )
+                        ExposedDropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = {
+                                expanded = false
+                                searchQuery = ""
+                            },
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("None (Top Level)") },
+                                onClick = {
+                                    selectedParentId = null
+                                    expanded = false
+                                    searchQuery = ""
+                                },
+                            )
+                            filteredCategories.forEach { cat ->
+                                DropdownMenuItem(
+                                    text = { Text(cat.name) },
+                                    onClick = {
+                                        selectedParentId = cat.id
+                                        expanded = false
+                                        searchQuery = ""
+                                    },
+                                )
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                    TextButton(
+                        onClick = { showDeleteConfirmation = true },
+                        colors =
+                            ButtonDefaults.textButtonColors(
+                                contentColor = MaterialTheme.colorScheme.error,
+                            ),
+                        enabled = !isSaving,
+                    ) {
+                        Text("Delete Category")
+                    }
+                }
+
+                errorMessage?.let { error ->
+                    Text(
+                        text = error,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (name.isBlank()) {
+                        errorMessage = "Category name is required"
+                    } else {
+                        isSaving = true
+                        errorMessage = null
+                        scope.launch {
+                            try {
+                                categoryRepository.updateCategory(
+                                    category.copy(
+                                        name = name.trim(),
+                                        parentId = selectedParentId,
+                                    ),
+                                )
+                                onDismiss()
+                            } catch (e: Exception) {
+                                logger.error(e) { "Failed to update category: ${e.message}" }
+                                errorMessage = "Failed to update category: ${e.message}"
+                                isSaving = false
+                            }
+                        }
+                    }
+                },
+                enabled = !isSaving && !isUncategorized,
+            ) {
+                if (isSaving) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Text("Save")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !isSaving,
+            ) {
+                Text("Cancel")
+            }
+        },
+    )
+
+    if (showDeleteConfirmation) {
+        DeleteCategoryDialog(
+            category = category,
+            categoryRepository = categoryRepository,
+            onDismiss = { showDeleteConfirmation = false },
+            onDeleted = onDismiss,
+        )
+    }
+}
+
+@Composable
+fun DeleteCategoryDialog(
+    category: Category,
+    categoryRepository: CategoryRepository,
+    onDismiss: () -> Unit,
+    onDeleted: () -> Unit,
+) {
+    var isDeleting by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
+    AlertDialog(
+        onDismissRequest = { if (!isDeleting) onDismiss() },
+        icon = {
+            Text(
+                text = "⚠️",
+                style = MaterialTheme.typography.headlineMedium,
+            )
+        },
+        title = { Text("Delete Category?") },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = "Are you sure you want to delete \"${category.name}\"?",
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                Text(
+                    text = "Child categories will be moved to the parent of this category. Transactions using this category will become uncategorized.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                errorMessage?.let { error ->
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = error,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    isDeleting = true
+                    errorMessage = null
+                    scope.launch {
+                        try {
+                            categoryRepository.deleteCategory(category.id)
+                            onDeleted()
+                        } catch (e: Exception) {
+                            logger.error(e) { "Failed to delete category: ${e.message}" }
+                            errorMessage = "Failed to delete category: ${e.message}"
+                            isDeleting = false
+                        }
+                    }
+                },
+                enabled = !isDeleting,
+                colors =
+                    ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error,
+                    ),
+            ) {
+                if (isDeleting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Text("Delete")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !isDeleting,
+            ) {
+                Text("Cancel")
+            }
+        },
+    )
 }
 
 @Composable

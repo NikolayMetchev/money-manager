@@ -8,16 +8,16 @@ CREATE TABLE Category (
 CREATE INDEX IF NOT EXISTS idx_category_parent ON Category(parentId);
 
 selectAll:
-SELECT * FROM Category;
+SELECT * FROM Category ORDER BY name;
 
 selectById:
 SELECT * FROM Category WHERE id = ?;
 
 selectTopLevel:
-SELECT * FROM Category WHERE parentId IS NULL;
+SELECT * FROM Category WHERE parentId IS NULL ORDER BY name;
 
 selectByParent:
-SELECT * FROM Category WHERE parentId = ?;
+SELECT * FROM Category WHERE parentId = ? ORDER BY name;
 
 insert:
 INSERT INTO Category(name, parentId)

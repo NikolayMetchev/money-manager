@@ -64,3 +64,44 @@ fun flattenCategoryForest(
     forest.forEach { traverse(it) }
     return result
 }
+
+/**
+ * Gets all descendant IDs of a category (children, grandchildren, etc.).
+ * Used to prevent creating cycles when changing parent via drag-and-drop.
+ *
+ * @param categoryId The ID of the category to find descendants for
+ * @param forest The category forest to search in
+ * @return Set of all descendant category IDs
+ */
+fun getDescendantIds(
+    categoryId: Long,
+    forest: List<CategoryNode>,
+): Set<Long> {
+    val result = mutableSetOf<Long>()
+
+    fun findAndCollectDescendants(nodes: List<CategoryNode>): Boolean {
+        for (node in nodes) {
+            if (node.category.id == categoryId) {
+                collectAllDescendants(node, result)
+                return true
+            }
+            if (findAndCollectDescendants(node.children)) {
+                return true
+            }
+        }
+        return false
+    }
+
+    findAndCollectDescendants(forest)
+    return result
+}
+
+private fun collectAllDescendants(
+    node: CategoryNode,
+    result: MutableSet<Long>,
+) {
+    for (child in node.children) {
+        result.add(child.category.id)
+        collectAllDescendants(child, result)
+    }
+}
