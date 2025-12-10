@@ -62,11 +62,13 @@ class CategoryRepositoryImpl(
 
     override suspend fun createCategory(category: Category): Long =
         withContext(Dispatchers.Default) {
-            queries.insert(
-                name = category.name,
-                parentId = category.parentId,
-            )
-            queries.lastInsertRowId().executeAsOne()
+            queries.transactionWithResult {
+                queries.insert(
+                    name = category.name,
+                    parentId = category.parentId,
+                )
+                queries.lastInsertRowId().executeAsOne()
+            }
         }
 
     override suspend fun updateCategory(category: Category): Unit =
