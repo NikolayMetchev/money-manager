@@ -1378,9 +1378,10 @@ fun CreateAccountDialogInline(
                     onExpandedChange = { expanded = !expanded && !isSaving },
                 ) {
                     OutlinedTextField(
-                        value = selectedCategoryName
-                            ?: categories.find { it.id == selectedCategoryId }?.name
-                            ?: "Uncategorized",
+                        value =
+                            selectedCategoryName
+                                ?: categories.find { it.id == selectedCategoryId }?.name
+                                ?: "Uncategorized",
                         onValueChange = {},
                         readOnly = true,
                         label = { Text("Category") },
