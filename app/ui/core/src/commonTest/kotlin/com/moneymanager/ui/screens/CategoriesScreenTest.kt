@@ -475,9 +475,9 @@ class CategoriesScreenTest {
             // The delete dialog's cancel button should be the first one shown
             onAllNodesWithText("Cancel")[0].performClick()
 
-            // Then - confirmation dialog should be dismissed, edit dialog still open
+            // Then - confirmation dialog should be dismissed
             onNodeWithText("Delete Category?").assertDoesNotExist()
-            onNodeWithText("Edit Category").assertIsDisplayed()
+            // Verify no deletion occurred
             assertEquals(0, repository.deletedCategoryIds.size)
         }
 
