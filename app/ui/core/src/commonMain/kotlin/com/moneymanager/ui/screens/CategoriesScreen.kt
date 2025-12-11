@@ -7,12 +7,15 @@
 package com.moneymanager.ui.screens
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
@@ -27,6 +30,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.moneymanager.domain.model.Category
@@ -44,6 +48,9 @@ import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
 
 private val logger = logging()
+
+private val BALANCE_COLUMN_WIDTH = 100.dp
+private val HIERARCHY_COLUMN_WIDTH = 250.dp
 
 @Composable
 fun CategoriesScreen(
@@ -76,8 +83,18 @@ fun CategoriesScreen(
             categoryBalances.groupBy { it.categoryId }
         }
 
+    // Get unique currencies that have balances (for column headers)
+    val currenciesWithBalances =
+        remember(categoryBalances, currencies) {
+            val currencyIdsWithBalances = categoryBalances.map { it.currencyId }.toSet()
+            currencies.filter { it.id in currencyIdsWithBalances }
+        }
+
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
+
+    // Shared horizontal scroll state for header and all rows
+    val balancesScrollState = rememberScrollState()
 
     // Get descendants of dragged item to prevent invalid drops
     val draggedDescendants =
@@ -149,6 +166,15 @@ fun CategoriesScreen(
                 }
             }
 
+            // Currency column headers (only if there are balances)
+            if (currenciesWithBalances.isNotEmpty()) {
+                CurrencyHeaderRow(
+                    currencies = currenciesWithBalances,
+                    scrollState = balancesScrollState,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
             LazyColumn(
                 state = listState,
                 verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -169,7 +195,8 @@ fun CategoriesScreen(
                     CategoryTreeItem(
                         node = node,
                         balances = balancesByCategoryId[node.category.id] ?: emptyList(),
-                        currencies = currencies,
+                        currenciesWithBalances = currenciesWithBalances,
+                        balancesScrollState = balancesScrollState,
                         isExpanded = node.category.id in expandedIds,
                         onToggleExpand = {
                             expandedIds =
@@ -267,10 +294,47 @@ fun CategoriesScreen(
 }
 
 @Composable
+private fun CurrencyHeaderRow(
+    currencies: List<Currency>,
+    scrollState: ScrollState,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // Fixed-width left column for hierarchy
+        Box(modifier = Modifier.width(HIERARCHY_COLUMN_WIDTH)) {
+            Text(
+                text = "Category",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 12.dp),
+            )
+        }
+
+        // Scrollable currency headers
+        Row(
+            modifier = Modifier.horizontalScroll(scrollState),
+        ) {
+            currencies.forEach { currency ->
+                Text(
+                    text = currency.code,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.width(BALANCE_COLUMN_WIDTH),
+                )
+            }
+        }
+    }
+}
+
+@Composable
 fun CategoryTreeItem(
     node: CategoryNode,
     balances: List<CategoryBalance>,
-    currencies: List<Currency>,
+    currenciesWithBalances: List<Currency>,
+    balancesScrollState: ScrollState,
     isExpanded: Boolean,
     onToggleExpand: () -> Unit,
     onEditClick: () -> Unit,
@@ -290,11 +354,17 @@ fun CategoryTreeItem(
         label = "expandIconRotation",
     )
 
-    Card(
+    // Create a map for quick balance lookup by currency
+    val balancesByCurrency =
+        remember(balances) {
+            balances.associateBy { it.currencyId }
+        }
+
+    // Main row with two sections: fixed hierarchy column + scrollable balances
+    Row(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(start = (node.depth * 24).dp)
                 .zIndex(if (isDragging) 1f else 0f)
                 .onGloballyPositioned { coordinates ->
                     val position = coordinates.positionInRoot()
@@ -303,10 +373,10 @@ fun CategoryTreeItem(
                 .graphicsLayer {
                     if (isDragging) {
                         translationY = dragOffset.y
-                        scaleX = 1.05f
-                        scaleY = 1.05f
+                        scaleX = 1.02f
+                        scaleY = 1.02f
                         alpha = 0.9f
-                        shadowElevation = 16f
+                        shadowElevation = 8f
                     }
                 }
                 .then(
@@ -326,125 +396,118 @@ fun CategoryTreeItem(
                         Modifier
                     },
                 ),
-        elevation =
-            CardDefaults.cardElevation(
-                defaultElevation = if (node.depth == 0) 2.dp else 1.dp,
-            ),
-        colors =
-            CardDefaults.cardColors(
-                containerColor =
-                    when {
-                        isDropTarget -> MaterialTheme.colorScheme.primaryContainer
-                        node.depth == 0 -> MaterialTheme.colorScheme.surface
-                        else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                    },
-            ),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f),
+        // Left column: fixed width hierarchy with Card
+        Box(modifier = Modifier.width(HIERARCHY_COLUMN_WIDTH)) {
+            Card(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(start = (node.depth * 16).dp),
+                elevation =
+                    CardDefaults.cardElevation(
+                        defaultElevation = if (node.depth == 0) 2.dp else 1.dp,
+                    ),
+                colors =
+                    CardDefaults.cardColors(
+                        containerColor =
+                            when {
+                                isDropTarget -> MaterialTheme.colorScheme.primaryContainer
+                                node.depth == 0 -> MaterialTheme.colorScheme.surface
+                                else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                            },
+                    ),
             ) {
-                if (hasChildren) {
-                    IconButton(
-                        onClick = onToggleExpand,
-                        modifier = Modifier.size(24.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                            contentDescription = if (isExpanded) "Collapse" else "Expand",
-                            modifier =
-                                Modifier
-                                    .size(24.dp)
-                                    .rotate(rotationAngle),
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
+                Row(
+                    modifier = Modifier.padding(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    // Expand/collapse icon
+                    if (hasChildren) {
+                        IconButton(
+                            onClick = onToggleExpand,
+                            modifier = Modifier.size(20.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                contentDescription = if (isExpanded) "Collapse" else "Expand",
+                                modifier =
+                                    Modifier
+                                        .size(20.dp)
+                                        .rotate(rotationAngle),
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.width(20.dp))
                     }
-                } else {
-                    Spacer(modifier = Modifier.width(24.dp))
-                }
 
-                Spacer(modifier = Modifier.width(8.dp))
-
-                Text(
-                    text = node.category.name,
-                    style =
-                        if (node.depth == 0) {
-                            MaterialTheme.typography.titleMedium
-                        } else {
-                            MaterialTheme.typography.bodyMedium
-                        },
-                )
-            }
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                // Display category balances
-                if (balances.isNotEmpty()) {
-                    CategoryBalanceDisplay(
-                        balances = balances,
-                        currencies = currencies,
-                    )
-                }
-
-                if (node.category.id != Category.UNCATEGORIZED_ID) {
-                    IconButton(
-                        onClick = onEditClick,
-                        modifier = Modifier.size(32.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Edit,
-                            contentDescription = "Edit",
-                            modifier = Modifier.size(18.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-
-                if (hasChildren) {
                     Spacer(modifier = Modifier.width(4.dp))
+
+                    // Category name with children count
                     Text(
-                        text = "${node.children.size}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        text =
+                            buildString {
+                                append(node.category.name)
+                                if (hasChildren) {
+                                    append(" (${node.children.size})")
+                                }
+                            },
+                        style =
+                            if (node.depth == 0) {
+                                MaterialTheme.typography.titleSmall
+                            } else {
+                                MaterialTheme.typography.bodySmall
+                            },
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f),
                     )
+
+                    // Edit button
+                    if (node.category.id != Category.UNCATEGORIZED_ID) {
+                        IconButton(
+                            onClick = onEditClick,
+                            modifier = Modifier.size(20.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = "Edit",
+                                modifier = Modifier.size(14.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                 }
             }
         }
-    }
-}
 
-@Composable
-private fun CategoryBalanceDisplay(
-    balances: List<CategoryBalance>,
-    currencies: List<Currency>,
-) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        balances.forEach { balance ->
-            val currency = currencies.find { it.id == balance.currencyId }
-            if (currency != null) {
-                Text(
-                    text = formatAmount(balance.balance, currency),
-                    style = MaterialTheme.typography.labelMedium,
-                    color =
-                        when {
-                            balance.balance > 0 -> MaterialTheme.colorScheme.primary
-                            balance.balance < 0 -> MaterialTheme.colorScheme.error
-                            else -> MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                )
+        // Right column: scrollable balance matrix (aligned with header)
+        if (currenciesWithBalances.isNotEmpty()) {
+            Row(
+                modifier = Modifier.horizontalScroll(balancesScrollState),
+            ) {
+                currenciesWithBalances.forEach { currency ->
+                    val balance = balancesByCurrency[currency.id]
+                    Text(
+                        text =
+                            if (balance != null) {
+                                formatAmount(balance.balance, currency)
+                            } else {
+                                ""
+                            },
+                        style = MaterialTheme.typography.labelMedium,
+                        textAlign = TextAlign.End,
+                        color =
+                            when {
+                                balance == null -> MaterialTheme.colorScheme.onSurfaceVariant
+                                balance.balance > 0 -> MaterialTheme.colorScheme.primary
+                                balance.balance < 0 -> MaterialTheme.colorScheme.error
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                        modifier = Modifier.width(BALANCE_COLUMN_WIDTH),
+                    )
+                }
             }
         }
     }

@@ -135,9 +135,8 @@ class CategoriesScreenTest {
                 )
             }
 
-            // Then
-            onNodeWithText("Food").assertIsDisplayed()
-            onNodeWithText("2").assertIsDisplayed() // Child count badge
+            // Then - child count is shown in brackets after category name
+            onNodeWithText("Food (2)").assertIsDisplayed()
         }
 
     @Test
@@ -791,13 +790,13 @@ class CategoriesScreenTest {
                 )
             }
 
-            // Initially only top-level visible
-            onNodeWithText("Food").assertIsDisplayed()
-            onNodeWithText("Groceries").assertDoesNotExist()
+            // Initially only top-level visible - child count shown in brackets
+            onNodeWithText("Food (1)").assertIsDisplayed()
+            onNodeWithText("Groceries (1)").assertDoesNotExist()
 
             // Expand Food by clicking the expand icon
             onAllNodesWithContentDescription("Expand")[0].performClick()
-            onNodeWithText("Groceries").assertIsDisplayed()
+            onNodeWithText("Groceries (1)").assertIsDisplayed()
             onNodeWithText("Organic").assertDoesNotExist()
 
             // Expand Groceries by clicking its expand icon (now there are 2 expand icons - Food is collapsed)
