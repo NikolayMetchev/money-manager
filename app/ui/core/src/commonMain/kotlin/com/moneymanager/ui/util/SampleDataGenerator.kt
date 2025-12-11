@@ -5,6 +5,7 @@ package com.moneymanager.ui.util
 import com.moneymanager.database.RepositorySet
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,6 +19,8 @@ import kotlin.uuid.Uuid
 data class GenerationProgress(
     val accountsCreated: Int = 0,
     val totalAccounts: Int = 100,
+    val categoriesCreated: Int = 0,
+    val totalCategories: Int = 0,
     val transactionsCreated: Int = 0,
     val totalTransactions: Int = 0,
     val currentOperation: String = "Initializing...",
@@ -57,16 +60,69 @@ suspend fun generateSampleData(
         throw IllegalStateException("No currencies available for sample data generation.")
     }
 
-    // Step 2: Generate account names
+    // Step 2: Generate and create categories with hierarchical structure
     progressFlow.emit(
         GenerationProgress(
+            currentOperation = "Generating categories...",
+        ),
+    )
+
+    val categoryHierarchy = generateCategoryHierarchy()
+    val totalCategories = categoryHierarchy.sumOf { 1 + it.children.size }
+
+    progressFlow.emit(
+        GenerationProgress(
+            totalCategories = totalCategories,
+            currentOperation = "Creating $totalCategories categories...",
+        ),
+    )
+
+    val categoryIds = mutableListOf<Long>()
+    var categoriesCreated = 0
+
+    for (parent in categoryHierarchy) {
+        val parentId = repositorySet.categoryRepository.createCategory(parent.category)
+        categoryIds.add(parentId)
+        categoriesCreated++
+
+        progressFlow.emit(
+            GenerationProgress(
+                categoriesCreated = categoriesCreated,
+                totalCategories = totalCategories,
+                currentOperation = "Creating categories...",
+            ),
+        )
+
+        for (child in parent.children) {
+            val childId =
+                repositorySet.categoryRepository.createCategory(
+                    child.copy(parentId = parentId),
+                )
+            categoryIds.add(childId)
+            categoriesCreated++
+
+            progressFlow.emit(
+                GenerationProgress(
+                    categoriesCreated = categoriesCreated,
+                    totalCategories = totalCategories,
+                    currentOperation = "Creating categories...",
+                ),
+            )
+        }
+    }
+
+    // Step 3: Generate account names
+    progressFlow.emit(
+        GenerationProgress(
+            categoriesCreated = categoriesCreated,
+            totalCategories = totalCategories,
             currentOperation = "Generating account names...",
         ),
     )
 
     val accountNames = generateAccountNames(100)
 
-    // Step 3: Determine transaction counts per account (variable distribution)
+    // Step 4: Determine transaction counts per account (variable distribution)
     val transactionCounts = mutableListOf<Int>()
     for (i in 0 until 100) {
         val count =
@@ -82,17 +138,21 @@ suspend fun generateSampleData(
 
     progressFlow.emit(
         GenerationProgress(
+            categoriesCreated = categoriesCreated,
+            totalCategories = totalCategories,
             totalAccounts = 100,
             totalTransactions = totalExpectedTransactions,
             currentOperation = "Creating accounts...",
         ),
     )
 
-    // Step 4: Create accounts in batch
+    // Step 5: Create accounts in batch with category assignments
     val now = Clock.System.now()
 
     progressFlow.emit(
         GenerationProgress(
+            categoriesCreated = categoriesCreated,
+            totalCategories = totalCategories,
             totalAccounts = 100,
             totalTransactions = totalExpectedTransactions,
             currentOperation = "Creating 100 accounts in batch...",
@@ -102,11 +162,10 @@ suspend fun generateSampleData(
     val accountsToCreate =
         accountNames.map { name ->
             Account(
-                // Will be auto-generated
                 id = AccountId(0),
                 name = name,
-                // Opened 1-10 years ago
                 openingDate = now.minus(random.nextInt(1, 3650).days),
+                categoryId = categoryIds.random(random),
             )
         }
 
@@ -114,6 +173,8 @@ suspend fun generateSampleData(
 
     progressFlow.emit(
         GenerationProgress(
+            categoriesCreated = categoriesCreated,
+            totalCategories = totalCategories,
             accountsCreated = 100,
             totalAccounts = 100,
             totalTransactions = totalExpectedTransactions,
@@ -121,9 +182,11 @@ suspend fun generateSampleData(
         ),
     )
 
-    // Step 5: Generate transactions in batches
+    // Step 6: Generate transactions in batches
     progressFlow.emit(
         GenerationProgress(
+            categoriesCreated = categoriesCreated,
+            totalCategories = totalCategories,
             accountsCreated = 100,
             totalAccounts = 100,
             totalTransactions = totalExpectedTransactions,
@@ -186,6 +249,8 @@ suspend fun generateSampleData(
 
         progressFlow.emit(
             GenerationProgress(
+                categoriesCreated = categoriesCreated,
+                totalCategories = totalCategories,
                 accountsCreated = 100,
                 totalAccounts = 100,
                 transactionsCreated = transactionsCreated,
@@ -198,6 +263,8 @@ suspend fun generateSampleData(
     // Refresh materialized views
     progressFlow.emit(
         GenerationProgress(
+            categoriesCreated = categoriesCreated,
+            totalCategories = totalCategories,
             accountsCreated = 100,
             totalAccounts = 100,
             transactionsCreated = transactionsCreated,
@@ -210,6 +277,8 @@ suspend fun generateSampleData(
     // Final progress update
     progressFlow.emit(
         GenerationProgress(
+            categoriesCreated = categoriesCreated,
+            totalCategories = totalCategories,
             accountsCreated = 100,
             totalAccounts = 100,
             transactionsCreated = transactionsCreated,
@@ -314,4 +383,193 @@ private fun generateTransactionDescription(random: Random): String {
         )
 
     return descriptions.random(random)
+}
+
+private data class CategoryWithChildren(
+    val category: Category,
+    val children: List<Category>,
+)
+
+private fun generateCategoryHierarchy(): List<CategoryWithChildren> {
+    return listOf(
+        CategoryWithChildren(
+            category = Category(name = "Income"),
+            children =
+                listOf(
+                    Category(name = "Salary"),
+                    Category(name = "Freelance"),
+                    Category(name = "Investments"),
+                    Category(name = "Dividends"),
+                    Category(name = "Interest"),
+                    Category(name = "Gifts Received"),
+                    Category(name = "Refunds"),
+                    Category(name = "Other Income"),
+                ),
+        ),
+        CategoryWithChildren(
+            category = Category(name = "Housing"),
+            children =
+                listOf(
+                    Category(name = "Rent"),
+                    Category(name = "Mortgage"),
+                    Category(name = "Property Tax"),
+                    Category(name = "Home Insurance"),
+                    Category(name = "Maintenance"),
+                    Category(name = "Utilities"),
+                    Category(name = "HOA Fees"),
+                ),
+        ),
+        CategoryWithChildren(
+            category = Category(name = "Transportation"),
+            children =
+                listOf(
+                    Category(name = "Fuel"),
+                    Category(name = "Public Transit"),
+                    Category(name = "Car Payment"),
+                    Category(name = "Car Insurance"),
+                    Category(name = "Maintenance & Repairs"),
+                    Category(name = "Parking"),
+                    Category(name = "Tolls"),
+                    Category(name = "Rideshare"),
+                ),
+        ),
+        CategoryWithChildren(
+            category = Category(name = "Food & Dining"),
+            children =
+                listOf(
+                    Category(name = "Groceries"),
+                    Category(name = "Restaurants"),
+                    Category(name = "Coffee Shops"),
+                    Category(name = "Fast Food"),
+                    Category(name = "Delivery"),
+                ),
+        ),
+        CategoryWithChildren(
+            category = Category(name = "Shopping"),
+            children =
+                listOf(
+                    Category(name = "Clothing"),
+                    Category(name = "Electronics"),
+                    Category(name = "Home Goods"),
+                    Category(name = "Personal Care"),
+                    Category(name = "Gifts"),
+                    Category(name = "Books"),
+                    Category(name = "Hobbies"),
+                ),
+        ),
+        CategoryWithChildren(
+            category = Category(name = "Entertainment"),
+            children =
+                listOf(
+                    Category(name = "Streaming Services"),
+                    Category(name = "Movies & Theater"),
+                    Category(name = "Concerts & Events"),
+                    Category(name = "Sports"),
+                    Category(name = "Gaming"),
+                    Category(name = "Subscriptions"),
+                ),
+        ),
+        CategoryWithChildren(
+            category = Category(name = "Health & Fitness"),
+            children =
+                listOf(
+                    Category(name = "Medical"),
+                    Category(name = "Dental"),
+                    Category(name = "Vision"),
+                    Category(name = "Pharmacy"),
+                    Category(name = "Gym Membership"),
+                    Category(name = "Health Insurance"),
+                ),
+        ),
+        CategoryWithChildren(
+            category = Category(name = "Personal"),
+            children =
+                listOf(
+                    Category(name = "Hair & Beauty"),
+                    Category(name = "Clothing"),
+                    Category(name = "Education"),
+                    Category(name = "Professional Development"),
+                    Category(name = "Legal"),
+                ),
+        ),
+        CategoryWithChildren(
+            category = Category(name = "Travel"),
+            children =
+                listOf(
+                    Category(name = "Flights"),
+                    Category(name = "Hotels"),
+                    Category(name = "Car Rental"),
+                    Category(name = "Vacation"),
+                    Category(name = "Business Travel"),
+                ),
+        ),
+        CategoryWithChildren(
+            category = Category(name = "Financial"),
+            children =
+                listOf(
+                    Category(name = "Bank Fees"),
+                    Category(name = "Investment Fees"),
+                    Category(name = "Tax Preparation"),
+                    Category(name = "Financial Advisor"),
+                    Category(name = "Insurance Premiums"),
+                ),
+        ),
+        CategoryWithChildren(
+            category = Category(name = "Family"),
+            children =
+                listOf(
+                    Category(name = "Childcare"),
+                    Category(name = "Child Support"),
+                    Category(name = "Pet Care"),
+                    Category(name = "Allowance"),
+                    Category(name = "Gifts to Family"),
+                ),
+        ),
+        CategoryWithChildren(
+            category = Category(name = "Bills & Utilities"),
+            children =
+                listOf(
+                    Category(name = "Electricity"),
+                    Category(name = "Water"),
+                    Category(name = "Gas"),
+                    Category(name = "Internet"),
+                    Category(name = "Phone"),
+                    Category(name = "Cable/Satellite"),
+                ),
+        ),
+        CategoryWithChildren(
+            category = Category(name = "Savings & Investments"),
+            children =
+                listOf(
+                    Category(name = "Emergency Fund"),
+                    Category(name = "Retirement"),
+                    Category(name = "Stocks"),
+                    Category(name = "Bonds"),
+                    Category(name = "Real Estate"),
+                    Category(name = "Cryptocurrency"),
+                ),
+        ),
+        CategoryWithChildren(
+            category = Category(name = "Charity"),
+            children =
+                listOf(
+                    Category(name = "Religious Organizations"),
+                    Category(name = "Nonprofits"),
+                    Category(name = "Education"),
+                    Category(name = "Community"),
+                ),
+        ),
+        CategoryWithChildren(
+            category = Category(name = "Business"),
+            children =
+                listOf(
+                    Category(name = "Office Supplies"),
+                    Category(name = "Software"),
+                    Category(name = "Marketing"),
+                    Category(name = "Professional Services"),
+                    Category(name = "Business Travel"),
+                    Category(name = "Equipment"),
+                ),
+        ),
+    )
 }

@@ -36,6 +36,7 @@ import androidx.compose.ui.zIndex
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CategoryBalance
 import com.moneymanager.domain.model.Currency
+import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
@@ -88,6 +89,21 @@ fun CategoriesScreen(
         remember(categoryBalances, currencies) {
             val currencyIdsWithBalances = categoryBalances.map { it.currencyId }.toSet()
             currencies.filter { it.id in currencyIdsWithBalances }
+        }
+
+    // Calculate maximum width needed for each currency column
+    val columnWidths =
+        remember(categoryBalances, currenciesWithBalances) {
+            currenciesWithBalances.associate { currency ->
+                val maxBalance =
+                    categoryBalances
+                        .filter { it.currencyId == currency.id }
+                        .maxOfOrNull { kotlin.math.abs(it.balance) } ?: 0.0
+                val formattedMax = formatAmount(maxBalance, currency)
+                // Estimate width: ~8dp per character + 16dp padding
+                val estimatedWidth = (formattedMax.length * 8 + 16).dp
+                currency.id to maxOf(estimatedWidth, BALANCE_COLUMN_WIDTH)
+            }
         }
 
     val scope = rememberCoroutineScope()
@@ -170,6 +186,7 @@ fun CategoriesScreen(
             if (currenciesWithBalances.isNotEmpty()) {
                 CurrencyHeaderRow(
                     currencies = currenciesWithBalances,
+                    columnWidths = columnWidths,
                     scrollState = balancesScrollState,
                 )
                 Spacer(modifier = Modifier.height(8.dp))
@@ -196,6 +213,7 @@ fun CategoriesScreen(
                         node = node,
                         balances = balancesByCategoryId[node.category.id] ?: emptyList(),
                         currenciesWithBalances = currenciesWithBalances,
+                        columnWidths = columnWidths,
                         balancesScrollState = balancesScrollState,
                         isExpanded = node.category.id in expandedIds,
                         onToggleExpand = {
@@ -296,6 +314,7 @@ fun CategoriesScreen(
 @Composable
 private fun CurrencyHeaderRow(
     currencies: List<Currency>,
+    columnWidths: Map<CurrencyId, androidx.compose.ui.unit.Dp>,
     scrollState: ScrollState,
 ) {
     Row(
@@ -322,7 +341,12 @@ private fun CurrencyHeaderRow(
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.End,
-                    modifier = Modifier.width(BALANCE_COLUMN_WIDTH),
+                    maxLines = 1,
+                    softWrap = false,
+                    modifier =
+                        Modifier
+                            .width(columnWidths[currency.id] ?: BALANCE_COLUMN_WIDTH)
+                            .padding(horizontal = 8.dp),
                 )
             }
         }
@@ -334,6 +358,7 @@ fun CategoryTreeItem(
     node: CategoryNode,
     balances: List<CategoryBalance>,
     currenciesWithBalances: List<Currency>,
+    columnWidths: Map<CurrencyId, androidx.compose.ui.unit.Dp>,
     balancesScrollState: ScrollState,
     isExpanded: Boolean,
     onToggleExpand: () -> Unit,
@@ -498,6 +523,8 @@ fun CategoryTreeItem(
                             },
                         style = MaterialTheme.typography.labelMedium,
                         textAlign = TextAlign.End,
+                        maxLines = 1,
+                        softWrap = false,
                         color =
                             when {
                                 balance == null -> MaterialTheme.colorScheme.onSurfaceVariant
@@ -505,7 +532,10 @@ fun CategoryTreeItem(
                                 balance.balance < 0 -> MaterialTheme.colorScheme.error
                                 else -> MaterialTheme.colorScheme.onSurfaceVariant
                             },
-                        modifier = Modifier.width(BALANCE_COLUMN_WIDTH),
+                        modifier =
+                            Modifier
+                                .width(columnWidths[currency.id] ?: BALANCE_COLUMN_WIDTH)
+                                .padding(horizontal = 8.dp),
                     )
                 }
             }
