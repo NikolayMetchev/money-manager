@@ -689,6 +689,28 @@ allCurrencies.forEach { currency ->
 createIncrementalRefreshTriggers(driver)
 ```
 
+### Type Imports
+
+**ALWAYS** import types explicitly. **NEVER** use fully qualified type names in code.
+
+❌ **Bad** - Fully qualified type name:
+```kotlin
+fun example(columnWidths: Map<CurrencyId, androidx.compose.ui.unit.Dp>) {
+    // ...
+}
+```
+
+✅ **Good** - Import the type:
+```kotlin
+import androidx.compose.ui.unit.Dp
+
+fun example(columnWidths: Map<CurrencyId, Dp>) {
+    // ...
+}
+```
+
+This improves code readability and is automatically enforced by ktlint which will expand wildcard imports into explicit imports.
+
 ### Platform Support Status
 
 The project currently supports:
