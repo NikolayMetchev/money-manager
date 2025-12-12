@@ -951,6 +951,10 @@ The project uses modern Gradle practices for maintainability:
    - **NEVER** hardcode dependencies with versions directly in build files
    - Use `libs.*` references in all build files for consistency and centralized version management
    - Example: Use `implementation(libs.kotlinx.coroutines.core)` NOT `implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")`
+   - **ALWAYS** use typesafe project accessors for project dependencies
+   - Use `projects.*` references instead of string-based `project()` calls
+   - Example: Use `implementation(projects.utils.bigdecimal)` NOT `implementation(project(":utils:bigdecimal"))`
+   - Typesafe accessors provide compile-time safety and better IDE support
 
 10. **Build Health (Dependency Analysis)**:
     - **NEVER** skip or exclude modules from the `buildHealth` task
