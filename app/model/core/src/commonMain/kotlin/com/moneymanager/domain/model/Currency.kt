@@ -20,7 +20,7 @@ data class Currency(
     val id: CurrencyId,
     val code: String,
     val name: String,
-    val scaleFactor: Int = 100,
+    val scaleFactor: Long = 100,
 )
 
 @JvmInline

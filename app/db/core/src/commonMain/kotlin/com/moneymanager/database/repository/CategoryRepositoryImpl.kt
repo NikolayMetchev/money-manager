@@ -41,7 +41,7 @@ class CategoryRepositoryImpl(
                             id = CurrencyId(Uuid.parse(row.currency_id)),
                             code = row.currency_code,
                             name = row.currency_name,
-                            scaleFactor = row.currency_scaleFactor.toInt(),
+                            scaleFactor = row.currency_scaleFactor,
                         )
                     CategoryBalance(
                         categoryId = row.categoryId,
