@@ -1,6 +1,7 @@
 package com.moneymanager.ui.util
 
 import com.moneymanager.domain.model.Currency
+import com.moneymanager.domain.model.Money
 import com.moneymanager.currency.Currency as CurrencyFormatter
 
 /**
@@ -20,4 +21,14 @@ fun formatAmount(
         // Fallback for unknown currency codes - just format as number with currency code
         String.format("%.2f %s", amount.toDouble(), currency.code)
     }
+}
+
+/**
+ * Formats a Money value using the embedded currency.
+ *
+ * @param money The Money value to format
+ * @return Formatted currency string (e.g., "$1,234.56" for USD)
+ */
+fun formatAmount(money: Money): String {
+    return formatAmount(money.toDisplayValue().toDouble(), money.currency)
 }

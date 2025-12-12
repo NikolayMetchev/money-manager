@@ -9,7 +9,9 @@ import com.moneymanager.database.sql.MoneyManagerDatabase
 import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
+import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.TransactionRepository
@@ -32,14 +34,20 @@ class TransactionRepositoryImpl(
             .mapToList(Dispatchers.Default)
             .map { list ->
                 list.map { row ->
+                    val currency =
+                        Currency(
+                            id = CurrencyId(Uuid.parse(row.currency_id)),
+                            code = row.currency_code,
+                            name = row.currency_name,
+                            scaleFactor = row.currency_scaleFactor.toInt(),
+                        )
                     Transfer(
                         id = TransferId(Uuid.parse(row.id)),
                         timestamp = fromEpochMilliseconds(row.timestamp),
                         description = row.description,
                         sourceAccountId = AccountId(row.sourceAccountId),
                         targetAccountId = AccountId(row.targetAccountId),
-                        currencyId = CurrencyId(Uuid.parse(row.currencyId)),
-                        amount = row.amount,
+                        amount = Money(row.amount, currency),
                     )
                 }
             }
@@ -50,14 +58,20 @@ class TransactionRepositoryImpl(
             .mapToOneOrNull(Dispatchers.Default)
             .map { row ->
                 row?.let {
+                    val currency =
+                        Currency(
+                            id = CurrencyId(Uuid.parse(it.currency_id)),
+                            code = it.currency_code,
+                            name = it.currency_name,
+                            scaleFactor = it.currency_scaleFactor.toInt(),
+                        )
                     Transfer(
                         id = TransferId(Uuid.parse(row.id)),
                         timestamp = fromEpochMilliseconds(it.timestamp),
                         description = it.description,
                         sourceAccountId = AccountId(it.sourceAccountId),
                         targetAccountId = AccountId(it.targetAccountId),
-                        currencyId = CurrencyId(Uuid.parse(it.currencyId)),
-                        amount = it.amount,
+                        amount = Money(it.amount, currency),
                     )
                 }
             }
@@ -68,14 +82,20 @@ class TransactionRepositoryImpl(
             .mapToList(Dispatchers.Default)
             .map { list ->
                 list.map { row ->
+                    val currency =
+                        Currency(
+                            id = CurrencyId(Uuid.parse(row.currency_id)),
+                            code = row.currency_code,
+                            name = row.currency_name,
+                            scaleFactor = row.currency_scaleFactor.toInt(),
+                        )
                     Transfer(
                         id = TransferId(Uuid.parse(row.id)),
                         timestamp = fromEpochMilliseconds(row.timestamp),
                         description = row.description,
                         sourceAccountId = AccountId(row.sourceAccountId),
                         targetAccountId = AccountId(row.targetAccountId),
-                        currencyId = CurrencyId(Uuid.parse(row.currencyId)),
-                        amount = row.amount,
+                        amount = Money(row.amount, currency),
                     )
                 }
             }
@@ -92,14 +112,20 @@ class TransactionRepositoryImpl(
             .mapToList(Dispatchers.Default)
             .map { list ->
                 list.map { row ->
+                    val currency =
+                        Currency(
+                            id = CurrencyId(Uuid.parse(row.currency_id)),
+                            code = row.currency_code,
+                            name = row.currency_name,
+                            scaleFactor = row.currency_scaleFactor.toInt(),
+                        )
                     Transfer(
                         id = TransferId(Uuid.parse(row.id)),
                         timestamp = fromEpochMilliseconds(row.timestamp),
                         description = row.description,
                         sourceAccountId = AccountId(row.sourceAccountId),
                         targetAccountId = AccountId(row.targetAccountId),
-                        currencyId = CurrencyId(Uuid.parse(row.currencyId)),
-                        amount = row.amount,
+                        amount = Money(row.amount, currency),
                     )
                 }
             }
@@ -119,14 +145,20 @@ class TransactionRepositoryImpl(
             .mapToList(Dispatchers.Default)
             .map { list ->
                 list.map { row ->
+                    val currency =
+                        Currency(
+                            id = CurrencyId(Uuid.parse(row.currency_id)),
+                            code = row.currency_code,
+                            name = row.currency_name,
+                            scaleFactor = row.currency_scaleFactor.toInt(),
+                        )
                     Transfer(
                         id = TransferId(Uuid.parse(row.id)),
                         timestamp = fromEpochMilliseconds(row.timestamp),
                         description = row.description,
                         sourceAccountId = AccountId(row.sourceAccountId),
                         targetAccountId = AccountId(row.targetAccountId),
-                        currencyId = CurrencyId(Uuid.parse(row.currencyId)),
-                        amount = row.amount,
+                        amount = Money(row.amount, currency),
                     )
                 }
             }
@@ -137,10 +169,16 @@ class TransactionRepositoryImpl(
             .mapToList(Dispatchers.Default)
             .map { list ->
                 list.map { row ->
+                    val currency =
+                        Currency(
+                            id = CurrencyId(Uuid.parse(row.currency_id)),
+                            code = row.currency_code,
+                            name = row.currency_name,
+                            scaleFactor = row.currency_scaleFactor.toInt(),
+                        )
                     AccountBalance(
                         accountId = AccountId(row.accountId),
-                        currencyId = CurrencyId(Uuid.parse(row.currencyId)),
-                        balance = row.balance ?: 0.0,
+                        balance = Money(row.balance ?: 0, currency),
                     )
                 }
             }
@@ -151,14 +189,20 @@ class TransactionRepositoryImpl(
             .mapToList(Dispatchers.Default)
             .map { list ->
                 list.map { row ->
+                    val currency =
+                        Currency(
+                            id = CurrencyId(Uuid.parse(row.currency_id)),
+                            code = row.currency_code,
+                            name = row.currency_name,
+                            scaleFactor = row.currency_scaleFactor.toInt(),
+                        )
                     AccountRow(
                         transactionId = TransferId(Uuid.parse(row.id)),
                         timestamp = fromEpochMilliseconds(row.timestamp),
                         description = row.description,
                         accountId = AccountId(row.accountId),
-                        currencyId = CurrencyId(Uuid.parse(row.currencyId)),
-                        transactionAmount = row.transactionAmount,
-                        runningBalance = row.runningBalance ?: 0.0,
+                        transactionAmount = Money(row.transactionAmount, currency),
+                        runningBalance = Money(row.runningBalance ?: 0, currency),
                     )
                 }
             }
@@ -171,8 +215,8 @@ class TransactionRepositoryImpl(
                 description = transfer.description,
                 sourceAccountId = transfer.sourceAccountId.id,
                 targetAccountId = transfer.targetAccountId.id,
-                currencyId = transfer.currencyId.toString(),
-                amount = transfer.amount,
+                currencyId = transfer.amount.currency.id.toString(),
+                amount = transfer.amount.amount,
             )
         }
 
@@ -186,8 +230,8 @@ class TransactionRepositoryImpl(
                         description = transfer.description,
                         sourceAccountId = transfer.sourceAccountId.id,
                         targetAccountId = transfer.targetAccountId.id,
-                        currencyId = transfer.currencyId.toString(),
-                        amount = transfer.amount,
+                        currencyId = transfer.amount.currency.id.toString(),
+                        amount = transfer.amount.amount,
                     )
                 }
             }
@@ -200,8 +244,8 @@ class TransactionRepositoryImpl(
                 description = transfer.description,
                 sourceAccountId = transfer.sourceAccountId.id,
                 targetAccountId = transfer.targetAccountId.id,
-                currencyId = transfer.currencyId.toString(),
-                amount = transfer.amount,
+                currencyId = transfer.amount.currency.id.toString(),
+                amount = transfer.amount.amount,
                 id = transfer.id.toString(),
             )
         }

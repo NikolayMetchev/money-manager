@@ -8,11 +8,9 @@ package com.moneymanager.domain.model
  * plus all descendant categories, grouped by currency.
  *
  * @property categoryId The category this balance belongs to
- * @property currencyId The currency of this balance
- * @property balance The aggregated balance amount
+ * @property balance The aggregated balance amount (includes currency)
  */
 data class CategoryBalance(
     val categoryId: Long,
-    val currencyId: CurrencyId,
-    val balance: Double,
+    val balance: Money,
 )

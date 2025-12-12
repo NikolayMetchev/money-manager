@@ -119,7 +119,7 @@ fun CategoriesScreen(
     // Get unique currencies that have balances (for column headers)
     val currenciesWithBalances =
         remember(categoryBalances, currencies) {
-            val currencyIdsWithBalances = categoryBalances.map { it.currencyId }.toSet()
+            val currencyIdsWithBalances = categoryBalances.map { it.balance.currency.id }.toSet()
             currencies.filter { it.id in currencyIdsWithBalances }
         }
 
@@ -129,9 +129,13 @@ fun CategoriesScreen(
             currenciesWithBalances.associate { currency ->
                 val maxBalance =
                     categoryBalances
-                        .filter { it.currencyId == currency.id }
-                        .maxOfOrNull { kotlin.math.abs(it.balance) } ?: 0.0
-                val formattedMax = formatAmount(maxBalance, currency)
+                        .filter { it.balance.currency.id == currency.id }
+                        .maxOfOrNull { kotlin.math.abs(it.balance.amount) } ?: 0L
+                val maxMoney =
+                    categoryBalances
+                        .filter { it.balance.currency.id == currency.id }
+                        .maxByOrNull { kotlin.math.abs(it.balance.amount) }?.balance
+                val formattedMax = maxMoney?.let { formatAmount(it) } ?: formatAmount(0.0, currency)
                 // Estimate width: ~8dp per character + 16dp padding
                 val estimatedWidth = (formattedMax.length * 8 + 16).dp
                 currency.id to maxOf(estimatedWidth, BALANCE_COLUMN_WIDTH)
@@ -414,7 +418,7 @@ fun CategoryTreeItem(
     // Create a map for quick balance lookup by currency
     val balancesByCurrency =
         remember(balances) {
-            balances.associateBy { it.currencyId }
+            balances.associateBy { it.balance.currency.id }
         }
 
     // Main row with two sections: fixed hierarchy column + scrollable balances
@@ -549,7 +553,7 @@ fun CategoryTreeItem(
                     Text(
                         text =
                             if (balance != null) {
-                                formatAmount(balance.balance, currency)
+                                formatAmount(balance.balance)
                             } else {
                                 ""
                             },
@@ -560,8 +564,8 @@ fun CategoryTreeItem(
                         color =
                             when {
                                 balance == null -> MaterialTheme.colorScheme.onSurfaceVariant
-                                balance.balance > 0 -> MaterialTheme.colorScheme.primary
-                                balance.balance < 0 -> MaterialTheme.colorScheme.error
+                                balance.balance.amount > 0 -> MaterialTheme.colorScheme.primary
+                                balance.balance.amount < 0 -> MaterialTheme.colorScheme.error
                                 else -> MaterialTheme.colorScheme.onSurfaceVariant
                             },
                         modifier =

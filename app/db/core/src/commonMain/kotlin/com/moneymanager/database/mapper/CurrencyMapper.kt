@@ -12,6 +12,7 @@ object CurrencyMapper {
             id = CurrencyId(Uuid.parse(entity.id)),
             code = entity.code,
             name = entity.name,
+            scaleFactor = entity.scaleFactor.toInt(),
         )
 
     fun mapList(entities: List<com.moneymanager.database.sql.Currency>): List<Currency> = entities.map(::map)

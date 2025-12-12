@@ -9,6 +9,7 @@ import com.moneymanager.database.mapper.CurrencyMapper
 import com.moneymanager.database.sql.MoneyManagerDatabase
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.CurrencyScaleFactors
 import com.moneymanager.domain.repository.CurrencyRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -49,7 +50,8 @@ class CurrencyRepositoryImpl(
                 existing?.let { CurrencyId(Uuid.parse(it.id)) }
                     ?: run {
                         val newId = Uuid.random()
-                        queries.insert(newId.toString(), code, name)
+                        val scaleFactor = CurrencyScaleFactors.getScaleFactor(code)
+                        queries.insert(newId.toString(), code, name, scaleFactor.toLong())
                         CurrencyId(newId)
                     }
             }
@@ -60,6 +62,7 @@ class CurrencyRepositoryImpl(
             queries.update(
                 code = currency.code,
                 name = currency.name,
+                scaleFactor = currency.scaleFactor.toLong(),
                 id = currency.id.toString(),
             )
         }

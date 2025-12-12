@@ -6,11 +6,13 @@ import com.moneymanager.di.AppComponent
 import com.moneymanager.di.createTestAppComponentParams
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.TransactionRepository
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -98,9 +100,8 @@ class IncrementalMaterializedViewRefreshTest {
                 "Currency ID should match between materialized view and view",
             )
             assertEquals(
-                view.balance ?: 0.0,
+                view.balance ?: 0,
                 materialized.balance,
-                0.01,
                 "Balance should match between materialized view and view",
             )
         }
@@ -130,6 +131,7 @@ class IncrementalMaterializedViewRefreshTest {
         runTest {
             val (account1Id, account2Id) = createTestAccounts()
             val currencyId = currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
+            val currency = currencyRepository.getCurrencyById(currencyId).first()!!
 
             val now = Clock.System.now()
 
@@ -141,8 +143,7 @@ class IncrementalMaterializedViewRefreshTest {
                     description = "Transfer 1",
                     sourceAccountId = account1Id,
                     targetAccountId = account2Id,
-                    currencyId = currencyId,
-                    amount = 100.0,
+                    amount = Money.fromDisplayValue(100.0, currency),
                 ),
             )
 
@@ -157,8 +158,7 @@ class IncrementalMaterializedViewRefreshTest {
                     description = "Transfer 2 (after)",
                     sourceAccountId = account1Id,
                     targetAccountId = account2Id,
-                    currencyId = currencyId,
-                    amount = 50.0,
+                    amount = Money.fromDisplayValue(50.0, currency),
                 ),
             )
 
@@ -184,6 +184,7 @@ class IncrementalMaterializedViewRefreshTest {
         runTest {
             val (account1Id, account2Id) = createTestAccounts()
             val currencyId = currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
+            val currency = currencyRepository.getCurrencyById(currencyId).first()!!
 
             val now = Clock.System.now()
 
@@ -195,8 +196,7 @@ class IncrementalMaterializedViewRefreshTest {
                     description = "Transfer 1",
                     sourceAccountId = account1Id,
                     targetAccountId = account2Id,
-                    currencyId = currencyId,
-                    amount = 100.0,
+                    amount = Money.fromDisplayValue(100.0, currency),
                 ),
             )
 
@@ -208,8 +208,7 @@ class IncrementalMaterializedViewRefreshTest {
                     description = "Transfer 3",
                     sourceAccountId = account1Id,
                     targetAccountId = account2Id,
-                    currencyId = currencyId,
-                    amount = 75.0,
+                    amount = Money.fromDisplayValue(75.0, currency),
                 ),
             )
 
@@ -224,8 +223,7 @@ class IncrementalMaterializedViewRefreshTest {
                     description = "Transfer 2 (middle)",
                     sourceAccountId = account1Id,
                     targetAccountId = account2Id,
-                    currencyId = currencyId,
-                    amount = 50.0,
+                    amount = Money.fromDisplayValue(50.0, currency),
                 ),
             )
 
@@ -238,6 +236,7 @@ class IncrementalMaterializedViewRefreshTest {
         runTest {
             val (account1Id, account2Id) = createTestAccounts()
             val currencyId = currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
+            val currency = currencyRepository.getCurrencyById(currencyId).first()!!
 
             val now = Clock.System.now()
 
@@ -249,8 +248,7 @@ class IncrementalMaterializedViewRefreshTest {
                     description = "Transfer 1",
                     sourceAccountId = account1Id,
                     targetAccountId = account2Id,
-                    currencyId = currencyId,
-                    amount = 100.0,
+                    amount = Money.fromDisplayValue(100.0, currency),
                 ),
             )
 
@@ -265,8 +263,7 @@ class IncrementalMaterializedViewRefreshTest {
                     description = "Transfer 0 (before)",
                     sourceAccountId = account1Id,
                     targetAccountId = account2Id,
-                    currencyId = currencyId,
-                    amount = 50.0,
+                    amount = Money.fromDisplayValue(50.0, currency),
                 ),
             )
 
@@ -281,6 +278,7 @@ class IncrementalMaterializedViewRefreshTest {
         runTest {
             val (account1Id, account2Id) = createTestAccounts()
             val currencyId = currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
+            val currency = currencyRepository.getCurrencyById(currencyId).first()!!
 
             val now = Clock.System.now()
 
@@ -293,8 +291,7 @@ class IncrementalMaterializedViewRefreshTest {
                     description = "Transfer 1",
                     sourceAccountId = account1Id,
                     targetAccountId = account2Id,
-                    currencyId = currencyId,
-                    amount = 100.0,
+                    amount = Money.fromDisplayValue(100.0, currency),
                 ),
             )
 
@@ -305,8 +302,7 @@ class IncrementalMaterializedViewRefreshTest {
                     description = "Transfer 2",
                     sourceAccountId = account1Id,
                     targetAccountId = account2Id,
-                    currencyId = currencyId,
-                    amount = 50.0,
+                    amount = Money.fromDisplayValue(50.0, currency),
                 ),
             )
 
@@ -321,8 +317,7 @@ class IncrementalMaterializedViewRefreshTest {
                     description = "Transfer 1 (updated)",
                     sourceAccountId = account1Id,
                     targetAccountId = account2Id,
-                    currencyId = currencyId,
-                    amount = 100.0,
+                    amount = Money.fromDisplayValue(100.0, currency),
                 ),
             )
 
@@ -354,6 +349,7 @@ class IncrementalMaterializedViewRefreshTest {
                 )
 
             val currencyId = currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
+            val currency = currencyRepository.getCurrencyById(currencyId).first()!!
 
             // Insert transfer between account1 and account2
             val transferId = TransferId(Uuid.random())
@@ -364,8 +360,7 @@ class IncrementalMaterializedViewRefreshTest {
                     description = "Original transfer",
                     sourceAccountId = account1Id,
                     targetAccountId = account2Id,
-                    currencyId = currencyId,
-                    amount = 100.0,
+                    amount = Money.fromDisplayValue(100.0, currency),
                 ),
             )
 
@@ -380,8 +375,7 @@ class IncrementalMaterializedViewRefreshTest {
                     description = "Updated transfer",
                     sourceAccountId = account3Id,
                     targetAccountId = account4Id,
-                    currencyId = currencyId,
-                    amount = 100.0,
+                    amount = Money.fromDisplayValue(100.0, currency),
                 ),
             )
 
@@ -405,6 +399,7 @@ class IncrementalMaterializedViewRefreshTest {
         runTest {
             val (account1Id, account2Id) = createTestAccounts()
             val currencyId = currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
+            val currency = currencyRepository.getCurrencyById(currencyId).first()!!
 
             val now = Clock.System.now()
 
@@ -417,8 +412,7 @@ class IncrementalMaterializedViewRefreshTest {
                     description = "Transfer 1",
                     sourceAccountId = account1Id,
                     targetAccountId = account2Id,
-                    currencyId = currencyId,
-                    amount = 100.0,
+                    amount = Money.fromDisplayValue(100.0, currency),
                 ),
             )
 
@@ -429,8 +423,7 @@ class IncrementalMaterializedViewRefreshTest {
                     description = "Transfer 2",
                     sourceAccountId = account1Id,
                     targetAccountId = account2Id,
-                    currencyId = currencyId,
-                    amount = 50.0,
+                    amount = Money.fromDisplayValue(50.0, currency),
                 ),
             )
 
@@ -455,6 +448,7 @@ class IncrementalMaterializedViewRefreshTest {
         runTest {
             val (account1Id, account2Id) = createTestAccounts()
             val currencyId = currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
+            val currency = currencyRepository.getCurrencyById(currencyId).first()!!
 
             val now = Clock.System.now()
 
@@ -467,8 +461,7 @@ class IncrementalMaterializedViewRefreshTest {
                     description = "Only transfer",
                     sourceAccountId = account1Id,
                     targetAccountId = account2Id,
-                    currencyId = currencyId,
-                    amount = 100.0,
+                    amount = Money.fromDisplayValue(100.0, currency),
                 ),
             )
 
@@ -514,6 +507,7 @@ class IncrementalMaterializedViewRefreshTest {
                     Account(id = AccountId(0), name = "Account 2", openingDate = now),
                 )
             val currencyId = currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
+            val currency = currencyRepository.getCurrencyById(currencyId).first()!!
 
             transactionRepository.createTransfer(
                 Transfer(
@@ -522,8 +516,7 @@ class IncrementalMaterializedViewRefreshTest {
                     description = "First transfer",
                     sourceAccountId = account1Id,
                     targetAccountId = account2Id,
-                    currencyId = currencyId,
-                    amount = 100.0,
+                    amount = Money.fromDisplayValue(100.0, currency),
                 ),
             )
 
@@ -543,8 +536,7 @@ class IncrementalMaterializedViewRefreshTest {
                     description = "Transfer with new account",
                     sourceAccountId = account3Id,
                     targetAccountId = account1Id,
-                    currencyId = currencyId,
-                    amount = 50.0,
+                    amount = Money.fromDisplayValue(50.0, currency),
                 ),
             )
 
@@ -567,6 +559,7 @@ class IncrementalMaterializedViewRefreshTest {
 
             // Insert transfer with USD
             val usdId = currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
+            val usdCurrency = currencyRepository.getCurrencyById(usdId).first()!!
             transactionRepository.createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
@@ -574,8 +567,7 @@ class IncrementalMaterializedViewRefreshTest {
                     description = "USD transfer",
                     sourceAccountId = account1Id,
                     targetAccountId = account2Id,
-                    currencyId = usdId,
-                    amount = 100.0,
+                    amount = Money.fromDisplayValue(100.0, usdCurrency),
                 ),
             )
 
@@ -584,6 +576,7 @@ class IncrementalMaterializedViewRefreshTest {
 
             // Insert transfer with NEW currency (EUR)
             val eurId = currencyRepository.upsertCurrencyByCode("EUR", "Euro")
+            val eurCurrency = currencyRepository.getCurrencyById(eurId).first()!!
             transactionRepository.createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
@@ -591,8 +584,7 @@ class IncrementalMaterializedViewRefreshTest {
                     description = "EUR transfer",
                     sourceAccountId = account1Id,
                     targetAccountId = account2Id,
-                    currencyId = eurId,
-                    amount = 50.0,
+                    amount = Money.fromDisplayValue(50.0, eurCurrency),
                 ),
             )
 
@@ -614,6 +606,7 @@ class IncrementalMaterializedViewRefreshTest {
         runTest {
             val (account1Id, account2Id) = createTestAccounts()
             val currencyId = currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
+            val currency = currencyRepository.getCurrencyById(currencyId).first()!!
 
             val now = Clock.System.now()
 
@@ -625,8 +618,7 @@ class IncrementalMaterializedViewRefreshTest {
                     description = "Initial transfer",
                     sourceAccountId = account1Id,
                     targetAccountId = account2Id,
-                    currencyId = currencyId,
-                    amount = 100.0,
+                    amount = Money.fromDisplayValue(100.0, currency),
                 ),
             )
 
@@ -641,8 +633,7 @@ class IncrementalMaterializedViewRefreshTest {
                     description = "Transfer 2",
                     sourceAccountId = account1Id,
                     targetAccountId = account2Id,
-                    currencyId = currencyId,
-                    amount = 50.0,
+                    amount = Money.fromDisplayValue(50.0, currency),
                 ),
             )
 
@@ -653,8 +644,7 @@ class IncrementalMaterializedViewRefreshTest {
                     description = "Transfer 3",
                     sourceAccountId = account2Id,
                     targetAccountId = account1Id,
-                    currencyId = currencyId,
-                    amount = 25.0,
+                    amount = Money.fromDisplayValue(25.0, currency),
                 ),
             )
 
@@ -665,8 +655,7 @@ class IncrementalMaterializedViewRefreshTest {
                     description = "Transfer 4",
                     sourceAccountId = account1Id,
                     targetAccountId = account2Id,
-                    currencyId = currencyId,
-                    amount = 75.0,
+                    amount = Money.fromDisplayValue(75.0, currency),
                 ),
             )
 
@@ -695,6 +684,7 @@ class IncrementalMaterializedViewRefreshTest {
         runTest {
             val (account1Id, account2Id) = createTestAccounts()
             val currencyId = currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
+            val currency = currencyRepository.getCurrencyById(currencyId).first()!!
 
             val now = Clock.System.now()
 
@@ -707,8 +697,7 @@ class IncrementalMaterializedViewRefreshTest {
                         description = "Transfer $i",
                         sourceAccountId = if (i % 2 == 0) account1Id else account2Id,
                         targetAccountId = if (i % 2 == 0) account2Id else account1Id,
-                        currencyId = currencyId,
-                        amount = (i + 1) * 10.0,
+                        amount = Money.fromDisplayValue((i + 1) * 10.0, currency),
                     ),
                 )
             }
@@ -748,7 +737,6 @@ class IncrementalMaterializedViewRefreshTest {
                 assertEquals(
                     full.balance,
                     incremental.balance,
-                    0.01,
                     "Balances should match",
                 )
             }
