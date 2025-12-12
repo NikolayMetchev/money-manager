@@ -9,7 +9,9 @@ import com.moneymanager.database.mapper.CategoryMapper
 import com.moneymanager.database.sql.MoneyManagerDatabase
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CategoryBalance
+import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.repository.CategoryRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -34,10 +36,16 @@ class CategoryRepositoryImpl(
             .mapToList(Dispatchers.Default)
             .map { list ->
                 list.map { row ->
+                    val currency =
+                        Currency(
+                            id = CurrencyId(Uuid.parse(row.currency_id)),
+                            code = row.currency_code,
+                            name = row.currency_name,
+                            scaleFactor = row.currency_scaleFactor,
+                        )
                     CategoryBalance(
                         categoryId = row.categoryId,
-                        currencyId = CurrencyId(Uuid.parse(row.currencyId)),
-                        balance = row.balance ?: 0.0,
+                        balance = Money(row.balance ?: 0, currency),
                     )
                 }
             }

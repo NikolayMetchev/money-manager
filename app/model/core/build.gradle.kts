@@ -10,6 +10,7 @@ kotlin {
                 implementation(libs.kmlogging)
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.datetime)
+                implementation(projects.utils.bigdecimal)
             }
         }
     }

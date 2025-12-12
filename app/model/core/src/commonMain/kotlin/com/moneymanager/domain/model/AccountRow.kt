@@ -9,7 +9,6 @@ data class AccountRow(
     val timestamp: Instant,
     val description: String,
     val accountId: AccountId,
-    val currencyId: CurrencyId,
-    val transactionAmount: Double,
-    val runningBalance: Double,
+    val transactionAmount: Money,
+    val runningBalance: Money,
 )

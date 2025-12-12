@@ -23,7 +23,7 @@ CREATE TABLE Transfer (
             AND substr(currencyId, 15, 1) IN ('1','2','3','4','5','6','7','8')
             AND lower(substr(currencyId, 20, 1)) IN ('8','9','a','b')
         ),
-    amount REAL NOT NULL,
+    amount INTEGER NOT NULL,
     CHECK (sourceAccountId != targetAccountId),
     FOREIGN KEY (sourceAccountId) REFERENCES Account(id) ON DELETE CASCADE,
     FOREIGN KEY (targetAccountId) REFERENCES Account(id) ON DELETE CASCADE,
@@ -38,7 +38,7 @@ CREATE INDEX IF NOT EXISTS idx_transfer_currency ON Transfer(currencyId);
 CREATE TABLE AccountBalanceMaterializedView (
     accountId INTEGER NOT NULL,
     currencyId TEXT NOT NULL,
-    balance REAL NOT NULL,
+    balance INTEGER NOT NULL,
     PRIMARY KEY (accountId, currencyId),
     FOREIGN KEY (accountId) REFERENCES Account(id) ON DELETE CASCADE,
     FOREIGN KEY (currencyId) REFERENCES Currency(id) ON DELETE CASCADE
@@ -54,8 +54,8 @@ CREATE TABLE RunningBalanceMaterializedView (
     description TEXT NOT NULL,
     accountId INTEGER NOT NULL,
     currencyId TEXT NOT NULL,
-    transactionAmount REAL NOT NULL,
-    runningBalance REAL NOT NULL,
+    transactionAmount INTEGER NOT NULL,
+    runningBalance INTEGER NOT NULL,
     PRIMARY KEY (id, accountId),
     FOREIGN KEY (accountId) REFERENCES Account(id) ON DELETE CASCADE,
     FOREIGN KEY (currencyId) REFERENCES Currency(id) ON DELETE CASCADE
@@ -252,23 +252,60 @@ clearPendingChanges:
 DELETE FROM PendingMaterializedViewChanges;
 
 selectAll:
-SELECT * FROM Transfer ORDER BY timestamp DESC;
+SELECT
+    Transfer.*,
+    Currency.id AS currency_id,
+    Currency.code AS currency_code,
+    Currency.name AS currency_name,
+    Currency.scaleFactor AS currency_scaleFactor
+FROM Transfer
+JOIN Currency ON Transfer.currencyId = Currency.id
+ORDER BY timestamp DESC;
 
 selectById:
-SELECT * FROM Transfer WHERE id = ?;
+SELECT
+    Transfer.*,
+    Currency.id AS currency_id,
+    Currency.code AS currency_code,
+    Currency.name AS currency_name,
+    Currency.scaleFactor AS currency_scaleFactor
+FROM Transfer
+JOIN Currency ON Transfer.currencyId = Currency.id
+WHERE Transfer.id = ?;
 
 selectByAccount:
-SELECT * FROM Transfer
+SELECT
+    Transfer.*,
+    Currency.id AS currency_id,
+    Currency.code AS currency_code,
+    Currency.name AS currency_name,
+    Currency.scaleFactor AS currency_scaleFactor
+FROM Transfer
+JOIN Currency ON Transfer.currencyId = Currency.id
 WHERE sourceAccountId = ? OR targetAccountId = ?
 ORDER BY timestamp DESC;
 
 selectByDateRange:
-SELECT * FROM Transfer
+SELECT
+    Transfer.*,
+    Currency.id AS currency_id,
+    Currency.code AS currency_code,
+    Currency.name AS currency_name,
+    Currency.scaleFactor AS currency_scaleFactor
+FROM Transfer
+JOIN Currency ON Transfer.currencyId = Currency.id
 WHERE timestamp >= ? AND timestamp <= ?
 ORDER BY timestamp DESC;
 
 selectByAccountAndDateRange:
-SELECT * FROM Transfer
+SELECT
+    Transfer.*,
+    Currency.id AS currency_id,
+    Currency.code AS currency_code,
+    Currency.name AS currency_name,
+    Currency.scaleFactor AS currency_scaleFactor
+FROM Transfer
+JOIN Currency ON Transfer.currencyId = Currency.id
 WHERE (sourceAccountId = ? OR targetAccountId = ?)
 AND timestamp >= ? AND timestamp <= ?
 ORDER BY timestamp DESC;
@@ -289,16 +326,27 @@ selectAllBalances:
 SELECT
     AccountBalanceMaterializedView.accountId,
     AccountBalanceMaterializedView.currencyId,
-    AccountBalanceMaterializedView.balance
+    AccountBalanceMaterializedView.balance,
+    Currency.id AS currency_id,
+    Currency.code AS currency_code,
+    Currency.name AS currency_name,
+    Currency.scaleFactor AS currency_scaleFactor
 FROM AccountBalanceMaterializedView
 JOIN Account ON AccountBalanceMaterializedView.accountId = Account.id
 JOIN Currency ON AccountBalanceMaterializedView.currencyId = Currency.id
 ORDER BY Currency.code, Account.name;
 
 selectRunningBalanceByAccount:
-SELECT * FROM RunningBalanceMaterializedView
+SELECT
+    RunningBalanceMaterializedView.*,
+    Currency.id AS currency_id,
+    Currency.code AS currency_code,
+    Currency.name AS currency_name,
+    Currency.scaleFactor AS currency_scaleFactor
+FROM RunningBalanceMaterializedView
+JOIN Currency ON RunningBalanceMaterializedView.currencyId = Currency.id
 WHERE accountId = ?
-ORDER BY timestamp DESC, id DESC;
+ORDER BY timestamp DESC, RunningBalanceMaterializedView.id DESC;
 
 -- Test helper queries
 countPendingChanges:

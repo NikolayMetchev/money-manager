@@ -39,6 +39,7 @@
             <option value="$PROJECT_DIR$/test/app" />
             <option value="$PROJECT_DIR$/test/app/db" />
             <option value="$PROJECT_DIR$/utils" />
+            <option value="$PROJECT_DIR$/utils/bigdecimal" />
             <option value="$PROJECT_DIR$/utils/currency" />
           </set>
         </option>

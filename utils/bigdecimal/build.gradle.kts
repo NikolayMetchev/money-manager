@@ -5,7 +5,7 @@ plugins {
 
 kotlin {
     sourceSets {
-        // Shared source set for JVM and Android (both have access to java.text.NumberFormat)
+        // Shared source set for JVM and Android (both have access to java.math.BigDecimal)
         val jvmAndroidMain by creating {
             dependsOn(commonMain.get())
         }

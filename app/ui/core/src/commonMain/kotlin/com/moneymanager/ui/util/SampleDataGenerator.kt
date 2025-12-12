@@ -6,6 +6,7 @@ import com.moneymanager.database.RepositorySet
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Category
+import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -228,8 +229,7 @@ suspend fun generateSampleData(
                     description = description,
                     sourceAccountId = accountId,
                     targetAccountId = targetAccountId,
-                    currencyId = currency.id,
-                    amount = amount,
+                    amount = Money.fromDisplayValue(amount, currency),
                 )
 
             allTransfers.add(transfer)

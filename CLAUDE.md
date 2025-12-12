@@ -185,6 +185,15 @@ The project follows a modular architecture with clear separation of concerns:
     - `moneymanager.mappie-convention.gradle.kts`: Mappie object mapping
     - `moneymanager.metro-convention.gradle.kts`: Metro DI plugin and runtime
 
+- **utils/bigdecimal/**: BigDecimal utility module (multiplatform: JVM, Android)
+  - `src/jvmAndroidMain/kotlin/`: Shared JVM/Android implementation using `java.math.BigDecimal`
+  - Provides arbitrary-precision decimal arithmetic for Money display values
+  - Not available on native platforms (uses expect/actual pattern for future expansion)
+
+- **utils/currency/**: Currency formatting utility module (multiplatform: JVM, Android)
+  - Provides locale-aware currency symbol formatting
+  - Used by UI layer for displaying formatted amounts
+
 - **app/model/core/**: Core domain module (multiplatform: JVM, Android)
   - `src/commonMain/kotlin/com/moneymanager/domain/`:
     - `model/`: Domain models (Account, Category, Transaction)
@@ -242,6 +251,74 @@ The application follows a clean architecture pattern with three main entities:
 3. **Transaction**: Represents financial transactions
    - Supports income, expense, and transfer types
    - Fields: id, accountId, categoryId, type, amount, currency, description, date, etc.
+
+### Money and Currency Handling
+
+The project uses a **Money value class** to handle monetary amounts with proper precision and currency association.
+
+**Why Money Type?**
+- Prevents mixing amounts from different currencies
+- Avoids floating-point precision issues
+- Stores amounts as INTEGER in database (no rounding errors)
+- Uses BigDecimal for display calculations
+- Type-safe amount handling throughout the application
+
+**Key Components**:
+
+1. **Money Value Class** (`app/model/core/src/commonMain/kotlin/com/moneymanager/domain/model/Money.kt`):
+   - Stores amount as `Long` (integer representation)
+   - Stores associated `Currency` object
+   - Provides `toDisplayValue()` to convert to BigDecimal for UI
+   - Factory method `fromDisplayValue(displayValue: Double, currency: Currency)` for creating from user input
+   - Arithmetic operations that maintain currency type
+
+2. **BigDecimal Utility** (`utils/bigdecimal` module):
+   - Multiplatform expect/actual implementation
+   - JVM: Uses `java.math.BigDecimal`
+   - Android: Uses `java.math.BigDecimal` via jvmAndroidMain sourceSet
+   - Provides arbitrary-precision decimal arithmetic for display calculations
+   - Not available on native platforms (future consideration)
+
+3. **Currency Scale Factors** (`app/model/core/src/commonMain/kotlin/com/moneymanager/domain/model/CurrencyScaleFactors.kt`):
+   - ISO 4217 currency scale factor lookup utility
+   - Most currencies use 2 decimal places (scale factor 100)
+   - Some currencies use 0 decimal places (e.g., JPY, KRW: scale factor 1)
+   - Some currencies use 3 decimal places (e.g., BHD, KWD: scale factor 1000)
+   - Formula: `scaleFactor = 10^decimalPlaces`
+
+4. **Currency Formatting** (`app/ui/core/src/commonMain/kotlin/com/moneymanager/ui/util/CurrencyFormatting.kt`):
+   - `formatAmount(money: Money): String` - Formats Money values for display
+   - `formatAmount(amount: Number, currency: Currency): String` - Low-level formatter
+   - Uses `utils/currency` module for locale-aware formatting with currency symbols
+
+**Amount Storage**:
+- Database stores amounts as `INTEGER` (SQLite type)
+- Value = display_amount × scale_factor
+- Example: $12.34 stored as 1234 (with scale factor 100)
+- Example: ¥1000 stored as 1000 (with scale factor 1)
+- Example: KWD 12.345 stored as 12345 (with scale factor 1000)
+
+**Usage Pattern**:
+```kotlin
+// Creating Money from user input
+val amount = Money.fromDisplayValue(12.34, usdCurrency)  // Stores 1234 internally
+
+// Displaying Money
+val formatted = formatAmount(amount)  // Returns "$12.34"
+
+// Converting to BigDecimal for calculations
+val displayValue: BigDecimal = amount.toDisplayValue()  // Returns 12.34
+
+// Database storage
+// SQLDelight automatically handles conversion between Long and INTEGER
+// Currency information comes from joined Currency table
+```
+
+**Module Dependencies**:
+- `app/model/core`: Contains Money value class and Currency domain models
+- `utils/bigdecimal`: Provides BigDecimal for display calculations (jvmAndroidMain)
+- `utils/currency`: Provides currency symbol formatting
+- `app/ui/core`: Uses Money type for all amount displays, depends on bigdecimal and currency utils
 
 ### Database Schema
 
@@ -874,6 +951,10 @@ The project uses modern Gradle practices for maintainability:
    - **NEVER** hardcode dependencies with versions directly in build files
    - Use `libs.*` references in all build files for consistency and centralized version management
    - Example: Use `implementation(libs.kotlinx.coroutines.core)` NOT `implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")`
+   - **ALWAYS** use typesafe project accessors for project dependencies
+   - Use `projects.*` references instead of string-based `project()` calls
+   - Example: Use `implementation(projects.utils.bigdecimal)` NOT `implementation(project(":utils:bigdecimal"))`
+   - Typesafe accessors provide compile-time safety and better IDE support
 
 10. **Build Health (Dependency Analysis)**:
     - **NEVER** skip or exclude modules from the `buildHealth` task

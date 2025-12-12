@@ -4,15 +4,13 @@ package com.moneymanager.database.mapper
 
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
+import tech.mappie.api.ObjectMappie
 import kotlin.uuid.Uuid
+import com.moneymanager.database.sql.Currency as DbCurrency
 
-object CurrencyMapper {
-    fun map(entity: com.moneymanager.database.sql.Currency): Currency =
-        Currency(
-            id = CurrencyId(Uuid.parse(entity.id)),
-            code = entity.code,
-            name = entity.name,
-        )
-
-    fun mapList(entities: List<com.moneymanager.database.sql.Currency>): List<Currency> = entities.map(::map)
+object CurrencyMapper : ObjectMappie<DbCurrency, Currency>() {
+    override fun map(from: DbCurrency) =
+        mapping {
+            Currency::id fromValue CurrencyId(Uuid.parse(from.id))
+        }
 }

@@ -63,8 +63,16 @@ lastInsertRowId:
 SELECT last_insert_rowid();
 
 selectAllCategoryBalances:
-SELECT categoryId, currencyId, balance
+SELECT
+    CategoryBalanceView.categoryId,
+    CategoryBalanceView.currencyId,
+    CategoryBalanceView.balance,
+    Currency.id AS currency_id,
+    Currency.code AS currency_code,
+    Currency.name AS currency_name,
+    Currency.scaleFactor AS currency_scaleFactor
 FROM CategoryBalanceView
+JOIN Currency ON CategoryBalanceView.currencyId = Currency.id
 ORDER BY categoryId, currencyId;
 
 selectCategoryBalanceById:

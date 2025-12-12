@@ -167,26 +167,23 @@ fun AccountCard(
             if (balances.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
                 balances.forEach { balance ->
-                    val currency = currencies.find { it.id == balance.currencyId }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            text = currency?.code ?: "Unknown Currency",
+                            text = balance.balance.currency.code,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Text(
-                            text =
-                                currency?.let { formatAmount(balance.balance, it) }
-                                    ?: String.format("%.2f", balance.balance),
+                            text = formatAmount(balance.balance),
                             style = MaterialTheme.typography.bodyLarge,
                             color =
                                 when {
-                                    balance.balance > 0 -> MaterialTheme.colorScheme.primary
-                                    balance.balance < 0 -> MaterialTheme.colorScheme.error
+                                    balance.balance.amount > 0 -> MaterialTheme.colorScheme.primary
+                                    balance.balance.amount < 0 -> MaterialTheme.colorScheme.error
                                     else -> MaterialTheme.colorScheme.onSurface
                                 },
                         )

@@ -4,6 +4,5 @@ package com.moneymanager.domain.model
 
 data class AccountBalance(
     val accountId: AccountId,
-    val currencyId: CurrencyId,
-    val balance: Double,
+    val balance: Money,
 )

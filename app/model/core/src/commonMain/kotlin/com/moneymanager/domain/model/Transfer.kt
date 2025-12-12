@@ -11,8 +11,7 @@ data class Transfer(
     val description: String,
     val sourceAccountId: AccountId,
     val targetAccountId: AccountId,
-    val currencyId: CurrencyId,
-    val amount: Double,
+    val amount: Money,
 )
 
 @JvmInline

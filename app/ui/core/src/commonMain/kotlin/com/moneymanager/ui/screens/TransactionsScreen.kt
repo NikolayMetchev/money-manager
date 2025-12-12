@@ -68,6 +68,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
@@ -81,7 +82,6 @@ import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atTime
-import kotlinx.datetime.format
 import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
 import org.lighthousegames.logging.logging
@@ -177,7 +177,7 @@ fun AccountTransactionsScreen(
     val transactionMap = allTransactions.associateBy { it.id }
 
     // Get unique currency IDs from running balances for this account
-    val accountCurrencyIds = runningBalances.map { it.currencyId }.distinct()
+    val accountCurrencyIds = runningBalances.map { it.transactionAmount.currency.id }.distinct()
     val accountCurrencies = currencies.filter { it.id in accountCurrencyIds }
 
     // Selected currency state - default to first currency if available
@@ -204,11 +204,11 @@ fun AccountTransactionsScreen(
     // Filter running balances by selected currency (or show all if no currency selected)
     val filteredRunningBalances =
         selectedCurrencyId?.let { currencyId ->
-            runningBalances.filter { it.currencyId == currencyId }
+            runningBalances.filter { it.transactionAmount.currency.id == currencyId }
         } ?: runningBalances
 
     // Get all unique currencies from account balances for matrix
-    val uniqueCurrencyIds = accountBalances.map { it.currencyId }.distinct()
+    val uniqueCurrencyIds = accountBalances.map { it.balance.currency.id }.distinct()
 
     // Hoist scroll states to enable auto-scrolling from transaction clicks
     val horizontalScrollState = rememberScrollState()
@@ -367,7 +367,7 @@ fun AccountTransactionsScreen(
                                         allAccounts.forEach { account ->
                                             val balance =
                                                 accountBalances.find {
-                                                    it.accountId == account.id && it.currencyId == currencyId
+                                                    it.accountId == account.id && it.balance.currency.id == currencyId
                                                 }
                                             val isSelectedCell = selectedAccountId == account.id && selectedCurrencyId == currencyId
                                             val isColumnSelected = selectedAccountId == account.id && selectedCurrencyId == null
@@ -393,12 +393,10 @@ fun AccountTransactionsScreen(
                                             ) {
                                                 if (balance != null) {
                                                     Text(
-                                                        text =
-                                                            currency?.let { formatAmount(balance.balance, it) }
-                                                                ?: String.format("%.2f", balance.balance),
+                                                        text = formatAmount(balance.balance),
                                                         style = MaterialTheme.typography.bodySmall,
                                                         color =
-                                                            if (balance.balance >= 0) {
+                                                            if (balance.balance.amount >= 0) {
                                                                 MaterialTheme.colorScheme.primary
                                                             } else {
                                                                 MaterialTheme.colorScheme.error
@@ -537,7 +535,7 @@ fun AccountTransactionsScreen(
                             onAccountClick = { accountId ->
                                 highlightedTransactionId = runningBalance.transactionId
                                 selectedAccountId = accountId
-                                selectedCurrencyId = runningBalance.currencyId
+                                selectedCurrencyId = runningBalance.transactionAmount.currency.id
 
                                 // Auto-scroll matrix to the clicked account and transaction currency
                                 scrollScope.launch {
@@ -562,7 +560,10 @@ fun AccountTransactionsScreen(
                                             val targetScrollX = (columnCenterPx - (viewportWidthPx / 2)).coerceAtLeast(0f).toInt()
 
                                             // Calculate vertical scroll position for the currency
-                                            val currencyIndex = uniqueCurrencyIds.indexOfFirst { it == runningBalance.currencyId }
+                                            val currencyIndex =
+                                                uniqueCurrencyIds.indexOfFirst {
+                                                    it == runningBalance.transactionAmount.currency.id
+                                                }
                                             if (currencyIndex >= 0) {
                                                 // Each currency row: text + padding + spacing ≈ 28.dp
                                                 val rowHeightPx = 28.dp.toPx()
@@ -607,10 +608,10 @@ fun AccountTransactionCard(
 ) {
     val sourceAccount = transaction?.let { accounts.find { a -> a.id == it.sourceAccountId } }
     val targetAccount = transaction?.let { accounts.find { a -> a.id == it.targetAccountId } }
-    val currency = currencies.find { it.id == runningBalance.currencyId }
+    val currency = currencies.find { it.id == runningBalance.transactionAmount.currency.id }
 
     // Determine the other account based on transaction direction
-    val isOutgoing = runningBalance.transactionAmount < 0
+    val isOutgoing = runningBalance.transactionAmount.amount < 0
     val otherAccount = if (isOutgoing) targetAccount else sourceAccount
 
     Card(
@@ -699,12 +700,10 @@ fun AccountTransactionCard(
 
             // Amount column
             Text(
-                text =
-                    currency?.let { formatAmount(runningBalance.transactionAmount, it) }
-                        ?: String.format("%.2f", runningBalance.transactionAmount),
+                text = formatAmount(runningBalance.transactionAmount),
                 style = cellStyle,
                 color =
-                    if (runningBalance.transactionAmount >= 0) {
+                    if (runningBalance.transactionAmount.amount >= 0) {
                         MaterialTheme.colorScheme.primary
                     } else {
                         MaterialTheme.colorScheme.error
@@ -717,12 +716,10 @@ fun AccountTransactionCard(
 
             // Balance column
             Text(
-                text =
-                    currency?.let { formatAmount(runningBalance.runningBalance, it) }
-                        ?: String.format("%.2f", runningBalance.runningBalance),
+                text = formatAmount(runningBalance.runningBalance),
                 style = cellStyle,
                 color =
-                    if (runningBalance.runningBalance >= 0) {
+                    if (runningBalance.runningBalance.amount >= 0) {
                         MaterialTheme.colorScheme.primary
                     } else {
                         MaterialTheme.colorScheme.error
@@ -744,7 +741,7 @@ fun TransactionCard(
 ) {
     val sourceAccount = accounts.find { it.id == transaction.sourceAccountId }
     val targetAccount = accounts.find { it.id == transaction.targetAccountId }
-    val currency = currencies.find { it.id == transaction.currencyId }
+    val currency = currencies.find { it.id == transaction.amount.currency.id }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -803,9 +800,7 @@ fun TransactionCard(
                 modifier = Modifier.weight(0.15f),
             ) {
                 Text(
-                    text =
-                        currency?.let { formatAmount(transaction.amount, it) }
-                            ?: String.format("%.2f", transaction.amount),
+                    text = formatAmount(transaction.amount),
                     style = MaterialTheme.typography.titleLarge,
                     maxLines = 1,
                     autoSize = TextAutoSize.StepBased(minFontSize = 8.sp),
@@ -1182,6 +1177,11 @@ fun TransactionEntryDialog(
                             errorMessage = null
                             scope.launch {
                                 try {
+                                    // Get the currency object
+                                    val currency =
+                                        currencies.find { it.id == currencyId }
+                                            ?: throw IllegalStateException("Currency not found")
+
                                     // Convert selected date and time to Instant
                                     val timestamp =
                                         selectedDate
@@ -1194,8 +1194,7 @@ fun TransactionEntryDialog(
                                             description = description.trim(),
                                             sourceAccountId = sourceAccountId!!,
                                             targetAccountId = targetAccountId!!,
-                                            currencyId = currencyId!!,
-                                            amount = amount.toDouble(),
+                                            amount = Money.fromDisplayValue(amount.toDouble(), currency),
                                         )
                                     transactionRepository.createTransfer(transfer)
 
