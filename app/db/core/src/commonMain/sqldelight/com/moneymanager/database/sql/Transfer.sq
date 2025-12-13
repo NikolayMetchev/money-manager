@@ -357,7 +357,7 @@ JOIN Transfer ON RunningBalanceMaterializedView.id = Transfer.id
 WHERE RunningBalanceMaterializedView.accountId = ?
 ORDER BY RunningBalanceMaterializedView.timestamp DESC, RunningBalanceMaterializedView.id DESC;
 
-selectRunningBalanceByAccountFirstPage:
+selectRunningBalanceByAccountPaginated:
 SELECT
     RunningBalanceMaterializedView.id,
     RunningBalanceMaterializedView.timestamp,
@@ -376,29 +376,10 @@ FROM RunningBalanceMaterializedView
 JOIN Currency ON RunningBalanceMaterializedView.currencyId = Currency.id
 JOIN Transfer ON RunningBalanceMaterializedView.id = Transfer.id
 WHERE RunningBalanceMaterializedView.accountId = ?
-ORDER BY RunningBalanceMaterializedView.timestamp DESC, RunningBalanceMaterializedView.id DESC
-LIMIT ?;
-
-selectRunningBalanceByAccountNextPage:
-SELECT
-    RunningBalanceMaterializedView.id,
-    RunningBalanceMaterializedView.timestamp,
-    RunningBalanceMaterializedView.description,
-    RunningBalanceMaterializedView.accountId,
-    RunningBalanceMaterializedView.currencyId,
-    RunningBalanceMaterializedView.transactionAmount,
-    RunningBalanceMaterializedView.runningBalance,
-    Currency.id AS currency_id,
-    Currency.code AS currency_code,
-    Currency.name AS currency_name,
-    Currency.scaleFactor AS currency_scaleFactor,
-    Transfer.sourceAccountId,
-    Transfer.targetAccountId
-FROM RunningBalanceMaterializedView
-JOIN Currency ON RunningBalanceMaterializedView.currencyId = Currency.id
-JOIN Transfer ON RunningBalanceMaterializedView.id = Transfer.id
-WHERE RunningBalanceMaterializedView.accountId = ?
-  AND (RunningBalanceMaterializedView.timestamp < ? OR (RunningBalanceMaterializedView.timestamp = ? AND RunningBalanceMaterializedView.id < ?))
+  AND ((:lastTimestamp IS NULL AND :lastId IS NULL)
+       OR RunningBalanceMaterializedView.timestamp < :lastTimestamp
+       OR (RunningBalanceMaterializedView.timestamp = :lastTimestamp
+           AND RunningBalanceMaterializedView.id < :lastId))
 ORDER BY RunningBalanceMaterializedView.timestamp DESC, RunningBalanceMaterializedView.id DESC
 LIMIT ?;
 

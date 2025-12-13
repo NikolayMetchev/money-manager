@@ -78,60 +78,31 @@ class TransactionRepositoryImpl(
     ): PagingResult<AccountRow> =
         withContext(Dispatchers.Default) {
             val items =
-                if (pagingInfo == null) {
-                    transferQueries.selectRunningBalanceByAccountFirstPage(
-                        accountId.id,
-                        (pageSize + 1).toLong(),
-                    ) { id, timestamp, description, accountId_, currencyId, transactionAmount, runningBalance,
-                        currency_id, currency_code, currency_name, currency_scaleFactor, sourceAccountId, targetAccountId,
-                        ->
-                        AccountRowMapper.mapRaw(
-                            id,
-                            timestamp,
-                            description,
-                            accountId_,
-                            currencyId,
-                            transactionAmount,
-                            runningBalance,
-                            currency_id,
-                            currency_code,
-                            currency_name,
-                            currency_scaleFactor,
-                            sourceAccountId,
-                            targetAccountId,
-                        )
-                    }
-                        .executeAsList()
-                } else {
-                    val lastTimestamp = pagingInfo.lastTimestamp ?: throw IllegalStateException("lastTimestamp is null")
-                    val lastId = pagingInfo.lastId ?: throw IllegalStateException("lastId is null")
-                    transferQueries.selectRunningBalanceByAccountNextPage(
-                        accountId.id,
-                        lastTimestamp.toEpochMilliseconds(),
-                        lastTimestamp.toEpochMilliseconds(),
-                        lastId.toString(),
-                        (pageSize + 1).toLong(),
-                    ) { id, timestamp, description, accountId_, currencyId, transactionAmount, runningBalance,
-                        currency_id, currency_code, currency_name, currency_scaleFactor, sourceAccountId, targetAccountId,
-                        ->
-                        AccountRowMapper.mapRaw(
-                            id,
-                            timestamp,
-                            description,
-                            accountId_,
-                            currencyId,
-                            transactionAmount,
-                            runningBalance,
-                            currency_id,
-                            currency_code,
-                            currency_name,
-                            currency_scaleFactor,
-                            sourceAccountId,
-                            targetAccountId,
-                        )
-                    }
-                        .executeAsList()
+                transferQueries.selectRunningBalanceByAccountPaginated(
+                    accountId.id,
+                    pagingInfo?.lastTimestamp?.toEpochMilliseconds(),
+                    pagingInfo?.lastId?.toString(),
+                    (pageSize + 1).toLong(),
+                ) { id, timestamp, description, accountId_, currencyId, transactionAmount, runningBalance,
+                    currency_id, currency_code, currency_name, currency_scaleFactor, sourceAccountId, targetAccountId,
+                    ->
+                    AccountRowMapper.mapRaw(
+                        id,
+                        timestamp,
+                        description,
+                        accountId_,
+                        currencyId,
+                        transactionAmount,
+                        runningBalance,
+                        currency_id,
+                        currency_code,
+                        currency_name,
+                        currency_scaleFactor,
+                        sourceAccountId,
+                        targetAccountId,
+                    )
                 }
+                    .executeAsList()
 
             val hasMore = items.size > pageSize
             val pageItems = if (hasMore) items.take(pageSize) else items
