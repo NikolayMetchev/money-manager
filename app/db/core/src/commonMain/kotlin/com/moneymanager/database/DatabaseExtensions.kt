@@ -1,6 +1,5 @@
 package com.moneymanager.database
 
-import app.cash.sqldelight.Query
 import app.cash.sqldelight.db.QueryResult
 import app.cash.sqldelight.db.SqlDriver
 import com.moneymanager.database.sql.MoneyManagerDatabase
