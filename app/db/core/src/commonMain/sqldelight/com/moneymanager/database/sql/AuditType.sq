@@ -1,0 +1,13 @@
+-- AuditType lookup table for audit operations
+CREATE TABLE AuditType (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE
+);
+
+-- Query all audit types
+selectAll:
+SELECT * FROM AuditType ORDER BY id;
+
+-- Insert audit type (used during seeding)
+insert:
+INSERT INTO AuditType (id, name) VALUES (?, ?);

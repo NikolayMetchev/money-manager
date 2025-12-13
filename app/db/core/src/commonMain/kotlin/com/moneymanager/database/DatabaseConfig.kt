@@ -2,9 +2,7 @@
 
 package com.moneymanager.database
 
-import app.cash.sqldelight.db.SqlDriver
 import com.moneymanager.currency.Currency
-import com.moneymanager.database.sql.MoneyManagerDatabase
 
 /**
  * Centralized database configuration for SQLite PRAGMA settings and seed data.
@@ -33,12 +31,10 @@ object DatabaseConfig {
      *
      * NOTE: Triggers are created at runtime (not in schema) due to SQLDelight 2.2.1 parser limitations.
      * Called automatically from seedDatabase() during database initialization.
-     *
-     * @param driver The SQLite driver to use for executing the CREATE TRIGGER statements
      */
-    private fun createIncrementalRefreshTriggers(driver: SqlDriver) {
+    private fun MoneyManagerDatabaseWrapper.createIncrementalRefreshTriggers() {
         // INSERT trigger - tracks both source and target account-currency pairs
-        driver.execute(
+        execute(
             null,
             """
             CREATE TRIGGER IF NOT EXISTS trigger_transfer_insert_track_changes
@@ -68,7 +64,7 @@ object DatabaseConfig {
         )
 
         // UPDATE trigger - tracks all 4 possible account-currency pairs (old/new source/target)
-        driver.execute(
+        execute(
             null,
             """
             CREATE TRIGGER IF NOT EXISTS trigger_transfer_update_track_changes
@@ -116,7 +112,7 @@ object DatabaseConfig {
         )
 
         // DELETE trigger - tracks old source and target account-currency pairs
-        driver.execute(
+        execute(
             null,
             """
             CREATE TRIGGER IF NOT EXISTS trigger_transfer_delete_track_changes
@@ -149,11 +145,9 @@ object DatabaseConfig {
     /**
      * Creates a trigger to update children's parentId when a category is deleted.
      * Children inherit the deleted category's parent (grandparent becomes parent).
-     *
-     * @param driver The SQLite driver to use for executing the CREATE TRIGGER statement
      */
-    private fun createCategoryDeleteTrigger(driver: SqlDriver) {
-        driver.execute(
+    private fun MoneyManagerDatabaseWrapper.createCategoryDeleteTrigger() =
+        execute(
             null,
             """
             CREATE TRIGGER IF NOT EXISTS trigger_category_delete_update_children
@@ -167,6 +161,75 @@ object DatabaseConfig {
             """.trimIndent(),
             0,
         )
+
+    /**
+     * Creates audit triggers dynamically for all main tables.
+     * Queries sqlite_master to discover tables and their columns, then generates triggers.
+     *
+     * Each table gets 3 triggers: INSERT, UPDATE, DELETE that record changes to audit tables.
+     * - INSERT triggers store NEW values
+     * - UPDATE triggers store OLD values (state before change)
+     * - DELETE triggers store OLD values (state before deletion)
+     *
+     * NOTE: Triggers are created at runtime (not in schema) due to SQLDelight 2.2.1 parser limitations.
+     * Called automatically from seedDatabase() during database initialization.
+     */
+    private fun MoneyManagerDatabaseWrapper.createAuditTriggers() {
+        val tables = getAuditableTables()
+
+        tables.forEach { tableName ->
+            val auditTableName = "${tableName}_Audit"
+            val columns = getTableColumns(tableName)
+
+            val columnList = columns.joinToString(", ")
+            val newColumnList = columns.joinToString(", ") { "NEW.$it" }
+            val oldColumnList = columns.joinToString(", ") { "OLD.$it" }
+
+            // INSERT trigger - stores NEW values with auditTypeId 1
+            execute(
+                null,
+                """
+                CREATE TRIGGER IF NOT EXISTS trigger_${tableName.lowercase()}_insert_audit
+                AFTER INSERT ON $tableName
+                FOR EACH ROW
+                BEGIN
+                    INSERT INTO $auditTableName (auditTimestamp, auditTypeId, $columnList)
+                    VALUES (strftime('%s', 'now'), 1, $newColumnList);
+                END
+                """.trimIndent(),
+                0,
+            )
+
+            // UPDATE trigger - stores OLD values with auditTypeId 2
+            execute(
+                null,
+                """
+                CREATE TRIGGER IF NOT EXISTS trigger_${tableName.lowercase()}_update_audit
+                AFTER UPDATE ON $tableName
+                FOR EACH ROW
+                BEGIN
+                    INSERT INTO $auditTableName (auditTimestamp, auditTypeId, $columnList)
+                    VALUES (strftime('%s', 'now'), 2, $oldColumnList);
+                END
+                """.trimIndent(),
+                0,
+            )
+
+            // DELETE trigger - stores OLD values with auditTypeId 3
+            execute(
+                null,
+                """
+                CREATE TRIGGER IF NOT EXISTS trigger_${tableName.lowercase()}_delete_audit
+                AFTER DELETE ON $tableName
+                FOR EACH ROW
+                BEGIN
+                    INSERT INTO $auditTableName (auditTimestamp, auditTypeId, $columnList)
+                    VALUES (strftime('%s', 'now'), 3, $oldColumnList);
+                END
+                """.trimIndent(),
+                0,
+            )
+        }
     }
 
     /**
@@ -174,29 +237,35 @@ object DatabaseConfig {
      * Should be called once after creating a new database.
      *
      * @param database The database to seed
-     * @param driver The SQLite driver (needed for creating triggers)
      */
-    suspend fun seedDatabase(
-        database: MoneyManagerDatabase,
-        driver: SqlDriver,
-    ) {
-        // Create triggers for incremental materialized view refresh
-        createIncrementalRefreshTriggers(driver)
+    suspend fun seedDatabase(database: MoneyManagerDatabaseWrapper) {
+        with(database) {
+            // Seed AuditType lookup table
+            auditTypeQueries.insert(id = 1, name = "INSERT")
+            auditTypeQueries.insert(id = 2, name = "UPDATE")
+            auditTypeQueries.insert(id = 3, name = "DELETE")
 
-        // Create trigger for category deletion (children inherit grandparent)
-        createCategoryDeleteTrigger(driver)
+            // Create triggers for incremental materialized view refresh
+            createIncrementalRefreshTriggers()
 
-        // Seed default "Uncategorized" category
-        database.categoryQueries.insertWithId(
-            id = -1,
-            name = "Uncategorized",
-            parentId = null,
-        )
+            // Create trigger for category deletion (children inherit grandparent)
+            createCategoryDeleteTrigger()
 
-        // Seed currencies
-        val currencyRepository = RepositorySet(database).currencyRepository
-        allCurrencies.forEach { currency ->
-            currencyRepository.upsertCurrencyByCode(currency.code, currency.displayName)
+            // Create audit triggers for all main tables
+            createAuditTriggers()
+
+            // Seed default "Uncategorized" category
+            categoryQueries.insertWithId(
+                id = -1,
+                name = "Uncategorized",
+                parentId = null,
+            )
+
+            // Seed currencies
+            val currencyRepository = RepositorySet(database).currencyRepository
+            allCurrencies.forEach { currency ->
+                currencyRepository.upsertCurrencyByCode(currency.code, currency.displayName)
+            }
         }
     }
 }

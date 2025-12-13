@@ -17,7 +17,7 @@ private val DbLocation.jdbcUrl: String
  * Stateless - does not track open databases.
  */
 class JvmDatabaseManager : DatabaseManager {
-    override suspend fun openDatabase(location: DbLocation): MoneyManagerDatabase =
+    override suspend fun openDatabase(location: DbLocation): MoneyManagerDatabaseWrapper =
         withContext(Dispatchers.IO) {
             // Auto-detect if this is a new database
             val isNewDatabase = !location.exists()
@@ -51,10 +51,10 @@ class JvmDatabaseManager : DatabaseManager {
                 MoneyManagerDatabase.Schema.create(driver)
             }
 
-            val database = MoneyManagerDatabase(driver)
+            val database = MoneyManagerDatabaseWrapper(driver)
 
             if (isNewDatabase) {
-                DatabaseConfig.seedDatabase(database, driver)
+                DatabaseConfig.seedDatabase(database)
             }
 
             database

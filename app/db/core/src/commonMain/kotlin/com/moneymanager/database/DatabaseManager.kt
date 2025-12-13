@@ -1,7 +1,5 @@
 package com.moneymanager.database
 
-import com.moneymanager.database.sql.MoneyManagerDatabase
-
 /**
  * Default database filename used across all platforms.
  */
@@ -21,7 +19,7 @@ interface DatabaseManager {
      * @return The opened database instance
      * @throws Exception if database opening fails
      */
-    suspend fun openDatabase(location: DbLocation): MoneyManagerDatabase
+    suspend fun openDatabase(location: DbLocation): MoneyManagerDatabaseWrapper
 
     /**
      * Checks if a database exists at the specified location.

@@ -14,7 +14,7 @@ private val DEFAULT_DB_LOCATION = DbLocation(DEFAULT_DATABASE_NAME)
  * Stateless - does not track open databases.
  */
 class AndroidDatabaseManager(private val context: Context) : DatabaseManager {
-    override suspend fun openDatabase(location: DbLocation): MoneyManagerDatabase =
+    override suspend fun openDatabase(location: DbLocation): MoneyManagerDatabaseWrapper =
         withContext(Dispatchers.IO) {
             // Check if this is a new database before opening
             val isNewDatabase = !context.getDatabasePath(location.name).exists()
@@ -56,10 +56,10 @@ class AndroidDatabaseManager(private val context: Context) : DatabaseManager {
                         },
                 )
 
-            val database = MoneyManagerDatabase(driver)
+            val database = MoneyManagerDatabaseWrapper(driver)
 
             if (isNewDatabase) {
-                DatabaseConfig.seedDatabase(database, driver)
+                DatabaseConfig.seedDatabase(database)
             }
 
             database
