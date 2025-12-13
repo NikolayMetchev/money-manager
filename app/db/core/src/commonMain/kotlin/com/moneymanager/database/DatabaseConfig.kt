@@ -31,12 +31,10 @@ object DatabaseConfig {
      *
      * NOTE: Triggers are created at runtime (not in schema) due to SQLDelight 2.2.1 parser limitations.
      * Called automatically from seedDatabase() during database initialization.
-     *
-     * @param database The database to create triggers on
      */
-    private fun createIncrementalRefreshTriggers(database: MoneyManagerDatabaseWrapper) {
+    private fun MoneyManagerDatabaseWrapper.createIncrementalRefreshTriggers() {
         // INSERT trigger - tracks both source and target account-currency pairs
-        database.execute(
+        execute(
             null,
             """
             CREATE TRIGGER IF NOT EXISTS trigger_transfer_insert_track_changes
@@ -66,7 +64,7 @@ object DatabaseConfig {
         )
 
         // UPDATE trigger - tracks all 4 possible account-currency pairs (old/new source/target)
-        database.execute(
+        execute(
             null,
             """
             CREATE TRIGGER IF NOT EXISTS trigger_transfer_update_track_changes
@@ -114,7 +112,7 @@ object DatabaseConfig {
         )
 
         // DELETE trigger - tracks old source and target account-currency pairs
-        database.execute(
+        execute(
             null,
             """
             CREATE TRIGGER IF NOT EXISTS trigger_transfer_delete_track_changes
@@ -147,11 +145,9 @@ object DatabaseConfig {
     /**
      * Creates a trigger to update children's parentId when a category is deleted.
      * Children inherit the deleted category's parent (grandparent becomes parent).
-     *
-     * @param database The database to create trigger on
      */
-    private fun createCategoryDeleteTrigger(database: MoneyManagerDatabaseWrapper) {
-        database.execute(
+    private fun MoneyManagerDatabaseWrapper.createCategoryDeleteTrigger() =
+        execute(
             null,
             """
             CREATE TRIGGER IF NOT EXISTS trigger_category_delete_update_children
@@ -165,7 +161,6 @@ object DatabaseConfig {
             """.trimIndent(),
             0,
         )
-    }
 
     /**
      * Creates audit triggers dynamically for all main tables.
@@ -178,22 +173,20 @@ object DatabaseConfig {
      *
      * NOTE: Triggers are created at runtime (not in schema) due to SQLDelight 2.2.1 parser limitations.
      * Called automatically from seedDatabase() during database initialization.
-     *
-     * @param database The database to create triggers on
      */
-    private fun createAuditTriggers(database: MoneyManagerDatabaseWrapper) {
-        val tables = database.getAuditableTables()
+    private fun MoneyManagerDatabaseWrapper.createAuditTriggers() {
+        val tables = getAuditableTables()
 
         tables.forEach { tableName ->
             val auditTableName = "${tableName}_Audit"
-            val columns = database.getTableColumns(tableName)
+            val columns = getTableColumns(tableName)
 
             val columnList = columns.joinToString(", ")
             val newColumnList = columns.joinToString(", ") { "NEW.$it" }
             val oldColumnList = columns.joinToString(", ") { "OLD.$it" }
 
             // INSERT trigger - stores NEW values with auditTypeId 1
-            database.execute(
+            execute(
                 null,
                 """
                 CREATE TRIGGER IF NOT EXISTS trigger_${tableName.lowercase()}_insert_audit
@@ -208,7 +201,7 @@ object DatabaseConfig {
             )
 
             // UPDATE trigger - stores OLD values with auditTypeId 2
-            database.execute(
+            execute(
                 null,
                 """
                 CREATE TRIGGER IF NOT EXISTS trigger_${tableName.lowercase()}_update_audit
@@ -223,7 +216,7 @@ object DatabaseConfig {
             )
 
             // DELETE trigger - stores OLD values with auditTypeId 3
-            database.execute(
+            execute(
                 null,
                 """
                 CREATE TRIGGER IF NOT EXISTS trigger_${tableName.lowercase()}_delete_audit
@@ -246,31 +239,33 @@ object DatabaseConfig {
      * @param database The database to seed
      */
     suspend fun seedDatabase(database: MoneyManagerDatabaseWrapper) {
-        // Seed AuditType lookup table
-        database.auditTypeQueries.insert(id = 1, name = "INSERT")
-        database.auditTypeQueries.insert(id = 2, name = "UPDATE")
-        database.auditTypeQueries.insert(id = 3, name = "DELETE")
+        with(database) {
+            // Seed AuditType lookup table
+            auditTypeQueries.insert(id = 1, name = "INSERT")
+            auditTypeQueries.insert(id = 2, name = "UPDATE")
+            auditTypeQueries.insert(id = 3, name = "DELETE")
 
-        // Create triggers for incremental materialized view refresh
-        createIncrementalRefreshTriggers(database)
+            // Create triggers for incremental materialized view refresh
+            createIncrementalRefreshTriggers()
 
-        // Create trigger for category deletion (children inherit grandparent)
-        createCategoryDeleteTrigger(database)
+            // Create trigger for category deletion (children inherit grandparent)
+            createCategoryDeleteTrigger()
 
-        // Create audit triggers for all main tables
-        createAuditTriggers(database)
+            // Create audit triggers for all main tables
+            createAuditTriggers()
 
-        // Seed default "Uncategorized" category
-        database.categoryQueries.insertWithId(
-            id = -1,
-            name = "Uncategorized",
-            parentId = null,
-        )
+            // Seed default "Uncategorized" category
+            categoryQueries.insertWithId(
+                id = -1,
+                name = "Uncategorized",
+                parentId = null,
+            )
 
-        // Seed currencies
-        val currencyRepository = RepositorySet(database).currencyRepository
-        allCurrencies.forEach { currency ->
-            currencyRepository.upsertCurrencyByCode(currency.code, currency.displayName)
+            // Seed currencies
+            val currencyRepository = RepositorySet(database).currencyRepository
+            allCurrencies.forEach { currency ->
+                currencyRepository.upsertCurrencyByCode(currency.code, currency.displayName)
+            }
         }
     }
 }
