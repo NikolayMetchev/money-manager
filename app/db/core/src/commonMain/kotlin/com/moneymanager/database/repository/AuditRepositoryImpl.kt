@@ -19,6 +19,6 @@ class AuditRepositoryImpl(
         withContext(Dispatchers.Default) {
             queries.selectAuditHistoryForTransfer(transferId.toString())
                 .executeAsList()
-                .let(TransferAuditEntryMapper::mapList)
+                .map(TransferAuditEntryMapper::map)
         }
 }
