@@ -4,8 +4,8 @@ import app.cash.sqldelight.db.SqlDriver
 import com.moneymanager.database.DbLocation
 import com.moneymanager.database.RepositorySet
 import com.moneymanager.database.createTestDatabaseLocation
-import com.moneymanager.database.createTestDriver
 import com.moneymanager.database.deleteTestDatabase
+import com.moneymanager.database.getPlatformDriver
 import com.moneymanager.database.sql.MoneyManagerDatabase
 import com.moneymanager.di.AppComponent
 import com.moneymanager.di.createTestAppComponentParams
@@ -31,8 +31,7 @@ class AuditTableCoverageTest {
             val databaseManager = component.databaseManager
             // Open file-based database for testing
             database = databaseManager.openDatabase(testDbLocation)
-            // Create driver using the same approach as DatabaseManager
-            driver = createTestDriver(testDbLocation)
+            // Create driver for metadata queries
             RepositorySet(database)
         }
 
