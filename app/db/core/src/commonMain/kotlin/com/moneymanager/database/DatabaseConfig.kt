@@ -173,7 +173,7 @@ object DatabaseConfig {
      * Tables to exclude from audit trail.
      * Includes audit tables themselves, materialized views, and system tables.
      */
-    private val EXCLUDED_FROM_AUDIT =
+    internal val EXCLUDED_FROM_AUDIT =
         setOf(
             "AuditType",
             "Account_Audit",
@@ -187,21 +187,13 @@ object DatabaseConfig {
         )
 
     /**
-     * Creates audit triggers dynamically for all main tables.
-     * Queries sqlite_master to discover tables and their columns, then generates triggers.
+     * Gets all auditable tables from the database.
+     * Queries sqlite_master and excludes tables in EXCLUDED_FROM_AUDIT set.
      *
-     * Each table gets 3 triggers: INSERT, UPDATE, DELETE that record changes to audit tables.
-     * - INSERT triggers store NEW values
-     * - UPDATE triggers store OLD values (state before change)
-     * - DELETE triggers store OLD values (state before deletion)
-     *
-     * NOTE: Triggers are created at runtime (not in schema) due to SQLDelight 2.2.1 parser limitations.
-     * Called automatically from seedDatabase() during database initialization.
-     *
-     * @param driver The SQLite driver to use for executing the CREATE TRIGGER statements
+     * @param driver The SQLite driver to use for querying
+     * @return List of auditable table names, sorted alphabetically
      */
-    private fun createAuditTriggers(driver: SqlDriver) {
-        // Query all table names
+    internal fun getAuditableTables(driver: SqlDriver): List<String> {
         val tables = mutableListOf<String>()
         driver.executeQuery<Unit>(
             null,
@@ -222,25 +214,57 @@ object DatabaseConfig {
             },
             0,
         )
+        return tables
+    }
 
-        // For each table, get its columns and create triggers
+    /**
+     * Gets all column names for a specific table.
+     * Uses PRAGMA table_info() to query column metadata.
+     *
+     * @param driver The SQLite driver to use for querying
+     * @param tableName The name of the table to query
+     * @return List of column names in the order they appear in the table
+     */
+    internal fun getTableColumns(
+        driver: SqlDriver,
+        tableName: String,
+    ): List<String> {
+        val columns = mutableListOf<String>()
+        driver.executeQuery<Unit>(
+            null,
+            "PRAGMA table_info($tableName)",
+            { cursor ->
+                while (cursor.next().value) {
+                    val columnName = cursor.getString(1) ?: continue
+                    columns.add(columnName)
+                }
+                app.cash.sqldelight.db.QueryResult.Unit
+            },
+            0,
+        )
+        return columns
+    }
+
+    /**
+     * Creates audit triggers dynamically for all main tables.
+     * Queries sqlite_master to discover tables and their columns, then generates triggers.
+     *
+     * Each table gets 3 triggers: INSERT, UPDATE, DELETE that record changes to audit tables.
+     * - INSERT triggers store NEW values
+     * - UPDATE triggers store OLD values (state before change)
+     * - DELETE triggers store OLD values (state before deletion)
+     *
+     * NOTE: Triggers are created at runtime (not in schema) due to SQLDelight 2.2.1 parser limitations.
+     * Called automatically from seedDatabase() during database initialization.
+     *
+     * @param driver The SQLite driver to use for executing the CREATE TRIGGER statements
+     */
+    private fun createAuditTriggers(driver: SqlDriver) {
+        val tables = getAuditableTables(driver)
+
         tables.forEach { tableName ->
             val auditTableName = "${tableName}_Audit"
-
-            // Get column names for this table
-            val columns = mutableListOf<String>()
-            driver.executeQuery<Unit>(
-                null,
-                "PRAGMA table_info($tableName)",
-                { pragmaCursor ->
-                    while (pragmaCursor.next().value) {
-                        val columnName = pragmaCursor.getString(1) ?: continue
-                        columns.add(columnName)
-                    }
-                    app.cash.sqldelight.db.QueryResult.Unit
-                },
-                0,
-            )
+            val columns = getTableColumns(driver, tableName)
 
             val columnList = columns.joinToString(", ")
             val newColumnList = columns.joinToString(", ") { "NEW.$it" }

@@ -22,23 +22,6 @@ class AuditTableCoverageTest {
     private lateinit var driver: SqlDriver
     private lateinit var testDbLocation: com.moneymanager.database.DbLocation
 
-    /**
-     * Tables to exclude from audit trail.
-     * Must match EXCLUDED_FROM_AUDIT in DatabaseConfig.kt
-     */
-    private val excludedFromAudit =
-        setOf(
-            "AuditType",
-            "Account_Audit",
-            "Currency_Audit",
-            "Category_Audit",
-            "Transfer_Audit",
-            "AccountBalanceMaterializedView",
-            "RunningBalanceMaterializedView",
-            "PendingMaterializedViewChanges",
-            "sqlite_sequence",
-        )
-
     @BeforeTest
     fun setup() =
         runTest {
@@ -60,27 +43,8 @@ class AuditTableCoverageTest {
 
     @Test
     fun `all regular tables have audit tables with matching schema`() {
-        // Query all regular tables
-        val regularTables = mutableListOf<String>()
-        driver.executeQuery<Unit>(
-            null,
-            """
-            SELECT name FROM sqlite_master
-            WHERE type = 'table'
-            AND name NOT LIKE 'sqlite_%'
-            ORDER BY name
-            """.trimIndent(),
-            { cursor ->
-                while (cursor.next().value) {
-                    val tableName = cursor.getString(0) ?: continue
-                    if (tableName !in excludedFromAudit) {
-                        regularTables.add(tableName)
-                    }
-                }
-                app.cash.sqldelight.db.QueryResult.Unit
-            },
-            0,
-        )
+        // Get all auditable tables using centralized utility function
+        val regularTables = com.moneymanager.database.DatabaseConfig.getAuditableTables(driver)
 
         assertTrue(regularTables.isNotEmpty(), "Should have at least one regular table to audit")
 
@@ -107,35 +71,9 @@ class AuditTableCoverageTest {
                 fail("Audit table $auditTableName is missing for table $tableName")
             }
 
-            // Get columns from main table
-            val mainTableColumns = mutableListOf<String>()
-            driver.executeQuery<Unit>(
-                null,
-                "PRAGMA table_info($tableName)",
-                { mainCursor ->
-                    while (mainCursor.next().value) {
-                        val columnName = mainCursor.getString(1) ?: continue
-                        mainTableColumns.add(columnName)
-                    }
-                    app.cash.sqldelight.db.QueryResult.Unit
-                },
-                0,
-            )
-
-            // Get columns from audit table
-            val auditTableColumns = mutableListOf<String>()
-            driver.executeQuery<Unit>(
-                null,
-                "PRAGMA table_info($auditTableName)",
-                { auditCursor ->
-                    while (auditCursor.next().value) {
-                        val columnName = auditCursor.getString(1) ?: continue
-                        auditTableColumns.add(columnName)
-                    }
-                    app.cash.sqldelight.db.QueryResult.Unit
-                },
-                0,
-            )
+            // Get columns using centralized utility function
+            val mainTableColumns = com.moneymanager.database.DatabaseConfig.getTableColumns(driver, tableName)
+            val auditTableColumns = com.moneymanager.database.DatabaseConfig.getTableColumns(driver, auditTableName)
 
             // Verify audit table has audit metadata columns
             assertTrue(
