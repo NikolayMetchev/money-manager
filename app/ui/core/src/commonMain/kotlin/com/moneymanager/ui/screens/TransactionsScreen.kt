@@ -122,7 +122,9 @@ fun AccountTransactionsScreen(
     accountId: AccountId,
     transactionRepository: TransactionRepository,
     accountRepository: AccountRepository,
+    categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
+    maintenanceService: DatabaseMaintenanceService,
     onAccountIdChange: (AccountId) -> Unit = {},
     onCurrencyIdChange: (CurrencyId?) -> Unit = {},
 ) {
@@ -135,16 +137,19 @@ fun AccountTransactionsScreen(
     val accountBalances by transactionRepository.getAccountBalances()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
 
-    // Selected account state - default to the provided accountId
+    // Selected account state - synced with parent's accountId parameter
     var selectedAccountId by remember { mutableStateOf(accountId) }
 
-    // Notify parent when selected account changes
-    LaunchedEffect(selectedAccountId) {
-        onAccountIdChange(selectedAccountId)
+    // Sync selectedAccountId when parent's accountId parameter changes
+    LaunchedEffect(accountId) {
+        selectedAccountId = accountId
     }
 
     // Highlighted transaction state
     var highlightedTransactionId by remember { mutableStateOf<TransactionId?>(null) }
+
+    // Edit transaction state
+    var transactionToEdit by remember { mutableStateOf<Transfer?>(null) }
 
     // Coroutine scope for scroll animations
     val scrollScope = rememberCoroutineScope()
@@ -165,7 +170,6 @@ fun AccountTransactionsScreen(
     }
 
     // Track when transaction data has loaded for the current account
-    // Mark as loaded when we have data for the currently selected account
     LaunchedEffect(selectedAccountId, runningBalances) {
         loadedAccountId = selectedAccountId
     }
@@ -523,7 +527,10 @@ fun AccountTransactionsScreen(
                 LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    items(filteredRunningBalances) { runningBalance ->
+                    items(
+                        items = filteredRunningBalances,
+                        key = { "${it.transactionId}-${it.accountId}" },
+                    ) { runningBalance ->
                         val transaction = transactionMap[runningBalance.transactionId]
                         AccountTransactionCard(
                             runningBalance = runningBalance,
@@ -532,10 +539,15 @@ fun AccountTransactionsScreen(
                             currencies = currencies,
                             screenSizeClass = screenSizeClass,
                             isHighlighted = highlightedTransactionId == runningBalance.transactionId,
-                            onAccountClick = { accountId ->
+                            onEditClick = { transfer ->
+                                transactionToEdit = transfer
+                            },
+                            onAccountClick = { clickedAccountId ->
                                 highlightedTransactionId = runningBalance.transactionId
-                                selectedAccountId = accountId
                                 selectedCurrencyId = runningBalance.transactionAmount.currency.id
+
+                                // Notify parent to switch to the clicked account
+                                onAccountIdChange(clickedAccountId)
 
                                 // Auto-scroll matrix to the clicked account and transaction currency
                                 scrollScope.launch {
@@ -594,6 +606,19 @@ fun AccountTransactionsScreen(
             }
         }
     }
+
+    // Show edit dialog if a transaction is selected for editing
+    transactionToEdit?.let { transfer ->
+        TransactionEditDialog(
+            transaction = transfer,
+            transactionRepository = transactionRepository,
+            accountRepository = accountRepository,
+            categoryRepository = categoryRepository,
+            currencyRepository = currencyRepository,
+            maintenanceService = maintenanceService,
+            onDismiss = { transactionToEdit = null },
+        )
+    }
 }
 
 @Composable
@@ -605,14 +630,22 @@ fun AccountTransactionCard(
     screenSizeClass: ScreenSizeClass,
     isHighlighted: Boolean = false,
     onAccountClick: (AccountId) -> Unit = {},
+    onEditClick: (Transfer) -> Unit = {},
 ) {
-    val sourceAccount = transaction?.let { accounts.find { a -> a.id == it.sourceAccountId } }
-    val targetAccount = transaction?.let { accounts.find { a -> a.id == it.targetAccountId } }
-    val currency = currencies.find { it.id == runningBalance.transactionAmount.currency.id }
-
-    // Determine the other account based on transaction direction
-    val isOutgoing = runningBalance.transactionAmount.amount < 0
-    val otherAccount = if (isOutgoing) targetAccount else sourceAccount
+    // Determine which account to display based on the current view
+    // The account column should show the OTHER account in the transaction
+    // runningBalance.accountId tells us which account's perspective we're viewing
+    val otherAccount =
+        transaction?.let { txn ->
+            when {
+                // If current account is the source, show the target (where money went)
+                txn.sourceAccountId == runningBalance.accountId -> accounts.find { it.id == txn.targetAccountId }
+                // If current account is the target, show the source (where money came from)
+                txn.targetAccountId == runningBalance.accountId -> accounts.find { it.id == txn.sourceAccountId }
+                // Fallback: shouldn't happen, but if neither matches, show nothing
+                else -> null
+            }
+        }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -678,7 +711,9 @@ fun AccountTransactionCard(
                         .weight(0.2f)
                         .padding(horizontal = 8.dp)
                         .clickable(enabled = otherAccount != null) {
-                            otherAccount?.id?.let { onAccountClick(it) }
+                            otherAccount?.id?.let { accountId ->
+                                onAccountClick(accountId)
+                            }
                         },
             )
 
@@ -729,6 +764,21 @@ fun AccountTransactionCard(
                 autoSize = cellAutoSize,
                 modifier = Modifier.weight(0.15f).padding(start = 8.dp),
             )
+
+            // Edit button
+            if (transaction != null) {
+                IconButton(
+                    onClick = { onEditClick(transaction) },
+                    modifier = Modifier.size(32.dp),
+                ) {
+                    Text(
+                        text = "\u270F\uFE0F",
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                }
+            } else {
+                Spacer(modifier = Modifier.width(32.dp))
+            }
         }
     }
 }
@@ -1301,6 +1351,513 @@ fun TransactionEntryDialog(
     }
 
     // Time Picker Dialog
+    if (showTimePicker) {
+        val timePickerState =
+            rememberTimePickerState(
+                initialHour = selectedHour,
+                initialMinute = selectedMinute,
+                is24Hour = false,
+            )
+        AlertDialog(
+            onDismissRequest = { showTimePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        selectedHour = timePickerState.hour
+                        selectedMinute = timePickerState.minute
+                        showTimePicker = false
+                    },
+                ) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTimePicker = false }) {
+                    Text("Cancel")
+                }
+            },
+            text = {
+                TimePicker(state = timePickerState)
+            },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TransactionEditDialog(
+    transaction: Transfer,
+    transactionRepository: TransactionRepository,
+    accountRepository: AccountRepository,
+    categoryRepository: CategoryRepository,
+    currencyRepository: CurrencyRepository,
+    maintenanceService: DatabaseMaintenanceService,
+    onDismiss: () -> Unit,
+) {
+    val accounts by accountRepository.getAllAccounts()
+        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val currencies by currencyRepository.getAllCurrencies()
+        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+
+    var sourceAccountId by remember { mutableStateOf(transaction.sourceAccountId) }
+    var targetAccountId by remember { mutableStateOf(transaction.targetAccountId) }
+    var currencyId by remember { mutableStateOf(transaction.amount.currency.id) }
+    var amount by remember { mutableStateOf(transaction.amount.toDisplayValue().toString()) }
+    var description by remember { mutableStateOf(transaction.description) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var isSaving by remember { mutableStateOf(false) }
+
+    val transactionDateTime = transaction.timestamp.toLocalDateTime(TimeZone.currentSystemDefault())
+    var selectedDate by remember { mutableStateOf(transactionDateTime.date) }
+    var selectedHour by remember { mutableStateOf(transactionDateTime.hour) }
+    var selectedMinute by remember { mutableStateOf(transactionDateTime.minute) }
+    var showDatePicker by remember { mutableStateOf(false) }
+    var showTimePicker by remember { mutableStateOf(false) }
+
+    var showCreateAccountDialog by remember { mutableStateOf(false) }
+    var showCreateCurrencyDialog by remember { mutableStateOf(false) }
+    var creatingForSource by remember { mutableStateOf(true) }
+
+    var sourceAccountExpanded by remember { mutableStateOf(false) }
+    var targetAccountExpanded by remember { mutableStateOf(false) }
+    var currencyExpanded by remember { mutableStateOf(false) }
+
+    val scope = rememberCoroutineScope()
+
+    AlertDialog(
+        onDismissRequest = { if (!isSaving) onDismiss() },
+        title = { Text("Edit Transaction") },
+        text = {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                // Source Account Dropdown with search
+                var sourceAccountSearchQuery by remember { mutableStateOf("") }
+                val filteredSourceAccounts =
+                    remember(accounts, sourceAccountSearchQuery, targetAccountId) {
+                        val available = accounts.filter { it.id != targetAccountId }
+                        if (sourceAccountSearchQuery.isBlank()) {
+                            available
+                        } else {
+                            available.filter { account ->
+                                account.name.contains(sourceAccountSearchQuery, ignoreCase = true)
+                            }
+                        }
+                    }
+
+                ExposedDropdownMenuBox(
+                    expanded = sourceAccountExpanded,
+                    onExpandedChange = { sourceAccountExpanded = it },
+                ) {
+                    OutlinedTextField(
+                        value =
+                            if (sourceAccountExpanded) {
+                                sourceAccountSearchQuery
+                            } else {
+                                accounts.find { it.id == sourceAccountId }?.name ?: ""
+                            },
+                        onValueChange = { sourceAccountSearchQuery = it },
+                        label = { Text("From Account") },
+                        placeholder = { Text("Type to search...") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = sourceAccountExpanded) },
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable),
+                        enabled = !isSaving,
+                        singleLine = true,
+                    )
+                    ExposedDropdownMenu(
+                        expanded = sourceAccountExpanded,
+                        onDismissRequest = {
+                            sourceAccountExpanded = false
+                            sourceAccountSearchQuery = ""
+                        },
+                    ) {
+                        filteredSourceAccounts.forEach { account ->
+                            DropdownMenuItem(
+                                text = { Text(account.name) },
+                                onClick = {
+                                    sourceAccountId = account.id
+                                    sourceAccountExpanded = false
+                                    sourceAccountSearchQuery = ""
+                                },
+                            )
+                        }
+                        HorizontalDivider()
+                        DropdownMenuItem(
+                            text = { Text("+ Create New Account") },
+                            onClick = {
+                                creatingForSource = true
+                                showCreateAccountDialog = true
+                                sourceAccountExpanded = false
+                                sourceAccountSearchQuery = ""
+                            },
+                        )
+                    }
+                }
+
+                // Target Account Dropdown with search
+                var targetAccountSearchQuery by remember { mutableStateOf("") }
+                val filteredTargetAccounts =
+                    remember(accounts, targetAccountSearchQuery, sourceAccountId) {
+                        val available = accounts.filter { it.id != sourceAccountId }
+                        if (targetAccountSearchQuery.isBlank()) {
+                            available
+                        } else {
+                            available.filter { account ->
+                                account.name.contains(targetAccountSearchQuery, ignoreCase = true)
+                            }
+                        }
+                    }
+
+                ExposedDropdownMenuBox(
+                    expanded = targetAccountExpanded,
+                    onExpandedChange = { targetAccountExpanded = it },
+                ) {
+                    OutlinedTextField(
+                        value =
+                            if (targetAccountExpanded) {
+                                targetAccountSearchQuery
+                            } else {
+                                accounts.find { it.id == targetAccountId }?.name ?: ""
+                            },
+                        onValueChange = { targetAccountSearchQuery = it },
+                        label = { Text("To Account") },
+                        placeholder = { Text("Type to search...") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = targetAccountExpanded) },
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable),
+                        enabled = !isSaving,
+                        singleLine = true,
+                    )
+                    ExposedDropdownMenu(
+                        expanded = targetAccountExpanded,
+                        onDismissRequest = {
+                            targetAccountExpanded = false
+                            targetAccountSearchQuery = ""
+                        },
+                    ) {
+                        filteredTargetAccounts.forEach { account ->
+                            DropdownMenuItem(
+                                text = { Text(account.name) },
+                                onClick = {
+                                    targetAccountId = account.id
+                                    targetAccountExpanded = false
+                                    targetAccountSearchQuery = ""
+                                },
+                            )
+                        }
+                        HorizontalDivider()
+                        DropdownMenuItem(
+                            text = { Text("+ Create New Account") },
+                            onClick = {
+                                creatingForSource = false
+                                showCreateAccountDialog = true
+                                targetAccountExpanded = false
+                                targetAccountSearchQuery = ""
+                            },
+                        )
+                    }
+                }
+
+                // Currency Dropdown with search
+                var currencySearchQuery by remember { mutableStateOf("") }
+                val filteredCurrencies =
+                    remember(currencies, currencySearchQuery) {
+                        if (currencySearchQuery.isBlank()) {
+                            currencies
+                        } else {
+                            currencies.filter { currency ->
+                                currency.code.contains(currencySearchQuery, ignoreCase = true) ||
+                                    currency.name.contains(currencySearchQuery, ignoreCase = true)
+                            }
+                        }
+                    }
+
+                ExposedDropdownMenuBox(
+                    expanded = currencyExpanded,
+                    onExpandedChange = { currencyExpanded = it },
+                ) {
+                    OutlinedTextField(
+                        value =
+                            if (currencyExpanded) {
+                                currencySearchQuery
+                            } else {
+                                currencies.find { it.id == currencyId }?.let { "${it.code} - ${it.name}" } ?: ""
+                            },
+                        onValueChange = { currencySearchQuery = it },
+                        label = { Text("Currency") },
+                        placeholder = { Text("Type to search...") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = currencyExpanded) },
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable),
+                        enabled = !isSaving,
+                        singleLine = true,
+                    )
+                    ExposedDropdownMenu(
+                        expanded = currencyExpanded,
+                        onDismissRequest = {
+                            currencyExpanded = false
+                            currencySearchQuery = ""
+                        },
+                    ) {
+                        filteredCurrencies.forEach { currency ->
+                            DropdownMenuItem(
+                                text = { Text("${currency.code} - ${currency.name}") },
+                                onClick = {
+                                    currencyId = currency.id
+                                    currencyExpanded = false
+                                    currencySearchQuery = ""
+                                },
+                            )
+                        }
+                        HorizontalDivider()
+                        DropdownMenuItem(
+                            text = { Text("+ Create New Currency") },
+                            onClick = {
+                                showCreateCurrencyDialog = true
+                                currencyExpanded = false
+                                currencySearchQuery = ""
+                            },
+                        )
+                    }
+                }
+
+                // Date and Time Pickers
+                val dateTimeTextStyle = MaterialTheme.typography.bodySmall
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    OutlinedTextField(
+                        value = selectedDate.toString(),
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Date") },
+                        textStyle = dateTimeTextStyle,
+                        trailingIcon = {
+                            IconButton(
+                                onClick = { showDatePicker = true },
+                                enabled = !isSaving,
+                            ) {
+                                Text(
+                                    text = "\uD83D\uDCC5",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                )
+                            }
+                        },
+                        modifier = Modifier.weight(1.5f),
+                        enabled = false,
+                        singleLine = true,
+                        colors =
+                            OutlinedTextFieldDefaults.colors(
+                                disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                                disabledBorderColor = MaterialTheme.colorScheme.outline,
+                                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            ),
+                    )
+
+                    val time = LocalTime(selectedHour, selectedMinute)
+                    OutlinedTextField(
+                        value = time.toString(),
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Time") },
+                        textStyle = dateTimeTextStyle,
+                        trailingIcon = {
+                            IconButton(
+                                onClick = { showTimePicker = true },
+                                enabled = !isSaving,
+                            ) {
+                                Text(
+                                    text = "\uD83D\uDD54",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                )
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                        enabled = false,
+                        singleLine = true,
+                        colors =
+                            OutlinedTextFieldDefaults.colors(
+                                disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                                disabledBorderColor = MaterialTheme.colorScheme.outline,
+                                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            ),
+                    )
+                }
+
+                // Amount Input
+                OutlinedTextField(
+                    value = amount,
+                    onValueChange = { amount = it },
+                    label = { Text("Amount") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    enabled = !isSaving,
+                )
+
+                // Description Input
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("Description") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    enabled = !isSaving,
+                )
+
+                errorMessage?.let { error ->
+                    Text(
+                        text = error,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    when {
+                        sourceAccountId == targetAccountId -> errorMessage = "Source and target accounts must be different"
+                        amount.isBlank() -> errorMessage = "Amount is required"
+                        amount.toDoubleOrNull() == null -> errorMessage = "Invalid amount"
+                        amount.toDouble() <= 0 -> errorMessage = "Amount must be greater than 0"
+                        description.isBlank() -> errorMessage = "Description is required"
+                        else -> {
+                            isSaving = true
+                            errorMessage = null
+                            scope.launch {
+                                try {
+                                    val currency =
+                                        currencies.find { it.id == currencyId }
+                                            ?: throw IllegalStateException("Currency not found")
+
+                                    val timestamp =
+                                        selectedDate
+                                            .atTime(selectedHour, selectedMinute, 0)
+                                            .toInstant(TimeZone.currentSystemDefault())
+                                    val updatedTransfer =
+                                        Transfer(
+                                            id = transaction.id,
+                                            timestamp = timestamp,
+                                            description = description.trim(),
+                                            sourceAccountId = sourceAccountId,
+                                            targetAccountId = targetAccountId,
+                                            amount = Money.fromDisplayValue(amount.toDouble(), currency),
+                                        )
+                                    transactionRepository.updateTransfer(updatedTransfer)
+
+                                    maintenanceService.refreshMaterializedViews()
+
+                                    onDismiss()
+                                } catch (e: Exception) {
+                                    logger.error(e) { "Failed to update transaction: ${e.message}" }
+                                    errorMessage = "Failed to update transaction: ${e.message}"
+                                    isSaving = false
+                                }
+                            }
+                        }
+                    }
+                },
+                enabled = !isSaving,
+            ) {
+                if (isSaving) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Text("Update")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !isSaving,
+            ) {
+                Text("Cancel")
+            }
+        },
+    )
+
+    if (showCreateAccountDialog) {
+        CreateAccountDialogInline(
+            accountRepository = accountRepository,
+            categoryRepository = categoryRepository,
+            onAccountCreated = { accountId ->
+                if (creatingForSource) {
+                    sourceAccountId = accountId
+                } else {
+                    targetAccountId = accountId
+                }
+                showCreateAccountDialog = false
+            },
+            onDismiss = { showCreateAccountDialog = false },
+        )
+    }
+
+    if (showCreateCurrencyDialog) {
+        CreateCurrencyDialogInline(
+            currencyRepository = currencyRepository,
+            onCurrencyCreated = { newCurrencyId ->
+                currencyId = newCurrencyId
+                showCreateCurrencyDialog = false
+            },
+            onDismiss = { showCreateCurrencyDialog = false },
+        )
+    }
+
+    if (showDatePicker) {
+        val datePickerState =
+            rememberDatePickerState(
+                initialSelectedDateMillis =
+                    selectedDate
+                        .atTime(0, 0)
+                        .toInstant(TimeZone.UTC)
+                        .toEpochMilliseconds(),
+            )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        datePickerState.selectedDateMillis?.let { millis ->
+                            selectedDate =
+                                Instant
+                                    .fromEpochMilliseconds(millis)
+                                    .toLocalDateTime(TimeZone.UTC)
+                                    .date
+                        }
+                        showDatePicker = false
+                    },
+                ) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text("Cancel")
+                }
+            },
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
     if (showTimePicker) {
         val timePickerState =
             rememberTimePickerState(

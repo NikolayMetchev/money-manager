@@ -305,10 +305,12 @@ private fun MoneyManagerAppContent(
                             currentlyViewedAccountId = screen.accountId
                         }
                         AccountTransactionsScreen(
-                            accountId = screen.accountId,
+                            accountId = currentlyViewedAccountId ?: screen.accountId,
                             transactionRepository = repositorySet.transactionRepository,
                             accountRepository = repositorySet.accountRepository,
+                            categoryRepository = repositorySet.categoryRepository,
                             currencyRepository = repositorySet.currencyRepository,
+                            maintenanceService = repositorySet.maintenanceService,
                             onAccountIdChange = { accountId ->
                                 currentlyViewedAccountId = accountId
                             },
