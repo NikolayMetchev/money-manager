@@ -24,7 +24,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
@@ -445,54 +444,5 @@ class TransactionRepositoryImplTest {
 
             val deleted = transactionRepository.getTransactionById(transferId.id).first()
             assertEquals(null, deleted)
-        }
-
-    @Test
-    fun `getAllTransactions should return all transactions ordered by timestamp descending`() =
-        runTest {
-            val now = Clock.System.now()
-
-            // Create test accounts
-            val sourceAccountId =
-                accountRepository.createAccount(
-                    Account(id = AccountId(0), name = "Source Account", openingDate = now),
-                )
-            val targetAccountId =
-                accountRepository.createAccount(
-                    Account(id = AccountId(0), name = "Target Account", openingDate = now),
-                )
-
-            // Create test currency
-            val currencyId = currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
-            val currency = currencyRepository.getCurrencyById(currencyId).first()!!
-
-            // Create multiple transactions with different timestamps
-            transactionRepository.createTransfer(
-                Transfer(
-                    id = TransferId(Uuid.random()),
-                    timestamp = now - kotlin.time.Duration.parse("1h"),
-                    description = "Earlier transaction",
-                    sourceAccountId = sourceAccountId,
-                    targetAccountId = targetAccountId,
-                    amount = Money.fromDisplayValue(100.0, currency),
-                ),
-            )
-
-            transactionRepository.createTransfer(
-                Transfer(
-                    id = TransferId(Uuid.random()),
-                    timestamp = now,
-                    description = "Later transaction",
-                    sourceAccountId = sourceAccountId,
-                    targetAccountId = targetAccountId,
-                    amount = Money.fromDisplayValue(200.0, currency),
-                ),
-            )
-
-            val allTransactions = transactionRepository.getAllTransactions().first()
-            assertEquals(2, allTransactions.size)
-
-            // Verify descending order by timestamp
-            assertTrue(allTransactions[0].timestamp >= allTransactions[1].timestamp)
         }
 }

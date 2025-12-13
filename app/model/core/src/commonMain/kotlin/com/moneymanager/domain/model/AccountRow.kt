@@ -11,4 +11,6 @@ data class AccountRow(
     val accountId: AccountId,
     val transactionAmount: Money,
     val runningBalance: Money,
+    val sourceAccountId: AccountId,
+    val targetAccountId: AccountId,
 )
