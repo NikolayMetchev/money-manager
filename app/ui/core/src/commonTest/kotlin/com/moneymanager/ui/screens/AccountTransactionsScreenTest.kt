@@ -250,8 +250,6 @@ class AccountTransactionsScreenTest {
     private class FakeTransactionRepository(
         private val transfers: List<Transfer>,
     ) : TransactionRepository {
-        override fun getAllTransactions(): Flow<List<Transfer>> = flowOf(transfers)
-
         override fun getTransactionById(id: Uuid): Flow<Transfer?> = flowOf(transfers.find { it.id.id == id })
 
         override fun getTransactionsByAccount(accountId: AccountId): Flow<List<Transfer>> =
@@ -270,11 +268,15 @@ class AccountTransactionsScreenTest {
 
         override fun getAccountBalances(): Flow<List<AccountBalance>> = flowOf(emptyList())
 
-        override fun getRunningBalanceByAccount(accountId: AccountId): Flow<List<AccountRow>> {
+        override suspend fun getRunningBalanceByAccountPaginated(
+            accountId: AccountId,
+            pageSize: Int,
+            pagingInfo: com.moneymanager.domain.model.PagingInfo?,
+        ): com.moneymanager.domain.model.PagingResult<AccountRow> {
             // Simulate the materialized view logic: create TWO AccountRow entries per transfer
             // One from the source account's perspective (outgoing = negative)
             // One from the target account's perspective (incoming = positive)
-            val rows =
+            val allRows =
                 transfers.flatMap { transfer ->
                     listOf(
                         // Source account's perspective (outgoing = negative)
@@ -284,8 +286,9 @@ class AccountTransactionsScreenTest {
                             description = transfer.description,
                             accountId = transfer.sourceAccountId,
                             transactionAmount = Money(-transfer.amount.amount, transfer.amount.currency),
-                            // Simplified for testing
                             runningBalance = transfer.amount,
+                            sourceAccountId = transfer.sourceAccountId,
+                            targetAccountId = transfer.targetAccountId,
                         ),
                         // Target account's perspective (incoming = positive)
                         AccountRow(
@@ -294,14 +297,27 @@ class AccountTransactionsScreenTest {
                             description = transfer.description,
                             accountId = transfer.targetAccountId,
                             transactionAmount = transfer.amount,
-                            // Simplified for testing
                             runningBalance = transfer.amount,
+                            sourceAccountId = transfer.sourceAccountId,
+                            targetAccountId = transfer.targetAccountId,
                         ),
                     )
-                    // Filter by requested account
                 }.filter { it.accountId == accountId }
+                    .sortedByDescending { it.timestamp }
 
-            return flowOf(rows)
+            // Simple pagination for testing
+            val items = allRows.take(pageSize)
+            val hasMore = allRows.size > pageSize
+
+            return com.moneymanager.domain.model.PagingResult(
+                items = items,
+                pagingInfo =
+                    com.moneymanager.domain.model.PagingInfo(
+                        lastTimestamp = items.lastOrNull()?.timestamp,
+                        lastId = items.lastOrNull()?.transactionId,
+                        hasMore = hasMore,
+                    ),
+            )
         }
 
         override suspend fun createTransfer(transfer: Transfer) {}

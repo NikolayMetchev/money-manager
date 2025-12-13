@@ -12,6 +12,8 @@ import com.moneymanager.database.sql.MoneyManagerDatabase
 import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
+import com.moneymanager.domain.model.PagingInfo
+import com.moneymanager.domain.model.PagingResult
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.repository.TransactionRepository
 import kotlinx.coroutines.Dispatchers
@@ -25,12 +27,6 @@ class TransactionRepositoryImpl(
     database: MoneyManagerDatabase,
 ) : TransactionRepository {
     private val transferQueries = database.transferQueries
-
-    override fun getAllTransactions(): Flow<List<Transfer>> =
-        transferQueries.selectAll()
-            .asFlow()
-            .mapToList(Dispatchers.Default)
-            .map { list -> TransferMapper.mapList(list) }
 
     override fun getTransactionById(id: Uuid): Flow<Transfer?> =
         transferQueries.selectById(id.toString(), TransferMapper::mapRaw)
@@ -75,11 +71,92 @@ class TransactionRepositoryImpl(
             .mapToList(Dispatchers.Default)
             .map(AccountBalanceMapper::mapList)
 
-    override fun getRunningBalanceByAccount(accountId: AccountId): Flow<List<AccountRow>> =
-        transferQueries.selectRunningBalanceByAccount(accountId.id)
-            .asFlow()
-            .mapToList(Dispatchers.Default)
-            .map(AccountRowMapper::mapList)
+    override suspend fun getRunningBalanceByAccountPaginated(
+        accountId: AccountId,
+        pageSize: Int,
+        pagingInfo: PagingInfo?,
+    ): PagingResult<AccountRow> =
+        withContext(Dispatchers.Default) {
+            val items =
+                if (pagingInfo == null) {
+                    transferQueries.selectRunningBalanceByAccountFirstPage(
+                        accountId.id,
+                        (pageSize + 1).toLong(),
+                    ) { id, timestamp, description, accountId_, currencyId, transactionAmount, runningBalance,
+                        currency_id, currency_code, currency_name, currency_scaleFactor, sourceAccountId, targetAccountId,
+                        ->
+                        AccountRowMapper.mapRaw(
+                            id,
+                            timestamp,
+                            description,
+                            accountId_,
+                            currencyId,
+                            transactionAmount,
+                            runningBalance,
+                            currency_id,
+                            currency_code,
+                            currency_name,
+                            currency_scaleFactor,
+                            sourceAccountId,
+                            targetAccountId,
+                        )
+                    }
+                        .executeAsList()
+                } else {
+                    val lastTimestamp = pagingInfo.lastTimestamp ?: throw IllegalStateException("lastTimestamp is null")
+                    val lastId = pagingInfo.lastId ?: throw IllegalStateException("lastId is null")
+                    transferQueries.selectRunningBalanceByAccountNextPage(
+                        accountId.id,
+                        lastTimestamp.toEpochMilliseconds(),
+                        lastTimestamp.toEpochMilliseconds(),
+                        lastId.toString(),
+                        (pageSize + 1).toLong(),
+                    ) { id, timestamp, description, accountId_, currencyId, transactionAmount, runningBalance,
+                        currency_id, currency_code, currency_name, currency_scaleFactor, sourceAccountId, targetAccountId,
+                        ->
+                        AccountRowMapper.mapRaw(
+                            id,
+                            timestamp,
+                            description,
+                            accountId_,
+                            currencyId,
+                            transactionAmount,
+                            runningBalance,
+                            currency_id,
+                            currency_code,
+                            currency_name,
+                            currency_scaleFactor,
+                            sourceAccountId,
+                            targetAccountId,
+                        )
+                    }
+                        .executeAsList()
+                }
+
+            val hasMore = items.size > pageSize
+            val pageItems = if (hasMore) items.take(pageSize) else items
+
+            val nextPagingInfo =
+                if (hasMore && pageItems.isNotEmpty()) {
+                    val lastItem = pageItems.last()
+                    PagingInfo(
+                        lastTimestamp = lastItem.timestamp,
+                        lastId = lastItem.transactionId,
+                        hasMore = true,
+                    )
+                } else {
+                    PagingInfo(
+                        lastTimestamp = null,
+                        lastId = null,
+                        hasMore = false,
+                    )
+                }
+
+            PagingResult(
+                items = pageItems,
+                pagingInfo = nextPagingInfo,
+            )
+        }
 
     override suspend fun createTransfer(transfer: Transfer): Unit =
         withContext(Dispatchers.Default) {

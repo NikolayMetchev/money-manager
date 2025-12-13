@@ -361,8 +361,6 @@ class AccountsScreenTest {
     }
 
     private class FakeTransactionRepository : TransactionRepository {
-        override fun getAllTransactions(): Flow<List<Transfer>> = flowOf(emptyList())
-
         override fun getTransactionById(id: Uuid): Flow<Transfer?> = flowOf(null)
 
         override fun getTransactionsByAccount(accountId: AccountId): Flow<List<Transfer>> = flowOf(emptyList())
@@ -380,7 +378,20 @@ class AccountsScreenTest {
 
         override fun getAccountBalances(): Flow<List<AccountBalance>> = flowOf(emptyList())
 
-        override fun getRunningBalanceByAccount(accountId: AccountId): Flow<List<AccountRow>> = flowOf(emptyList())
+        override suspend fun getRunningBalanceByAccountPaginated(
+            accountId: AccountId,
+            pageSize: Int,
+            pagingInfo: com.moneymanager.domain.model.PagingInfo?,
+        ): com.moneymanager.domain.model.PagingResult<AccountRow> =
+            com.moneymanager.domain.model.PagingResult(
+                items = emptyList(),
+                pagingInfo =
+                    com.moneymanager.domain.model.PagingInfo(
+                        lastTimestamp = null,
+                        lastId = null,
+                        hasMore = false,
+                    ),
+            )
 
         override suspend fun createTransfer(transfer: Transfer) {}
 

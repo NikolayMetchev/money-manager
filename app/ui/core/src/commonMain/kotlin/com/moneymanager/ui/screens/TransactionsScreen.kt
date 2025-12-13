@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.TextAutoSize
@@ -56,6 +57,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
@@ -129,8 +131,6 @@ fun AccountTransactionsScreen(
 ) {
     val allAccounts by accountRepository.getAllAccounts()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val allTransactions by transactionRepository.getAllTransactions()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
     val currencies by currencyRepository.getAllCurrencies()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
     val accountBalances by transactionRepository.getAccountBalances()
@@ -150,16 +150,17 @@ fun AccountTransactionsScreen(
     // Edit transaction state
     var transactionToEdit by remember { mutableStateOf<Transfer?>(null) }
 
-    // Coroutine scope for scroll animations
+    // Coroutine scope for scroll animations and pagination
     val scrollScope = rememberCoroutineScope()
 
-    // Get running balances for the selected account
-    val runningBalances by transactionRepository.getRunningBalanceByAccount(selectedAccountId)
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    // Pagination state
+    var runningBalances by remember { mutableStateOf<List<AccountRow>>(emptyList()) }
+    var currentPagingInfo by remember { mutableStateOf<com.moneymanager.domain.model.PagingInfo?>(null) }
+    var isLoadingPage by remember { mutableStateOf(false) }
+    var hasLoadedFirstPage by remember { mutableStateOf(false) }
 
     // Loading state - separate tracking for matrix (top) and transactions (bottom)
     var hasLoadedMatrix by remember { mutableStateOf(false) }
-    var loadedAccountId by remember { mutableStateOf<AccountId?>(null) }
 
     // Track when matrix data (accounts, currencies, balances) has loaded
     LaunchedEffect(allAccounts, currencies, accountBalances) {
@@ -168,16 +169,8 @@ fun AccountTransactionsScreen(
         }
     }
 
-    // Track when transaction data has loaded for the current account
-    LaunchedEffect(selectedAccountId, runningBalances) {
-        loadedAccountId = selectedAccountId
-    }
-
     val isMatrixLoading = !hasLoadedMatrix
-    val isTransactionsLoading = loadedAccountId != selectedAccountId
-
-    // Build a map of transactionId -> full Transaction for additional details
-    val transactionMap = allTransactions.associateBy { it.id }
+    val isTransactionsLoading = !hasLoadedFirstPage
 
     // Get unique currency IDs from running balances for this account
     val accountCurrencyIds = runningBalances.map { it.transactionAmount.currency.id }.distinct()
@@ -223,6 +216,66 @@ fun AccountTransactionsScreen(
                 .fillMaxSize()
                 .padding(16.dp),
     ) {
+        // Calculate page size based on screen height
+        val pageSize =
+            remember(maxHeight) {
+                val itemHeightDp = 60.dp
+                val visibleItems = (maxHeight / itemHeightDp).toInt()
+                (visibleItems * 1.5).toInt().coerceAtLeast(20)
+            }
+
+        // Load first page when account changes
+        LaunchedEffect(selectedAccountId, pageSize) {
+            runningBalances = emptyList()
+            currentPagingInfo = null
+            hasLoadedFirstPage = false
+            isLoadingPage = true
+
+            try {
+                val result =
+                    transactionRepository.getRunningBalanceByAccountPaginated(
+                        accountId = selectedAccountId,
+                        pageSize = pageSize,
+                        pagingInfo = null,
+                    )
+                runningBalances = result.items
+                currentPagingInfo = result.pagingInfo
+                hasLoadedFirstPage = true
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                // Cancellation is expected when user navigates away quickly
+                throw e
+            } catch (e: Exception) {
+                logger.error(e) { "Failed to load transactions: ${e.message}" }
+            } finally {
+                isLoadingPage = false
+            }
+        }
+
+        // Function to load next page
+        suspend fun loadNextPage() {
+            if (isLoadingPage || currentPagingInfo?.hasMore != true) return
+
+            isLoadingPage = true
+            try {
+                val result =
+                    transactionRepository.getRunningBalanceByAccountPaginated(
+                        accountId = selectedAccountId,
+                        pageSize = pageSize,
+                        pagingInfo = currentPagingInfo,
+                    )
+                runningBalances = runningBalances + result.items
+                currentPagingInfo = result.pagingInfo
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                // Cancellation is expected when user navigates away or scrolls fast
+                // Rethrow to let coroutine machinery handle it properly
+                throw e
+            } catch (e: Exception) {
+                logger.error(e) { "Failed to load more transactions: ${e.message}" }
+            } finally {
+                isLoadingPage = false
+            }
+        }
+
         val screenSizeClass = ScreenSizeClass.fromWidth(maxWidth)
 
         // Get density for dp to pixel conversion
@@ -522,17 +575,35 @@ fun AccountTransactionsScreen(
                     )
                 }
 
+                val listState = rememberLazyListState()
+
+                // Trigger pagination when user scrolls near the end
+                LaunchedEffect(listState, isLoadingPage, currentPagingInfo?.hasMore) {
+                    snapshotFlow {
+                        val lastVisibleItem = listState.layoutInfo.visibleItemsInfo.lastOrNull()
+                        lastVisibleItem?.index
+                    }.collect { lastVisibleIndex ->
+                        // Load more when within 10 items of the end
+                        if (lastVisibleIndex != null &&
+                            lastVisibleIndex >= filteredRunningBalances.size - 10 &&
+                            !isLoadingPage &&
+                            currentPagingInfo?.hasMore == true
+                        ) {
+                            loadNextPage()
+                        }
+                    }
+                }
+
                 LazyColumn(
+                    state = listState,
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(
                         items = filteredRunningBalances,
                         key = { "${it.transactionId}-${it.accountId}" },
                     ) { runningBalance ->
-                        val transaction = transactionMap[runningBalance.transactionId]
                         AccountTransactionCard(
                             runningBalance = runningBalance,
-                            transaction = transaction,
                             accounts = allAccounts,
                             screenSizeClass = screenSizeClass,
                             isHighlighted = highlightedTransactionId == runningBalance.transactionId,
@@ -599,6 +670,21 @@ fun AccountTransactionsScreen(
                             },
                         )
                     }
+
+                    // Loading indicator at bottom
+                    if (isLoadingPage && currentPagingInfo?.hasMore == true) {
+                        item {
+                            Box(
+                                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    strokeWidth = 2.dp,
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -621,7 +707,6 @@ fun AccountTransactionsScreen(
 @Composable
 fun AccountTransactionCard(
     runningBalance: AccountRow,
-    transaction: Transfer?,
     accounts: List<Account>,
     screenSizeClass: ScreenSizeClass,
     isHighlighted: Boolean = false,
@@ -632,15 +717,13 @@ fun AccountTransactionCard(
     // The account column should show the OTHER account in the transaction
     // runningBalance.accountId tells us which account's perspective we're viewing
     val otherAccount =
-        transaction?.let { txn ->
-            when {
-                // If current account is the source, show the target (where money went)
-                txn.sourceAccountId == runningBalance.accountId -> accounts.find { it.id == txn.targetAccountId }
-                // If current account is the target, show the source (where money came from)
-                txn.targetAccountId == runningBalance.accountId -> accounts.find { it.id == txn.sourceAccountId }
-                // Fallback: shouldn't happen, but if neither matches, show nothing
-                else -> null
-            }
+        when {
+            // If current account is the source, show the target (where money went)
+            runningBalance.sourceAccountId == runningBalance.accountId -> accounts.find { it.id == runningBalance.targetAccountId }
+            // If current account is the target, show the source (where money came from)
+            runningBalance.targetAccountId == runningBalance.accountId -> accounts.find { it.id == runningBalance.sourceAccountId }
+            // Fallback: shouldn't happen, but if neither matches, show nothing
+            else -> null
         }
 
     Card(
@@ -714,20 +797,18 @@ fun AccountTransactionCard(
             )
 
             // Description column
-            transaction?.description?.let { desc ->
-                if (desc.isNotBlank()) {
-                    Text(
-                        text = desc,
-                        style = cellStyle,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        autoSize = cellAutoSize,
-                        modifier = Modifier.weight(0.25f).padding(horizontal = 8.dp),
-                    )
-                } else {
-                    Spacer(modifier = Modifier.weight(0.25f))
-                }
-            } ?: Spacer(modifier = Modifier.weight(0.25f))
+            if (runningBalance.description.isNotBlank()) {
+                Text(
+                    text = runningBalance.description,
+                    style = cellStyle,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    autoSize = cellAutoSize,
+                    modifier = Modifier.weight(0.25f).padding(horizontal = 8.dp),
+                )
+            } else {
+                Spacer(modifier = Modifier.weight(0.25f))
+            }
 
             // Amount column
             Text(
@@ -761,19 +842,34 @@ fun AccountTransactionCard(
                 modifier = Modifier.weight(0.15f).padding(start = 8.dp),
             )
 
-            // Edit button
-            if (transaction != null) {
-                IconButton(
-                    onClick = { onEditClick(transaction) },
-                    modifier = Modifier.size(32.dp),
-                ) {
-                    Text(
-                        text = "\u270F\uFE0F",
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
-                }
-            } else {
-                Spacer(modifier = Modifier.width(32.dp))
+            // Edit button - reconstruct Transfer from AccountRow
+            IconButton(
+                onClick = {
+                    // Reconstruct Transfer object from AccountRow fields
+                    // Note: Amount needs to be positive value from the materialized view
+                    val amount =
+                        if (runningBalance.transactionAmount.amount < 0) {
+                            Money(-runningBalance.transactionAmount.amount, runningBalance.transactionAmount.currency)
+                        } else {
+                            runningBalance.transactionAmount
+                        }
+                    val transfer =
+                        Transfer(
+                            id = runningBalance.transactionId,
+                            timestamp = runningBalance.timestamp,
+                            description = runningBalance.description,
+                            sourceAccountId = runningBalance.sourceAccountId,
+                            targetAccountId = runningBalance.targetAccountId,
+                            amount = amount,
+                        )
+                    onEditClick(transfer)
+                },
+                modifier = Modifier.size(32.dp),
+            ) {
+                Text(
+                    text = "\u270F\uFE0F",
+                    style = MaterialTheme.typography.bodyLarge,
+                )
             }
         }
     }

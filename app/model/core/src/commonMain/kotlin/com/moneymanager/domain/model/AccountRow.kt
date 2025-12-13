@@ -5,10 +5,12 @@ package com.moneymanager.domain.model
 import kotlin.time.Instant
 
 data class AccountRow(
-    val transactionId: TransactionId,
+    val transactionId: TransferId,
     val timestamp: Instant,
     val description: String,
     val accountId: AccountId,
     val transactionAmount: Money,
     val runningBalance: Money,
+    val sourceAccountId: AccountId,
+    val targetAccountId: AccountId,
 )

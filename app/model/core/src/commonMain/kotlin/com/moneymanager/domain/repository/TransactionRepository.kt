@@ -5,14 +5,13 @@ package com.moneymanager.domain.repository
 import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
+import com.moneymanager.domain.model.PagingInfo
 import com.moneymanager.domain.model.Transfer
 import kotlinx.coroutines.flow.Flow
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 interface TransactionRepository {
-    fun getAllTransactions(): Flow<List<Transfer>>
-
     fun getTransactionById(id: Uuid): Flow<Transfer?>
 
     fun getTransactionsByAccount(accountId: AccountId): Flow<List<Transfer>>
@@ -30,7 +29,11 @@ interface TransactionRepository {
 
     fun getAccountBalances(): Flow<List<AccountBalance>>
 
-    fun getRunningBalanceByAccount(accountId: AccountId): Flow<List<AccountRow>>
+    suspend fun getRunningBalanceByAccountPaginated(
+        accountId: AccountId,
+        pageSize: Int,
+        pagingInfo: PagingInfo?,
+    ): com.moneymanager.domain.model.PagingResult<AccountRow>
 
     suspend fun createTransfer(transfer: Transfer)
 
