@@ -29,6 +29,8 @@ Money Manager is a personal finance management application built with Kotlin Mul
 
 **IMPORTANT (Gradle Daemon)**: Do NOT use the `--no-daemon` flag when running Gradle commands. The Gradle daemon significantly improves build performance. Let Gradle manage the daemon lifecycle automatically.
 
+**IMPORTANT (Console Output)**: Always use `--console=plain` when running Gradle commands. This provides cleaner output that is easier to read and parse. For example: `./gradlew build --console=plain`.
+
 ### Building the Project
 ```bash
 ./gradlew build

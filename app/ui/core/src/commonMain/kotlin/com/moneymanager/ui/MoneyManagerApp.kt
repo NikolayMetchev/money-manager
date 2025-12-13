@@ -310,6 +310,7 @@ private fun MoneyManagerAppContent(
                             accountRepository = repositorySet.accountRepository,
                             categoryRepository = repositorySet.categoryRepository,
                             currencyRepository = repositorySet.currencyRepository,
+                            auditRepository = repositorySet.auditRepository,
                             maintenanceService = repositorySet.maintenanceService,
                             onAccountIdChange = { accountId ->
                                 currentlyViewedAccountId = accountId

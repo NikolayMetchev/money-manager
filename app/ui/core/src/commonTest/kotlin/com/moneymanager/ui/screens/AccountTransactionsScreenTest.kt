@@ -24,8 +24,10 @@ import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Transfer
+import com.moneymanager.domain.model.TransferAuditEntry
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.AccountRepository
+import com.moneymanager.domain.repository.AuditRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.TransactionRepository
@@ -80,6 +82,7 @@ class AccountTransactionsScreenTest {
             val transactionRepository = FakeTransactionRepository(listOf(transfer))
             val currencyRepository = FakeCurrencyRepository(listOf(usdCurrency))
             val categoryRepository = FakeCategoryRepository()
+            val auditRepository = FakeAuditRepository()
             val maintenanceService = FakeDatabaseMaintenanceService()
 
             // When: Viewing from Checking account's perspective
@@ -92,6 +95,7 @@ class AccountTransactionsScreenTest {
                     accountRepository = accountRepository,
                     categoryRepository = categoryRepository,
                     currencyRepository = currencyRepository,
+                    auditRepository = auditRepository,
                     maintenanceService = maintenanceService,
                     onAccountIdChange = { currentAccountId = it },
                     onCurrencyIdChange = {},
@@ -165,6 +169,7 @@ class AccountTransactionsScreenTest {
             val transactionRepository = FakeTransactionRepository(listOf(transfer))
             val currencyRepository = FakeCurrencyRepository(listOf(usdCurrency))
             val categoryRepository = FakeCategoryRepository()
+            val auditRepository = FakeAuditRepository()
             val maintenanceService = FakeDatabaseMaintenanceService()
 
             setContent {
@@ -176,6 +181,7 @@ class AccountTransactionsScreenTest {
                     accountRepository = accountRepository,
                     categoryRepository = categoryRepository,
                     currencyRepository = currencyRepository,
+                    auditRepository = auditRepository,
                     maintenanceService = maintenanceService,
                     onAccountIdChange = { currentAccountId = it },
                     onCurrencyIdChange = {},
@@ -383,5 +389,9 @@ class AccountTransactionsScreenTest {
         override suspend fun refreshMaterializedViews(): Duration = Duration.ZERO
 
         override suspend fun fullRefreshMaterializedViews(): Duration = Duration.ZERO
+    }
+
+    private class FakeAuditRepository : AuditRepository {
+        override suspend fun getAuditHistoryForTransfer(transferId: TransferId): List<TransferAuditEntry> = emptyList()
     }
 }
