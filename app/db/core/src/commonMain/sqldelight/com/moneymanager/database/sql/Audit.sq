@@ -125,8 +125,13 @@ SELECT
     Transfer_Audit.sourceAccountId,
     Transfer_Audit.targetAccountId,
     Transfer_Audit.currencyId,
-    Transfer_Audit.amount
+    Transfer_Audit.amount,
+    Currency.id AS currency_id,
+    Currency.code AS currency_code,
+    Currency.name AS currency_name,
+    Currency.scaleFactor AS currency_scaleFactor
 FROM Transfer_Audit
 JOIN AuditType ON Transfer_Audit.auditTypeId = AuditType.id
+JOIN Currency ON Transfer_Audit.currencyId = Currency.id
 WHERE Transfer_Audit.id = ?
 ORDER BY Transfer_Audit.auditTimestamp DESC, Transfer_Audit.auditId DESC;

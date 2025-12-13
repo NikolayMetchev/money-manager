@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -68,17 +69,21 @@ import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
+import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
+import com.moneymanager.domain.model.TransferAuditEntry
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.AccountRepository
+import com.moneymanager.domain.repository.AuditRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.util.formatAmount
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
@@ -125,10 +130,26 @@ fun AccountTransactionsScreen(
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
+    auditRepository: AuditRepository,
     maintenanceService: DatabaseMaintenanceService,
     onAccountIdChange: (AccountId) -> Unit = {},
     onCurrencyIdChange: (CurrencyId?) -> Unit = {},
 ) {
+    // Audit transaction state - when set, shows full-screen audit view
+    var transactionIdToAudit by remember { mutableStateOf<TransferId?>(null) }
+
+    // Show full-screen audit view if a transaction is selected for audit
+    transactionIdToAudit?.let { transferId ->
+        TransactionAuditScreen(
+            transferId = transferId,
+            auditRepository = auditRepository,
+            accountRepository = accountRepository,
+            transactionRepository = transactionRepository,
+            onBack = { transactionIdToAudit = null },
+        )
+        return
+    }
+
     val allAccounts by accountRepository.getAllAccounts()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
     val currencies by currencyRepository.getAllCurrencies()
@@ -573,6 +594,8 @@ fun AccountTransactionsScreen(
                         softWrap = false,
                         modifier = Modifier.weight(0.15f).padding(start = 8.dp),
                     )
+                    // Spacer for edit and audit button columns
+                    Spacer(modifier = Modifier.width(64.dp))
                 }
 
                 val listState = rememberLazyListState()
@@ -609,6 +632,9 @@ fun AccountTransactionsScreen(
                             isHighlighted = highlightedTransactionId == runningBalance.transactionId,
                             onEditClick = { transfer ->
                                 transactionToEdit = transfer
+                            },
+                            onAuditClick = { transferId ->
+                                transactionIdToAudit = transferId
                             },
                             onAccountClick = { clickedAccountId ->
                                 highlightedTransactionId = runningBalance.transactionId
@@ -712,6 +738,7 @@ fun AccountTransactionCard(
     isHighlighted: Boolean = false,
     onAccountClick: (AccountId) -> Unit = {},
     onEditClick: (Transfer) -> Unit = {},
+    onAuditClick: (TransferId) -> Unit = {},
 ) {
     // Determine which account to display based on the current view
     // The account column should show the OTHER account in the transaction
@@ -868,6 +895,19 @@ fun AccountTransactionCard(
             ) {
                 Text(
                     text = "\u270F\uFE0F",
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+            }
+
+            // Audit button - show audit history for this transaction
+            IconButton(
+                onClick = {
+                    onAuditClick(runningBalance.transactionId as TransferId)
+                },
+                modifier = Modifier.size(32.dp),
+            ) {
+                Text(
+                    text = "\uD83D\uDCDC",
                     style = MaterialTheme.typography.bodyLarge,
                 )
             }
@@ -2153,4 +2193,402 @@ fun CreateCurrencyDialogInline(
             }
         },
     )
+}
+
+@Composable
+fun TransactionAuditScreen(
+    transferId: TransferId,
+    auditRepository: AuditRepository,
+    accountRepository: AccountRepository,
+    transactionRepository: TransactionRepository,
+    onBack: () -> Unit,
+) {
+    var auditEntries by remember { mutableStateOf<List<TransferAuditEntry>>(emptyList()) }
+    var currentTransfer by remember { mutableStateOf<Transfer?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    val accounts by accountRepository.getAllAccounts()
+        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+
+    LaunchedEffect(transferId) {
+        isLoading = true
+        errorMessage = null
+        try {
+            auditEntries = auditRepository.getAuditHistoryForTransfer(transferId)
+            currentTransfer = transactionRepository.getTransactionById(transferId.id).first()
+        } catch (e: Exception) {
+            logger.error(e) { "Failed to load audit history: ${e.message}" }
+            errorMessage = "Failed to load audit history: ${e.message}"
+        } finally {
+            isLoading = false
+        }
+    }
+
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+    ) {
+        // Header with back button
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = onBack) {
+                Text(
+                    text = "\u2190",
+                    style = MaterialTheme.typography.headlineMedium,
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "Audit History: $transferId",
+                style = MaterialTheme.typography.headlineSmall,
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        if (isLoading) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator()
+            }
+        } else if (errorMessage != null) {
+            Text(
+                text = errorMessage!!,
+                color = MaterialTheme.colorScheme.error,
+            )
+        } else if (auditEntries.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "No audit history found for this transaction.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else {
+            // Column headers
+            val headerStyle = MaterialTheme.typography.labelSmall
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Type",
+                    style = headerStyle,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(0.1f),
+                    maxLines = 1,
+                )
+                Text(
+                    text = "Audit Time",
+                    style = headerStyle,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(0.15f),
+                    maxLines = 1,
+                )
+                Text(
+                    text = "From",
+                    style = headerStyle,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(0.15f).padding(horizontal = 8.dp),
+                    maxLines = 1,
+                )
+                Text(
+                    text = "To",
+                    style = headerStyle,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(0.15f).padding(horizontal = 8.dp),
+                    maxLines = 1,
+                )
+                Text(
+                    text = "Description",
+                    style = headerStyle,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(0.3f).padding(horizontal = 8.dp),
+                    maxLines = 1,
+                )
+                Text(
+                    text = "Amount",
+                    style = headerStyle,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(0.15f),
+                    textAlign = TextAlign.End,
+                    maxLines = 1,
+                )
+            }
+
+            HorizontalDivider()
+
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(top = 8.dp),
+            ) {
+                // Show current state at the top if the transaction still exists
+                currentTransfer?.let { transfer ->
+                    item(key = "current") {
+                        // Compare current state with the most recent audit entry
+                        val mostRecentAuditEntry = auditEntries.firstOrNull()
+                        CurrentStateCard(
+                            transfer = transfer,
+                            previousAuditEntry = mostRecentAuditEntry,
+                            accounts = accounts,
+                        )
+                    }
+                }
+
+                itemsIndexed(auditEntries, key = { _, entry -> entry.auditId }) { index, entry ->
+                    // Previous entry in chronological order is the next item in the list
+                    // (since list is ordered by timestamp DESC)
+                    val previousEntry = auditEntries.getOrNull(index + 1)
+                    AuditEntryCard(
+                        entry = entry,
+                        previousEntry = previousEntry,
+                        accounts = accounts,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AuditEntryCard(
+    entry: TransferAuditEntry,
+    previousEntry: TransferAuditEntry?,
+    accounts: List<Account>,
+) {
+    val auditDateTime = entry.auditTimestamp.toLocalDateTime(TimeZone.currentSystemDefault())
+
+    val sourceAccount = accounts.find { it.id == entry.sourceAccountId }
+    val targetAccount = accounts.find { it.id == entry.targetAccountId }
+
+    val auditTypeColor =
+        when (entry.auditType) {
+            AuditType.INSERT -> MaterialTheme.colorScheme.primary
+            AuditType.UPDATE -> MaterialTheme.colorScheme.tertiary
+            AuditType.DELETE -> MaterialTheme.colorScheme.error
+        }
+
+    val auditTypeLabel =
+        when (entry.auditType) {
+            AuditType.INSERT -> "Created"
+            AuditType.UPDATE -> "Updated"
+            AuditType.DELETE -> "Deleted"
+        }
+
+    // Determine which fields changed (only for non-INSERT entries with a previous entry)
+    val shouldHighlight = entry.auditType != AuditType.INSERT && previousEntry != null
+    val sourceChanged = shouldHighlight && entry.sourceAccountId != previousEntry?.sourceAccountId
+    val targetChanged = shouldHighlight && entry.targetAccountId != previousEntry?.targetAccountId
+    val descriptionChanged = shouldHighlight && entry.description != previousEntry?.description
+    val amountChanged = shouldHighlight && entry.amount != previousEntry?.amount
+
+    val cellStyle = MaterialTheme.typography.bodyMedium
+    val cellAutoSize = TextAutoSize.StepBased(minFontSize = 8.sp, maxFontSize = 14.sp)
+    val highlightColor = MaterialTheme.colorScheme.error
+    val normalColor = MaterialTheme.colorScheme.onSurface
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+    ) {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // Type column
+            Text(
+                text = auditTypeLabel,
+                style = cellStyle,
+                color = auditTypeColor,
+                modifier = Modifier.weight(0.1f),
+                maxLines = 1,
+                autoSize = cellAutoSize,
+            )
+
+            // Audit timestamp column
+            Text(
+                text = "${auditDateTime.date}\n${auditDateTime.time}",
+                style = cellStyle,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(0.15f),
+                maxLines = 2,
+                autoSize = cellAutoSize,
+            )
+
+            // From account column
+            Text(
+                text = sourceAccount?.name ?: "#${entry.sourceAccountId.id}",
+                style = cellStyle,
+                color = if (sourceChanged) highlightColor else normalColor,
+                modifier =
+                    Modifier
+                        .weight(0.15f)
+                        .padding(horizontal = 8.dp),
+                maxLines = 1,
+                autoSize = cellAutoSize,
+            )
+
+            // To account column
+            Text(
+                text = targetAccount?.name ?: "#${entry.targetAccountId.id}",
+                style = cellStyle,
+                color = if (targetChanged) highlightColor else normalColor,
+                modifier =
+                    Modifier
+                        .weight(0.15f)
+                        .padding(horizontal = 8.dp),
+                maxLines = 1,
+                autoSize = cellAutoSize,
+            )
+
+            // Description column
+            Text(
+                text = entry.description.ifBlank { "-" },
+                style = cellStyle,
+                color = if (descriptionChanged) highlightColor else normalColor,
+                modifier =
+                    Modifier
+                        .weight(0.3f)
+                        .padding(horizontal = 8.dp),
+                maxLines = 1,
+                autoSize = cellAutoSize,
+            )
+
+            // Amount column
+            Text(
+                text = formatAmount(entry.amount),
+                style = cellStyle,
+                color = if (amountChanged) highlightColor else MaterialTheme.colorScheme.primary,
+                modifier = Modifier.weight(0.15f),
+                textAlign = TextAlign.End,
+                maxLines = 1,
+                autoSize = cellAutoSize,
+            )
+        }
+    }
+}
+
+@Composable
+private fun CurrentStateCard(
+    transfer: Transfer,
+    previousAuditEntry: TransferAuditEntry?,
+    accounts: List<Account>,
+) {
+    val sourceAccount = accounts.find { it.id == transfer.sourceAccountId }
+    val targetAccount = accounts.find { it.id == transfer.targetAccountId }
+
+    // Determine which fields changed from the most recent audit entry
+    val shouldHighlight = previousAuditEntry != null
+    val sourceChanged = shouldHighlight && transfer.sourceAccountId != previousAuditEntry?.sourceAccountId
+    val targetChanged = shouldHighlight && transfer.targetAccountId != previousAuditEntry?.targetAccountId
+    val descriptionChanged = shouldHighlight && transfer.description != previousAuditEntry?.description
+    val amountChanged = shouldHighlight && transfer.amount != previousAuditEntry?.amount
+
+    val cellStyle = MaterialTheme.typography.bodyMedium
+    val cellAutoSize = TextAutoSize.StepBased(minFontSize = 8.sp, maxFontSize = 14.sp)
+    val highlightColor = MaterialTheme.colorScheme.error
+    val normalColor = MaterialTheme.colorScheme.onPrimaryContainer
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors =
+            CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+            ),
+    ) {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // Type column - shows "Current"
+            Text(
+                text = "Current",
+                style = cellStyle,
+                color = normalColor,
+                modifier = Modifier.weight(0.1f),
+                maxLines = 1,
+                autoSize = cellAutoSize,
+            )
+
+            // Audit timestamp column - shows "Now" for current state
+            Text(
+                text = "Now",
+                style = cellStyle,
+                color = normalColor,
+                modifier = Modifier.weight(0.15f),
+                maxLines = 1,
+                autoSize = cellAutoSize,
+            )
+
+            // From account column
+            Text(
+                text = sourceAccount?.name ?: "#${transfer.sourceAccountId.id}",
+                style = cellStyle,
+                color = if (sourceChanged) highlightColor else normalColor,
+                modifier =
+                    Modifier
+                        .weight(0.15f)
+                        .padding(horizontal = 8.dp),
+                maxLines = 1,
+                autoSize = cellAutoSize,
+            )
+
+            // To account column
+            Text(
+                text = targetAccount?.name ?: "#${transfer.targetAccountId.id}",
+                style = cellStyle,
+                color = if (targetChanged) highlightColor else normalColor,
+                modifier =
+                    Modifier
+                        .weight(0.15f)
+                        .padding(horizontal = 8.dp),
+                maxLines = 1,
+                autoSize = cellAutoSize,
+            )
+
+            // Description column
+            Text(
+                text = transfer.description.ifBlank { "-" },
+                style = cellStyle,
+                color = if (descriptionChanged) highlightColor else normalColor,
+                modifier =
+                    Modifier
+                        .weight(0.3f)
+                        .padding(horizontal = 8.dp),
+                maxLines = 1,
+                autoSize = cellAutoSize,
+            )
+
+            // Amount column
+            Text(
+                text = formatAmount(transfer.amount),
+                style = cellStyle,
+                color = if (amountChanged) highlightColor else MaterialTheme.colorScheme.primary,
+                modifier = Modifier.weight(0.15f),
+                textAlign = TextAlign.End,
+                maxLines = 1,
+                autoSize = cellAutoSize,
+            )
+        }
+    }
 }
