@@ -5,7 +5,6 @@ import com.moneymanager.database.DbLocation
 import com.moneymanager.database.RepositorySet
 import com.moneymanager.database.createTestDatabaseLocation
 import com.moneymanager.database.deleteTestDatabase
-import com.moneymanager.database.getPlatformDriver
 import com.moneymanager.database.sql.MoneyManagerDatabase
 import com.moneymanager.di.AppComponent
 import com.moneymanager.di.createTestAppComponentParams
