@@ -66,7 +66,6 @@ import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
-import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.TransactionId
@@ -362,7 +361,6 @@ fun AccountTransactionsScreen(
                             ) {
                                 // Row for each currency
                                 uniqueCurrencyIds.forEach { currencyId ->
-                                    val currency = currencies.find { it.id == currencyId }
                                     Row(
                                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                                         verticalAlignment = Alignment.CenterVertically,
@@ -536,7 +534,6 @@ fun AccountTransactionsScreen(
                             runningBalance = runningBalance,
                             transaction = transaction,
                             accounts = allAccounts,
-                            currencies = currencies,
                             screenSizeClass = screenSizeClass,
                             isHighlighted = highlightedTransactionId == runningBalance.transactionId,
                             onEditClick = { transfer ->
@@ -626,7 +623,6 @@ fun AccountTransactionCard(
     runningBalance: AccountRow,
     transaction: Transfer?,
     accounts: List<Account>,
-    currencies: List<Currency>,
     screenSizeClass: ScreenSizeClass,
     isHighlighted: Boolean = false,
     onAccountClick: (AccountId) -> Unit = {},
@@ -778,83 +774,6 @@ fun AccountTransactionCard(
                 }
             } else {
                 Spacer(modifier = Modifier.width(32.dp))
-            }
-        }
-    }
-}
-
-@Composable
-fun TransactionCard(
-    transaction: Transfer,
-    accounts: List<Account>,
-    currencies: List<Currency>,
-) {
-    val sourceAccount = accounts.find { it.id == transaction.sourceAccountId }
-    val targetAccount = accounts.find { it.id == transaction.targetAccountId }
-    val currency = currencies.find { it.id == transaction.amount.currency.id }
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-    ) {
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // Leftmost column: Date and time
-            val dateTime = transaction.timestamp.toLocalDateTime(TimeZone.currentSystemDefault())
-            Column(modifier = Modifier.weight(0.2f)) {
-                Text(
-                    text = "${dateTime.date}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    autoSize = TextAutoSize.StepBased(minFontSize = 8.sp),
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "${dateTime.time}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    autoSize = TextAutoSize.StepBased(minFontSize = 6.sp, maxFontSize = 12.sp),
-                )
-            }
-
-            // Second column: Accounts
-            Text(
-                text = "${sourceAccount?.name ?: "Unknown"} → ${targetAccount?.name ?: "Unknown"}",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.weight(0.3f).padding(horizontal = 8.dp),
-            )
-
-            // Third column: Description
-            if (transaction.description.isNotBlank()) {
-                Text(
-                    text = transaction.description,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.weight(0.35f).padding(horizontal = 8.dp),
-                )
-            } else {
-                Spacer(modifier = Modifier.weight(0.35f))
-            }
-
-            // Rightmost column: Amount
-            Column(
-                horizontalAlignment = Alignment.End,
-                modifier = Modifier.weight(0.15f),
-            ) {
-                Text(
-                    text = formatAmount(transaction.amount),
-                    style = MaterialTheme.typography.titleLarge,
-                    maxLines = 1,
-                    autoSize = TextAutoSize.StepBased(minFontSize = 8.sp),
-                )
             }
         }
     }

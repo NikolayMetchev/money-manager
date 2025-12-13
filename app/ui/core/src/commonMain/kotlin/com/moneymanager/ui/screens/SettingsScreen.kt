@@ -3,6 +3,7 @@
 package com.moneymanager.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -28,7 +29,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.moneymanager.database.RepositorySet
 import com.moneymanager.ui.util.GenerationProgress
 import com.moneymanager.ui.util.generateSampleData
@@ -48,6 +54,45 @@ private data class MaintenanceState(
     val lastResults: Map<MaintenanceOperation, Duration> = emptyMap(),
     val error: String? = null,
 )
+
+@Composable
+private fun AutoSizeText(
+    text: String,
+    modifier: Modifier = Modifier,
+    style: TextStyle = MaterialTheme.typography.labelLarge,
+    maxFontSize: Int = 14,
+    minFontSize: Int = 8,
+) {
+    BoxWithConstraints(modifier = modifier) {
+        val textMeasurer = rememberTextMeasurer()
+        val density = LocalDensity.current
+
+        // Convert maxWidth to pixels
+        val maxWidthPx = with(density) { maxWidth.toPx() }
+
+        // Find the optimal font size
+        var fontSize = maxFontSize
+        while (fontSize >= minFontSize) {
+            val textLayoutResult =
+                textMeasurer.measure(
+                    text = text,
+                    style = style.copy(fontSize = fontSize.sp),
+                )
+
+            if (textLayoutResult.size.width <= maxWidthPx) {
+                break
+            }
+            fontSize -= 1
+        }
+
+        Text(
+            text = text,
+            style = style.copy(fontSize = fontSize.sp),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
 
 @Composable
 fun SettingsScreen(repositorySet: RepositorySet) {
@@ -438,7 +483,10 @@ private fun MaintenanceButton(
                     strokeWidth = 2.dp,
                 )
             } else {
-                Text(operation.name)
+                AutoSizeText(
+                    text = operation.name,
+                    style = MaterialTheme.typography.labelLarge,
+                )
             }
         }
         Text(
