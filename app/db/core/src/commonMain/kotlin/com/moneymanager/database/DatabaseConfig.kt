@@ -3,7 +3,6 @@
 package com.moneymanager.database
 
 import com.moneymanager.currency.Currency
-import com.moneymanager.database.sql.MoneyManagerDatabase
 
 /**
  * Centralized database configuration for SQLite PRAGMA settings and seed data.
@@ -35,7 +34,7 @@ object DatabaseConfig {
      *
      * @param database The database to create triggers on
      */
-    private fun createIncrementalRefreshTriggers(database: MoneyManagerDatabase) {
+    private fun createIncrementalRefreshTriggers(database: MoneyManagerDatabaseWrapper) {
         // INSERT trigger - tracks both source and target account-currency pairs
         database.execute(
             null,
@@ -151,7 +150,7 @@ object DatabaseConfig {
      *
      * @param database The database to create trigger on
      */
-    private fun createCategoryDeleteTrigger(database: MoneyManagerDatabase) {
+    private fun createCategoryDeleteTrigger(database: MoneyManagerDatabaseWrapper) {
         database.execute(
             null,
             """
@@ -169,82 +168,6 @@ object DatabaseConfig {
     }
 
     /**
-     * Tables to exclude from audit trail.
-     * Includes audit tables themselves, materialized views, and system tables.
-     */
-    internal val EXCLUDED_FROM_AUDIT =
-        setOf(
-            "AuditType",
-            "Account_Audit",
-            "Currency_Audit",
-            "Category_Audit",
-            "Transfer_Audit",
-            "AccountBalanceMaterializedView",
-            "RunningBalanceMaterializedView",
-            "PendingMaterializedViewChanges",
-            "sqlite_sequence",
-        )
-
-    /**
-     * Gets all auditable tables from the database.
-     * Queries sqlite_master and excludes tables in EXCLUDED_FROM_AUDIT set.
-     *
-     * @param database The database to query
-     * @return List of auditable table names, sorted alphabetically
-     */
-    internal fun getAuditableTables(database: MoneyManagerDatabase): List<String> {
-        val tables = mutableListOf<String>()
-        database.executeQuery<Unit>(
-            null,
-            """
-            SELECT name FROM sqlite_master
-            WHERE type = 'table'
-            AND name NOT LIKE 'sqlite_%'
-            ORDER BY name
-            """.trimIndent(),
-            { cursor ->
-                while (cursor.next().value) {
-                    val tableName = cursor.getString(0) ?: continue
-                    if (tableName !in EXCLUDED_FROM_AUDIT) {
-                        tables.add(tableName)
-                    }
-                }
-                app.cash.sqldelight.db.QueryResult.Unit
-            },
-            0,
-        )
-        return tables
-    }
-
-    /**
-     * Gets all column names for a specific table.
-     * Uses PRAGMA table_info() to query column metadata.
-     *
-     * @param database The database to query
-     * @param tableName The name of the table to query
-     * @return List of column names in the order they appear in the table
-     */
-    internal fun getTableColumns(
-        database: MoneyManagerDatabase,
-        tableName: String,
-    ): List<String> {
-        val columns = mutableListOf<String>()
-        database.executeQuery<Unit>(
-            null,
-            "PRAGMA table_info($tableName)",
-            { cursor ->
-                while (cursor.next().value) {
-                    val columnName = cursor.getString(1) ?: continue
-                    columns.add(columnName)
-                }
-                app.cash.sqldelight.db.QueryResult.Unit
-            },
-            0,
-        )
-        return columns
-    }
-
-    /**
      * Creates audit triggers dynamically for all main tables.
      * Queries sqlite_master to discover tables and their columns, then generates triggers.
      *
@@ -258,12 +181,12 @@ object DatabaseConfig {
      *
      * @param database The database to create triggers on
      */
-    private fun createAuditTriggers(database: MoneyManagerDatabase) {
-        val tables = getAuditableTables(database)
+    private fun createAuditTriggers(database: MoneyManagerDatabaseWrapper) {
+        val tables = database.getAuditableTables()
 
         tables.forEach { tableName ->
             val auditTableName = "${tableName}_Audit"
-            val columns = getTableColumns(database, tableName)
+            val columns = database.getTableColumns(tableName)
 
             val columnList = columns.joinToString(", ")
             val newColumnList = columns.joinToString(", ") { "NEW.$it" }
@@ -321,9 +244,8 @@ object DatabaseConfig {
      * Should be called once after creating a new database.
      *
      * @param database The database to seed
-     * @param driver The SQLite driver (needed for creating triggers)
      */
-    suspend fun seedDatabase(database: MoneyManagerDatabase) {
+    suspend fun seedDatabase(database: MoneyManagerDatabaseWrapper) {
         // Seed AuditType lookup table
         database.auditTypeQueries.insert(id = 1, name = "INSERT")
         database.auditTypeQueries.insert(id = 2, name = "UPDATE")

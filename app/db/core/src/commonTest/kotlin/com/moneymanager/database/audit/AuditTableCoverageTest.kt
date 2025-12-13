@@ -1,11 +1,11 @@
 package com.moneymanager.database.audit
 
-import app.cash.sqldelight.db.SqlDriver
+import app.cash.sqldelight.db.QueryResult
 import com.moneymanager.database.DbLocation
+import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.RepositorySet
 import com.moneymanager.database.createTestDatabaseLocation
 import com.moneymanager.database.deleteTestDatabase
-import com.moneymanager.database.sql.MoneyManagerDatabase
 import com.moneymanager.di.AppComponent
 import com.moneymanager.di.createTestAppComponentParams
 import kotlinx.coroutines.test.runTest
@@ -17,9 +17,8 @@ import kotlin.test.assertTrue
 import kotlin.test.fail
 
 class AuditTableCoverageTest {
-    private lateinit var database: MoneyManagerDatabase
-    private lateinit var driver: SqlDriver
-    private lateinit var testDbLocation: com.moneymanager.database.DbLocation
+    private lateinit var database: MoneyManagerDatabaseWrapper
+    private lateinit var testDbLocation: DbLocation
 
     @BeforeTest
     fun setup() =
@@ -30,7 +29,6 @@ class AuditTableCoverageTest {
             val databaseManager = component.databaseManager
             // Open file-based database for testing
             database = databaseManager.openDatabase(testDbLocation)
-            // Create driver for metadata queries
             RepositorySet(database)
         }
 
@@ -42,7 +40,7 @@ class AuditTableCoverageTest {
     @Test
     fun `all regular tables have audit tables with matching schema`() {
         // Get all auditable tables using centralized utility function
-        val regularTables = com.moneymanager.database.DatabaseConfig.getAuditableTables(driver)
+        val regularTables = database.getAuditableTables()
 
         assertTrue(regularTables.isNotEmpty(), "Should have at least one regular table to audit")
 
@@ -52,15 +50,15 @@ class AuditTableCoverageTest {
 
             // Verify audit table exists
             var auditTableExists = false
-            driver.executeQuery<Unit>(
+            database.executeQuery(
                 null,
                 """
                 SELECT name FROM sqlite_master
                 WHERE type = 'table' AND name = '$auditTableName'
                 """.trimIndent(),
-                { auditCursor ->
-                    auditTableExists = auditCursor.next().value
-                    app.cash.sqldelight.db.QueryResult.Unit
+                { cursor ->
+                    auditTableExists = cursor.next().value
+                    QueryResult.Unit
                 },
                 0,
             )
@@ -70,8 +68,8 @@ class AuditTableCoverageTest {
             }
 
             // Get columns using centralized utility function
-            val mainTableColumns = com.moneymanager.database.DatabaseConfig.getTableColumns(driver, tableName)
-            val auditTableColumns = com.moneymanager.database.DatabaseConfig.getTableColumns(driver, auditTableName)
+            val mainTableColumns = database.getTableColumns(tableName)
+            val auditTableColumns = database.getTableColumns(auditTableName)
 
             // Verify audit table has audit metadata columns
             assertTrue(
