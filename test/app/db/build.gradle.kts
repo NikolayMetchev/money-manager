@@ -11,10 +11,15 @@ kotlin {
                 api(projects.app.model.core)
             }
         }
-        val jvmMain by getting
+        val jvmMain by getting {
+            dependencies {
+                implementation(libs.sqldelight.sqlite.driver)
+            }
+        }
         val androidMain by getting {
             dependencies {
                 api(libs.androidx.test.core)
+                implementation(libs.sqldelight.android.driver)
             }
         }
     }

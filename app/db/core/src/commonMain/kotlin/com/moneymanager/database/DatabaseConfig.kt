@@ -170,8 +170,30 @@ object DatabaseConfig {
     }
 
     /**
-     * Creates audit triggers for all main tables (Account, Currency, Category, Transfer).
+     * Tables to exclude from audit trail.
+     * Includes audit tables themselves, materialized views, and system tables.
+     */
+    private val EXCLUDED_FROM_AUDIT =
+        setOf(
+            "AuditType",
+            "Account_Audit",
+            "Currency_Audit",
+            "Category_Audit",
+            "Transfer_Audit",
+            "AccountBalanceMaterializedView",
+            "RunningBalanceMaterializedView",
+            "PendingMaterializedViewChanges",
+            "sqlite_sequence",
+        )
+
+    /**
+     * Creates audit triggers dynamically for all main tables.
+     * Queries sqlite_master to discover tables and their columns, then generates triggers.
+     *
      * Each table gets 3 triggers: INSERT, UPDATE, DELETE that record changes to audit tables.
+     * - INSERT triggers store NEW values
+     * - UPDATE triggers store OLD values (state before change)
+     * - DELETE triggers store OLD values (state before deletion)
      *
      * NOTE: Triggers are created at runtime (not in schema) due to SQLDelight 2.2.1 parser limitations.
      * Called automatically from seedDatabase() during database initialization.
@@ -179,177 +201,96 @@ object DatabaseConfig {
      * @param driver The SQLite driver to use for executing the CREATE TRIGGER statements
      */
     private fun createAuditTriggers(driver: SqlDriver) {
-        // Account audit triggers
-        driver.execute(
+        // Query all table names
+        val tables = mutableListOf<String>()
+        driver.executeQuery<Unit>(
             null,
             """
-            CREATE TRIGGER IF NOT EXISTS trigger_account_insert_audit
-            AFTER INSERT ON Account
-            FOR EACH ROW
-            BEGIN
-                INSERT INTO Account_Audit (auditTimestamp, auditTypeId, id, name, openingDate, categoryId)
-                VALUES (strftime('%s', 'now'), 1, NEW.id, NEW.name, NEW.openingDate, NEW.categoryId);
-            END
+            SELECT name FROM sqlite_master
+            WHERE type = 'table'
+            AND name NOT LIKE 'sqlite_%'
+            ORDER BY name
             """.trimIndent(),
+            { cursor ->
+                while (cursor.next().value) {
+                    val tableName = cursor.getString(0) ?: continue
+                    if (tableName !in EXCLUDED_FROM_AUDIT) {
+                        tables.add(tableName)
+                    }
+                }
+                app.cash.sqldelight.db.QueryResult.Unit
+            },
             0,
         )
 
-        driver.execute(
-            null,
-            """
-            CREATE TRIGGER IF NOT EXISTS trigger_account_update_audit
-            AFTER UPDATE ON Account
-            FOR EACH ROW
-            BEGIN
-                INSERT INTO Account_Audit (auditTimestamp, auditTypeId, id, name, openingDate, categoryId)
-                VALUES (strftime('%s', 'now'), 2, OLD.id, OLD.name, OLD.openingDate, OLD.categoryId);
-            END
-            """.trimIndent(),
-            0,
-        )
+        // For each table, get its columns and create triggers
+        tables.forEach { tableName ->
+            val auditTableName = "${tableName}_Audit"
 
-        driver.execute(
-            null,
-            """
-            CREATE TRIGGER IF NOT EXISTS trigger_account_delete_audit
-            AFTER DELETE ON Account
-            FOR EACH ROW
-            BEGIN
-                INSERT INTO Account_Audit (auditTimestamp, auditTypeId, id, name, openingDate, categoryId)
-                VALUES (strftime('%s', 'now'), 3, OLD.id, OLD.name, OLD.openingDate, OLD.categoryId);
-            END
-            """.trimIndent(),
-            0,
-        )
+            // Get column names for this table
+            val columns = mutableListOf<String>()
+            driver.executeQuery<Unit>(
+                null,
+                "PRAGMA table_info($tableName)",
+                { pragmaCursor ->
+                    while (pragmaCursor.next().value) {
+                        val columnName = pragmaCursor.getString(1) ?: continue
+                        columns.add(columnName)
+                    }
+                    app.cash.sqldelight.db.QueryResult.Unit
+                },
+                0,
+            )
 
-        // Currency audit triggers
-        driver.execute(
-            null,
-            """
-            CREATE TRIGGER IF NOT EXISTS trigger_currency_insert_audit
-            AFTER INSERT ON Currency
-            FOR EACH ROW
-            BEGIN
-                INSERT INTO Currency_Audit (auditTimestamp, auditTypeId, id, code, name, scaleFactor)
-                VALUES (strftime('%s', 'now'), 1, NEW.id, NEW.code, NEW.name, NEW.scaleFactor);
-            END
-            """.trimIndent(),
-            0,
-        )
+            val columnList = columns.joinToString(", ")
+            val newColumnList = columns.joinToString(", ") { "NEW.$it" }
+            val oldColumnList = columns.joinToString(", ") { "OLD.$it" }
 
-        driver.execute(
-            null,
-            """
-            CREATE TRIGGER IF NOT EXISTS trigger_currency_update_audit
-            AFTER UPDATE ON Currency
-            FOR EACH ROW
-            BEGIN
-                INSERT INTO Currency_Audit (auditTimestamp, auditTypeId, id, code, name, scaleFactor)
-                VALUES (strftime('%s', 'now'), 2, OLD.id, OLD.code, OLD.name, OLD.scaleFactor);
-            END
-            """.trimIndent(),
-            0,
-        )
+            // INSERT trigger - stores NEW values with auditTypeId 1
+            driver.execute(
+                null,
+                """
+                CREATE TRIGGER IF NOT EXISTS trigger_${tableName.lowercase()}_insert_audit
+                AFTER INSERT ON $tableName
+                FOR EACH ROW
+                BEGIN
+                    INSERT INTO $auditTableName (auditTimestamp, auditTypeId, $columnList)
+                    VALUES (strftime('%s', 'now'), 1, $newColumnList);
+                END
+                """.trimIndent(),
+                0,
+            )
 
-        driver.execute(
-            null,
-            """
-            CREATE TRIGGER IF NOT EXISTS trigger_currency_delete_audit
-            AFTER DELETE ON Currency
-            FOR EACH ROW
-            BEGIN
-                INSERT INTO Currency_Audit (auditTimestamp, auditTypeId, id, code, name, scaleFactor)
-                VALUES (strftime('%s', 'now'), 3, OLD.id, OLD.code, OLD.name, OLD.scaleFactor);
-            END
-            """.trimIndent(),
-            0,
-        )
+            // UPDATE trigger - stores OLD values with auditTypeId 2
+            driver.execute(
+                null,
+                """
+                CREATE TRIGGER IF NOT EXISTS trigger_${tableName.lowercase()}_update_audit
+                AFTER UPDATE ON $tableName
+                FOR EACH ROW
+                BEGIN
+                    INSERT INTO $auditTableName (auditTimestamp, auditTypeId, $columnList)
+                    VALUES (strftime('%s', 'now'), 2, $oldColumnList);
+                END
+                """.trimIndent(),
+                0,
+            )
 
-        // Category audit triggers
-        driver.execute(
-            null,
-            """
-            CREATE TRIGGER IF NOT EXISTS trigger_category_insert_audit
-            AFTER INSERT ON Category
-            FOR EACH ROW
-            BEGIN
-                INSERT INTO Category_Audit (auditTimestamp, auditTypeId, id, name, parentId)
-                VALUES (strftime('%s', 'now'), 1, NEW.id, NEW.name, NEW.parentId);
-            END
-            """.trimIndent(),
-            0,
-        )
-
-        driver.execute(
-            null,
-            """
-            CREATE TRIGGER IF NOT EXISTS trigger_category_update_audit
-            AFTER UPDATE ON Category
-            FOR EACH ROW
-            BEGIN
-                INSERT INTO Category_Audit (auditTimestamp, auditTypeId, id, name, parentId)
-                VALUES (strftime('%s', 'now'), 2, OLD.id, OLD.name, OLD.parentId);
-            END
-            """.trimIndent(),
-            0,
-        )
-
-        driver.execute(
-            null,
-            """
-            CREATE TRIGGER IF NOT EXISTS trigger_category_delete_audit
-            AFTER DELETE ON Category
-            FOR EACH ROW
-            BEGIN
-                INSERT INTO Category_Audit (auditTimestamp, auditTypeId, id, name, parentId)
-                VALUES (strftime('%s', 'now'), 3, OLD.id, OLD.name, OLD.parentId);
-            END
-            """.trimIndent(),
-            0,
-        )
-
-        // Transfer audit triggers
-        driver.execute(
-            null,
-            """
-            CREATE TRIGGER IF NOT EXISTS trigger_transfer_insert_audit
-            AFTER INSERT ON Transfer
-            FOR EACH ROW
-            BEGIN
-                INSERT INTO Transfer_Audit (auditTimestamp, auditTypeId, id, timestamp, description, sourceAccountId, targetAccountId, currencyId, amount)
-                VALUES (strftime('%s', 'now'), 1, NEW.id, NEW.timestamp, NEW.description, NEW.sourceAccountId, NEW.targetAccountId, NEW.currencyId, NEW.amount);
-            END
-            """.trimIndent(),
-            0,
-        )
-
-        driver.execute(
-            null,
-            """
-            CREATE TRIGGER IF NOT EXISTS trigger_transfer_update_audit
-            AFTER UPDATE ON Transfer
-            FOR EACH ROW
-            BEGIN
-                INSERT INTO Transfer_Audit (auditTimestamp, auditTypeId, id, timestamp, description, sourceAccountId, targetAccountId, currencyId, amount)
-                VALUES (strftime('%s', 'now'), 2, OLD.id, OLD.timestamp, OLD.description, OLD.sourceAccountId, OLD.targetAccountId, OLD.currencyId, OLD.amount);
-            END
-            """.trimIndent(),
-            0,
-        )
-
-        driver.execute(
-            null,
-            """
-            CREATE TRIGGER IF NOT EXISTS trigger_transfer_delete_audit
-            AFTER DELETE ON Transfer
-            FOR EACH ROW
-            BEGIN
-                INSERT INTO Transfer_Audit (auditTimestamp, auditTypeId, id, timestamp, description, sourceAccountId, targetAccountId, currencyId, amount)
-                VALUES (strftime('%s', 'now'), 3, OLD.id, OLD.timestamp, OLD.description, OLD.sourceAccountId, OLD.targetAccountId, OLD.currencyId, OLD.amount);
-            END
-            """.trimIndent(),
-            0,
-        )
+            // DELETE trigger - stores OLD values with auditTypeId 3
+            driver.execute(
+                null,
+                """
+                CREATE TRIGGER IF NOT EXISTS trigger_${tableName.lowercase()}_delete_audit
+                AFTER DELETE ON $tableName
+                FOR EACH ROW
+                BEGIN
+                    INSERT INTO $auditTableName (auditTimestamp, auditTypeId, $columnList)
+                    VALUES (strftime('%s', 'now'), 3, $oldColumnList);
+                END
+                """.trimIndent(),
+                0,
+            )
+        }
     }
 
     /**
