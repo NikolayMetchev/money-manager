@@ -22,7 +22,7 @@ fun <T> Flow<T>.collectAsStateWithSchemaErrorHandling(
     initial: T,
     databaseLocation: String = "default",
 ): State<T> {
-    return produceState(initial) {
+    return produceState(initial, this) {
         catch { e ->
             if (SchemaErrorDetector.isSchemaError(e)) {
                 logger.error(e) { "Schema error in Flow collection: ${e.message}" }
