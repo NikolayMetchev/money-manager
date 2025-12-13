@@ -1,0 +1,132 @@
+-- Audit tables store historical records of changes to main tables
+-- Each audit table mirrors its source table structure plus audit metadata
+
+-- Account_Audit: Audit trail for Account table
+CREATE TABLE Account_Audit (
+    auditId INTEGER PRIMARY KEY AUTOINCREMENT,
+    auditTimestamp INTEGER NOT NULL,
+    auditTypeId INTEGER NOT NULL,
+    id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    openingDate INTEGER NOT NULL,
+    categoryId INTEGER NOT NULL,
+    FOREIGN KEY (auditTypeId) REFERENCES AuditType(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_account_audit_id ON Account_Audit(id);
+CREATE INDEX IF NOT EXISTS idx_account_audit_timestamp ON Account_Audit(auditTimestamp);
+CREATE INDEX IF NOT EXISTS idx_account_audit_type ON Account_Audit(auditTypeId);
+CREATE INDEX IF NOT EXISTS idx_account_audit_id_timestamp ON Account_Audit(id, auditTimestamp DESC);
+
+-- Currency_Audit: Audit trail for Currency table
+CREATE TABLE Currency_Audit (
+    auditId INTEGER PRIMARY KEY AUTOINCREMENT,
+    auditTimestamp INTEGER NOT NULL,
+    auditTypeId INTEGER NOT NULL,
+    id TEXT NOT NULL,
+    code TEXT NOT NULL,
+    name TEXT NOT NULL,
+    scaleFactor INTEGER NOT NULL,
+    FOREIGN KEY (auditTypeId) REFERENCES AuditType(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_currency_audit_id ON Currency_Audit(id);
+CREATE INDEX IF NOT EXISTS idx_currency_audit_timestamp ON Currency_Audit(auditTimestamp);
+CREATE INDEX IF NOT EXISTS idx_currency_audit_type ON Currency_Audit(auditTypeId);
+CREATE INDEX IF NOT EXISTS idx_currency_audit_id_timestamp ON Currency_Audit(id, auditTimestamp DESC);
+
+-- Category_Audit: Audit trail for Category table
+CREATE TABLE Category_Audit (
+    auditId INTEGER PRIMARY KEY AUTOINCREMENT,
+    auditTimestamp INTEGER NOT NULL,
+    auditTypeId INTEGER NOT NULL,
+    id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    parentId INTEGER,
+    FOREIGN KEY (auditTypeId) REFERENCES AuditType(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_category_audit_id ON Category_Audit(id);
+CREATE INDEX IF NOT EXISTS idx_category_audit_timestamp ON Category_Audit(auditTimestamp);
+CREATE INDEX IF NOT EXISTS idx_category_audit_type ON Category_Audit(auditTypeId);
+CREATE INDEX IF NOT EXISTS idx_category_audit_id_timestamp ON Category_Audit(id, auditTimestamp DESC);
+
+-- Transfer_Audit: Audit trail for Transfer table
+CREATE TABLE Transfer_Audit (
+    auditId INTEGER PRIMARY KEY AUTOINCREMENT,
+    auditTimestamp INTEGER NOT NULL,
+    auditTypeId INTEGER NOT NULL,
+    id TEXT NOT NULL,
+    timestamp INTEGER NOT NULL,
+    description TEXT NOT NULL,
+    sourceAccountId INTEGER NOT NULL,
+    targetAccountId INTEGER NOT NULL,
+    currencyId TEXT NOT NULL,
+    amount INTEGER NOT NULL,
+    FOREIGN KEY (auditTypeId) REFERENCES AuditType(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_transfer_audit_id ON Transfer_Audit(id);
+CREATE INDEX IF NOT EXISTS idx_transfer_audit_timestamp ON Transfer_Audit(auditTimestamp);
+CREATE INDEX IF NOT EXISTS idx_transfer_audit_type ON Transfer_Audit(auditTypeId);
+CREATE INDEX IF NOT EXISTS idx_transfer_audit_id_timestamp ON Transfer_Audit(id, auditTimestamp DESC);
+
+-- Queries to retrieve audit history for each table
+
+selectAuditHistoryForAccount:
+SELECT
+    Account_Audit.auditId,
+    Account_Audit.auditTimestamp,
+    AuditType.name AS auditType,
+    Account_Audit.id,
+    Account_Audit.name,
+    Account_Audit.openingDate,
+    Account_Audit.categoryId
+FROM Account_Audit
+JOIN AuditType ON Account_Audit.auditTypeId = AuditType.id
+WHERE Account_Audit.id = ?
+ORDER BY Account_Audit.auditTimestamp DESC, Account_Audit.auditId DESC;
+
+selectAuditHistoryForCurrency:
+SELECT
+    Currency_Audit.auditId,
+    Currency_Audit.auditTimestamp,
+    AuditType.name AS auditType,
+    Currency_Audit.id,
+    Currency_Audit.code,
+    Currency_Audit.name,
+    Currency_Audit.scaleFactor
+FROM Currency_Audit
+JOIN AuditType ON Currency_Audit.auditTypeId = AuditType.id
+WHERE Currency_Audit.id = ?
+ORDER BY Currency_Audit.auditTimestamp DESC, Currency_Audit.auditId DESC;
+
+selectAuditHistoryForCategory:
+SELECT
+    Category_Audit.auditId,
+    Category_Audit.auditTimestamp,
+    AuditType.name AS auditType,
+    Category_Audit.id,
+    Category_Audit.name,
+    Category_Audit.parentId
+FROM Category_Audit
+JOIN AuditType ON Category_Audit.auditTypeId = AuditType.id
+WHERE Category_Audit.id = ?
+ORDER BY Category_Audit.auditTimestamp DESC, Category_Audit.auditId DESC;
+
+selectAuditHistoryForTransfer:
+SELECT
+    Transfer_Audit.auditId,
+    Transfer_Audit.auditTimestamp,
+    AuditType.name AS auditType,
+    Transfer_Audit.id,
+    Transfer_Audit.timestamp,
+    Transfer_Audit.description,
+    Transfer_Audit.sourceAccountId,
+    Transfer_Audit.targetAccountId,
+    Transfer_Audit.currencyId,
+    Transfer_Audit.amount
+FROM Transfer_Audit
+JOIN AuditType ON Transfer_Audit.auditTypeId = AuditType.id
+WHERE Transfer_Audit.id = ?
+ORDER BY Transfer_Audit.auditTimestamp DESC, Transfer_Audit.auditId DESC;

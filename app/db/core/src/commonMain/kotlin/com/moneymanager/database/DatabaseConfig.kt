@@ -170,6 +170,189 @@ object DatabaseConfig {
     }
 
     /**
+     * Creates audit triggers for all main tables (Account, Currency, Category, Transfer).
+     * Each table gets 3 triggers: INSERT, UPDATE, DELETE that record changes to audit tables.
+     *
+     * NOTE: Triggers are created at runtime (not in schema) due to SQLDelight 2.2.1 parser limitations.
+     * Called automatically from seedDatabase() during database initialization.
+     *
+     * @param driver The SQLite driver to use for executing the CREATE TRIGGER statements
+     */
+    private fun createAuditTriggers(driver: SqlDriver) {
+        // Account audit triggers
+        driver.execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_account_insert_audit
+            AFTER INSERT ON Account
+            FOR EACH ROW
+            BEGIN
+                INSERT INTO Account_Audit (auditTimestamp, auditTypeId, id, name, openingDate, categoryId)
+                VALUES (strftime('%s', 'now'), 1, NEW.id, NEW.name, NEW.openingDate, NEW.categoryId);
+            END
+            """.trimIndent(),
+            0,
+        )
+
+        driver.execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_account_update_audit
+            AFTER UPDATE ON Account
+            FOR EACH ROW
+            BEGIN
+                INSERT INTO Account_Audit (auditTimestamp, auditTypeId, id, name, openingDate, categoryId)
+                VALUES (strftime('%s', 'now'), 2, OLD.id, OLD.name, OLD.openingDate, OLD.categoryId);
+            END
+            """.trimIndent(),
+            0,
+        )
+
+        driver.execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_account_delete_audit
+            AFTER DELETE ON Account
+            FOR EACH ROW
+            BEGIN
+                INSERT INTO Account_Audit (auditTimestamp, auditTypeId, id, name, openingDate, categoryId)
+                VALUES (strftime('%s', 'now'), 3, OLD.id, OLD.name, OLD.openingDate, OLD.categoryId);
+            END
+            """.trimIndent(),
+            0,
+        )
+
+        // Currency audit triggers
+        driver.execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_currency_insert_audit
+            AFTER INSERT ON Currency
+            FOR EACH ROW
+            BEGIN
+                INSERT INTO Currency_Audit (auditTimestamp, auditTypeId, id, code, name, scaleFactor)
+                VALUES (strftime('%s', 'now'), 1, NEW.id, NEW.code, NEW.name, NEW.scaleFactor);
+            END
+            """.trimIndent(),
+            0,
+        )
+
+        driver.execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_currency_update_audit
+            AFTER UPDATE ON Currency
+            FOR EACH ROW
+            BEGIN
+                INSERT INTO Currency_Audit (auditTimestamp, auditTypeId, id, code, name, scaleFactor)
+                VALUES (strftime('%s', 'now'), 2, OLD.id, OLD.code, OLD.name, OLD.scaleFactor);
+            END
+            """.trimIndent(),
+            0,
+        )
+
+        driver.execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_currency_delete_audit
+            AFTER DELETE ON Currency
+            FOR EACH ROW
+            BEGIN
+                INSERT INTO Currency_Audit (auditTimestamp, auditTypeId, id, code, name, scaleFactor)
+                VALUES (strftime('%s', 'now'), 3, OLD.id, OLD.code, OLD.name, OLD.scaleFactor);
+            END
+            """.trimIndent(),
+            0,
+        )
+
+        // Category audit triggers
+        driver.execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_category_insert_audit
+            AFTER INSERT ON Category
+            FOR EACH ROW
+            BEGIN
+                INSERT INTO Category_Audit (auditTimestamp, auditTypeId, id, name, parentId)
+                VALUES (strftime('%s', 'now'), 1, NEW.id, NEW.name, NEW.parentId);
+            END
+            """.trimIndent(),
+            0,
+        )
+
+        driver.execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_category_update_audit
+            AFTER UPDATE ON Category
+            FOR EACH ROW
+            BEGIN
+                INSERT INTO Category_Audit (auditTimestamp, auditTypeId, id, name, parentId)
+                VALUES (strftime('%s', 'now'), 2, OLD.id, OLD.name, OLD.parentId);
+            END
+            """.trimIndent(),
+            0,
+        )
+
+        driver.execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_category_delete_audit
+            AFTER DELETE ON Category
+            FOR EACH ROW
+            BEGIN
+                INSERT INTO Category_Audit (auditTimestamp, auditTypeId, id, name, parentId)
+                VALUES (strftime('%s', 'now'), 3, OLD.id, OLD.name, OLD.parentId);
+            END
+            """.trimIndent(),
+            0,
+        )
+
+        // Transfer audit triggers
+        driver.execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_transfer_insert_audit
+            AFTER INSERT ON Transfer
+            FOR EACH ROW
+            BEGIN
+                INSERT INTO Transfer_Audit (auditTimestamp, auditTypeId, id, timestamp, description, sourceAccountId, targetAccountId, currencyId, amount)
+                VALUES (strftime('%s', 'now'), 1, NEW.id, NEW.timestamp, NEW.description, NEW.sourceAccountId, NEW.targetAccountId, NEW.currencyId, NEW.amount);
+            END
+            """.trimIndent(),
+            0,
+        )
+
+        driver.execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_transfer_update_audit
+            AFTER UPDATE ON Transfer
+            FOR EACH ROW
+            BEGIN
+                INSERT INTO Transfer_Audit (auditTimestamp, auditTypeId, id, timestamp, description, sourceAccountId, targetAccountId, currencyId, amount)
+                VALUES (strftime('%s', 'now'), 2, OLD.id, OLD.timestamp, OLD.description, OLD.sourceAccountId, OLD.targetAccountId, OLD.currencyId, OLD.amount);
+            END
+            """.trimIndent(),
+            0,
+        )
+
+        driver.execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_transfer_delete_audit
+            AFTER DELETE ON Transfer
+            FOR EACH ROW
+            BEGIN
+                INSERT INTO Transfer_Audit (auditTimestamp, auditTypeId, id, timestamp, description, sourceAccountId, targetAccountId, currencyId, amount)
+                VALUES (strftime('%s', 'now'), 3, OLD.id, OLD.timestamp, OLD.description, OLD.sourceAccountId, OLD.targetAccountId, OLD.currencyId, OLD.amount);
+            END
+            """.trimIndent(),
+            0,
+        )
+    }
+
+    /**
      * Seeds the database with all available currencies and creates incremental refresh triggers.
      * Should be called once after creating a new database.
      *
@@ -180,11 +363,19 @@ object DatabaseConfig {
         database: MoneyManagerDatabase,
         driver: SqlDriver,
     ) {
+        // Seed AuditType lookup table
+        database.auditTypeQueries.insert(id = 1, name = "INSERT")
+        database.auditTypeQueries.insert(id = 2, name = "UPDATE")
+        database.auditTypeQueries.insert(id = 3, name = "DELETE")
+
         // Create triggers for incremental materialized view refresh
         createIncrementalRefreshTriggers(driver)
 
         // Create trigger for category deletion (children inherit grandparent)
         createCategoryDeleteTrigger(driver)
+
+        // Create audit triggers for all main tables
+        createAuditTriggers(driver)
 
         // Seed default "Uncategorized" category
         database.categoryQueries.insertWithId(
