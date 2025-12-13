@@ -6,7 +6,7 @@ import kotlin.time.Instant
 
 data class PagingInfo(
     val lastTimestamp: Instant?,
-    val lastId: TransferId?,
+    val lastId: TransactionId?,
     val hasMore: Boolean,
 )
 

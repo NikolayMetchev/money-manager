@@ -855,7 +855,7 @@ fun AccountTransactionCard(
                         }
                     val transfer =
                         Transfer(
-                            id = runningBalance.transactionId,
+                            id = runningBalance.transactionId as TransferId,
                             timestamp = runningBalance.timestamp,
                             description = runningBalance.description,
                             sourceAccountId = runningBalance.sourceAccountId,
