@@ -1,5 +1,7 @@
-package com.moneymanager.database
+package com.moneymanager.test.database
 
+import com.moneymanager.database.DbLocation
+import com.moneymanager.di.AppComponentParams
 import java.nio.file.Files
 import java.nio.file.Paths
 
@@ -17,3 +19,5 @@ actual fun deleteTestDatabase(location: DbLocation) {
         // Ignore cleanup errors
     }
 }
+
+actual fun createTestAppComponentParams(): AppComponentParams = AppComponentParams()

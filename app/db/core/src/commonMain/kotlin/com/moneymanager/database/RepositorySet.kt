@@ -6,7 +6,6 @@ import com.moneymanager.database.repository.CategoryRepositoryImpl
 import com.moneymanager.database.repository.CsvImportRepositoryImpl
 import com.moneymanager.database.repository.CurrencyRepositoryImpl
 import com.moneymanager.database.repository.TransactionRepositoryImpl
-import com.moneymanager.database.sql.MoneyManagerDatabase
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AuditRepository
 import com.moneymanager.domain.repository.CategoryRepository

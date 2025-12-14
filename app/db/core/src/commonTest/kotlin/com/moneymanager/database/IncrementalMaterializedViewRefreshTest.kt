@@ -3,7 +3,6 @@
 package com.moneymanager.database
 
 import com.moneymanager.di.AppComponent
-import com.moneymanager.di.createTestAppComponentParams
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Money
@@ -12,6 +11,9 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.test.database.createTestAppComponentParams
+import com.moneymanager.test.database.createTestDatabaseLocation
+import com.moneymanager.test.database.deleteTestDatabase
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.AfterTest

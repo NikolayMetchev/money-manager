@@ -4,10 +4,10 @@ import app.cash.sqldelight.db.QueryResult
 import com.moneymanager.database.DbLocation
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.RepositorySet
-import com.moneymanager.database.createTestDatabaseLocation
-import com.moneymanager.database.deleteTestDatabase
 import com.moneymanager.di.AppComponent
-import com.moneymanager.di.createTestAppComponentParams
+import com.moneymanager.test.database.createTestAppComponentParams
+import com.moneymanager.test.database.createTestDatabaseLocation
+import com.moneymanager.test.database.deleteTestDatabase
 import kotlinx.coroutines.test.runTest
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest

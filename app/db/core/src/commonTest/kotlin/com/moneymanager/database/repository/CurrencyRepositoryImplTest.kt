@@ -4,11 +4,11 @@ package com.moneymanager.database.repository
 
 import com.moneymanager.database.DatabaseConfig
 import com.moneymanager.database.RepositorySet
-import com.moneymanager.database.createTestDatabaseLocation
-import com.moneymanager.database.deleteTestDatabase
 import com.moneymanager.di.AppComponent
-import com.moneymanager.di.createTestAppComponentParams
 import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.test.database.createTestAppComponentParams
+import com.moneymanager.test.database.createTestDatabaseLocation
+import com.moneymanager.test.database.deleteTestDatabase
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.AfterTest
