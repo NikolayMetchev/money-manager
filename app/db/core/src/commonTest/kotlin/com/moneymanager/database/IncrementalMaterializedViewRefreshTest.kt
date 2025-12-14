@@ -52,7 +52,7 @@ class IncrementalMaterializedViewRefreshTest {
 
             // Open file-based database for testing
             database = databaseManager.openDatabase(testDbLocation)
-            val repositories = RepositorySet(database, database)
+            val repositories = RepositorySet(database)
 
             transactionRepository = repositories.transactionRepository
             accountRepository = repositories.accountRepository

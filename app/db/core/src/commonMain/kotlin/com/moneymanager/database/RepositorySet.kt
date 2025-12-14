@@ -19,13 +19,12 @@ import com.moneymanager.domain.repository.TransactionRepository
  * Instances are tied to a specific database and should be recreated when switching databases.
  */
 class RepositorySet(
-    database: MoneyManagerDatabase,
-    databaseWrapper: MoneyManagerDatabaseWrapper,
+    database: MoneyManagerDatabaseWrapper,
 ) {
     val accountRepository: AccountRepository = AccountRepositoryImpl(database)
     val auditRepository: AuditRepository = AuditRepositoryImpl(database)
     val categoryRepository: CategoryRepository = CategoryRepositoryImpl(database)
-    val csvImportRepository: CsvImportRepository = CsvImportRepositoryImpl(database, databaseWrapper)
+    val csvImportRepository: CsvImportRepository = CsvImportRepositoryImpl(database)
     val currencyRepository: CurrencyRepository = CurrencyRepositoryImpl(database)
     val maintenanceService: DatabaseMaintenanceService = DatabaseMaintenanceServiceImpl(database)
     val transactionRepository: TransactionRepository = TransactionRepositoryImpl(database)

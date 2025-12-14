@@ -45,7 +45,7 @@ class AuditFunctionalTest {
             val component = AppComponent.create(createTestAppComponentParams())
             val databaseManager = component.databaseManager
             database = databaseManager.openDatabase(testDbLocation)
-            val repositories = RepositorySet(database, database)
+            val repositories = RepositorySet(database)
 
             accountRepository = repositories.accountRepository
             categoryRepository = repositories.categoryRepository

@@ -36,7 +36,7 @@ class AccountRepositoryImplTest {
 
             // Open file-based database for testing
             val database = databaseManager.openDatabase(testDbLocation)
-            val repositories = RepositorySet(database, database)
+            val repositories = RepositorySet(database)
 
             repository = repositories.accountRepository
         }

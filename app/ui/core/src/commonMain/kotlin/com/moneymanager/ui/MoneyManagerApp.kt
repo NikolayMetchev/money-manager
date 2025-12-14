@@ -68,7 +68,7 @@ fun MoneyManagerApp(
             onLog("Existing database found, opening...", null)
             try {
                 val database = databaseManager.openDatabase(defaultLocation)
-                val repositories = RepositorySet(database, database)
+                val repositories = RepositorySet(database)
                 // Schema errors at runtime are now caught globally by the uncaught exception handler
                 // which updates GlobalSchemaErrorState - no need for explicit validation queries here
                 databaseState = DatabaseState.DatabaseLoaded(defaultLocation, repositories)
@@ -83,7 +83,7 @@ fun MoneyManagerApp(
             onLog("No existing database, creating new one...", null)
             try {
                 val database = databaseManager.openDatabase(defaultLocation)
-                val repositories = RepositorySet(database, database)
+                val repositories = RepositorySet(database)
                 databaseState = DatabaseState.DatabaseLoaded(defaultLocation, repositories)
                 onLog("New database created successfully", null)
             } catch (e: Exception) {
@@ -134,7 +134,7 @@ fun MoneyManagerApp(
                         onLog("Database backed up to: $backupLocation", null)
 
                         val database = databaseManager.openDatabase(location)
-                        val repositories = RepositorySet(database, database)
+                        val repositories = RepositorySet(database)
                         databaseState = DatabaseState.DatabaseLoaded(location, repositories)
                         schemaErrorInfo = null
                         GlobalSchemaErrorState.clearError()
@@ -153,7 +153,7 @@ fun MoneyManagerApp(
                         onLog("Database deleted", null)
 
                         val database = databaseManager.openDatabase(location)
-                        val repositories = RepositorySet(database, database)
+                        val repositories = RepositorySet(database)
                         databaseState = DatabaseState.DatabaseLoaded(location, repositories)
                         schemaErrorInfo = null
                         GlobalSchemaErrorState.clearError()

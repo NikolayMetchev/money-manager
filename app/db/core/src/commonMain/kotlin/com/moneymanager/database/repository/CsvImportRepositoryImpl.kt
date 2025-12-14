@@ -7,7 +7,6 @@ import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.csv.CsvTableManager
-import com.moneymanager.database.sql.MoneyManagerDatabase
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvColumnId
 import com.moneymanager.domain.model.csv.CsvImport
@@ -25,12 +24,11 @@ import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 class CsvImportRepositoryImpl(
-    database: MoneyManagerDatabase,
-    private val databaseWrapper: MoneyManagerDatabaseWrapper,
+    database: MoneyManagerDatabaseWrapper,
     private val coroutineContext: CoroutineContext = Dispatchers.Default,
 ) : CsvImportRepository {
     private val csvImportQueries = database.csvImportQueries
-    private val tableManager = CsvTableManager(databaseWrapper)
+    private val tableManager = CsvTableManager(database)
 
     override suspend fun createImport(
         fileName: String,

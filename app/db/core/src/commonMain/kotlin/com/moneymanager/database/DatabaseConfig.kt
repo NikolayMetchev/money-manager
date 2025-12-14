@@ -262,7 +262,7 @@ object DatabaseConfig {
             )
 
             // Seed currencies
-            val currencyRepository = RepositorySet(database, database).currencyRepository
+            val currencyRepository = RepositorySet(database).currencyRepository
             allCurrencies.forEach { currency ->
                 currencyRepository.upsertCurrencyByCode(currency.code, currency.displayName)
             }

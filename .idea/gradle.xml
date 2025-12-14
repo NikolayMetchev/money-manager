@@ -40,7 +40,11 @@
             <option value="$PROJECT_DIR$/test/app/db" />
             <option value="$PROJECT_DIR$/utils" />
             <option value="$PROJECT_DIR$/utils/bigdecimal" />
+            <option value="$PROJECT_DIR$/utils/compose" />
+            <option value="$PROJECT_DIR$/utils/compose/filePicker" />
             <option value="$PROJECT_DIR$/utils/currency" />
+            <option value="$PROJECT_DIR$/utils/parsers" />
+            <option value="$PROJECT_DIR$/utils/parsers/csv" />
           </set>
         </option>
       </GradleProjectSettings>
