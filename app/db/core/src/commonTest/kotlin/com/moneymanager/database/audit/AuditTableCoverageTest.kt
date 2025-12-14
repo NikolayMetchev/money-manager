@@ -8,6 +8,7 @@ import com.moneymanager.di.AppComponent
 import com.moneymanager.test.database.createTestAppComponentParams
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.deleteTestDatabase
+import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.test.runTest
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -16,27 +17,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.test.fail
 
-class AuditTableCoverageTest {
-    private lateinit var database: MoneyManagerDatabaseWrapper
-    private lateinit var testDbLocation: DbLocation
-
-    @BeforeTest
-    fun setup() =
-        runTest {
-            testDbLocation = createTestDatabaseLocation()
-            // Create app component
-            val component = AppComponent.create(createTestAppComponentParams())
-            val databaseManager = component.databaseManager
-            // Open file-based database for testing
-            database = databaseManager.openDatabase(testDbLocation)
-            RepositorySet(database)
-        }
-
-    @AfterTest
-    fun cleanup() {
-        deleteTestDatabase(testDbLocation)
-    }
-
+class AuditTableCoverageTest: DbTest() {
     @Test
     fun `all regular tables have audit tables with matching schema`() {
         // Get all auditable tables using centralized utility function

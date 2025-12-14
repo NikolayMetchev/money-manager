@@ -10,6 +10,7 @@ import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.test.database.createTestAppComponentParams
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.deleteTestDatabase
+import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.AfterTest
@@ -20,34 +21,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 
-class AccountRepositoryImplTest {
-    private lateinit var repository: AccountRepository
-    private lateinit var testDbLocation: com.moneymanager.database.DbLocation
-
-    @BeforeTest
-    fun setup() =
-        runTest {
-            // Create temporary database file
-            testDbLocation = createTestDatabaseLocation()
-
-            // Create app component
-            val component = AppComponent.create(createTestAppComponentParams())
-            val databaseManager = component.databaseManager
-
-            // Open file-based database for testing
-            val database = databaseManager.openDatabase(testDbLocation)
-            val repositories = RepositorySet(database)
-
-            repository = repositories.accountRepository
-        }
-
-    @AfterTest
-    fun cleanup() {
-        deleteTestDatabase(testDbLocation)
-    }
-
-    // CREATE ACCOUNT TESTS
-
+class AccountRepositoryImplTest : DbTest() {
     @Test
     fun `createAccount should insert account and return generated id`() =
         runTest {
@@ -59,11 +33,11 @@ class AccountRepositoryImplTest {
                     openingDate = now,
                 )
 
-            val accountId = repository.createAccount(account)
+            val accountId = repositories.accountRepository.createAccount(account)
 
             assertTrue(accountId.id > 0, "Generated ID should be positive")
 
-            val retrieved = repository.getAccountById(accountId).first()
+            val retrieved = repositories.accountRepository.getAccountById(accountId).first()
             assertNotNull(retrieved)
             assertEquals(account.name, retrieved.name)
         }
@@ -82,14 +56,14 @@ class AccountRepositoryImplTest {
                         openingDate = now,
                     )
 
-                val accountId = repository.createAccount(account)
-                val retrieved = repository.getAccountById(accountId).first()
+                val accountId = repositories.accountRepository.createAccount(account)
+                val retrieved = repositories.accountRepository.getAccountById(accountId).first()
 
                 assertNotNull(retrieved)
                 assertEquals(name, retrieved.name)
             }
 
-            val allAccounts = repository.getAllAccounts().first()
+            val allAccounts = repositories.accountRepository.getAllAccounts().first()
             assertEquals(accountNames.size, allAccounts.size)
         }
 
@@ -103,14 +77,14 @@ class AccountRepositoryImplTest {
                     name = "Original Name",
                     openingDate = now,
                 )
-            val accountId = repository.createAccount(account)
-            val retrieved = repository.getAccountById(accountId).first()
+            val accountId = repositories.accountRepository.createAccount(account)
+            val retrieved = repositories.accountRepository.getAccountById(accountId).first()
             assertNotNull(retrieved)
 
             val updatedAccount = retrieved.copy(name = "Updated Name")
-            repository.updateAccount(updatedAccount)
+            repositories.accountRepository.updateAccount(updatedAccount)
 
-            val updated = repository.getAccountById(accountId).first()
+            val updated = repositories.accountRepository.getAccountById(accountId).first()
             assertNotNull(updated)
             assertEquals("Updated Name", updated.name)
         }
@@ -125,11 +99,11 @@ class AccountRepositoryImplTest {
                     name = "To Delete",
                     openingDate = now,
                 )
-            val accountId = repository.createAccount(account)
+            val accountId = repositories.accountRepository.createAccount(account)
 
-            repository.deleteAccount(accountId)
+            repositories.accountRepository.deleteAccount(accountId)
 
-            val deleted = repository.getAccountById(accountId).first()
+            val deleted = repositories.accountRepository.getAccountById(accountId).first()
             assertEquals(null, deleted)
         }
 }

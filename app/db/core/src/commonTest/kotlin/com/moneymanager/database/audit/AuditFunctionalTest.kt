@@ -19,6 +19,7 @@ import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.test.database.createTestAppComponentParams
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.deleteTestDatabase
+import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.AfterTest
@@ -30,36 +31,7 @@ import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
-class AuditFunctionalTest {
-    private lateinit var database: MoneyManagerDatabaseWrapper
-    private lateinit var accountRepository: AccountRepository
-    private lateinit var categoryRepository: CategoryRepository
-    private lateinit var currencyRepository: CurrencyRepository
-    private lateinit var transactionRepository: TransactionRepository
-    private lateinit var testDbLocation: com.moneymanager.database.DbLocation
-
-    @BeforeTest
-    fun setup() =
-        runTest {
-            testDbLocation = createTestDatabaseLocation()
-            val component = AppComponent.create(createTestAppComponentParams())
-            val databaseManager = component.databaseManager
-            database = databaseManager.openDatabase(testDbLocation)
-            val repositories = RepositorySet(database)
-
-            accountRepository = repositories.accountRepository
-            categoryRepository = repositories.categoryRepository
-            currencyRepository = repositories.currencyRepository
-            transactionRepository = repositories.transactionRepository
-        }
-
-    @AfterTest
-    fun cleanup() {
-        deleteTestDatabase(testDbLocation)
-    }
-
-    // ACCOUNT AUDIT TESTS
-
+class AuditFunctionalTest: DbTest() {
     @Test
     fun `account INSERT creates audit record with auditTypeId 1`() =
         runTest {
@@ -71,7 +43,7 @@ class AuditFunctionalTest {
                     openingDate = now,
                 )
 
-            val accountId = accountRepository.createAccount(account)
+            val accountId = repositories.accountRepository.createAccount(account)
 
             val auditHistory = database.auditQueries.selectAuditHistoryForAccount(accountId.id).executeAsList()
 
@@ -94,9 +66,9 @@ class AuditFunctionalTest {
                     openingDate = now,
                 )
 
-            val accountId = accountRepository.createAccount(account)
+            val accountId = repositories.accountRepository.createAccount(account)
 
-            accountRepository.updateAccount(
+            repositories.accountRepository.updateAccount(
                 Account(
                     id = accountId,
                     name = "Updated Name",
@@ -128,8 +100,8 @@ class AuditFunctionalTest {
                     openingDate = now,
                 )
 
-            val accountId = accountRepository.createAccount(account)
-            accountRepository.deleteAccount(accountId)
+            val accountId = repositories.accountRepository.createAccount(account)
+            repositories.accountRepository.deleteAccount(accountId)
 
             val auditHistory = database.auditQueries.selectAuditHistoryForAccount(accountId.id).executeAsList()
 
@@ -154,11 +126,11 @@ class AuditFunctionalTest {
                     openingDate = now,
                 )
 
-            val accountId = accountRepository.createAccount(account)
+            val accountId = repositories.accountRepository.createAccount(account)
 
-            accountRepository.updateAccount(account.copy(id = accountId, name = "Version 2"))
-            accountRepository.updateAccount(account.copy(id = accountId, name = "Version 3"))
-            accountRepository.updateAccount(account.copy(id = accountId, name = "Version 4"))
+            repositories.accountRepository.updateAccount(account.copy(id = accountId, name = "Version 2"))
+            repositories.accountRepository.updateAccount(account.copy(id = accountId, name = "Version 3"))
+            repositories.accountRepository.updateAccount(account.copy(id = accountId, name = "Version 4"))
 
             val auditHistory = database.auditQueries.selectAuditHistoryForAccount(accountId.id).executeAsList()
 
@@ -178,7 +150,7 @@ class AuditFunctionalTest {
     @Test
     fun `currency INSERT creates audit record`() =
         runTest {
-            val currencyId = currencyRepository.upsertCurrencyByCode("TST", "Test Currency")
+            val currencyId = repositories.currencyRepository.upsertCurrencyByCode("TST", "Test Currency")
             assertNotNull(currencyId)
 
             val auditHistory = database.auditQueries.selectAuditHistoryForCurrency(currencyId.toString()).executeAsList()
@@ -192,7 +164,7 @@ class AuditFunctionalTest {
     @Test
     fun `currency UPDATE creates audit record with OLD values`() =
         runTest {
-            val currencyId = currencyRepository.upsertCurrencyByCode("TST", "Original Name")
+            val currencyId = repositories.currencyRepository.upsertCurrencyByCode("TST", "Original Name")
             assertNotNull(currencyId)
 
             database.currencyQueries.update(
@@ -214,7 +186,7 @@ class AuditFunctionalTest {
     @Test
     fun `currency DELETE creates audit record`() =
         runTest {
-            val currencyId = currencyRepository.upsertCurrencyByCode("TST", "Test Currency")
+            val currencyId = repositories.currencyRepository.upsertCurrencyByCode("TST", "Test Currency")
             assertNotNull(currencyId)
 
             database.currencyQueries.delete(currencyId.toString())
@@ -238,7 +210,7 @@ class AuditFunctionalTest {
                     parentId = null,
                 )
 
-            val categoryId = categoryRepository.createCategory(category)
+            val categoryId = repositories.categoryRepository.createCategory(category)
 
             val auditHistory = database.auditQueries.selectAuditHistoryForCategory(categoryId).executeAsList()
 
@@ -257,9 +229,9 @@ class AuditFunctionalTest {
                     parentId = null,
                 )
 
-            val categoryId = categoryRepository.createCategory(category)
+            val categoryId = repositories.categoryRepository.createCategory(category)
 
-            categoryRepository.updateCategory(
+            repositories.categoryRepository.updateCategory(
                 Category(
                     id = categoryId,
                     name = "Updated Category",
@@ -285,8 +257,8 @@ class AuditFunctionalTest {
                     parentId = null,
                 )
 
-            val categoryId = categoryRepository.createCategory(category)
-            categoryRepository.deleteCategory(categoryId)
+            val categoryId = repositories.categoryRepository.createCategory(category)
+            repositories.categoryRepository.deleteCategory(categoryId)
 
             val auditHistory = database.auditQueries.selectAuditHistoryForCategory(categoryId).executeAsList()
 
@@ -307,7 +279,7 @@ class AuditFunctionalTest {
             val description = "Test Transfer"
             val amount = Money.fromDisplayValue(100.0, currency)
 
-            transactionRepository.createTransfer(
+            repositories.transactionRepository.createTransfer(
                 Transfer(
                     id = transferId,
                     timestamp = now,
@@ -336,7 +308,7 @@ class AuditFunctionalTest {
             val originalAmount = Money.fromDisplayValue(100.0, currency)
             val updatedAmount = Money.fromDisplayValue(200.0, currency)
 
-            transactionRepository.createTransfer(
+            repositories.transactionRepository.createTransfer(
                 Transfer(
                     id = transferId,
                     timestamp = now,
@@ -347,7 +319,7 @@ class AuditFunctionalTest {
                 ),
             )
 
-            transactionRepository.updateTransfer(
+            repositories.transactionRepository.updateTransfer(
                 Transfer(
                     id = transferId,
                     timestamp = now,
@@ -375,7 +347,7 @@ class AuditFunctionalTest {
             val transferId = TransferId(Uuid.random())
             val now = Clock.System.now()
 
-            transactionRepository.createTransfer(
+            repositories.transactionRepository.createTransfer(
                 Transfer(
                     id = transferId,
                     timestamp = now,
@@ -386,7 +358,7 @@ class AuditFunctionalTest {
                 ),
             )
 
-            transactionRepository.deleteTransaction(transferId.id)
+            repositories.transactionRepository.deleteTransaction(transferId.id)
 
             val auditHistory = database.auditQueries.selectAuditHistoryForTransfer(transferId.toString()).executeAsList()
 
@@ -399,7 +371,7 @@ class AuditFunctionalTest {
         val now = Clock.System.now()
 
         val sourceAccountId =
-            accountRepository.createAccount(
+            repositories.accountRepository.createAccount(
                 Account(
                     id = AccountId(0),
                     name = "Source Account",
@@ -408,7 +380,7 @@ class AuditFunctionalTest {
             )
 
         val targetAccountId =
-            accountRepository.createAccount(
+            repositories.accountRepository.createAccount(
                 Account(
                     id = AccountId(0),
                     name = "Target Account",
@@ -416,7 +388,7 @@ class AuditFunctionalTest {
                 ),
             )
 
-        val usdCurrency = currencyRepository.getCurrencyByCode("USD").first()
+        val usdCurrency = repositories.currencyRepository.getCurrencyByCode("USD").first()
         assertNotNull(usdCurrency, "USD currency should exist from seed data")
 
         return Triple(sourceAccountId, targetAccountId, usdCurrency)
