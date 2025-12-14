@@ -32,7 +32,6 @@ import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.repository.CsvImportRepository
 import com.moneymanager.ui.components.csv.CsvPreviewTable
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
-import com.moneymanager.ui.error.runWithSchemaErrorHandling
 import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -57,11 +56,7 @@ fun CsvImportDetailScreen(
         import?.let {
             isLoading = true
             // Load all rows - the actual row count is stored in the import metadata
-            val loadedRows =
-                runWithSchemaErrorHandling {
-                    csvImportRepository.getImportRows(importId, limit = it.rowCount, offset = 0)
-                }
-            rows = loadedRows ?: emptyList()
+            rows = csvImportRepository.getImportRows(importId, limit = it.rowCount, offset = 0)
             isLoading = false
         }
     }

@@ -33,28 +33,3 @@ fun <T> Flow<T>.collectAsStateWithSchemaErrorHandling(
         }.collect { value = it }
     }
 }
-
-/**
- * Executes a suspend function while catching schema errors and reporting them globally.
- * If a schema error occurs, it's reported to GlobalSchemaErrorState and null is returned.
- *
- * @param databaseLocation The database location to report with the error
- * @param block The suspend function to execute
- * @return The result of the block, or null if a schema error occurred
- */
-suspend fun <T> runWithSchemaErrorHandling(
-    databaseLocation: String = "default",
-    block: suspend () -> T,
-): T? {
-    return try {
-        block()
-    } catch (e: Exception) {
-        if (SchemaErrorDetector.isSchemaError(e)) {
-            logger.error(e) { "Schema error in suspend call: ${e.message}" }
-            GlobalSchemaErrorState.reportError(databaseLocation, e)
-            null
-        } else {
-            throw e
-        }
-    }
-}
