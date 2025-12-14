@@ -20,19 +20,12 @@ actual class FilePickerLauncher(
             val fileDialog = FileDialog(frame, "Select a CSV file", FileDialog.LOAD)
 
             // Set file filter based on mime types
-            val extensions =
-                mimeTypes.flatMap { mimeType ->
-                    when (mimeType) {
-                        "text/csv" -> listOf(".csv")
-                        "text/plain" -> listOf(".txt", ".csv")
-                        else -> emptyList()
-                    }
-                }.distinct()
+            val extensions = mimeTypesToExtensions(mimeTypes)
 
             if (extensions.isNotEmpty()) {
                 fileDialog.filenameFilter =
                     FilenameFilter { _, name ->
-                        extensions.any { ext -> name.lowercase().endsWith(ext) }
+                        matchesExtensions(name, extensions)
                     }
             }
 
@@ -43,13 +36,8 @@ actual class FilePickerLauncher(
 
             if (directory != null && file != null) {
                 val selectedFile = File(directory, file)
-                try {
-                    val content = selectedFile.readText(Charsets.UTF_8)
-                    onResult(FilePickerResult(fileName = file, content = content))
-                } catch (e: Exception) {
-                    // Failed to read file
-                    onResult(null)
-                }
+                val result = readFileAsResult(selectedFile)
+                onResult(result)
             } else {
                 // User cancelled
                 onResult(null)
@@ -59,3 +47,37 @@ actual class FilePickerLauncher(
         }
     }
 }
+
+/**
+ * Converts MIME types to file extensions.
+ */
+internal fun mimeTypesToExtensions(mimeTypes: List<String>): List<String> =
+    mimeTypes
+        .flatMap { mimeType ->
+            when (mimeType) {
+                "text/csv" -> listOf(".csv")
+                "text/plain" -> listOf(".txt", ".csv")
+                "text/tab-separated-values" -> listOf(".tsv")
+                "application/vnd.ms-excel" -> listOf(".csv", ".xls")
+                else -> emptyList()
+            }
+        }.distinct()
+
+/**
+ * Checks if a filename matches any of the given extensions.
+ */
+internal fun matchesExtensions(
+    fileName: String,
+    extensions: List<String>,
+): Boolean = extensions.any { ext -> fileName.lowercase().endsWith(ext) }
+
+/**
+ * Reads a file and returns a FilePickerResult, or null if reading fails.
+ */
+internal fun readFileAsResult(file: File): FilePickerResult? =
+    try {
+        val content = file.readText(Charsets.UTF_8)
+        FilePickerResult(fileName = file.name, content = content)
+    } catch (e: Exception) {
+        null
+    }
