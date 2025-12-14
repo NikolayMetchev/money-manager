@@ -23,7 +23,9 @@ kotlin {
                 implementation(projects.app.di.core)
                 implementation(projects.app.model.core)
                 implementation(projects.utils.bigdecimal)
+                implementation(projects.utils.compose.filePicker)
                 implementation(projects.utils.currency)
+                implementation(projects.utils.parsers.csv)
             }
         }
         val commonTest by getting {

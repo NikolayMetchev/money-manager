@@ -37,7 +37,7 @@ class IncrementalMaterializedViewRefreshTest {
     private lateinit var accountRepository: AccountRepository
     private lateinit var currencyRepository: CurrencyRepository
     private lateinit var maintenanceService: DatabaseMaintenanceService
-    private lateinit var database: com.moneymanager.database.sql.MoneyManagerDatabase
+    private lateinit var database: MoneyManagerDatabaseWrapper
     private lateinit var testDbLocation: DbLocation
 
     @BeforeTest
@@ -52,7 +52,7 @@ class IncrementalMaterializedViewRefreshTest {
 
             // Open file-based database for testing
             database = databaseManager.openDatabase(testDbLocation)
-            val repositories = RepositorySet(database)
+            val repositories = RepositorySet(database, database)
 
             transactionRepository = repositories.transactionRepository
             accountRepository = repositories.accountRepository

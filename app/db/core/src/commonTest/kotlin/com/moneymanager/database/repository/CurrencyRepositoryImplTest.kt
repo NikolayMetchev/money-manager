@@ -34,7 +34,7 @@ class CurrencyRepositoryImplTest {
 
             // Open file-based database for testing
             val database = databaseManager.openDatabase(testDbLocation)
-            val repositories = RepositorySet(database)
+            val repositories = RepositorySet(database, database)
 
             repository = repositories.currencyRepository
         }

@@ -2,10 +2,10 @@
 
 package com.moneymanager.database.audit
 
+import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.RepositorySet
 import com.moneymanager.database.createTestDatabaseLocation
 import com.moneymanager.database.deleteTestDatabase
-import com.moneymanager.database.sql.MoneyManagerDatabase
 import com.moneymanager.di.AppComponent
 import com.moneymanager.di.createTestAppComponentParams
 import com.moneymanager.domain.model.Account
@@ -31,7 +31,7 @@ import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 class AuditFunctionalTest {
-    private lateinit var database: MoneyManagerDatabase
+    private lateinit var database: MoneyManagerDatabaseWrapper
     private lateinit var accountRepository: AccountRepository
     private lateinit var categoryRepository: CategoryRepository
     private lateinit var currencyRepository: CurrencyRepository
@@ -45,7 +45,7 @@ class AuditFunctionalTest {
             val component = AppComponent.create(createTestAppComponentParams())
             val databaseManager = component.databaseManager
             database = databaseManager.openDatabase(testDbLocation)
-            val repositories = RepositorySet(database)
+            val repositories = RepositorySet(database, database)
 
             accountRepository = repositories.accountRepository
             categoryRepository = repositories.categoryRepository

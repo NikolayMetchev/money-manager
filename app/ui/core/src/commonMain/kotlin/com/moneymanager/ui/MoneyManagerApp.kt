@@ -37,6 +37,8 @@ import com.moneymanager.ui.navigation.Screen
 import com.moneymanager.ui.screens.AccountTransactionsScreen
 import com.moneymanager.ui.screens.AccountsScreen
 import com.moneymanager.ui.screens.CategoriesScreen
+import com.moneymanager.ui.screens.CsvImportDetailScreen
+import com.moneymanager.ui.screens.CsvImportsScreen
 import com.moneymanager.ui.screens.CurrenciesScreen
 import com.moneymanager.ui.screens.SettingsScreen
 import com.moneymanager.ui.screens.TransactionEntryDialog
@@ -66,7 +68,7 @@ fun MoneyManagerApp(
             onLog("Existing database found, opening...", null)
             try {
                 val database = databaseManager.openDatabase(defaultLocation)
-                val repositories = RepositorySet(database)
+                val repositories = RepositorySet(database, database)
                 // Schema errors at runtime are now caught globally by the uncaught exception handler
                 // which updates GlobalSchemaErrorState - no need for explicit validation queries here
                 databaseState = DatabaseState.DatabaseLoaded(defaultLocation, repositories)
@@ -81,7 +83,7 @@ fun MoneyManagerApp(
             onLog("No existing database, creating new one...", null)
             try {
                 val database = databaseManager.openDatabase(defaultLocation)
-                val repositories = RepositorySet(database)
+                val repositories = RepositorySet(database, database)
                 databaseState = DatabaseState.DatabaseLoaded(defaultLocation, repositories)
                 onLog("New database created successfully", null)
             } catch (e: Exception) {
@@ -132,7 +134,7 @@ fun MoneyManagerApp(
                         onLog("Database backed up to: $backupLocation", null)
 
                         val database = databaseManager.openDatabase(location)
-                        val repositories = RepositorySet(database)
+                        val repositories = RepositorySet(database, database)
                         databaseState = DatabaseState.DatabaseLoaded(location, repositories)
                         schemaErrorInfo = null
                         GlobalSchemaErrorState.clearError()
@@ -151,7 +153,7 @@ fun MoneyManagerApp(
                         onLog("Database deleted", null)
 
                         val database = databaseManager.openDatabase(location)
-                        val repositories = RepositorySet(database)
+                        val repositories = RepositorySet(database, database)
                         databaseState = DatabaseState.DatabaseLoaded(location, repositories)
                         schemaErrorInfo = null
                         GlobalSchemaErrorState.clearError()
@@ -233,6 +235,12 @@ private fun MoneyManagerAppContent(
                         label = { Text("Categories") },
                         selected = currentScreen is Screen.Categories,
                         onClick = { currentScreen = Screen.Categories },
+                    )
+                    NavigationBarItem(
+                        icon = { Text("📄") },
+                        label = { Text("CSV") },
+                        selected = currentScreen is Screen.CsvImports || currentScreen is Screen.CsvImportDetail,
+                        onClick = { currentScreen = Screen.CsvImports },
                     )
                     NavigationBarItem(
                         icon = { Text("⚙️") },
@@ -318,6 +326,26 @@ private fun MoneyManagerAppContent(
                             onCurrencyIdChange = { currencyId ->
                                 currentlyViewedCurrencyId = currencyId
                             },
+                        )
+                    }
+                    is Screen.CsvImports -> {
+                        LaunchedEffect(Unit) {
+                            currentlyViewedAccountId = null
+                            currentlyViewedCurrencyId = null
+                        }
+                        CsvImportsScreen(
+                            csvImportRepository = repositorySet.csvImportRepository,
+                            onImportClick = { importId ->
+                                currentScreen = Screen.CsvImportDetail(importId)
+                            },
+                        )
+                    }
+                    is Screen.CsvImportDetail -> {
+                        CsvImportDetailScreen(
+                            importId = screen.importId,
+                            csvImportRepository = repositorySet.csvImportRepository,
+                            onBack = { currentScreen = Screen.CsvImports },
+                            onDeleted = { currentScreen = Screen.CsvImports },
                         )
                     }
                 }

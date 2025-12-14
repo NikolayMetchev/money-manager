@@ -29,7 +29,7 @@ class AuditTableCoverageTest {
             val databaseManager = component.databaseManager
             // Open file-based database for testing
             database = databaseManager.openDatabase(testDbLocation)
-            RepositorySet(database)
+            RepositorySet(database, database)
         }
 
     @AfterTest
