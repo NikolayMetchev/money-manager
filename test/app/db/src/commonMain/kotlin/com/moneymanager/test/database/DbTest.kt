@@ -10,7 +10,7 @@ import kotlin.test.BeforeTest
 
 abstract class DbTest {
     protected lateinit var database: MoneyManagerDatabaseWrapper
-    protected lateinit var testDbLocation: DbLocation
+    private lateinit var testDbLocation: DbLocation
     protected lateinit var repositories: RepositorySet
 
     @BeforeTest
