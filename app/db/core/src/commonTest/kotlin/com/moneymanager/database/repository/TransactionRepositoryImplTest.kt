@@ -2,24 +2,14 @@
 
 package com.moneymanager.database.repository
 
-import com.moneymanager.database.DatabaseMaintenanceService
-import com.moneymanager.database.RepositorySet
-import com.moneymanager.database.createTestDatabaseLocation
-import com.moneymanager.database.deleteTestDatabase
-import com.moneymanager.di.AppComponent
-import com.moneymanager.di.createTestAppComponentParams
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
-import com.moneymanager.domain.repository.AccountRepository
-import com.moneymanager.domain.repository.CurrencyRepository
-import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
-import kotlin.test.AfterTest
-import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -27,40 +17,7 @@ import kotlin.test.assertNotNull
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
-class TransactionRepositoryImplTest {
-    private lateinit var transactionRepository: TransactionRepository
-    private lateinit var accountRepository: AccountRepository
-    private lateinit var currencyRepository: CurrencyRepository
-    private lateinit var maintenanceService: DatabaseMaintenanceService
-    private lateinit var testDbLocation: com.moneymanager.database.DbLocation
-
-    @BeforeTest
-    fun setup() =
-        runTest {
-            // Create temporary database file
-            testDbLocation = createTestDatabaseLocation()
-
-            // Create app component
-            val component = AppComponent.create(createTestAppComponentParams())
-            val databaseManager = component.databaseManager
-
-            // Open file-based database for testing
-            val database = databaseManager.openDatabase(testDbLocation)
-            val repositories = RepositorySet(database)
-
-            transactionRepository = repositories.transactionRepository
-            accountRepository = repositories.accountRepository
-            currencyRepository = repositories.currencyRepository
-            maintenanceService = repositories.maintenanceService
-        }
-
-    @AfterTest
-    fun cleanup() {
-        deleteTestDatabase(testDbLocation)
-    }
-
-    // CREATE TRANSACTION TESTS
-
+class TransactionRepositoryImplTest : DbTest() {
     @Test
     fun `createTransfer should insert transaction and transfer`() =
         runTest {
@@ -68,17 +25,17 @@ class TransactionRepositoryImplTest {
 
             // Create test accounts
             val sourceAccountId =
-                accountRepository.createAccount(
+                repositories.accountRepository.createAccount(
                     Account(id = AccountId(0), name = "Source Account", openingDate = now),
                 )
             val targetAccountId =
-                accountRepository.createAccount(
+                repositories.accountRepository.createAccount(
                     Account(id = AccountId(0), name = "Target Account", openingDate = now),
                 )
 
             // Create test currency
-            val currencyId = currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
-            val currency = currencyRepository.getCurrencyById(currencyId).first()!!
+            val currencyId = repositories.currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
+            val currency = repositories.currencyRepository.getCurrencyById(currencyId).first()!!
 
             // Create transfer
             val transferId = TransferId(Uuid.random())
@@ -91,9 +48,9 @@ class TransactionRepositoryImplTest {
                     targetAccountId = targetAccountId,
                     amount = Money.fromDisplayValue(100.0, currency),
                 )
-            transactionRepository.createTransfer(transfer)
+            repositories.transactionRepository.createTransfer(transfer)
 
-            val retrieved = transactionRepository.getTransactionById(transferId.id).first()
+            val retrieved = repositories.transactionRepository.getTransactionById(transferId.id).first()
             assertNotNull(retrieved, "Retrieved transaction should not be null for ID: $transferId")
             assertEquals(sourceAccountId, retrieved.sourceAccountId)
             assertEquals(targetAccountId, retrieved.targetAccountId)
@@ -108,13 +65,13 @@ class TransactionRepositoryImplTest {
 
             // Create test account
             val accountId =
-                accountRepository.createAccount(
+                repositories.accountRepository.createAccount(
                     Account(id = AccountId(0), name = "Test Account", openingDate = now),
                 )
 
             // Create test currency
-            val currencyId = currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
-            val currency = currencyRepository.getCurrencyById(currencyId).first()!!
+            val currencyId = repositories.currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
+            val currency = repositories.currencyRepository.getCurrencyById(currencyId).first()!!
 
             // Should throw exception due to CHECK constraint
             // Same as source - violates CHECK constraint
@@ -128,7 +85,7 @@ class TransactionRepositoryImplTest {
                         targetAccountId = accountId,
                         amount = Money.fromDisplayValue(100.0, currency),
                     )
-                transactionRepository.createTransfer(transfer)
+                repositories.transactionRepository.createTransfer(transfer)
             }
         }
 
@@ -139,17 +96,17 @@ class TransactionRepositoryImplTest {
 
             // Create test accounts
             val sourceAccountId =
-                accountRepository.createAccount(
+                repositories.accountRepository.createAccount(
                     Account(id = AccountId(0), name = "Source Account", openingDate = now),
                 )
             val targetAccountId =
-                accountRepository.createAccount(
+                repositories.accountRepository.createAccount(
                     Account(id = AccountId(0), name = "Target Account", openingDate = now),
                 )
 
             // Create test currency
-            val currencyId = currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
-            val currency = currencyRepository.getCurrencyById(currencyId).first()!!
+            val currencyId = repositories.currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
+            val currency = repositories.currencyRepository.getCurrencyById(currencyId).first()!!
 
             // Create valid transfer
             val transferId = TransferId(Uuid.random())
@@ -162,10 +119,10 @@ class TransactionRepositoryImplTest {
                     targetAccountId = targetAccountId,
                     amount = Money.fromDisplayValue(100.0, currency),
                 )
-            transactionRepository.createTransfer(transfer)
+            repositories.transactionRepository.createTransfer(transfer)
 
             // Verify transaction was created
-            val created = transactionRepository.getTransactionById(transferId.id).first()
+            val created = repositories.transactionRepository.getTransactionById(transferId.id).first()
             assertNotNull(created, "Transaction should be created")
 
             // Should throw exception due to CHECK constraint
@@ -180,7 +137,7 @@ class TransactionRepositoryImplTest {
                         targetAccountId = sourceAccountId,
                         amount = Money.fromDisplayValue(100.0, currency),
                     )
-                transactionRepository.updateTransfer(invalidTransfer)
+                repositories.transactionRepository.updateTransfer(invalidTransfer)
             }
         }
 
@@ -193,17 +150,17 @@ class TransactionRepositoryImplTest {
 
             // Create test accounts
             val checkingAccountId =
-                accountRepository.createAccount(
+                repositories.accountRepository.createAccount(
                     Account(id = AccountId(0), name = "Checking", openingDate = now),
                 )
             val savingsAccountId =
-                accountRepository.createAccount(
+                repositories.accountRepository.createAccount(
                     Account(id = AccountId(0), name = "Savings", openingDate = now),
                 )
 
             // Create test currency
-            val usdId = currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
-            val usd = currencyRepository.getCurrencyById(usdId).first()!!
+            val usdId = repositories.currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
+            val usd = repositories.currencyRepository.getCurrencyById(usdId).first()!!
 
             // Create transaction: Checking -> Savings, 100 USD
             val transfer =
@@ -215,13 +172,13 @@ class TransactionRepositoryImplTest {
                     targetAccountId = savingsAccountId,
                     amount = Money.fromDisplayValue(100.0, usd),
                 )
-            transactionRepository.createTransfer(transfer)
+            repositories.transactionRepository.createTransfer(transfer)
 
             // Refresh materialized views
-            maintenanceService.refreshMaterializedViews()
+            repositories.maintenanceService.refreshMaterializedViews()
 
             // Get balances
-            val balances = transactionRepository.getAccountBalances().first()
+            val balances = repositories.transactionRepository.getAccountBalances().first()
 
             // Find balances for each account
             val checkingBalance = balances.find { it.accountId == checkingAccountId && it.balance.currency.id == usdId }
@@ -241,25 +198,25 @@ class TransactionRepositoryImplTest {
 
             // Create test accounts
             val checkingAccountId =
-                accountRepository.createAccount(
+                repositories.accountRepository.createAccount(
                     Account(id = AccountId(0), name = "Checking", openingDate = now),
                 )
             val savingsAccountId =
-                accountRepository.createAccount(
+                repositories.accountRepository.createAccount(
                     Account(id = AccountId(0), name = "Savings", openingDate = now),
                 )
             val creditCardAccountId =
-                accountRepository.createAccount(
+                repositories.accountRepository.createAccount(
                     Account(id = AccountId(0), name = "Credit Card", openingDate = now),
                 )
 
             // Create test currency
-            val usdId = currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
-            val usd = currencyRepository.getCurrencyById(usdId).first()!!
+            val usdId = repositories.currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
+            val usd = repositories.currencyRepository.getCurrencyById(usdId).first()!!
 
             // Create multiple transactions
             // 1. Checking -> Savings: 100
-            transactionRepository.createTransfer(
+            repositories.transactionRepository.createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
                     timestamp = now,
@@ -271,7 +228,7 @@ class TransactionRepositoryImplTest {
             )
 
             // 2. Checking -> Credit Card: 50 (payment)
-            transactionRepository.createTransfer(
+            repositories.transactionRepository.createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
                     timestamp = now,
@@ -283,7 +240,7 @@ class TransactionRepositoryImplTest {
             )
 
             // 3. Savings -> Checking: 30
-            transactionRepository.createTransfer(
+            repositories.transactionRepository.createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
                     timestamp = now,
@@ -295,10 +252,10 @@ class TransactionRepositoryImplTest {
             )
 
             // Refresh materialized views
-            maintenanceService.refreshMaterializedViews()
+            repositories.maintenanceService.refreshMaterializedViews()
 
             // Get balances
-            val balances = transactionRepository.getAccountBalances().first()
+            val balances = repositories.transactionRepository.getAccountBalances().first()
 
             // Find balances for each account
             val checkingBalance = balances.find { it.accountId == checkingAccountId && it.balance.currency.id == usdId }
@@ -327,23 +284,23 @@ class TransactionRepositoryImplTest {
 
             // Create test accounts
             val checkingAccountId =
-                accountRepository.createAccount(
+                repositories.accountRepository.createAccount(
                     Account(id = AccountId(0), name = "Checking", openingDate = now),
                 )
             val savingsAccountId =
-                accountRepository.createAccount(
+                repositories.accountRepository.createAccount(
                     Account(id = AccountId(0), name = "Savings", openingDate = now),
                 )
 
             // Create test currencies
-            val usdId = currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
-            val usd = currencyRepository.getCurrencyById(usdId).first()!!
-            val eurId = currencyRepository.upsertCurrencyByCode("EUR", "Euro")
-            val eur = currencyRepository.getCurrencyById(eurId).first()!!
+            val usdId = repositories.currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
+            val usd = repositories.currencyRepository.getCurrencyById(usdId).first()!!
+            val eurId = repositories.currencyRepository.upsertCurrencyByCode("EUR", "Euro")
+            val eur = repositories.currencyRepository.getCurrencyById(eurId).first()!!
 
             // Create transactions in different currencies
             // USD: Checking -> Savings, 100
-            transactionRepository.createTransfer(
+            repositories.transactionRepository.createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
                     timestamp = now,
@@ -355,7 +312,7 @@ class TransactionRepositoryImplTest {
             )
 
             // EUR: Checking -> Savings, 50
-            transactionRepository.createTransfer(
+            repositories.transactionRepository.createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
                     timestamp = now,
@@ -367,10 +324,10 @@ class TransactionRepositoryImplTest {
             )
 
             // Refresh materialized views
-            maintenanceService.refreshMaterializedViews()
+            repositories.maintenanceService.refreshMaterializedViews()
 
             // Get balances
-            val balances = transactionRepository.getAccountBalances().first()
+            val balances = repositories.transactionRepository.getAccountBalances().first()
 
             // Find balances for checking account
             val checkingUsdBalance = balances.find { it.accountId == checkingAccountId && it.balance.currency.id == usdId }
@@ -397,10 +354,10 @@ class TransactionRepositoryImplTest {
         runTest {
             // Create accounts but no transactions
             val now = Clock.System.now()
-            accountRepository.createAccount(Account(id = AccountId(0), name = "Checking", openingDate = now))
-            accountRepository.createAccount(Account(id = AccountId(0), name = "Savings", openingDate = now))
+            repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Checking", openingDate = now))
+            repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Savings", openingDate = now))
 
-            val balances = transactionRepository.getAccountBalances().first()
+            val balances = repositories.transactionRepository.getAccountBalances().first()
 
             assertEquals(0, balances.size, "Should have no balances when no transactions exist")
         }
@@ -414,17 +371,17 @@ class TransactionRepositoryImplTest {
 
             // Create test accounts
             val sourceAccountId =
-                accountRepository.createAccount(
+                repositories.accountRepository.createAccount(
                     Account(id = AccountId(0), name = "Source Account", openingDate = now),
                 )
             val targetAccountId =
-                accountRepository.createAccount(
+                repositories.accountRepository.createAccount(
                     Account(id = AccountId(0), name = "Target Account", openingDate = now),
                 )
 
             // Create test currency
-            val currencyId = currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
-            val currency = currencyRepository.getCurrencyById(currencyId).first()!!
+            val currencyId = repositories.currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
+            val currency = repositories.currencyRepository.getCurrencyById(currencyId).first()!!
 
             // Create transaction
             val transferId = TransferId(Uuid.random())
@@ -437,12 +394,12 @@ class TransactionRepositoryImplTest {
                     targetAccountId = targetAccountId,
                     amount = Money.fromDisplayValue(100.0, currency),
                 )
-            transactionRepository.createTransfer(transfer)
+            repositories.transactionRepository.createTransfer(transfer)
 
             // Delete transaction
-            transactionRepository.deleteTransaction(transferId.id)
+            repositories.transactionRepository.deleteTransaction(transferId.id)
 
-            val deleted = transactionRepository.getTransactionById(transferId.id).first()
+            val deleted = repositories.transactionRepository.getTransactionById(transferId.id).first()
             assertEquals(null, deleted)
         }
 }

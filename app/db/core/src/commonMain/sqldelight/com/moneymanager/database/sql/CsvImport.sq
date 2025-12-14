@@ -1,0 +1,51 @@
+-- Tracks imported CSV files and their dynamically created tables
+CREATE TABLE CsvImportMetadata (
+    id TEXT PRIMARY KEY NOT NULL,
+    tableName TEXT NOT NULL UNIQUE,
+    originalFileName TEXT NOT NULL,
+    importTimestamp INTEGER NOT NULL,
+    rowCount INTEGER NOT NULL,
+    columnCount INTEGER NOT NULL
+);
+
+-- Column definitions for each imported CSV
+CREATE TABLE CsvColumnMetadata (
+    id TEXT PRIMARY KEY NOT NULL,
+    importId TEXT NOT NULL,
+    columnIndex INTEGER NOT NULL,
+    originalName TEXT NOT NULL,
+    FOREIGN KEY (importId) REFERENCES CsvImportMetadata(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_csv_column_import ON CsvColumnMetadata(importId);
+
+-- CsvImportMetadata queries
+selectAllImports:
+SELECT * FROM CsvImportMetadata ORDER BY importTimestamp DESC;
+
+selectImportById:
+SELECT * FROM CsvImportMetadata WHERE id = ?;
+
+selectImportByTableName:
+SELECT * FROM CsvImportMetadata WHERE tableName = ?;
+
+insertImport:
+INSERT INTO CsvImportMetadata (id, tableName, originalFileName, importTimestamp, rowCount, columnCount)
+VALUES (?, ?, ?, ?, ?, ?);
+
+updateImportRowCount:
+UPDATE CsvImportMetadata SET rowCount = ? WHERE id = ?;
+
+deleteImport:
+DELETE FROM CsvImportMetadata WHERE id = ?;
+
+-- CsvColumnMetadata queries
+selectColumnsByImportId:
+SELECT * FROM CsvColumnMetadata WHERE importId = ? ORDER BY columnIndex;
+
+insertColumn:
+INSERT INTO CsvColumnMetadata (id, importId, columnIndex, originalName)
+VALUES (?, ?, ?, ?);
+
+deleteColumnsByImportId:
+DELETE FROM CsvColumnMetadata WHERE importId = ?;

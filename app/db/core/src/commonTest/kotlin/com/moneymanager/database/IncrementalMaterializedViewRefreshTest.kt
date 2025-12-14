@@ -2,20 +2,14 @@
 
 package com.moneymanager.database
 
-import com.moneymanager.di.AppComponent
-import com.moneymanager.di.createTestAppComponentParams
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
-import com.moneymanager.domain.repository.AccountRepository
-import com.moneymanager.domain.repository.CurrencyRepository
-import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
-import kotlin.test.AfterTest
-import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -32,43 +26,11 @@ import kotlin.uuid.Uuid
  * 4. New accounts and currencies are handled correctly
  * 5. Multiple changes are batched correctly
  */
-class IncrementalMaterializedViewRefreshTest {
-    private lateinit var transactionRepository: TransactionRepository
-    private lateinit var accountRepository: AccountRepository
-    private lateinit var currencyRepository: CurrencyRepository
-    private lateinit var maintenanceService: DatabaseMaintenanceService
-    private lateinit var database: com.moneymanager.database.sql.MoneyManagerDatabase
-    private lateinit var testDbLocation: DbLocation
-
-    @BeforeTest
-    fun setup() =
-        runTest {
-            // Create temporary database file
-            testDbLocation = createTestDatabaseLocation()
-
-            // Create app component
-            val component = AppComponent.create(createTestAppComponentParams())
-            val databaseManager = component.databaseManager
-
-            // Open file-based database for testing
-            database = databaseManager.openDatabase(testDbLocation)
-            val repositories = RepositorySet(database)
-
-            transactionRepository = repositories.transactionRepository
-            accountRepository = repositories.accountRepository
-            currencyRepository = repositories.currencyRepository
-            maintenanceService = repositories.maintenanceService
-        }
-
-    @AfterTest
-    fun cleanup() {
-        deleteTestDatabase(testDbLocation)
-    }
-
+class IncrementalMaterializedViewRefreshTest : DbTest() {
     // Helper to verify materialized views match the source views
     private suspend fun verifyMaterializedViewsMatchViews() {
         // Refresh incrementally
-        maintenanceService.refreshMaterializedViews()
+        repositories.maintenanceService.refreshMaterializedViews()
 
         // Query both materialized views and views
         val materializedBalances =
@@ -114,11 +76,11 @@ class IncrementalMaterializedViewRefreshTest {
     private suspend fun createTestAccounts(): Pair<AccountId, AccountId> {
         val now = Clock.System.now()
         val account1Id =
-            accountRepository.createAccount(
+            repositories.accountRepository.createAccount(
                 Account(id = AccountId(0), name = "Account 1", openingDate = now),
             )
         val account2Id =
-            accountRepository.createAccount(
+            repositories.accountRepository.createAccount(
                 Account(id = AccountId(0), name = "Account 2", openingDate = now),
             )
         return Pair(account1Id, account2Id)
@@ -130,13 +92,13 @@ class IncrementalMaterializedViewRefreshTest {
     fun `INSERT with timestamp after all existing transactions should trigger incremental refresh`() =
         runTest {
             val (account1Id, account2Id) = createTestAccounts()
-            val currencyId = currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
-            val currency = currencyRepository.getCurrencyById(currencyId).first()!!
+            val currencyId = repositories.currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
+            val currency = repositories.currencyRepository.getCurrencyById(currencyId).first()!!
 
             val now = Clock.System.now()
 
             // Insert first transfer
-            transactionRepository.createTransfer(
+            repositories.transactionRepository.createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
                     timestamp = now,
@@ -148,10 +110,10 @@ class IncrementalMaterializedViewRefreshTest {
             )
 
             // Initial refresh to populate materialized views
-            maintenanceService.fullRefreshMaterializedViews()
+            repositories.maintenanceService.fullRefreshMaterializedViews()
 
             // Insert transfer with timestamp AFTER existing
-            transactionRepository.createTransfer(
+            repositories.transactionRepository.createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
                     timestamp = now.plus(kotlin.time.Duration.parse("1h")),
@@ -183,13 +145,13 @@ class IncrementalMaterializedViewRefreshTest {
     fun `INSERT with timestamp in middle of existing transactions should trigger incremental refresh`() =
         runTest {
             val (account1Id, account2Id) = createTestAccounts()
-            val currencyId = currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
-            val currency = currencyRepository.getCurrencyById(currencyId).first()!!
+            val currencyId = repositories.currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
+            val currency = repositories.currencyRepository.getCurrencyById(currencyId).first()!!
 
             val now = Clock.System.now()
 
             // Insert first transfer
-            transactionRepository.createTransfer(
+            repositories.transactionRepository.createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
                     timestamp = now,
@@ -201,7 +163,7 @@ class IncrementalMaterializedViewRefreshTest {
             )
 
             // Insert third transfer (leaving gap for middle insert)
-            transactionRepository.createTransfer(
+            repositories.transactionRepository.createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
                     timestamp = now.plus(kotlin.time.Duration.parse("2h")),
@@ -213,10 +175,10 @@ class IncrementalMaterializedViewRefreshTest {
             )
 
             // Initial refresh
-            maintenanceService.fullRefreshMaterializedViews()
+            repositories.maintenanceService.fullRefreshMaterializedViews()
 
             // Insert transfer with timestamp IN THE MIDDLE
-            transactionRepository.createTransfer(
+            repositories.transactionRepository.createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
                     timestamp = now.plus(kotlin.time.Duration.parse("1h")),
@@ -235,13 +197,13 @@ class IncrementalMaterializedViewRefreshTest {
     fun `INSERT with timestamp before all existing transactions should trigger incremental refresh`() =
         runTest {
             val (account1Id, account2Id) = createTestAccounts()
-            val currencyId = currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
-            val currency = currencyRepository.getCurrencyById(currencyId).first()!!
+            val currencyId = repositories.currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
+            val currency = repositories.currencyRepository.getCurrencyById(currencyId).first()!!
 
             val now = Clock.System.now()
 
             // Insert transfer at current time
-            transactionRepository.createTransfer(
+            repositories.transactionRepository.createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
                     timestamp = now,
@@ -253,10 +215,10 @@ class IncrementalMaterializedViewRefreshTest {
             )
 
             // Initial refresh
-            maintenanceService.fullRefreshMaterializedViews()
+            repositories.maintenanceService.fullRefreshMaterializedViews()
 
             // Insert transfer with timestamp BEFORE existing
-            transactionRepository.createTransfer(
+            repositories.transactionRepository.createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
                     timestamp = now.minus(kotlin.time.Duration.parse("1h")),
@@ -277,14 +239,14 @@ class IncrementalMaterializedViewRefreshTest {
     fun `UPDATE changing timestamp to after all transactions should trigger incremental refresh`() =
         runTest {
             val (account1Id, account2Id) = createTestAccounts()
-            val currencyId = currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
-            val currency = currencyRepository.getCurrencyById(currencyId).first()!!
+            val currencyId = repositories.currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
+            val currency = repositories.currencyRepository.getCurrencyById(currencyId).first()!!
 
             val now = Clock.System.now()
 
             // Insert two transfers
             val transfer1Id = TransferId(Uuid.random())
-            transactionRepository.createTransfer(
+            repositories.transactionRepository.createTransfer(
                 Transfer(
                     id = transfer1Id,
                     timestamp = now,
@@ -295,7 +257,7 @@ class IncrementalMaterializedViewRefreshTest {
                 ),
             )
 
-            transactionRepository.createTransfer(
+            repositories.transactionRepository.createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
                     timestamp = now.plus(kotlin.time.Duration.parse("1h")),
@@ -307,10 +269,10 @@ class IncrementalMaterializedViewRefreshTest {
             )
 
             // Initial refresh
-            maintenanceService.fullRefreshMaterializedViews()
+            repositories.maintenanceService.fullRefreshMaterializedViews()
 
             // UPDATE first transfer to have timestamp AFTER second
-            transactionRepository.updateTransfer(
+            repositories.transactionRepository.updateTransfer(
                 Transfer(
                     id = transfer1Id,
                     timestamp = now.plus(kotlin.time.Duration.parse("2h")),
@@ -332,28 +294,28 @@ class IncrementalMaterializedViewRefreshTest {
 
             // Create 4 accounts
             val account1Id =
-                accountRepository.createAccount(
+                repositories.accountRepository.createAccount(
                     Account(id = AccountId(0), name = "Account 1", openingDate = now),
                 )
             val account2Id =
-                accountRepository.createAccount(
+                repositories.accountRepository.createAccount(
                     Account(id = AccountId(0), name = "Account 2", openingDate = now),
                 )
             val account3Id =
-                accountRepository.createAccount(
+                repositories.accountRepository.createAccount(
                     Account(id = AccountId(0), name = "Account 3", openingDate = now),
                 )
             val account4Id =
-                accountRepository.createAccount(
+                repositories.accountRepository.createAccount(
                     Account(id = AccountId(0), name = "Account 4", openingDate = now),
                 )
 
-            val currencyId = currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
-            val currency = currencyRepository.getCurrencyById(currencyId).first()!!
+            val currencyId = repositories.currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
+            val currency = repositories.currencyRepository.getCurrencyById(currencyId).first()!!
 
             // Insert transfer between account1 and account2
             val transferId = TransferId(Uuid.random())
-            transactionRepository.createTransfer(
+            repositories.transactionRepository.createTransfer(
                 Transfer(
                     id = transferId,
                     timestamp = now,
@@ -365,10 +327,10 @@ class IncrementalMaterializedViewRefreshTest {
             )
 
             // Initial refresh
-            maintenanceService.fullRefreshMaterializedViews()
+            repositories.maintenanceService.fullRefreshMaterializedViews()
 
             // UPDATE to change BOTH source and target accounts (account1→account2 becomes account3→account4)
-            transactionRepository.updateTransfer(
+            repositories.transactionRepository.updateTransfer(
                 Transfer(
                     id = transferId,
                     timestamp = now,
@@ -398,14 +360,14 @@ class IncrementalMaterializedViewRefreshTest {
     fun `DELETE should trigger incremental refresh`() =
         runTest {
             val (account1Id, account2Id) = createTestAccounts()
-            val currencyId = currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
-            val currency = currencyRepository.getCurrencyById(currencyId).first()!!
+            val currencyId = repositories.currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
+            val currency = repositories.currencyRepository.getCurrencyById(currencyId).first()!!
 
             val now = Clock.System.now()
 
             // Insert two transfers
             val transfer1Id = TransferId(Uuid.random())
-            transactionRepository.createTransfer(
+            repositories.transactionRepository.createTransfer(
                 Transfer(
                     id = transfer1Id,
                     timestamp = now,
@@ -416,7 +378,7 @@ class IncrementalMaterializedViewRefreshTest {
                 ),
             )
 
-            transactionRepository.createTransfer(
+            repositories.transactionRepository.createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
                     timestamp = now.plus(kotlin.time.Duration.parse("1h")),
@@ -428,10 +390,10 @@ class IncrementalMaterializedViewRefreshTest {
             )
 
             // Initial refresh
-            maintenanceService.fullRefreshMaterializedViews()
+            repositories.maintenanceService.fullRefreshMaterializedViews()
 
             // DELETE first transfer
-            transactionRepository.deleteTransaction(transfer1Id.id)
+            repositories.transactionRepository.deleteTransaction(transfer1Id.id)
 
             // Verify pending changes were tracked
             assertTrue(
@@ -447,14 +409,14 @@ class IncrementalMaterializedViewRefreshTest {
     fun `DELETE removing all transfers for account-currency pair should remove from materialized view`() =
         runTest {
             val (account1Id, account2Id) = createTestAccounts()
-            val currencyId = currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
-            val currency = currencyRepository.getCurrencyById(currencyId).first()!!
+            val currencyId = repositories.currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
+            val currency = repositories.currencyRepository.getCurrencyById(currencyId).first()!!
 
             val now = Clock.System.now()
 
             // Insert single transfer
             val transferId = TransferId(Uuid.random())
-            transactionRepository.createTransfer(
+            repositories.transactionRepository.createTransfer(
                 Transfer(
                     id = transferId,
                     timestamp = now,
@@ -466,7 +428,7 @@ class IncrementalMaterializedViewRefreshTest {
             )
 
             // Initial refresh
-            maintenanceService.fullRefreshMaterializedViews()
+            repositories.maintenanceService.fullRefreshMaterializedViews()
 
             // Verify materialized view has entries
             val balancesBeforeDelete = database.transferQueries.selectAllBalances().executeAsList()
@@ -476,7 +438,7 @@ class IncrementalMaterializedViewRefreshTest {
             )
 
             // DELETE the only transfer
-            transactionRepository.deleteTransaction(transferId.id)
+            repositories.transactionRepository.deleteTransaction(transferId.id)
 
             // Verify incremental refresh produces correct results (should be empty)
             verifyMaterializedViewsMatchViews()
@@ -499,17 +461,17 @@ class IncrementalMaterializedViewRefreshTest {
 
             // Create first account and insert transfer
             val account1Id =
-                accountRepository.createAccount(
+                repositories.accountRepository.createAccount(
                     Account(id = AccountId(0), name = "Account 1", openingDate = now),
                 )
             val account2Id =
-                accountRepository.createAccount(
+                repositories.accountRepository.createAccount(
                     Account(id = AccountId(0), name = "Account 2", openingDate = now),
                 )
-            val currencyId = currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
-            val currency = currencyRepository.getCurrencyById(currencyId).first()!!
+            val currencyId = repositories.currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
+            val currency = repositories.currencyRepository.getCurrencyById(currencyId).first()!!
 
-            transactionRepository.createTransfer(
+            repositories.transactionRepository.createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
                     timestamp = now,
@@ -521,15 +483,15 @@ class IncrementalMaterializedViewRefreshTest {
             )
 
             // Initial refresh
-            maintenanceService.fullRefreshMaterializedViews()
+            repositories.maintenanceService.fullRefreshMaterializedViews()
 
             // Create NEW account and insert transfer involving it
             val account3Id =
-                accountRepository.createAccount(
+                repositories.accountRepository.createAccount(
                     Account(id = AccountId(0), name = "Account 3 (NEW)", openingDate = now),
                 )
 
-            transactionRepository.createTransfer(
+            repositories.transactionRepository.createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
                     timestamp = now.plus(kotlin.time.Duration.parse("1h")),
@@ -558,9 +520,9 @@ class IncrementalMaterializedViewRefreshTest {
             val (account1Id, account2Id) = createTestAccounts()
 
             // Insert transfer with USD
-            val usdId = currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
-            val usdCurrency = currencyRepository.getCurrencyById(usdId).first()!!
-            transactionRepository.createTransfer(
+            val usdId = repositories.currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
+            val usdCurrency = repositories.currencyRepository.getCurrencyById(usdId).first()!!
+            repositories.transactionRepository.createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
                     timestamp = now,
@@ -572,12 +534,12 @@ class IncrementalMaterializedViewRefreshTest {
             )
 
             // Initial refresh
-            maintenanceService.fullRefreshMaterializedViews()
+            repositories.maintenanceService.fullRefreshMaterializedViews()
 
             // Insert transfer with NEW currency (EUR)
-            val eurId = currencyRepository.upsertCurrencyByCode("EUR", "Euro")
-            val eurCurrency = currencyRepository.getCurrencyById(eurId).first()!!
-            transactionRepository.createTransfer(
+            val eurId = repositories.currencyRepository.upsertCurrencyByCode("EUR", "Euro")
+            val eurCurrency = repositories.currencyRepository.getCurrencyById(eurId).first()!!
+            repositories.transactionRepository.createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
                     timestamp = now.plus(kotlin.time.Duration.parse("1h")),
@@ -605,13 +567,13 @@ class IncrementalMaterializedViewRefreshTest {
     fun `Multiple changes between refreshes should be batched correctly`() =
         runTest {
             val (account1Id, account2Id) = createTestAccounts()
-            val currencyId = currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
-            val currency = currencyRepository.getCurrencyById(currencyId).first()!!
+            val currencyId = repositories.currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
+            val currency = repositories.currencyRepository.getCurrencyById(currencyId).first()!!
 
             val now = Clock.System.now()
 
             // Insert initial transfer
-            transactionRepository.createTransfer(
+            repositories.transactionRepository.createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
                     timestamp = now,
@@ -623,10 +585,10 @@ class IncrementalMaterializedViewRefreshTest {
             )
 
             // Initial refresh
-            maintenanceService.fullRefreshMaterializedViews()
+            repositories.maintenanceService.fullRefreshMaterializedViews()
 
             // Make MULTIPLE changes WITHOUT refreshing in between
-            transactionRepository.createTransfer(
+            repositories.transactionRepository.createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
                     timestamp = now.plus(kotlin.time.Duration.parse("1h")),
@@ -637,7 +599,7 @@ class IncrementalMaterializedViewRefreshTest {
                 ),
             )
 
-            transactionRepository.createTransfer(
+            repositories.transactionRepository.createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
                     timestamp = now.plus(kotlin.time.Duration.parse("2h")),
@@ -648,7 +610,7 @@ class IncrementalMaterializedViewRefreshTest {
                 ),
             )
 
-            transactionRepository.createTransfer(
+            repositories.transactionRepository.createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
                     timestamp = now.plus(kotlin.time.Duration.parse("3h")),
@@ -683,14 +645,14 @@ class IncrementalMaterializedViewRefreshTest {
     fun `Incremental refresh should produce same results as full refresh`() =
         runTest {
             val (account1Id, account2Id) = createTestAccounts()
-            val currencyId = currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
-            val currency = currencyRepository.getCurrencyById(currencyId).first()!!
+            val currencyId = repositories.currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
+            val currency = repositories.currencyRepository.getCurrencyById(currencyId).first()!!
 
             val now = Clock.System.now()
 
             // Insert several transfers
             repeat(5) { i ->
-                transactionRepository.createTransfer(
+                repositories.transactionRepository.createTransfer(
                     Transfer(
                         id = TransferId(Uuid.random()),
                         timestamp = now.plus(kotlin.time.Duration.parse("${i}h")),
@@ -703,14 +665,14 @@ class IncrementalMaterializedViewRefreshTest {
             }
 
             // Do incremental refresh
-            maintenanceService.refreshMaterializedViews()
+            repositories.maintenanceService.refreshMaterializedViews()
             val incrementalBalances =
                 database.transferQueries.selectAllBalances()
                     .executeAsList()
                     .sortedBy { "${it.accountId}-${it.currencyId}" }
 
             // Do full refresh
-            maintenanceService.fullRefreshMaterializedViews()
+            repositories.maintenanceService.fullRefreshMaterializedViews()
             val fullBalances =
                 database.transferQueries.selectAllBalances()
                     .executeAsList()

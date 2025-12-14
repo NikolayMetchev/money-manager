@@ -28,8 +28,24 @@ class MoneyManagerDatabaseWrapper(private val driver: SqlDriver) : MoneyManagerD
     ): QueryResult<R> = driver.executeQuery(identifier, sql, mapper, parameters)
 
     /**
+     * Execute a SQL statement with string parameters.
+     * Used for dynamic SQL where parameters need to be bound safely.
+     */
+    fun executeWithParams(
+        sql: String,
+        parameterCount: Int,
+        parameters: List<String>,
+    ) {
+        driver.execute(null, sql, parameterCount) {
+            parameters.forEachIndexed { index, value ->
+                bindString(index, value)
+            }
+        }
+    }
+
+    /**
      * Tables to exclude from audit trail.
-     * Includes audit tables themselves, materialized views, and system tables.
+     * Includes audit tables themselves, materialized views, system tables, and CSV import tables.
      */
     @Suppress("PrivatePropertyName", "ktlint:standard:property-naming")
     private val EXCLUDED_FROM_AUDIT =
@@ -43,7 +59,19 @@ class MoneyManagerDatabaseWrapper(private val driver: SqlDriver) : MoneyManagerD
             "RunningBalanceMaterializedView",
             "PendingMaterializedViewChanges",
             "sqlite_sequence",
+            "CsvImportMetadata",
+            "CsvColumnMetadata",
         )
+
+    /**
+     * Prefix for dynamically created CSV import tables.
+     */
+    private val csvTablePrefix = "csv_import_"
+
+    /**
+     * Checks if a table should be excluded from audit.
+     */
+    fun isExcludedFromAudit(tableName: String): Boolean = tableName in EXCLUDED_FROM_AUDIT || tableName.startsWith(csvTablePrefix)
 
     /**
      * Gets all auditable tables from the database.
@@ -64,7 +92,7 @@ class MoneyManagerDatabaseWrapper(private val driver: SqlDriver) : MoneyManagerD
             { cursor ->
                 while (cursor.next().value) {
                     val tableName = cursor.getString(0) ?: continue
-                    if (tableName !in EXCLUDED_FROM_AUDIT) {
+                    if (!isExcludedFromAudit(tableName)) {
                         tables.add(tableName)
                     }
                 }

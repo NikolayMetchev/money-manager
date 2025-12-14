@@ -37,6 +37,8 @@ import com.moneymanager.ui.navigation.Screen
 import com.moneymanager.ui.screens.AccountTransactionsScreen
 import com.moneymanager.ui.screens.AccountsScreen
 import com.moneymanager.ui.screens.CategoriesScreen
+import com.moneymanager.ui.screens.CsvImportDetailScreen
+import com.moneymanager.ui.screens.CsvImportsScreen
 import com.moneymanager.ui.screens.CurrenciesScreen
 import com.moneymanager.ui.screens.SettingsScreen
 import com.moneymanager.ui.screens.TransactionEntryDialog
@@ -235,6 +237,12 @@ private fun MoneyManagerAppContent(
                         onClick = { currentScreen = Screen.Categories },
                     )
                     NavigationBarItem(
+                        icon = { Text("📄") },
+                        label = { Text("CSV") },
+                        selected = currentScreen is Screen.CsvImports || currentScreen is Screen.CsvImportDetail,
+                        onClick = { currentScreen = Screen.CsvImports },
+                    )
+                    NavigationBarItem(
                         icon = { Text("⚙️") },
                         label = { Text("Settings") },
                         selected = currentScreen is Screen.Settings,
@@ -318,6 +326,26 @@ private fun MoneyManagerAppContent(
                             onCurrencyIdChange = { currencyId ->
                                 currentlyViewedCurrencyId = currencyId
                             },
+                        )
+                    }
+                    is Screen.CsvImports -> {
+                        LaunchedEffect(Unit) {
+                            currentlyViewedAccountId = null
+                            currentlyViewedCurrencyId = null
+                        }
+                        CsvImportsScreen(
+                            csvImportRepository = repositorySet.csvImportRepository,
+                            onImportClick = { importId ->
+                                currentScreen = Screen.CsvImportDetail(importId)
+                            },
+                        )
+                    }
+                    is Screen.CsvImportDetail -> {
+                        CsvImportDetailScreen(
+                            importId = screen.importId,
+                            csvImportRepository = repositorySet.csvImportRepository,
+                            onBack = { currentScreen = Screen.CsvImports },
+                            onDeleted = { currentScreen = Screen.CsvImports },
                         )
                     }
                 }
