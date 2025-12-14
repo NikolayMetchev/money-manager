@@ -2,25 +2,14 @@
 
 package com.moneymanager.database.repository
 
-import com.moneymanager.database.DatabaseMaintenanceService
-import com.moneymanager.database.RepositorySet
-import com.moneymanager.di.AppComponent
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
-import com.moneymanager.domain.repository.AccountRepository
-import com.moneymanager.domain.repository.CurrencyRepository
-import com.moneymanager.domain.repository.TransactionRepository
-import com.moneymanager.test.database.createTestAppComponentParams
-import com.moneymanager.test.database.createTestDatabaseLocation
-import com.moneymanager.test.database.deleteTestDatabase
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
-import kotlin.test.AfterTest
-import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -28,7 +17,7 @@ import kotlin.test.assertNotNull
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
-class TransactionRepositoryImplTest: DbTest() {
+class TransactionRepositoryImplTest : DbTest() {
     @Test
     fun `createTransfer should insert transaction and transfer`() =
         runTest {

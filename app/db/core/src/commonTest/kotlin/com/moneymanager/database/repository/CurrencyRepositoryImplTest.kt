@@ -3,23 +3,15 @@
 package com.moneymanager.database.repository
 
 import com.moneymanager.database.DatabaseConfig
-import com.moneymanager.database.RepositorySet
-import com.moneymanager.di.AppComponent
-import com.moneymanager.domain.repository.CurrencyRepository
-import com.moneymanager.test.database.createTestAppComponentParams
-import com.moneymanager.test.database.createTestDatabaseLocation
-import com.moneymanager.test.database.deleteTestDatabase
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
-import kotlin.test.AfterTest
-import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-class CurrencyRepositoryImplTest: DbTest() {
+class CurrencyRepositoryImplTest : DbTest() {
     // Number of seeded currencies from DatabaseConfig
     private val seededCurrencyCount = DatabaseConfig.allCurrencies.size
 

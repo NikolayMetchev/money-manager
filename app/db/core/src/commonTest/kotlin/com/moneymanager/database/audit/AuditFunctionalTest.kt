@@ -2,9 +2,6 @@
 
 package com.moneymanager.database.audit
 
-import com.moneymanager.database.MoneyManagerDatabaseWrapper
-import com.moneymanager.database.RepositorySet
-import com.moneymanager.di.AppComponent
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Category
@@ -12,18 +9,9 @@ import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
-import com.moneymanager.domain.repository.AccountRepository
-import com.moneymanager.domain.repository.CategoryRepository
-import com.moneymanager.domain.repository.CurrencyRepository
-import com.moneymanager.domain.repository.TransactionRepository
-import com.moneymanager.test.database.createTestAppComponentParams
-import com.moneymanager.test.database.createTestDatabaseLocation
-import com.moneymanager.test.database.deleteTestDatabase
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
-import kotlin.test.AfterTest
-import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -31,7 +19,7 @@ import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
-class AuditFunctionalTest: DbTest() {
+class AuditFunctionalTest : DbTest() {
     @Test
     fun `account INSERT creates audit record with auditTypeId 1`() =
         runTest {

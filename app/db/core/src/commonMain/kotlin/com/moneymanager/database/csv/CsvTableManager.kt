@@ -22,7 +22,7 @@ class CsvTableManager(private val database: MoneyManagerDatabaseWrapper) {
         val columns = (0 until columnCount).joinToString(", ") { "col_$it TEXT" }
         database.execute(
             null,
-            "CREATE TABLE IF NOT EXISTS $tableName (_row_id INTEGER PRIMARY KEY AUTOINCREMENT, $columns)",
+            "CREATE TABLE IF NOT EXISTS $tableName (row_index INTEGER PRIMARY KEY AUTOINCREMENT, $columns)",
             0,
         )
     }
@@ -78,7 +78,7 @@ class CsvTableManager(private val database: MoneyManagerDatabaseWrapper) {
         offset: Int,
     ): List<CsvRow> {
         val columns = (0 until columnCount).joinToString(", ") { "col_$it" }
-        val sql = "SELECT _row_id, $columns FROM $tableName ORDER BY _row_id LIMIT $limit OFFSET $offset"
+        val sql = "SELECT row_index, $columns FROM $tableName ORDER BY row_index LIMIT $limit OFFSET $offset"
 
         val result = mutableListOf<CsvRow>()
         database.executeQuery(
@@ -86,12 +86,12 @@ class CsvTableManager(private val database: MoneyManagerDatabaseWrapper) {
             sql,
             { cursor ->
                 while (cursor.next().value) {
-                    val rowId = cursor.getLong(0) ?: continue
+                    val rowIndex = cursor.getLong(0) ?: continue
                     val values =
                         (0 until columnCount).map { i ->
                             cursor.getString(i + 1) ?: ""
                         }
-                    result.add(CsvRow(rowId = rowId, values = values))
+                    result.add(CsvRow(rowIndex = rowIndex, values = values))
                 }
                 QueryResult.Unit
             },
