@@ -22,5 +22,13 @@ kotlin {
                 implementation(libs.androidx.activity.compose)
             }
         }
+
+        val androidDeviceTest by getting {
+            dependencies {
+                implementation(kotlin("test"))
+                implementation(libs.androidx.test.core)
+                implementation(libs.androidx.test.runner)
+            }
+        }
     }
 }
