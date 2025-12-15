@@ -195,28 +195,16 @@ class AccountTransactionsScreenTest {
 
             waitForIdle()
 
-            // BEFORE: Viewing Checking account's transactions
-            // The transaction row should show "Savings" (the other account)
-            println("=== BEFORE CLICK ===")
-            onRoot().printToLog("UI_TREE")
-
             // Find all "Savings" text nodes - should be:
             // [0] = Matrix header
             // [1] = Transaction row (the "other" account from Checking's view)
             val savingsNodesBeforeClick = onAllNodesWithText("Savings")
             savingsNodesBeforeClick.assertCountEquals(2)
 
-            // Click the second "Savings" node (the one in the transaction row)
-            println("=== CLICKING SAVINGS IN TRANSACTION ROW ===")
             savingsNodesBeforeClick[1].performClick()
 
             waitForIdle()
             mainClock.advanceTimeBy(200)
-
-            // AFTER: Now viewing Savings account's transactions
-            // The transaction row should now show "Checking" (the other account)
-            println("=== AFTER CLICK ===")
-            onRoot().printToLog("UI_TREE")
 
             // Verify "Savings" only appears once (in matrix header, NOT in transaction row)
             onAllNodesWithText("Savings").assertCountEquals(1)
@@ -225,8 +213,6 @@ class AccountTransactionsScreenTest {
             // [0] = Matrix header
             // [1] = Transaction row (the "other" account from Savings' view)
             onAllNodesWithText("Checking").assertCountEquals(2)
-
-            println("=== TEST PASSED ===")
         }
 
     private class FakeAccountRepository(
