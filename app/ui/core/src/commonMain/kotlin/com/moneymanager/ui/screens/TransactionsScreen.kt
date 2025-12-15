@@ -62,6 +62,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moneymanager.compose.scrollbar.HorizontalScrollbarForScrollState
@@ -99,6 +100,8 @@ import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 private val logger = logging()
+
+private val ACCOUNT_COLUMN_MIN_WIDTH = 100.dp
 
 /**
  * Screen size classification for responsive layouts.
@@ -230,6 +233,25 @@ fun AccountTransactionsScreen(
     // Get all unique currencies from account balances for matrix
     val uniqueCurrencyIds = accountBalances.map { it.balance.currency.id }.distinct()
 
+    // Calculate column widths for each account based on account name and balance amounts
+    val accountColumnWidths: Map<AccountId, Dp> =
+        remember(allAccounts, accountBalances) {
+            allAccounts.associate { account ->
+                // Calculate width needed for account name header
+                val nameWidth = (account.name.length * 8 + 16).dp
+
+                // Calculate max balance width for this account
+                val maxBalanceWidth =
+                    accountBalances
+                        .filter { it.accountId == account.id }
+                        .maxOfOrNull { formatAmount(it.balance).length }
+                        ?.let { (it * 8 + 16).dp }
+                        ?: 0.dp
+
+                account.id to maxOf(nameWidth, maxBalanceWidth, ACCOUNT_COLUMN_MIN_WIDTH)
+            }
+        }
+
     // Hoist scroll states to enable auto-scrolling from transaction clicks
     val horizontalScrollState = rememberScrollState()
     val verticalScrollState = rememberScrollState()
@@ -351,10 +373,11 @@ fun AccountTransactionsScreen(
                                     val isSelectedColumn = selectedAccountId == account.id
                                     val isColumnSelected = isSelectedColumn && selectedCurrencyId == null
                                     val isCellSelected = isSelectedColumn && selectedCurrencyId != null
+                                    val columnWidth = accountColumnWidths[account.id] ?: ACCOUNT_COLUMN_MIN_WIDTH
                                     Box(
                                         modifier =
                                             Modifier
-                                                .width(120.dp)
+                                                .width(columnWidth)
                                                 .background(
                                                     when {
                                                         isColumnSelected -> MaterialTheme.colorScheme.primaryContainer
@@ -451,6 +474,7 @@ fun AccountTransactionsScreen(
                                                     }
                                                 val isSelectedCell = selectedAccountId == account.id && selectedCurrencyId == currencyId
                                                 val isColumnSelected = selectedAccountId == account.id && selectedCurrencyId == null
+                                                val columnWidth = accountColumnWidths[account.id] ?: ACCOUNT_COLUMN_MIN_WIDTH
 
                                                 val backgroundColor =
                                                     when {
@@ -462,7 +486,7 @@ fun AccountTransactionsScreen(
                                                 Box(
                                                     modifier =
                                                         Modifier
-                                                            .width(120.dp)
+                                                            .width(columnWidth)
                                                             .background(backgroundColor)
                                                             .clickable(enabled = balance != null) {
                                                                 selectedAccountId = account.id
@@ -662,21 +686,26 @@ fun AccountTransactionsScreen(
                                     // Auto-scroll matrix to the clicked account and transaction currency
                                     scrollScope.launch {
                                         // Calculate horizontal scroll position for the account
-                                        val accountIndex = allAccounts.indexOfFirst { it.id == accountId }
+                                        val accountIndex = allAccounts.indexOfFirst { it.id == clickedAccountId }
                                         if (accountIndex >= 0) {
                                             // Convert dp to pixels using density
                                             with(density) {
-                                                // Each account column: 120.dp width + 8.dp spacing
-                                                val columnWidthPx = 120.dp.toPx()
                                                 val spacingPx = 8.dp.toPx()
 
                                                 // Calculate viewport width (total width - currency label column - padding)
                                                 val currencyLabelWidthPx = 60.dp.toPx()
                                                 val viewportWidthPx = containerWidthDp.toPx() - currencyLabelWidthPx
 
-                                                // Calculate column position
-                                                val columnStartPx = accountIndex * (columnWidthPx + spacingPx)
-                                                val columnCenterPx = columnStartPx + (columnWidthPx / 2)
+                                                // Calculate column position by summing preceding column widths
+                                                var columnStartPx = 0f
+                                                for (i in 0 until accountIndex) {
+                                                    val acc = allAccounts[i]
+                                                    val colWidth = accountColumnWidths[acc.id] ?: ACCOUNT_COLUMN_MIN_WIDTH
+                                                    columnStartPx += colWidth.toPx() + spacingPx
+                                                }
+                                                val targetAccount = allAccounts[accountIndex]
+                                                val targetColumnWidth = accountColumnWidths[targetAccount.id] ?: ACCOUNT_COLUMN_MIN_WIDTH
+                                                val columnCenterPx = columnStartPx + (targetColumnWidth.toPx() / 2)
 
                                                 // Center the column in the viewport
                                                 val targetScrollX = (columnCenterPx - (viewportWidthPx / 2)).coerceAtLeast(0f).toInt()

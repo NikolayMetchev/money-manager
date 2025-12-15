@@ -129,18 +129,16 @@ fun CategoriesScreen(
     val columnWidths =
         remember(categoryBalances, currenciesWithBalances) {
             currenciesWithBalances.associate { currency ->
-                val maxBalance =
-                    categoryBalances
-                        .filter { it.balance.currency.id == currency.id }
-                        .maxOfOrNull { kotlin.math.abs(it.balance.amount) } ?: 0L
                 val maxMoney =
                     categoryBalances
                         .filter { it.balance.currency.id == currency.id }
                         .maxByOrNull { kotlin.math.abs(it.balance.amount) }?.balance
                 val formattedMax = maxMoney?.let { formatAmount(it) } ?: formatAmount(0.0, currency)
                 // Estimate width: ~8dp per character + 16dp padding
-                val estimatedWidth = (formattedMax.length * 8 + 16).dp
-                currency.id to maxOf(estimatedWidth, BALANCE_COLUMN_WIDTH)
+                val balanceWidth = (formattedMax.length * 8 + 16).dp
+                // Also consider header text width (currency code)
+                val headerWidth = (currency.code.length * 8 + 16).dp
+                currency.id to maxOf(balanceWidth, headerWidth, BALANCE_COLUMN_WIDTH)
             }
         }
 
