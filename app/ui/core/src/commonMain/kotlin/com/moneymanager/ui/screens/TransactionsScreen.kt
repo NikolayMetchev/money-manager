@@ -64,6 +64,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.moneymanager.compose.scrollbar.HorizontalScrollbarForScrollState
+import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
+import com.moneymanager.compose.scrollbar.VerticalScrollbarForScrollState
 import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
@@ -385,114 +388,126 @@ fun AccountTransactionsScreen(
                         Spacer(modifier = Modifier.height(4.dp))
 
                         // Bottom area: Currency labels + Balance grid (vertically scrollable)
-                        Row(modifier = Modifier.weight(1f)) {
-                            // Left column: Currency labels (always visible, scrolls vertically in sync)
-                            Column(
-                                modifier =
-                                    Modifier
-                                        .width(60.dp)
-                                        .verticalScroll(verticalScrollState),
-                                verticalArrangement = Arrangement.spacedBy(4.dp),
-                            ) {
-                                uniqueCurrencyIds.forEach { currencyId ->
-                                    val currency = currencies.find { it.id == currencyId }
-                                    val isCurrencySelected = selectedCurrencyId == currencyId
-                                    Box(
-                                        modifier =
-                                            Modifier
-                                                .width(60.dp)
-                                                .background(
+                        Box(modifier = Modifier.weight(1f)) {
+                            Row(modifier = Modifier.fillMaxSize()) {
+                                // Left column: Currency labels (always visible, scrolls vertically in sync)
+                                Column(
+                                    modifier =
+                                        Modifier
+                                            .width(60.dp)
+                                            .verticalScroll(verticalScrollState),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                                ) {
+                                    uniqueCurrencyIds.forEach { currencyId ->
+                                        val currency = currencies.find { it.id == currencyId }
+                                        val isCurrencySelected = selectedCurrencyId == currencyId
+                                        Box(
+                                            modifier =
+                                                Modifier
+                                                    .width(60.dp)
+                                                    .background(
+                                                        if (isCurrencySelected) {
+                                                            MaterialTheme.colorScheme.secondaryContainer
+                                                        } else {
+                                                            MaterialTheme.colorScheme.surface
+                                                        },
+                                                    )
+                                                    .padding(vertical = 4.dp),
+                                        ) {
+                                            Text(
+                                                text = "${currency?.code ?: "?"}:",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color =
                                                     if (isCurrencySelected) {
-                                                        MaterialTheme.colorScheme.secondaryContainer
+                                                        MaterialTheme.colorScheme.secondary
                                                     } else {
-                                                        MaterialTheme.colorScheme.surface
+                                                        MaterialTheme.colorScheme.onSurfaceVariant
                                                     },
-                                                )
-                                                .padding(vertical = 4.dp),
-                                    ) {
-                                        Text(
-                                            text = "${currency?.code ?: "?"}:",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color =
-                                                if (isCurrencySelected) {
-                                                    MaterialTheme.colorScheme.secondary
-                                                } else {
-                                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                                },
-                                        )
+                                            )
+                                        }
                                     }
                                 }
-                            }
 
-                            // Right side: Balance grid (scrolls both vertically and horizontally)
-                            Column(
-                                modifier =
-                                    Modifier
-                                        .weight(1f)
-                                        .verticalScroll(verticalScrollState)
-                                        .horizontalScroll(horizontalScrollState),
-                                verticalArrangement = Arrangement.spacedBy(4.dp),
-                            ) {
-                                // Row for each currency
-                                uniqueCurrencyIds.forEach { currencyId ->
-                                    Row(
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                    ) {
-                                        // Balance for each account
-                                        allAccounts.forEach { account ->
-                                            val balance =
-                                                accountBalances.find {
-                                                    it.accountId == account.id && it.balance.currency.id == currencyId
-                                                }
-                                            val isSelectedCell = selectedAccountId == account.id && selectedCurrencyId == currencyId
-                                            val isColumnSelected = selectedAccountId == account.id && selectedCurrencyId == null
+                                // Right side: Balance grid (scrolls both vertically and horizontally)
+                                Column(
+                                    modifier =
+                                        Modifier
+                                            .weight(1f)
+                                            .verticalScroll(verticalScrollState)
+                                            .horizontalScroll(horizontalScrollState),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                                ) {
+                                    // Row for each currency
+                                    uniqueCurrencyIds.forEach { currencyId ->
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                        ) {
+                                            // Balance for each account
+                                            allAccounts.forEach { account ->
+                                                val balance =
+                                                    accountBalances.find {
+                                                        it.accountId == account.id && it.balance.currency.id == currencyId
+                                                    }
+                                                val isSelectedCell = selectedAccountId == account.id && selectedCurrencyId == currencyId
+                                                val isColumnSelected = selectedAccountId == account.id && selectedCurrencyId == null
 
-                                            val backgroundColor =
-                                                when {
-                                                    isSelectedCell -> MaterialTheme.colorScheme.primaryContainer
-                                                    isColumnSelected -> MaterialTheme.colorScheme.primaryContainer
-                                                    else -> MaterialTheme.colorScheme.surface
-                                                }
+                                                val backgroundColor =
+                                                    when {
+                                                        isSelectedCell -> MaterialTheme.colorScheme.primaryContainer
+                                                        isColumnSelected -> MaterialTheme.colorScheme.primaryContainer
+                                                        else -> MaterialTheme.colorScheme.surface
+                                                    }
 
-                                            Box(
-                                                modifier =
-                                                    Modifier
-                                                        .width(120.dp)
-                                                        .background(backgroundColor)
-                                                        .clickable(enabled = balance != null) {
-                                                            selectedAccountId = account.id
-                                                            selectedCurrencyId = currencyId
-                                                        }
-                                                        .padding(vertical = 4.dp),
-                                                contentAlignment = Alignment.Center,
-                                            ) {
-                                                if (balance != null) {
-                                                    Text(
-                                                        text = formatAmount(balance.balance),
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        color =
-                                                            if (balance.balance.amount >= 0) {
-                                                                MaterialTheme.colorScheme.primary
-                                                            } else {
-                                                                MaterialTheme.colorScheme.error
-                                                            },
-                                                        maxLines = 1,
-                                                    )
-                                                } else {
-                                                    // Empty cell if account doesn't have this currency
-                                                    Text(
-                                                        text = "-",
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                    )
+                                                Box(
+                                                    modifier =
+                                                        Modifier
+                                                            .width(120.dp)
+                                                            .background(backgroundColor)
+                                                            .clickable(enabled = balance != null) {
+                                                                selectedAccountId = account.id
+                                                                selectedCurrencyId = currencyId
+                                                            }
+                                                            .padding(vertical = 4.dp),
+                                                    contentAlignment = Alignment.Center,
+                                                ) {
+                                                    if (balance != null) {
+                                                        Text(
+                                                            text = formatAmount(balance.balance),
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color =
+                                                                if (balance.balance.amount >= 0) {
+                                                                    MaterialTheme.colorScheme.primary
+                                                                } else {
+                                                                    MaterialTheme.colorScheme.error
+                                                                },
+                                                            maxLines = 1,
+                                                        )
+                                                    } else {
+                                                        // Empty cell if account doesn't have this currency
+                                                        Text(
+                                                            text = "-",
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        )
+                                                    }
                                                 }
                                             }
                                         }
                                     }
                                 }
                             }
+                            VerticalScrollbarForScrollState(
+                                scrollState = verticalScrollState,
+                                modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+                            )
                         }
+
+                        // Horizontal scrollbar for the balance matrix
+                        HorizontalScrollbarForScrollState(
+                            scrollState = horizontalScrollState,
+                            modifier = Modifier.fillMaxWidth().padding(start = 60.dp),
+                        )
                     }
                 }
             }
@@ -617,100 +632,106 @@ fun AccountTransactionsScreen(
                     }
                 }
 
-                LazyColumn(
-                    state = listState,
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    items(
-                        items = filteredRunningBalances,
-                        key = { "${it.transactionId}-${it.accountId}" },
-                    ) { runningBalance ->
-                        AccountTransactionCard(
-                            runningBalance = runningBalance,
-                            accounts = allAccounts,
-                            screenSizeClass = screenSizeClass,
-                            isHighlighted = highlightedTransactionId == runningBalance.transactionId,
-                            onEditClick = { transfer ->
-                                transactionToEdit = transfer
-                            },
-                            onAuditClick = { transferId ->
-                                transactionIdToAudit = transferId
-                            },
-                            onAccountClick = { clickedAccountId ->
-                                highlightedTransactionId = runningBalance.transactionId
-                                selectedCurrencyId = runningBalance.transactionAmount.currency.id
+                Box(modifier = Modifier.fillMaxSize()) {
+                    LazyColumn(
+                        state = listState,
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        items(
+                            items = filteredRunningBalances,
+                            key = { "${it.transactionId}-${it.accountId}" },
+                        ) { runningBalance ->
+                            AccountTransactionCard(
+                                runningBalance = runningBalance,
+                                accounts = allAccounts,
+                                screenSizeClass = screenSizeClass,
+                                isHighlighted = highlightedTransactionId == runningBalance.transactionId,
+                                onEditClick = { transfer ->
+                                    transactionToEdit = transfer
+                                },
+                                onAuditClick = { transferId ->
+                                    transactionIdToAudit = transferId
+                                },
+                                onAccountClick = { clickedAccountId ->
+                                    highlightedTransactionId = runningBalance.transactionId
+                                    selectedCurrencyId = runningBalance.transactionAmount.currency.id
 
-                                // Notify parent to switch to the clicked account
-                                onAccountIdChange(clickedAccountId)
+                                    // Notify parent to switch to the clicked account
+                                    onAccountIdChange(clickedAccountId)
 
-                                // Auto-scroll matrix to the clicked account and transaction currency
-                                scrollScope.launch {
-                                    // Calculate horizontal scroll position for the account
-                                    val accountIndex = allAccounts.indexOfFirst { it.id == accountId }
-                                    if (accountIndex >= 0) {
-                                        // Convert dp to pixels using density
-                                        with(density) {
-                                            // Each account column: 120.dp width + 8.dp spacing
-                                            val columnWidthPx = 120.dp.toPx()
-                                            val spacingPx = 8.dp.toPx()
+                                    // Auto-scroll matrix to the clicked account and transaction currency
+                                    scrollScope.launch {
+                                        // Calculate horizontal scroll position for the account
+                                        val accountIndex = allAccounts.indexOfFirst { it.id == accountId }
+                                        if (accountIndex >= 0) {
+                                            // Convert dp to pixels using density
+                                            with(density) {
+                                                // Each account column: 120.dp width + 8.dp spacing
+                                                val columnWidthPx = 120.dp.toPx()
+                                                val spacingPx = 8.dp.toPx()
 
-                                            // Calculate viewport width (total width - currency label column - padding)
-                                            val currencyLabelWidthPx = 60.dp.toPx()
-                                            val viewportWidthPx = containerWidthDp.toPx() - currencyLabelWidthPx
+                                                // Calculate viewport width (total width - currency label column - padding)
+                                                val currencyLabelWidthPx = 60.dp.toPx()
+                                                val viewportWidthPx = containerWidthDp.toPx() - currencyLabelWidthPx
 
-                                            // Calculate column position
-                                            val columnStartPx = accountIndex * (columnWidthPx + spacingPx)
-                                            val columnCenterPx = columnStartPx + (columnWidthPx / 2)
+                                                // Calculate column position
+                                                val columnStartPx = accountIndex * (columnWidthPx + spacingPx)
+                                                val columnCenterPx = columnStartPx + (columnWidthPx / 2)
 
-                                            // Center the column in the viewport
-                                            val targetScrollX = (columnCenterPx - (viewportWidthPx / 2)).coerceAtLeast(0f).toInt()
+                                                // Center the column in the viewport
+                                                val targetScrollX = (columnCenterPx - (viewportWidthPx / 2)).coerceAtLeast(0f).toInt()
 
-                                            // Calculate vertical scroll position for the currency
-                                            val currencyIndex =
-                                                uniqueCurrencyIds.indexOfFirst {
-                                                    it == runningBalance.transactionAmount.currency.id
+                                                // Calculate vertical scroll position for the currency
+                                                val currencyIndex =
+                                                    uniqueCurrencyIds.indexOfFirst {
+                                                        it == runningBalance.transactionAmount.currency.id
+                                                    }
+                                                if (currencyIndex >= 0) {
+                                                    // Each currency row: text + padding + spacing ≈ 28.dp
+                                                    val rowHeightPx = 28.dp.toPx()
+
+                                                    // Calculate viewport height (30% of container height - account header row - spacing)
+                                                    val matrixHeightPx = containerHeightDp.toPx() * 0.3f
+                                                    val accountHeaderHeightPx = 24.dp.toPx() // Account name header row
+                                                    val viewportHeightPx = matrixHeightPx - accountHeaderHeightPx
+
+                                                    // Calculate row position
+                                                    val rowStartPx = currencyIndex * rowHeightPx
+                                                    val rowCenterPx = rowStartPx + (rowHeightPx / 2)
+
+                                                    // Center the row in the viewport
+                                                    val targetScrollY = (rowCenterPx - (viewportHeightPx / 2)).coerceAtLeast(0f).toInt()
+
+                                                    // Animate both scrolls concurrently
+                                                    launch { horizontalScrollState.animateScrollTo(targetScrollX) }
+                                                    launch { verticalScrollState.animateScrollTo(targetScrollY) }
                                                 }
-                                            if (currencyIndex >= 0) {
-                                                // Each currency row: text + padding + spacing ≈ 28.dp
-                                                val rowHeightPx = 28.dp.toPx()
-
-                                                // Calculate viewport height (30% of container height - account header row - spacing)
-                                                val matrixHeightPx = containerHeightDp.toPx() * 0.3f
-                                                val accountHeaderHeightPx = 24.dp.toPx() // Account name header row
-                                                val viewportHeightPx = matrixHeightPx - accountHeaderHeightPx
-
-                                                // Calculate row position
-                                                val rowStartPx = currencyIndex * rowHeightPx
-                                                val rowCenterPx = rowStartPx + (rowHeightPx / 2)
-
-                                                // Center the row in the viewport
-                                                val targetScrollY = (rowCenterPx - (viewportHeightPx / 2)).coerceAtLeast(0f).toInt()
-
-                                                // Animate both scrolls concurrently
-                                                launch { horizontalScrollState.animateScrollTo(targetScrollX) }
-                                                launch { verticalScrollState.animateScrollTo(targetScrollY) }
                                             }
                                         }
                                     }
-                                }
-                            },
-                        )
-                    }
+                                },
+                            )
+                        }
 
-                    // Loading indicator at bottom
-                    if (isLoadingPage && currentPagingInfo?.hasMore == true) {
-                        item {
-                            Box(
-                                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(24.dp),
-                                    strokeWidth = 2.dp,
-                                )
+                        // Loading indicator at bottom
+                        if (isLoadingPage && currentPagingInfo?.hasMore == true) {
+                            item {
+                                Box(
+                                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(24.dp),
+                                        strokeWidth = 2.dp,
+                                    )
+                                }
                             }
                         }
                     }
+                    VerticalScrollbarForLazyList(
+                        lazyListState = listState,
+                        modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+                    )
                 }
             }
         }
@@ -2331,33 +2352,41 @@ fun TransactionAuditScreen(
 
             HorizontalDivider()
 
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.padding(top = 8.dp),
-            ) {
-                // Show current state at the top if the transaction still exists
-                currentTransfer?.let { transfer ->
-                    item(key = "current") {
-                        // Compare current state with the most recent audit entry
-                        val mostRecentAuditEntry = auditEntries.firstOrNull()
-                        CurrentStateCard(
-                            transfer = transfer,
-                            previousAuditEntry = mostRecentAuditEntry,
+            val auditListState = rememberLazyListState()
+            Box(modifier = Modifier.weight(1f)) {
+                LazyColumn(
+                    state = auditListState,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(top = 8.dp),
+                ) {
+                    // Show current state at the top if the transaction still exists
+                    currentTransfer?.let { transfer ->
+                        item(key = "current") {
+                            // Compare current state with the most recent audit entry
+                            val mostRecentAuditEntry = auditEntries.firstOrNull()
+                            CurrentStateCard(
+                                transfer = transfer,
+                                previousAuditEntry = mostRecentAuditEntry,
+                                accounts = accounts,
+                            )
+                        }
+                    }
+
+                    itemsIndexed(auditEntries, key = { _, entry -> entry.auditId }) { index, entry ->
+                        // Previous entry in chronological order is the next item in the list
+                        // (since list is ordered by timestamp DESC)
+                        val previousEntry = auditEntries.getOrNull(index + 1)
+                        AuditEntryCard(
+                            entry = entry,
+                            previousEntry = previousEntry,
                             accounts = accounts,
                         )
                     }
                 }
-
-                itemsIndexed(auditEntries, key = { _, entry -> entry.auditId }) { index, entry ->
-                    // Previous entry in chronological order is the next item in the list
-                    // (since list is ordered by timestamp DESC)
-                    val previousEntry = auditEntries.getOrNull(index + 1)
-                    AuditEntryCard(
-                        entry = entry,
-                        previousEntry = previousEntry,
-                        accounts = accounts,
-                    )
-                }
+                VerticalScrollbarForLazyList(
+                    lazyListState = auditListState,
+                    modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+                )
             }
         }
     }

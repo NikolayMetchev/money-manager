@@ -1,4 +1,6 @@
-package com.moneymanager.ui.components.csv
+@file:Suppress("FunctionName")
+
+package com.moneymanager.compose.scrollbar
 
 import androidx.compose.foundation.HorizontalScrollbar
 import androidx.compose.foundation.ScrollState
@@ -16,6 +18,17 @@ actual fun VerticalScrollbarForLazyList(
     VerticalScrollbar(
         modifier = modifier,
         adapter = rememberScrollbarAdapter(lazyListState),
+    )
+}
+
+@Composable
+actual fun VerticalScrollbarForScrollState(
+    scrollState: ScrollState,
+    modifier: Modifier,
+) {
+    VerticalScrollbar(
+        modifier = modifier,
+        adapter = rememberScrollbarAdapter(scrollState),
     )
 }
 

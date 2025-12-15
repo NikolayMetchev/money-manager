@@ -5,11 +5,13 @@ package com.moneymanager.ui.screens
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
@@ -50,15 +52,23 @@ fun CurrenciesScreen(currencyRepository: CurrencyRepository) {
                     )
                 }
             } else {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    items(currencies) { currency ->
-                        CurrencyCard(
-                            currency = currency,
-                            currencyRepository = currencyRepository,
-                        )
+                val lazyListState = rememberLazyListState()
+                Box(modifier = Modifier.weight(1f)) {
+                    LazyColumn(
+                        state = lazyListState,
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        items(currencies) { currency ->
+                            CurrencyCard(
+                                currency = currency,
+                                currencyRepository = currencyRepository,
+                            )
+                        }
                     }
+                    VerticalScrollbarForLazyList(
+                        lazyListState = lazyListState,
+                        modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+                    )
                 }
             }
         }

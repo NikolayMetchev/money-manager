@@ -24,6 +24,7 @@ kotlin {
                 implementation(projects.app.model.core)
                 implementation(projects.utils.bigdecimal)
                 implementation(projects.utils.compose.filePicker)
+                implementation(projects.utils.compose.scrollbar)
                 implementation(projects.utils.currency)
                 implementation(projects.utils.parsers.csv)
             }
