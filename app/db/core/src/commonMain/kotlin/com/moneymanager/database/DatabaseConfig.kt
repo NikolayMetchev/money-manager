@@ -186,6 +186,7 @@ object DatabaseConfig {
             val oldColumnList = columns.joinToString(", ") { "OLD.$it" }
 
             // INSERT trigger - stores NEW values with auditTypeId 1
+            // Uses unixepoch('subsec') for millisecond precision (SQLite 3.38.0+)
             execute(
                 null,
                 """
@@ -194,7 +195,7 @@ object DatabaseConfig {
                 FOR EACH ROW
                 BEGIN
                     INSERT INTO $auditTableName (auditTimestamp, auditTypeId, $columnList)
-                    VALUES (strftime('%s', 'now'), 1, $newColumnList);
+                    VALUES (CAST(unixepoch('subsec') * 1000 AS INTEGER), 1, $newColumnList);
                 END
                 """.trimIndent(),
                 0,
@@ -209,7 +210,7 @@ object DatabaseConfig {
                 FOR EACH ROW
                 BEGIN
                     INSERT INTO $auditTableName (auditTimestamp, auditTypeId, $columnList)
-                    VALUES (strftime('%s', 'now'), 2, $oldColumnList);
+                    VALUES (CAST(unixepoch('subsec') * 1000 AS INTEGER), 2, $oldColumnList);
                 END
                 """.trimIndent(),
                 0,
@@ -224,7 +225,7 @@ object DatabaseConfig {
                 FOR EACH ROW
                 BEGIN
                     INSERT INTO $auditTableName (auditTimestamp, auditTypeId, $columnList)
-                    VALUES (strftime('%s', 'now'), 3, $oldColumnList);
+                    VALUES (CAST(unixepoch('subsec') * 1000 AS INTEGER), 3, $oldColumnList);
                 END
                 """.trimIndent(),
                 0,
