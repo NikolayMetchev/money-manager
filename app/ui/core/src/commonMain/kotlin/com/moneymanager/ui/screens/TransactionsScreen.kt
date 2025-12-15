@@ -2662,6 +2662,6 @@ private fun formatTimeDiff(
     newTimestamp: Instant,
 ): String {
     val duration = newTimestamp - oldTimestamp
-    val sign = if (duration.isPositive()) "+" else ""
-    return "$sign${HumanReadable.duration(duration)}"
+    val sign = if (duration.isPositive()) "+" else "-"
+    return "$sign${HumanReadable.duration(duration.absoluteValue)}"
 }
