@@ -10,11 +10,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
@@ -85,21 +87,29 @@ fun AccountsScreen(
                 )
             }
         } else {
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                items(accounts) { account ->
-                    val accountBalances = balances.filter { it.accountId == account.id }
-                    val category = categories.find { it.id == account.categoryId }
-                    AccountCard(
-                        account = account,
-                        category = category,
-                        balances = accountBalances,
-                        currencies = currencies,
-                        accountRepository = accountRepository,
-                        onClick = { onAccountClick(account) },
-                    )
+            val lazyListState = rememberLazyListState()
+            Box(modifier = Modifier.fillMaxSize()) {
+                LazyColumn(
+                    state = lazyListState,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(accounts) { account ->
+                        val accountBalances = balances.filter { it.accountId == account.id }
+                        val category = categories.find { it.id == account.categoryId }
+                        AccountCard(
+                            account = account,
+                            category = category,
+                            balances = accountBalances,
+                            currencies = currencies,
+                            accountRepository = accountRepository,
+                            onClick = { onAccountClick(account) },
+                        )
+                    }
                 }
+                VerticalScrollbarForLazyList(
+                    lazyListState = lazyListState,
+                    modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+                )
             }
         }
     }

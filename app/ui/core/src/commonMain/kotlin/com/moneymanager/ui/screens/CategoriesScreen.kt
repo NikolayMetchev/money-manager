@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -64,6 +65,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CategoryBalance
 import com.moneymanager.domain.model.Currency
@@ -228,104 +230,110 @@ fun CategoriesScreen(
                 Spacer(modifier = Modifier.height(8.dp))
             }
 
-            LazyColumn(
-                state = listState,
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                itemsIndexed(
-                    items = flattenedNodes,
-                    key = { _, node -> node.category.id },
-                ) { index, node ->
-                    val isDragging = node.category.id == draggedCategoryId
-                    val isValidDropTarget =
-                        draggedCategoryId != null &&
-                            node.category.id != draggedCategoryId &&
-                            node.category.id !in draggedDescendants
-                    val isDropTarget = dropTargetId == node.category.id && isValidDropTarget
+            Box(modifier = Modifier.weight(1f)) {
+                LazyColumn(
+                    state = listState,
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    itemsIndexed(
+                        items = flattenedNodes,
+                        key = { _, node -> node.category.id },
+                    ) { index, node ->
+                        val isDragging = node.category.id == draggedCategoryId
+                        val isValidDropTarget =
+                            draggedCategoryId != null &&
+                                node.category.id != draggedCategoryId &&
+                                node.category.id !in draggedDescendants
+                        val isDropTarget = dropTargetId == node.category.id && isValidDropTarget
 
-                    val isUncategorized = node.category.id == Category.UNCATEGORIZED_ID
+                        val isUncategorized = node.category.id == Category.UNCATEGORIZED_ID
 
-                    CategoryTreeItem(
-                        node = node,
-                        balances = balancesByCategoryId[node.category.id] ?: emptyList(),
-                        currenciesWithBalances = currenciesWithBalances,
-                        columnWidths = columnWidths,
-                        balancesScrollState = balancesScrollState,
-                        isExpanded = node.category.id in expandedIds,
-                        onToggleExpand = {
-                            expandedIds =
-                                if (node.category.id in expandedIds) {
-                                    expandedIds - node.category.id
-                                } else {
-                                    expandedIds + node.category.id
-                                }
-                        },
-                        onEditClick = { editingCategory = node.category },
-                        isDraggable = !isUncategorized,
-                        isDragging = isDragging,
-                        isDropTarget = isDropTarget && !isUncategorized,
-                        dragOffset = if (isDragging) dragOffset else Offset.Zero,
-                        onPositionChanged = { top, bottom ->
-                            itemPositions[node.category.id] = top to bottom
-                        },
-                        onDragStart = {
-                            draggedCategoryId = node.category.id
-                            dragOffset = Offset.Zero
-                        },
-                        onDrag = { change ->
-                            dragOffset += change
+                        CategoryTreeItem(
+                            node = node,
+                            balances = balancesByCategoryId[node.category.id] ?: emptyList(),
+                            currenciesWithBalances = currenciesWithBalances,
+                            columnWidths = columnWidths,
+                            balancesScrollState = balancesScrollState,
+                            isExpanded = node.category.id in expandedIds,
+                            onToggleExpand = {
+                                expandedIds =
+                                    if (node.category.id in expandedIds) {
+                                        expandedIds - node.category.id
+                                    } else {
+                                        expandedIds + node.category.id
+                                    }
+                            },
+                            onEditClick = { editingCategory = node.category },
+                            isDraggable = !isUncategorized,
+                            isDragging = isDragging,
+                            isDropTarget = isDropTarget && !isUncategorized,
+                            dragOffset = if (isDragging) dragOffset else Offset.Zero,
+                            onPositionChanged = { top, bottom ->
+                                itemPositions[node.category.id] = top to bottom
+                            },
+                            onDragStart = {
+                                draggedCategoryId = node.category.id
+                                dragOffset = Offset.Zero
+                            },
+                            onDrag = { change ->
+                                dragOffset += change
 
-                            // Determine drop target based on position
-                            val currentY = (itemPositions[node.category.id]?.first ?: 0f) + dragOffset.y
-                            var newDropTarget: Long? = null
+                                // Determine drop target based on position
+                                val currentY = (itemPositions[node.category.id]?.first ?: 0f) + dragOffset.y
+                                var newDropTarget: Long? = null
 
-                            for ((id, positions) in itemPositions) {
-                                if (id != draggedCategoryId && id !in draggedDescendants) {
-                                    val (top, bottom) = positions
-                                    if (currentY >= top && currentY <= bottom) {
-                                        newDropTarget = id
-                                        break
+                                for ((id, positions) in itemPositions) {
+                                    if (id != draggedCategoryId && id !in draggedDescendants) {
+                                        val (top, bottom) = positions
+                                        if (currentY >= top && currentY <= bottom) {
+                                            newDropTarget = id
+                                            break
+                                        }
                                     }
                                 }
-                            }
 
-                            dropTargetId = newDropTarget
-                        },
-                        onDragEnd = {
-                            val draggedId = draggedCategoryId
-                            val targetId = dropTargetId
+                                dropTargetId = newDropTarget
+                            },
+                            onDragEnd = {
+                                val draggedId = draggedCategoryId
+                                val targetId = dropTargetId
 
-                            if (draggedId != null) {
-                                val draggedCategory = categories.find { it.id == draggedId }
-                                if (draggedCategory != null) {
-                                    val newParentId = targetId // null means top-level
-                                    if (draggedCategory.parentId != newParentId) {
-                                        scope.launch {
-                                            try {
-                                                categoryRepository.updateCategory(
-                                                    draggedCategory.copy(parentId = newParentId),
-                                                )
-                                            } catch (e: Exception) {
-                                                logger.error(e) {
-                                                    "Failed to update category hierarchy: ${e.message}"
+                                if (draggedId != null) {
+                                    val draggedCategory = categories.find { it.id == draggedId }
+                                    if (draggedCategory != null) {
+                                        val newParentId = targetId // null means top-level
+                                        if (draggedCategory.parentId != newParentId) {
+                                            scope.launch {
+                                                try {
+                                                    categoryRepository.updateCategory(
+                                                        draggedCategory.copy(parentId = newParentId),
+                                                    )
+                                                } catch (e: Exception) {
+                                                    logger.error(e) {
+                                                        "Failed to update category hierarchy: ${e.message}"
+                                                    }
                                                 }
                                             }
                                         }
                                     }
                                 }
-                            }
 
-                            draggedCategoryId = null
-                            dragOffset = Offset.Zero
-                            dropTargetId = null
-                        },
-                        onDragCancel = {
-                            draggedCategoryId = null
-                            dragOffset = Offset.Zero
-                            dropTargetId = null
-                        },
-                    )
+                                draggedCategoryId = null
+                                dragOffset = Offset.Zero
+                                dropTargetId = null
+                            },
+                            onDragCancel = {
+                                draggedCategoryId = null
+                                dragOffset = Offset.Zero
+                                dropTargetId = null
+                            },
+                        )
+                    }
                 }
+                VerticalScrollbarForLazyList(
+                    lazyListState = listState,
+                    modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+                )
             }
         }
     }
