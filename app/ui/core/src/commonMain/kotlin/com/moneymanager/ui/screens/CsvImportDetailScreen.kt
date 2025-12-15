@@ -18,6 +18,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -29,7 +30,6 @@ import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.repository.CsvImportRepository
 import com.moneymanager.ui.components.csv.CsvPreviewTable
-import com.moneymanager.ui.error.SchemaAwareLaunchedEffect
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.launch
@@ -52,13 +52,15 @@ fun CsvImportDetailScreen(
     var isDeleting by remember { mutableStateOf(false) }
 
     // Load rows when import is available - uses schema-aware scope for error handling
-    SchemaAwareLaunchedEffect(import) {
-        import?.let {
-            isLoading = true
-            // Load all rows - the actual row count is stored in the import metadata
-            rows = csvImportRepository.getImportRows(importId, limit = it.rowCount, offset = 0)
-            isLoading = false
-        }
+    LaunchedEffect(import) {
+        scope.launch {
+            import?.let {
+                isLoading = true
+                // Load all rows - the actual row count is stored in the import metadata
+                rows = csvImportRepository.getImportRows(importId, limit = it.rowCount, offset = 0)
+                isLoading = false
+            }
+        }.join()
     }
 
     Column(

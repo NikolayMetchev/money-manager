@@ -19,7 +19,7 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 
 /**
- * End-to-end test for SchemaAwareLaunchedEffect.
+ * End-to-end test for schema-aware coroutine scope error handling.
  * Tests that when a schema error occurs in a coroutine launched with the schema-aware scope,
  * the error is caught and the DatabaseSchemaErrorDialog is displayed.
  *
@@ -28,7 +28,7 @@ import kotlin.test.Test
  * load the rows.
  */
 @OptIn(ExperimentalTestApi::class)
-class SchemaAwareLaunchedEffectE2ETest {
+class SchemaAwareCoroutineScopeE2ETest {
     private var testDbLocation: DbLocation? = null
 
     @AfterTest
@@ -41,7 +41,7 @@ class SchemaAwareLaunchedEffectE2ETest {
     }
 
     @Test
-    fun schemaAwareLaunchedEffect_showsSchemaErrorDialog_whenCsvTableHasOldSchema() =
+    fun schemaAwareScope_showsSchemaErrorDialog_whenCsvTableHasOldSchema() =
         runComposeUiTest {
             // Given: Copy the test database with old CSV schema to a test location
             testDbLocation = copyDatabaseFromResources("/money_manager_csv_old_schema.db")
@@ -72,7 +72,7 @@ class SchemaAwareLaunchedEffectE2ETest {
             waitUntilExactlyOneExists(hasText("test_import", substring = true), timeoutMillis = 10000)
             onNodeWithText("test_import", substring = true).performClick()
 
-            // Then: SchemaAwareLaunchedEffect should catch the schema error
+            // Then: Schema-aware scope should catch the schema error
             // and DatabaseSchemaErrorDialog should be displayed
             waitUntilExactlyOneExists(hasText("Database Schema Error"), timeoutMillis = 10000)
             onNodeWithText("Database Schema Error").assertIsDisplayed()
@@ -80,7 +80,7 @@ class SchemaAwareLaunchedEffectE2ETest {
         }
 
     @Test
-    fun schemaAwareLaunchedEffect_allowsRecovery_whenCsvTableHasOldSchema() =
+    fun schemaAwareScope_allowsRecovery_whenCsvTableHasOldSchema() =
         runComposeUiTest {
             // Given: Copy the test database with old CSV schema to a test location
             testDbLocation = copyDatabaseFromResources("/money_manager_csv_old_schema.db")
