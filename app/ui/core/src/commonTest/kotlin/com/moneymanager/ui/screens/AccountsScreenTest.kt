@@ -20,6 +20,7 @@ import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
@@ -38,13 +39,15 @@ class AccountsScreenTest {
 
             // When
             setContent {
-                AccountsScreen(
-                    accountRepository = repository,
-                    categoryRepository = FakeCategoryRepository(),
-                    transactionRepository = FakeTransactionRepository(),
-                    currencyRepository = FakeCurrencyRepository(),
-                    onAccountClick = {},
-                )
+                ProvideSchemaAwareScope {
+                    AccountsScreen(
+                        accountRepository = repository,
+                        categoryRepository = FakeCategoryRepository(),
+                        transactionRepository = FakeTransactionRepository(),
+                        currencyRepository = FakeCurrencyRepository(),
+                        onAccountClick = {},
+                    )
+                }
             }
 
             // Then
@@ -74,13 +77,15 @@ class AccountsScreenTest {
 
             // When
             setContent {
-                AccountsScreen(
-                    accountRepository = repository,
-                    categoryRepository = FakeCategoryRepository(),
-                    transactionRepository = FakeTransactionRepository(),
-                    currencyRepository = FakeCurrencyRepository(),
-                    onAccountClick = {},
-                )
+                ProvideSchemaAwareScope {
+                    AccountsScreen(
+                        accountRepository = repository,
+                        categoryRepository = FakeCategoryRepository(),
+                        transactionRepository = FakeTransactionRepository(),
+                        currencyRepository = FakeCurrencyRepository(),
+                        onAccountClick = {},
+                    )
+                }
             }
 
             // Then
@@ -96,13 +101,15 @@ class AccountsScreenTest {
 
             // When
             setContent {
-                AccountsScreen(
-                    accountRepository = repository,
-                    categoryRepository = FakeCategoryRepository(),
-                    transactionRepository = FakeTransactionRepository(),
-                    currencyRepository = FakeCurrencyRepository(),
-                    onAccountClick = {},
-                )
+                ProvideSchemaAwareScope {
+                    AccountsScreen(
+                        accountRepository = repository,
+                        categoryRepository = FakeCategoryRepository(),
+                        transactionRepository = FakeTransactionRepository(),
+                        currencyRepository = FakeCurrencyRepository(),
+                        onAccountClick = {},
+                    )
+                }
             }
 
             // Then
@@ -117,13 +124,15 @@ class AccountsScreenTest {
 
             // When
             setContent {
-                AccountsScreen(
-                    accountRepository = repository,
-                    categoryRepository = FakeCategoryRepository(),
-                    transactionRepository = FakeTransactionRepository(),
-                    currencyRepository = FakeCurrencyRepository(),
-                    onAccountClick = {},
-                )
+                ProvideSchemaAwareScope {
+                    AccountsScreen(
+                        accountRepository = repository,
+                        categoryRepository = FakeCategoryRepository(),
+                        transactionRepository = FakeTransactionRepository(),
+                        currencyRepository = FakeCurrencyRepository(),
+                        onAccountClick = {},
+                    )
+                }
             }
 
             onNodeWithText("+ Add Account").performClick()
@@ -148,13 +157,15 @@ class AccountsScreenTest {
 
             // When
             setContent {
-                AccountsScreen(
-                    accountRepository = repository,
-                    categoryRepository = FakeCategoryRepository(),
-                    transactionRepository = FakeTransactionRepository(),
-                    currencyRepository = FakeCurrencyRepository(),
-                    onAccountClick = {},
-                )
+                ProvideSchemaAwareScope {
+                    AccountsScreen(
+                        accountRepository = repository,
+                        categoryRepository = FakeCategoryRepository(),
+                        transactionRepository = FakeTransactionRepository(),
+                        currencyRepository = FakeCurrencyRepository(),
+                        onAccountClick = {},
+                    )
+                }
             }
 
             // Then
@@ -176,13 +187,15 @@ class AccountsScreenTest {
 
             // When
             setContent {
-                AccountsScreen(
-                    accountRepository = repository,
-                    categoryRepository = FakeCategoryRepository(),
-                    transactionRepository = FakeTransactionRepository(),
-                    currencyRepository = FakeCurrencyRepository(),
-                    onAccountClick = {},
-                )
+                ProvideSchemaAwareScope {
+                    AccountsScreen(
+                        accountRepository = repository,
+                        categoryRepository = FakeCategoryRepository(),
+                        transactionRepository = FakeTransactionRepository(),
+                        currencyRepository = FakeCurrencyRepository(),
+                        onAccountClick = {},
+                    )
+                }
             }
 
             // Click the delete button (trash icon)
@@ -201,13 +214,15 @@ class AccountsScreenTest {
 
             // When
             setContent {
-                AccountsScreen(
-                    accountRepository = repository,
-                    categoryRepository = FakeCategoryRepository(),
-                    transactionRepository = FakeTransactionRepository(),
-                    currencyRepository = FakeCurrencyRepository(),
-                    onAccountClick = {},
-                )
+                ProvideSchemaAwareScope {
+                    AccountsScreen(
+                        accountRepository = repository,
+                        categoryRepository = FakeCategoryRepository(),
+                        transactionRepository = FakeTransactionRepository(),
+                        currencyRepository = FakeCurrencyRepository(),
+                        onAccountClick = {},
+                    )
+                }
             }
 
             // Open dialog
@@ -228,13 +243,15 @@ class AccountsScreenTest {
 
             // When
             setContent {
-                AccountsScreen(
-                    accountRepository = repository,
-                    categoryRepository = FakeCategoryRepository(),
-                    transactionRepository = FakeTransactionRepository(),
-                    currencyRepository = FakeCurrencyRepository(),
-                    onAccountClick = {},
-                )
+                ProvideSchemaAwareScope {
+                    AccountsScreen(
+                        accountRepository = repository,
+                        categoryRepository = FakeCategoryRepository(),
+                        transactionRepository = FakeTransactionRepository(),
+                        currencyRepository = FakeCurrencyRepository(),
+                        onAccountClick = {},
+                    )
+                }
             }
 
             // Open dialog
@@ -263,13 +280,15 @@ class AccountsScreenTest {
 
             // When
             setContent {
-                AccountsScreen(
-                    accountRepository = repository,
-                    categoryRepository = FakeCategoryRepository(),
-                    transactionRepository = FakeTransactionRepository(),
-                    currencyRepository = FakeCurrencyRepository(),
-                    onAccountClick = {},
-                )
+                ProvideSchemaAwareScope {
+                    AccountsScreen(
+                        accountRepository = repository,
+                        categoryRepository = FakeCategoryRepository(),
+                        transactionRepository = FakeTransactionRepository(),
+                        currencyRepository = FakeCurrencyRepository(),
+                        onAccountClick = {},
+                    )
+                }
             }
 
             // Open delete dialog
@@ -310,13 +329,15 @@ class AccountsScreenTest {
 
             // When
             setContent {
-                AccountsScreen(
-                    accountRepository = repository,
-                    categoryRepository = FakeCategoryRepository(),
-                    transactionRepository = FakeTransactionRepository(),
-                    currencyRepository = FakeCurrencyRepository(),
-                    onAccountClick = {},
-                )
+                ProvideSchemaAwareScope {
+                    AccountsScreen(
+                        accountRepository = repository,
+                        categoryRepository = FakeCategoryRepository(),
+                        transactionRepository = FakeTransactionRepository(),
+                        currencyRepository = FakeCurrencyRepository(),
+                        onAccountClick = {},
+                    )
+                }
             }
 
             // Then - all accounts should be visible

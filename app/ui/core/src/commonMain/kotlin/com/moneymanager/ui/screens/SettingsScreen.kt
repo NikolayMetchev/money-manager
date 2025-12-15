@@ -25,7 +25,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,6 +35,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moneymanager.database.RepositorySet
+import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.util.GenerationProgress
 import com.moneymanager.ui.util.generateSampleData
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -102,7 +102,7 @@ fun SettingsScreen(repositorySet: RepositorySet) {
     var generationProgress by remember { mutableStateOf(GenerationProgress()) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var successMessage by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
+    val scope = rememberSchemaAwareCoroutineScope()
 
     // Maintenance state
     var maintenanceState by remember { mutableStateOf(MaintenanceState()) }

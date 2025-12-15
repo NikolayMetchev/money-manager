@@ -31,6 +31,7 @@ import com.moneymanager.domain.repository.AuditRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
@@ -87,19 +88,21 @@ class AccountTransactionsScreenTest {
 
             // When: Viewing from Checking account's perspective
             setContent {
-                var currentAccountId by remember { mutableStateOf(checking.id) }
+                ProvideSchemaAwareScope {
+                    var currentAccountId by remember { mutableStateOf(checking.id) }
 
-                AccountTransactionsScreen(
-                    accountId = currentAccountId,
-                    transactionRepository = transactionRepository,
-                    accountRepository = accountRepository,
-                    categoryRepository = categoryRepository,
-                    currencyRepository = currencyRepository,
-                    auditRepository = auditRepository,
-                    maintenanceService = maintenanceService,
-                    onAccountIdChange = { currentAccountId = it },
-                    onCurrencyIdChange = {},
-                )
+                    AccountTransactionsScreen(
+                        accountId = currentAccountId,
+                        transactionRepository = transactionRepository,
+                        accountRepository = accountRepository,
+                        categoryRepository = categoryRepository,
+                        currencyRepository = currencyRepository,
+                        auditRepository = auditRepository,
+                        maintenanceService = maintenanceService,
+                        onAccountIdChange = { currentAccountId = it },
+                        onCurrencyIdChange = {},
+                    )
+                }
             }
 
             // Then: When viewing Checking's transactions, should show:
@@ -173,19 +176,21 @@ class AccountTransactionsScreenTest {
             val maintenanceService = FakeDatabaseMaintenanceService()
 
             setContent {
-                var currentAccountId by remember { mutableStateOf(checking.id) }
+                ProvideSchemaAwareScope {
+                    var currentAccountId by remember { mutableStateOf(checking.id) }
 
-                AccountTransactionsScreen(
-                    accountId = currentAccountId,
-                    transactionRepository = transactionRepository,
-                    accountRepository = accountRepository,
-                    categoryRepository = categoryRepository,
-                    currencyRepository = currencyRepository,
-                    auditRepository = auditRepository,
-                    maintenanceService = maintenanceService,
-                    onAccountIdChange = { currentAccountId = it },
-                    onCurrencyIdChange = {},
-                )
+                    AccountTransactionsScreen(
+                        accountId = currentAccountId,
+                        transactionRepository = transactionRepository,
+                        accountRepository = accountRepository,
+                        categoryRepository = categoryRepository,
+                        currencyRepository = currencyRepository,
+                        auditRepository = auditRepository,
+                        maintenanceService = maintenanceService,
+                        onAccountIdChange = { currentAccountId = it },
+                        onCurrencyIdChange = {},
+                    )
+                }
             }
 
             waitForIdle()

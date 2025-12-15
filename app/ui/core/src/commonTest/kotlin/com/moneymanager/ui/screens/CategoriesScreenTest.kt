@@ -17,6 +17,7 @@ import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
@@ -38,10 +39,12 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(
-                    categoryRepository = repository,
-                    currencyRepository = fakeCurrencyRepository,
-                )
+                ProvideSchemaAwareScope {
+                    CategoriesScreen(
+                        categoryRepository = repository,
+                        currencyRepository = fakeCurrencyRepository,
+                    )
+                }
             }
 
             // Then
@@ -62,10 +65,12 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(
-                    categoryRepository = repository,
-                    currencyRepository = fakeCurrencyRepository,
-                )
+                ProvideSchemaAwareScope {
+                    CategoriesScreen(
+                        categoryRepository = repository,
+                        currencyRepository = fakeCurrencyRepository,
+                    )
+                }
             }
 
             // Then
@@ -81,10 +86,12 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(
-                    categoryRepository = repository,
-                    currencyRepository = fakeCurrencyRepository,
-                )
+                ProvideSchemaAwareScope {
+                    CategoriesScreen(
+                        categoryRepository = repository,
+                        currencyRepository = fakeCurrencyRepository,
+                    )
+                }
             }
 
             // Then
@@ -104,10 +111,12 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(
-                    categoryRepository = repository,
-                    currencyRepository = fakeCurrencyRepository,
-                )
+                ProvideSchemaAwareScope {
+                    CategoriesScreen(
+                        categoryRepository = repository,
+                        currencyRepository = fakeCurrencyRepository,
+                    )
+                }
             }
 
             // Then
@@ -129,10 +138,12 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(
-                    categoryRepository = repository,
-                    currencyRepository = fakeCurrencyRepository,
-                )
+                ProvideSchemaAwareScope {
+                    CategoriesScreen(
+                        categoryRepository = repository,
+                        currencyRepository = fakeCurrencyRepository,
+                    )
+                }
             }
 
             // Then - child count is shown in brackets after category name
@@ -152,10 +163,12 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(
-                    categoryRepository = repository,
-                    currencyRepository = fakeCurrencyRepository,
-                )
+                ProvideSchemaAwareScope {
+                    CategoriesScreen(
+                        categoryRepository = repository,
+                        currencyRepository = fakeCurrencyRepository,
+                    )
+                }
             }
 
             // Children should not be visible initially
@@ -180,10 +193,12 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(
-                    categoryRepository = repository,
-                    currencyRepository = fakeCurrencyRepository,
-                )
+                ProvideSchemaAwareScope {
+                    CategoriesScreen(
+                        categoryRepository = repository,
+                        currencyRepository = fakeCurrencyRepository,
+                    )
+                }
             }
 
             onNodeWithText("Add Category").performClick()
@@ -202,10 +217,12 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(
-                    categoryRepository = repository,
-                    currencyRepository = fakeCurrencyRepository,
-                )
+                ProvideSchemaAwareScope {
+                    CategoriesScreen(
+                        categoryRepository = repository,
+                        currencyRepository = fakeCurrencyRepository,
+                    )
+                }
             }
 
             // Open dialog
@@ -226,10 +243,12 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(
-                    categoryRepository = repository,
-                    currencyRepository = fakeCurrencyRepository,
-                )
+                ProvideSchemaAwareScope {
+                    CategoriesScreen(
+                        categoryRepository = repository,
+                        currencyRepository = fakeCurrencyRepository,
+                    )
+                }
             }
 
             // Open dialog
@@ -251,10 +270,12 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(
-                    categoryRepository = repository,
-                    currencyRepository = fakeCurrencyRepository,
-                )
+                ProvideSchemaAwareScope {
+                    CategoriesScreen(
+                        categoryRepository = repository,
+                        currencyRepository = fakeCurrencyRepository,
+                    )
+                }
             }
 
             // Open dialog
@@ -286,10 +307,12 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(
-                    categoryRepository = repository,
-                    currencyRepository = fakeCurrencyRepository,
-                )
+                ProvideSchemaAwareScope {
+                    CategoriesScreen(
+                        categoryRepository = repository,
+                        currencyRepository = fakeCurrencyRepository,
+                    )
+                }
             }
 
             // Open dialog
@@ -320,10 +343,12 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(
-                    categoryRepository = repository,
-                    currencyRepository = fakeCurrencyRepository,
-                )
+                ProvideSchemaAwareScope {
+                    CategoriesScreen(
+                        categoryRepository = repository,
+                        currencyRepository = fakeCurrencyRepository,
+                    )
+                }
             }
 
             // Click edit button (there's only one, so use content description "Edit")
@@ -345,10 +370,12 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(
-                    categoryRepository = repository,
-                    currencyRepository = fakeCurrencyRepository,
-                )
+                ProvideSchemaAwareScope {
+                    CategoriesScreen(
+                        categoryRepository = repository,
+                        currencyRepository = fakeCurrencyRepository,
+                    )
+                }
             }
 
             // Click edit button
@@ -378,10 +405,12 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(
-                    categoryRepository = repository,
-                    currencyRepository = fakeCurrencyRepository,
-                )
+                ProvideSchemaAwareScope {
+                    CategoriesScreen(
+                        categoryRepository = repository,
+                        currencyRepository = fakeCurrencyRepository,
+                    )
+                }
             }
 
             // Click edit button
@@ -408,10 +437,12 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(
-                    categoryRepository = repository,
-                    currencyRepository = fakeCurrencyRepository,
-                )
+                ProvideSchemaAwareScope {
+                    CategoriesScreen(
+                        categoryRepository = repository,
+                        currencyRepository = fakeCurrencyRepository,
+                    )
+                }
             }
 
             // Click edit button
@@ -437,10 +468,12 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(
-                    categoryRepository = repository,
-                    currencyRepository = fakeCurrencyRepository,
-                )
+                ProvideSchemaAwareScope {
+                    CategoriesScreen(
+                        categoryRepository = repository,
+                        currencyRepository = fakeCurrencyRepository,
+                    )
+                }
             }
 
             // Click edit button
@@ -462,10 +495,12 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(
-                    categoryRepository = repository,
-                    currencyRepository = fakeCurrencyRepository,
-                )
+                ProvideSchemaAwareScope {
+                    CategoriesScreen(
+                        categoryRepository = repository,
+                        currencyRepository = fakeCurrencyRepository,
+                    )
+                }
             }
 
             // Click edit button
@@ -491,10 +526,12 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(
-                    categoryRepository = repository,
-                    currencyRepository = fakeCurrencyRepository,
-                )
+                ProvideSchemaAwareScope {
+                    CategoriesScreen(
+                        categoryRepository = repository,
+                        currencyRepository = fakeCurrencyRepository,
+                    )
+                }
             }
 
             // Click edit button
@@ -523,10 +560,12 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(
-                    categoryRepository = repository,
-                    currencyRepository = fakeCurrencyRepository,
-                )
+                ProvideSchemaAwareScope {
+                    CategoriesScreen(
+                        categoryRepository = repository,
+                        currencyRepository = fakeCurrencyRepository,
+                    )
+                }
             }
 
             // Click edit button
@@ -562,10 +601,12 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(
-                    categoryRepository = repository,
-                    currencyRepository = fakeCurrencyRepository,
-                )
+                ProvideSchemaAwareScope {
+                    CategoriesScreen(
+                        categoryRepository = repository,
+                        currencyRepository = fakeCurrencyRepository,
+                    )
+                }
             }
 
             // Then - Uncategorized should be displayed but no edit button
@@ -586,10 +627,12 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(
-                    categoryRepository = repository,
-                    currencyRepository = fakeCurrencyRepository,
-                )
+                ProvideSchemaAwareScope {
+                    CategoriesScreen(
+                        categoryRepository = repository,
+                        currencyRepository = fakeCurrencyRepository,
+                    )
+                }
             }
 
             // Then - both displayed, but only one edit button (for Food)
@@ -616,10 +659,12 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(
-                    categoryRepository = repository,
-                    currencyRepository = fakeCurrencyRepository,
-                )
+                ProvideSchemaAwareScope {
+                    CategoriesScreen(
+                        categoryRepository = repository,
+                        currencyRepository = fakeCurrencyRepository,
+                    )
+                }
             }
 
             // Click first edit button (for Food)
@@ -648,10 +693,12 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(
-                    categoryRepository = repository,
-                    currencyRepository = fakeCurrencyRepository,
-                )
+                ProvideSchemaAwareScope {
+                    CategoriesScreen(
+                        categoryRepository = repository,
+                        currencyRepository = fakeCurrencyRepository,
+                    )
+                }
             }
 
             // Click first edit button (for Food - top level)
@@ -677,10 +724,12 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(
-                    categoryRepository = repository,
-                    currencyRepository = fakeCurrencyRepository,
-                )
+                ProvideSchemaAwareScope {
+                    CategoriesScreen(
+                        categoryRepository = repository,
+                        currencyRepository = fakeCurrencyRepository,
+                    )
+                }
             }
 
             // Click second edit button (for Groceries)
@@ -719,10 +768,12 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(
-                    categoryRepository = repository,
-                    currencyRepository = fakeCurrencyRepository,
-                )
+                ProvideSchemaAwareScope {
+                    CategoriesScreen(
+                        categoryRepository = repository,
+                        currencyRepository = fakeCurrencyRepository,
+                    )
+                }
             }
 
             // Open create dialog
@@ -757,10 +808,12 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(
-                    categoryRepository = repository,
-                    currencyRepository = fakeCurrencyRepository,
-                )
+                ProvideSchemaAwareScope {
+                    CategoriesScreen(
+                        categoryRepository = repository,
+                        currencyRepository = fakeCurrencyRepository,
+                    )
+                }
             }
 
             // Then
@@ -784,10 +837,12 @@ class CategoriesScreenTest {
 
             // When
             setContent {
-                CategoriesScreen(
-                    categoryRepository = repository,
-                    currencyRepository = fakeCurrencyRepository,
-                )
+                ProvideSchemaAwareScope {
+                    CategoriesScreen(
+                        categoryRepository = repository,
+                        currencyRepository = fakeCurrencyRepository,
+                    )
+                }
             }
 
             // Initially only top-level visible - child count shown in brackets

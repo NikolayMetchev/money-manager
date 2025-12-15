@@ -25,6 +25,7 @@ import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
+import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.util.formatAmount
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
@@ -228,7 +229,7 @@ fun CreateAccountDialog(
 
     val categories by categoryRepository.getAllCategories()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val scope = rememberCoroutineScope()
+    val scope = rememberSchemaAwareCoroutineScope()
 
     AlertDialog(
         onDismissRequest = { if (!isSaving) onDismiss() },
@@ -372,7 +373,7 @@ fun DeleteAccountDialog(
 ) {
     var isDeleting by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
+    val scope = rememberSchemaAwareCoroutineScope()
 
     AlertDialog(
         onDismissRequest = { if (!isDeleting) onDismiss() },
@@ -463,7 +464,7 @@ fun CreateCategoryDialog(
 
     val categories by categoryRepository.getAllCategories()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val scope = rememberCoroutineScope()
+    val scope = rememberSchemaAwareCoroutineScope()
 
     AlertDialog(
         onDismissRequest = { if (!isSaving) onDismiss() },

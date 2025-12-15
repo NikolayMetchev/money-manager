@@ -24,7 +24,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,6 +35,7 @@ import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.repository.CsvImportRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
+import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -45,7 +45,7 @@ fun CsvImportsScreen(
     csvImportRepository: CsvImportRepository,
     onImportClick: (CsvImportId) -> Unit,
 ) {
-    val scope = rememberCoroutineScope()
+    val scope = rememberSchemaAwareCoroutineScope()
     val imports by csvImportRepository.getAllImports()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
     var isImporting by remember { mutableStateOf(false) }

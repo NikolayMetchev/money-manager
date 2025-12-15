@@ -51,7 +51,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -72,6 +71,7 @@ import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
+import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.util.CategoryNode
 import com.moneymanager.ui.util.buildCategoryForest
 import com.moneymanager.ui.util.flattenCategoryForest
@@ -142,7 +142,7 @@ fun CategoriesScreen(
             }
         }
 
-    val scope = rememberCoroutineScope()
+    val scope = rememberSchemaAwareCoroutineScope()
     val listState = rememberLazyListState()
 
     // Shared horizontal scroll state for header and all rows
@@ -592,7 +592,7 @@ fun CreateCategoryDialogInCategories(
 
     val categories by categoryRepository.getAllCategories()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val scope = rememberCoroutineScope()
+    val scope = rememberSchemaAwareCoroutineScope()
 
     AlertDialog(
         onDismissRequest = { if (!isSaving) onDismiss() },
@@ -748,7 +748,7 @@ fun EditCategoryDialog(
     var isSaving by remember { mutableStateOf(false) }
     var showDeleteConfirmation by remember { mutableStateOf(false) }
 
-    val scope = rememberCoroutineScope()
+    val scope = rememberSchemaAwareCoroutineScope()
 
     // Get descendants to prevent selecting them as parent (would create cycle)
     val forest = remember(categories) { buildCategoryForest(categories) }
@@ -938,7 +938,7 @@ fun DeleteCategoryDialog(
 ) {
     var isDeleting by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
+    val scope = rememberSchemaAwareCoroutineScope()
 
     AlertDialog(
         onDismissRequest = { if (!isDeleting) onDismiss() },

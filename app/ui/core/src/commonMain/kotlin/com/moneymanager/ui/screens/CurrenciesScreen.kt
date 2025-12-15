@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
+import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
 
@@ -141,7 +142,7 @@ fun CreateCurrencyDialog(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
 
-    val scope = rememberCoroutineScope()
+    val scope = rememberSchemaAwareCoroutineScope()
 
     AlertDialog(
         onDismissRequest = { if (!isSaving) onDismiss() },
@@ -235,7 +236,7 @@ fun DeleteCurrencyDialog(
 ) {
     var isDeleting by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
+    val scope = rememberSchemaAwareCoroutineScope()
 
     AlertDialog(
         onDismissRequest = { if (!isDeleting) onDismiss() },
