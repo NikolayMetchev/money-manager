@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -60,8 +59,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -84,6 +85,10 @@ import com.moneymanager.domain.repository.AuditRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.ui.audit.AuditEntryDiff
+import com.moneymanager.ui.audit.FieldChange
+import com.moneymanager.ui.audit.UpdateNewValues
+import com.moneymanager.ui.audit.computeAuditDiff
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.util.formatAmount
@@ -94,6 +99,7 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atTime
 import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
+import nl.jacobras.humanreadable.HumanReadable
 import org.lighthousegames.logging.logging
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -1529,6 +1535,28 @@ fun TransactionEditDialog(
 
     val scope = rememberSchemaAwareCoroutineScope()
 
+    // Check if any field has changed from the original transaction
+    val hasChanges =
+        remember(
+            sourceAccountId,
+            targetAccountId,
+            currencyId,
+            amount,
+            description,
+            selectedDate,
+            selectedHour,
+            selectedMinute,
+        ) {
+            sourceAccountId != transaction.sourceAccountId ||
+                targetAccountId != transaction.targetAccountId ||
+                currencyId != transaction.amount.currency.id ||
+                amount != transaction.amount.toDisplayValue().toString() ||
+                description != transaction.description ||
+                selectedDate != transactionDateTime.date ||
+                selectedHour != transactionDateTime.hour ||
+                selectedMinute != transactionDateTime.minute
+        }
+
     AlertDialog(
         onDismissRequest = { if (!isSaving) onDismiss() },
         title = { Text("Edit Transaction") },
@@ -1877,7 +1905,7 @@ fun TransactionEditDialog(
                         }
                     }
                 },
-                enabled = !isSaving,
+                enabled = !isSaving && hasChanges,
             ) {
                 if (isSaving) {
                     CircularProgressIndicator(
@@ -2325,89 +2353,36 @@ fun TransactionAuditScreen(
                 )
             }
         } else {
-            // Column headers
-            val headerStyle = MaterialTheme.typography.labelSmall
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "Type",
-                    style = headerStyle,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(0.1f),
-                    maxLines = 1,
-                )
-                Text(
-                    text = "Audit Time",
-                    style = headerStyle,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(0.15f),
-                    maxLines = 1,
-                )
-                Text(
-                    text = "From",
-                    style = headerStyle,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(0.15f).padding(horizontal = 8.dp),
-                    maxLines = 1,
-                )
-                Text(
-                    text = "To",
-                    style = headerStyle,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(0.15f).padding(horizontal = 8.dp),
-                    maxLines = 1,
-                )
-                Text(
-                    text = "Description",
-                    style = headerStyle,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(0.3f).padding(horizontal = 8.dp),
-                    maxLines = 1,
-                )
-                Text(
-                    text = "Amount",
-                    style = headerStyle,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(0.15f),
-                    textAlign = TextAlign.End,
-                    maxLines = 1,
-                )
-            }
-
-            HorizontalDivider()
+            // Compute diffs from audit entries
+            // For UPDATE entries: entry stores OLD values, NEW values come from:
+            // - Current transfer (if this is the most recent entry, index 0)
+            // - Next audit entry's values (entries[index-1]) for older updates
+            val auditDiffs =
+                remember(auditEntries, currentTransfer) {
+                    val transfer = currentTransfer
+                    auditEntries.mapIndexed { index, entry ->
+                        val newValuesForUpdate =
+                            when {
+                                entry.auditType != AuditType.UPDATE -> null
+                                index == 0 && transfer != null ->
+                                    UpdateNewValues.fromTransfer(transfer)
+                                index > 0 ->
+                                    UpdateNewValues.fromAuditEntry(auditEntries[index - 1])
+                                else -> null
+                            }
+                        computeAuditDiff(entry, newValuesForUpdate)
+                    }
+                }
 
             val auditListState = rememberLazyListState()
             Box(modifier = Modifier.weight(1f)) {
                 LazyColumn(
                     state = auditListState,
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.padding(top = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    // Show current state at the top if the transaction still exists
-                    currentTransfer?.let { transfer ->
-                        item(key = "current") {
-                            // Compare current state with the most recent audit entry
-                            val mostRecentAuditEntry = auditEntries.firstOrNull()
-                            CurrentStateCard(
-                                transfer = transfer,
-                                previousAuditEntry = mostRecentAuditEntry,
-                                accounts = accounts,
-                            )
-                        }
-                    }
-
-                    itemsIndexed(auditEntries, key = { _, entry -> entry.auditId }) { index, entry ->
-                        // Previous entry in chronological order is the next item in the list
-                        // (since list is ordered by timestamp DESC)
-                        val previousEntry = auditEntries.getOrNull(index + 1)
-                        AuditEntryCard(
-                            entry = entry,
-                            previousEntry = previousEntry,
+                    items(auditDiffs, key = { it.auditId }) { diff ->
+                        AuditDiffCard(
+                            diff = diff,
                             accounts = accounts,
                         )
                     }
@@ -2422,231 +2397,271 @@ fun TransactionAuditScreen(
 }
 
 @Composable
-private fun AuditEntryCard(
-    entry: TransferAuditEntry,
-    previousEntry: TransferAuditEntry?,
+private fun AuditDiffCard(
+    diff: AuditEntryDiff,
     accounts: List<Account>,
 ) {
-    val auditDateTime = entry.auditTimestamp.toLocalDateTime(TimeZone.currentSystemDefault())
+    val auditDateTime = diff.auditTimestamp.toLocalDateTime(TimeZone.currentSystemDefault())
 
-    val sourceAccount = accounts.find { it.id == entry.sourceAccountId }
-    val targetAccount = accounts.find { it.id == entry.targetAccountId }
-
-    val auditTypeColor =
-        when (entry.auditType) {
-            AuditType.INSERT -> MaterialTheme.colorScheme.primary
-            AuditType.UPDATE -> MaterialTheme.colorScheme.tertiary
-            AuditType.DELETE -> MaterialTheme.colorScheme.error
+    val (headerColor, headerText, containerColor) =
+        when (diff.auditType) {
+            AuditType.INSERT ->
+                Triple(
+                    MaterialTheme.colorScheme.primary,
+                    "Created",
+                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+                )
+            AuditType.UPDATE ->
+                Triple(
+                    MaterialTheme.colorScheme.tertiary,
+                    "Updated",
+                    MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f),
+                )
+            AuditType.DELETE ->
+                Triple(
+                    MaterialTheme.colorScheme.error,
+                    "Deleted",
+                    MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
+                )
         }
-
-    val auditTypeLabel =
-        when (entry.auditType) {
-            AuditType.INSERT -> "Created"
-            AuditType.UPDATE -> "Updated"
-            AuditType.DELETE -> "Deleted"
-        }
-
-    // Determine which fields changed (only for non-INSERT entries with a previous entry)
-    val shouldHighlight = entry.auditType != AuditType.INSERT && previousEntry != null
-    val sourceChanged = shouldHighlight && entry.sourceAccountId != previousEntry?.sourceAccountId
-    val targetChanged = shouldHighlight && entry.targetAccountId != previousEntry?.targetAccountId
-    val descriptionChanged = shouldHighlight && entry.description != previousEntry?.description
-    val amountChanged = shouldHighlight && entry.amount != previousEntry?.amount
-
-    val cellStyle = MaterialTheme.typography.bodyMedium
-    val cellAutoSize = TextAutoSize.StepBased(minFontSize = 8.sp, maxFontSize = 14.sp)
-    val highlightColor = MaterialTheme.colorScheme.error
-    val normalColor = MaterialTheme.colorScheme.onSurface
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
     ) {
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            // Type column
-            Text(
-                text = auditTypeLabel,
-                style = cellStyle,
-                color = auditTypeColor,
-                modifier = Modifier.weight(0.1f),
-                maxLines = 1,
-                autoSize = cellAutoSize,
-            )
+            // Header row: Type + Timestamp
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = headerText,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = headerColor,
+                )
+                Text(
+                    text = "${auditDateTime.date} ${auditDateTime.time}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
 
-            // Audit timestamp column
-            Text(
-                text = "${auditDateTime.date}\n${auditDateTime.time}",
-                style = cellStyle,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.weight(0.15f),
-                maxLines = 2,
-                autoSize = cellAutoSize,
-            )
-
-            // From account column
-            Text(
-                text = sourceAccount?.name ?: "#${entry.sourceAccountId.id}",
-                style = cellStyle,
-                color = if (sourceChanged) highlightColor else normalColor,
-                modifier =
-                    Modifier
-                        .weight(0.15f)
-                        .padding(horizontal = 8.dp),
-                maxLines = 1,
-                autoSize = cellAutoSize,
-            )
-
-            // To account column
-            Text(
-                text = targetAccount?.name ?: "#${entry.targetAccountId.id}",
-                style = cellStyle,
-                color = if (targetChanged) highlightColor else normalColor,
-                modifier =
-                    Modifier
-                        .weight(0.15f)
-                        .padding(horizontal = 8.dp),
-                maxLines = 1,
-                autoSize = cellAutoSize,
-            )
-
-            // Description column
-            Text(
-                text = entry.description.ifBlank { "-" },
-                style = cellStyle,
-                color = if (descriptionChanged) highlightColor else normalColor,
-                modifier =
-                    Modifier
-                        .weight(0.3f)
-                        .padding(horizontal = 8.dp),
-                maxLines = 1,
-                autoSize = cellAutoSize,
-            )
-
-            // Amount column
-            Text(
-                text = formatAmount(entry.amount),
-                style = cellStyle,
-                color = if (amountChanged) highlightColor else MaterialTheme.colorScheme.primary,
-                modifier = Modifier.weight(0.15f),
-                textAlign = TextAlign.End,
-                maxLines = 1,
-                autoSize = cellAutoSize,
-            )
+            // Content varies by audit type
+            when (diff.auditType) {
+                AuditType.INSERT -> InsertDiffContent(diff, accounts)
+                AuditType.UPDATE -> UpdateDiffContent(diff, accounts)
+                AuditType.DELETE -> DeleteDiffContent(diff, accounts)
+            }
         }
     }
 }
 
 @Composable
-private fun CurrentStateCard(
-    transfer: Transfer,
-    previousAuditEntry: TransferAuditEntry?,
+private fun InsertDiffContent(
+    diff: AuditEntryDiff,
     accounts: List<Account>,
 ) {
-    val sourceAccount = accounts.find { it.id == transfer.sourceAccountId }
-    val targetAccount = accounts.find { it.id == transfer.targetAccountId }
+    val transactionDateTime = diff.timestamp.value().toLocalDateTime(TimeZone.currentSystemDefault())
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            text = "Created with:",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        FieldValueRow("Date", "${transactionDateTime.date} ${transactionDateTime.time}")
+        FieldValueRow("From", resolveAccountName(diff.sourceAccountId.value(), accounts))
+        FieldValueRow("To", resolveAccountName(diff.targetAccountId.value(), accounts))
+        FieldValueRow("Amount", formatAmount(diff.amount.value()))
+        FieldValueRow("Description", diff.description.value().ifBlank { "(none)" })
+    }
+}
 
-    // Determine which fields changed from the most recent audit entry
-    val shouldHighlight = previousAuditEntry != null
-    val sourceChanged = shouldHighlight && transfer.sourceAccountId != previousAuditEntry?.sourceAccountId
-    val targetChanged = shouldHighlight && transfer.targetAccountId != previousAuditEntry?.targetAccountId
-    val descriptionChanged = shouldHighlight && transfer.description != previousAuditEntry?.description
-    val amountChanged = shouldHighlight && transfer.amount != previousAuditEntry?.amount
+@Composable
+private fun UpdateDiffContent(
+    diff: AuditEntryDiff,
+    accounts: List<Account>,
+) {
+    val hasAnyChanges = diff.hasChanges
 
-    val cellStyle = MaterialTheme.typography.bodyMedium
-    val cellAutoSize = TextAutoSize.StepBased(minFontSize = 8.sp, maxFontSize = 14.sp)
-    val highlightColor = MaterialTheme.colorScheme.error
-    val normalColor = MaterialTheme.colorScheme.onPrimaryContainer
+    if (!hasAnyChanges) {
+        Text(
+            text = "No visible changes recorded",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    } else {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                text = "Changed:",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            val timestampChange = diff.timestamp
+            if (timestampChange is FieldChange.Changed) {
+                val oldDateTime = timestampChange.oldValue.toLocalDateTime(TimeZone.currentSystemDefault())
+                val newDateTime = timestampChange.newValue.toLocalDateTime(TimeZone.currentSystemDefault())
+                val timeDiff = formatTimeDiff(timestampChange.oldValue, timestampChange.newValue)
+                FieldChangeRow(
+                    label = "Date",
+                    oldValue = "${oldDateTime.date} ${oldDateTime.time}",
+                    newValue = "${newDateTime.date} ${newDateTime.time}",
+                    suffix = "($timeDiff)",
+                )
+            }
+            val sourceChange = diff.sourceAccountId
+            if (sourceChange is FieldChange.Changed) {
+                FieldChangeRow(
+                    label = "From",
+                    oldValue = resolveAccountName(sourceChange.oldValue, accounts),
+                    newValue = resolveAccountName(sourceChange.newValue, accounts),
+                )
+            }
+            val targetChange = diff.targetAccountId
+            if (targetChange is FieldChange.Changed) {
+                FieldChangeRow(
+                    label = "To",
+                    oldValue = resolveAccountName(targetChange.oldValue, accounts),
+                    newValue = resolveAccountName(targetChange.newValue, accounts),
+                )
+            }
+            val amountChange = diff.amount
+            if (amountChange is FieldChange.Changed) {
+                val amountDiff = amountChange.newValue - amountChange.oldValue
+                val sign = if (amountDiff.isPositive()) "+" else ""
+                FieldChangeRow(
+                    label = "Amount",
+                    oldValue = formatAmount(amountChange.oldValue),
+                    newValue = formatAmount(amountChange.newValue),
+                    suffix = "($sign${formatAmount(amountDiff)})",
+                )
+            }
+            val descriptionChange = diff.description
+            if (descriptionChange is FieldChange.Changed) {
+                FieldChangeRow(
+                    label = "Description",
+                    oldValue = descriptionChange.oldValue.ifBlank { "(none)" },
+                    newValue = descriptionChange.newValue.ifBlank { "(none)" },
+                )
+            }
+        }
+    }
+}
 
-    Card(
+@Composable
+private fun DeleteDiffContent(
+    diff: AuditEntryDiff,
+    accounts: List<Account>,
+) {
+    val errorColor = MaterialTheme.colorScheme.error
+    val transactionDateTime = diff.timestamp.value().toLocalDateTime(TimeZone.currentSystemDefault())
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            text = "Deleted (final values):",
+            style = MaterialTheme.typography.labelMedium,
+            color = errorColor.copy(alpha = 0.8f),
+        )
+        FieldValueRow("Date", "${transactionDateTime.date} ${transactionDateTime.time}", errorColor)
+        FieldValueRow("From", resolveAccountName(diff.sourceAccountId.value(), accounts), errorColor)
+        FieldValueRow("To", resolveAccountName(diff.targetAccountId.value(), accounts), errorColor)
+        FieldValueRow("Amount", formatAmount(diff.amount.value()), errorColor)
+        FieldValueRow("Description", diff.description.value().ifBlank { "(none)" }, errorColor)
+    }
+}
+
+@Composable
+private fun FieldValueRow(
+    label: String,
+    value: String,
+    valueColor: Color = MaterialTheme.colorScheme.onSurface,
+) {
+    Row(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        colors =
-            CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-            ),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // Type column - shows "Current"
-            Text(
-                text = "Current",
-                style = cellStyle,
-                color = normalColor,
-                modifier = Modifier.weight(0.1f),
-                maxLines = 1,
-                autoSize = cellAutoSize,
-            )
+        Text(
+            text = "$label:",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.width(80.dp),
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = valueColor,
+        )
+    }
+}
 
-            // Audit timestamp column - shows "Now" for current state
-            Text(
-                text = "Now",
-                style = cellStyle,
-                color = normalColor,
-                modifier = Modifier.weight(0.15f),
-                maxLines = 1,
-                autoSize = cellAutoSize,
-            )
+@Composable
+private fun FieldChangeRow(
+    label: String,
+    oldValue: String,
+    newValue: String,
+    suffix: String? = null,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "$label:",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.width(80.dp),
+        )
 
-            // From account column
-            Text(
-                text = sourceAccount?.name ?: "#${transfer.sourceAccountId.id}",
-                style = cellStyle,
-                color = if (sourceChanged) highlightColor else normalColor,
-                modifier =
-                    Modifier
-                        .weight(0.15f)
-                        .padding(horizontal = 8.dp),
-                maxLines = 1,
-                autoSize = cellAutoSize,
-            )
+        // Old value with strikethrough
+        Text(
+            text = oldValue,
+            style =
+                MaterialTheme.typography.bodyMedium.copy(
+                    textDecoration = TextDecoration.LineThrough,
+                ),
+            color = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+        )
 
-            // To account column
-            Text(
-                text = targetAccount?.name ?: "#${transfer.targetAccountId.id}",
-                style = cellStyle,
-                color = if (targetChanged) highlightColor else normalColor,
-                modifier =
-                    Modifier
-                        .weight(0.15f)
-                        .padding(horizontal = 8.dp),
-                maxLines = 1,
-                autoSize = cellAutoSize,
-            )
+        // Arrow
+        Text(
+            text = "\u2192",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
 
-            // Description column
-            Text(
-                text = transfer.description.ifBlank { "-" },
-                style = cellStyle,
-                color = if (descriptionChanged) highlightColor else normalColor,
-                modifier =
-                    Modifier
-                        .weight(0.3f)
-                        .padding(horizontal = 8.dp),
-                maxLines = 1,
-                autoSize = cellAutoSize,
-            )
+        // New value
+        Text(
+            text = newValue,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.primary,
+        )
 
-            // Amount column
+        // Optional suffix (e.g., diff in brackets)
+        if (suffix != null) {
             Text(
-                text = formatAmount(transfer.amount),
-                style = cellStyle,
-                color = if (amountChanged) highlightColor else MaterialTheme.colorScheme.primary,
-                modifier = Modifier.weight(0.15f),
-                textAlign = TextAlign.End,
-                maxLines = 1,
-                autoSize = cellAutoSize,
+                text = suffix,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
+}
+
+private fun resolveAccountName(
+    accountId: AccountId,
+    accounts: List<Account>,
+): String = accounts.find { it.id == accountId }?.name ?: "#${accountId.id}"
+
+private fun formatTimeDiff(
+    oldTimestamp: Instant,
+    newTimestamp: Instant,
+): String {
+    val duration = newTimestamp - oldTimestamp
+    val sign = if (duration.isPositive()) "+" else "-"
+    return "$sign${HumanReadable.duration(duration.absoluteValue)}"
 }
