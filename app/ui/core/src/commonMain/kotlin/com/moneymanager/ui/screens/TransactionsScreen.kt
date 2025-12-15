@@ -99,6 +99,7 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atTime
 import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
+import nl.jacobras.humanreadable.HumanReadable
 import org.lighthousegames.logging.logging
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -2466,12 +2467,14 @@ private fun InsertDiffContent(
     diff: AuditEntryDiff,
     accounts: List<Account>,
 ) {
+    val transactionDateTime = diff.timestamp.value().toLocalDateTime(TimeZone.currentSystemDefault())
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(
             text = "Created with:",
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        FieldValueRow("Date", "${transactionDateTime.date} ${transactionDateTime.time}")
         FieldValueRow("From", resolveAccountName(diff.sourceAccountId.value(), accounts))
         FieldValueRow("To", resolveAccountName(diff.targetAccountId.value(), accounts))
         FieldValueRow("Amount", formatAmount(diff.amount.value()))
@@ -2499,6 +2502,18 @@ private fun UpdateDiffContent(
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            val timestampChange = diff.timestamp
+            if (timestampChange is FieldChange.Changed) {
+                val oldDateTime = timestampChange.oldValue.toLocalDateTime(TimeZone.currentSystemDefault())
+                val newDateTime = timestampChange.newValue.toLocalDateTime(TimeZone.currentSystemDefault())
+                val timeDiff = formatTimeDiff(timestampChange.oldValue, timestampChange.newValue)
+                FieldChangeRow(
+                    label = "Date",
+                    oldValue = "${oldDateTime.date} ${oldDateTime.time}",
+                    newValue = "${newDateTime.date} ${newDateTime.time}",
+                    suffix = "($timeDiff)",
+                )
+            }
             val sourceChange = diff.sourceAccountId
             if (sourceChange is FieldChange.Changed) {
                 FieldChangeRow(
@@ -2517,10 +2532,13 @@ private fun UpdateDiffContent(
             }
             val amountChange = diff.amount
             if (amountChange is FieldChange.Changed) {
+                val amountDiff = amountChange.newValue - amountChange.oldValue
+                val sign = if (amountDiff.isPositive()) "+" else ""
                 FieldChangeRow(
                     label = "Amount",
                     oldValue = formatAmount(amountChange.oldValue),
                     newValue = formatAmount(amountChange.newValue),
+                    suffix = "($sign${formatAmount(amountDiff)})",
                 )
             }
             val descriptionChange = diff.description
@@ -2541,12 +2559,14 @@ private fun DeleteDiffContent(
     accounts: List<Account>,
 ) {
     val errorColor = MaterialTheme.colorScheme.error
+    val transactionDateTime = diff.timestamp.value().toLocalDateTime(TimeZone.currentSystemDefault())
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(
             text = "Deleted (final values):",
             style = MaterialTheme.typography.labelMedium,
             color = errorColor.copy(alpha = 0.8f),
         )
+        FieldValueRow("Date", "${transactionDateTime.date} ${transactionDateTime.time}", errorColor)
         FieldValueRow("From", resolveAccountName(diff.sourceAccountId.value(), accounts), errorColor)
         FieldValueRow("To", resolveAccountName(diff.targetAccountId.value(), accounts), errorColor)
         FieldValueRow("Amount", formatAmount(diff.amount.value()), errorColor)
@@ -2583,6 +2603,7 @@ private fun FieldChangeRow(
     label: String,
     oldValue: String,
     newValue: String,
+    suffix: String? = null,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -2619,6 +2640,15 @@ private fun FieldChangeRow(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.primary,
         )
+
+        // Optional suffix (e.g., diff in brackets)
+        if (suffix != null) {
+            Text(
+                text = suffix,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
@@ -2626,3 +2656,12 @@ private fun resolveAccountName(
     accountId: AccountId,
     accounts: List<Account>,
 ): String = accounts.find { it.id == accountId }?.name ?: "#${accountId.id}"
+
+private fun formatTimeDiff(
+    oldTimestamp: Instant,
+    newTimestamp: Instant,
+): String {
+    val duration = newTimestamp - oldTimestamp
+    val sign = if (duration.isPositive()) "+" else ""
+    return "$sign${HumanReadable.duration(duration)}"
+}
