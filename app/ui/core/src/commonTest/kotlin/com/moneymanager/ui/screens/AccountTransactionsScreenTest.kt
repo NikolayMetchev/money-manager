@@ -9,9 +9,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.onAllNodesWithText
-import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.printToLog
 import androidx.compose.ui.test.runComposeUiTest
 import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.domain.model.Account
