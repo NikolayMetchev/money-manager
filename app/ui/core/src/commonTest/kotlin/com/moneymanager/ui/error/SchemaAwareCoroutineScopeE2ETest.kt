@@ -63,8 +63,8 @@ class SchemaAwareCoroutineScopeE2ETest {
             // Wait for app to load
             waitForIdle()
 
-            // Navigate to CSV imports screen
-            onNodeWithText("CSV").performClick()
+            // Navigate to CSV imports screen (useUnmergedTree for NavigationBarItem)
+            onNodeWithText("CSV", useUnmergedTree = true).performClick()
             waitForIdle()
 
             // Click on the first CSV import to open detail screen
@@ -100,7 +100,7 @@ class SchemaAwareCoroutineScopeE2ETest {
 
             // Wait for app to load and navigate to CSV detail
             waitForIdle()
-            onNodeWithText("CSV").performClick()
+            onNodeWithText("CSV", useUnmergedTree = true).performClick()
             waitForIdle()
             waitUntilExactlyOneExists(hasText("test_import", substring = true), timeoutMillis = 10000)
             onNodeWithText("test_import", substring = true).performClick()
