@@ -56,7 +56,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -82,6 +81,7 @@ import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
+import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.util.formatAmount
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -172,7 +172,7 @@ fun AccountTransactionsScreen(
     var transactionToEdit by remember { mutableStateOf<Transfer?>(null) }
 
     // Coroutine scope for scroll animations and pagination
-    val scrollScope = rememberCoroutineScope()
+    val scrollScope = rememberSchemaAwareCoroutineScope()
 
     // Pagination state
     var runningBalances by remember { mutableStateOf<List<AccountRow>>(emptyList()) }
@@ -957,7 +957,7 @@ fun TransactionEntryDialog(
     var targetAccountExpanded by remember { mutableStateOf(false) }
     var currencyExpanded by remember { mutableStateOf(false) }
 
-    val scope = rememberCoroutineScope()
+    val scope = rememberSchemaAwareCoroutineScope()
 
     AlertDialog(
         onDismissRequest = { if (!isSaving) onDismiss() },
@@ -1477,7 +1477,7 @@ fun TransactionEditDialog(
     var targetAccountExpanded by remember { mutableStateOf(false) }
     var currencyExpanded by remember { mutableStateOf(false) }
 
-    val scope = rememberCoroutineScope()
+    val scope = rememberSchemaAwareCoroutineScope()
 
     AlertDialog(
         onDismissRequest = { if (!isSaving) onDismiss() },
@@ -1962,7 +1962,7 @@ fun CreateAccountDialogInline(
 
     val categories by categoryRepository.getAllCategories()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val scope = rememberCoroutineScope()
+    val scope = rememberSchemaAwareCoroutineScope()
 
     AlertDialog(
         onDismissRequest = { if (!isSaving) onDismiss() },
@@ -2109,7 +2109,7 @@ fun CreateCurrencyDialogInline(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
 
-    val scope = rememberCoroutineScope()
+    val scope = rememberSchemaAwareCoroutineScope()
 
     AlertDialog(
         onDismissRequest = { if (!isSaving) onDismiss() },

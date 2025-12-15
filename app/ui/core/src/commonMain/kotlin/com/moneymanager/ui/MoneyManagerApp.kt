@@ -20,7 +20,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.moneymanager.database.DatabaseManager
@@ -32,7 +31,9 @@ import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.ui.components.DatabaseSchemaErrorDialog
 import com.moneymanager.ui.error.GlobalSchemaErrorState
+import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
+import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.navigation.Screen
 import com.moneymanager.ui.screens.AccountTransactionsScreen
 import com.moneymanager.ui.screens.AccountsScreen
@@ -51,7 +52,20 @@ fun MoneyManagerApp(
     appVersion: AppVersion,
     onLog: (String, Throwable?) -> Unit = { _, _ -> },
 ) {
-    val scope = rememberCoroutineScope()
+    // Provide schema-aware coroutine scope to all child composables
+    ProvideSchemaAwareScope {
+        MoneyManagerAppImpl(databaseManager, appVersion, onLog)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MoneyManagerAppImpl(
+    databaseManager: DatabaseManager,
+    appVersion: AppVersion,
+    onLog: (String, Throwable?) -> Unit,
+) {
+    val scope = rememberSchemaAwareCoroutineScope()
     var databaseState by remember { mutableStateOf<DatabaseState>(DatabaseState.NoDatabaseSelected) }
     var schemaErrorInfo by remember { mutableStateOf<Pair<DbLocation, Throwable>?>(null) }
 

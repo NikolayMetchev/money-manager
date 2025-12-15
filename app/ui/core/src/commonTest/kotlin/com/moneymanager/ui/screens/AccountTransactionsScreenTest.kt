@@ -9,9 +9,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.onAllNodesWithText
-import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.printToLog
 import androidx.compose.ui.test.runComposeUiTest
 import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.domain.model.Account
@@ -31,6 +29,7 @@ import com.moneymanager.domain.repository.AuditRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
@@ -87,19 +86,21 @@ class AccountTransactionsScreenTest {
 
             // When: Viewing from Checking account's perspective
             setContent {
-                var currentAccountId by remember { mutableStateOf(checking.id) }
+                ProvideSchemaAwareScope {
+                    var currentAccountId by remember { mutableStateOf(checking.id) }
 
-                AccountTransactionsScreen(
-                    accountId = currentAccountId,
-                    transactionRepository = transactionRepository,
-                    accountRepository = accountRepository,
-                    categoryRepository = categoryRepository,
-                    currencyRepository = currencyRepository,
-                    auditRepository = auditRepository,
-                    maintenanceService = maintenanceService,
-                    onAccountIdChange = { currentAccountId = it },
-                    onCurrencyIdChange = {},
-                )
+                    AccountTransactionsScreen(
+                        accountId = currentAccountId,
+                        transactionRepository = transactionRepository,
+                        accountRepository = accountRepository,
+                        categoryRepository = categoryRepository,
+                        currencyRepository = currencyRepository,
+                        auditRepository = auditRepository,
+                        maintenanceService = maintenanceService,
+                        onAccountIdChange = { currentAccountId = it },
+                        onCurrencyIdChange = {},
+                    )
+                }
             }
 
             // Then: When viewing Checking's transactions, should show:
@@ -173,27 +174,24 @@ class AccountTransactionsScreenTest {
             val maintenanceService = FakeDatabaseMaintenanceService()
 
             setContent {
-                var currentAccountId by remember { mutableStateOf(checking.id) }
+                ProvideSchemaAwareScope {
+                    var currentAccountId by remember { mutableStateOf(checking.id) }
 
-                AccountTransactionsScreen(
-                    accountId = currentAccountId,
-                    transactionRepository = transactionRepository,
-                    accountRepository = accountRepository,
-                    categoryRepository = categoryRepository,
-                    currencyRepository = currencyRepository,
-                    auditRepository = auditRepository,
-                    maintenanceService = maintenanceService,
-                    onAccountIdChange = { currentAccountId = it },
-                    onCurrencyIdChange = {},
-                )
+                    AccountTransactionsScreen(
+                        accountId = currentAccountId,
+                        transactionRepository = transactionRepository,
+                        accountRepository = accountRepository,
+                        categoryRepository = categoryRepository,
+                        currencyRepository = currencyRepository,
+                        auditRepository = auditRepository,
+                        maintenanceService = maintenanceService,
+                        onAccountIdChange = { currentAccountId = it },
+                        onCurrencyIdChange = {},
+                    )
+                }
             }
 
             waitForIdle()
-
-            // BEFORE: Viewing Checking account's transactions
-            // The transaction row should show "Savings" (the other account)
-            println("=== BEFORE CLICK ===")
-            onRoot().printToLog("UI_TREE")
 
             // Find all "Savings" text nodes - should be:
             // [0] = Matrix header
@@ -201,17 +199,10 @@ class AccountTransactionsScreenTest {
             val savingsNodesBeforeClick = onAllNodesWithText("Savings")
             savingsNodesBeforeClick.assertCountEquals(2)
 
-            // Click the second "Savings" node (the one in the transaction row)
-            println("=== CLICKING SAVINGS IN TRANSACTION ROW ===")
             savingsNodesBeforeClick[1].performClick()
 
             waitForIdle()
             mainClock.advanceTimeBy(200)
-
-            // AFTER: Now viewing Savings account's transactions
-            // The transaction row should now show "Checking" (the other account)
-            println("=== AFTER CLICK ===")
-            onRoot().printToLog("UI_TREE")
 
             // Verify "Savings" only appears once (in matrix header, NOT in transaction row)
             onAllNodesWithText("Savings").assertCountEquals(1)
@@ -220,8 +211,6 @@ class AccountTransactionsScreenTest {
             // [0] = Matrix header
             // [1] = Transaction row (the "other" account from Savings' view)
             onAllNodesWithText("Checking").assertCountEquals(2)
-
-            println("=== TEST PASSED ===")
         }
 
     private class FakeAccountRepository(

@@ -10,6 +10,7 @@ import androidx.compose.ui.test.runComposeUiTest
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlin.test.Test
@@ -54,7 +55,9 @@ class CurrenciesScreenTest {
             val repository = FakeCurrencyRepository(emptyList())
 
             setContent {
-                CurrenciesScreen(currencyRepository = repository)
+                ProvideSchemaAwareScope {
+                    CurrenciesScreen(currencyRepository = repository)
+                }
             }
 
             onNodeWithText("No currencies yet. Add your first currency!").assertIsDisplayed()
@@ -72,7 +75,9 @@ class CurrenciesScreenTest {
             val repository = FakeCurrencyRepository(listOf(testCurrency))
 
             setContent {
-                CurrenciesScreen(currencyRepository = repository)
+                ProvideSchemaAwareScope {
+                    CurrenciesScreen(currencyRepository = repository)
+                }
             }
 
             onNodeWithText("USD").assertIsDisplayed()
@@ -91,7 +96,9 @@ class CurrenciesScreenTest {
             val repository = FakeCurrencyRepository(currencies)
 
             setContent {
-                CurrenciesScreen(currencyRepository = repository)
+                ProvideSchemaAwareScope {
+                    CurrenciesScreen(currencyRepository = repository)
+                }
             }
 
             onNodeWithText("USD").assertIsDisplayed()
@@ -108,7 +115,9 @@ class CurrenciesScreenTest {
             val repository = FakeCurrencyRepository(emptyList())
 
             setContent {
-                CurrenciesScreen(currencyRepository = repository)
+                ProvideSchemaAwareScope {
+                    CurrenciesScreen(currencyRepository = repository)
+                }
             }
 
             onNodeWithText("+").performClick()
@@ -122,7 +131,9 @@ class CurrenciesScreenTest {
             val repository = FakeCurrencyRepository(emptyList())
 
             setContent {
-                CurrenciesScreen(currencyRepository = repository)
+                ProvideSchemaAwareScope {
+                    CurrenciesScreen(currencyRepository = repository)
+                }
             }
 
             onNodeWithText("+").performClick()
