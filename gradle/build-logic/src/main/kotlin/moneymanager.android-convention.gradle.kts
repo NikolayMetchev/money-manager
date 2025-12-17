@@ -67,3 +67,6 @@ ktlint {
 tasks.named("build") {
     dependsOn("compileAndroidDeviceTest")
 }
+
+// Configure build scan integration for Android device tests
+configureAndroidTestBuildScan(listOf("pixel6api34"))

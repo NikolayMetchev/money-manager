@@ -18,6 +18,7 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
 }
 
 dependencies {
+    compileOnly(libs.develocity.gradle.plugin)
     implementation(libs.android.gradle.plugin)
     implementation(libs.compose.gradle.plugin)
     implementation(libs.detekt.gradle.plugin)
