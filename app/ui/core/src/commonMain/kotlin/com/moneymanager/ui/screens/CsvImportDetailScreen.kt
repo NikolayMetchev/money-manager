@@ -26,6 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csv.CsvRow
@@ -53,6 +54,7 @@ fun CsvImportDetailScreen(
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
     transactionRepository: TransactionRepository,
+    maintenanceService: DatabaseMaintenanceService,
     onBack: () -> Unit,
     onDeleted: () -> Unit,
     onTransferClick: ((TransferId) -> Unit)? = null,
@@ -271,6 +273,7 @@ fun CsvImportDetailScreen(
             currencyRepository = currencyRepository,
             transactionRepository = transactionRepository,
             csvImportRepository = csvImportRepository,
+            maintenanceService = maintenanceService,
             onDismiss = { showApplyStrategyDialog = false },
             onImportComplete = { count ->
                 showApplyStrategyDialog = false

@@ -375,6 +375,7 @@ private fun MoneyManagerAppContent(
                             categoryRepository = repositorySet.categoryRepository,
                             currencyRepository = repositorySet.currencyRepository,
                             transactionRepository = repositorySet.transactionRepository,
+                            maintenanceService = repositorySet.maintenanceService,
                             onBack = { currentScreen = Screen.CsvImports },
                             onDeleted = { currentScreen = Screen.CsvImports },
                             onTransferClick = { transferId ->

@@ -41,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.database.csv.CsvTransferMapper
 import com.moneymanager.database.csv.ImportPreparation
 import com.moneymanager.database.csv.StrategyMatcher
@@ -70,6 +71,7 @@ fun ApplyStrategyDialog(
     currencyRepository: CurrencyRepository,
     transactionRepository: TransactionRepository,
     csvImportRepository: CsvImportRepository,
+    maintenanceService: DatabaseMaintenanceService,
     onDismiss: () -> Unit,
     onImportComplete: (Int) -> Unit,
 ) {
@@ -215,6 +217,9 @@ fun ApplyStrategyDialog(
                                     rowTransferMap,
                                 )
                             }
+
+                            // Refresh materialized views so transfers are visible
+                            maintenanceService.refreshMaterializedViews()
 
                             onImportComplete(successCount)
                         } catch (e: Exception) {
