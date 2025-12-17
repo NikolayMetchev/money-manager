@@ -5,11 +5,11 @@ package com.moneymanager.ui.screens
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
-import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
+import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import androidx.compose.ui.test.waitUntilDoesNotExist
 import androidx.compose.ui.test.waitUntilExactlyOneExists
 import com.moneymanager.database.DatabaseManager
@@ -184,14 +184,39 @@ class ImportMonzoCsvE2ETest {
             onNodeWithText("Strategy Name").performTextInput("Monzo")
             waitForIdle()
 
-            // Step 7: Verify the dialog is fully loaded
-            // The dialog has many fields, some may be scrolled off-screen
-            // Just verify that account selection exists (even if not visible without scrolling)
+            // Step 7: Verify column auto-detection selected the correct columns
+            // The ColumnDetector should have selected:
+            // - Date Column: "Date" (not "Transaction ID" which was the bug)
+            // - Amount Column: "Amount"
+            // - Description Column: "Description"
+            // - Target Account Column: "Name"
+
+            // Wait for the dialog to fully load with auto-detected values
+            waitForIdle()
+
+            // Verify the dialog has account/currency dropdowns ready
             waitUntilExactlyOneExists(hasText("Select Account"), timeoutMillis = 10000)
             waitUntilExactlyOneExists(hasText("Select Currency"), timeoutMillis = 10000)
 
+            // Verify the auto-detected column names are shown in the dropdown fields
+            // The Date column dropdown should show "Date" (not "Transaction ID")
+            waitUntilAtLeastOneExists(hasText("Date", substring = false), timeoutMillis = 10000)
+
+            // The Amount column dropdown should show "Amount"
+            waitUntilAtLeastOneExists(hasText("Amount", substring = false), timeoutMillis = 10000)
+
+            // The Description column dropdown should show "Description"
+            waitUntilAtLeastOneExists(hasText("Description", substring = false), timeoutMillis = 10000)
+
+            // The Target Account column dropdown should show "Name"
+            waitUntilAtLeastOneExists(hasText("Name", substring = false), timeoutMillis = 10000)
+
+            // The dropdown sample values help verify the correct column was selected
+            // Date column sample: "24/02/2022" (from "Date" column, not "tx_..." from "Transaction ID")
+            // These may be truncated in supportingText, so just check for part of the date format
+            waitUntilAtLeastOneExists(hasText("24/02/2022", substring = true), timeoutMillis = 10000)
+
             // Cancel the dialog to return to CSV detail screen
-            // The Cancel button should be visible at the bottom
             onNodeWithText("Cancel").performClick()
             waitUntilDoesNotExist(hasText("Create Import Strategy"), timeoutMillis = 10000)
 
@@ -206,28 +231,28 @@ class ImportMonzoCsvE2ETest {
     private fun loadTestCsvContent(): String {
         // Load from test resources - this is a simplified version of the Monzo export
         return """
-Transaction ID,Date,Time,Type,Name,Emoji,Category,Amount,Currency,Local amount,Local currency,Notes and #tags,Address,Receipt,Description,Category split,Money Out,Money In
-tx_0000AGoDcVlolqzYp9Vh0U,24/02/2022,17:44:34,Faster payment,Nikolay Metchev,,Transfers,100.00,GBP,100.00,GBP,Starling,,,Starling,,,100.00
-tx_0000AGoDpgVm98x6eOfP1e,24/02/2022,17:46:57,Faster payment,Crypto.com,,General,-100.00,GBP,-100.00,GBP,BI6055443,,,BI6055443,,-100.00,
-tx_0000AGoEe10UDfpT5CopKD,24/02/2022,17:56:03,Faster payment,Nikolay Metchev,,Transfers,4900.00,GBP,4900.00,GBP,Starling,,,Starling,,,4900.00
-tx_0000AGoEkw4YxluuUw04bS,24/02/2022,17:57:17,Faster payment,Crypto.com,,General,-4900.00,GBP,-4900.00,GBP,BI6055443,,,BI6055443,,-4900.00,
-tx_0000AGodmaf22ZdixcFnPd,24/02/2022,22:37:44,Faster payment,MR NIKOLAY IVANOV METCHEV,,Transfers,10000.00,GBP,10000.00,GBP,Monzo-CYMYP,,,Monzo-CYMYP,,,10000.00
-tx_0000AGpyoTpch7okQWcqXZ,25/02/2022,14:08:05,Faster payment,Nikolay Metchev,,Transfers,-10000.00,GBP,-10000.00,GBP,To Revolut -VQRF-,,,To Revolut -VQRF-,,-10000.00,
-tx_0000AGtj1X3hBdP7h3X9v7,27/02/2022,09:30:00,Monzo-to-Monzo,Emanuele Naykene,,General,6.00,GBP,6.00,GBP,,,,,,,6.00
-tx_0000AGtj71davE1ihTalIQ,27/02/2022,09:31:00,Faster payment,Crypto.com,,General,-6.00,GBP,-6.00,GBP,BI6055443,,,BI6055443,,-6.00,
-tx_0000AGyNavm83XOPHjahtp,01/03/2022,15:23:27,Card payment,Curve,💳,General,0.00,GBP,0.00,GBP,Active card check,,,CRV*Card verification  London        GBR,,0.00,
-tx_0000AGyNeEEXsuJrgdhBgI,01/03/2022,15:24:03,Card payment,Curve,💳,General,-0.75,GBP,-0.75,GBP,,,,CRV*Card verification  London        GBR,,-0.75,
-tx_0000AGyNeIMUXJg9gk8CXp,01/03/2022,15:24:04,Card payment,Curve,💳,General,0.75,GBP,0.75,GBP,,,,CRV*Card verification  London        GBR,,,0.75
-tx_0000AHkf5W1MsrxQiV1uuf,24/03/2022,22:25:36,Faster payment,MR NIKOLAY IVANOV METCHEV,,Transfers,5000.00,GBP,5000.00,GBP,Monzo-NYTPD,,,Monzo-NYTPD,,,5000.00
-tx_0000AHkfBdOsMSkI1RBTaT,24/03/2022,22:26:43,Faster payment,Crypto.com,,General,-5000.00,GBP,-5000.00,GBP,BI6055443,,,BI6055443,,-5000.00,
-tx_0000AHs4HJA8NKwhZFUviL,28/03/2022,12:10:51,Faster payment,Foris DAX MT Limited,,Income,100.00,GBP,100.00,GBP,073a8c24ebeb4f15b9,,,073a8c24ebeb4f15b9,,,100.00
-tx_0000AHsP4YXzxgDDDoWjjd,28/03/2022,16:03:51,Faster payment,Nexo,,Transfers,-100.00,GBP,-100.00,GBP,DKMRNMM95V,,,DKMRNMM95V,,-100.00,
-tx_0000AHtrRgHYMV1ssBbLrF,29/03/2022,08:56:29,Faster payment,Foris DAX MT Limited,,Income,5000.00,GBP,5000.00,GBP,781af9870e44432bb6,,,781af9870e44432bb6,,,5000.00
-tx_0000AHtxZqYAfWMjQ83mio,29/03/2022,10:05:11,Faster payment,Nexo AG,,Income,100.00,GBP,100.00,GBP,NXTwY0nExDjfw,,,NXTwY0nExDjfw,,,100.00
-tx_0000AHtxiueemGDNJ8cWLx,29/03/2022,10:06:49,Faster payment,Nexo,,Transfers,-5000.00,GBP,-5000.00,GBP,DKMRNMM95V,,,DKMRNMM95V,,-5000.00,
-tx_0000AHtypT6bhdtlj0uDC5,29/03/2022,10:19:13,Faster payment,Nexo,,General,-100.00,GBP,-100.00,GBP,DKMRNMM95V,,,DKMRNMM95V,,-100.00,
-tx_0000AHu1WpKt7u8GzS8XJ3,29/03/2022,10:49:27,Faster payment,Foris DAX MT Limited,,Income,7854.23,GBP,7854.23,GBP,b75c2cc252ab473e88,,,b75c2cc252ab473e88,,,7854.23
-        """.trimIndent()
+            Transaction ID,Date,Time,Type,Name,Emoji,Category,Amount,Currency,Local amount,Local currency,Notes and #tags,Address,Receipt,Description,Category split,Money Out,Money In
+            tx_0000AGoDcVlolqzYp9Vh0U,24/02/2022,17:44:34,Faster payment,Nikolay Metchev,,Transfers,100.00,GBP,100.00,GBP,Starling,,,Starling,,,100.00
+            tx_0000AGoDpgVm98x6eOfP1e,24/02/2022,17:46:57,Faster payment,Crypto.com,,General,-100.00,GBP,-100.00,GBP,BI6055443,,,BI6055443,,-100.00,
+            tx_0000AGoEe10UDfpT5CopKD,24/02/2022,17:56:03,Faster payment,Nikolay Metchev,,Transfers,4900.00,GBP,4900.00,GBP,Starling,,,Starling,,,4900.00
+            tx_0000AGoEkw4YxluuUw04bS,24/02/2022,17:57:17,Faster payment,Crypto.com,,General,-4900.00,GBP,-4900.00,GBP,BI6055443,,,BI6055443,,-4900.00,
+            tx_0000AGodmaf22ZdixcFnPd,24/02/2022,22:37:44,Faster payment,MR NIKOLAY IVANOV METCHEV,,Transfers,10000.00,GBP,10000.00,GBP,Monzo-CYMYP,,,Monzo-CYMYP,,,10000.00
+            tx_0000AGpyoTpch7okQWcqXZ,25/02/2022,14:08:05,Faster payment,Nikolay Metchev,,Transfers,-10000.00,GBP,-10000.00,GBP,To Revolut -VQRF-,,,To Revolut -VQRF-,,-10000.00,
+            tx_0000AGtj1X3hBdP7h3X9v7,27/02/2022,09:30:00,Monzo-to-Monzo,Emanuele Naykene,,General,6.00,GBP,6.00,GBP,,,,,,,6.00
+            tx_0000AGtj71davE1ihTalIQ,27/02/2022,09:31:00,Faster payment,Crypto.com,,General,-6.00,GBP,-6.00,GBP,BI6055443,,,BI6055443,,-6.00,
+            tx_0000AGyNavm83XOPHjahtp,01/03/2022,15:23:27,Card payment,Curve,💳,General,0.00,GBP,0.00,GBP,Active card check,,,CRV*Card verification  London        GBR,,0.00,
+            tx_0000AGyNeEEXsuJrgdhBgI,01/03/2022,15:24:03,Card payment,Curve,💳,General,-0.75,GBP,-0.75,GBP,,,,CRV*Card verification  London        GBR,,-0.75,
+            tx_0000AGyNeIMUXJg9gk8CXp,01/03/2022,15:24:04,Card payment,Curve,💳,General,0.75,GBP,0.75,GBP,,,,CRV*Card verification  London        GBR,,,0.75
+            tx_0000AHkf5W1MsrxQiV1uuf,24/03/2022,22:25:36,Faster payment,MR NIKOLAY IVANOV METCHEV,,Transfers,5000.00,GBP,5000.00,GBP,Monzo-NYTPD,,,Monzo-NYTPD,,,5000.00
+            tx_0000AHkfBdOsMSkI1RBTaT,24/03/2022,22:26:43,Faster payment,Crypto.com,,General,-5000.00,GBP,-5000.00,GBP,BI6055443,,,BI6055443,,-5000.00,
+            tx_0000AHs4HJA8NKwhZFUviL,28/03/2022,12:10:51,Faster payment,Foris DAX MT Limited,,Income,100.00,GBP,100.00,GBP,073a8c24ebeb4f15b9,,,073a8c24ebeb4f15b9,,,100.00
+            tx_0000AHsP4YXzxgDDDoWjjd,28/03/2022,16:03:51,Faster payment,Nexo,,Transfers,-100.00,GBP,-100.00,GBP,DKMRNMM95V,,,DKMRNMM95V,,-100.00,
+            tx_0000AHtrRgHYMV1ssBbLrF,29/03/2022,08:56:29,Faster payment,Foris DAX MT Limited,,Income,5000.00,GBP,5000.00,GBP,781af9870e44432bb6,,,781af9870e44432bb6,,,5000.00
+            tx_0000AHtxZqYAfWMjQ83mio,29/03/2022,10:05:11,Faster payment,Nexo AG,,Income,100.00,GBP,100.00,GBP,NXTwY0nExDjfw,,,NXTwY0nExDjfw,,,100.00
+            tx_0000AHtxiueemGDNJ8cWLx,29/03/2022,10:06:49,Faster payment,Nexo,,Transfers,-5000.00,GBP,-5000.00,GBP,DKMRNMM95V,,,DKMRNMM95V,,-5000.00,
+            tx_0000AHtypT6bhdtlj0uDC5,29/03/2022,10:19:13,Faster payment,Nexo,,General,-100.00,GBP,-100.00,GBP,DKMRNMM95V,,,DKMRNMM95V,,-100.00,
+            tx_0000AHu1WpKt7u8GzS8XJ3,29/03/2022,10:49:27,Faster payment,Foris DAX MT Limited,,Income,7854.23,GBP,7854.23,GBP,b75c2cc252ab473e88,,,b75c2cc252ab473e88,,,7854.23
+            """.trimIndent()
     }
 
     /**

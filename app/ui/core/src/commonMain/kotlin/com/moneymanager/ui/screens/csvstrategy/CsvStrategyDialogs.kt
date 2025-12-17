@@ -64,27 +64,105 @@ import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 /**
- * Utility object for auto-detecting likely column mappings based on common naming patterns.
+ * Utility object for auto-detecting likely column mappings based on column names and values.
+ *
+ * Detection strategy (in order of priority):
+ * 1. Exact word match in column name (e.g., "Date" matches "date")
+ * 2. Value-based detection (e.g., column contains date-like values)
+ * 3. Substring match in column name (fallback)
  */
 object ColumnDetector {
-    private val datePatterns = listOf("date", "time", "posted", "transaction", "when", "day")
-    private val amountPatterns = listOf("amount", "value", "sum", "debit", "credit", "money", "price", "cost", "total")
-    private val descriptionPatterns =
+    // Name patterns ordered by specificity
+    private val dateNamePatterns = listOf("date", "time", "posted", "when", "day")
+    private val amountNamePatterns =
+        listOf("amount", "value", "sum", "debit", "credit", "money", "price", "cost", "total")
+    private val descriptionNamePatterns =
         listOf("description", "memo", "narrative", "details", "reference", "particular", "note", "remark")
-    private val payeePatterns =
+    private val payeeNamePatterns =
         listOf("payee", "name", "merchant", "counterparty", "beneficiary", "vendor", "recipient", "payer", "party")
 
-    fun suggestDateColumn(columns: List<CsvColumn>): String? =
-        columns.find { col -> datePatterns.any { col.originalName.contains(it, ignoreCase = true) } }?.originalName
+    // Value patterns for content-based detection
+    private val dateValuePatterns =
+        listOf(
+            // DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY
+            Regex("""\d{1,2}[/\-\.]\d{1,2}[/\-\.]\d{2,4}"""),
+            // YYYY-MM-DD, YYYY/MM/DD
+            Regex("""\d{4}[/\-]\d{1,2}[/\-]\d{1,2}"""),
+            // Month name formats: "24 Feb 2022", "Feb 24, 2022"
+            Regex("""\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{2,4}""", RegexOption.IGNORE_CASE),
+            Regex("""(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{1,2},?\s+\d{2,4}""", RegexOption.IGNORE_CASE),
+        )
 
-    fun suggestAmountColumn(columns: List<CsvColumn>): String? =
-        columns.find { col -> amountPatterns.any { col.originalName.contains(it, ignoreCase = true) } }?.originalName
+    // Amount values: numbers with optional decimal, negative sign, currency symbols
+    private val amountValuePattern = Regex("""^[£$€¥]?-?\d{1,3}(,\d{3})*(\.\d{1,2})?$|^-?\d+(\.\d{1,2})?$""")
 
-    fun suggestDescriptionColumn(columns: List<CsvColumn>): String? =
-        columns.find { col -> descriptionPatterns.any { col.originalName.contains(it, ignoreCase = true) } }?.originalName
+    /**
+     * Checks if a column name matches a pattern as a whole word.
+     */
+    private fun matchesNameAsWord(
+        columnName: String,
+        pattern: String,
+    ): Boolean {
+        val regex = Regex("\\b${Regex.escape(pattern)}\\b", RegexOption.IGNORE_CASE)
+        return regex.containsMatchIn(columnName)
+    }
 
-    fun suggestPayeeColumn(columns: List<CsvColumn>): String? =
-        columns.find { col -> payeePatterns.any { col.originalName.contains(it, ignoreCase = true) } }?.originalName
+    /**
+     * Checks if a value looks like a date.
+     */
+    private fun looksLikeDate(value: String): Boolean = dateValuePatterns.any { it.containsMatchIn(value.trim()) }
+
+    /**
+     * Checks if a value looks like an amount.
+     */
+    private fun looksLikeAmount(value: String): Boolean = amountValuePattern.matches(value.trim())
+
+    /**
+     * Suggests a column based on name patterns and optionally value analysis.
+     */
+    private fun suggestColumn(
+        columns: List<CsvColumn>,
+        namePatterns: List<String>,
+        sampleValues: Map<Int, String>? = null,
+        valueMatcher: ((String) -> Boolean)? = null,
+    ): String? {
+        // First pass: exact word match in column name
+        for (pattern in namePatterns) {
+            val match = columns.find { matchesNameAsWord(it.originalName, pattern) }
+            if (match != null) return match.originalName
+        }
+
+        // Second pass: value-based detection (if sample values provided)
+        if (sampleValues != null && valueMatcher != null) {
+            val match =
+                columns.find { col ->
+                    sampleValues[col.columnIndex]?.let { valueMatcher(it) } == true
+                }
+            if (match != null) return match.originalName
+        }
+
+        // Third pass: substring match in column name (fallback)
+        for (pattern in namePatterns) {
+            val match = columns.find { it.originalName.contains(pattern, ignoreCase = true) }
+            if (match != null) return match.originalName
+        }
+
+        return null
+    }
+
+    fun suggestDateColumn(
+        columns: List<CsvColumn>,
+        sampleValues: Map<Int, String>? = null,
+    ): String? = suggestColumn(columns, dateNamePatterns, sampleValues, ::looksLikeDate)
+
+    fun suggestAmountColumn(
+        columns: List<CsvColumn>,
+        sampleValues: Map<Int, String>? = null,
+    ): String? = suggestColumn(columns, amountNamePatterns, sampleValues, ::looksLikeAmount)
+
+    fun suggestDescriptionColumn(columns: List<CsvColumn>): String? = suggestColumn(columns, descriptionNamePatterns)
+
+    fun suggestPayeeColumn(columns: List<CsvColumn>): String? = suggestColumn(columns, payeeNamePatterns)
 }
 
 /**
@@ -129,16 +207,22 @@ fun CreateCsvStrategyDialog(
     val currencies by currencyRepository.getAllCurrencies()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
 
+    // Build sample values map for value-based detection
+    val sampleValues: Map<Int, String>? =
+        firstRow?.let { row ->
+            csvColumns.associate { col -> col.columnIndex to (row.values.getOrNull(col.columnIndex) ?: "") }
+        }
+
     // Auto-detect columns on first load
-    LaunchedEffect(csvColumns) {
+    LaunchedEffect(csvColumns, firstRow) {
         if (dateColumnName == null) {
-            dateColumnName = ColumnDetector.suggestDateColumn(csvColumns)
+            dateColumnName = ColumnDetector.suggestDateColumn(csvColumns, sampleValues)
         }
         if (descriptionColumnName == null) {
             descriptionColumnName = ColumnDetector.suggestDescriptionColumn(csvColumns)
         }
         if (amountColumnName == null) {
-            amountColumnName = ColumnDetector.suggestAmountColumn(csvColumns)
+            amountColumnName = ColumnDetector.suggestAmountColumn(csvColumns, sampleValues)
         }
         if (targetAccountColumnName == null) {
             targetAccountColumnName = ColumnDetector.suggestPayeeColumn(csvColumns)
