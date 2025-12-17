@@ -61,6 +61,7 @@ class MoneyManagerDatabaseWrapper(private val driver: SqlDriver) : MoneyManagerD
             "sqlite_sequence",
             "CsvImportMetadata",
             "CsvColumnMetadata",
+            "CsvImportStrategy",
         )
 
     /**

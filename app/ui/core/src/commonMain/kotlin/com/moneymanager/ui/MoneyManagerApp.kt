@@ -43,6 +43,7 @@ import com.moneymanager.ui.screens.CsvImportsScreen
 import com.moneymanager.ui.screens.CurrenciesScreen
 import com.moneymanager.ui.screens.SettingsScreen
 import com.moneymanager.ui.screens.TransactionEntryDialog
+import com.moneymanager.ui.screens.csvstrategy.CsvStrategiesScreen
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -189,6 +190,7 @@ private fun MoneyManagerAppContent(
     appVersion: AppVersion,
     databaseLocation: DbLocation,
 ) {
+    val scope = rememberSchemaAwareCoroutineScope()
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Accounts) }
     var showTransactionDialog by remember { mutableStateOf(false) }
     var preSelectedAccountId by remember { mutableStateOf<AccountId?>(null) }
@@ -265,14 +267,21 @@ private fun MoneyManagerAppContent(
                 }
             },
             floatingActionButton = {
-                FloatingActionButton(
-                    onClick = {
-                        preSelectedAccountId = currentlyViewedAccountId
-                        preSelectedCurrencyId = currentlyViewedCurrencyId
-                        showTransactionDialog = true
-                    },
-                ) {
-                    Text("+", style = MaterialTheme.typography.headlineLarge)
+                // Only show transaction FAB on screens where it makes sense
+                val showTransactionFab =
+                    currentScreen is Screen.Accounts ||
+                        currentScreen is Screen.AccountTransactions ||
+                        currentScreen is Screen.Categories
+                if (showTransactionFab) {
+                    FloatingActionButton(
+                        onClick = {
+                            preSelectedAccountId = currentlyViewedAccountId
+                            preSelectedCurrencyId = currentlyViewedCurrencyId
+                            showTransactionDialog = true
+                        },
+                    ) {
+                        Text("+", style = MaterialTheme.typography.headlineLarge)
+                    }
                 }
             },
         ) { paddingValues ->
@@ -352,14 +361,52 @@ private fun MoneyManagerAppContent(
                             onImportClick = { importId ->
                                 currentScreen = Screen.CsvImportDetail(importId)
                             },
+                            onStrategiesClick = {
+                                currentScreen = Screen.CsvStrategies
+                            },
                         )
                     }
                     is Screen.CsvImportDetail -> {
                         CsvImportDetailScreen(
                             importId = screen.importId,
                             csvImportRepository = repositorySet.csvImportRepository,
+                            csvImportStrategyRepository = repositorySet.csvImportStrategyRepository,
+                            accountRepository = repositorySet.accountRepository,
+                            currencyRepository = repositorySet.currencyRepository,
+                            transactionRepository = repositorySet.transactionRepository,
                             onBack = { currentScreen = Screen.CsvImports },
                             onDeleted = { currentScreen = Screen.CsvImports },
+                            onTransferClick = { transferId ->
+                                scope.launch {
+                                    repositorySet.transactionRepository
+                                        .getTransactionById(transferId.id)
+                                        .collect { transfer ->
+                                            transfer?.let {
+                                                val account =
+                                                    accounts.find { a ->
+                                                        a.id == transfer.sourceAccountId
+                                                    }
+                                                if (account != null) {
+                                                    currentScreen =
+                                                        Screen.AccountTransactions(
+                                                            accountId = account.id,
+                                                            accountName = account.name,
+                                                        )
+                                                }
+                                            }
+                                        }
+                                }
+                            },
+                        )
+                    }
+                    is Screen.CsvStrategies -> {
+                        LaunchedEffect(Unit) {
+                            currentlyViewedAccountId = null
+                            currentlyViewedCurrencyId = null
+                        }
+                        CsvStrategiesScreen(
+                            csvImportStrategyRepository = repositorySet.csvImportStrategyRepository,
+                            onBack = { currentScreen = Screen.CsvImports },
                         )
                     }
                 }

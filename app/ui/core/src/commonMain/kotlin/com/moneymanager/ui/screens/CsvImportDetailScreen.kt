@@ -26,12 +26,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csv.CsvRow
+import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.CsvImportRepository
+import com.moneymanager.domain.repository.CsvImportStrategyRepository
+import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.ui.components.csv.CsvPreviewTable
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.ui.screens.csv.ApplyStrategyDialog
+import com.moneymanager.ui.screens.csvstrategy.CreateCsvStrategyDialog
 import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -40,8 +47,13 @@ import kotlinx.datetime.toLocalDateTime
 fun CsvImportDetailScreen(
     importId: CsvImportId,
     csvImportRepository: CsvImportRepository,
+    csvImportStrategyRepository: CsvImportStrategyRepository,
+    accountRepository: AccountRepository,
+    currencyRepository: CurrencyRepository,
+    transactionRepository: TransactionRepository,
     onBack: () -> Unit,
     onDeleted: () -> Unit,
+    onTransferClick: ((TransferId) -> Unit)? = null,
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
     val import by csvImportRepository.getImport(importId)
@@ -49,7 +61,10 @@ fun CsvImportDetailScreen(
     var rows by remember { mutableStateOf<List<CsvRow>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showApplyStrategyDialog by remember { mutableStateOf(false) }
+    var showCreateStrategyDialog by remember { mutableStateOf(false) }
     var isDeleting by remember { mutableStateOf(false) }
+    var importResultMessage by remember { mutableStateOf<String?>(null) }
 
     // Load rows when import is available - uses schema-aware scope for error handling
     LaunchedEffect(import) {
@@ -78,15 +93,47 @@ fun CsvImportDetailScreen(
             TextButton(onClick = onBack) {
                 Text("< Back")
             }
-            TextButton(
-                onClick = { showDeleteDialog = true },
-                enabled = !isDeleting,
-            ) {
-                Text(
-                    text = "Delete",
-                    color = MaterialTheme.colorScheme.error,
-                )
+            Row {
+                TextButton(
+                    onClick = { showCreateStrategyDialog = true },
+                    enabled = !isDeleting && import != null,
+                ) {
+                    Text(
+                        text = "Create Strategy",
+                        color = MaterialTheme.colorScheme.secondary,
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                TextButton(
+                    onClick = { showApplyStrategyDialog = true },
+                    enabled = !isDeleting && import != null && rows.isNotEmpty(),
+                ) {
+                    Text(
+                        text = "Apply Strategy",
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                TextButton(
+                    onClick = { showDeleteDialog = true },
+                    enabled = !isDeleting,
+                ) {
+                    Text(
+                        text = "Delete",
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
             }
+        }
+
+        // Show import result message
+        importResultMessage?.let { message ->
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
         }
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -171,6 +218,7 @@ fun CsvImportDetailScreen(
                         columns = currentImport.columns,
                         rows = rows,
                         modifier = Modifier.fillMaxSize(),
+                        onTransferClick = onTransferClick,
                     )
                 }
             }
@@ -208,6 +256,36 @@ fun CsvImportDetailScreen(
                     Text("Cancel")
                 }
             },
+        )
+    }
+
+    // Apply Strategy dialog
+    if (showApplyStrategyDialog && import != null) {
+        ApplyStrategyDialog(
+            csvImport = import!!,
+            rows = rows,
+            csvImportStrategyRepository = csvImportStrategyRepository,
+            accountRepository = accountRepository,
+            currencyRepository = currencyRepository,
+            transactionRepository = transactionRepository,
+            csvImportRepository = csvImportRepository,
+            onDismiss = { showApplyStrategyDialog = false },
+            onImportComplete = { count ->
+                showApplyStrategyDialog = false
+                importResultMessage = "Successfully imported $count transfers"
+            },
+        )
+    }
+
+    // Create Strategy dialog
+    if (showCreateStrategyDialog && import != null) {
+        CreateCsvStrategyDialog(
+            csvImportStrategyRepository = csvImportStrategyRepository,
+            accountRepository = accountRepository,
+            currencyRepository = currencyRepository,
+            csvColumns = import!!.columns,
+            firstRow = rows.firstOrNull(),
+            onDismiss = { showCreateStrategyDialog = false },
         )
     }
 }

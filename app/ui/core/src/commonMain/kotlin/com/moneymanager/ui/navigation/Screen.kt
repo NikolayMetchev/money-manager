@@ -14,6 +14,8 @@ sealed class Screen(val route: String, val title: String) {
 
     data object CsvImports : Screen("csv-imports", "CSV Imports")
 
+    data object CsvStrategies : Screen("csv-strategies", "Import Strategies")
+
     data object Settings : Screen("settings", "Settings")
 
     data class AccountTransactions(val accountId: AccountId, val accountName: String) :

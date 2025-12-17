@@ -2,6 +2,7 @@ package com.moneymanager.ui.components.csv
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,13 +21,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.scrollbar.HorizontalScrollbarForScrollState
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
+import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
+
+private val TRANSFER_COLUMN_WIDTH = 100.dp
 
 @Composable
 fun CsvPreviewTable(
@@ -34,6 +39,7 @@ fun CsvPreviewTable(
     rows: List<CsvRow>,
     modifier: Modifier = Modifier,
     columnWidth: Dp = 150.dp,
+    onTransferClick: ((TransferId) -> Unit)? = null,
 ) {
     val horizontalScrollState = rememberScrollState()
     val lazyListState = rememberLazyListState()
@@ -47,6 +53,27 @@ fun CsvPreviewTable(
                     .horizontalScroll(horizontalScrollState)
                     .background(MaterialTheme.colorScheme.surfaceVariant),
         ) {
+            // Transfer ID column header
+            Box(
+                modifier =
+                    Modifier
+                        .width(TRANSFER_COLUMN_WIDTH)
+                        .border(
+                            width = 1.dp,
+                            color = MaterialTheme.colorScheme.outline,
+                        )
+                        .padding(8.dp),
+            ) {
+                Text(
+                    text = "Transfer",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+
+            // CSV columns
             columns.sortedBy { it.columnIndex }.forEach { column ->
                 Box(
                     modifier =
@@ -79,6 +106,13 @@ fun CsvPreviewTable(
                                 .fillMaxWidth()
                                 .horizontalScroll(horizontalScrollState),
                     ) {
+                        // Transfer ID cell
+                        TransferIdCell(
+                            transferId = row.transferId,
+                            onClick = onTransferClick,
+                        )
+
+                        // CSV data cells
                         row.values.forEachIndexed { index, value ->
                             if (index < columns.size) {
                                 Box(
@@ -115,5 +149,40 @@ fun CsvPreviewTable(
             scrollState = horizontalScrollState,
             modifier = Modifier.fillMaxWidth(),
         )
+    }
+}
+
+@Composable
+private fun TransferIdCell(
+    transferId: TransferId?,
+    onClick: ((TransferId) -> Unit)?,
+) {
+    Box(
+        modifier =
+            Modifier
+                .width(TRANSFER_COLUMN_WIDTH)
+                .border(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                )
+                .then(
+                    if (transferId != null && onClick != null) {
+                        Modifier.clickable { onClick(transferId) }
+                    } else {
+                        Modifier
+                    },
+                )
+                .padding(8.dp),
+    ) {
+        if (transferId != null) {
+            Text(
+                text = "View →",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+                textDecoration = if (onClick != null) TextDecoration.Underline else TextDecoration.None,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }

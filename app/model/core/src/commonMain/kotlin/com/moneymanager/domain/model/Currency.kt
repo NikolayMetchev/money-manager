@@ -2,6 +2,8 @@
 
 package com.moneymanager.domain.model
 
+import kotlinx.serialization.Contextual
+import kotlinx.serialization.Serializable
 import kotlin.uuid.Uuid
 
 /**
@@ -23,7 +25,10 @@ data class Currency(
     val scaleFactor: Long = 100,
 )
 
+@Serializable
 @JvmInline
-value class CurrencyId(val id: Uuid) {
+value class CurrencyId(
+    @Contextual val id: Uuid,
+) {
     override fun toString() = id.toString()
 }
