@@ -35,12 +35,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuAnchorType
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -90,6 +85,7 @@ import com.moneymanager.ui.audit.FieldChange
 import com.moneymanager.ui.audit.UpdateNewValues
 import com.moneymanager.ui.audit.computeAuditDiff
 import com.moneymanager.ui.components.AccountPicker
+import com.moneymanager.ui.components.CurrencyPicker
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.util.formatAmount
@@ -984,10 +980,6 @@ fun TransactionEntryDialog(
     preSelectedCurrencyId: CurrencyId? = null,
     onDismiss: () -> Unit,
 ) {
-    // Collect currencies from Flow so newly created items appear immediately
-    val currencies by currencyRepository.getAllCurrencies()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-
     var sourceAccountId by remember { mutableStateOf(preSelectedSourceAccountId) }
     var targetAccountId by remember { mutableStateOf<AccountId?>(null) }
     var currencyId by remember { mutableStateOf<CurrencyId?>(preSelectedCurrencyId) }
@@ -1003,9 +995,6 @@ fun TransactionEntryDialog(
     var selectedMinute by remember { mutableStateOf(now.minute) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
-
-    var showCreateCurrencyDialog by remember { mutableStateOf(false) }
-    var currencyExpanded by remember { mutableStateOf(false) }
 
     val scope = rememberSchemaAwareCoroutineScope()
 
@@ -1043,71 +1032,14 @@ fun TransactionEntryDialog(
                     excludeAccountId = sourceAccountId,
                 )
 
-                // Currency Dropdown with search
-                var currencySearchQuery by remember { mutableStateOf("") }
-                val filteredCurrencies =
-                    remember(currencies, currencySearchQuery) {
-                        if (currencySearchQuery.isBlank()) {
-                            currencies
-                        } else {
-                            currencies.filter { currency ->
-                                currency.code.contains(currencySearchQuery, ignoreCase = true) ||
-                                    currency.name.contains(currencySearchQuery, ignoreCase = true)
-                            }
-                        }
-                    }
-
-                ExposedDropdownMenuBox(
-                    expanded = currencyExpanded,
-                    onExpandedChange = { currencyExpanded = it },
-                ) {
-                    OutlinedTextField(
-                        value =
-                            if (currencyExpanded) {
-                                currencySearchQuery
-                            } else {
-                                currencies.find { it.id == currencyId }?.let { "${it.code} - ${it.name}" } ?: ""
-                            },
-                        onValueChange = { currencySearchQuery = it },
-                        label = { Text("Currency") },
-                        placeholder = { Text("Type to search...") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = currencyExpanded) },
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable),
-                        enabled = !isSaving,
-                        singleLine = true,
-                    )
-                    ExposedDropdownMenu(
-                        expanded = currencyExpanded,
-                        onDismissRequest = {
-                            currencyExpanded = false
-                            currencySearchQuery = ""
-                        },
-                    ) {
-                        filteredCurrencies.forEach { currency ->
-                            DropdownMenuItem(
-                                text = { Text("${currency.code} - ${currency.name}") },
-                                onClick = {
-                                    currencyId = currency.id
-                                    currencyExpanded = false
-                                    currencySearchQuery = ""
-                                },
-                            )
-                        }
-                        // Always show "Create New Currency" option
-                        HorizontalDivider()
-                        DropdownMenuItem(
-                            text = { Text("+ Create New Currency") },
-                            onClick = {
-                                showCreateCurrencyDialog = true
-                                currencyExpanded = false
-                                currencySearchQuery = ""
-                            },
-                        )
-                    }
-                }
+                // Currency Picker
+                CurrencyPicker(
+                    selectedCurrencyId = currencyId,
+                    onCurrencySelected = { currencyId = it },
+                    label = "Currency",
+                    currencyRepository = currencyRepository,
+                    enabled = !isSaving,
+                )
 
                 // Date and Time Pickers
                 val dateTimeTextStyle = MaterialTheme.typography.bodySmall
@@ -1222,9 +1154,9 @@ fun TransactionEntryDialog(
                             errorMessage = null
                             scope.launch {
                                 try {
-                                    // Get the currency object
+                                    // Get the currency object from repository
                                     val currency =
-                                        currencies.find { it.id == currencyId }
+                                        currencyRepository.getCurrencyById(currencyId!!).first()
                                             ?: throw IllegalStateException("Currency not found")
 
                                     // Convert selected date and time to Instant
@@ -1276,18 +1208,6 @@ fun TransactionEntryDialog(
             }
         },
     )
-
-    // Currency Creation Dialog
-    if (showCreateCurrencyDialog) {
-        CreateCurrencyDialogInline(
-            currencyRepository = currencyRepository,
-            onCurrencyCreated = { newCurrencyId ->
-                currencyId = newCurrencyId
-                showCreateCurrencyDialog = false
-            },
-            onDismiss = { showCreateCurrencyDialog = false },
-        )
-    }
 
     // Date Picker Dialog
     if (showDatePicker) {
@@ -1372,9 +1292,6 @@ fun TransactionEditDialog(
     maintenanceService: DatabaseMaintenanceService,
     onDismiss: () -> Unit,
 ) {
-    val currencies by currencyRepository.getAllCurrencies()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-
     var sourceAccountId by remember { mutableStateOf(transaction.sourceAccountId) }
     var targetAccountId by remember { mutableStateOf(transaction.targetAccountId) }
     var currencyId by remember { mutableStateOf(transaction.amount.currency.id) }
@@ -1389,9 +1306,6 @@ fun TransactionEditDialog(
     var selectedMinute by remember { mutableStateOf(transactionDateTime.minute) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
-
-    var showCreateCurrencyDialog by remember { mutableStateOf(false) }
-    var currencyExpanded by remember { mutableStateOf(false) }
 
     val scope = rememberSchemaAwareCoroutineScope()
 
@@ -1451,70 +1365,14 @@ fun TransactionEditDialog(
                     excludeAccountId = sourceAccountId,
                 )
 
-                // Currency Dropdown with search
-                var currencySearchQuery by remember { mutableStateOf("") }
-                val filteredCurrencies =
-                    remember(currencies, currencySearchQuery) {
-                        if (currencySearchQuery.isBlank()) {
-                            currencies
-                        } else {
-                            currencies.filter { currency ->
-                                currency.code.contains(currencySearchQuery, ignoreCase = true) ||
-                                    currency.name.contains(currencySearchQuery, ignoreCase = true)
-                            }
-                        }
-                    }
-
-                ExposedDropdownMenuBox(
-                    expanded = currencyExpanded,
-                    onExpandedChange = { currencyExpanded = it },
-                ) {
-                    OutlinedTextField(
-                        value =
-                            if (currencyExpanded) {
-                                currencySearchQuery
-                            } else {
-                                currencies.find { it.id == currencyId }?.let { "${it.code} - ${it.name}" } ?: ""
-                            },
-                        onValueChange = { currencySearchQuery = it },
-                        label = { Text("Currency") },
-                        placeholder = { Text("Type to search...") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = currencyExpanded) },
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable),
-                        enabled = !isSaving,
-                        singleLine = true,
-                    )
-                    ExposedDropdownMenu(
-                        expanded = currencyExpanded,
-                        onDismissRequest = {
-                            currencyExpanded = false
-                            currencySearchQuery = ""
-                        },
-                    ) {
-                        filteredCurrencies.forEach { currency ->
-                            DropdownMenuItem(
-                                text = { Text("${currency.code} - ${currency.name}") },
-                                onClick = {
-                                    currencyId = currency.id
-                                    currencyExpanded = false
-                                    currencySearchQuery = ""
-                                },
-                            )
-                        }
-                        HorizontalDivider()
-                        DropdownMenuItem(
-                            text = { Text("+ Create New Currency") },
-                            onClick = {
-                                showCreateCurrencyDialog = true
-                                currencyExpanded = false
-                                currencySearchQuery = ""
-                            },
-                        )
-                    }
-                }
+                // Currency Picker
+                CurrencyPicker(
+                    selectedCurrencyId = currencyId,
+                    onCurrencySelected = { currencyId = it },
+                    label = "Currency",
+                    currencyRepository = currencyRepository,
+                    enabled = !isSaving,
+                )
 
                 // Date and Time Pickers
                 val dateTimeTextStyle = MaterialTheme.typography.bodySmall
@@ -1624,8 +1482,9 @@ fun TransactionEditDialog(
                             errorMessage = null
                             scope.launch {
                                 try {
+                                    // Get the currency object from repository
                                     val currency =
-                                        currencies.find { it.id == currencyId }
+                                        currencyRepository.getCurrencyById(currencyId).first()
                                             ?: throw IllegalStateException("Currency not found")
 
                                     val timestamp =
@@ -1676,17 +1535,6 @@ fun TransactionEditDialog(
             }
         },
     )
-
-    if (showCreateCurrencyDialog) {
-        CreateCurrencyDialogInline(
-            currencyRepository = currencyRepository,
-            onCurrencyCreated = { newCurrencyId ->
-                currencyId = newCurrencyId
-                showCreateCurrencyDialog = false
-            },
-            onDismiss = { showCreateCurrencyDialog = false },
-        )
-    }
 
     if (showDatePicker) {
         val datePickerState =
@@ -1755,103 +1603,6 @@ fun TransactionEditDialog(
             },
         )
     }
-}
-
-@Composable
-fun CreateCurrencyDialogInline(
-    currencyRepository: CurrencyRepository,
-    onCurrencyCreated: (CurrencyId) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    var code by remember { mutableStateOf("") }
-    var name by remember { mutableStateOf("") }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    var isSaving by remember { mutableStateOf(false) }
-
-    val scope = rememberSchemaAwareCoroutineScope()
-
-    AlertDialog(
-        onDismissRequest = { if (!isSaving) onDismiss() },
-        title = { Text("Create New Currency") },
-        text = {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                OutlinedTextField(
-                    value = code,
-                    onValueChange = { code = it.uppercase().take(3) },
-                    label = { Text("Currency Code (e.g., USD)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    enabled = !isSaving,
-                )
-
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Currency Name (e.g., US Dollar)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    enabled = !isSaving,
-                )
-
-                errorMessage?.let { error ->
-                    Text(
-                        text = error,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    when {
-                        code.isBlank() -> errorMessage = "Currency code is required"
-                        code.length != 3 -> errorMessage = "Currency code must be 3 characters"
-                        name.isBlank() -> errorMessage = "Currency name is required"
-                        else -> {
-                            isSaving = true
-                            errorMessage = null
-                            scope.launch {
-                                try {
-                                    val currencyId = currencyRepository.upsertCurrencyByCode(code.trim(), name.trim())
-                                    onCurrencyCreated(currencyId)
-                                } catch (e: Exception) {
-                                    logger.error(e) { "Failed to create currency: ${e.message}" }
-                                    errorMessage = "Failed to create currency: ${e.message}"
-                                    isSaving = false
-                                }
-                            }
-                        }
-                    }
-                },
-                enabled = !isSaving,
-            ) {
-                if (isSaving) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp,
-                    )
-                } else {
-                    Text("Create")
-                }
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                enabled = !isSaving,
-            ) {
-                Text("Cancel")
-            }
-        },
-    )
 }
 
 @Composable

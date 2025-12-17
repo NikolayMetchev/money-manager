@@ -38,7 +38,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.AccountId
-import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
@@ -58,7 +57,7 @@ import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.ui.components.AccountPicker
-import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
+import com.moneymanager.ui.components.CurrencyPicker
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
@@ -204,9 +203,6 @@ fun CreateCsvStrategyDialog(
     var isSaving by remember { mutableStateOf(false) }
     val scope = rememberSchemaAwareCoroutineScope()
 
-    val currencies by currencyRepository.getAllCurrencies()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-
     // Build sample values map for value-based detection
     val sampleValues: Map<Int, String>? =
         firstRow?.let { row ->
@@ -347,11 +343,11 @@ fun CreateCsvStrategyDialog(
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
-                Text("Currency", style = MaterialTheme.typography.titleSmall)
-                CurrencyDropdown(
-                    currencies = currencies,
+                CurrencyPicker(
                     selectedCurrencyId = selectedCurrencyId,
                     onCurrencySelected = { selectedCurrencyId = it },
+                    label = "Select Currency",
+                    currencyRepository = currencyRepository,
                     enabled = !isSaving,
                 )
 
@@ -633,49 +629,6 @@ private fun ColumnDropdown(
                     },
                     onClick = {
                         onColumnSelected(column.originalName)
-                        expanded = false
-                    },
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun CurrencyDropdown(
-    currencies: List<Currency>,
-    selectedCurrencyId: CurrencyId?,
-    onCurrencySelected: (CurrencyId) -> Unit,
-    enabled: Boolean,
-) {
-    var expanded by remember { mutableStateOf(false) }
-    val selectedCurrency = currencies.find { it.id == selectedCurrencyId }
-
-    ExposedDropdownMenuBox(
-        expanded = expanded,
-        onExpandedChange = { if (enabled) expanded = !expanded },
-    ) {
-        OutlinedTextField(
-            value = selectedCurrency?.let { "${it.code} - ${it.name}" } ?: "",
-            onValueChange = {},
-            readOnly = true,
-            label = { Text("Select Currency") },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .menuAnchor(MenuAnchorType.PrimaryNotEditable),
-            enabled = enabled,
-        )
-        ExposedDropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-        ) {
-            currencies.forEach { currency ->
-                DropdownMenuItem(
-                    text = { Text("${currency.code} - ${currency.name}") },
-                    onClick = {
-                        onCurrencySelected(currency.id)
                         expanded = false
                     },
                 )

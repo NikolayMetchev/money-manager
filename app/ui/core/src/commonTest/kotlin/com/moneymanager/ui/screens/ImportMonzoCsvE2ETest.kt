@@ -6,6 +6,7 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -156,13 +157,15 @@ class ImportMonzoCsvE2ETest {
             // Step 5: Create source account inline via AccountPicker
             // Wait for the dialog to fully load - look for the Source Account section title
             waitUntilExactlyOneExists(hasText("Source Account"), timeoutMillis = 10000)
-            waitUntilExactlyOneExists(hasText("Select..."), timeoutMillis = 10000)
+            // Note: There are two "Select..." elements - one for AccountPicker and one for CurrencyPicker
+            waitUntilAtLeastOneExists(hasText("Select..."), timeoutMillis = 10000)
 
             // Scroll the AccountPicker into view and click to expand dropdown
             // The dialog content is scrollable, so ensure element is visible
-            onNodeWithText("Select...").performScrollTo()
+            // Use onFirst() since there are two "Select..." (account and currency pickers)
+            onAllNodesWithText("Select...").onFirst().performScrollTo()
             waitForIdle()
-            onNodeWithText("Select...").performClick()
+            onAllNodesWithText("Select...").onFirst().performClick()
             waitForIdle()
 
             // Click "+ Create New Account" option in the dropdown menu
