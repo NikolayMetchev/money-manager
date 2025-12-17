@@ -11,6 +11,16 @@ import org.gradle.api.Project
  */
 internal fun Project.configureAndroidTestBuildScan(managedDeviceNames: List<String>) {
     afterEvaluate {
+        // Register for connected device tests (physical devices or emulators)
+        tasks.findByName("connectedAndroidDeviceTest")?.let {
+            ImportJUnitXmlReports.register(
+                tasks,
+                tasks.named("connectedAndroidDeviceTest"),
+                JUnitXmlDialect.GENERIC,
+            )
+        }
+
+        // Register for managed device tests
         managedDeviceNames.forEach { deviceName ->
             val testTaskName = "${deviceName}AndroidDeviceTest"
             tasks.findByName(testTaskName)?.let {
