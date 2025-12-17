@@ -37,7 +37,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
@@ -55,8 +54,10 @@ import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.repository.AccountRepository
+import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.launch
@@ -182,6 +183,7 @@ private fun getSampleValue(
 fun CreateCsvStrategyDialog(
     csvImportStrategyRepository: CsvImportStrategyRepository,
     accountRepository: AccountRepository,
+    categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
     csvColumns: List<CsvColumn>,
     firstRow: CsvRow?,
@@ -202,8 +204,6 @@ fun CreateCsvStrategyDialog(
     var isSaving by remember { mutableStateOf(false) }
     val scope = rememberSchemaAwareCoroutineScope()
 
-    val accounts by accountRepository.getAllAccounts()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
     val currencies by currencyRepository.getAllCurrencies()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
 
@@ -265,10 +265,12 @@ fun CreateCsvStrategyDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
                 Text("Source Account", style = MaterialTheme.typography.titleSmall)
-                AccountDropdown(
-                    accounts = accounts,
+                AccountPicker(
                     selectedAccountId = selectedAccountId,
                     onAccountSelected = { selectedAccountId = it },
+                    label = "Select Account",
+                    accountRepository = accountRepository,
+                    categoryRepository = categoryRepository,
                     enabled = !isSaving,
                 )
 
@@ -631,49 +633,6 @@ private fun ColumnDropdown(
                     },
                     onClick = {
                         onColumnSelected(column.originalName)
-                        expanded = false
-                    },
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun AccountDropdown(
-    accounts: List<Account>,
-    selectedAccountId: AccountId?,
-    onAccountSelected: (AccountId) -> Unit,
-    enabled: Boolean,
-) {
-    var expanded by remember { mutableStateOf(false) }
-    val selectedAccount = accounts.find { it.id == selectedAccountId }
-
-    ExposedDropdownMenuBox(
-        expanded = expanded,
-        onExpandedChange = { if (enabled) expanded = !expanded },
-    ) {
-        OutlinedTextField(
-            value = selectedAccount?.name ?: "",
-            onValueChange = {},
-            readOnly = true,
-            label = { Text("Select Account") },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .menuAnchor(MenuAnchorType.PrimaryNotEditable),
-            enabled = enabled,
-        )
-        ExposedDropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-        ) {
-            accounts.forEach { account ->
-                DropdownMenuItem(
-                    text = { Text(account.name) },
-                    onClick = {
-                        onAccountSelected(account.id)
                         expanded = false
                     },
                 )

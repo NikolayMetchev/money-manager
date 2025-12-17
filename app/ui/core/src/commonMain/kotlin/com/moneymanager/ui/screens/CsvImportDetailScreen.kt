@@ -30,6 +30,7 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.repository.AccountRepository
+import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CsvImportRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
@@ -49,6 +50,7 @@ fun CsvImportDetailScreen(
     csvImportRepository: CsvImportRepository,
     csvImportStrategyRepository: CsvImportStrategyRepository,
     accountRepository: AccountRepository,
+    categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
     transactionRepository: TransactionRepository,
     onBack: () -> Unit,
@@ -282,6 +284,7 @@ fun CsvImportDetailScreen(
         CreateCsvStrategyDialog(
             csvImportStrategyRepository = csvImportStrategyRepository,
             accountRepository = accountRepository,
+            categoryRepository = categoryRepository,
             currencyRepository = currencyRepository,
             csvColumns = import!!.columns,
             firstRow = rows.firstOrNull(),

@@ -5,8 +5,11 @@ package com.moneymanager.ui.screens
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
@@ -31,9 +34,9 @@ import kotlin.test.Test
  * 1. Create fresh database with Monzo CSV data injected (simulates file picker which can't be automated)
  * 2. Navigate to CSV Imports screen
  * 3. Click on the imported CSV file
- * 4. Create a source account for Monzo (required for strategy)
- * 5. Create a strategy named "Monzo" with proper column mappings
- * 6. Verify strategy is created with auto-detected columns
+ * 4. Navigate to Accounts screen and create source account for Monzo
+ * 5. Navigate back to CSV import and open Create Strategy dialog
+ * 6. Select the account and verify auto-detected column mappings
  */
 @OptIn(ExperimentalTestApi::class)
 class ImportMonzoCsvE2ETest {
@@ -141,50 +144,47 @@ class ImportMonzoCsvE2ETest {
             waitUntilExactlyOneExists(hasText("20 rows"), timeoutMillis = 10000)
             onNodeWithText("18 columns").assertIsDisplayed()
 
-            // Step 3: First create a source account (required for strategy)
-            // Navigate back and create an account
-            onNodeWithText("< Back").performClick()
-            waitForIdle()
-            // Wait for file list to appear (more reliable than title)
-            waitUntilExactlyOneExists(hasText("monzo_test_export.csv"), timeoutMillis = 10000)
-
-            // Navigate to Accounts
-            waitUntilExactlyOneExists(hasText("Accounts"), timeoutMillis = 10000)
-            onNodeWithText("Accounts", useUnmergedTree = true).performClick()
-            waitForIdle()
-            waitUntilExactlyOneExists(hasText("Your Accounts"), timeoutMillis = 10000)
-
-            onNodeWithText("+ Add Account").performClick()
-            waitUntilExactlyOneExists(hasText("Create New Account"), timeoutMillis = 10000)
-
-            onNodeWithText("Account Name").performTextInput("Monzo Current Account")
-            onNodeWithText("Create").performClick()
-            waitUntilDoesNotExist(hasText("Create New Account"), timeoutMillis = 10000)
-
-            // Verify account was created
-            onNodeWithText("Monzo Current Account").assertIsDisplayed()
-
-            // Step 4: Navigate back to CSV import and create strategy
-            waitUntilExactlyOneExists(hasText("CSV"), timeoutMillis = 10000)
-            onNodeWithText("CSV", useUnmergedTree = true).performClick()
-            waitForIdle()
-            // Wait for file list to appear (more reliable than title)
-            waitUntilExactlyOneExists(hasText("monzo_test_export.csv"), timeoutMillis = 10000)
-
-            onNodeWithText("monzo_test_export.csv").performClick()
-            waitUntilExactlyOneExists(hasText("20 rows"), timeoutMillis = 10000)
-
-            // Step 5: Click "Create Strategy" button
+            // Step 3: Click "Create Strategy" button
             onNodeWithText("Create Strategy").performClick()
             waitUntilExactlyOneExists(hasText("Create Import Strategy"), timeoutMillis = 10000)
 
-            // Step 6: Enter strategy name "Monzo"
-            // Wait for the dialog to fully load (accounts need to load from repository)
+            // Step 4: Enter strategy name "Monzo"
             waitUntilExactlyOneExists(hasText("Strategy Name"), timeoutMillis = 10000)
             onNodeWithText("Strategy Name").performTextInput("Monzo")
             waitForIdle()
 
-            // Step 7: Verify column auto-detection selected the correct columns
+            // Step 5: Create source account inline via AccountPicker
+            // Wait for the dialog to fully load - look for the Source Account section title
+            waitUntilExactlyOneExists(hasText("Source Account"), timeoutMillis = 10000)
+            waitUntilExactlyOneExists(hasText("Select..."), timeoutMillis = 10000)
+
+            // Scroll the AccountPicker into view and click to expand dropdown
+            // The dialog content is scrollable, so ensure element is visible
+            onNodeWithText("Select...").performScrollTo()
+            waitForIdle()
+            onNodeWithText("Select...").performClick()
+            waitForIdle()
+
+            // Click "+ Create New Account" option in the dropdown menu
+            waitUntilExactlyOneExists(hasText("+ Create New Account"), timeoutMillis = 10000)
+            onNodeWithText("+ Create New Account", useUnmergedTree = true).performClick()
+            waitForIdle()
+
+            // Fill in the account name in the CreateAccountDialog
+            waitUntilExactlyOneExists(hasText("Create New Account"), timeoutMillis = 10000)
+            onNodeWithText("Account Name").performTextInput("Monzo Current Account")
+            waitForIdle()
+
+            // Click Create to create the account
+            // Note: There are two "Create" buttons - one in CreateAccountDialog and one in CreateCsvStrategyDialog
+            // The CreateAccountDialog is on top, so we select the last one (rendered on top)
+            onAllNodesWithText("Create").onLast().performClick()
+            waitUntilDoesNotExist(hasText("Create New Account"), timeoutMillis = 10000)
+
+            // Verify the account was selected in the AccountPicker
+            waitUntilExactlyOneExists(hasText("Monzo Current Account"), timeoutMillis = 10000)
+
+            // Step 6: Verify column auto-detection selected the correct columns
             // The ColumnDetector should have selected:
             // - Date Column: "Date" (not "Transaction ID" which was the bug)
             // - Amount Column: "Amount"
@@ -194,8 +194,7 @@ class ImportMonzoCsvE2ETest {
             // Wait for the dialog to fully load with auto-detected values
             waitForIdle()
 
-            // Verify the dialog has account/currency dropdowns ready
-            waitUntilExactlyOneExists(hasText("Select Account"), timeoutMillis = 10000)
+            // Verify the currency dropdown is ready (account is already selected)
             waitUntilExactlyOneExists(hasText("Select Currency"), timeoutMillis = 10000)
 
             // Verify the auto-detected column names are shown in the dropdown fields

@@ -372,6 +372,7 @@ private fun MoneyManagerAppContent(
                             csvImportRepository = repositorySet.csvImportRepository,
                             csvImportStrategyRepository = repositorySet.csvImportStrategyRepository,
                             accountRepository = repositorySet.accountRepository,
+                            categoryRepository = repositorySet.categoryRepository,
                             currencyRepository = repositorySet.currencyRepository,
                             transactionRepository = repositorySet.transactionRepository,
                             onBack = { currentScreen = Screen.CsvImports },
