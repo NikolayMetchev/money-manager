@@ -69,9 +69,10 @@ fun CsvImportDetailScreen(
     var showCreateStrategyDialog by remember { mutableStateOf(false) }
     var isDeleting by remember { mutableStateOf(false) }
     var importResultMessage by remember { mutableStateOf<String?>(null) }
+    var rowsRefreshTrigger by remember { mutableStateOf(0) }
 
-    // Load rows when import is available - uses schema-aware scope for error handling
-    LaunchedEffect(import) {
+    // Load rows when import is available or after import completes
+    LaunchedEffect(import, rowsRefreshTrigger) {
         scope.launch {
             import?.let {
                 isLoading = true
@@ -278,6 +279,7 @@ fun CsvImportDetailScreen(
             onImportComplete = { count ->
                 showApplyStrategyDialog = false
                 importResultMessage = "Successfully imported $count transfers"
+                rowsRefreshTrigger++
             },
         )
     }

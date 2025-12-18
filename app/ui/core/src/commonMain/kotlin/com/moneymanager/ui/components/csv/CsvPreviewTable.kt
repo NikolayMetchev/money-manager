@@ -65,7 +65,7 @@ fun CsvPreviewTable(
                         .padding(8.dp),
             ) {
                 Text(
-                    text = "Transfer",
+                    text = "Transaction Id",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
