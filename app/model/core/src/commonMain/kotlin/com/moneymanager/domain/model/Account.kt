@@ -2,6 +2,7 @@
 
 package com.moneymanager.domain.model
 
+import kotlinx.serialization.Serializable
 import kotlin.time.Instant
 
 data class Account(
@@ -11,6 +12,7 @@ data class Account(
     val categoryId: Long = Category.UNCATEGORIZED_ID,
 )
 
+@Serializable
 @JvmInline
 value class AccountId(val id: Long) {
     override fun toString() = id.toString()

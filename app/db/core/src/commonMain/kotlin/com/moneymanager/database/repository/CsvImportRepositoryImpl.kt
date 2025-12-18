@@ -7,6 +7,7 @@ import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.csv.CsvTableManager
+import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvColumnId
 import com.moneymanager.domain.model.csv.CsvImport
@@ -168,5 +169,32 @@ class CsvImportRepositoryImpl(
 
             // Delete import metadata
             csvImportQueries.deleteImport(id.id.toString())
+        }
+
+    override suspend fun updateRowTransferId(
+        id: CsvImportId,
+        rowIndex: Long,
+        transferId: TransferId,
+    ): Unit =
+        withContext(coroutineContext) {
+            val import =
+                csvImportQueries.selectImportById(id.id.toString()).executeAsOneOrNull()
+                    ?: return@withContext
+
+            tableManager.updateTransferId(import.tableName, rowIndex, transferId)
+        }
+
+    override suspend fun updateRowTransferIdsBatch(
+        id: CsvImportId,
+        rowTransferMap: Map<Long, TransferId>,
+    ): Unit =
+        withContext(coroutineContext) {
+            if (rowTransferMap.isEmpty()) return@withContext
+
+            val import =
+                csvImportQueries.selectImportById(id.id.toString()).executeAsOneOrNull()
+                    ?: return@withContext
+
+            tableManager.updateTransferIdsBatch(import.tableName, rowTransferMap)
         }
 }

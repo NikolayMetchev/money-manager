@@ -1,0 +1,38 @@
+-- Stores reusable CSV import strategies for mapping CSV columns to Transfer fields
+CREATE TABLE CsvImportStrategy (
+    id TEXT PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL UNIQUE,
+    identificationColumnsJson TEXT NOT NULL,
+    fieldMappingsJson TEXT NOT NULL,
+    createdAt INTEGER NOT NULL,
+    updatedAt INTEGER NOT NULL
+);
+
+CREATE INDEX idx_csv_import_strategy_name ON CsvImportStrategy(name);
+
+-- Select all strategies ordered by name
+selectAll:
+SELECT * FROM CsvImportStrategy ORDER BY name;
+
+-- Select a strategy by ID
+selectById:
+SELECT * FROM CsvImportStrategy WHERE id = ?;
+
+-- Select a strategy by name
+selectByName:
+SELECT * FROM CsvImportStrategy WHERE name = ?;
+
+-- Insert a new strategy
+insert:
+INSERT INTO CsvImportStrategy (id, name, identificationColumnsJson, fieldMappingsJson, createdAt, updatedAt)
+VALUES (?, ?, ?, ?, ?, ?);
+
+-- Update an existing strategy
+update:
+UPDATE CsvImportStrategy
+SET name = ?, identificationColumnsJson = ?, fieldMappingsJson = ?, updatedAt = ?
+WHERE id = ?;
+
+-- Delete a strategy by ID
+deleteById:
+DELETE FROM CsvImportStrategy WHERE id = ?;

@@ -1,8 +1,12 @@
+@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
+
 package com.moneymanager.database.csv
 
 import app.cash.sqldelight.db.QueryResult
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
+import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvRow
+import kotlin.uuid.Uuid
 
 /**
  * Manages dynamic CSV tables in the database.
@@ -22,7 +26,7 @@ class CsvTableManager(private val database: MoneyManagerDatabaseWrapper) {
         val columns = (0 until columnCount).joinToString(", ") { "col_$it TEXT" }
         database.execute(
             null,
-            "CREATE TABLE IF NOT EXISTS $tableName (row_index INTEGER PRIMARY KEY AUTOINCREMENT, $columns)",
+            "CREATE TABLE IF NOT EXISTS $tableName (row_index INTEGER PRIMARY KEY AUTOINCREMENT, transaction_id TEXT, $columns)",
             0,
         )
     }
@@ -78,7 +82,7 @@ class CsvTableManager(private val database: MoneyManagerDatabaseWrapper) {
         offset: Int,
     ): List<CsvRow> {
         val columns = (0 until columnCount).joinToString(", ") { "col_$it" }
-        val sql = "SELECT row_index, $columns FROM $tableName ORDER BY row_index LIMIT $limit OFFSET $offset"
+        val sql = "SELECT row_index, transaction_id, $columns FROM $tableName ORDER BY row_index LIMIT $limit OFFSET $offset"
 
         val result = mutableListOf<CsvRow>()
         database.executeQuery(
@@ -87,11 +91,13 @@ class CsvTableManager(private val database: MoneyManagerDatabaseWrapper) {
             { cursor ->
                 while (cursor.next().value) {
                     val rowIndex = cursor.getLong(0) ?: continue
+                    val transferIdStr = cursor.getString(1)
+                    val transferId = transferIdStr?.let { TransferId(Uuid.parse(it)) }
                     val values =
                         (0 until columnCount).map { i ->
-                            cursor.getString(i + 1) ?: ""
+                            cursor.getString(i + 2) ?: ""
                         }
-                    result.add(CsvRow(rowIndex = rowIndex, values = values))
+                    result.add(CsvRow(rowIndex = rowIndex, values = values, transferId = transferId))
                 }
                 QueryResult.Unit
             },
@@ -131,6 +137,57 @@ class CsvTableManager(private val database: MoneyManagerDatabaseWrapper) {
         database.execute(
             null,
             "DROP TABLE IF EXISTS $tableName",
+            0,
+        )
+    }
+
+    /**
+     * Updates the transfer ID for a specific row.
+     *
+     * @param tableName The name of the table
+     * @param rowIndex The row index to update
+     * @param transferId The transfer ID to set
+     */
+    fun updateTransferId(
+        tableName: String,
+        rowIndex: Long,
+        transferId: TransferId,
+    ) {
+        database.execute(
+            null,
+            "UPDATE $tableName SET transaction_id = '${transferId.id}' WHERE row_index = $rowIndex",
+            0,
+        )
+    }
+
+    /**
+     * Updates the transfer IDs for multiple rows in batch.
+     *
+     * @param tableName The name of the table
+     * @param rowTransferMap Map of row index to transfer ID
+     */
+    fun updateTransferIdsBatch(
+        tableName: String,
+        rowTransferMap: Map<Long, TransferId>,
+    ) {
+        rowTransferMap.forEach { (rowIndex, transferId) ->
+            updateTransferId(tableName, rowIndex, transferId)
+        }
+    }
+
+    /**
+     * Clears the transfer ID for a specific row.
+     *
+     * @param tableName The name of the table
+     * @param rowIndex The row index to clear
+     */
+    fun clearTransferId(
+        tableName: String,
+        rowIndex: Long,
+    ) {
+        database.execute(
+            null,
+            "UPDATE $tableName SET transaction_id = NULL WHERE row_index = $rowIndex",
             0,
         )
     }

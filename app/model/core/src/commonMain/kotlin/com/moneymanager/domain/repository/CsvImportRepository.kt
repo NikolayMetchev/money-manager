@@ -1,5 +1,6 @@
 package com.moneymanager.domain.repository
 
+import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csv.CsvRow
@@ -49,4 +50,29 @@ interface CsvImportRepository {
      * Deletes an import, including its metadata, columns, and dynamic table.
      */
     suspend fun deleteImport(id: CsvImportId)
+
+    /**
+     * Updates the transfer ID for a specific row after importing.
+     * This links the CSV row to the created transfer for navigation.
+     *
+     * @param id The import ID
+     * @param rowIndex The row index to update
+     * @param transferId The transfer ID to link
+     */
+    suspend fun updateRowTransferId(
+        id: CsvImportId,
+        rowIndex: Long,
+        transferId: TransferId,
+    )
+
+    /**
+     * Updates transfer IDs for multiple rows in batch.
+     *
+     * @param id The import ID
+     * @param rowTransferMap Map of row index to transfer ID
+     */
+    suspend fun updateRowTransferIdsBatch(
+        id: CsvImportId,
+        rowTransferMap: Map<Long, TransferId>,
+    )
 }

@@ -35,12 +35,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuAnchorType
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -89,6 +84,8 @@ import com.moneymanager.ui.audit.AuditEntryDiff
 import com.moneymanager.ui.audit.FieldChange
 import com.moneymanager.ui.audit.UpdateNewValues
 import com.moneymanager.ui.audit.computeAuditDiff
+import com.moneymanager.ui.components.AccountPicker
+import com.moneymanager.ui.components.CurrencyPicker
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.util.formatAmount
@@ -146,6 +143,7 @@ fun AccountTransactionsScreen(
     maintenanceService: DatabaseMaintenanceService,
     onAccountIdChange: (AccountId) -> Unit = {},
     onCurrencyIdChange: (CurrencyId?) -> Unit = {},
+    scrollToTransferId: TransferId? = null,
 ) {
     // Audit transaction state - when set, shows full-screen audit view
     var transactionIdToAudit by remember { mutableStateOf<TransferId?>(null) }
@@ -191,6 +189,9 @@ fun AccountTransactionsScreen(
     var currentPagingInfo by remember { mutableStateOf<com.moneymanager.domain.model.PagingInfo?>(null) }
     var isLoadingPage by remember { mutableStateOf(false) }
     var hasLoadedFirstPage by remember { mutableStateOf(false) }
+    // Backward paging state - tracks if there are more items at the start of the list
+    var hasPreviousPage by remember { mutableStateOf(false) }
+    var isLoadingPreviousPage by remember { mutableStateOf(false) }
 
     // Loading state - separate tracking for matrix (top) and transactions (bottom)
     var hasLoadedMatrix by remember { mutableStateOf(false) }
@@ -277,21 +278,39 @@ fun AccountTransactionsScreen(
             }
 
         // Load first page when account changes
-        LaunchedEffect(selectedAccountId, pageSize) {
+        // If scrollToTransferId is provided, load the page containing that transaction
+        LaunchedEffect(selectedAccountId, pageSize, scrollToTransferId) {
             runningBalances = emptyList()
             currentPagingInfo = null
             hasLoadedFirstPage = false
             isLoadingPage = true
+            hasPreviousPage = false
 
             try {
-                val result =
-                    transactionRepository.getRunningBalanceByAccountPaginated(
-                        accountId = selectedAccountId,
-                        pageSize = pageSize,
-                        pagingInfo = null,
-                    )
-                runningBalances = result.items
-                currentPagingInfo = result.pagingInfo
+                if (scrollToTransferId != null) {
+                    // Load the page containing the target transaction
+                    val pageResult =
+                        transactionRepository.getPageContainingTransaction(
+                            accountId = selectedAccountId,
+                            transactionId = scrollToTransferId,
+                            pageSize = pageSize,
+                        )
+                    runningBalances = pageResult.items
+                    currentPagingInfo = pageResult.pagingInfo
+                    // Use the hasPrevious flag from the page result
+                    hasPreviousPage = pageResult.hasPrevious
+                } else {
+                    // Normal first page load - no previous items
+                    val result =
+                        transactionRepository.getRunningBalanceByAccountPaginated(
+                            accountId = selectedAccountId,
+                            pageSize = pageSize,
+                            pagingInfo = null,
+                        )
+                    runningBalances = result.items
+                    currentPagingInfo = result.pagingInfo
+                    hasPreviousPage = false
+                }
                 hasLoadedFirstPage = true
             } catch (e: kotlinx.coroutines.CancellationException) {
                 // Cancellation is expected when user navigates away quickly
@@ -325,6 +344,33 @@ fun AccountTransactionsScreen(
                 logger.error(e) { "Failed to load more transactions: ${e.message}" }
             } finally {
                 isLoadingPage = false
+            }
+        }
+
+        // Function to load previous page (backward pagination)
+        suspend fun loadPreviousPage() {
+            if (isLoadingPreviousPage || !hasPreviousPage || runningBalances.isEmpty()) return
+
+            val firstItem = runningBalances.first()
+            isLoadingPreviousPage = true
+            try {
+                val result =
+                    transactionRepository.getRunningBalanceByAccountPaginatedBackward(
+                        accountId = selectedAccountId,
+                        pageSize = pageSize,
+                        firstTimestamp = firstItem.timestamp,
+                        firstId = firstItem.transactionId,
+                    )
+                if (result.items.isNotEmpty()) {
+                    runningBalances = result.items + runningBalances
+                }
+                hasPreviousPage = result.pagingInfo.hasMore
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                logger.error(e) { "Failed to load previous transactions: ${e.message}" }
+            } finally {
+                isLoadingPreviousPage = false
             }
         }
 
@@ -645,6 +691,73 @@ fun AccountTransactionsScreen(
 
                 val listState = rememberLazyListState()
 
+                // Scroll to specific transaction if requested
+                LaunchedEffect(scrollToTransferId, runningBalances) {
+                    scrollToTransferId?.let { targetTransferId ->
+                        // Set highlighted transaction (TransferId implements TransactionId)
+                        highlightedTransactionId = targetTransferId
+
+                        // First find the transaction in unfiltered list to get its currency
+                        val transaction =
+                            runningBalances.find { it.transactionId.id == targetTransferId.id }
+                                ?: return@let
+
+                        // Set currency filter to match the transaction
+                        selectedCurrencyId = transaction.transactionAmount.currency.id
+
+                        // Now find the index in the filtered list (which now includes this currency)
+                        val index =
+                            runningBalances.filter {
+                                it.transactionAmount.currency.id == transaction.transactionAmount.currency.id
+                            }.indexOfFirst { it.transactionId.id == targetTransferId.id }
+
+                        if (index >= 0) {
+                            // Scroll to the transaction
+                            listState.animateScrollToItem(index)
+
+                            // Scroll matrix to show the account and currency
+                            val accountIndex = allAccounts.indexOfFirst { it.id == accountId }
+                            val currencyIndex =
+                                uniqueCurrencyIds.indexOfFirst {
+                                    it == transaction.transactionAmount.currency.id
+                                }
+
+                            if (accountIndex >= 0 && currencyIndex >= 0) {
+                                with(density) {
+                                    val spacingPx = 8.dp.toPx()
+
+                                    // Calculate horizontal scroll position
+                                    var columnStartPx = 0f
+                                    for (i in 0 until accountIndex) {
+                                        val acc = allAccounts[i]
+                                        val colWidth = accountColumnWidths[acc.id] ?: ACCOUNT_COLUMN_MIN_WIDTH
+                                        columnStartPx += colWidth.toPx() + spacingPx
+                                    }
+                                    val targetAccount = allAccounts[accountIndex]
+                                    val targetColumnWidth = accountColumnWidths[targetAccount.id] ?: ACCOUNT_COLUMN_MIN_WIDTH
+                                    val currencyLabelWidthPx = 60.dp.toPx()
+                                    val viewportWidthPx = containerWidthDp.toPx() - currencyLabelWidthPx
+                                    val columnCenterPx = columnStartPx + (targetColumnWidth.toPx() / 2)
+                                    val targetScrollX = (columnCenterPx - (viewportWidthPx / 2)).coerceAtLeast(0f).toInt()
+
+                                    // Calculate vertical scroll position
+                                    val rowHeightPx = 28.dp.toPx()
+                                    val matrixHeightPx = containerHeightDp.toPx() * 0.3f
+                                    val accountHeaderHeightPx = 24.dp.toPx()
+                                    val viewportHeightPx = matrixHeightPx - accountHeaderHeightPx
+                                    val rowStartPx = currencyIndex * rowHeightPx
+                                    val rowCenterPx = rowStartPx + (rowHeightPx / 2)
+                                    val targetScrollY = (rowCenterPx - (viewportHeightPx / 2)).coerceAtLeast(0f).toInt()
+
+                                    // Animate scrolls
+                                    launch { horizontalScrollState.animateScrollTo(targetScrollX) }
+                                    launch { verticalScrollState.animateScrollTo(targetScrollY) }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // Trigger pagination when user scrolls near the end
                 LaunchedEffect(listState, isLoadingPage, currentPagingInfo?.hasMore) {
                     snapshotFlow {
@@ -658,6 +771,23 @@ fun AccountTransactionsScreen(
                             currentPagingInfo?.hasMore == true
                         ) {
                             loadNextPage()
+                        }
+                    }
+                }
+
+                // Trigger backward pagination when user scrolls near the beginning
+                LaunchedEffect(listState, isLoadingPreviousPage, hasPreviousPage) {
+                    snapshotFlow {
+                        val firstVisibleItem = listState.layoutInfo.visibleItemsInfo.firstOrNull()
+                        firstVisibleItem?.index
+                    }.collect { firstVisibleIndex ->
+                        // Load previous when within 5 items of the start
+                        if (firstVisibleIndex != null &&
+                            firstVisibleIndex <= 5 &&
+                            !isLoadingPreviousPage &&
+                            hasPreviousPage
+                        ) {
+                            loadPreviousPage()
                         }
                     }
                 }
@@ -983,12 +1113,6 @@ fun TransactionEntryDialog(
     preSelectedCurrencyId: CurrencyId? = null,
     onDismiss: () -> Unit,
 ) {
-    // Collect accounts and currencies from Flows so newly created items appear immediately
-    val accounts by accountRepository.getAllAccounts()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val currencies by currencyRepository.getAllCurrencies()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-
     var sourceAccountId by remember { mutableStateOf(preSelectedSourceAccountId) }
     var targetAccountId by remember { mutableStateOf<AccountId?>(null) }
     var currencyId by remember { mutableStateOf<CurrencyId?>(preSelectedCurrencyId) }
@@ -1005,14 +1129,6 @@ fun TransactionEntryDialog(
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
 
-    var showCreateAccountDialog by remember { mutableStateOf(false) }
-    var showCreateCurrencyDialog by remember { mutableStateOf(false) }
-    var creatingForSource by remember { mutableStateOf(true) }
-
-    var sourceAccountExpanded by remember { mutableStateOf(false) }
-    var targetAccountExpanded by remember { mutableStateOf(false) }
-    var currencyExpanded by remember { mutableStateOf(false) }
-
     val scope = rememberSchemaAwareCoroutineScope()
 
     AlertDialog(
@@ -1027,203 +1143,36 @@ fun TransactionEntryDialog(
                         .padding(vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                // Source Account Dropdown with search
-                var sourceAccountSearchQuery by remember { mutableStateOf("") }
-                val filteredSourceAccounts =
-                    remember(accounts, sourceAccountSearchQuery, targetAccountId) {
-                        val available = accounts.filter { it.id != targetAccountId }
-                        if (sourceAccountSearchQuery.isBlank()) {
-                            available
-                        } else {
-                            available.filter { account ->
-                                account.name.contains(sourceAccountSearchQuery, ignoreCase = true)
-                            }
-                        }
-                    }
+                // Source Account Picker
+                AccountPicker(
+                    selectedAccountId = sourceAccountId,
+                    onAccountSelected = { sourceAccountId = it },
+                    label = "From Account",
+                    accountRepository = accountRepository,
+                    categoryRepository = categoryRepository,
+                    enabled = !isSaving,
+                    excludeAccountId = targetAccountId,
+                )
 
-                ExposedDropdownMenuBox(
-                    expanded = sourceAccountExpanded,
-                    onExpandedChange = { sourceAccountExpanded = it },
-                ) {
-                    OutlinedTextField(
-                        value =
-                            if (sourceAccountExpanded) {
-                                sourceAccountSearchQuery
-                            } else {
-                                accounts.find { it.id == sourceAccountId }?.name ?: ""
-                            },
-                        onValueChange = { sourceAccountSearchQuery = it },
-                        label = { Text("From Account") },
-                        placeholder = { Text("Type to search...") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = sourceAccountExpanded) },
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable),
-                        enabled = !isSaving,
-                        singleLine = true,
-                    )
-                    ExposedDropdownMenu(
-                        expanded = sourceAccountExpanded,
-                        onDismissRequest = {
-                            sourceAccountExpanded = false
-                            sourceAccountSearchQuery = ""
-                        },
-                    ) {
-                        filteredSourceAccounts.forEach { account ->
-                            DropdownMenuItem(
-                                text = { Text(account.name) },
-                                onClick = {
-                                    sourceAccountId = account.id
-                                    sourceAccountExpanded = false
-                                    sourceAccountSearchQuery = ""
-                                },
-                            )
-                        }
-                        HorizontalDivider()
-                        DropdownMenuItem(
-                            text = { Text("+ Create New Account") },
-                            onClick = {
-                                creatingForSource = true
-                                showCreateAccountDialog = true
-                                sourceAccountExpanded = false
-                                sourceAccountSearchQuery = ""
-                            },
-                        )
-                    }
-                }
+                // Target Account Picker
+                AccountPicker(
+                    selectedAccountId = targetAccountId,
+                    onAccountSelected = { targetAccountId = it },
+                    label = "To Account",
+                    accountRepository = accountRepository,
+                    categoryRepository = categoryRepository,
+                    enabled = !isSaving,
+                    excludeAccountId = sourceAccountId,
+                )
 
-                // Target Account Dropdown with search
-                var targetAccountSearchQuery by remember { mutableStateOf("") }
-                val filteredTargetAccounts =
-                    remember(accounts, targetAccountSearchQuery, sourceAccountId) {
-                        val available = accounts.filter { it.id != sourceAccountId }
-                        if (targetAccountSearchQuery.isBlank()) {
-                            available
-                        } else {
-                            available.filter { account ->
-                                account.name.contains(targetAccountSearchQuery, ignoreCase = true)
-                            }
-                        }
-                    }
-
-                ExposedDropdownMenuBox(
-                    expanded = targetAccountExpanded,
-                    onExpandedChange = { targetAccountExpanded = it },
-                ) {
-                    OutlinedTextField(
-                        value =
-                            if (targetAccountExpanded) {
-                                targetAccountSearchQuery
-                            } else {
-                                accounts.find { it.id == targetAccountId }?.name ?: ""
-                            },
-                        onValueChange = { targetAccountSearchQuery = it },
-                        label = { Text("To Account") },
-                        placeholder = { Text("Type to search...") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = targetAccountExpanded) },
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable),
-                        enabled = !isSaving,
-                        singleLine = true,
-                    )
-                    ExposedDropdownMenu(
-                        expanded = targetAccountExpanded,
-                        onDismissRequest = {
-                            targetAccountExpanded = false
-                            targetAccountSearchQuery = ""
-                        },
-                    ) {
-                        filteredTargetAccounts.forEach { account ->
-                            DropdownMenuItem(
-                                text = { Text(account.name) },
-                                onClick = {
-                                    targetAccountId = account.id
-                                    targetAccountExpanded = false
-                                    targetAccountSearchQuery = ""
-                                },
-                            )
-                        }
-                        HorizontalDivider()
-                        DropdownMenuItem(
-                            text = { Text("+ Create New Account") },
-                            onClick = {
-                                creatingForSource = false
-                                showCreateAccountDialog = true
-                                targetAccountExpanded = false
-                                targetAccountSearchQuery = ""
-                            },
-                        )
-                    }
-                }
-
-                // Currency Dropdown with search
-                var currencySearchQuery by remember { mutableStateOf("") }
-                val filteredCurrencies =
-                    remember(currencies, currencySearchQuery) {
-                        if (currencySearchQuery.isBlank()) {
-                            currencies
-                        } else {
-                            currencies.filter { currency ->
-                                currency.code.contains(currencySearchQuery, ignoreCase = true) ||
-                                    currency.name.contains(currencySearchQuery, ignoreCase = true)
-                            }
-                        }
-                    }
-
-                ExposedDropdownMenuBox(
-                    expanded = currencyExpanded,
-                    onExpandedChange = { currencyExpanded = it },
-                ) {
-                    OutlinedTextField(
-                        value =
-                            if (currencyExpanded) {
-                                currencySearchQuery
-                            } else {
-                                currencies.find { it.id == currencyId }?.let { "${it.code} - ${it.name}" } ?: ""
-                            },
-                        onValueChange = { currencySearchQuery = it },
-                        label = { Text("Currency") },
-                        placeholder = { Text("Type to search...") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = currencyExpanded) },
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable),
-                        enabled = !isSaving,
-                        singleLine = true,
-                    )
-                    ExposedDropdownMenu(
-                        expanded = currencyExpanded,
-                        onDismissRequest = {
-                            currencyExpanded = false
-                            currencySearchQuery = ""
-                        },
-                    ) {
-                        filteredCurrencies.forEach { currency ->
-                            DropdownMenuItem(
-                                text = { Text("${currency.code} - ${currency.name}") },
-                                onClick = {
-                                    currencyId = currency.id
-                                    currencyExpanded = false
-                                    currencySearchQuery = ""
-                                },
-                            )
-                        }
-                        // Always show "Create New Currency" option
-                        HorizontalDivider()
-                        DropdownMenuItem(
-                            text = { Text("+ Create New Currency") },
-                            onClick = {
-                                showCreateCurrencyDialog = true
-                                currencyExpanded = false
-                                currencySearchQuery = ""
-                            },
-                        )
-                    }
-                }
+                // Currency Picker
+                CurrencyPicker(
+                    selectedCurrencyId = currencyId,
+                    onCurrencySelected = { currencyId = it },
+                    label = "Currency",
+                    currencyRepository = currencyRepository,
+                    enabled = !isSaving,
+                )
 
                 // Date and Time Pickers
                 val dateTimeTextStyle = MaterialTheme.typography.bodySmall
@@ -1338,9 +1287,9 @@ fun TransactionEntryDialog(
                             errorMessage = null
                             scope.launch {
                                 try {
-                                    // Get the currency object
+                                    // Get the currency object from repository
                                     val currency =
-                                        currencies.find { it.id == currencyId }
+                                        currencyRepository.getCurrencyById(currencyId!!).first()
                                             ?: throw IllegalStateException("Currency not found")
 
                                     // Convert selected date and time to Instant
@@ -1392,35 +1341,6 @@ fun TransactionEntryDialog(
             }
         },
     )
-
-    // Account Creation Dialog
-    if (showCreateAccountDialog) {
-        CreateAccountDialogInline(
-            accountRepository = accountRepository,
-            categoryRepository = categoryRepository,
-            onAccountCreated = { accountId ->
-                if (creatingForSource) {
-                    sourceAccountId = accountId
-                } else {
-                    targetAccountId = accountId
-                }
-                showCreateAccountDialog = false
-            },
-            onDismiss = { showCreateAccountDialog = false },
-        )
-    }
-
-    // Currency Creation Dialog
-    if (showCreateCurrencyDialog) {
-        CreateCurrencyDialogInline(
-            currencyRepository = currencyRepository,
-            onCurrencyCreated = { newCurrencyId ->
-                currencyId = newCurrencyId
-                showCreateCurrencyDialog = false
-            },
-            onDismiss = { showCreateCurrencyDialog = false },
-        )
-    }
 
     // Date Picker Dialog
     if (showDatePicker) {
@@ -1505,11 +1425,6 @@ fun TransactionEditDialog(
     maintenanceService: DatabaseMaintenanceService,
     onDismiss: () -> Unit,
 ) {
-    val accounts by accountRepository.getAllAccounts()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val currencies by currencyRepository.getAllCurrencies()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-
     var sourceAccountId by remember { mutableStateOf(transaction.sourceAccountId) }
     var targetAccountId by remember { mutableStateOf(transaction.targetAccountId) }
     var currencyId by remember { mutableStateOf(transaction.amount.currency.id) }
@@ -1524,14 +1439,6 @@ fun TransactionEditDialog(
     var selectedMinute by remember { mutableStateOf(transactionDateTime.minute) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
-
-    var showCreateAccountDialog by remember { mutableStateOf(false) }
-    var showCreateCurrencyDialog by remember { mutableStateOf(false) }
-    var creatingForSource by remember { mutableStateOf(true) }
-
-    var sourceAccountExpanded by remember { mutableStateOf(false) }
-    var targetAccountExpanded by remember { mutableStateOf(false) }
-    var currencyExpanded by remember { mutableStateOf(false) }
 
     val scope = rememberSchemaAwareCoroutineScope()
 
@@ -1569,202 +1476,36 @@ fun TransactionEditDialog(
                         .padding(vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                // Source Account Dropdown with search
-                var sourceAccountSearchQuery by remember { mutableStateOf("") }
-                val filteredSourceAccounts =
-                    remember(accounts, sourceAccountSearchQuery, targetAccountId) {
-                        val available = accounts.filter { it.id != targetAccountId }
-                        if (sourceAccountSearchQuery.isBlank()) {
-                            available
-                        } else {
-                            available.filter { account ->
-                                account.name.contains(sourceAccountSearchQuery, ignoreCase = true)
-                            }
-                        }
-                    }
+                // Source Account Picker
+                AccountPicker(
+                    selectedAccountId = sourceAccountId,
+                    onAccountSelected = { sourceAccountId = it },
+                    label = "From Account",
+                    accountRepository = accountRepository,
+                    categoryRepository = categoryRepository,
+                    enabled = !isSaving,
+                    excludeAccountId = targetAccountId,
+                )
 
-                ExposedDropdownMenuBox(
-                    expanded = sourceAccountExpanded,
-                    onExpandedChange = { sourceAccountExpanded = it },
-                ) {
-                    OutlinedTextField(
-                        value =
-                            if (sourceAccountExpanded) {
-                                sourceAccountSearchQuery
-                            } else {
-                                accounts.find { it.id == sourceAccountId }?.name ?: ""
-                            },
-                        onValueChange = { sourceAccountSearchQuery = it },
-                        label = { Text("From Account") },
-                        placeholder = { Text("Type to search...") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = sourceAccountExpanded) },
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable),
-                        enabled = !isSaving,
-                        singleLine = true,
-                    )
-                    ExposedDropdownMenu(
-                        expanded = sourceAccountExpanded,
-                        onDismissRequest = {
-                            sourceAccountExpanded = false
-                            sourceAccountSearchQuery = ""
-                        },
-                    ) {
-                        filteredSourceAccounts.forEach { account ->
-                            DropdownMenuItem(
-                                text = { Text(account.name) },
-                                onClick = {
-                                    sourceAccountId = account.id
-                                    sourceAccountExpanded = false
-                                    sourceAccountSearchQuery = ""
-                                },
-                            )
-                        }
-                        HorizontalDivider()
-                        DropdownMenuItem(
-                            text = { Text("+ Create New Account") },
-                            onClick = {
-                                creatingForSource = true
-                                showCreateAccountDialog = true
-                                sourceAccountExpanded = false
-                                sourceAccountSearchQuery = ""
-                            },
-                        )
-                    }
-                }
+                // Target Account Picker
+                AccountPicker(
+                    selectedAccountId = targetAccountId,
+                    onAccountSelected = { targetAccountId = it },
+                    label = "To Account",
+                    accountRepository = accountRepository,
+                    categoryRepository = categoryRepository,
+                    enabled = !isSaving,
+                    excludeAccountId = sourceAccountId,
+                )
 
-                // Target Account Dropdown with search
-                var targetAccountSearchQuery by remember { mutableStateOf("") }
-                val filteredTargetAccounts =
-                    remember(accounts, targetAccountSearchQuery, sourceAccountId) {
-                        val available = accounts.filter { it.id != sourceAccountId }
-                        if (targetAccountSearchQuery.isBlank()) {
-                            available
-                        } else {
-                            available.filter { account ->
-                                account.name.contains(targetAccountSearchQuery, ignoreCase = true)
-                            }
-                        }
-                    }
-
-                ExposedDropdownMenuBox(
-                    expanded = targetAccountExpanded,
-                    onExpandedChange = { targetAccountExpanded = it },
-                ) {
-                    OutlinedTextField(
-                        value =
-                            if (targetAccountExpanded) {
-                                targetAccountSearchQuery
-                            } else {
-                                accounts.find { it.id == targetAccountId }?.name ?: ""
-                            },
-                        onValueChange = { targetAccountSearchQuery = it },
-                        label = { Text("To Account") },
-                        placeholder = { Text("Type to search...") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = targetAccountExpanded) },
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable),
-                        enabled = !isSaving,
-                        singleLine = true,
-                    )
-                    ExposedDropdownMenu(
-                        expanded = targetAccountExpanded,
-                        onDismissRequest = {
-                            targetAccountExpanded = false
-                            targetAccountSearchQuery = ""
-                        },
-                    ) {
-                        filteredTargetAccounts.forEach { account ->
-                            DropdownMenuItem(
-                                text = { Text(account.name) },
-                                onClick = {
-                                    targetAccountId = account.id
-                                    targetAccountExpanded = false
-                                    targetAccountSearchQuery = ""
-                                },
-                            )
-                        }
-                        HorizontalDivider()
-                        DropdownMenuItem(
-                            text = { Text("+ Create New Account") },
-                            onClick = {
-                                creatingForSource = false
-                                showCreateAccountDialog = true
-                                targetAccountExpanded = false
-                                targetAccountSearchQuery = ""
-                            },
-                        )
-                    }
-                }
-
-                // Currency Dropdown with search
-                var currencySearchQuery by remember { mutableStateOf("") }
-                val filteredCurrencies =
-                    remember(currencies, currencySearchQuery) {
-                        if (currencySearchQuery.isBlank()) {
-                            currencies
-                        } else {
-                            currencies.filter { currency ->
-                                currency.code.contains(currencySearchQuery, ignoreCase = true) ||
-                                    currency.name.contains(currencySearchQuery, ignoreCase = true)
-                            }
-                        }
-                    }
-
-                ExposedDropdownMenuBox(
-                    expanded = currencyExpanded,
-                    onExpandedChange = { currencyExpanded = it },
-                ) {
-                    OutlinedTextField(
-                        value =
-                            if (currencyExpanded) {
-                                currencySearchQuery
-                            } else {
-                                currencies.find { it.id == currencyId }?.let { "${it.code} - ${it.name}" } ?: ""
-                            },
-                        onValueChange = { currencySearchQuery = it },
-                        label = { Text("Currency") },
-                        placeholder = { Text("Type to search...") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = currencyExpanded) },
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable),
-                        enabled = !isSaving,
-                        singleLine = true,
-                    )
-                    ExposedDropdownMenu(
-                        expanded = currencyExpanded,
-                        onDismissRequest = {
-                            currencyExpanded = false
-                            currencySearchQuery = ""
-                        },
-                    ) {
-                        filteredCurrencies.forEach { currency ->
-                            DropdownMenuItem(
-                                text = { Text("${currency.code} - ${currency.name}") },
-                                onClick = {
-                                    currencyId = currency.id
-                                    currencyExpanded = false
-                                    currencySearchQuery = ""
-                                },
-                            )
-                        }
-                        HorizontalDivider()
-                        DropdownMenuItem(
-                            text = { Text("+ Create New Currency") },
-                            onClick = {
-                                showCreateCurrencyDialog = true
-                                currencyExpanded = false
-                                currencySearchQuery = ""
-                            },
-                        )
-                    }
-                }
+                // Currency Picker
+                CurrencyPicker(
+                    selectedCurrencyId = currencyId,
+                    onCurrencySelected = { currencyId = it },
+                    label = "Currency",
+                    currencyRepository = currencyRepository,
+                    enabled = !isSaving,
+                )
 
                 // Date and Time Pickers
                 val dateTimeTextStyle = MaterialTheme.typography.bodySmall
@@ -1874,8 +1615,9 @@ fun TransactionEditDialog(
                             errorMessage = null
                             scope.launch {
                                 try {
+                                    // Get the currency object from repository
                                     val currency =
-                                        currencies.find { it.id == currencyId }
+                                        currencyRepository.getCurrencyById(currencyId).first()
                                             ?: throw IllegalStateException("Currency not found")
 
                                     val timestamp =
@@ -1926,33 +1668,6 @@ fun TransactionEditDialog(
             }
         },
     )
-
-    if (showCreateAccountDialog) {
-        CreateAccountDialogInline(
-            accountRepository = accountRepository,
-            categoryRepository = categoryRepository,
-            onAccountCreated = { accountId ->
-                if (creatingForSource) {
-                    sourceAccountId = accountId
-                } else {
-                    targetAccountId = accountId
-                }
-                showCreateAccountDialog = false
-            },
-            onDismiss = { showCreateAccountDialog = false },
-        )
-    }
-
-    if (showCreateCurrencyDialog) {
-        CreateCurrencyDialogInline(
-            currencyRepository = currencyRepository,
-            onCurrencyCreated = { newCurrencyId ->
-                currencyId = newCurrencyId
-                showCreateCurrencyDialog = false
-            },
-            onDismiss = { showCreateCurrencyDialog = false },
-        )
-    }
 
     if (showDatePicker) {
         val datePickerState =
@@ -2021,256 +1736,6 @@ fun TransactionEditDialog(
             },
         )
     }
-}
-
-@Composable
-fun CreateAccountDialogInline(
-    accountRepository: AccountRepository,
-    categoryRepository: CategoryRepository,
-    onAccountCreated: (AccountId) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    var name by remember { mutableStateOf("") }
-    var selectedCategoryId by remember { mutableStateOf(-1L) }
-    var selectedCategoryName by remember { mutableStateOf<String?>(null) }
-    var expanded by remember { mutableStateOf(false) }
-    var showCreateCategoryDialog by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    var isSaving by remember { mutableStateOf(false) }
-
-    val categories by categoryRepository.getAllCategories()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val scope = rememberSchemaAwareCoroutineScope()
-
-    AlertDialog(
-        onDismissRequest = { if (!isSaving) onDismiss() },
-        title = { Text("Create New Account") },
-        text = {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Account Name") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    enabled = !isSaving,
-                )
-
-                ExposedDropdownMenuBox(
-                    expanded = expanded,
-                    onExpandedChange = { expanded = !expanded && !isSaving },
-                ) {
-                    OutlinedTextField(
-                        value =
-                            selectedCategoryName
-                                ?: categories.find { it.id == selectedCategoryId }?.name
-                                ?: "Uncategorized",
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Category") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                        modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
-                        enabled = !isSaving,
-                    )
-                    ExposedDropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { expanded = false },
-                    ) {
-                        categories.forEach { category ->
-                            DropdownMenuItem(
-                                text = { Text(category.name) },
-                                onClick = {
-                                    selectedCategoryId = category.id
-                                    selectedCategoryName = null
-                                    expanded = false
-                                },
-                            )
-                        }
-                        HorizontalDivider()
-                        DropdownMenuItem(
-                            text = { Text("+ Create New Category") },
-                            onClick = {
-                                expanded = false
-                                showCreateCategoryDialog = true
-                            },
-                        )
-                    }
-                }
-
-                errorMessage?.let { error ->
-                    Text(
-                        text = error,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    if (name.isBlank()) {
-                        errorMessage = "Account name is required"
-                    } else {
-                        isSaving = true
-                        errorMessage = null
-                        scope.launch {
-                            try {
-                                val now = Clock.System.now()
-                                // Placeholder ID, repository will assign actual ID
-                                val newAccount =
-                                    Account(
-                                        id = AccountId(0),
-                                        name = name.trim(),
-                                        openingDate = now,
-                                        categoryId = selectedCategoryId,
-                                    )
-                                val accountId = accountRepository.createAccount(newAccount)
-                                onAccountCreated(accountId)
-                            } catch (e: Exception) {
-                                logger.error(e) { "Failed to create account: ${e.message}" }
-                                errorMessage = "Failed to create account: ${e.message}"
-                                isSaving = false
-                            }
-                        }
-                    }
-                },
-                enabled = !isSaving,
-            ) {
-                if (isSaving) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp,
-                    )
-                } else {
-                    Text("Create")
-                }
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                enabled = !isSaving,
-            ) {
-                Text("Cancel")
-            }
-        },
-    )
-
-    if (showCreateCategoryDialog) {
-        CreateCategoryDialog(
-            categoryRepository = categoryRepository,
-            onCategoryCreated = { categoryId, categoryName ->
-                selectedCategoryId = categoryId
-                selectedCategoryName = categoryName
-                showCreateCategoryDialog = false
-            },
-            onDismiss = { showCreateCategoryDialog = false },
-        )
-    }
-}
-
-@Composable
-fun CreateCurrencyDialogInline(
-    currencyRepository: CurrencyRepository,
-    onCurrencyCreated: (CurrencyId) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    var code by remember { mutableStateOf("") }
-    var name by remember { mutableStateOf("") }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    var isSaving by remember { mutableStateOf(false) }
-
-    val scope = rememberSchemaAwareCoroutineScope()
-
-    AlertDialog(
-        onDismissRequest = { if (!isSaving) onDismiss() },
-        title = { Text("Create New Currency") },
-        text = {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                OutlinedTextField(
-                    value = code,
-                    onValueChange = { code = it.uppercase().take(3) },
-                    label = { Text("Currency Code (e.g., USD)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    enabled = !isSaving,
-                )
-
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Currency Name (e.g., US Dollar)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    enabled = !isSaving,
-                )
-
-                errorMessage?.let { error ->
-                    Text(
-                        text = error,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    when {
-                        code.isBlank() -> errorMessage = "Currency code is required"
-                        code.length != 3 -> errorMessage = "Currency code must be 3 characters"
-                        name.isBlank() -> errorMessage = "Currency name is required"
-                        else -> {
-                            isSaving = true
-                            errorMessage = null
-                            scope.launch {
-                                try {
-                                    val currencyId = currencyRepository.upsertCurrencyByCode(code.trim(), name.trim())
-                                    onCurrencyCreated(currencyId)
-                                } catch (e: Exception) {
-                                    logger.error(e) { "Failed to create currency: ${e.message}" }
-                                    errorMessage = "Failed to create currency: ${e.message}"
-                                    isSaving = false
-                                }
-                            }
-                        }
-                    }
-                },
-                enabled = !isSaving,
-            ) {
-                if (isSaving) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp,
-                    )
-                } else {
-                    Text("Create")
-                }
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                enabled = !isSaving,
-            ) {
-                Text("Cancel")
-            }
-        },
-    )
 }
 
 @Composable

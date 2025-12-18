@@ -1,4 +1,5 @@
 plugins {
+    alias(libs.plugins.kotlin.serialization)
     id("moneymanager.android-convention")
     id("moneymanager.kotlin-multiplatform-convention")
 }
@@ -10,6 +11,7 @@ kotlin {
                 implementation(libs.kmlogging)
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.datetime)
+                implementation(libs.kotlinx.serialization.json)
                 implementation(projects.utils.bigdecimal)
             }
         }

@@ -44,6 +44,7 @@ import kotlinx.datetime.toLocalDateTime
 fun CsvImportsScreen(
     csvImportRepository: CsvImportRepository,
     onImportClick: (CsvImportId) -> Unit,
+    onStrategiesClick: () -> Unit = {},
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
     val imports by csvImportRepository.getAllImports()
@@ -96,16 +97,25 @@ fun CsvImportsScreen(
                 text = "CSV Imports",
                 style = MaterialTheme.typography.headlineMedium,
             )
-            TextButton(
-                onClick = { filePicker.launch() },
-                enabled = !isImporting,
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                if (isImporting) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.height(16.dp),
-                    )
-                } else {
-                    Text("+ Import CSV")
+                TextButton(
+                    onClick = onStrategiesClick,
+                ) {
+                    Text("Strategies")
+                }
+                TextButton(
+                    onClick = { filePicker.launch() },
+                    enabled = !isImporting,
+                ) {
+                    if (isImporting) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.height(16.dp),
+                        )
+                    } else {
+                        Text("+ Import CSV")
+                    }
                 }
             }
         }
