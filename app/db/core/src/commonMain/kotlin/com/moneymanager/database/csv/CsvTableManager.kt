@@ -26,7 +26,7 @@ class CsvTableManager(private val database: MoneyManagerDatabaseWrapper) {
         val columns = (0 until columnCount).joinToString(", ") { "col_$it TEXT" }
         database.execute(
             null,
-            "CREATE TABLE IF NOT EXISTS $tableName (row_index INTEGER PRIMARY KEY AUTOINCREMENT, _transfer_id TEXT, $columns)",
+            "CREATE TABLE IF NOT EXISTS $tableName (row_index INTEGER PRIMARY KEY AUTOINCREMENT, transaction_id TEXT, $columns)",
             0,
         )
     }
@@ -82,7 +82,7 @@ class CsvTableManager(private val database: MoneyManagerDatabaseWrapper) {
         offset: Int,
     ): List<CsvRow> {
         val columns = (0 until columnCount).joinToString(", ") { "col_$it" }
-        val sql = "SELECT row_index, _transfer_id, $columns FROM $tableName ORDER BY row_index LIMIT $limit OFFSET $offset"
+        val sql = "SELECT row_index, transaction_id, $columns FROM $tableName ORDER BY row_index LIMIT $limit OFFSET $offset"
 
         val result = mutableListOf<CsvRow>()
         database.executeQuery(
@@ -155,7 +155,7 @@ class CsvTableManager(private val database: MoneyManagerDatabaseWrapper) {
     ) {
         database.execute(
             null,
-            "UPDATE $tableName SET _transfer_id = '${transferId.id}' WHERE row_index = $rowIndex",
+            "UPDATE $tableName SET transaction_id = '${transferId.id}' WHERE row_index = $rowIndex",
             0,
         )
     }
@@ -187,7 +187,7 @@ class CsvTableManager(private val database: MoneyManagerDatabaseWrapper) {
     ) {
         database.execute(
             null,
-            "UPDATE $tableName SET _transfer_id = NULL WHERE row_index = $rowIndex",
+            "UPDATE $tableName SET transaction_id = NULL WHERE row_index = $rowIndex",
             0,
         )
     }
