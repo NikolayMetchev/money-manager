@@ -349,6 +349,7 @@ private fun MoneyManagerAppContent(
                             onCurrencyIdChange = { currencyId ->
                                 currentlyViewedCurrencyId = currencyId
                             },
+                            scrollToTransferId = screen.scrollToTransferId,
                         )
                     }
                     is Screen.CsvImports -> {
@@ -393,6 +394,7 @@ private fun MoneyManagerAppContent(
                                                         Screen.AccountTransactions(
                                                             accountId = account.id,
                                                             accountName = account.name,
+                                                            scrollToTransferId = transferId,
                                                         )
                                                 }
                                             }

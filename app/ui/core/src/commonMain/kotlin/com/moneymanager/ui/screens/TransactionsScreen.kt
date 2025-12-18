@@ -143,6 +143,7 @@ fun AccountTransactionsScreen(
     maintenanceService: DatabaseMaintenanceService,
     onAccountIdChange: (AccountId) -> Unit = {},
     onCurrencyIdChange: (CurrencyId?) -> Unit = {},
+    scrollToTransferId: TransferId? = null,
 ) {
     // Audit transaction state - when set, shows full-screen audit view
     var transactionIdToAudit by remember { mutableStateOf<TransferId?>(null) }
@@ -641,6 +642,68 @@ fun AccountTransactionsScreen(
                 }
 
                 val listState = rememberLazyListState()
+
+                // Scroll to specific transaction if requested
+                LaunchedEffect(scrollToTransferId, filteredRunningBalances) {
+                    scrollToTransferId?.let { targetTransferId ->
+                        // Set highlighted transaction (TransferId implements TransactionId)
+                        highlightedTransactionId = targetTransferId
+
+                        // Find the index of the transaction in the list
+                        val index =
+                            filteredRunningBalances.indexOfFirst {
+                                it.transactionId.id == targetTransferId.id
+                            }
+                        if (index >= 0) {
+                            // Scroll to the transaction
+                            listState.animateScrollToItem(index)
+
+                            // Get the transaction to scroll matrix to its currency
+                            val transaction = filteredRunningBalances[index]
+                            selectedCurrencyId = transaction.transactionAmount.currency.id
+
+                            // Scroll matrix to show the account and currency
+                            val accountIndex = allAccounts.indexOfFirst { it.id == accountId }
+                            val currencyIndex =
+                                uniqueCurrencyIds.indexOfFirst {
+                                    it == transaction.transactionAmount.currency.id
+                                }
+
+                            if (accountIndex >= 0 && currencyIndex >= 0) {
+                                with(density) {
+                                    val spacingPx = 8.dp.toPx()
+
+                                    // Calculate horizontal scroll position
+                                    var columnStartPx = 0f
+                                    for (i in 0 until accountIndex) {
+                                        val acc = allAccounts[i]
+                                        val colWidth = accountColumnWidths[acc.id] ?: ACCOUNT_COLUMN_MIN_WIDTH
+                                        columnStartPx += colWidth.toPx() + spacingPx
+                                    }
+                                    val targetAccount = allAccounts[accountIndex]
+                                    val targetColumnWidth = accountColumnWidths[targetAccount.id] ?: ACCOUNT_COLUMN_MIN_WIDTH
+                                    val currencyLabelWidthPx = 60.dp.toPx()
+                                    val viewportWidthPx = containerWidthDp.toPx() - currencyLabelWidthPx
+                                    val columnCenterPx = columnStartPx + (targetColumnWidth.toPx() / 2)
+                                    val targetScrollX = (columnCenterPx - (viewportWidthPx / 2)).coerceAtLeast(0f).toInt()
+
+                                    // Calculate vertical scroll position
+                                    val rowHeightPx = 28.dp.toPx()
+                                    val matrixHeightPx = containerHeightDp.toPx() * 0.3f
+                                    val accountHeaderHeightPx = 24.dp.toPx()
+                                    val viewportHeightPx = matrixHeightPx - accountHeaderHeightPx
+                                    val rowStartPx = currencyIndex * rowHeightPx
+                                    val rowCenterPx = rowStartPx + (rowHeightPx / 2)
+                                    val targetScrollY = (rowCenterPx - (viewportHeightPx / 2)).coerceAtLeast(0f).toInt()
+
+                                    // Animate scrolls
+                                    launch { horizontalScrollState.animateScrollTo(targetScrollX) }
+                                    launch { verticalScrollState.animateScrollTo(targetScrollY) }
+                                }
+                            }
+                        }
+                    }
+                }
 
                 // Trigger pagination when user scrolls near the end
                 LaunchedEffect(listState, isLoadingPage, currentPagingInfo?.hasMore) {
