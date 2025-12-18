@@ -275,21 +275,35 @@ fun AccountTransactionsScreen(
             }
 
         // Load first page when account changes
-        LaunchedEffect(selectedAccountId, pageSize) {
+        // If scrollToTransferId is provided, load the page containing that transaction
+        LaunchedEffect(selectedAccountId, pageSize, scrollToTransferId) {
             runningBalances = emptyList()
             currentPagingInfo = null
             hasLoadedFirstPage = false
             isLoadingPage = true
 
             try {
-                val result =
-                    transactionRepository.getRunningBalanceByAccountPaginated(
-                        accountId = selectedAccountId,
-                        pageSize = pageSize,
-                        pagingInfo = null,
-                    )
-                runningBalances = result.items
-                currentPagingInfo = result.pagingInfo
+                if (scrollToTransferId != null) {
+                    // Load the page containing the target transaction
+                    val pageResult =
+                        transactionRepository.getPageContainingTransaction(
+                            accountId = selectedAccountId,
+                            transactionId = scrollToTransferId,
+                            pageSize = pageSize,
+                        )
+                    runningBalances = pageResult.items
+                    currentPagingInfo = pageResult.pagingInfo
+                } else {
+                    // Normal first page load
+                    val result =
+                        transactionRepository.getRunningBalanceByAccountPaginated(
+                            accountId = selectedAccountId,
+                            pageSize = pageSize,
+                            pagingInfo = null,
+                        )
+                    runningBalances = result.items
+                    currentPagingInfo = result.pagingInfo
+                }
                 hasLoadedFirstPage = true
             } catch (e: kotlinx.coroutines.CancellationException) {
                 // Cancellation is expected when user navigates away quickly
@@ -644,23 +658,28 @@ fun AccountTransactionsScreen(
                 val listState = rememberLazyListState()
 
                 // Scroll to specific transaction if requested
-                LaunchedEffect(scrollToTransferId, filteredRunningBalances) {
+                LaunchedEffect(scrollToTransferId, runningBalances) {
                     scrollToTransferId?.let { targetTransferId ->
                         // Set highlighted transaction (TransferId implements TransactionId)
                         highlightedTransactionId = targetTransferId
 
-                        // Find the index of the transaction in the list
+                        // First find the transaction in unfiltered list to get its currency
+                        val transaction =
+                            runningBalances.find { it.transactionId.id == targetTransferId.id }
+                                ?: return@let
+
+                        // Set currency filter to match the transaction
+                        selectedCurrencyId = transaction.transactionAmount.currency.id
+
+                        // Now find the index in the filtered list (which now includes this currency)
                         val index =
-                            filteredRunningBalances.indexOfFirst {
-                                it.transactionId.id == targetTransferId.id
-                            }
+                            runningBalances.filter {
+                                it.transactionAmount.currency.id == transaction.transactionAmount.currency.id
+                            }.indexOfFirst { it.transactionId.id == targetTransferId.id }
+
                         if (index >= 0) {
                             // Scroll to the transaction
                             listState.animateScrollToItem(index)
-
-                            // Get the transaction to scroll matrix to its currency
-                            val transaction = filteredRunningBalances[index]
-                            selectedCurrencyId = transaction.transactionAmount.currency.id
 
                             // Scroll matrix to show the account and currency
                             val accountIndex = allAccounts.indexOfFirst { it.id == accountId }

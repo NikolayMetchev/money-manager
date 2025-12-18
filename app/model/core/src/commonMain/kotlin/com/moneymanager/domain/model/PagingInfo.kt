@@ -14,3 +14,13 @@ data class PagingResult<T>(
     val items: List<T>,
     val pagingInfo: PagingInfo,
 )
+
+/**
+ * Result of loading a page centered around a specific item.
+ * Includes the index of the target item within the page.
+ */
+data class PageWithTargetIndex<T>(
+    val items: List<T>,
+    val targetIndex: Int,
+    val pagingInfo: PagingInfo,
+)

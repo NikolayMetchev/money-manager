@@ -315,6 +315,54 @@ class AccountTransactionsScreenTest {
             )
         }
 
+        override suspend fun getPageContainingTransaction(
+            accountId: AccountId,
+            transactionId: TransferId,
+            pageSize: Int,
+        ): com.moneymanager.domain.model.PageWithTargetIndex<AccountRow> {
+            val allRows =
+                transfers.flatMap { transfer ->
+                    listOf(
+                        AccountRow(
+                            transactionId = transfer.id,
+                            timestamp = transfer.timestamp,
+                            description = transfer.description,
+                            accountId = transfer.sourceAccountId,
+                            transactionAmount = Money(-transfer.amount.amount, transfer.amount.currency),
+                            runningBalance = transfer.amount,
+                            sourceAccountId = transfer.sourceAccountId,
+                            targetAccountId = transfer.targetAccountId,
+                        ),
+                        AccountRow(
+                            transactionId = transfer.id,
+                            timestamp = transfer.timestamp,
+                            description = transfer.description,
+                            accountId = transfer.targetAccountId,
+                            transactionAmount = transfer.amount,
+                            runningBalance = transfer.amount,
+                            sourceAccountId = transfer.sourceAccountId,
+                            targetAccountId = transfer.targetAccountId,
+                        ),
+                    )
+                }.filter { it.accountId == accountId }
+                    .sortedByDescending { it.timestamp }
+
+            val targetIndex = allRows.indexOfFirst { it.transactionId.id == transactionId.id }
+            val items = allRows.take(pageSize)
+            val hasMore = allRows.size > pageSize
+
+            return com.moneymanager.domain.model.PageWithTargetIndex(
+                items = items,
+                targetIndex = targetIndex,
+                pagingInfo =
+                    com.moneymanager.domain.model.PagingInfo(
+                        lastTimestamp = items.lastOrNull()?.timestamp,
+                        lastId = items.lastOrNull()?.transactionId,
+                        hasMore = hasMore,
+                    ),
+            )
+        }
+
         override suspend fun createTransfer(transfer: Transfer) {}
 
         override suspend fun createTransfersBatch(transfers: List<Transfer>) {}

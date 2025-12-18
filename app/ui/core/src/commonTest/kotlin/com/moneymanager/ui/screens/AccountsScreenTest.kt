@@ -16,6 +16,7 @@ import com.moneymanager.domain.model.CategoryBalance
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Transfer
+import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
@@ -406,6 +407,22 @@ class AccountsScreenTest {
         ): com.moneymanager.domain.model.PagingResult<AccountRow> =
             com.moneymanager.domain.model.PagingResult(
                 items = emptyList(),
+                pagingInfo =
+                    com.moneymanager.domain.model.PagingInfo(
+                        lastTimestamp = null,
+                        lastId = null,
+                        hasMore = false,
+                    ),
+            )
+
+        override suspend fun getPageContainingTransaction(
+            accountId: AccountId,
+            transactionId: TransferId,
+            pageSize: Int,
+        ): com.moneymanager.domain.model.PageWithTargetIndex<AccountRow> =
+            com.moneymanager.domain.model.PageWithTargetIndex(
+                items = emptyList(),
+                targetIndex = -1,
                 pagingInfo =
                     com.moneymanager.domain.model.PagingInfo(
                         lastTimestamp = null,

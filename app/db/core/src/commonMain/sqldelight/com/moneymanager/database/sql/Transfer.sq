@@ -383,6 +383,44 @@ WHERE RunningBalanceMaterializedView.accountId = ?
 ORDER BY RunningBalanceMaterializedView.timestamp DESC, RunningBalanceMaterializedView.id DESC
 LIMIT ?;
 
+-- Get the row position (0-indexed) of a transaction within an account's transaction list
+-- Returns the count of transactions that come BEFORE this one (i.e., have higher timestamp or same timestamp but higher id)
+getTransactionRowPosition:
+SELECT COUNT(*) AS rowPosition
+FROM RunningBalanceMaterializedView
+WHERE accountId = :accountId
+  AND (timestamp > :targetTimestamp
+       OR (timestamp = :targetTimestamp AND id > :targetId));
+
+-- Load transactions for an account with offset-based pagination
+selectRunningBalanceByAccountOffset:
+SELECT
+    RunningBalanceMaterializedView.id,
+    RunningBalanceMaterializedView.timestamp,
+    RunningBalanceMaterializedView.description,
+    RunningBalanceMaterializedView.accountId,
+    RunningBalanceMaterializedView.currencyId,
+    RunningBalanceMaterializedView.transactionAmount,
+    RunningBalanceMaterializedView.runningBalance,
+    Currency.id AS currency_id,
+    Currency.code AS currency_code,
+    Currency.name AS currency_name,
+    Currency.scaleFactor AS currency_scaleFactor,
+    Transfer.sourceAccountId,
+    Transfer.targetAccountId
+FROM RunningBalanceMaterializedView
+JOIN Currency ON RunningBalanceMaterializedView.currencyId = Currency.id
+JOIN Transfer ON RunningBalanceMaterializedView.id = Transfer.id
+WHERE RunningBalanceMaterializedView.accountId = :accountId
+ORDER BY RunningBalanceMaterializedView.timestamp DESC, RunningBalanceMaterializedView.id DESC
+LIMIT :limit OFFSET :offset;
+
+-- Get total count of transactions for an account
+countTransactionsByAccount:
+SELECT COUNT(*) AS count
+FROM RunningBalanceMaterializedView
+WHERE accountId = :accountId;
+
 -- Test helper queries
 countPendingChanges:
 SELECT COUNT(*) AS count FROM PendingMaterializedViewChanges;
