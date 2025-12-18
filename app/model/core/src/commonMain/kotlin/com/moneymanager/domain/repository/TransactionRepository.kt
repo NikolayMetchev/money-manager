@@ -8,6 +8,7 @@ import com.moneymanager.domain.model.AccountRow
 import com.moneymanager.domain.model.PageWithTargetIndex
 import com.moneymanager.domain.model.PagingInfo
 import com.moneymanager.domain.model.PagingResult
+import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import kotlinx.coroutines.flow.Flow
@@ -36,6 +37,23 @@ interface TransactionRepository {
         accountId: AccountId,
         pageSize: Int,
         pagingInfo: PagingInfo?,
+    ): PagingResult<AccountRow>
+
+    /**
+     * Loads older transactions (backward pagination - items that come before the current first item).
+     * Used when user scrolls up after navigating to a transaction in the middle of the list.
+     *
+     * @param accountId The account to load transactions for
+     * @param pageSize The number of transactions to load
+     * @param firstTimestamp Timestamp of the first item in the current list
+     * @param firstId ID of the first item in the current list
+     * @return A PagingResult containing items to prepend (in correct display order)
+     */
+    suspend fun getRunningBalanceByAccountPaginatedBackward(
+        accountId: AccountId,
+        pageSize: Int,
+        firstTimestamp: Instant,
+        firstId: TransactionId,
     ): PagingResult<AccountRow>
 
     /**

@@ -189,6 +189,9 @@ fun AccountTransactionsScreen(
     var currentPagingInfo by remember { mutableStateOf<com.moneymanager.domain.model.PagingInfo?>(null) }
     var isLoadingPage by remember { mutableStateOf(false) }
     var hasLoadedFirstPage by remember { mutableStateOf(false) }
+    // Backward paging state - tracks if there are more items at the start of the list
+    var hasPreviousPage by remember { mutableStateOf(false) }
+    var isLoadingPreviousPage by remember { mutableStateOf(false) }
 
     // Loading state - separate tracking for matrix (top) and transactions (bottom)
     var hasLoadedMatrix by remember { mutableStateOf(false) }
@@ -281,6 +284,7 @@ fun AccountTransactionsScreen(
             currentPagingInfo = null
             hasLoadedFirstPage = false
             isLoadingPage = true
+            hasPreviousPage = false
 
             try {
                 if (scrollToTransferId != null) {
@@ -293,8 +297,10 @@ fun AccountTransactionsScreen(
                         )
                     runningBalances = pageResult.items
                     currentPagingInfo = pageResult.pagingInfo
+                    // Use the hasPrevious flag from the page result
+                    hasPreviousPage = pageResult.hasPrevious
                 } else {
-                    // Normal first page load
+                    // Normal first page load - no previous items
                     val result =
                         transactionRepository.getRunningBalanceByAccountPaginated(
                             accountId = selectedAccountId,
@@ -303,6 +309,7 @@ fun AccountTransactionsScreen(
                         )
                     runningBalances = result.items
                     currentPagingInfo = result.pagingInfo
+                    hasPreviousPage = false
                 }
                 hasLoadedFirstPage = true
             } catch (e: kotlinx.coroutines.CancellationException) {
@@ -337,6 +344,33 @@ fun AccountTransactionsScreen(
                 logger.error(e) { "Failed to load more transactions: ${e.message}" }
             } finally {
                 isLoadingPage = false
+            }
+        }
+
+        // Function to load previous page (backward pagination)
+        suspend fun loadPreviousPage() {
+            if (isLoadingPreviousPage || !hasPreviousPage || runningBalances.isEmpty()) return
+
+            val firstItem = runningBalances.first()
+            isLoadingPreviousPage = true
+            try {
+                val result =
+                    transactionRepository.getRunningBalanceByAccountPaginatedBackward(
+                        accountId = selectedAccountId,
+                        pageSize = pageSize,
+                        firstTimestamp = firstItem.timestamp,
+                        firstId = firstItem.transactionId,
+                    )
+                if (result.items.isNotEmpty()) {
+                    runningBalances = result.items + runningBalances
+                }
+                hasPreviousPage = result.pagingInfo.hasMore
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                logger.error(e) { "Failed to load previous transactions: ${e.message}" }
+            } finally {
+                isLoadingPreviousPage = false
             }
         }
 
@@ -737,6 +771,23 @@ fun AccountTransactionsScreen(
                             currentPagingInfo?.hasMore == true
                         ) {
                             loadNextPage()
+                        }
+                    }
+                }
+
+                // Trigger backward pagination when user scrolls near the beginning
+                LaunchedEffect(listState, isLoadingPreviousPage, hasPreviousPage) {
+                    snapshotFlow {
+                        val firstVisibleItem = listState.layoutInfo.visibleItemsInfo.firstOrNull()
+                        firstVisibleItem?.index
+                    }.collect { firstVisibleIndex ->
+                        // Load previous when within 5 items of the start
+                        if (firstVisibleIndex != null &&
+                            firstVisibleIndex <= 5 &&
+                            !isLoadingPreviousPage &&
+                            hasPreviousPage
+                        ) {
+                            loadPreviousPage()
                         }
                     }
                 }

@@ -57,7 +57,7 @@ fun CsvImportDetailScreen(
     maintenanceService: DatabaseMaintenanceService,
     onBack: () -> Unit,
     onDeleted: () -> Unit,
-    onTransferClick: ((TransferId) -> Unit)? = null,
+    onTransferClick: ((TransferId, Boolean) -> Unit)? = null,
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
     val import by csvImportRepository.getImport(importId)
@@ -70,6 +70,16 @@ fun CsvImportDetailScreen(
     var isDeleting by remember { mutableStateOf(false) }
     var importResultMessage by remember { mutableStateOf<String?>(null) }
     var rowsRefreshTrigger by remember { mutableStateOf(0) }
+
+    // Determine amount column index by looking for common amount column names
+    val amountColumnIndex =
+        remember(import) {
+            import?.columns?.indexOfFirst { column ->
+                val name = column.originalName.lowercase()
+                name == "amount" || name == "value" || name == "total" ||
+                    name == "debit" || name == "credit" || name.contains("amount")
+            }?.takeIf { it >= 0 }
+        }
 
     // Load rows when import is available or after import completes
     LaunchedEffect(import, rowsRefreshTrigger) {
@@ -223,6 +233,7 @@ fun CsvImportDetailScreen(
                         columns = currentImport.columns,
                         rows = rows,
                         modifier = Modifier.fillMaxSize(),
+                        amountColumnIndex = amountColumnIndex,
                         onTransferClick = onTransferClick,
                     )
                 }

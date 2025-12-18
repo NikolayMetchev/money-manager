@@ -39,7 +39,8 @@ fun CsvPreviewTable(
     rows: List<CsvRow>,
     modifier: Modifier = Modifier,
     columnWidth: Dp = 150.dp,
-    onTransferClick: ((TransferId) -> Unit)? = null,
+    amountColumnIndex: Int? = null,
+    onTransferClick: ((TransferId, Boolean) -> Unit)? = null,
 ) {
     val horizontalScrollState = rememberScrollState()
     val lazyListState = rememberLazyListState()
@@ -106,9 +107,23 @@ fun CsvPreviewTable(
                                 .fillMaxWidth()
                                 .horizontalScroll(horizontalScrollState),
                     ) {
+                        // Determine if amount is positive from the amount column
+                        val isPositiveAmount =
+                            amountColumnIndex?.let { idx ->
+                                if (idx in row.values.indices) {
+                                    val amountStr = row.values[idx].trim()
+                                    // Parse the amount string - positive if it doesn't start with '-'
+                                    // Also handle parentheses notation (123) as negative
+                                    !amountStr.startsWith("-") && !amountStr.startsWith("(")
+                                } else {
+                                    true
+                                }
+                            } ?: true
+
                         // Transfer ID cell
                         TransferIdCell(
                             transferId = row.transferId,
+                            isPositiveAmount = isPositiveAmount,
                             onClick = onTransferClick,
                         )
 
@@ -155,7 +170,8 @@ fun CsvPreviewTable(
 @Composable
 private fun TransferIdCell(
     transferId: TransferId?,
-    onClick: ((TransferId) -> Unit)?,
+    isPositiveAmount: Boolean,
+    onClick: ((TransferId, Boolean) -> Unit)?,
 ) {
     Box(
         modifier =
@@ -167,7 +183,7 @@ private fun TransferIdCell(
                 )
                 .then(
                     if (transferId != null && onClick != null) {
-                        Modifier.clickable { onClick(transferId) }
+                        Modifier.clickable { onClick(transferId, isPositiveAmount) }
                     } else {
                         Modifier
                     },

@@ -383,6 +383,33 @@ WHERE RunningBalanceMaterializedView.accountId = ?
 ORDER BY RunningBalanceMaterializedView.timestamp DESC, RunningBalanceMaterializedView.id DESC
 LIMIT ?;
 
+-- Load earlier transactions (backward pagination - items newer than the current first item)
+-- Results are returned in ASC order (oldest first), must be reversed in code
+selectRunningBalanceByAccountPaginatedBackward:
+SELECT
+    RunningBalanceMaterializedView.id,
+    RunningBalanceMaterializedView.timestamp,
+    RunningBalanceMaterializedView.description,
+    RunningBalanceMaterializedView.accountId,
+    RunningBalanceMaterializedView.currencyId,
+    RunningBalanceMaterializedView.transactionAmount,
+    RunningBalanceMaterializedView.runningBalance,
+    Currency.id AS currency_id,
+    Currency.code AS currency_code,
+    Currency.name AS currency_name,
+    Currency.scaleFactor AS currency_scaleFactor,
+    Transfer.sourceAccountId,
+    Transfer.targetAccountId
+FROM RunningBalanceMaterializedView
+JOIN Currency ON RunningBalanceMaterializedView.currencyId = Currency.id
+JOIN Transfer ON RunningBalanceMaterializedView.id = Transfer.id
+WHERE RunningBalanceMaterializedView.accountId = ?
+  AND (RunningBalanceMaterializedView.timestamp > :firstTimestamp
+       OR (RunningBalanceMaterializedView.timestamp = :firstTimestamp
+           AND RunningBalanceMaterializedView.id > :firstId))
+ORDER BY RunningBalanceMaterializedView.timestamp ASC, RunningBalanceMaterializedView.id ASC
+LIMIT ?;
+
 -- Get the row position (0-indexed) of a transaction within an account's transaction list
 -- Returns the count of transactions that come BEFORE this one (i.e., have higher timestamp or same timestamp but higher id)
 getTransactionRowPosition:

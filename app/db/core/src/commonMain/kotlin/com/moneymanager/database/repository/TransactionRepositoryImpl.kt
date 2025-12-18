@@ -15,6 +15,7 @@ import com.moneymanager.domain.model.AccountRow
 import com.moneymanager.domain.model.PageWithTargetIndex
 import com.moneymanager.domain.model.PagingInfo
 import com.moneymanager.domain.model.PagingResult
+import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.TransactionRepository
@@ -131,6 +132,67 @@ class TransactionRepositoryImpl(
             )
         }
 
+    override suspend fun getRunningBalanceByAccountPaginatedBackward(
+        accountId: AccountId,
+        pageSize: Int,
+        firstTimestamp: Instant,
+        firstId: TransactionId,
+    ): PagingResult<AccountRow> =
+        withContext(Dispatchers.Default) {
+            val items =
+                transferQueries.selectRunningBalanceByAccountPaginatedBackward(
+                    accountId.id,
+                    firstTimestamp.toEpochMilliseconds(),
+                    firstId.id.toString(),
+                    (pageSize + 1).toLong(),
+                ) { id, timestamp, description, accountId_, currencyId, transactionAmount, runningBalance,
+                    currency_id, currency_code, currency_name, currency_scaleFactor, sourceAccountId, targetAccountId,
+                    ->
+                    AccountRowMapper.mapRaw(
+                        id,
+                        timestamp,
+                        description,
+                        accountId_,
+                        currencyId,
+                        transactionAmount,
+                        runningBalance,
+                        currency_id,
+                        currency_code,
+                        currency_name,
+                        currency_scaleFactor,
+                        sourceAccountId,
+                        targetAccountId,
+                    )
+                }
+                    .executeAsList()
+                    // Reverse to get correct display order (newest first)
+                    .reversed()
+
+            val hasMore = items.size > pageSize
+            val pageItems = if (hasMore) items.drop(1) else items
+
+            val nextPagingInfo =
+                if (hasMore && pageItems.isNotEmpty()) {
+                    val firstItem = pageItems.first()
+                    PagingInfo(
+                        lastTimestamp = firstItem.timestamp,
+                        lastId = firstItem.transactionId,
+                        hasMore = true,
+                    )
+                } else {
+                    PagingInfo(
+                        lastTimestamp = null,
+                        lastId = null,
+                        hasMore = false,
+                    )
+                }
+
+            PagingResult(
+                items = pageItems,
+                pagingInfo = nextPagingInfo,
+            )
+        }
+
     override suspend fun getPageContainingTransaction(
         accountId: AccountId,
         transactionId: TransferId,
@@ -219,6 +281,7 @@ class TransactionRepositoryImpl(
                 items = items,
                 targetIndex = targetIndex,
                 pagingInfo = pagingInfo,
+                hasPrevious = offset > 0,
             )
         }
 

@@ -23,4 +23,6 @@ data class PageWithTargetIndex<T>(
     val items: List<T>,
     val targetIndex: Int,
     val pagingInfo: PagingInfo,
+    /** True if there are items before this page (newer items with higher timestamps) */
+    val hasPrevious: Boolean,
 )

@@ -415,6 +415,22 @@ class AccountsScreenTest {
                     ),
             )
 
+        override suspend fun getRunningBalanceByAccountPaginatedBackward(
+            accountId: AccountId,
+            pageSize: Int,
+            firstTimestamp: Instant,
+            firstId: com.moneymanager.domain.model.TransactionId,
+        ): com.moneymanager.domain.model.PagingResult<AccountRow> =
+            com.moneymanager.domain.model.PagingResult(
+                items = emptyList(),
+                pagingInfo =
+                    com.moneymanager.domain.model.PagingInfo(
+                        lastTimestamp = null,
+                        lastId = null,
+                        hasMore = false,
+                    ),
+            )
+
         override suspend fun getPageContainingTransaction(
             accountId: AccountId,
             transactionId: TransferId,
@@ -429,6 +445,7 @@ class AccountsScreenTest {
                         lastId = null,
                         hasMore = false,
                     ),
+                hasPrevious = false,
             )
 
         override suspend fun createTransfer(transfer: Transfer) {}

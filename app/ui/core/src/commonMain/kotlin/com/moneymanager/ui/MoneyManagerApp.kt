@@ -379,16 +379,21 @@ private fun MoneyManagerAppContent(
                             maintenanceService = repositorySet.maintenanceService,
                             onBack = { currentScreen = Screen.CsvImports },
                             onDeleted = { currentScreen = Screen.CsvImports },
-                            onTransferClick = { transferId ->
+                            onTransferClick = { transferId, isPositiveAmount ->
                                 scope.launch {
                                     repositorySet.transactionRepository
                                         .getTransactionById(transferId.id)
                                         .collect { transfer ->
                                             transfer?.let {
-                                                val account =
-                                                    accounts.find { a ->
-                                                        a.id == transfer.sourceAccountId
+                                                // Navigate to target account if positive (money coming in),
+                                                // source account if negative (money going out)
+                                                val accountId =
+                                                    if (isPositiveAmount) {
+                                                        transfer.targetAccountId
+                                                    } else {
+                                                        transfer.sourceAccountId
                                                     }
+                                                val account = accounts.find { a -> a.id == accountId }
                                                 if (account != null) {
                                                     currentScreen =
                                                         Screen.AccountTransactions(
