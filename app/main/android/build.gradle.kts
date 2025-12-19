@@ -2,29 +2,6 @@ plugins {
     id("moneymanager.android-application-convention")
 }
 
-kotlin {
-    sourceSets {
-        val androidMain by getting {
-            dependencies {
-                implementation(kotlin("stdlib"))
-                implementation(compose.components.resources)
-                implementation(compose.foundation)
-                implementation(compose.material3)
-                implementation(compose.runtime)
-                implementation(compose.ui)
-                implementation(libs.androidx.activity)
-                implementation(libs.androidx.activity.compose)
-                implementation(libs.androidx.compose.runtime)
-                implementation(libs.kotlinx.coroutines.core)
-                implementation(libs.sqldelight.runtime)
-                implementation(projects.app.db.core)
-                implementation(projects.app.di.core)
-                implementation(projects.app.ui.core)
-            }
-        }
-    }
-}
-
 android {
     namespace = "com.moneymanager.android"
 
@@ -60,8 +37,10 @@ tasks.matching { it.name.startsWith("explodeAssetSource") }.configureEach {
 
 dependencies {
     implementation(kotlin("stdlib"))
+    implementation(compose.components.resources)
     implementation(libs.androidx.activity)
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.compose.runtime)
     implementation(projects.app.db.core)
     implementation(projects.app.di.core)
     implementation(projects.app.ui.core)
