@@ -1,20 +1,23 @@
 import com.android.build.api.dsl.ApplicationExtension
-import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("moneymanager.kotlin-convention")
     id("com.android.application")
     id("org.jetbrains.compose")
-    id("org.jetbrains.kotlin.multiplatform")
+    id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
 val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
+val jvmTargetVersion = libs.findVersion("jvm-target").get().toString()
 
-configure<KotlinMultiplatformExtension> {
-    androidTarget { }
-
+kotlin {
     jvmToolchain(libs.findVersion("jvm-toolchain").get().toString().toInt())
+
+    compilerOptions {
+        jvmTarget.set(JvmTarget.fromTarget(jvmTargetVersion))
+    }
 }
 
 configure<ApplicationExtension> {
@@ -32,8 +35,8 @@ configure<ApplicationExtension> {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_24
-        targetCompatibility = JavaVersion.VERSION_24
+        sourceCompatibility = JavaVersion.toVersion(jvmTargetVersion)
+        targetCompatibility = JavaVersion.toVersion(jvmTargetVersion)
     }
 }
 
