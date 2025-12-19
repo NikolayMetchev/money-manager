@@ -1,3 +1,4 @@
+import dev.detekt.gradle.Detekt
 import kotlinx.kover.gradle.plugin.dsl.KoverProjectExtension
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
@@ -14,16 +15,23 @@ val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
 // Example: :app:model:core -> app.model.core
 group = project.path.removePrefix(":").replace(":", ".")
 
-// Configure JVM target for all Kotlin compilation tasks
-tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
-    compilerOptions {
-        jvmTarget.set(JvmTarget.fromTarget(libs.findVersion("jvm-target").get().toString()))
-    }
-}
+tasks {
+    val jvmTargetVersion = libs.findVersion("jvm-target").get().toString()
 
-// Configure Java compilation target
-tasks.withType<JavaCompile>().configureEach {
-    targetCompatibility = libs.findVersion("jvm-target").get().toString()
+    withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+        compilerOptions {
+            jvmTarget.set(JvmTarget.fromTarget(jvmTargetVersion))
+        }
+    }
+
+    withType<Detekt>().configureEach {
+        // Detekt only supports up to JVM target 24
+        jvmTarget = minOf(jvmTargetVersion.toInt(), 24).toString()
+    }
+
+    withType<JavaCompile>().configureEach {
+        targetCompatibility = jvmTargetVersion
+    }
 }
 
 detekt {
