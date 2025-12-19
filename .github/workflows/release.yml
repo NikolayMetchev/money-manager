@@ -80,19 +80,19 @@ jobs:
         include:
           - platform: Windows
             os: windows-latest
-            task: :app:main:jvm:packageMsi
+            task: :app:main:jvm:packageReleaseMsi
             artifact-name: windows-installer
-            artifact-path: app/main/jvm/build/compose/binaries/main/msi/*.msi
+            artifact-path: app/main/jvm/build/compose/binaries/main-release/msi/*.msi
           - platform: macOS
             os: macos-latest
-            task: :app:main:jvm:packageDmg
+            task: :app:main:jvm:packageReleaseDmg
             artifact-name: macos-installer
-            artifact-path: app/main/jvm/build/compose/binaries/main/dmg/*.dmg
+            artifact-path: app/main/jvm/build/compose/binaries/main-release/dmg/*.dmg
           - platform: Linux
             os: ubuntu-latest
-            task: :app:main:jvm:packageDeb
+            task: :app:main:jvm:packageReleaseDeb
             artifact-name: linux-installer
-            artifact-path: app/main/jvm/build/compose/binaries/main/deb/*.deb
+            artifact-path: app/main/jvm/build/compose/binaries/main-release/deb/*.deb
           - platform: Android
             os: ubuntu-latest
             task: :app:main:android:assembleRelease
