@@ -66,3 +66,8 @@ dependencies {
     implementation(projects.app.di.core)
     implementation(projects.app.ui.core)
 }
+
+// Run release build as part of build to catch release issues early
+tasks.named("build") {
+    dependsOn("assembleRelease")
+}
