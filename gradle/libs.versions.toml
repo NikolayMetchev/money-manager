@@ -13,6 +13,7 @@ compose-plugin = "1.9.3"
 compose-ui-test = "1.9.3"
 dependency-analysis = "3.5.1"
 detekt = "2.0.0-alpha.1"
+gradle-doctor = "0.12.0"
 human-readable = "1.12.2"
 jvm-target = "25"
 jvm-toolchain = "25"
@@ -93,6 +94,7 @@ compose = { id = "org.jetbrains.compose", version.ref = "compose-plugin" }
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 dependency-analysis = { id = "com.autonomousapps.dependency-analysis", version.ref = "dependency-analysis" }
 detekt = { id = "dev.detekt", version.ref = "detekt" }
+gradle-doctor = { id = "com.osacky.doctor", version.ref = "gradle-doctor" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }

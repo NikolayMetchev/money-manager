@@ -1,4 +1,5 @@
 import com.android.build.api.dsl.ApplicationExtension
+import org.jetbrains.kotlin.compose.compiler.gradle.ComposeCompilerGradlePluginExtension
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -30,7 +31,12 @@ configure<ApplicationExtension> {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
 
@@ -38,6 +44,12 @@ configure<ApplicationExtension> {
         sourceCompatibility = JavaVersion.toVersion(jvmTargetVersion)
         targetCompatibility = JavaVersion.toVersion(jvmTargetVersion)
     }
+}
+
+// Disable Compose mapping file generation to work around Java 25 compatibility issue
+// (ASM version used by the task doesn't support class file major version 69)
+configure<ComposeCompilerGradlePluginExtension> {
+    includeComposeMappingFile.set(false)
 }
 
 // Override ktlint android setting for Android modules
