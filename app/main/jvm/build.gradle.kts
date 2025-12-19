@@ -76,7 +76,6 @@ compose.desktop {
 
             macOS {
                 bundleID = "com.moneymanager.app"
-
             }
         }
     }
