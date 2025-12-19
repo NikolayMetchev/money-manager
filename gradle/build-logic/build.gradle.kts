@@ -2,6 +2,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     `kotlin-dsl`
+    kotlin("jvm") version libs.versions.kotlin.get()
 }
 
 java {
