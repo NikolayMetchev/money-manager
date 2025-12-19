@@ -8,7 +8,6 @@
 codecov:
   notify:
     after_n_builds: 2
-  disable_default_path_fixes: true
 
 # Define flags for unit and instrumented tests
 flags:
