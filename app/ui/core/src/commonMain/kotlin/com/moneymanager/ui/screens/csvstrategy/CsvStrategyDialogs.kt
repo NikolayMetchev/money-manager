@@ -73,7 +73,8 @@ import kotlin.uuid.Uuid
  */
 object ColumnDetector {
     // Name patterns ordered by specificity
-    private val dateNamePatterns = listOf("date", "time", "posted", "when", "day")
+    private val dateNamePatterns = listOf("date", "posted", "when", "day")
+    private val timeNamePatterns = listOf("time")
     private val amountNamePatterns =
         listOf("amount", "value", "sum", "debit", "credit", "money", "price", "cost", "total")
     private val descriptionNamePatterns =
@@ -92,6 +93,9 @@ object ColumnDetector {
             Regex("""\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{2,4}""", RegexOption.IGNORE_CASE),
             Regex("""(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+\d{1,2},?\s+\d{2,4}""", RegexOption.IGNORE_CASE),
         )
+
+    // Time values: HH:mm or HH:mm:ss format
+    private val timeValuePattern = Regex("""^\d{1,2}:\d{2}(:\d{2})?$""")
 
     // Amount values: numbers with optional decimal, negative sign, currency symbols
     private val amountValuePattern = Regex("""^[£$€¥]?-?\d{1,3}(,\d{3})*(\.\d{1,2})?$|^-?\d+(\.\d{1,2})?$""")
@@ -116,6 +120,11 @@ object ColumnDetector {
      * Checks if a value looks like an amount.
      */
     private fun looksLikeAmount(value: String): Boolean = amountValuePattern.matches(value.trim())
+
+    /**
+     * Checks if a value looks like a time (HH:mm or HH:mm:ss format).
+     */
+    private fun looksLikeTime(value: String): Boolean = timeValuePattern.matches(value.trim())
 
     /**
      * Suggests a column based on name patterns and optionally value analysis.
@@ -160,6 +169,11 @@ object ColumnDetector {
         sampleValues: Map<Int, String>? = null,
     ): String? = suggestColumn(columns, amountNamePatterns, sampleValues, ::looksLikeAmount)
 
+    fun suggestTimeColumn(
+        columns: List<CsvColumn>,
+        sampleValues: Map<Int, String>? = null,
+    ): String? = suggestColumn(columns, timeNamePatterns, sampleValues, ::looksLikeTime)
+
     fun suggestDescriptionColumn(columns: List<CsvColumn>): String? = suggestColumn(columns, descriptionNamePatterns)
 
     fun suggestPayeeColumn(columns: List<CsvColumn>): String? = suggestColumn(columns, payeeNamePatterns)
@@ -192,6 +206,8 @@ fun CreateCsvStrategyDialog(
     var identificationColumns by remember { mutableStateOf(csvColumns.map { it.originalName }.toSet()) }
     var dateColumnName by remember { mutableStateOf<String?>(null) }
     var dateFormat by remember { mutableStateOf("dd/MM/yyyy") }
+    var timeColumnName by remember { mutableStateOf<String?>(null) }
+    var timeFormat by remember { mutableStateOf("HH:mm:ss") }
     var descriptionColumnName by remember { mutableStateOf<String?>(null) }
     var amountColumnName by remember { mutableStateOf<String?>(null) }
     var selectedAccountId by remember { mutableStateOf<AccountId?>(null) }
@@ -213,6 +229,9 @@ fun CreateCsvStrategyDialog(
     LaunchedEffect(csvColumns, firstRow) {
         if (dateColumnName == null) {
             dateColumnName = ColumnDetector.suggestDateColumn(csvColumns, sampleValues)
+        }
+        if (timeColumnName == null) {
+            timeColumnName = ColumnDetector.suggestTimeColumn(csvColumns, sampleValues)
         }
         if (descriptionColumnName == null) {
             descriptionColumnName = ColumnDetector.suggestDescriptionColumn(csvColumns)
@@ -305,6 +324,39 @@ fun CreateCsvStrategyDialog(
                         }
                     },
                 )
+
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Time Column (Optional)", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    "Select if time is in a separate column",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                OptionalColumnDropdown(
+                    columns = csvColumns,
+                    selectedColumn = timeColumnName,
+                    onColumnSelected = { timeColumnName = it },
+                    label = "Column containing transaction time",
+                    sampleValue = getSampleValue(csvColumns, firstRow, timeColumnName),
+                    enabled = !isSaving,
+                )
+                if (timeColumnName != null) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    OutlinedTextField(
+                        value = timeFormat,
+                        onValueChange = { timeFormat = it },
+                        label = { Text("Time Format (e.g., HH:mm:ss)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        enabled = !isSaving,
+                        supportingText = {
+                            getSampleValue(csvColumns, firstRow, timeColumnName)?.let {
+                                Text("Sample: $it")
+                            }
+                        },
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(16.dp))
                 Text("Description Column", style = MaterialTheme.typography.titleSmall)
@@ -405,6 +457,8 @@ fun CreateCsvStrategyDialog(
                                                             fieldType = TransferField.TIMESTAMP,
                                                             dateColumnName = dateColumnName!!,
                                                             dateFormat = dateFormat,
+                                                            timeColumnName = timeColumnName,
+                                                            timeFormat = timeColumnName?.let { timeFormat },
                                                         ),
                                                     TransferField.DESCRIPTION to
                                                         DirectColumnMapping(
@@ -611,6 +665,94 @@ private fun ColumnDropdown(
             expanded = expanded,
             onDismissRequest = { expanded = false },
         ) {
+            columns.sortedBy { it.columnIndex }.forEach { column ->
+                DropdownMenuItem(
+                    text = {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text(column.originalName)
+                            if (column.originalName == selectedColumn) {
+                                Text(
+                                    "✓",
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                        }
+                    },
+                    onClick = {
+                        onColumnSelected(column.originalName)
+                        expanded = false
+                    },
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Optional dropdown selector for CSV columns with "None" option.
+ * Allows selecting no column (null) or a specific column.
+ */
+@Composable
+private fun OptionalColumnDropdown(
+    columns: List<CsvColumn>,
+    selectedColumn: String?,
+    onColumnSelected: (String?) -> Unit,
+    label: String,
+    sampleValue: String? = null,
+    enabled: Boolean = true,
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { if (enabled) expanded = !expanded },
+    ) {
+        OutlinedTextField(
+            value = selectedColumn ?: "None",
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(label) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .menuAnchor(MenuAnchorType.PrimaryNotEditable),
+            enabled = enabled,
+            supportingText =
+                sampleValue?.let {
+                    { Text("Sample: $it", maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                },
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            DropdownMenuItem(
+                text = {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(
+                            "None",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        if (selectedColumn == null) {
+                            Text(
+                                "✓",
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    }
+                },
+                onClick = {
+                    onColumnSelected(null)
+                    expanded = false
+                },
+            )
             columns.sortedBy { it.columnIndex }.forEach { column ->
                 DropdownMenuItem(
                     text = {

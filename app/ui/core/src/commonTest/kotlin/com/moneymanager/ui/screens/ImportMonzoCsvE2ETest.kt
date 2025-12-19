@@ -190,6 +190,7 @@ class ImportMonzoCsvE2ETest {
             // Step 6: Verify column auto-detection selected the correct columns
             // The ColumnDetector should have selected:
             // - Date Column: "Date" (not "Transaction ID" which was the bug)
+            // - Time Column: "Time" (optional, auto-detected from Monzo format)
             // - Amount Column: "Amount"
             // - Description Column: "Description"
             // - Target Account Column: "Name"
@@ -204,6 +205,9 @@ class ImportMonzoCsvE2ETest {
             // The Date column dropdown should show "Date" (not "Transaction ID")
             waitUntilAtLeastOneExists(hasText("Date", substring = false), timeoutMillis = 10000)
 
+            // The Time column section should be visible and auto-detected as "Time"
+            waitUntilAtLeastOneExists(hasText("Time Column (Optional)", substring = true), timeoutMillis = 10000)
+
             // The Amount column dropdown should show "Amount"
             waitUntilAtLeastOneExists(hasText("Amount", substring = false), timeoutMillis = 10000)
 
@@ -217,6 +221,12 @@ class ImportMonzoCsvE2ETest {
             // Date column sample: "24/02/2022" (from "Date" column, not "tx_..." from "Transaction ID")
             // These may be truncated in supportingText, so just check for part of the date format
             waitUntilAtLeastOneExists(hasText("24/02/2022", substring = true), timeoutMillis = 10000)
+
+            // Time column sample: "17:44:34" (from "Time" column in Monzo format)
+            waitUntilAtLeastOneExists(hasText("17:44:34", substring = true), timeoutMillis = 10000)
+
+            // The Time Format field should be visible since a time column was auto-detected
+            waitUntilAtLeastOneExists(hasText("Time Format", substring = true), timeoutMillis = 10000)
 
             // Cancel the dialog to return to CSV detail screen
             onNodeWithText("Cancel").performClick()
