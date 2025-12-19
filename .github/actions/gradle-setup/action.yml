@@ -22,7 +22,7 @@ runs:
       uses: actions/setup-java@v4
       with:
         java-version: '25'
-        distribution: 'temurin'
+        distribution: 'corretto'  # Corretto includes jmod files required by ProGuard (Temurin removed them in JDK 24+ per JEP 493)
 
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v4
