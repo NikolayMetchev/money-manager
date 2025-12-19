@@ -33,6 +33,13 @@ compose.desktop {
     application {
         mainClass = "com.moneymanager.MainKt"
 
+        buildTypes.release {
+            proguard {
+                isEnabled.set(true)
+                configurationFiles.from(project.file("proguard-rules.pro"))
+            }
+        }
+
         // Add required Java modules for the bundled JRE
         jvmArgs +=
             listOf(
@@ -41,7 +48,7 @@ compose.desktop {
 
         nativeDistributions {
             // Include java.sql module in the custom runtime
-            modules("java.sql", "java.naming", "java.management")
+            modules("java.sql")
             targetFormats(
                 // macOS
                 org.jetbrains.compose.desktop.application.dsl.TargetFormat.Dmg,

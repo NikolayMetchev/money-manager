@@ -12,7 +12,7 @@ plugins {
 val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
 
 configure<KotlinMultiplatformExtension> {
-    androidTarget()
+    androidTarget { }
 
     jvmToolchain(libs.findVersion("jvm-toolchain").get().toString().toInt())
 }
