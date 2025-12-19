@@ -24,3 +24,8 @@
 
 # Ignore warnings for diamondedge logging optional dependency
 -dontwarn kotlinx.datetime.**
+
+# Ignore warnings for platform-specific Compose/Skiko dependencies
+# These differ between macOS, Linux, and Windows
+-dontwarn org.jetbrains.skia.**
+-dontwarn org.jetbrains.skiko.**
