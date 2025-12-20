@@ -4,23 +4,19 @@ package com.moneymanager.database.mapper
 
 import com.moneymanager.database.sql.SelectAll
 import com.moneymanager.database.sql.SelectByDateRange
-import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Transfer
-import com.moneymanager.domain.model.TransferId
 import tech.mappie.api.ObjectMappie
-import kotlin.time.Instant.Companion.fromEpochMilliseconds
 import kotlin.uuid.Uuid
 
-object TransferMapper : ObjectMappie<SelectAll, Transfer>() {
+object TransferMapper :
+    ObjectMappie<SelectAll, Transfer>(),
+    IdConversions,
+    InstantConversions {
     override fun map(from: SelectAll): Transfer =
         mapping {
-            Transfer::id fromValue TransferId(Uuid.parse(from.id))
-            Transfer::timestamp fromValue fromEpochMilliseconds(from.timestamp)
-            Transfer::sourceAccountId fromValue AccountId(from.sourceAccountId)
-            Transfer::targetAccountId fromValue AccountId(from.targetAccountId)
             Transfer::amount fromValue Money(from.amount, from.toCurrency())
         }
 
