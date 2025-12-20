@@ -1,4 +1,5 @@
 plugins {
+    alias(libs.plugins.gradle.doctor)
     alias(libs.plugins.kover)
 }
 
