@@ -1,6 +1,6 @@
 CREATE TABLE Category (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
+    name TEXT NOT NULL CHECK(length(trim(name)) > 0),
     parentId INTEGER,
     FOREIGN KEY (parentId) REFERENCES Category(id) ON DELETE SET NULL
 );
