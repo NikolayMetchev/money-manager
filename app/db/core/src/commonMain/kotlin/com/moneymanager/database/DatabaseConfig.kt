@@ -246,6 +246,14 @@ object DatabaseConfig {
             auditTypeQueries.insert(id = 2, name = "UPDATE")
             auditTypeQueries.insert(id = 3, name = "DELETE")
 
+            // Seed SourceType lookup table
+            sourceTypeQueries.insert(id = 1, name = "MANUAL")
+            sourceTypeQueries.insert(id = 2, name = "CSV_IMPORT")
+
+            // Seed Platform lookup table
+            platformQueries.insert(id = 1, name = "JVM")
+            platformQueries.insert(id = 2, name = "ANDROID")
+
             // Create triggers for incremental materialized view refresh
             createIncrementalRefreshTriggers()
 

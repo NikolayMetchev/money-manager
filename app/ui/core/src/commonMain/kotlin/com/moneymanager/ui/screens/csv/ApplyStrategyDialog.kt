@@ -53,9 +53,11 @@ import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.CsvImportRepository
+import com.moneymanager.domain.repository.CsvImportSourceRecord
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.domain.repository.TransferSourceRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.flow.first
@@ -70,6 +72,7 @@ fun ApplyStrategyDialog(
     accountRepository: AccountRepository,
     currencyRepository: CurrencyRepository,
     transactionRepository: TransactionRepository,
+    transferSourceRepository: TransferSourceRepository,
     csvImportRepository: CsvImportRepository,
     maintenanceService: DatabaseMaintenanceService,
     onDismiss: () -> Unit,
@@ -197,6 +200,7 @@ fun ApplyStrategyDialog(
 
                             // Create transfers and track which rows they came from
                             val rowTransferMap = mutableMapOf<Long, com.moneymanager.domain.model.TransferId>()
+                            val sourceRecords = mutableListOf<CsvImportSourceRecord>()
                             var successCount = 0
 
                             for ((index, transfer) in finalPrep.validTransfers.withIndex()) {
@@ -207,6 +211,15 @@ fun ApplyStrategyDialog(
 
                                 transactionRepository.createTransfer(transfer)
                                 rowTransferMap[originalRowIndex] = transfer.id
+
+                                // Track source record for batch insertion
+                                sourceRecords.add(
+                                    CsvImportSourceRecord(
+                                        transactionId = transfer.id,
+                                        revisionId = transfer.revisionId,
+                                        rowIndex = originalRowIndex,
+                                    ),
+                                )
                                 successCount++
                             }
 
@@ -215,6 +228,14 @@ fun ApplyStrategyDialog(
                                 csvImportRepository.updateRowTransferIdsBatch(
                                     csvImport.id,
                                     rowTransferMap,
+                                )
+                            }
+
+                            // Record CSV import sources for all transfers
+                            if (sourceRecords.isNotEmpty()) {
+                                transferSourceRepository.recordCsvImportSourcesBatch(
+                                    csvImportId = csvImport.id,
+                                    sources = sourceRecords,
                                 )
                             }
 

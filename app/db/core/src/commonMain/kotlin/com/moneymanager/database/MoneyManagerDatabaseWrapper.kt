@@ -62,6 +62,15 @@ class MoneyManagerDatabaseWrapper(private val driver: SqlDriver) : MoneyManagerD
             "CsvImportMetadata",
             "CsvColumnMetadata",
             "CsvImportStrategy",
+            "TransactionId",
+            "SourceType",
+            "TransferSource",
+            "Platform",
+            "OsName",
+            "MachineName",
+            "DeviceMake",
+            "DeviceModel",
+            "Device",
         )
 
     /**

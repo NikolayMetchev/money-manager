@@ -19,8 +19,8 @@ import androidx.compose.ui.test.waitUntilExactlyOneExists
 import com.moneymanager.database.DatabaseManager
 import com.moneymanager.database.DbLocation
 import com.moneymanager.database.RepositorySet
+import com.moneymanager.domain.getDeviceInfo
 import com.moneymanager.domain.model.AppVersion
-import com.moneymanager.test.database.copyDatabaseFromResources
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
@@ -53,9 +53,8 @@ class ImportMonzoCsvE2ETest {
     @Test
     fun navigateToCsvImports_shouldShowCsvImportsScreen() =
         runComposeUiTest {
-            // Given: Use existing database to verify navigation works
-            // (using money_manager.db which has old schema but allows testing navigation)
-            testDbLocation = copyDatabaseFromResources("/money_manager.db")
+            // Given: Create fresh database (old databases don't have Device/Platform tables)
+            testDbLocation = createTestDatabaseLocation()
             val databaseManager = createTestDatabaseManager()
 
             val testDatabaseManager =
@@ -71,22 +70,17 @@ class ImportMonzoCsvE2ETest {
                 )
             }
 
-            // Wait for app to load and navigate to CSV Imports screen
-            // Following the pattern from SchemaAwareCoroutineScopeE2ETest
+            // Wait for app to load
             waitForIdle()
+            waitUntilExactlyOneExists(hasText("Your Accounts"), timeoutMillis = 15000)
 
             // Navigate to CSV imports screen (useUnmergedTree for NavigationBarItem)
             waitUntilExactlyOneExists(hasText("CSV"), timeoutMillis = 10000)
             onNodeWithText("CSV", useUnmergedTree = true).performClick()
             waitForIdle()
 
-            // Wait for navigation to complete - this will trigger schema error since
-            // money_manager.db doesn't have CSV tables, which shows the error dialog
-            // If we get a schema error, navigation actually worked!
-            waitUntilExactlyOneExists(
-                hasText("Database Schema Error").or(hasText("No CSV files imported yet")),
-                timeoutMillis = 15000,
-            )
+            // Wait for navigation to complete - should show empty state
+            waitUntilExactlyOneExists(hasText("No CSV files imported yet", substring = true), timeoutMillis = 15000)
         }
 
     @Test
@@ -111,6 +105,7 @@ class ImportMonzoCsvE2ETest {
                     fileName = "monzo_test_export.csv",
                     headers = headers,
                     rows = rows,
+                    deviceInfo = getDeviceInfo(),
                 )
             }
 

@@ -21,4 +21,11 @@ class AuditRepositoryImpl(
                 .executeAsList()
                 .map(TransferAuditEntryMapper::map)
         }
+
+    override suspend fun getAuditHistoryForTransferWithSource(transferId: TransferId): List<TransferAuditEntry> =
+        withContext(Dispatchers.Default) {
+            queries.selectAuditHistoryForTransferWithSource(transferId.toString())
+                .executeAsList()
+                .map(TransferAuditEntryMapper::mapWithSource)
+        }
 }

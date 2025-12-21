@@ -1,0 +1,24 @@
+package com.moneymanager.domain.model
+
+/**
+ * Represents the source/origin of a transfer audit entry.
+ * Tracks how each change (INSERT, UPDATE, DELETE) was initiated.
+ */
+enum class SourceType(val id: Int) {
+    /** Manual entry by user */
+    MANUAL(1),
+
+    /** Imported from CSV file */
+    CSV_IMPORT(2),
+    ;
+
+    companion object {
+        fun fromId(id: Int): SourceType = entries.first { it.id == id }
+
+        fun fromIdOrNull(id: Int): SourceType? = entries.find { it.id == id }
+
+        fun fromName(name: String): SourceType = valueOf(name.uppercase())
+
+        fun fromNameOrNull(name: String): SourceType? = entries.find { it.name.equals(name, ignoreCase = true) }
+    }
+}

@@ -26,6 +26,7 @@ import com.moneymanager.database.DatabaseManager
 import com.moneymanager.database.DatabaseState
 import com.moneymanager.database.DbLocation
 import com.moneymanager.database.RepositorySet
+import com.moneymanager.domain.getDeviceInfo
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.CurrencyId
@@ -84,6 +85,7 @@ private fun MoneyManagerAppImpl(
             try {
                 val database = databaseManager.openDatabase(defaultLocation)
                 val repositories = RepositorySet(database)
+                repositories.deviceRepository.initCurrentDevice(getDeviceInfo())
                 // Schema errors at runtime are now caught globally by the uncaught exception handler
                 // which updates GlobalSchemaErrorState - no need for explicit validation queries here
                 databaseState = DatabaseState.DatabaseLoaded(defaultLocation, repositories)
@@ -99,6 +101,7 @@ private fun MoneyManagerAppImpl(
             try {
                 val database = databaseManager.openDatabase(defaultLocation)
                 val repositories = RepositorySet(database)
+                repositories.deviceRepository.initCurrentDevice(getDeviceInfo())
                 databaseState = DatabaseState.DatabaseLoaded(defaultLocation, repositories)
                 onLog("New database created successfully", null)
             } catch (e: Exception) {
@@ -150,6 +153,7 @@ private fun MoneyManagerAppImpl(
 
                         val database = databaseManager.openDatabase(location)
                         val repositories = RepositorySet(database)
+                        repositories.deviceRepository.initCurrentDevice(getDeviceInfo())
                         databaseState = DatabaseState.DatabaseLoaded(location, repositories)
                         schemaErrorInfo = null
                         GlobalSchemaErrorState.clearError()
@@ -169,6 +173,7 @@ private fun MoneyManagerAppImpl(
 
                         val database = databaseManager.openDatabase(location)
                         val repositories = RepositorySet(database)
+                        repositories.deviceRepository.initCurrentDevice(getDeviceInfo())
                         databaseState = DatabaseState.DatabaseLoaded(location, repositories)
                         schemaErrorInfo = null
                         GlobalSchemaErrorState.clearError()
@@ -338,11 +343,13 @@ private fun MoneyManagerAppContent(
                         AccountTransactionsScreen(
                             accountId = currentlyViewedAccountId ?: screen.accountId,
                             transactionRepository = repositorySet.transactionRepository,
+                            transferSourceRepository = repositorySet.transferSourceRepository,
                             accountRepository = repositorySet.accountRepository,
                             categoryRepository = repositorySet.categoryRepository,
                             currencyRepository = repositorySet.currencyRepository,
                             auditRepository = repositorySet.auditRepository,
                             maintenanceService = repositorySet.maintenanceService,
+                            currentDeviceId = repositorySet.deviceRepository.currentDeviceId,
                             onAccountIdChange = { accountId ->
                                 currentlyViewedAccountId = accountId
                             },
@@ -376,6 +383,7 @@ private fun MoneyManagerAppContent(
                             categoryRepository = repositorySet.categoryRepository,
                             currencyRepository = repositorySet.currencyRepository,
                             transactionRepository = repositorySet.transactionRepository,
+                            transferSourceRepository = repositorySet.transferSourceRepository,
                             maintenanceService = repositorySet.maintenanceService,
                             onBack = { currentScreen = Screen.CsvImports },
                             onDeleted = { currentScreen = Screen.CsvImports },
@@ -425,6 +433,7 @@ private fun MoneyManagerAppContent(
         if (showTransactionDialog) {
             TransactionEntryDialog(
                 transactionRepository = repositorySet.transactionRepository,
+                transferSourceRepository = repositorySet.transferSourceRepository,
                 accountRepository = repositorySet.accountRepository,
                 categoryRepository = repositorySet.categoryRepository,
                 currencyRepository = repositorySet.currencyRepository,

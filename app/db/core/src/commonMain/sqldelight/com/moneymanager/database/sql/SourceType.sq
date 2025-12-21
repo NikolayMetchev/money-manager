@@ -1,0 +1,22 @@
+-- SourceType lookup table for transfer source types
+-- Tracks how each transfer audit entry was initiated
+CREATE TABLE SourceType (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE
+);
+
+-- Query all source types
+selectAll:
+SELECT * FROM SourceType ORDER BY id;
+
+-- Select by ID
+selectById:
+SELECT * FROM SourceType WHERE id = ?;
+
+-- Select by name
+selectByName:
+SELECT * FROM SourceType WHERE name = ?;
+
+-- Insert source type (used during seeding)
+insert:
+INSERT INTO SourceType (id, name) VALUES (?, ?);

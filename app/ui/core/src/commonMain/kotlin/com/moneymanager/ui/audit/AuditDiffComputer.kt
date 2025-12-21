@@ -38,6 +38,7 @@ fun computeAuditDiff(
                 sourceAccountId = FieldChange.Created(entry.sourceAccountId),
                 targetAccountId = FieldChange.Created(entry.targetAccountId),
                 amount = FieldChange.Created(entry.amount),
+                source = entry.source,
             )
         AuditType.DELETE ->
             AuditEntryDiff(
@@ -50,6 +51,7 @@ fun computeAuditDiff(
                 sourceAccountId = FieldChange.Deleted(entry.sourceAccountId),
                 targetAccountId = FieldChange.Deleted(entry.targetAccountId),
                 amount = FieldChange.Deleted(entry.amount),
+                source = entry.source,
             )
         AuditType.UPDATE -> {
             requireNotNull(newValuesForUpdate) { "UPDATE entry must have new values to compare against" }
@@ -63,6 +65,7 @@ fun computeAuditDiff(
                 sourceAccountId = computeFieldChange(entry.sourceAccountId, newValuesForUpdate.sourceAccountId),
                 targetAccountId = computeFieldChange(entry.targetAccountId, newValuesForUpdate.targetAccountId),
                 amount = computeFieldChange(entry.amount, newValuesForUpdate.amount),
+                source = entry.source,
             )
         }
     }

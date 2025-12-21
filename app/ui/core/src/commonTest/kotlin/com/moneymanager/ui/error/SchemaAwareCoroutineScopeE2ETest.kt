@@ -44,11 +44,13 @@ class SchemaAwareCoroutineScopeE2ETest {
     fun schemaAwareScope_showsSchemaErrorDialog_whenCsvTableHasOldSchema() =
         runComposeUiTest {
             // Given: Copy the test database with old CSV schema to a test location
+            // Note: Old databases are missing Device/Platform tables, so schema error
+            // is shown at startup during initCurrentDevice
             testDbLocation = copyDatabaseFromResources("/money_manager_csv_old_schema.db")
 
             val databaseManager = createTestDatabaseManager()
 
-            // When: MoneyManagerApp is initialized and we navigate to CSV imports
+            // When: MoneyManagerApp is initialized
             setContent {
                 MoneyManagerApp(
                     databaseManager =
@@ -60,30 +62,20 @@ class SchemaAwareCoroutineScopeE2ETest {
                 )
             }
 
-            // Wait for app to load
-            waitForIdle()
-
-            // Navigate to CSV imports screen (useUnmergedTree for NavigationBarItem)
-            waitUntilExactlyOneExists(hasText("CSV"), timeoutMillis = 10000)
-            onNodeWithText("CSV", useUnmergedTree = true).performClick()
-            waitForIdle()
-
-            // Click on the first CSV import to open detail screen
-            // The test database has a CSV import with this filename
-            waitUntilExactlyOneExists(hasText("test_import", substring = true), timeoutMillis = 10000)
-            onNodeWithText("test_import", substring = true).performClick()
-
-            // Then: Schema-aware scope should catch the schema error
-            // and DatabaseSchemaErrorDialog should be displayed
+            // Then: Schema error dialog should be displayed at startup
+            // (old database is missing Device/Platform tables)
             waitUntilExactlyOneExists(hasText("Database Schema Error"), timeoutMillis = 10000)
             onNodeWithText("Database Schema Error").assertIsDisplayed()
-            onNodeWithText(text = "no such column", substring = true).assertIsDisplayed()
+            // The error message should mention a missing table
+            onNodeWithText(text = "no such table", substring = true).assertIsDisplayed()
         }
 
     @Test
     fun schemaAwareScope_allowsRecovery_whenCsvTableHasOldSchema() =
         runComposeUiTest {
-            // Given: Copy the test database with old CSV schema to a test location
+            // Given: Copy the test database with old schema to a test location
+            // Note: Old databases are missing Device/Platform tables, so schema error
+            // is shown at startup during initCurrentDevice
             testDbLocation = copyDatabaseFromResources("/money_manager_csv_old_schema.db")
 
             val databaseManager = createTestDatabaseManager()
@@ -99,15 +91,7 @@ class SchemaAwareCoroutineScopeE2ETest {
                 )
             }
 
-            // Wait for app to load and navigate to CSV detail
-            waitForIdle()
-            waitUntilExactlyOneExists(hasText("CSV"), timeoutMillis = 10000)
-            onNodeWithText("CSV", useUnmergedTree = true).performClick()
-            waitForIdle()
-            waitUntilExactlyOneExists(hasText("test_import", substring = true), timeoutMillis = 10000)
-            onNodeWithText("test_import", substring = true).performClick()
-
-            // Wait for schema error dialog
+            // Wait for schema error dialog (shown at startup due to missing tables)
             waitUntilExactlyOneExists(hasText("Database Schema Error"), timeoutMillis = 10000)
 
             // When: User clicks "Delete Database and Start Fresh"
@@ -116,6 +100,9 @@ class SchemaAwareCoroutineScopeE2ETest {
             // Then: Dialog should disappear and app should recover
             waitUntilDoesNotExist(hasText("Database Schema Error"), timeoutMillis = 10000)
             onNodeWithText("Database Schema Error").assertDoesNotExist()
+
+            // App should now show normal content after database recreation
+            waitUntilExactlyOneExists(hasText("Your Accounts"), timeoutMillis = 10000)
         }
 }
 

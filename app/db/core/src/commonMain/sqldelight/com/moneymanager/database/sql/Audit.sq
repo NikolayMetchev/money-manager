@@ -57,6 +57,7 @@ CREATE TABLE Transfer_Audit (
     auditTimestamp INTEGER NOT NULL,
     auditTypeId INTEGER NOT NULL,
     id TEXT NOT NULL,
+    revisionId INTEGER NOT NULL,
     timestamp INTEGER NOT NULL,
     description TEXT NOT NULL,
     sourceAccountId INTEGER NOT NULL,
@@ -120,6 +121,7 @@ SELECT
     Transfer_Audit.auditTimestamp,
     AuditType.name AS auditType,
     Transfer_Audit.id,
+    Transfer_Audit.revisionId,
     Transfer_Audit.timestamp,
     Transfer_Audit.description,
     Transfer_Audit.sourceAccountId,
@@ -133,5 +135,53 @@ SELECT
 FROM Transfer_Audit
 JOIN AuditType ON Transfer_Audit.auditTypeId = AuditType.id
 JOIN Currency ON Transfer_Audit.currencyId = Currency.id
+WHERE Transfer_Audit.id = ?
+ORDER BY Transfer_Audit.auditTimestamp DESC, Transfer_Audit.auditId DESC;
+
+-- Get audit history for a transfer with source information
+selectAuditHistoryForTransferWithSource:
+SELECT
+    Transfer_Audit.auditId,
+    Transfer_Audit.auditTimestamp,
+    AuditType.name AS auditType,
+    Transfer_Audit.id,
+    Transfer_Audit.revisionId,
+    Transfer_Audit.timestamp,
+    Transfer_Audit.description,
+    Transfer_Audit.sourceAccountId,
+    Transfer_Audit.targetAccountId,
+    Transfer_Audit.currencyId,
+    Transfer_Audit.amount,
+    Currency.id AS currency_id,
+    Currency.code AS currency_code,
+    Currency.name AS currency_name,
+    Currency.scaleFactor AS currency_scaleFactor,
+    -- Source information
+    TransferSource.id AS source_id,
+    TransferSource.device_id AS source_device_id,
+    SourceType.id AS source_type_id,
+    SourceType.name AS source_type_name,
+    TransferSource.csvImportId AS source_csv_import_id,
+    TransferSource.csvRowIndex AS source_csv_row_index,
+    CsvImportMetadata.originalFileName AS source_csv_file_name,
+    Platform.name AS source_platform_name,
+    OsName.name AS source_os_name,
+    MachineName.name AS source_machine_name,
+    DeviceMake.name AS source_device_make,
+    DeviceModel.name AS source_device_model,
+    TransferSource.createdAt AS source_created_at
+FROM Transfer_Audit
+JOIN AuditType ON Transfer_Audit.auditTypeId = AuditType.id
+JOIN Currency ON Transfer_Audit.currencyId = Currency.id
+LEFT JOIN TransferSource ON Transfer_Audit.id = TransferSource.transactionId
+    AND Transfer_Audit.revisionId = TransferSource.revisionId
+LEFT JOIN SourceType ON TransferSource.sourceTypeId = SourceType.id
+LEFT JOIN CsvImportMetadata ON TransferSource.csvImportId = CsvImportMetadata.id
+LEFT JOIN Device ON TransferSource.device_id = Device.id
+LEFT JOIN Platform ON Device.platform_id = Platform.id
+LEFT JOIN OsName ON Device.os_id = OsName.id
+LEFT JOIN MachineName ON Device.machine_id = MachineName.id
+LEFT JOIN DeviceMake ON Device.device_make_id = DeviceMake.id
+LEFT JOIN DeviceModel ON Device.device_model_id = DeviceModel.id
 WHERE Transfer_Audit.id = ?
 ORDER BY Transfer_Audit.auditTimestamp DESC, Transfer_Audit.auditId DESC;

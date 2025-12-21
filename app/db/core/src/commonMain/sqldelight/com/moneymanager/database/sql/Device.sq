@@ -1,0 +1,68 @@
+-- Device: Normalized device information table
+-- JVM devices: platform_id, os_id, machine_id are set; device_make_id, device_model_id are NULL
+-- Android devices: platform_id, device_make_id, device_model_id are set; os_id, machine_id are NULL
+CREATE TABLE Device (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    platform_id INTEGER NOT NULL,
+    os_id INTEGER,
+    machine_id INTEGER,
+    device_make_id INTEGER,
+    device_model_id INTEGER,
+    FOREIGN KEY (platform_id) REFERENCES Platform(id),
+    FOREIGN KEY (os_id) REFERENCES OsName(id),
+    FOREIGN KEY (machine_id) REFERENCES MachineName(id),
+    FOREIGN KEY (device_make_id) REFERENCES DeviceMake(id),
+    FOREIGN KEY (device_model_id) REFERENCES DeviceModel(id),
+    UNIQUE (platform_id, os_id, machine_id, device_make_id, device_model_id),
+    -- JVM devices must have os_id and machine_id (platform_id = 1)
+    CHECK (platform_id != 1 OR (os_id IS NOT NULL AND machine_id IS NOT NULL)),
+    -- Android devices must have device_make_id and device_model_id (platform_id = 2)
+    CHECK (platform_id != 2 OR (device_make_id IS NOT NULL AND device_model_id IS NOT NULL))
+);
+
+CREATE INDEX IF NOT EXISTS idx_device_platform ON Device(platform_id);
+
+-- Select device by ID with all related data
+selectById:
+SELECT
+    Device.id,
+    Platform.name AS platformName,
+    OsName.name AS osName,
+    MachineName.name AS machineName,
+    DeviceMake.name AS deviceMake,
+    DeviceModel.name AS deviceModel
+FROM Device
+JOIN Platform ON Device.platform_id = Platform.id
+LEFT JOIN OsName ON Device.os_id = OsName.id
+LEFT JOIN MachineName ON Device.machine_id = MachineName.id
+LEFT JOIN DeviceMake ON Device.device_make_id = DeviceMake.id
+LEFT JOIN DeviceModel ON Device.device_model_id = DeviceModel.id
+WHERE Device.id = ?;
+
+-- Find existing device by all attributes (for deduplication)
+selectByAttributes:
+SELECT id FROM Device
+WHERE platform_id = ?
+  AND (os_id IS ? OR (os_id IS NOT NULL AND os_id = ?))
+  AND (machine_id IS ? OR (machine_id IS NOT NULL AND machine_id = ?))
+  AND (device_make_id IS ? OR (device_make_id IS NOT NULL AND device_make_id = ?))
+  AND (device_model_id IS ? OR (device_model_id IS NOT NULL AND device_model_id = ?));
+
+-- Insert a new device
+insert:
+INSERT INTO Device (platform_id, os_id, machine_id, device_make_id, device_model_id)
+VALUES (?, ?, ?, ?, ?);
+
+-- Get last inserted ID
+lastInsertRowId:
+SELECT last_insert_rowid();
+
+-- Insert JVM device
+insertJvm:
+INSERT INTO Device (platform_id, os_id, machine_id, device_make_id, device_model_id)
+VALUES (1, ?, ?, NULL, NULL);
+
+-- Insert Android device
+insertAndroid:
+INSERT INTO Device (platform_id, os_id, machine_id, device_make_id, device_model_id)
+VALUES (2, NULL, NULL, ?, ?);

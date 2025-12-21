@@ -30,6 +30,7 @@ class TransactionRepositoryImpl(
     database: MoneyManagerDatabase,
 ) : TransactionRepository {
     private val transferQueries = database.transferQueries
+    private val transactionIdQueries = database.transactionIdQueries
 
     override fun getTransactionById(id: Uuid): Flow<Transfer?> =
         transferQueries.selectById(id.toString(), TransferMapper::mapRaw)
@@ -287,23 +288,29 @@ class TransactionRepositoryImpl(
 
     override suspend fun createTransfer(transfer: Transfer): Unit =
         withContext(Dispatchers.Default) {
-            transferQueries.insert(
-                id = transfer.id.toString(),
-                timestamp = transfer.timestamp.toEpochMilliseconds(),
-                description = transfer.description,
-                sourceAccountId = transfer.sourceAccountId.id,
-                targetAccountId = transfer.targetAccountId.id,
-                currencyId = transfer.amount.currency.id.toString(),
-                amount = transfer.amount.amount,
-            )
+            transferQueries.transaction {
+                transactionIdQueries.insert(transfer.id.toString())
+                transferQueries.insert(
+                    id = transfer.id.toString(),
+                    revisionId = transfer.revisionId,
+                    timestamp = transfer.timestamp.toEpochMilliseconds(),
+                    description = transfer.description,
+                    sourceAccountId = transfer.sourceAccountId.id,
+                    targetAccountId = transfer.targetAccountId.id,
+                    currencyId = transfer.amount.currency.id.toString(),
+                    amount = transfer.amount.amount,
+                )
+            }
         }
 
     override suspend fun createTransfersBatch(transfers: List<Transfer>): Unit =
         withContext(Dispatchers.Default) {
             transferQueries.transaction {
                 transfers.forEach { transfer ->
+                    transactionIdQueries.insert(transfer.id.toString())
                     transferQueries.insert(
                         id = transfer.id.toString(),
+                        revisionId = transfer.revisionId,
                         timestamp = transfer.timestamp.toEpochMilliseconds(),
                         description = transfer.description,
                         sourceAccountId = transfer.sourceAccountId.id,

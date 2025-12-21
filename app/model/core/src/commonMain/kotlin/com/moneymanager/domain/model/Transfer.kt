@@ -7,6 +7,7 @@ import kotlin.uuid.Uuid
 
 data class Transfer(
     val id: TransferId,
+    val revisionId: Long = 1,
     val timestamp: Instant,
     val description: String,
     val sourceAccountId: AccountId,

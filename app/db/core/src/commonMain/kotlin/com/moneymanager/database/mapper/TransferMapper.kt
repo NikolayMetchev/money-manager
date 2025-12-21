@@ -23,6 +23,7 @@ object TransferMapper :
     @Suppress("LongParameterList")
     fun mapRaw(
         id: String,
+        revisionId: Long,
         timestamp: Long,
         description: String,
         sourceAccountId: Long,
@@ -37,6 +38,7 @@ object TransferMapper :
         map(
             SelectAll(
                 id = id,
+                revisionId = revisionId,
                 timestamp = timestamp,
                 description = description,
                 sourceAccountId = sourceAccountId,
