@@ -62,7 +62,23 @@ import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import org.lighthousegames.logging.logging
 import kotlin.time.Clock
+
+private val logger = logging()
+
+/**
+ * Result of a CSV import operation.
+ */
+data class CsvImportResult(
+    val successCount: Int,
+    val failedRows: List<FailedRow>,
+) {
+    data class FailedRow(
+        val rowIndex: Long,
+        val errorMessage: String,
+    )
+}
 
 @Composable
 fun ApplyStrategyDialog(
@@ -76,7 +92,7 @@ fun ApplyStrategyDialog(
     csvImportRepository: CsvImportRepository,
     maintenanceService: DatabaseMaintenanceService,
     onDismiss: () -> Unit,
-    onImportComplete: (Int) -> Unit,
+    onImportComplete: (CsvImportResult) -> Unit,
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
     val strategies by csvImportStrategyRepository.getAllStrategies()
@@ -201,6 +217,7 @@ fun ApplyStrategyDialog(
                             // Create transfers and track which rows they came from
                             val rowTransferMap = mutableMapOf<Long, com.moneymanager.domain.model.TransferId>()
                             val sourceRecords = mutableListOf<CsvImportSourceRecord>()
+                            val failedRows = mutableListOf<CsvImportResult.FailedRow>()
                             var successCount = 0
 
                             for ((index, transfer) in finalPrep.validTransfers.withIndex()) {
@@ -209,18 +226,32 @@ fun ApplyStrategyDialog(
                                     rows.getOrNull(index)?.rowIndex
                                         ?: continue
 
-                                transactionRepository.createTransfer(transfer)
-                                rowTransferMap[originalRowIndex] = transfer.id
+                                try {
+                                    transactionRepository.createTransfer(transfer)
+                                    rowTransferMap[originalRowIndex] = transfer.id
 
-                                // Track source record for batch insertion
-                                sourceRecords.add(
-                                    CsvImportSourceRecord(
-                                        transactionId = transfer.id,
-                                        revisionId = transfer.revisionId,
-                                        rowIndex = originalRowIndex,
-                                    ),
-                                )
-                                successCount++
+                                    // Track source record for batch insertion
+                                    sourceRecords.add(
+                                        CsvImportSourceRecord(
+                                            transactionId = transfer.id,
+                                            revisionId = transfer.revisionId,
+                                            rowIndex = originalRowIndex,
+                                        ),
+                                    )
+                                    successCount++
+                                } catch (e: Exception) {
+                                    // Log the error and continue with remaining rows
+                                    val errorMsg = e.message ?: "Unknown error"
+                                    logger.warn(e) {
+                                        "Failed to import row $originalRowIndex: $errorMsg"
+                                    }
+                                    failedRows.add(
+                                        CsvImportResult.FailedRow(
+                                            rowIndex = originalRowIndex,
+                                            errorMessage = errorMsg,
+                                        ),
+                                    )
+                                }
                             }
 
                             // Update CSV rows with transfer IDs
@@ -242,7 +273,26 @@ fun ApplyStrategyDialog(
                             // Refresh materialized views so transfers are visible
                             maintenanceService.refreshMaterializedViews()
 
-                            onImportComplete(successCount)
+                            val result =
+                                CsvImportResult(
+                                    successCount = successCount,
+                                    failedRows = failedRows,
+                                )
+
+                            if (successCount == 0 && failedRows.isNotEmpty()) {
+                                // All rows failed - show error
+                                errorMessage =
+                                    "Import failed: all ${failedRows.size} rows failed due to database constraints"
+                                isImporting = false
+                            } else {
+                                // At least some rows succeeded (or no rows at all)
+                                if (failedRows.isNotEmpty()) {
+                                    logger.info {
+                                        "Import completed with $successCount successes and ${failedRows.size} failures"
+                                    }
+                                }
+                                onImportComplete(result)
+                            }
                         } catch (e: Exception) {
                             errorMessage = "Import failed: ${e.message}"
                             isImporting = false

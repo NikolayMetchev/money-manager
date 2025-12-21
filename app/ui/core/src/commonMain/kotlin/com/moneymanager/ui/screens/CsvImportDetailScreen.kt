@@ -290,9 +290,18 @@ fun CsvImportDetailScreen(
             csvImportRepository = csvImportRepository,
             maintenanceService = maintenanceService,
             onDismiss = { showApplyStrategyDialog = false },
-            onImportComplete = { count ->
+            onImportComplete = { result ->
                 showApplyStrategyDialog = false
-                importResultMessage = "Successfully imported $count transfers"
+                importResultMessage =
+                    buildString {
+                        append("Successfully imported ${result.successCount} transfers")
+                        if (result.failedRows.isNotEmpty()) {
+                            append("\n\nFailed rows (${result.failedRows.size}):")
+                            result.failedRows.forEach { failed ->
+                                append("\n  Row ${failed.rowIndex}: ${failed.errorMessage}")
+                            }
+                        }
+                    }
                 rowsRefreshTrigger++
             },
         )
