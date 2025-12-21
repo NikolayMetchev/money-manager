@@ -21,9 +21,12 @@ A personal finance money manager
 * Safe upgrades of DB across versions
 * Categorization hierarchy for Accounts, People, Assets and Transactions
 * Tags on all the objects
+* Export to GnuCash
 
 # Already working
 * Basic transfers
+* Audit History
+* Basic CSV importing (a lot more to do here)
 * Android app
 * Desktop App
 * Automated Deploys
