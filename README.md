@@ -24,6 +24,8 @@ A personal finance money manager
 
 # Already working
 * Basic transfers
+* Audit History
+* Basic CSV importing (a lot more to do here)
 * Android app
 * Desktop App
 * Automated Deploys
