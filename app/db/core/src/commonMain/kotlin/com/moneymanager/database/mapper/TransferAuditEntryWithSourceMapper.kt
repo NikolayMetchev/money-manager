@@ -2,7 +2,7 @@
 
 package com.moneymanager.database.mapper
 
-import com.moneymanager.database.sql.SelectAuditHistoryForTransfer
+import com.moneymanager.database.sql.SelectAuditHistoryForTransferWithSource
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Money
@@ -10,19 +10,23 @@ import com.moneymanager.domain.model.TransferAuditEntry
 import tech.mappie.api.ObjectMappie
 import kotlin.uuid.Uuid
 
-object TransferAuditEntryMapper :
-    ObjectMappie<SelectAuditHistoryForTransfer, TransferAuditEntry>(),
+object TransferAuditEntryWithSourceMapper :
+    ObjectMappie<SelectAuditHistoryForTransferWithSource, TransferAuditEntry>(),
     IdConversions,
     InstantConversions,
     AuditTypeConversions {
-    override fun map(from: SelectAuditHistoryForTransfer): TransferAuditEntry =
+    override fun map(from: SelectAuditHistoryForTransferWithSource): TransferAuditEntry =
         mapping {
             TransferAuditEntry::transferId fromValue toTransferId(from.id)
             TransferAuditEntry::amount fromValue Money(from.amount, from.toCurrency())
+            TransferAuditEntry::source fromValue
+                from.source_id?.let {
+                    TransferSourceMapper.mapFromAuditQuery(from)
+                }
         }
 }
 
-private fun SelectAuditHistoryForTransfer.toCurrency(): Currency =
+private fun SelectAuditHistoryForTransferWithSource.toCurrency(): Currency =
     Currency(
         id = CurrencyId(Uuid.parse(currency_id)),
         code = currency_code,

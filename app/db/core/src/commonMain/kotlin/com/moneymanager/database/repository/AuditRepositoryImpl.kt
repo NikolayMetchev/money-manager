@@ -3,6 +3,7 @@
 package com.moneymanager.database.repository
 
 import com.moneymanager.database.mapper.TransferAuditEntryMapper
+import com.moneymanager.database.mapper.TransferAuditEntryWithSourceMapper
 import com.moneymanager.database.sql.MoneyManagerDatabase
 import com.moneymanager.domain.model.TransferAuditEntry
 import com.moneymanager.domain.model.TransferId
@@ -26,6 +27,6 @@ class AuditRepositoryImpl(
         withContext(Dispatchers.Default) {
             queries.selectAuditHistoryForTransferWithSource(transferId.toString())
                 .executeAsList()
-                .map(TransferAuditEntryMapper::mapWithSource)
+                .map(TransferAuditEntryWithSourceMapper::map)
         }
 }
