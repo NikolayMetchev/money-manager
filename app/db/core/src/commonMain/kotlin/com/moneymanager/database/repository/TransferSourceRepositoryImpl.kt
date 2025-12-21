@@ -3,7 +3,8 @@
 package com.moneymanager.database.repository
 
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
-import com.moneymanager.database.mapper.TransferSourceMapper
+import com.moneymanager.database.mapper.TransferSourceFromRevisionMapper
+import com.moneymanager.database.mapper.TransferSourceFromTransactionIdMapper
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.TransferSource
@@ -44,7 +45,7 @@ class TransferSourceRepositoryImpl(
 
             queries.selectByTransactionIdAndRevision(transactionId.toString(), revisionId)
                 .executeAsOne()
-                .let(TransferSourceMapper::map)
+                .let(TransferSourceFromRevisionMapper::map)
         }
 
     override suspend fun recordCsvImportSource(
@@ -72,7 +73,7 @@ class TransferSourceRepositoryImpl(
             )
             queries.selectByTransactionIdAndRevision(transactionId.toString(), revisionId)
                 .executeAsOne()
-                .let(TransferSourceMapper::map)
+                .let(TransferSourceFromRevisionMapper::map)
         }
 
     override suspend fun recordCsvImportSourcesBatch(
@@ -103,7 +104,7 @@ class TransferSourceRepositoryImpl(
         withContext(Dispatchers.Default) {
             queries.selectAllByTransactionId(transactionId.toString())
                 .executeAsList()
-                .map(TransferSourceMapper::map)
+                .map(TransferSourceFromTransactionIdMapper::map)
         }
 
     override suspend fun getSourceByRevision(
@@ -113,6 +114,6 @@ class TransferSourceRepositoryImpl(
         withContext(Dispatchers.Default) {
             queries.selectByTransactionIdAndRevision(transactionId.toString(), revisionId)
                 .executeAsOneOrNull()
-                ?.let(TransferSourceMapper::map)
+                ?.let(TransferSourceFromRevisionMapper::map)
         }
 }

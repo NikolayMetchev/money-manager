@@ -8,59 +8,68 @@ import com.moneymanager.database.sql.SelectAuditHistoryForTransferWithSource
 import com.moneymanager.database.sql.SelectByTransactionIdAndRevision
 import com.moneymanager.domain.model.CsvSourceDetails
 import com.moneymanager.domain.model.SourceType
-import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.TransferSource
 import com.moneymanager.domain.model.csv.CsvImportId
-import kotlin.time.Instant.Companion.fromEpochMilliseconds
+import tech.mappie.api.ObjectMappie
 import kotlin.uuid.Uuid
 
-/**
- * Maps database query results to TransferSource domain model.
- */
-object TransferSourceMapper {
-    fun map(from: SelectByTransactionIdAndRevision): TransferSource {
-        val sourceType = SourceType.fromName(from.sourceTypeName)
-        return TransferSource(
-            id = from.id,
-            transactionId = TransferId(Uuid.parse(from.transactionId)),
-            revisionId = from.revisionId,
-            sourceType = sourceType,
-            deviceId = from.device_id,
-            deviceInfo =
+object TransferSourceFromRevisionMapper :
+    ObjectMappie<SelectByTransactionIdAndRevision, TransferSource>(),
+    IdConversions,
+    InstantConversions,
+    SourceTypeConversions {
+    override fun map(from: SelectByTransactionIdAndRevision): TransferSource {
+        val sourceType = toSourceType(from.sourceType)
+        return mapping {
+            TransferSource::transactionId fromValue toTransferId(from.transactionId)
+            TransferSource::sourceType fromValue sourceType
+            TransferSource::deviceId fromProperty from::device_id
+            TransferSource::deviceInfo fromValue
                 DeviceRepositoryImpl.createDeviceInfo(
                     platformName = from.platformName,
                     osName = from.osName,
                     machineName = from.machineName,
                     deviceMake = from.deviceMake,
                     deviceModel = from.deviceModel,
-                ),
-            csvSource = mapCsvSource(sourceType, from.csvImportId, from.csvRowIndex, from.csvFileName),
-            createdAt = fromEpochMilliseconds(from.createdAt),
-        )
+                )
+            TransferSource::csvSource fromValue
+                mapCsvSource(sourceType, from.csvImportId, from.csvRowIndex, from.csvFileName)
+            TransferSource::createdAt fromValue toInstant(from.createdAt)
+        }
     }
+}
 
-    fun map(from: SelectAllByTransactionId): TransferSource {
-        val sourceType = SourceType.fromName(from.sourceTypeName)
-        return TransferSource(
-            id = from.id,
-            transactionId = TransferId(Uuid.parse(from.transactionId)),
-            revisionId = from.revisionId,
-            sourceType = sourceType,
-            deviceId = from.device_id,
-            deviceInfo =
+object TransferSourceFromTransactionIdMapper :
+    ObjectMappie<SelectAllByTransactionId, TransferSource>(),
+    IdConversions,
+    InstantConversions,
+    SourceTypeConversions {
+    override fun map(from: SelectAllByTransactionId): TransferSource {
+        val sourceType = toSourceType(from.sourceType)
+        return mapping {
+            TransferSource::transactionId fromValue toTransferId(from.transactionId)
+            TransferSource::sourceType fromValue sourceType
+            TransferSource::deviceId fromProperty from::device_id
+            TransferSource::deviceInfo fromValue
                 DeviceRepositoryImpl.createDeviceInfo(
                     platformName = from.platformName,
                     osName = from.osName,
                     machineName = from.machineName,
                     deviceMake = from.deviceMake,
                     deviceModel = from.deviceModel,
-                ),
-            csvSource = mapCsvSource(sourceType, from.csvImportId, from.csvRowIndex, from.csvFileName),
-            createdAt = fromEpochMilliseconds(from.createdAt),
-        )
+                )
+            TransferSource::csvSource fromValue
+                mapCsvSource(sourceType, from.csvImportId, from.csvRowIndex, from.csvFileName)
+            TransferSource::createdAt fromValue toInstant(from.createdAt)
+        }
     }
+}
 
-    fun mapFromAuditQuery(from: SelectAuditHistoryForTransferWithSource): TransferSource {
+object TransferSourceFromAuditMapper :
+    IdConversions,
+    InstantConversions,
+    SourceTypeConversions {
+    fun map(from: SelectAuditHistoryForTransferWithSource): TransferSource {
         val sourceTypeName =
             from.source_type_name
                 ?: throw IllegalArgumentException("source_type_name is null")
@@ -77,10 +86,10 @@ object TransferSourceMapper {
             from.source_device_id
                 ?: throw IllegalArgumentException("source_device_id is null")
 
-        val sourceType = SourceType.fromName(sourceTypeName)
+        val sourceType = toSourceType(sourceTypeName)
         return TransferSource(
             id = sourceId,
-            transactionId = TransferId(Uuid.parse(from.id)),
+            transactionId = toTransferId(from.id),
             revisionId = from.revisionId,
             sourceType = sourceType,
             deviceId = sourceDeviceId,
@@ -99,21 +108,21 @@ object TransferSourceMapper {
                     from.source_csv_row_index,
                     from.source_csv_file_name,
                 ),
-            createdAt = fromEpochMilliseconds(sourceCreatedAt),
+            createdAt = toInstant(sourceCreatedAt),
         )
     }
+}
 
-    private fun mapCsvSource(
-        sourceType: SourceType,
-        csvImportId: String?,
-        csvRowIndex: Long?,
-        csvFileName: String?,
-    ): CsvSourceDetails? {
-        if (sourceType != SourceType.CSV_IMPORT) return null
-        return CsvSourceDetails(
-            importId = csvImportId?.let { CsvImportId(Uuid.parse(it)) },
-            rowIndex = csvRowIndex ?: 0,
-            fileName = csvFileName,
-        )
-    }
+private fun mapCsvSource(
+    sourceType: SourceType,
+    csvImportId: String?,
+    csvRowIndex: Long?,
+    csvFileName: String?,
+): CsvSourceDetails? {
+    if (sourceType != SourceType.CSV_IMPORT) return null
+    return CsvSourceDetails(
+        importId = csvImportId?.let { CsvImportId(Uuid.parse(it)) },
+        rowIndex = csvRowIndex ?: 0,
+        fileName = csvFileName,
+    )
 }
