@@ -1933,17 +1933,27 @@ private fun AuditDiffCard(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            // Header row: Type + Timestamp
+            // Header row: Type + Revision + Timestamp
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    text = headerText,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = headerColor,
-                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = headerText,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = headerColor,
+                    )
+                    Text(
+                        text = "Rev ${diff.revisionId}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 Text(
                     text = "${auditDateTime.date} ${auditDateTime.time}",
                     style = MaterialTheme.typography.bodySmall,

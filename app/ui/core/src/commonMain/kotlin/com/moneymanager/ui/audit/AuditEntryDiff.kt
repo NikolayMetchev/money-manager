@@ -19,6 +19,7 @@ data class AuditEntryDiff(
     val auditTimestamp: Instant,
     val auditType: AuditType,
     val transferId: TransferId,
+    val revisionId: Long,
     val timestamp: FieldChange<Instant>,
     val description: FieldChange<String>,
     val sourceAccountId: FieldChange<AccountId>,
