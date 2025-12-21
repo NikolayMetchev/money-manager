@@ -189,6 +189,9 @@ fun AccountTransactionsScreen(
     // Edit transaction state
     var transactionToEdit by remember { mutableStateOf<Transfer?>(null) }
 
+    // Refresh trigger - increment to force reload after edits
+    var refreshTrigger by remember { mutableStateOf(0) }
+
     // Coroutine scope for scroll animations and pagination
     val scrollScope = rememberSchemaAwareCoroutineScope()
 
@@ -285,9 +288,9 @@ fun AccountTransactionsScreen(
                 (visibleItems * 1.5).toInt().coerceAtLeast(20)
             }
 
-        // Load first page when account changes
+        // Load first page when account changes or after edits (via refreshTrigger)
         // If scrollToTransferId is provided, load the page containing that transaction
-        LaunchedEffect(selectedAccountId, pageSize, scrollToTransferId) {
+        LaunchedEffect(selectedAccountId, pageSize, scrollToTransferId, refreshTrigger) {
             runningBalances = emptyList()
             currentPagingInfo = null
             hasLoadedFirstPage = false
@@ -921,6 +924,7 @@ fun AccountTransactionsScreen(
             currencyRepository = currencyRepository,
             maintenanceService = maintenanceService,
             onDismiss = { transactionToEdit = null },
+            onSaved = { refreshTrigger++ },
         )
     }
 }
@@ -985,8 +989,15 @@ fun AccountTransactionCard(
 
             // Time column (only on medium/expanded screens)
             if (screenSizeClass != ScreenSizeClass.Compact) {
+                val time = dateTime.time
+                val millis = time.nanosecond / 1_000_000
+                val timeText =
+                    "${time.hour.toString().padStart(2, '0')}:" +
+                        "${time.minute.toString().padStart(2, '0')}:" +
+                        "${time.second.toString().padStart(2, '0')}." +
+                        millis.toString().padStart(3, '0')
                 Text(
-                    text = "${dateTime.time}",
+                    text = timeText,
                     style = cellStyle,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -1314,7 +1325,7 @@ fun TransactionEntryDialog(
                                             description = description.trim(),
                                             sourceAccountId = sourceAccountId!!,
                                             targetAccountId = targetAccountId!!,
-                                            amount = Money.fromDisplayValue(amount.toDouble(), currency),
+                                            amount = Money.fromDisplayValue(amount, currency),
                                         )
                                     transactionRepository.createTransfer(transfer)
 
@@ -1442,6 +1453,7 @@ fun TransactionEditDialog(
     currencyRepository: CurrencyRepository,
     maintenanceService: DatabaseMaintenanceService,
     onDismiss: () -> Unit,
+    onSaved: () -> Unit = {},
 ) {
     var sourceAccountId by remember { mutableStateOf(transaction.sourceAccountId) }
     var targetAccountId by remember { mutableStateOf(transaction.targetAccountId) }
@@ -1455,6 +1467,8 @@ fun TransactionEditDialog(
     var selectedDate by remember { mutableStateOf(transactionDateTime.date) }
     var selectedHour by remember { mutableStateOf(transactionDateTime.hour) }
     var selectedMinute by remember { mutableStateOf(transactionDateTime.minute) }
+    val originalSecond = remember { transactionDateTime.second }
+    val originalNanosecond = remember { transactionDateTime.nanosecond }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
 
@@ -1640,7 +1654,7 @@ fun TransactionEditDialog(
 
                                     val timestamp =
                                         selectedDate
-                                            .atTime(selectedHour, selectedMinute, 0)
+                                            .atTime(selectedHour, selectedMinute, originalSecond, originalNanosecond)
                                             .toInstant(TimeZone.currentSystemDefault())
                                     val updatedTransfer =
                                         Transfer(
@@ -1649,7 +1663,7 @@ fun TransactionEditDialog(
                                             description = description.trim(),
                                             sourceAccountId = sourceAccountId,
                                             targetAccountId = targetAccountId,
-                                            amount = Money.fromDisplayValue(amount.toDouble(), currency),
+                                            amount = Money.fromDisplayValue(amount, currency),
                                         )
                                     transactionRepository.updateTransfer(updatedTransfer)
 
@@ -1668,6 +1682,7 @@ fun TransactionEditDialog(
 
                                     maintenanceService.refreshMaterializedViews()
 
+                                    onSaved()
                                     onDismiss()
                                 } catch (e: Exception) {
                                     logger.error(e) { "Failed to update transaction: ${e.message}" }

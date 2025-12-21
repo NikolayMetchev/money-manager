@@ -71,6 +71,7 @@ fun CsvImportDetailScreen(
     var showCreateStrategyDialog by remember { mutableStateOf(false) }
     var isDeleting by remember { mutableStateOf(false) }
     var importResultMessage by remember { mutableStateOf<String?>(null) }
+    var failedRowIndexes by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var rowsRefreshTrigger by remember { mutableStateOf(0) }
 
     // Determine amount column index by looking for common amount column names
@@ -236,6 +237,7 @@ fun CsvImportDetailScreen(
                         rows = rows,
                         modifier = Modifier.fillMaxSize(),
                         amountColumnIndex = amountColumnIndex,
+                        failedRowIndexes = failedRowIndexes,
                         onTransferClick = onTransferClick,
                     )
                 }
@@ -292,6 +294,7 @@ fun CsvImportDetailScreen(
             onDismiss = { showApplyStrategyDialog = false },
             onImportComplete = { result ->
                 showApplyStrategyDialog = false
+                failedRowIndexes = result.failedRows.map { it.rowIndex }.toSet()
                 importResultMessage =
                     buildString {
                         append("Successfully imported ${result.successCount} transfers")

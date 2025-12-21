@@ -187,19 +187,27 @@ fun ApplyStrategyDialog(
 
                     scope.launch {
                         try {
-                            // Create new accounts first
+                            logger.info { "Starting CSV import with ${prep.validTransfers.size} valid transfers" }
+
+                            // Create new accounts first (skip failures - transfers using them will fail later)
                             for (newAccount in prep.newAccounts) {
-                                val account =
-                                    Account(
-                                        id = com.moneymanager.domain.model.AccountId(0),
-                                        name = newAccount.name,
-                                        openingDate = Clock.System.now(),
-                                        categoryId = newAccount.categoryId,
-                                    )
-                                accountRepository.createAccount(account)
+                                try {
+                                    val account =
+                                        Account(
+                                            id = com.moneymanager.domain.model.AccountId(0),
+                                            name = newAccount.name,
+                                            openingDate = Clock.System.now(),
+                                            categoryId = newAccount.categoryId,
+                                        )
+                                    accountRepository.createAccount(account)
+                                    logger.info { "Created new account: ${newAccount.name}" }
+                                } catch (e: Exception) {
+                                    logger.warn(e) { "Skipping account '${newAccount.name}': ${e.message}" }
+                                }
                             }
 
                             // Re-map with new account IDs
+                            logger.info { "Re-mapping transfers with updated account IDs" }
                             val updatedAccounts = accountRepository.getAllAccounts().first()
                             val accountsByName = updatedAccounts.associateBy { it.name }
                             val currenciesById = currencies.associateBy { it.id }
@@ -213,8 +221,12 @@ fun ApplyStrategyDialog(
                                 )
 
                             val finalPrep = mapper.prepareImport(rows)
+                            val validCount = finalPrep.validTransfers.size
+                            val errorCount = finalPrep.errorRows.size
+                            logger.info { "Prepared $validCount valid transfers, $errorCount error rows" }
 
                             // Create transfers and track which rows they came from
+                            logger.info { "Starting to create $validCount transfers" }
                             val rowTransferMap = mutableMapOf<Long, com.moneymanager.domain.model.TransferId>()
                             val sourceRecords = mutableListOf<CsvImportSourceRecord>()
                             val failedRows = mutableListOf<CsvImportResult.FailedRow>()
@@ -254,8 +266,11 @@ fun ApplyStrategyDialog(
                                 }
                             }
 
+                            logger.info { "Transfer creation complete: $successCount successes, ${failedRows.size} failures" }
+
                             // Update CSV rows with transfer IDs
                             if (rowTransferMap.isNotEmpty()) {
+                                logger.info { "Updating ${rowTransferMap.size} CSV rows with transfer IDs" }
                                 csvImportRepository.updateRowTransferIdsBatch(
                                     csvImport.id,
                                     rowTransferMap,
@@ -264,6 +279,7 @@ fun ApplyStrategyDialog(
 
                             // Record CSV import sources for all transfers
                             if (sourceRecords.isNotEmpty()) {
+                                logger.info { "Recording ${sourceRecords.size} CSV import sources" }
                                 transferSourceRepository.recordCsvImportSourcesBatch(
                                     csvImportId = csvImport.id,
                                     sources = sourceRecords,
@@ -271,7 +287,9 @@ fun ApplyStrategyDialog(
                             }
 
                             // Refresh materialized views so transfers are visible
+                            logger.info { "Refreshing materialized views" }
                             maintenanceService.refreshMaterializedViews()
+                            logger.info { "Import completed successfully" }
 
                             val result =
                                 CsvImportResult(
@@ -294,6 +312,7 @@ fun ApplyStrategyDialog(
                                 onImportComplete(result)
                             }
                         } catch (e: Exception) {
+                            logger.error(e) { "Import failed: ${e.message}" }
                             errorMessage = "Import failed: ${e.message}"
                             isImporting = false
                         }
