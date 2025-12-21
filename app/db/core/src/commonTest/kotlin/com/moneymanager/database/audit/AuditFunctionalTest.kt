@@ -355,6 +355,116 @@ class AuditFunctionalTest : DbTest() {
             assertEquals("To Be Deleted", auditHistory[0].description)
         }
 
+    @Test
+    fun `transfer UPDATE should increment revisionId in audit record`() =
+        runTest {
+            val (sourceAccountId, targetAccountId, currency) = setupTransferPrerequisites()
+
+            val transferId = TransferId(Uuid.random())
+            val now = Clock.System.now()
+
+            // Create transfer (revisionId should be 1)
+            repositories.transactionRepository.createTransfer(
+                Transfer(
+                    id = transferId,
+                    timestamp = now,
+                    description = "Original Description",
+                    sourceAccountId = sourceAccountId,
+                    targetAccountId = targetAccountId,
+                    amount = Money.fromDisplayValue(100.0, currency),
+                ),
+            )
+
+            // Update transfer (revisionId should be 2)
+            repositories.transactionRepository.updateTransfer(
+                Transfer(
+                    id = transferId,
+                    timestamp = now,
+                    description = "Updated Description",
+                    sourceAccountId = sourceAccountId,
+                    targetAccountId = targetAccountId,
+                    amount = Money.fromDisplayValue(200.0, currency),
+                ),
+            )
+
+            val auditHistory = database.auditQueries.selectAuditHistoryForTransfer(transferId.toString()).executeAsList()
+
+            assertEquals(2, auditHistory.size, "Should have 2 audit records (INSERT + UPDATE)")
+
+            // Most recent first (UPDATE)
+            val updateAudit = auditHistory[0]
+            assertEquals("UPDATE", updateAudit.auditType)
+            // Bug: UPDATE trigger captures OLD.revisionId (1) instead of NEW.revisionId (2)
+            // This test will fail until the trigger is fixed
+            assertEquals(2L, updateAudit.revisionId, "UPDATE audit should have revisionId 2 (after increment)")
+
+            // INSERT entry
+            val insertAudit = auditHistory[1]
+            assertEquals("INSERT", insertAudit.auditType)
+            assertEquals(1L, insertAudit.revisionId, "INSERT audit should have revisionId 1")
+        }
+
+    @Test
+    fun `transfer multiple UPDATEs should increment revisionId each time`() =
+        runTest {
+            val (sourceAccountId, targetAccountId, currency) = setupTransferPrerequisites()
+
+            val transferId = TransferId(Uuid.random())
+            val now = Clock.System.now()
+
+            // Create transfer (revisionId = 1)
+            repositories.transactionRepository.createTransfer(
+                Transfer(
+                    id = transferId,
+                    timestamp = now,
+                    description = "Version 1",
+                    sourceAccountId = sourceAccountId,
+                    targetAccountId = targetAccountId,
+                    amount = Money.fromDisplayValue(100.0, currency),
+                ),
+            )
+
+            // First update (revisionId = 2)
+            repositories.transactionRepository.updateTransfer(
+                Transfer(
+                    id = transferId,
+                    timestamp = now,
+                    description = "Version 2",
+                    sourceAccountId = sourceAccountId,
+                    targetAccountId = targetAccountId,
+                    amount = Money.fromDisplayValue(200.0, currency),
+                ),
+            )
+
+            // Second update (revisionId = 3)
+            repositories.transactionRepository.updateTransfer(
+                Transfer(
+                    id = transferId,
+                    timestamp = now,
+                    description = "Version 3",
+                    sourceAccountId = sourceAccountId,
+                    targetAccountId = targetAccountId,
+                    amount = Money.fromDisplayValue(300.0, currency),
+                ),
+            )
+
+            val auditHistory = database.auditQueries.selectAuditHistoryForTransfer(transferId.toString()).executeAsList()
+
+            assertEquals(3, auditHistory.size, "Should have 3 audit records (INSERT + 2 UPDATEs)")
+
+            // Most recent first - second UPDATE (revisionId = 3)
+            assertEquals("UPDATE", auditHistory[0].auditType)
+            assertEquals(3L, auditHistory[0].revisionId, "Second UPDATE should have revisionId 3")
+
+            // First UPDATE (revisionId = 2)
+            assertEquals("UPDATE", auditHistory[1].auditType)
+            assertEquals(2L, auditHistory[1].revisionId, "First UPDATE should have revisionId 2")
+
+            // INSERT (revisionId = 1)
+            assertEquals("INSERT", auditHistory[2].auditType)
+            assertEquals(1L, auditHistory[2].revisionId, "INSERT should have revisionId 1")
+        }
+
     private suspend fun setupTransferPrerequisites(): Triple<AccountId, AccountId, Currency> {
         val now = Clock.System.now()
 

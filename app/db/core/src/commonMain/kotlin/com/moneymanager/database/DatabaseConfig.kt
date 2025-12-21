@@ -184,6 +184,12 @@ object DatabaseConfig {
             val columnList = columns.joinToString(", ")
             val newColumnList = columns.joinToString(", ") { "NEW.$it" }
             val oldColumnList = columns.joinToString(", ") { "OLD.$it" }
+            // For UPDATE: use OLD values for all columns EXCEPT revisionId, which uses NEW
+            // (revisionId is incremented during UPDATE, so OLD.revisionId is pre-increment)
+            val updateColumnList =
+                columns.joinToString(", ") { col ->
+                    if (col == "revisionId") "NEW.$col" else "OLD.$col"
+                }
 
             // INSERT trigger - stores NEW values with auditTypeId 1
             // Uses strftime('%s', 'now') for cross-platform compatibility (works on all SQLite versions)
@@ -201,7 +207,7 @@ object DatabaseConfig {
                 0,
             )
 
-            // UPDATE trigger - stores OLD values with auditTypeId 2
+            // UPDATE trigger - stores OLD values (except revisionId uses NEW) with auditTypeId 2
             execute(
                 null,
                 """
@@ -210,7 +216,7 @@ object DatabaseConfig {
                 FOR EACH ROW
                 BEGIN
                     INSERT INTO $auditTableName (auditTimestamp, auditTypeId, $columnList)
-                    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, $oldColumnList);
+                    VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, $updateColumnList);
                 END
                 """.trimIndent(),
                 0,
