@@ -20,7 +20,7 @@ object TransferAuditEntryWithSourceMapper :
             TransferAuditEntry::transferId fromValue toTransferId(from.id)
             TransferAuditEntry::amount fromValue Money(from.amount, from.toCurrency())
             TransferAuditEntry::source fromValue
-                from.source_id?.let {
+                from.sourceId?.let {
                     TransferSourceFromAuditMapper.map(from)
                 }
         }

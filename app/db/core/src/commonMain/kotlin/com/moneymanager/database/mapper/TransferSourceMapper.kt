@@ -19,11 +19,8 @@ object TransferSourceFromRevisionMapper :
     InstantConversions,
     SourceTypeConversions {
     override fun map(from: SelectByTransactionIdAndRevision): TransferSource {
-        val sourceType = toSourceType(from.sourceType)
         return mapping {
             TransferSource::transactionId fromValue toTransferId(from.transactionId)
-            TransferSource::sourceType fromValue sourceType
-            TransferSource::deviceId fromProperty from::device_id
             TransferSource::deviceInfo fromValue
                 DeviceRepositoryImpl.createDeviceInfo(
                     platformName = from.platformName,
@@ -33,8 +30,7 @@ object TransferSourceFromRevisionMapper :
                     deviceModel = from.deviceModel,
                 )
             TransferSource::csvSource fromValue
-                mapCsvSource(sourceType, from.csvImportId, from.csvRowIndex, from.csvFileName)
-            TransferSource::createdAt fromValue toInstant(from.createdAt)
+                mapCsvSource(toSourceType(from.sourceType), from.csvImportId, from.csvRowIndex, from.csvFileName)
         }
     }
 }
@@ -45,11 +41,8 @@ object TransferSourceFromTransactionIdMapper :
     InstantConversions,
     SourceTypeConversions {
     override fun map(from: SelectAllByTransactionId): TransferSource {
-        val sourceType = toSourceType(from.sourceType)
         return mapping {
             TransferSource::transactionId fromValue toTransferId(from.transactionId)
-            TransferSource::sourceType fromValue sourceType
-            TransferSource::deviceId fromProperty from::device_id
             TransferSource::deviceInfo fromValue
                 DeviceRepositoryImpl.createDeviceInfo(
                     platformName = from.platformName,
@@ -59,57 +52,40 @@ object TransferSourceFromTransactionIdMapper :
                     deviceModel = from.deviceModel,
                 )
             TransferSource::csvSource fromValue
-                mapCsvSource(sourceType, from.csvImportId, from.csvRowIndex, from.csvFileName)
-            TransferSource::createdAt fromValue toInstant(from.createdAt)
+                mapCsvSource(toSourceType(from.sourceType), from.csvImportId, from.csvRowIndex, from.csvFileName)
         }
     }
 }
 
 object TransferSourceFromAuditMapper :
+    ObjectMappie<SelectAuditHistoryForTransferWithSource, TransferSource>(),
     IdConversions,
     InstantConversions,
     SourceTypeConversions {
-    fun map(from: SelectAuditHistoryForTransferWithSource): TransferSource {
-        val sourceTypeName =
-            from.source_type_name
-                ?: throw IllegalArgumentException("source_type_name is null")
-        val sourceId =
-            from.source_id
-                ?: throw IllegalArgumentException("source_id is null")
-        val sourceCreatedAt =
-            from.source_created_at
-                ?: throw IllegalArgumentException("source_created_at is null")
-        val sourcePlatformName =
-            from.source_platform_name
-                ?: throw IllegalArgumentException("source_platform_name is null")
-        val sourceDeviceId =
-            from.source_device_id
-                ?: throw IllegalArgumentException("source_device_id is null")
-
-        val sourceType = toSourceType(sourceTypeName)
-        return TransferSource(
-            id = sourceId,
-            transactionId = toTransferId(from.id),
-            revisionId = from.revisionId,
-            sourceType = sourceType,
-            deviceId = sourceDeviceId,
-            deviceInfo =
+    override fun map(from: SelectAuditHistoryForTransferWithSource): TransferSource {
+        val sourceType = toSourceType(from.sourceType!!)
+        return mapping {
+            TransferSource::id fromValue from.sourceId!!
+            TransferSource::transactionId fromValue toTransferId(from.id)
+            TransferSource::sourceType fromValue sourceType
+            TransferSource::deviceId fromValue from.deviceId!!
+            TransferSource::deviceInfo fromValue
                 DeviceRepositoryImpl.createDeviceInfo(
-                    platformName = sourcePlatformName,
+                    platformName = from.sourcePlatformName!!,
                     osName = from.source_os_name,
                     machineName = from.source_machine_name,
                     deviceMake = from.source_device_make,
                     deviceModel = from.source_device_model,
-                ),
-            csvSource =
+                )
+            TransferSource::csvSource fromValue
                 mapCsvSource(
                     sourceType,
                     from.source_csv_import_id,
                     from.source_csv_row_index,
                     from.source_csv_file_name,
-                ),
-            createdAt = toInstant(sourceCreatedAt),
-        )
+                )
+            TransferSource::createdAt fromValue toInstant(from.sourceCreatedAt!!)
+        }
     }
 }
 

@@ -39,7 +39,7 @@ class TransferSourceRepositoryImpl(
             queries.insertManual(
                 transactionId = transactionId.toString(),
                 revisionId = revisionId,
-                device_id = deviceId,
+                deviceId = deviceId,
                 createdAt = now.toEpochMilliseconds(),
             )
 
@@ -66,7 +66,7 @@ class TransferSourceRepositoryImpl(
             queries.insertCsvImport(
                 transactionId = transactionId.toString(),
                 revisionId = revisionId,
-                device_id = csvImport.device_id,
+                deviceId = csvImport.device_id,
                 csvImportId = csvImportId.toString(),
                 csvRowIndex = rowIndex,
                 createdAt = now.toEpochMilliseconds(),
@@ -91,7 +91,7 @@ class TransferSourceRepositoryImpl(
                     queries.insertCsvImport(
                         transactionId = source.transactionId.toString(),
                         revisionId = source.revisionId,
-                        device_id = deviceId,
+                        deviceId = deviceId,
                         csvImportId = csvImportId.toString(),
                         csvRowIndex = source.rowIndex,
                         createdAt = now.toEpochMilliseconds(),

@@ -157,19 +157,19 @@ SELECT
     Currency.name AS currency_name,
     Currency.scaleFactor AS currency_scaleFactor,
     -- Source information
-    TransferSource.id AS source_id,
-    TransferSource.device_id AS source_device_id,
-    SourceType.id AS source_type_id,
-    SourceType.name AS source_type_name,
+    TransferSource.id AS sourceId,
+    TransferSource.deviceId,
+    SourceType.id AS sourceTypeId,
+    SourceType.name AS sourceType,
     TransferSource.csvImportId AS source_csv_import_id,
     TransferSource.csvRowIndex AS source_csv_row_index,
     CsvImportMetadata.originalFileName AS source_csv_file_name,
-    Platform.name AS source_platform_name,
+    Platform.name AS sourcePlatformName,
     OsName.name AS source_os_name,
     MachineName.name AS source_machine_name,
     DeviceMake.name AS source_device_make,
     DeviceModel.name AS source_device_model,
-    TransferSource.createdAt AS source_created_at
+    TransferSource.createdAt AS sourceCreatedAt
 FROM Transfer_Audit
 JOIN AuditType ON Transfer_Audit.auditTypeId = AuditType.id
 JOIN Currency ON Transfer_Audit.currencyId = Currency.id
@@ -177,7 +177,7 @@ LEFT JOIN TransferSource ON Transfer_Audit.id = TransferSource.transactionId
     AND Transfer_Audit.revisionId = TransferSource.revisionId
 LEFT JOIN SourceType ON TransferSource.sourceTypeId = SourceType.id
 LEFT JOIN CsvImportMetadata ON TransferSource.csvImportId = CsvImportMetadata.id
-LEFT JOIN Device ON TransferSource.device_id = Device.id
+LEFT JOIN Device ON TransferSource.deviceId = Device.id
 LEFT JOIN Platform ON Device.platform_id = Platform.id
 LEFT JOIN OsName ON Device.os_id = OsName.id
 LEFT JOIN MachineName ON Device.machine_id = MachineName.id
