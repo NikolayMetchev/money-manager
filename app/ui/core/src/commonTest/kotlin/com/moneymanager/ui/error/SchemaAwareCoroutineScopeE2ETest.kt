@@ -45,7 +45,7 @@ class SchemaAwareCoroutineScopeE2ETest {
         runComposeUiTest {
             // Given: Copy the test database with old CSV schema to a test location
             // Note: Old databases are missing Device/Platform tables, so schema error
-            // is shown at startup during initCurrentDevice
+            // is shown at startup during device initialization
             testDbLocation = copyDatabaseFromResources("/money_manager_csv_old_schema.db")
 
             val databaseManager = createTestDatabaseManager()
@@ -75,7 +75,7 @@ class SchemaAwareCoroutineScopeE2ETest {
         runComposeUiTest {
             // Given: Copy the test database with old schema to a test location
             // Note: Old databases are missing Device/Platform tables, so schema error
-            // is shown at startup during initCurrentDevice
+            // is shown at startup during device initialization
             testDbLocation = copyDatabaseFromResources("/money_manager_csv_old_schema.db")
 
             val databaseManager = createTestDatabaseManager()

@@ -25,18 +25,4 @@ interface DeviceRepository {
      * @return The device info or null if not found
      */
     suspend fun getDeviceById(id: Long): DeviceInfo?
-
-    /**
-     * The current device's ID. Set when the app initializes by calling
-     * getOrCreateDevice with the current device info.
-     */
-    val currentDeviceId: Long?
-
-    /**
-     * Initializes and stores the current device ID.
-     * Should be called once at app startup.
-     *
-     * @param deviceInfo The current device's info
-     */
-    suspend fun initCurrentDevice(deviceInfo: DeviceInfo)
 }

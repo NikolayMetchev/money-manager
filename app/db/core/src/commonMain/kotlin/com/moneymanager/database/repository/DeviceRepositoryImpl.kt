@@ -8,15 +8,6 @@ import com.moneymanager.domain.repository.DeviceRepository
 class DeviceRepositoryImpl(
     private val database: MoneyManagerDatabaseWrapper,
 ) : DeviceRepository {
-    private var _currentDeviceId: Long? = null
-
-    override val currentDeviceId: Long?
-        get() = _currentDeviceId
-
-    override suspend fun initCurrentDevice(deviceInfo: DeviceInfo) {
-        _currentDeviceId = getOrCreateDevice(deviceInfo)
-    }
-
     override suspend fun getOrCreateDevice(deviceInfo: DeviceInfo): Long {
         return when (deviceInfo) {
             is DeviceInfo.Jvm -> getOrCreateJvmDevice(deviceInfo)
