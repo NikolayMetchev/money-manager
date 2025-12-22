@@ -1,0 +1,17 @@
+-- Platform: Lookup table for platform types (JVM, ANDROID)
+CREATE TABLE Platform (
+    id INTEGER PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL UNIQUE
+);
+
+selectAll:
+SELECT * FROM Platform ORDER BY id;
+
+selectById:
+SELECT * FROM Platform WHERE id = ?;
+
+selectByName:
+SELECT * FROM Platform WHERE name = ?;
+
+insert:
+INSERT OR IGNORE INTO Platform (id, name) VALUES (?, ?);

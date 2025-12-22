@@ -3,37 +3,29 @@
 package com.moneymanager.database.mapper
 
 import com.moneymanager.database.sql.SelectAuditHistoryForTransfer
-import com.moneymanager.domain.model.AccountId
-import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.TransferAuditEntry
-import com.moneymanager.domain.model.TransferId
-import kotlin.time.Instant.Companion.fromEpochMilliseconds
+import tech.mappie.api.ObjectMappie
 import kotlin.uuid.Uuid
 
-object TransferAuditEntryMapper {
-    fun map(from: SelectAuditHistoryForTransfer): TransferAuditEntry {
-        val currency =
-            Currency(
-                id = CurrencyId(Uuid.parse(from.currency_id)),
-                code = from.currency_code,
-                name = from.currency_name,
-                scaleFactor = from.currency_scaleFactor,
-            )
-        return TransferAuditEntry(
-            auditId = from.auditId,
-            auditTimestamp = fromEpochMilliseconds(from.auditTimestamp),
-            auditType = enumValueOf<AuditType>(from.auditType.uppercase()),
-            transferId = TransferId(Uuid.parse(from.id)),
-            timestamp = fromEpochMilliseconds(from.timestamp),
-            description = from.description,
-            sourceAccountId = AccountId(from.sourceAccountId),
-            targetAccountId = AccountId(from.targetAccountId),
-            amount = Money(from.amount, currency),
-        )
-    }
-
-    fun mapList(list: List<SelectAuditHistoryForTransfer>): List<TransferAuditEntry> = list.map(::map)
+object TransferAuditEntryMapper :
+    ObjectMappie<SelectAuditHistoryForTransfer, TransferAuditEntry>(),
+    IdConversions,
+    InstantConversions,
+    AuditTypeConversions {
+    override fun map(from: SelectAuditHistoryForTransfer): TransferAuditEntry =
+        mapping {
+            TransferAuditEntry::transferId fromValue toTransferId(from.id)
+            TransferAuditEntry::amount fromValue Money(from.amount, from.toCurrency())
+        }
 }
+
+private fun SelectAuditHistoryForTransfer.toCurrency(): Currency =
+    Currency(
+        id = CurrencyId(Uuid.parse(currency_id)),
+        code = currency_code,
+        name = currency_name,
+        scaleFactor = currency_scaleFactor,
+    )

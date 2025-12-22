@@ -9,8 +9,8 @@ CREATE TABLE Currency (
             AND substr(id, 15, 1) IN ('1','2','3','4','5','6','7','8')
             AND lower(substr(id, 20, 1)) IN ('8','9','a','b')
         ),
-    code TEXT NOT NULL UNIQUE,
-    name TEXT NOT NULL,
+    code TEXT NOT NULL UNIQUE CHECK(length(trim(code)) > 0),
+    name TEXT NOT NULL CHECK(length(trim(name)) > 0),
     scaleFactor INTEGER NOT NULL DEFAULT 100
 );
 

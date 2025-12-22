@@ -9,6 +9,7 @@ CREATE TABLE Transfer (
             AND substr(id, 15, 1) IN ('1','2','3','4','5','6','7','8')
             AND lower(substr(id, 20, 1)) IN ('8','9','a','b')
         ),
+    revisionId INTEGER NOT NULL DEFAULT 1,
     timestamp INTEGER NOT NULL,
     description TEXT NOT NULL,
     sourceAccountId INTEGER NOT NULL,
@@ -25,6 +26,7 @@ CREATE TABLE Transfer (
         ),
     amount INTEGER NOT NULL,
     CHECK (sourceAccountId != targetAccountId),
+    FOREIGN KEY (id) REFERENCES TransactionId(id) ON DELETE RESTRICT,
     FOREIGN KEY (sourceAccountId) REFERENCES Account(id) ON DELETE CASCADE,
     FOREIGN KEY (targetAccountId) REFERENCES Account(id) ON DELETE CASCADE,
     FOREIGN KEY (currencyId) REFERENCES Currency(id) ON DELETE RESTRICT
@@ -253,7 +255,14 @@ DELETE FROM PendingMaterializedViewChanges;
 
 selectAll:
 SELECT
-    Transfer.*,
+    Transfer.id,
+    Transfer.revisionId,
+    Transfer.timestamp,
+    Transfer.description,
+    Transfer.sourceAccountId,
+    Transfer.targetAccountId,
+    Transfer.currencyId,
+    Transfer.amount,
     Currency.id AS currency_id,
     Currency.code AS currency_code,
     Currency.name AS currency_name,
@@ -264,7 +273,14 @@ ORDER BY timestamp DESC;
 
 selectById:
 SELECT
-    Transfer.*,
+    Transfer.id,
+    Transfer.revisionId,
+    Transfer.timestamp,
+    Transfer.description,
+    Transfer.sourceAccountId,
+    Transfer.targetAccountId,
+    Transfer.currencyId,
+    Transfer.amount,
     Currency.id AS currency_id,
     Currency.code AS currency_code,
     Currency.name AS currency_name,
@@ -275,7 +291,14 @@ WHERE Transfer.id = ?;
 
 selectByAccount:
 SELECT
-    Transfer.*,
+    Transfer.id,
+    Transfer.revisionId,
+    Transfer.timestamp,
+    Transfer.description,
+    Transfer.sourceAccountId,
+    Transfer.targetAccountId,
+    Transfer.currencyId,
+    Transfer.amount,
     Currency.id AS currency_id,
     Currency.code AS currency_code,
     Currency.name AS currency_name,
@@ -287,7 +310,14 @@ ORDER BY timestamp DESC;
 
 selectByDateRange:
 SELECT
-    Transfer.*,
+    Transfer.id,
+    Transfer.revisionId,
+    Transfer.timestamp,
+    Transfer.description,
+    Transfer.sourceAccountId,
+    Transfer.targetAccountId,
+    Transfer.currencyId,
+    Transfer.amount,
     Currency.id AS currency_id,
     Currency.code AS currency_code,
     Currency.name AS currency_name,
@@ -299,7 +329,14 @@ ORDER BY timestamp DESC;
 
 selectByAccountAndDateRange:
 SELECT
-    Transfer.*,
+    Transfer.id,
+    Transfer.revisionId,
+    Transfer.timestamp,
+    Transfer.description,
+    Transfer.sourceAccountId,
+    Transfer.targetAccountId,
+    Transfer.currencyId,
+    Transfer.amount,
     Currency.id AS currency_id,
     Currency.code AS currency_code,
     Currency.name AS currency_name,
@@ -311,13 +348,16 @@ AND timestamp >= ? AND timestamp <= ?
 ORDER BY timestamp DESC;
 
 insert:
-INSERT INTO Transfer(id, timestamp, description, sourceAccountId, targetAccountId, currencyId, amount)
-VALUES (?, ?, ?, ?, ?, ?, ?);
+INSERT INTO Transfer(id, revisionId, timestamp, description, sourceAccountId, targetAccountId, currencyId, amount)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
 
 update:
 UPDATE Transfer
-SET timestamp = ?, description = ?, sourceAccountId = ?, targetAccountId = ?, currencyId = ?, amount = ?
+SET revisionId = revisionId + 1, timestamp = ?, description = ?, sourceAccountId = ?, targetAccountId = ?, currencyId = ?, amount = ?
 WHERE id = ?;
+
+selectRevisionIdById:
+SELECT revisionId FROM Transfer WHERE id = ?;
 
 delete:
 DELETE FROM Transfer WHERE id = ?;

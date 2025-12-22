@@ -65,21 +65,26 @@ import com.moneymanager.compose.scrollbar.HorizontalScrollbarForScrollState
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForScrollState
 import com.moneymanager.database.DatabaseMaintenanceService
+import com.moneymanager.domain.getDeviceInfo
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
 import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.Money
+import com.moneymanager.domain.model.SourceType
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferAuditEntry
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.TransferSource
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AuditRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.domain.repository.TransferSourceRepository
 import com.moneymanager.ui.audit.AuditEntryDiff
 import com.moneymanager.ui.audit.FieldChange
 import com.moneymanager.ui.audit.UpdateNewValues
@@ -136,11 +141,13 @@ enum class ScreenSizeClass {
 fun AccountTransactionsScreen(
     accountId: AccountId,
     transactionRepository: TransactionRepository,
+    transferSourceRepository: TransferSourceRepository,
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
     auditRepository: AuditRepository,
     maintenanceService: DatabaseMaintenanceService,
+    currentDeviceId: Long? = null,
     onAccountIdChange: (AccountId) -> Unit = {},
     onCurrencyIdChange: (CurrencyId?) -> Unit = {},
     scrollToTransferId: TransferId? = null,
@@ -155,6 +162,7 @@ fun AccountTransactionsScreen(
             auditRepository = auditRepository,
             accountRepository = accountRepository,
             transactionRepository = transactionRepository,
+            currentDeviceId = currentDeviceId,
             onBack = { transactionIdToAudit = null },
         )
         return
@@ -180,6 +188,9 @@ fun AccountTransactionsScreen(
 
     // Edit transaction state
     var transactionToEdit by remember { mutableStateOf<Transfer?>(null) }
+
+    // Refresh trigger - increment to force reload after edits
+    var refreshTrigger by remember { mutableStateOf(0) }
 
     // Coroutine scope for scroll animations and pagination
     val scrollScope = rememberSchemaAwareCoroutineScope()
@@ -277,9 +288,9 @@ fun AccountTransactionsScreen(
                 (visibleItems * 1.5).toInt().coerceAtLeast(20)
             }
 
-        // Load first page when account changes
+        // Load first page when account changes or after edits (via refreshTrigger)
         // If scrollToTransferId is provided, load the page containing that transaction
-        LaunchedEffect(selectedAccountId, pageSize, scrollToTransferId) {
+        LaunchedEffect(selectedAccountId, pageSize, scrollToTransferId, refreshTrigger) {
             runningBalances = emptyList()
             currentPagingInfo = null
             hasLoadedFirstPage = false
@@ -907,11 +918,13 @@ fun AccountTransactionsScreen(
         TransactionEditDialog(
             transaction = transfer,
             transactionRepository = transactionRepository,
+            transferSourceRepository = transferSourceRepository,
             accountRepository = accountRepository,
             categoryRepository = categoryRepository,
             currencyRepository = currencyRepository,
             maintenanceService = maintenanceService,
             onDismiss = { transactionToEdit = null },
+            onSaved = { refreshTrigger++ },
         )
     }
 }
@@ -976,8 +989,15 @@ fun AccountTransactionCard(
 
             // Time column (only on medium/expanded screens)
             if (screenSizeClass != ScreenSizeClass.Compact) {
+                val time = dateTime.time
+                val millis = time.nanosecond / 1_000_000
+                val timeText =
+                    "${time.hour.toString().padStart(2, '0')}:" +
+                        "${time.minute.toString().padStart(2, '0')}:" +
+                        "${time.second.toString().padStart(2, '0')}." +
+                        millis.toString().padStart(3, '0')
                 Text(
-                    text = "${dateTime.time}",
+                    text = timeText,
                     style = cellStyle,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -1105,6 +1125,7 @@ fun AccountTransactionCard(
 @Composable
 fun TransactionEntryDialog(
     transactionRepository: TransactionRepository,
+    transferSourceRepository: TransferSourceRepository,
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
@@ -1304,9 +1325,16 @@ fun TransactionEntryDialog(
                                             description = description.trim(),
                                             sourceAccountId = sourceAccountId!!,
                                             targetAccountId = targetAccountId!!,
-                                            amount = Money.fromDisplayValue(amount.toDouble(), currency),
+                                            amount = Money.fromDisplayValue(amount, currency),
                                         )
                                     transactionRepository.createTransfer(transfer)
+
+                                    // Record manual source for this transfer
+                                    transferSourceRepository.recordManualSource(
+                                        transactionId = transfer.id,
+                                        revisionId = transfer.revisionId,
+                                        deviceInfo = getDeviceInfo(),
+                                    )
 
                                     maintenanceService.refreshMaterializedViews()
 
@@ -1419,11 +1447,13 @@ fun TransactionEntryDialog(
 fun TransactionEditDialog(
     transaction: Transfer,
     transactionRepository: TransactionRepository,
+    transferSourceRepository: TransferSourceRepository,
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
     maintenanceService: DatabaseMaintenanceService,
     onDismiss: () -> Unit,
+    onSaved: () -> Unit = {},
 ) {
     var sourceAccountId by remember { mutableStateOf(transaction.sourceAccountId) }
     var targetAccountId by remember { mutableStateOf(transaction.targetAccountId) }
@@ -1437,6 +1467,8 @@ fun TransactionEditDialog(
     var selectedDate by remember { mutableStateOf(transactionDateTime.date) }
     var selectedHour by remember { mutableStateOf(transactionDateTime.hour) }
     var selectedMinute by remember { mutableStateOf(transactionDateTime.minute) }
+    val originalSecond = remember { transactionDateTime.second }
+    val originalNanosecond = remember { transactionDateTime.nanosecond }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
 
@@ -1622,7 +1654,7 @@ fun TransactionEditDialog(
 
                                     val timestamp =
                                         selectedDate
-                                            .atTime(selectedHour, selectedMinute, 0)
+                                            .atTime(selectedHour, selectedMinute, originalSecond, originalNanosecond)
                                             .toInstant(TimeZone.currentSystemDefault())
                                     val updatedTransfer =
                                         Transfer(
@@ -1631,12 +1663,26 @@ fun TransactionEditDialog(
                                             description = description.trim(),
                                             sourceAccountId = sourceAccountId,
                                             targetAccountId = targetAccountId,
-                                            amount = Money.fromDisplayValue(amount.toDouble(), currency),
+                                            amount = Money.fromDisplayValue(amount, currency),
                                         )
                                     transactionRepository.updateTransfer(updatedTransfer)
 
+                                    // Get updated transfer to retrieve new revisionId
+                                    val updated =
+                                        transactionRepository.getTransactionById(transaction.id.id)
+                                            .first()
+                                    if (updated != null) {
+                                        // Record manual source for this update
+                                        transferSourceRepository.recordManualSource(
+                                            transactionId = updated.id,
+                                            revisionId = updated.revisionId,
+                                            deviceInfo = getDeviceInfo(),
+                                        )
+                                    }
+
                                     maintenanceService.refreshMaterializedViews()
 
+                                    onSaved()
                                     onDismiss()
                                 } catch (e: Exception) {
                                     logger.error(e) { "Failed to update transaction: ${e.message}" }
@@ -1744,6 +1790,7 @@ fun TransactionAuditScreen(
     auditRepository: AuditRepository,
     accountRepository: AccountRepository,
     transactionRepository: TransactionRepository,
+    currentDeviceId: Long? = null,
     onBack: () -> Unit,
 ) {
     var auditEntries by remember { mutableStateOf<List<TransferAuditEntry>>(emptyList()) }
@@ -1758,7 +1805,7 @@ fun TransactionAuditScreen(
         isLoading = true
         errorMessage = null
         try {
-            auditEntries = auditRepository.getAuditHistoryForTransfer(transferId)
+            auditEntries = auditRepository.getAuditHistoryForTransferWithSource(transferId)
             currentTransfer = transactionRepository.getTransactionById(transferId.id).first()
         } catch (e: Exception) {
             logger.error(e) { "Failed to load audit history: ${e.message}" }
@@ -1849,6 +1896,7 @@ fun TransactionAuditScreen(
                         AuditDiffCard(
                             diff = diff,
                             accounts = accounts,
+                            currentDeviceId = currentDeviceId,
                         )
                     }
                 }
@@ -1865,6 +1913,7 @@ fun TransactionAuditScreen(
 private fun AuditDiffCard(
     diff: AuditEntryDiff,
     accounts: List<Account>,
+    currentDeviceId: Long? = null,
 ) {
     val auditDateTime = diff.auditTimestamp.toLocalDateTime(TimeZone.currentSystemDefault())
 
@@ -1899,17 +1948,27 @@ private fun AuditDiffCard(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            // Header row: Type + Timestamp
+            // Header row: Type + Revision + Timestamp
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    text = headerText,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = headerColor,
-                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = headerText,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = headerColor,
+                    )
+                    Text(
+                        text = "Rev ${diff.revisionId}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 Text(
                     text = "${auditDateTime.date} ${auditDateTime.time}",
                     style = MaterialTheme.typography.bodySmall,
@@ -1919,9 +1978,9 @@ private fun AuditDiffCard(
 
             // Content varies by audit type
             when (diff.auditType) {
-                AuditType.INSERT -> InsertDiffContent(diff, accounts)
-                AuditType.UPDATE -> UpdateDiffContent(diff, accounts)
-                AuditType.DELETE -> DeleteDiffContent(diff, accounts)
+                AuditType.INSERT -> InsertDiffContent(diff, accounts, currentDeviceId)
+                AuditType.UPDATE -> UpdateDiffContent(diff, accounts, currentDeviceId)
+                AuditType.DELETE -> DeleteDiffContent(diff, accounts, currentDeviceId)
             }
         }
     }
@@ -1931,6 +1990,7 @@ private fun AuditDiffCard(
 private fun InsertDiffContent(
     diff: AuditEntryDiff,
     accounts: List<Account>,
+    currentDeviceId: Long? = null,
 ) {
     val transactionDateTime = diff.timestamp.value().toLocalDateTime(TimeZone.currentSystemDefault())
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -1944,6 +2004,7 @@ private fun InsertDiffContent(
         FieldValueRow("To", resolveAccountName(diff.targetAccountId.value(), accounts))
         FieldValueRow("Amount", formatAmount(diff.amount.value()))
         FieldValueRow("Description", diff.description.value().ifBlank { "(none)" })
+        SourceInfoSection(diff.source, currentDeviceId = currentDeviceId)
     }
 }
 
@@ -1951,17 +2012,18 @@ private fun InsertDiffContent(
 private fun UpdateDiffContent(
     diff: AuditEntryDiff,
     accounts: List<Account>,
+    currentDeviceId: Long? = null,
 ) {
     val hasAnyChanges = diff.hasChanges
 
-    if (!hasAnyChanges) {
-        Text(
-            text = "No visible changes recorded",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    } else {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        if (!hasAnyChanges) {
+            Text(
+                text = "No visible changes recorded",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
             Text(
                 text = "Changed:",
                 style = MaterialTheme.typography.labelMedium,
@@ -2015,6 +2077,7 @@ private fun UpdateDiffContent(
                 )
             }
         }
+        SourceInfoSection(diff.source, currentDeviceId = currentDeviceId)
     }
 }
 
@@ -2022,6 +2085,7 @@ private fun UpdateDiffContent(
 private fun DeleteDiffContent(
     diff: AuditEntryDiff,
     accounts: List<Account>,
+    currentDeviceId: Long? = null,
 ) {
     val errorColor = MaterialTheme.colorScheme.error
     val transactionDateTime = diff.timestamp.value().toLocalDateTime(TimeZone.currentSystemDefault())
@@ -2036,6 +2100,7 @@ private fun DeleteDiffContent(
         FieldValueRow("To", resolveAccountName(diff.targetAccountId.value(), accounts), errorColor)
         FieldValueRow("Amount", formatAmount(diff.amount.value()), errorColor)
         FieldValueRow("Description", diff.description.value().ifBlank { "(none)" }, errorColor)
+        SourceInfoSection(diff.source, currentDeviceId = currentDeviceId, labelColor = errorColor.copy(alpha = 0.8f))
     }
 }
 
@@ -2129,4 +2194,67 @@ private fun formatTimeDiff(
     val duration = newTimestamp - oldTimestamp
     val sign = if (duration.isPositive()) "+" else "-"
     return "$sign${HumanReadable.duration(duration.absoluteValue)}"
+}
+
+@Composable
+private fun SourceInfoSection(
+    source: TransferSource?,
+    currentDeviceId: Long? = null,
+    labelColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+) {
+    if (source == null) return
+
+    val isThisDevice = currentDeviceId != null && source.deviceId == currentDeviceId
+
+    Column(
+        modifier = Modifier.padding(top = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            text = "Source:",
+            style = MaterialTheme.typography.labelMedium,
+            color = labelColor,
+        )
+
+        when (source.sourceType) {
+            SourceType.MANUAL -> {
+                val deviceInfo = source.deviceInfo
+                val thisDeviceSuffix = if (isThisDevice) " (This Device)" else ""
+                when (deviceInfo) {
+                    is DeviceInfo.Jvm -> {
+                        FieldValueRow("Origin", "Manual (Desktop)$thisDeviceSuffix")
+                        FieldValueRow("Machine", deviceInfo.machineName)
+                        FieldValueRow("OS", deviceInfo.osName)
+                    }
+                    is DeviceInfo.Android -> {
+                        FieldValueRow("Origin", "Manual (Android)$thisDeviceSuffix")
+                        FieldValueRow("Device", "${deviceInfo.deviceMake} ${deviceInfo.deviceModel}")
+                    }
+                }
+            }
+            SourceType.CSV_IMPORT -> {
+                val csvSource = source.csvSource
+                val deviceInfo = source.deviceInfo
+                val thisDeviceSuffix = if (isThisDevice) " (This Device)" else ""
+                if (csvSource != null) {
+                    val fileName = csvSource.fileName ?: "Unknown file"
+                    FieldValueRow("Origin", "CSV Import$thisDeviceSuffix")
+                    FieldValueRow("File", fileName)
+                    FieldValueRow("Row", (csvSource.rowIndex + 1).toString())
+                } else {
+                    FieldValueRow("Origin", "CSV Import$thisDeviceSuffix")
+                }
+                // Show device info for CSV imports too
+                when (deviceInfo) {
+                    is DeviceInfo.Jvm -> {
+                        FieldValueRow("Machine", deviceInfo.machineName)
+                        FieldValueRow("OS", deviceInfo.osName)
+                    }
+                    is DeviceInfo.Android -> {
+                        FieldValueRow("Device", "${deviceInfo.deviceMake} ${deviceInfo.deviceModel}")
+                    }
+                }
+            }
+        }
+    }
 }

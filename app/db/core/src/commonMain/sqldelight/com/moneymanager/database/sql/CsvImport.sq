@@ -5,8 +5,12 @@ CREATE TABLE CsvImportMetadata (
     originalFileName TEXT NOT NULL,
     importTimestamp INTEGER NOT NULL,
     rowCount INTEGER NOT NULL,
-    columnCount INTEGER NOT NULL
+    columnCount INTEGER NOT NULL,
+    device_id INTEGER NOT NULL,
+    FOREIGN KEY (device_id) REFERENCES Device(id)
 );
+
+CREATE INDEX IF NOT EXISTS idx_csv_import_device ON CsvImportMetadata(device_id);
 
 -- Column definitions for each imported CSV
 CREATE TABLE CsvColumnMetadata (
@@ -21,17 +25,57 @@ CREATE INDEX idx_csv_column_import ON CsvColumnMetadata(importId);
 
 -- CsvImportMetadata queries
 selectAllImports:
-SELECT * FROM CsvImportMetadata ORDER BY importTimestamp DESC;
+SELECT
+    CsvImportMetadata.id,
+    CsvImportMetadata.tableName,
+    CsvImportMetadata.originalFileName,
+    CsvImportMetadata.importTimestamp,
+    CsvImportMetadata.rowCount,
+    CsvImportMetadata.columnCount,
+    CsvImportMetadata.device_id,
+    Platform.name AS platformName,
+    OsName.name AS osName,
+    MachineName.name AS machineName,
+    DeviceMake.name AS deviceMake,
+    DeviceModel.name AS deviceModel
+FROM CsvImportMetadata
+JOIN Device ON CsvImportMetadata.device_id = Device.id
+JOIN Platform ON Device.platform_id = Platform.id
+LEFT JOIN OsName ON Device.os_id = OsName.id
+LEFT JOIN MachineName ON Device.machine_id = MachineName.id
+LEFT JOIN DeviceMake ON Device.device_make_id = DeviceMake.id
+LEFT JOIN DeviceModel ON Device.device_model_id = DeviceModel.id
+ORDER BY CsvImportMetadata.importTimestamp DESC;
 
 selectImportById:
-SELECT * FROM CsvImportMetadata WHERE id = ?;
+SELECT
+    CsvImportMetadata.id,
+    CsvImportMetadata.tableName,
+    CsvImportMetadata.originalFileName,
+    CsvImportMetadata.importTimestamp,
+    CsvImportMetadata.rowCount,
+    CsvImportMetadata.columnCount,
+    CsvImportMetadata.device_id,
+    Platform.name AS platformName,
+    OsName.name AS osName,
+    MachineName.name AS machineName,
+    DeviceMake.name AS deviceMake,
+    DeviceModel.name AS deviceModel
+FROM CsvImportMetadata
+JOIN Device ON CsvImportMetadata.device_id = Device.id
+JOIN Platform ON Device.platform_id = Platform.id
+LEFT JOIN OsName ON Device.os_id = OsName.id
+LEFT JOIN MachineName ON Device.machine_id = MachineName.id
+LEFT JOIN DeviceMake ON Device.device_make_id = DeviceMake.id
+LEFT JOIN DeviceModel ON Device.device_model_id = DeviceModel.id
+WHERE CsvImportMetadata.id = ?;
 
 selectImportByTableName:
 SELECT * FROM CsvImportMetadata WHERE tableName = ?;
 
 insertImport:
-INSERT INTO CsvImportMetadata (id, tableName, originalFileName, importTimestamp, rowCount, columnCount)
-VALUES (?, ?, ?, ?, ?, ?);
+INSERT INTO CsvImportMetadata (id, tableName, originalFileName, importTimestamp, rowCount, columnCount, device_id)
+VALUES (?, ?, ?, ?, ?, ?, ?);
 
 updateImportRowCount:
 UPDATE CsvImportMetadata SET rowCount = ? WHERE id = ?;

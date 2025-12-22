@@ -2,6 +2,7 @@
 
 package com.moneymanager.domain.model.csv
 
+import com.moneymanager.domain.model.DeviceInfo
 import kotlin.jvm.JvmInline
 import kotlin.time.Instant
 import kotlin.uuid.ExperimentalUuidApi
@@ -23,4 +24,5 @@ data class CsvImport(
     val rowCount: Int,
     val columnCount: Int,
     val columns: List<CsvColumn>,
+    val deviceInfo: DeviceInfo,
 )

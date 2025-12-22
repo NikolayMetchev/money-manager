@@ -1,5 +1,6 @@
 package com.moneymanager.domain.repository
 
+import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvImportId
@@ -14,12 +15,14 @@ interface CsvImportRepository {
      * @param fileName The original file name
      * @param headers The column headers
      * @param rows The data rows
+     * @param deviceInfo Device information from the platform performing the import
      * @return The ID of the created import
      */
     suspend fun createImport(
         fileName: String,
         headers: List<String>,
         rows: List<List<String>>,
+        deviceInfo: DeviceInfo,
     ): CsvImportId
 
     /**

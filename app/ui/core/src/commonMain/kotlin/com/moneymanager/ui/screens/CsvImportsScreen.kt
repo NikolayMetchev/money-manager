@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.filepicker.rememberFilePicker
 import com.moneymanager.csv.CsvParseOptions
 import com.moneymanager.csv.CsvParser
+import com.moneymanager.domain.getDeviceInfo
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.repository.CsvImportRepository
@@ -72,6 +73,7 @@ fun CsvImportsScreen(
                             fileName = result.fileName,
                             headers = parseResult.headers,
                             rows = parseResult.rows,
+                            deviceInfo = getDeviceInfo(),
                         )
                     } catch (e: Exception) {
                         importError = "Failed to import CSV: ${e.message}"

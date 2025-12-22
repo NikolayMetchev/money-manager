@@ -20,10 +20,10 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -654,7 +654,7 @@ private fun ColumnDropdown(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
             enabled = enabled,
             supportingText =
                 sampleValue?.let {
@@ -719,7 +719,7 @@ private fun OptionalColumnDropdown(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
             enabled = enabled,
             supportingText =
                 sampleValue?.let {

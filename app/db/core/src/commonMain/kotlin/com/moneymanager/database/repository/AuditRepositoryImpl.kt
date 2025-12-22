@@ -3,6 +3,7 @@
 package com.moneymanager.database.repository
 
 import com.moneymanager.database.mapper.TransferAuditEntryMapper
+import com.moneymanager.database.mapper.TransferAuditEntryWithSourceMapper
 import com.moneymanager.database.sql.MoneyManagerDatabase
 import com.moneymanager.domain.model.TransferAuditEntry
 import com.moneymanager.domain.model.TransferId
@@ -20,5 +21,12 @@ class AuditRepositoryImpl(
             queries.selectAuditHistoryForTransfer(transferId.toString())
                 .executeAsList()
                 .map(TransferAuditEntryMapper::map)
+        }
+
+    override suspend fun getAuditHistoryForTransferWithSource(transferId: TransferId): List<TransferAuditEntry> =
+        withContext(Dispatchers.Default) {
+            queries.selectAuditHistoryForTransferWithSource(transferId.toString())
+                .executeAsList()
+                .map(TransferAuditEntryWithSourceMapper::map)
         }
 }

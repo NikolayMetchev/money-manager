@@ -33,11 +33,13 @@ fun computeAuditDiff(
                 auditTimestamp = entry.auditTimestamp,
                 auditType = entry.auditType,
                 transferId = entry.transferId,
+                revisionId = entry.revisionId,
                 timestamp = FieldChange.Created(entry.timestamp),
                 description = FieldChange.Created(entry.description),
                 sourceAccountId = FieldChange.Created(entry.sourceAccountId),
                 targetAccountId = FieldChange.Created(entry.targetAccountId),
                 amount = FieldChange.Created(entry.amount),
+                source = entry.source,
             )
         AuditType.DELETE ->
             AuditEntryDiff(
@@ -45,11 +47,13 @@ fun computeAuditDiff(
                 auditTimestamp = entry.auditTimestamp,
                 auditType = entry.auditType,
                 transferId = entry.transferId,
+                revisionId = entry.revisionId,
                 timestamp = FieldChange.Deleted(entry.timestamp),
                 description = FieldChange.Deleted(entry.description),
                 sourceAccountId = FieldChange.Deleted(entry.sourceAccountId),
                 targetAccountId = FieldChange.Deleted(entry.targetAccountId),
                 amount = FieldChange.Deleted(entry.amount),
+                source = entry.source,
             )
         AuditType.UPDATE -> {
             requireNotNull(newValuesForUpdate) { "UPDATE entry must have new values to compare against" }
@@ -58,11 +62,13 @@ fun computeAuditDiff(
                 auditTimestamp = entry.auditTimestamp,
                 auditType = entry.auditType,
                 transferId = entry.transferId,
+                revisionId = entry.revisionId,
                 timestamp = computeFieldChange(entry.timestamp, newValuesForUpdate.timestamp),
                 description = computeFieldChange(entry.description, newValuesForUpdate.description),
                 sourceAccountId = computeFieldChange(entry.sourceAccountId, newValuesForUpdate.sourceAccountId),
                 targetAccountId = computeFieldChange(entry.targetAccountId, newValuesForUpdate.targetAccountId),
                 amount = computeFieldChange(entry.amount, newValuesForUpdate.amount),
+                source = entry.source,
             )
         }
     }

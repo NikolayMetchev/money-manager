@@ -23,10 +23,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -53,14 +53,32 @@ import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.CsvImportRepository
+import com.moneymanager.domain.repository.CsvImportSourceRecord
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.domain.repository.TransferSourceRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import org.lighthousegames.logging.logging
 import kotlin.time.Clock
+
+private val logger = logging()
+
+/**
+ * Result of a CSV import operation.
+ */
+data class CsvImportResult(
+    val successCount: Int,
+    val failedRows: List<FailedRow>,
+) {
+    data class FailedRow(
+        val rowIndex: Long,
+        val errorMessage: String,
+    )
+}
 
 @Composable
 fun ApplyStrategyDialog(
@@ -70,10 +88,11 @@ fun ApplyStrategyDialog(
     accountRepository: AccountRepository,
     currencyRepository: CurrencyRepository,
     transactionRepository: TransactionRepository,
+    transferSourceRepository: TransferSourceRepository,
     csvImportRepository: CsvImportRepository,
     maintenanceService: DatabaseMaintenanceService,
     onDismiss: () -> Unit,
-    onImportComplete: (Int) -> Unit,
+    onImportComplete: (CsvImportResult) -> Unit,
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
     val strategies by csvImportStrategyRepository.getAllStrategies()
@@ -168,19 +187,27 @@ fun ApplyStrategyDialog(
 
                     scope.launch {
                         try {
-                            // Create new accounts first
+                            logger.info { "Starting CSV import with ${prep.validTransfers.size} valid transfers" }
+
+                            // Create new accounts first (skip failures - transfers using them will fail later)
                             for (newAccount in prep.newAccounts) {
-                                val account =
-                                    Account(
-                                        id = com.moneymanager.domain.model.AccountId(0),
-                                        name = newAccount.name,
-                                        openingDate = Clock.System.now(),
-                                        categoryId = newAccount.categoryId,
-                                    )
-                                accountRepository.createAccount(account)
+                                try {
+                                    val account =
+                                        Account(
+                                            id = com.moneymanager.domain.model.AccountId(0),
+                                            name = newAccount.name,
+                                            openingDate = Clock.System.now(),
+                                            categoryId = newAccount.categoryId,
+                                        )
+                                    accountRepository.createAccount(account)
+                                    logger.info { "Created new account: ${newAccount.name}" }
+                                } catch (e: Exception) {
+                                    logger.warn(e) { "Skipping account '${newAccount.name}': ${e.message}" }
+                                }
                             }
 
                             // Re-map with new account IDs
+                            logger.info { "Re-mapping transfers with updated account IDs" }
                             val updatedAccounts = accountRepository.getAllAccounts().first()
                             val accountsByName = updatedAccounts.associateBy { it.name }
                             val currenciesById = currencies.associateBy { it.id }
@@ -194,9 +221,15 @@ fun ApplyStrategyDialog(
                                 )
 
                             val finalPrep = mapper.prepareImport(rows)
+                            val validCount = finalPrep.validTransfers.size
+                            val errorCount = finalPrep.errorRows.size
+                            logger.info { "Prepared $validCount valid transfers, $errorCount error rows" }
 
                             // Create transfers and track which rows they came from
+                            logger.info { "Starting to create $validCount transfers" }
                             val rowTransferMap = mutableMapOf<Long, com.moneymanager.domain.model.TransferId>()
+                            val sourceRecords = mutableListOf<CsvImportSourceRecord>()
+                            val failedRows = mutableListOf<CsvImportResult.FailedRow>()
                             var successCount = 0
 
                             for ((index, transfer) in finalPrep.validTransfers.withIndex()) {
@@ -205,24 +238,81 @@ fun ApplyStrategyDialog(
                                     rows.getOrNull(index)?.rowIndex
                                         ?: continue
 
-                                transactionRepository.createTransfer(transfer)
-                                rowTransferMap[originalRowIndex] = transfer.id
-                                successCount++
+                                try {
+                                    transactionRepository.createTransfer(transfer)
+                                    rowTransferMap[originalRowIndex] = transfer.id
+
+                                    // Track source record for batch insertion
+                                    sourceRecords.add(
+                                        CsvImportSourceRecord(
+                                            transactionId = transfer.id,
+                                            revisionId = transfer.revisionId,
+                                            rowIndex = originalRowIndex,
+                                        ),
+                                    )
+                                    successCount++
+                                } catch (e: Exception) {
+                                    // Log the error and continue with remaining rows
+                                    val errorMsg = e.message ?: "Unknown error"
+                                    logger.warn(e) {
+                                        "Failed to import row $originalRowIndex: $errorMsg"
+                                    }
+                                    failedRows.add(
+                                        CsvImportResult.FailedRow(
+                                            rowIndex = originalRowIndex,
+                                            errorMessage = errorMsg,
+                                        ),
+                                    )
+                                }
                             }
+
+                            logger.info { "Transfer creation complete: $successCount successes, ${failedRows.size} failures" }
 
                             // Update CSV rows with transfer IDs
                             if (rowTransferMap.isNotEmpty()) {
+                                logger.info { "Updating ${rowTransferMap.size} CSV rows with transfer IDs" }
                                 csvImportRepository.updateRowTransferIdsBatch(
                                     csvImport.id,
                                     rowTransferMap,
                                 )
                             }
 
-                            // Refresh materialized views so transfers are visible
-                            maintenanceService.refreshMaterializedViews()
+                            // Record CSV import sources for all transfers
+                            if (sourceRecords.isNotEmpty()) {
+                                logger.info { "Recording ${sourceRecords.size} CSV import sources" }
+                                transferSourceRepository.recordCsvImportSourcesBatch(
+                                    csvImportId = csvImport.id,
+                                    sources = sourceRecords,
+                                )
+                            }
 
-                            onImportComplete(successCount)
+                            // Refresh materialized views so transfers are visible
+                            logger.info { "Refreshing materialized views" }
+                            maintenanceService.refreshMaterializedViews()
+                            logger.info { "Import completed successfully" }
+
+                            val result =
+                                CsvImportResult(
+                                    successCount = successCount,
+                                    failedRows = failedRows,
+                                )
+
+                            if (successCount == 0 && failedRows.isNotEmpty()) {
+                                // All rows failed - show error
+                                errorMessage =
+                                    "Import failed: all ${failedRows.size} rows failed due to database constraints"
+                                isImporting = false
+                            } else {
+                                // At least some rows succeeded (or no rows at all)
+                                if (failedRows.isNotEmpty()) {
+                                    logger.info {
+                                        "Import completed with $successCount successes and ${failedRows.size} failures"
+                                    }
+                                }
+                                onImportComplete(result)
+                            }
                         } catch (e: Exception) {
+                            logger.error(e) { "Import failed: ${e.message}" }
                             errorMessage = "Import failed: ${e.message}"
                             isImporting = false
                         }
@@ -283,7 +373,7 @@ private fun StrategySelector(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .menuAnchor(MenuAnchorType.PrimaryNotEditable),
+                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
                 enabled = enabled,
             )
             ExposedDropdownMenu(

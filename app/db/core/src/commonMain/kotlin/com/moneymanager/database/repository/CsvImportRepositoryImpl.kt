@@ -7,6 +7,7 @@ import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.csv.CsvTableManager
+import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvColumnId
@@ -14,6 +15,7 @@ import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.repository.CsvImportRepository
+import com.moneymanager.domain.repository.DeviceRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -25,7 +27,8 @@ import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 class CsvImportRepositoryImpl(
-    database: MoneyManagerDatabaseWrapper,
+    private val database: MoneyManagerDatabaseWrapper,
+    private val deviceRepository: DeviceRepository,
     private val coroutineContext: CoroutineContext = Dispatchers.Default,
 ) : CsvImportRepository {
     private val csvImportQueries = database.csvImportQueries
@@ -35,12 +38,14 @@ class CsvImportRepositoryImpl(
         fileName: String,
         headers: List<String>,
         rows: List<List<String>>,
+        deviceInfo: DeviceInfo,
     ): CsvImportId =
         withContext(coroutineContext) {
             val importId = CsvImportId(Uuid.random())
             val tableName = "csv_import_${importId.id.toHexString().take(8)}"
             val columnCount = headers.size
             val timestamp = Clock.System.now()
+            val deviceId = deviceRepository.getOrCreateDevice(deviceInfo)
 
             // Create the dynamic table
             tableManager.createCsvTable(tableName, columnCount)
@@ -56,6 +61,7 @@ class CsvImportRepositoryImpl(
                 importTimestamp = timestamp.toEpochMilliseconds(),
                 rowCount = rows.size.toLong(),
                 columnCount = columnCount.toLong(),
+                device_id = deviceId,
             )
 
             // Insert column metadata
@@ -97,6 +103,14 @@ class CsvImportRepositoryImpl(
                         rowCount = import.rowCount.toInt(),
                         columnCount = import.columnCount.toInt(),
                         columns = columns,
+                        deviceInfo =
+                            DeviceRepositoryImpl.createDeviceInfo(
+                                platformName = import.platformName,
+                                osName = import.osName,
+                                machineName = import.machineName,
+                                deviceMake = import.deviceMake,
+                                deviceModel = import.deviceModel,
+                            ),
                     )
                 }
             }
@@ -132,6 +146,14 @@ class CsvImportRepositoryImpl(
                     rowCount = it.rowCount.toInt(),
                     columnCount = it.columnCount.toInt(),
                     columns = columns,
+                    deviceInfo =
+                        DeviceRepositoryImpl.createDeviceInfo(
+                            platformName = it.platformName,
+                            osName = it.osName,
+                            machineName = it.machineName,
+                            deviceMake = it.deviceMake,
+                            deviceModel = it.deviceModel,
+                        ),
                 )
             }
         }

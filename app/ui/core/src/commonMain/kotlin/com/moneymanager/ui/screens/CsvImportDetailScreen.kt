@@ -36,6 +36,7 @@ import com.moneymanager.domain.repository.CsvImportRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.domain.repository.TransferSourceRepository
 import com.moneymanager.ui.components.csv.CsvPreviewTable
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -54,6 +55,7 @@ fun CsvImportDetailScreen(
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
     transactionRepository: TransactionRepository,
+    transferSourceRepository: TransferSourceRepository,
     maintenanceService: DatabaseMaintenanceService,
     onBack: () -> Unit,
     onDeleted: () -> Unit,
@@ -69,6 +71,7 @@ fun CsvImportDetailScreen(
     var showCreateStrategyDialog by remember { mutableStateOf(false) }
     var isDeleting by remember { mutableStateOf(false) }
     var importResultMessage by remember { mutableStateOf<String?>(null) }
+    var failedRowIndexes by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var rowsRefreshTrigger by remember { mutableStateOf(0) }
 
     // Determine amount column index by looking for common amount column names
@@ -234,6 +237,7 @@ fun CsvImportDetailScreen(
                         rows = rows,
                         modifier = Modifier.fillMaxSize(),
                         amountColumnIndex = amountColumnIndex,
+                        failedRowIndexes = failedRowIndexes,
                         onTransferClick = onTransferClick,
                     )
                 }
@@ -284,12 +288,23 @@ fun CsvImportDetailScreen(
             accountRepository = accountRepository,
             currencyRepository = currencyRepository,
             transactionRepository = transactionRepository,
+            transferSourceRepository = transferSourceRepository,
             csvImportRepository = csvImportRepository,
             maintenanceService = maintenanceService,
             onDismiss = { showApplyStrategyDialog = false },
-            onImportComplete = { count ->
+            onImportComplete = { result ->
                 showApplyStrategyDialog = false
-                importResultMessage = "Successfully imported $count transfers"
+                failedRowIndexes = result.failedRows.map { it.rowIndex }.toSet()
+                importResultMessage =
+                    buildString {
+                        append("Successfully imported ${result.successCount} transfers")
+                        if (result.failedRows.isNotEmpty()) {
+                            append("\n\nFailed rows (${result.failedRows.size}):")
+                            result.failedRows.forEach { failed ->
+                                append("\n  Row ${failed.rowIndex}: ${failed.errorMessage}")
+                            }
+                        }
+                    }
                 rowsRefreshTrigger++
             },
         )

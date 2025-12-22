@@ -56,19 +56,11 @@ dependencyAnalysis {
     }
 }
 
-// Aggregate Kover coverage from all subprojects
-// Only include projects that have actual source code (not intermediate directories)
-// Exclude test modules (under :test:) from coverage aggregation
-dependencies {
-    subprojects
-        .filter { it.buildFile.exists() && it.file("src").exists() }
-        .filter { !it.path.startsWith(":test:") }
-        .forEach { subproject ->
-            kover(subproject)
-        }
-}
-
 kover {
+    currentProject { sources { excludeJava = true } }
+    if (path.startsWith(":test") || project.file("src/test").exists().not()) {
+        disable()
+    }
     reports {
         filters {
             excludes {

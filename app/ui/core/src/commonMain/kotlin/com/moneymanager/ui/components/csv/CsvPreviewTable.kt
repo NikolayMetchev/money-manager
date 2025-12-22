@@ -32,6 +32,7 @@ import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
 
 private val TRANSFER_COLUMN_WIDTH = 100.dp
+private val ROW_INDEX_COLUMN_WIDTH = 60.dp
 
 @Composable
 fun CsvPreviewTable(
@@ -40,6 +41,7 @@ fun CsvPreviewTable(
     modifier: Modifier = Modifier,
     columnWidth: Dp = 150.dp,
     amountColumnIndex: Int? = null,
+    failedRowIndexes: Set<Long> = emptySet(),
     onTransferClick: ((TransferId, Boolean) -> Unit)? = null,
 ) {
     val horizontalScrollState = rememberScrollState()
@@ -54,6 +56,26 @@ fun CsvPreviewTable(
                     .horizontalScroll(horizontalScrollState)
                     .background(MaterialTheme.colorScheme.surfaceVariant),
         ) {
+            // Row index column header
+            Box(
+                modifier =
+                    Modifier
+                        .width(ROW_INDEX_COLUMN_WIDTH)
+                        .border(
+                            width = 1.dp,
+                            color = MaterialTheme.colorScheme.outline,
+                        )
+                        .padding(8.dp),
+            ) {
+                Text(
+                    text = "Row",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+
             // Transfer ID column header
             Box(
                 modifier =
@@ -101,12 +123,47 @@ fun CsvPreviewTable(
         Box(modifier = Modifier.weight(1f)) {
             LazyColumn(state = lazyListState) {
                 itemsIndexed(rows) { _, row ->
+                    val isFailed = row.rowIndex in failedRowIndexes
+                    val rowBackground =
+                        if (isFailed) {
+                            MaterialTheme.colorScheme.errorContainer
+                        } else {
+                            MaterialTheme.colorScheme.surface
+                        }
+
                     Row(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .horizontalScroll(horizontalScrollState),
+                                .horizontalScroll(horizontalScrollState)
+                                .background(rowBackground),
                     ) {
+                        // Row index cell
+                        Box(
+                            modifier =
+                                Modifier
+                                    .width(ROW_INDEX_COLUMN_WIDTH)
+                                    .border(
+                                        width = 1.dp,
+                                        color = MaterialTheme.colorScheme.outlineVariant,
+                                    )
+                                    .padding(8.dp),
+                        ) {
+                            Text(
+                                text = row.rowIndex.toString(),
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = if (isFailed) FontWeight.Bold else FontWeight.Normal,
+                                color =
+                                    if (isFailed) {
+                                        MaterialTheme.colorScheme.onErrorContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurface
+                                    },
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+
                         // Determine if amount is positive from the amount column
                         val isPositiveAmount =
                             amountColumnIndex?.let { idx ->
@@ -143,6 +200,12 @@ fun CsvPreviewTable(
                                     Text(
                                         text = value,
                                         style = MaterialTheme.typography.bodySmall,
+                                        color =
+                                            if (isFailed) {
+                                                MaterialTheme.colorScheme.onErrorContainer
+                                            } else {
+                                                MaterialTheme.colorScheme.onSurface
+                                            },
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                     )

@@ -1,0 +1,20 @@
+-- DeviceMake: Lookup table for device manufacturers
+CREATE TABLE DeviceMake (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE
+);
+
+selectAll:
+SELECT * FROM DeviceMake ORDER BY name;
+
+selectById:
+SELECT * FROM DeviceMake WHERE id = ?;
+
+selectByName:
+SELECT id FROM DeviceMake WHERE name = ?;
+
+insertOrIgnore:
+INSERT OR IGNORE INTO DeviceMake (name) VALUES (?);
+
+lastInsertRowId:
+SELECT last_insert_rowid();

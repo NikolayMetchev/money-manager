@@ -20,15 +20,20 @@ import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CategoryBalance
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferAuditEntry
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.TransferSource
+import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AuditRepository
 import com.moneymanager.domain.repository.CategoryRepository
+import com.moneymanager.domain.repository.CsvImportSourceRecord
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.domain.repository.TransferSourceRepository
 import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -79,6 +84,7 @@ class AccountTransactionsScreenTest {
 
             val accountRepository = FakeAccountRepository(listOf(checking, savings))
             val transactionRepository = FakeTransactionRepository(listOf(transfer))
+            val transferSourceRepository = FakeTransferSourceRepository()
             val currencyRepository = FakeCurrencyRepository(listOf(usdCurrency))
             val categoryRepository = FakeCategoryRepository()
             val auditRepository = FakeAuditRepository()
@@ -92,6 +98,7 @@ class AccountTransactionsScreenTest {
                     AccountTransactionsScreen(
                         accountId = currentAccountId,
                         transactionRepository = transactionRepository,
+                        transferSourceRepository = transferSourceRepository,
                         accountRepository = accountRepository,
                         categoryRepository = categoryRepository,
                         currencyRepository = currencyRepository,
@@ -168,6 +175,7 @@ class AccountTransactionsScreenTest {
 
             val accountRepository = FakeAccountRepository(listOf(checking, savings))
             val transactionRepository = FakeTransactionRepository(listOf(transfer))
+            val transferSourceRepository = FakeTransferSourceRepository()
             val currencyRepository = FakeCurrencyRepository(listOf(usdCurrency))
             val categoryRepository = FakeCategoryRepository()
             val auditRepository = FakeAuditRepository()
@@ -180,6 +188,7 @@ class AccountTransactionsScreenTest {
                     AccountTransactionsScreen(
                         accountId = currentAccountId,
                         transactionRepository = transactionRepository,
+                        transferSourceRepository = transferSourceRepository,
                         accountRepository = accountRepository,
                         categoryRepository = categoryRepository,
                         currencyRepository = currencyRepository,
@@ -447,5 +456,34 @@ class AccountTransactionsScreenTest {
 
     private class FakeAuditRepository : AuditRepository {
         override suspend fun getAuditHistoryForTransfer(transferId: TransferId): List<TransferAuditEntry> = emptyList()
+
+        override suspend fun getAuditHistoryForTransferWithSource(transferId: TransferId): List<TransferAuditEntry> = emptyList()
+    }
+
+    private class FakeTransferSourceRepository : TransferSourceRepository {
+        override suspend fun recordManualSource(
+            transactionId: TransferId,
+            revisionId: Long,
+            deviceInfo: DeviceInfo,
+        ): TransferSource = throw NotImplementedError("Not needed for this test")
+
+        override suspend fun recordCsvImportSource(
+            transactionId: TransferId,
+            revisionId: Long,
+            csvImportId: CsvImportId,
+            rowIndex: Long,
+        ): TransferSource = throw NotImplementedError("Not needed for this test")
+
+        override suspend fun recordCsvImportSourcesBatch(
+            csvImportId: CsvImportId,
+            sources: List<CsvImportSourceRecord>,
+        ) {}
+
+        override suspend fun getSourcesForTransaction(transactionId: TransferId): List<TransferSource> = emptyList()
+
+        override suspend fun getSourceByRevision(
+            transactionId: TransferId,
+            revisionId: Long,
+        ): TransferSource? = null
     }
 }
