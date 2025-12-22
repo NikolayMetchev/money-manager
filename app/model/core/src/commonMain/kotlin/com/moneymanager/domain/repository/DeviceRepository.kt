@@ -16,7 +16,7 @@ interface DeviceRepository {
      * @param deviceInfo The device information
      * @return The device ID (existing or newly created)
      */
-    suspend fun getOrCreateDevice(deviceInfo: DeviceInfo): Long
+    fun getOrCreateDevice(deviceInfo: DeviceInfo): Long
 
     /**
      * Gets device info by ID.

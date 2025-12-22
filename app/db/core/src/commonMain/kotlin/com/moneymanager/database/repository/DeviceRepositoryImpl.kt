@@ -8,14 +8,14 @@ import com.moneymanager.domain.repository.DeviceRepository
 class DeviceRepositoryImpl(
     private val database: MoneyManagerDatabaseWrapper,
 ) : DeviceRepository {
-    override suspend fun getOrCreateDevice(deviceInfo: DeviceInfo): Long {
+    override fun getOrCreateDevice(deviceInfo: DeviceInfo): Long {
         return when (deviceInfo) {
             is DeviceInfo.Jvm -> getOrCreateJvmDevice(deviceInfo)
             is DeviceInfo.Android -> getOrCreateAndroidDevice(deviceInfo)
         }
     }
 
-    private suspend fun getOrCreateJvmDevice(deviceInfo: DeviceInfo.Jvm): Long {
+    private fun getOrCreateJvmDevice(deviceInfo: DeviceInfo.Jvm): Long {
         // Get or create OsName
         database.osNameQueries.insertOrIgnore(deviceInfo.osName)
         val osId = database.osNameQueries.selectByName(deviceInfo.osName).executeAsOne()
@@ -61,7 +61,7 @@ class DeviceRepositoryImpl(
         ).executeAsOne()
     }
 
-    private suspend fun getOrCreateAndroidDevice(deviceInfo: DeviceInfo.Android): Long {
+    private fun getOrCreateAndroidDevice(deviceInfo: DeviceInfo.Android): Long {
         // Get or create DeviceMake
         database.deviceMakeQueries.insertOrIgnore(deviceInfo.deviceMake)
         val makeId = database.deviceMakeQueries.selectByName(deviceInfo.deviceMake).executeAsOne()
