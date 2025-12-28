@@ -1,7 +1,6 @@
 plugins {
     id("moneymanager.compose-multiplatform-convention")
     alias(libs.plugins.compose.compiler)
-    alias(libs.plugins.metro)
 }
 
 kotlin {
@@ -18,7 +17,6 @@ kotlin {
                 implementation(libs.kmlogging)
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.datetime)
-                implementation(libs.metro.runtime)
                 implementation(projects.app.db.core)
                 implementation(projects.app.di.core)
                 implementation(projects.app.model.core)
@@ -35,6 +33,7 @@ kotlin {
                 implementation(compose.uiTest)
 
                 implementation(libs.kotlinx.coroutines.test)
+                implementation(libs.metro.runtime)
                 implementation(libs.turbine)
                 implementation(projects.test.app.db)
             }
