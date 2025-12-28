@@ -25,6 +25,7 @@ import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -46,6 +47,7 @@ import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
+import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.FieldMappingId
@@ -62,6 +64,14 @@ import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
+
+/**
+ * Currency mapping mode for CSV import.
+ */
+enum class CurrencyMode {
+    HARDCODED,
+    FROM_COLUMN,
+}
 
 /**
  * Utility object for auto-detecting likely column mappings based on column names and values.
@@ -81,6 +91,7 @@ object ColumnDetector {
         listOf("description", "memo", "narrative", "details", "reference", "particular", "note", "remark")
     private val payeeNamePatterns =
         listOf("payee", "name", "merchant", "counterparty", "beneficiary", "vendor", "recipient", "payer", "party")
+    private val currencyNamePatterns = listOf("currency", "ccy", "curr", "fx")
 
     // Value patterns for content-based detection
     private val dateValuePatterns =
@@ -99,6 +110,9 @@ object ColumnDetector {
 
     // Amount values: numbers with optional decimal, negative sign, currency symbols
     private val amountValuePattern = Regex("""^[£$€¥]?-?\d{1,3}(,\d{3})*(\.\d{1,2})?$|^-?\d+(\.\d{1,2})?$""")
+
+    // Currency values: 3-letter ISO 4217 codes
+    private val currencyValuePattern = Regex("""^[A-Z]{3}$""")
 
     /**
      * Checks if a column name matches a pattern as a whole word.
@@ -125,6 +139,11 @@ object ColumnDetector {
      * Checks if a value looks like a time (HH:mm or HH:mm:ss format).
      */
     private fun looksLikeTime(value: String): Boolean = timeValuePattern.matches(value.trim())
+
+    /**
+     * Checks if a value looks like an ISO 4217 currency code.
+     */
+    private fun looksLikeCurrency(value: String): Boolean = currencyValuePattern.matches(value.trim().uppercase())
 
     /**
      * Suggests a column based on name patterns and optionally value analysis.
@@ -177,6 +196,11 @@ object ColumnDetector {
     fun suggestDescriptionColumn(columns: List<CsvColumn>): String? = suggestColumn(columns, descriptionNamePatterns)
 
     fun suggestPayeeColumn(columns: List<CsvColumn>): String? = suggestColumn(columns, payeeNamePatterns)
+
+    fun suggestCurrencyColumn(
+        columns: List<CsvColumn>,
+        sampleValues: Map<Int, String>? = null,
+    ): String? = suggestColumn(columns, currencyNamePatterns, sampleValues, ::looksLikeCurrency)
 }
 
 /**
@@ -212,6 +236,8 @@ fun CreateCsvStrategyDialog(
     var amountColumnName by remember { mutableStateOf<String?>(null) }
     var selectedAccountId by remember { mutableStateOf<AccountId?>(null) }
     var selectedCurrencyId by remember { mutableStateOf<CurrencyId?>(null) }
+    var currencyMode by remember { mutableStateOf(CurrencyMode.HARDCODED) }
+    var currencyColumnName by remember { mutableStateOf<String?>(null) }
     var targetAccountColumnName by remember { mutableStateOf<String?>(null) }
     var flipAccountsOnPositive by remember { mutableStateOf(true) }
 
@@ -224,6 +250,20 @@ fun CreateCsvStrategyDialog(
         firstRow?.let { row ->
             csvColumns.associate { col -> col.columnIndex to (row.values.getOrNull(col.columnIndex) ?: "") }
         }
+
+    // Compute form validity - all required fields must be populated
+    val isFormValid =
+        name.isNotBlank() &&
+            identificationColumns.isNotEmpty() &&
+            selectedAccountId != null &&
+            targetAccountColumnName != null &&
+            dateColumnName != null &&
+            descriptionColumnName != null &&
+            amountColumnName != null &&
+            when (currencyMode) {
+                CurrencyMode.HARDCODED -> selectedCurrencyId != null
+                CurrencyMode.FROM_COLUMN -> currencyColumnName != null
+            }
 
     // Auto-detect columns on first load
     LaunchedEffect(csvColumns, firstRow) {
@@ -241,6 +281,12 @@ fun CreateCsvStrategyDialog(
         }
         if (targetAccountColumnName == null) {
             targetAccountColumnName = ColumnDetector.suggestPayeeColumn(csvColumns)
+        }
+        if (currencyColumnName == null) {
+            currencyColumnName = ColumnDetector.suggestCurrencyColumn(csvColumns, sampleValues)
+            if (currencyColumnName != null) {
+                currencyMode = CurrencyMode.FROM_COLUMN
+            }
         }
     }
 
@@ -261,6 +307,7 @@ fun CreateCsvStrategyDialog(
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     enabled = !isSaving,
+                    isError = name.isBlank(),
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -287,6 +334,7 @@ fun CreateCsvStrategyDialog(
                     accountRepository = accountRepository,
                     categoryRepository = categoryRepository,
                     enabled = !isSaving,
+                    isError = selectedAccountId == null,
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -298,6 +346,7 @@ fun CreateCsvStrategyDialog(
                     label = "Column for payee/counterparty name",
                     sampleValue = getSampleValue(csvColumns, firstRow, targetAccountColumnName),
                     enabled = !isSaving,
+                    isError = targetAccountColumnName == null,
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -309,6 +358,7 @@ fun CreateCsvStrategyDialog(
                     label = "Column containing transaction date",
                     sampleValue = getSampleValue(csvColumns, firstRow, dateColumnName),
                     enabled = !isSaving,
+                    isError = dateColumnName == null,
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 OutlinedTextField(
@@ -367,6 +417,7 @@ fun CreateCsvStrategyDialog(
                     label = "Column containing transaction description",
                     sampleValue = getSampleValue(csvColumns, firstRow, descriptionColumnName),
                     enabled = !isSaving,
+                    isError = descriptionColumnName == null,
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -378,6 +429,7 @@ fun CreateCsvStrategyDialog(
                     label = "Column containing transaction amount",
                     sampleValue = getSampleValue(csvColumns, firstRow, amountColumnName),
                     enabled = !isSaving,
+                    isError = amountColumnName == null,
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(
@@ -395,13 +447,48 @@ fun CreateCsvStrategyDialog(
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
-                CurrencyPicker(
-                    selectedCurrencyId = selectedCurrencyId,
-                    onCurrencySelected = { selectedCurrencyId = it },
-                    label = "Select Currency",
-                    currencyRepository = currencyRepository,
-                    enabled = !isSaving,
-                )
+                Text("Currency", style = MaterialTheme.typography.titleSmall)
+
+                // Mode toggle using Row with RadioButtons
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(
+                        selected = currencyMode == CurrencyMode.HARDCODED,
+                        onClick = { currencyMode = CurrencyMode.HARDCODED },
+                        enabled = !isSaving,
+                    )
+                    Text("Fixed Currency", modifier = Modifier.padding(end = 16.dp))
+                    RadioButton(
+                        selected = currencyMode == CurrencyMode.FROM_COLUMN,
+                        onClick = { currencyMode = CurrencyMode.FROM_COLUMN },
+                        enabled = !isSaving,
+                    )
+                    Text("From CSV Column")
+                }
+
+                // Show appropriate input based on mode
+                when (currencyMode) {
+                    CurrencyMode.HARDCODED -> {
+                        CurrencyPicker(
+                            selectedCurrencyId = selectedCurrencyId,
+                            onCurrencySelected = { selectedCurrencyId = it },
+                            label = "Select Currency",
+                            currencyRepository = currencyRepository,
+                            enabled = !isSaving,
+                            isError = selectedCurrencyId == null,
+                        )
+                    }
+                    CurrencyMode.FROM_COLUMN -> {
+                        ColumnDropdown(
+                            columns = csvColumns,
+                            selectedColumn = currencyColumnName,
+                            onColumnSelected = { currencyColumnName = it },
+                            label = "Column containing currency code",
+                            sampleValue = getSampleValue(csvColumns, firstRow, currencyColumnName),
+                            enabled = !isSaving,
+                            isError = currencyColumnName == null,
+                        )
+                    }
+                }
 
                 errorMessage?.let {
                     Spacer(modifier = Modifier.height(8.dp))
@@ -416,85 +503,85 @@ fun CreateCsvStrategyDialog(
         confirmButton = {
             TextButton(
                 onClick = {
-                    when {
-                        name.isBlank() -> errorMessage = "Strategy name is required"
-                        identificationColumns.isEmpty() -> errorMessage = "At least one identification column is required"
-                        selectedAccountId == null -> errorMessage = "Source account is required"
-                        selectedCurrencyId == null -> errorMessage = "Currency is required"
-                        dateColumnName == null -> errorMessage = "Date column is required"
-                        descriptionColumnName == null -> errorMessage = "Description column is required"
-                        amountColumnName == null -> errorMessage = "Amount column is required"
-                        targetAccountColumnName == null -> errorMessage = "Target account column is required"
-                        else -> {
-                            isSaving = true
-                            errorMessage = null
-                            scope.launch {
-                                try {
-                                    val now = Clock.System.now()
-                                    val strategy =
-                                        CsvImportStrategy(
-                                            id = CsvImportStrategyId(Uuid.random()),
-                                            name = name,
-                                            identificationColumns = identificationColumns,
-                                            fieldMappings =
-                                                mapOf(
-                                                    TransferField.SOURCE_ACCOUNT to
-                                                        HardCodedAccountMapping(
-                                                            id = FieldMappingId(Uuid.random()),
-                                                            fieldType = TransferField.SOURCE_ACCOUNT,
-                                                            accountId = selectedAccountId!!,
-                                                        ),
-                                                    TransferField.TARGET_ACCOUNT to
-                                                        AccountLookupMapping(
-                                                            id = FieldMappingId(Uuid.random()),
-                                                            fieldType = TransferField.TARGET_ACCOUNT,
-                                                            columnName = targetAccountColumnName!!,
-                                                            createIfMissing = true,
-                                                        ),
-                                                    TransferField.TIMESTAMP to
-                                                        DateTimeParsingMapping(
-                                                            id = FieldMappingId(Uuid.random()),
-                                                            fieldType = TransferField.TIMESTAMP,
-                                                            dateColumnName = dateColumnName!!,
-                                                            dateFormat = dateFormat,
-                                                            timeColumnName = timeColumnName,
-                                                            timeFormat = timeColumnName?.let { timeFormat },
-                                                        ),
-                                                    TransferField.DESCRIPTION to
-                                                        DirectColumnMapping(
-                                                            id = FieldMappingId(Uuid.random()),
-                                                            fieldType = TransferField.DESCRIPTION,
-                                                            columnName = descriptionColumnName!!,
-                                                        ),
-                                                    TransferField.AMOUNT to
-                                                        AmountParsingMapping(
-                                                            id = FieldMappingId(Uuid.random()),
-                                                            fieldType = TransferField.AMOUNT,
-                                                            mode = AmountMode.SINGLE_COLUMN,
-                                                            amountColumnName = amountColumnName!!,
-                                                            flipAccountsOnPositive = flipAccountsOnPositive,
-                                                        ),
-                                                    TransferField.CURRENCY to
-                                                        HardCodedCurrencyMapping(
-                                                            id = FieldMappingId(Uuid.random()),
-                                                            fieldType = TransferField.CURRENCY,
-                                                            currencyId = selectedCurrencyId!!,
-                                                        ),
-                                                ),
-                                            createdAt = now,
-                                            updatedAt = now,
-                                        )
-                                    csvImportStrategyRepository.createStrategy(strategy)
-                                    onDismiss()
-                                } catch (e: Exception) {
-                                    errorMessage = "Failed to create strategy: ${e.message}"
-                                    isSaving = false
-                                }
+                    // Validation already done via isFormValid, but double-check
+                    if (isFormValid) {
+                        isSaving = true
+                        errorMessage = null
+                        scope.launch {
+                            try {
+                                val now = Clock.System.now()
+                                val strategy =
+                                    CsvImportStrategy(
+                                        id = CsvImportStrategyId(Uuid.random()),
+                                        name = name,
+                                        identificationColumns = identificationColumns,
+                                        fieldMappings =
+                                            mapOf(
+                                                TransferField.SOURCE_ACCOUNT to
+                                                    HardCodedAccountMapping(
+                                                        id = FieldMappingId(Uuid.random()),
+                                                        fieldType = TransferField.SOURCE_ACCOUNT,
+                                                        accountId = selectedAccountId!!,
+                                                    ),
+                                                TransferField.TARGET_ACCOUNT to
+                                                    AccountLookupMapping(
+                                                        id = FieldMappingId(Uuid.random()),
+                                                        fieldType = TransferField.TARGET_ACCOUNT,
+                                                        columnName = targetAccountColumnName!!,
+                                                        createIfMissing = true,
+                                                    ),
+                                                TransferField.TIMESTAMP to
+                                                    DateTimeParsingMapping(
+                                                        id = FieldMappingId(Uuid.random()),
+                                                        fieldType = TransferField.TIMESTAMP,
+                                                        dateColumnName = dateColumnName!!,
+                                                        dateFormat = dateFormat,
+                                                        timeColumnName = timeColumnName,
+                                                        timeFormat = timeColumnName?.let { timeFormat },
+                                                    ),
+                                                TransferField.DESCRIPTION to
+                                                    DirectColumnMapping(
+                                                        id = FieldMappingId(Uuid.random()),
+                                                        fieldType = TransferField.DESCRIPTION,
+                                                        columnName = descriptionColumnName!!,
+                                                    ),
+                                                TransferField.AMOUNT to
+                                                    AmountParsingMapping(
+                                                        id = FieldMappingId(Uuid.random()),
+                                                        fieldType = TransferField.AMOUNT,
+                                                        mode = AmountMode.SINGLE_COLUMN,
+                                                        amountColumnName = amountColumnName!!,
+                                                        flipAccountsOnPositive = flipAccountsOnPositive,
+                                                    ),
+                                                TransferField.CURRENCY to
+                                                    when (currencyMode) {
+                                                        CurrencyMode.HARDCODED ->
+                                                            HardCodedCurrencyMapping(
+                                                                id = FieldMappingId(Uuid.random()),
+                                                                fieldType = TransferField.CURRENCY,
+                                                                currencyId = selectedCurrencyId!!,
+                                                            )
+                                                        CurrencyMode.FROM_COLUMN ->
+                                                            CurrencyLookupMapping(
+                                                                id = FieldMappingId(Uuid.random()),
+                                                                fieldType = TransferField.CURRENCY,
+                                                                columnName = currencyColumnName!!,
+                                                            )
+                                                    },
+                                            ),
+                                        createdAt = now,
+                                        updatedAt = now,
+                                    )
+                                csvImportStrategyRepository.createStrategy(strategy)
+                                onDismiss()
+                            } catch (e: Exception) {
+                                errorMessage = "Failed to create strategy: ${e.message}"
+                                isSaving = false
                             }
                         }
                     }
                 },
-                enabled = !isSaving,
+                enabled = isFormValid && !isSaving,
             ) {
                 if (isSaving) {
                     CircularProgressIndicator(
@@ -638,6 +725,7 @@ private fun ColumnDropdown(
     label: String,
     sampleValue: String? = null,
     enabled: Boolean = true,
+    isError: Boolean = false,
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -656,6 +744,7 @@ private fun ColumnDropdown(
                     .fillMaxWidth()
                     .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
             enabled = enabled,
+            isError = isError,
             supportingText =
                 sampleValue?.let {
                     { Text("Sample: $it", maxLines = 1, overflow = TextOverflow.Ellipsis) }

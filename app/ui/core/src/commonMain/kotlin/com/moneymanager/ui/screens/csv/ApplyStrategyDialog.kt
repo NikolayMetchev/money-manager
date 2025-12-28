@@ -123,12 +123,14 @@ fun ApplyStrategyDialog(
                 try {
                     val accountsByName = accounts.associateBy { it.name }
                     val currenciesById = currencies.associateBy { it.id }
+                    val currenciesByCode = currencies.associateBy { it.code.uppercase() }
                     val mapper =
                         CsvTransferMapper(
                             strategy = strategy,
                             columns = csvImport.columns,
                             existingAccounts = accountsByName,
                             existingCurrencies = currenciesById,
+                            existingCurrenciesByCode = currenciesByCode,
                         )
                     importPreparation = mapper.prepareImport(rows)
                     errorMessage = null
@@ -211,6 +213,7 @@ fun ApplyStrategyDialog(
                             val updatedAccounts = accountRepository.getAllAccounts().first()
                             val accountsByName = updatedAccounts.associateBy { it.name }
                             val currenciesById = currencies.associateBy { it.id }
+                            val currenciesByCode = currencies.associateBy { it.code.uppercase() }
 
                             val mapper =
                                 CsvTransferMapper(
@@ -218,6 +221,7 @@ fun ApplyStrategyDialog(
                                     columns = csvImport.columns,
                                     existingAccounts = accountsByName,
                                     existingCurrencies = currenciesById,
+                                    existingCurrenciesByCode = currenciesByCode,
                                 )
 
                             val finalPrep = mapper.prepareImport(rows)

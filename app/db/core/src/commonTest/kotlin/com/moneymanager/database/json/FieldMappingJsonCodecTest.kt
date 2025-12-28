@@ -8,6 +8,7 @@ import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
+import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.FieldMappingId
@@ -169,6 +170,24 @@ class FieldMappingJsonCodecTest {
         val decodedMapping = decoded[TransferField.CURRENCY]
         assertIs<HardCodedCurrencyMapping>(decodedMapping)
         assertEquals(currencyId, decodedMapping.currencyId)
+    }
+
+    @Test
+    fun `encode and decode CurrencyLookupMapping`() {
+        val mapping =
+            CurrencyLookupMapping(
+                id = FieldMappingId(Uuid.random()),
+                fieldType = TransferField.CURRENCY,
+                columnName = "Currency",
+            )
+        val mappings = mapOf(TransferField.CURRENCY to mapping)
+
+        val json = FieldMappingJsonCodec.encode(mappings)
+        val decoded = FieldMappingJsonCodec.decode(json)
+
+        val decodedMapping = decoded[TransferField.CURRENCY]
+        assertIs<CurrencyLookupMapping>(decodedMapping)
+        assertEquals("Currency", decodedMapping.columnName)
     }
 
     @Test
