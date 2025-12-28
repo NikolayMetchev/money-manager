@@ -13,4 +13,5 @@ enum class TransferField {
     DESCRIPTION,
     AMOUNT,
     CURRENCY,
+    TIMEZONE,
 }

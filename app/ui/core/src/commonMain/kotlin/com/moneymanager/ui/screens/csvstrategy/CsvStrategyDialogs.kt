@@ -53,6 +53,8 @@ import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.FieldMappingId
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
+import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
+import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.CategoryRepository
@@ -62,6 +64,7 @@ import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.CurrencyPicker
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.datetime.TimeZone
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
@@ -69,6 +72,14 @@ import kotlin.uuid.Uuid
  * Currency mapping mode for CSV import.
  */
 enum class CurrencyMode {
+    HARDCODED,
+    FROM_COLUMN,
+}
+
+/**
+ * Timezone mapping mode for CSV import.
+ */
+enum class TimezoneMode {
     HARDCODED,
     FROM_COLUMN,
 }
@@ -238,6 +249,9 @@ fun CreateCsvStrategyDialog(
     var selectedCurrencyId by remember { mutableStateOf<CurrencyId?>(null) }
     var currencyMode by remember { mutableStateOf(CurrencyMode.HARDCODED) }
     var currencyColumnName by remember { mutableStateOf<String?>(null) }
+    var timezoneMode by remember { mutableStateOf(TimezoneMode.HARDCODED) }
+    var selectedTimezone by remember { mutableStateOf(TimeZone.currentSystemDefault().id) }
+    var timezoneColumnName by remember { mutableStateOf<String?>(null) }
     var targetAccountColumnName by remember { mutableStateOf<String?>(null) }
     var flipAccountsOnPositive by remember { mutableStateOf(true) }
 
@@ -263,6 +277,10 @@ fun CreateCsvStrategyDialog(
             when (currencyMode) {
                 CurrencyMode.HARDCODED -> selectedCurrencyId != null
                 CurrencyMode.FROM_COLUMN -> currencyColumnName != null
+            } &&
+            when (timezoneMode) {
+                TimezoneMode.HARDCODED -> true // Always valid, defaults to system timezone
+                TimezoneMode.FROM_COLUMN -> timezoneColumnName != null
             }
 
     // Auto-detect columns on first load
@@ -490,6 +508,52 @@ fun CreateCsvStrategyDialog(
                     }
                 }
 
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Timezone", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    "Timezone for interpreting date/time values",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                // Mode toggle using Row with RadioButtons
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(
+                        selected = timezoneMode == TimezoneMode.HARDCODED,
+                        onClick = { timezoneMode = TimezoneMode.HARDCODED },
+                        enabled = !isSaving,
+                    )
+                    Text("Fixed Timezone", modifier = Modifier.padding(end = 16.dp))
+                    RadioButton(
+                        selected = timezoneMode == TimezoneMode.FROM_COLUMN,
+                        onClick = { timezoneMode = TimezoneMode.FROM_COLUMN },
+                        enabled = !isSaving,
+                    )
+                    Text("From CSV Column")
+                }
+
+                // Show appropriate input based on mode
+                when (timezoneMode) {
+                    TimezoneMode.HARDCODED -> {
+                        TimezonePicker(
+                            selectedTimezone = selectedTimezone,
+                            onTimezoneSelected = { selectedTimezone = it },
+                            enabled = !isSaving,
+                        )
+                    }
+                    TimezoneMode.FROM_COLUMN -> {
+                        ColumnDropdown(
+                            columns = csvColumns,
+                            selectedColumn = timezoneColumnName,
+                            onColumnSelected = { timezoneColumnName = it },
+                            label = "Column containing timezone ID",
+                            sampleValue = getSampleValue(csvColumns, firstRow, timezoneColumnName),
+                            enabled = !isSaving,
+                            isError = timezoneColumnName == null,
+                        )
+                    }
+                }
+
                 errorMessage?.let {
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
@@ -566,6 +630,21 @@ fun CreateCsvStrategyDialog(
                                                                 id = FieldMappingId(Uuid.random()),
                                                                 fieldType = TransferField.CURRENCY,
                                                                 columnName = currencyColumnName!!,
+                                                            )
+                                                    },
+                                                TransferField.TIMEZONE to
+                                                    when (timezoneMode) {
+                                                        TimezoneMode.HARDCODED ->
+                                                            HardCodedTimezoneMapping(
+                                                                id = FieldMappingId(Uuid.random()),
+                                                                fieldType = TransferField.TIMEZONE,
+                                                                timezoneId = selectedTimezone,
+                                                            )
+                                                        TimezoneMode.FROM_COLUMN ->
+                                                            TimezoneLookupMapping(
+                                                                id = FieldMappingId(Uuid.random()),
+                                                                fieldType = TransferField.TIMEZONE,
+                                                                columnName = timezoneColumnName!!,
                                                             )
                                                     },
                                             ),
@@ -862,6 +941,100 @@ private fun OptionalColumnDropdown(
                         onColumnSelected(column.originalName)
                         expanded = false
                     },
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Dropdown selector for timezone with search capability.
+ * Uses kotlinx-datetime's TimeZone.availableZoneIds for multiplatform compatibility.
+ */
+@Composable
+private fun TimezonePicker(
+    selectedTimezone: String,
+    onTimezoneSelected: (String) -> Unit,
+    enabled: Boolean = true,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+
+    // Get all available timezone IDs (multiplatform via kotlinx-datetime)
+    val allTimezones = remember { TimeZone.availableZoneIds.sorted() }
+
+    // Filter timezones based on search query
+    val filteredTimezones =
+        remember(searchQuery) {
+            if (searchQuery.isBlank()) {
+                // Show common timezones first when no search
+                val common =
+                    listOf(
+                        "Europe/London",
+                        "UTC",
+                        "America/New_York",
+                        "America/Los_Angeles",
+                        "Europe/Paris",
+                        "Asia/Tokyo",
+                    ).filter { it in allTimezones }
+                common + (allTimezones - common.toSet()).take(20)
+            } else {
+                allTimezones.filter { it.contains(searchQuery, ignoreCase = true) }.take(50)
+            }
+        }
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { if (enabled) expanded = !expanded },
+    ) {
+        OutlinedTextField(
+            value = if (expanded) searchQuery else selectedTimezone,
+            onValueChange = { searchQuery = it },
+            readOnly = !expanded,
+            label = { Text("Select Timezone") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable),
+            enabled = enabled,
+            placeholder = { if (expanded) Text("Type to search...") },
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = {
+                expanded = false
+                searchQuery = ""
+            },
+        ) {
+            filteredTimezones.forEach { tzId ->
+                DropdownMenuItem(
+                    text = {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text(tzId)
+                            if (tzId == selectedTimezone) {
+                                Text(
+                                    "✓",
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                        }
+                    },
+                    onClick = {
+                        onTimezoneSelected(tzId)
+                        expanded = false
+                        searchQuery = ""
+                    },
+                )
+            }
+            if (filteredTimezones.isEmpty()) {
+                DropdownMenuItem(
+                    text = { Text("No timezones found", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                    onClick = {},
+                    enabled = false,
                 )
             }
         }

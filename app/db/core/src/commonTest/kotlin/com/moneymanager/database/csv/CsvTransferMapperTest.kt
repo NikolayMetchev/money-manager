@@ -20,7 +20,12 @@ import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.FieldMappingId
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
+import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
+import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toInstant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -492,5 +497,286 @@ class CsvTransferMapperTest {
 
         assertIs<MappingResult.Error>(result)
         assertTrue(result.errorMessage.contains("Currency"))
+    }
+
+    @Test
+    fun `mapRow with HardCodedTimezoneMapping uses specified timezone`() {
+        val now = Clock.System.now()
+        val strategyWithTimezone =
+            CsvImportStrategy(
+                id = CsvImportStrategyId(Uuid.random()),
+                name = "Test Strategy With Timezone",
+                identificationColumns = setOf("Date", "Description", "Amount"),
+                fieldMappings =
+                    mapOf(
+                        TransferField.SOURCE_ACCOUNT to
+                            HardCodedAccountMapping(
+                                id = FieldMappingId(Uuid.random()),
+                                fieldType = TransferField.SOURCE_ACCOUNT,
+                                accountId = testSourceAccountId,
+                            ),
+                        TransferField.TARGET_ACCOUNT to
+                            AccountLookupMapping(
+                                id = FieldMappingId(Uuid.random()),
+                                fieldType = TransferField.TARGET_ACCOUNT,
+                                columnName = "Payee",
+                                createIfMissing = true,
+                            ),
+                        TransferField.TIMESTAMP to
+                            DateTimeParsingMapping(
+                                id = FieldMappingId(Uuid.random()),
+                                fieldType = TransferField.TIMESTAMP,
+                                dateColumnName = "Date",
+                                dateFormat = "dd/MM/yyyy",
+                            ),
+                        TransferField.DESCRIPTION to
+                            DirectColumnMapping(
+                                id = FieldMappingId(Uuid.random()),
+                                fieldType = TransferField.DESCRIPTION,
+                                columnName = "Description",
+                            ),
+                        TransferField.AMOUNT to
+                            AmountParsingMapping(
+                                id = FieldMappingId(Uuid.random()),
+                                fieldType = TransferField.AMOUNT,
+                                mode = AmountMode.SINGLE_COLUMN,
+                                amountColumnName = "Amount",
+                            ),
+                        TransferField.CURRENCY to
+                            HardCodedCurrencyMapping(
+                                id = FieldMappingId(Uuid.random()),
+                                fieldType = TransferField.CURRENCY,
+                                currencyId = testCurrencyId,
+                            ),
+                        TransferField.TIMEZONE to
+                            HardCodedTimezoneMapping(
+                                id = FieldMappingId(Uuid.random()),
+                                fieldType = TransferField.TIMEZONE,
+                                timezoneId = "UTC",
+                            ),
+                    ),
+                createdAt = now,
+                updatedAt = now,
+            )
+
+        val mapper =
+            CsvTransferMapper(
+                strategy = strategyWithTimezone,
+                columns = columns,
+                existingAccounts = mapOf("Payee Account" to testTargetAccount),
+                existingCurrencies = mapOf(testCurrencyId to testCurrency),
+                existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
+            )
+
+        val row = CsvRow(rowIndex = 1, values = listOf("15/12/2024", "Test payment", "-50.00", "Payee Account"))
+        val result = mapper.mapRow(row)
+
+        assertIs<MappingResult.Success>(result)
+        // December 15, 2024 at 12:00 UTC should be 2024-12-15T12:00:00Z
+        val expected =
+            LocalDateTime(2024, 12, 15, 12, 0, 0)
+                .toInstant(TimeZone.UTC)
+        assertEquals(expected, result.transfer.timestamp)
+    }
+
+    @Test
+    fun `mapRow with TimezoneLookupMapping reads timezone from column`() {
+        val columnsWithTimezone =
+            listOf(
+                CsvColumn(CsvColumnId(Uuid.random()), 0, "Date"),
+                CsvColumn(CsvColumnId(Uuid.random()), 1, "Description"),
+                CsvColumn(CsvColumnId(Uuid.random()), 2, "Amount"),
+                CsvColumn(CsvColumnId(Uuid.random()), 3, "Payee"),
+                CsvColumn(CsvColumnId(Uuid.random()), 4, "Timezone"),
+            )
+
+        val now = Clock.System.now()
+        val strategyWithTimezoneColumn =
+            CsvImportStrategy(
+                id = CsvImportStrategyId(Uuid.random()),
+                name = "Test Strategy With Timezone Column",
+                identificationColumns = setOf("Date", "Description", "Amount", "Timezone"),
+                fieldMappings =
+                    mapOf(
+                        TransferField.SOURCE_ACCOUNT to
+                            HardCodedAccountMapping(
+                                id = FieldMappingId(Uuid.random()),
+                                fieldType = TransferField.SOURCE_ACCOUNT,
+                                accountId = testSourceAccountId,
+                            ),
+                        TransferField.TARGET_ACCOUNT to
+                            AccountLookupMapping(
+                                id = FieldMappingId(Uuid.random()),
+                                fieldType = TransferField.TARGET_ACCOUNT,
+                                columnName = "Payee",
+                                createIfMissing = true,
+                            ),
+                        TransferField.TIMESTAMP to
+                            DateTimeParsingMapping(
+                                id = FieldMappingId(Uuid.random()),
+                                fieldType = TransferField.TIMESTAMP,
+                                dateColumnName = "Date",
+                                dateFormat = "dd/MM/yyyy",
+                            ),
+                        TransferField.DESCRIPTION to
+                            DirectColumnMapping(
+                                id = FieldMappingId(Uuid.random()),
+                                fieldType = TransferField.DESCRIPTION,
+                                columnName = "Description",
+                            ),
+                        TransferField.AMOUNT to
+                            AmountParsingMapping(
+                                id = FieldMappingId(Uuid.random()),
+                                fieldType = TransferField.AMOUNT,
+                                mode = AmountMode.SINGLE_COLUMN,
+                                amountColumnName = "Amount",
+                            ),
+                        TransferField.CURRENCY to
+                            HardCodedCurrencyMapping(
+                                id = FieldMappingId(Uuid.random()),
+                                fieldType = TransferField.CURRENCY,
+                                currencyId = testCurrencyId,
+                            ),
+                        TransferField.TIMEZONE to
+                            TimezoneLookupMapping(
+                                id = FieldMappingId(Uuid.random()),
+                                fieldType = TransferField.TIMEZONE,
+                                columnName = "Timezone",
+                            ),
+                    ),
+                createdAt = now,
+                updatedAt = now,
+            )
+
+        val mapper =
+            CsvTransferMapper(
+                strategy = strategyWithTimezoneColumn,
+                columns = columnsWithTimezone,
+                existingAccounts = mapOf("Payee Account" to testTargetAccount),
+                existingCurrencies = mapOf(testCurrencyId to testCurrency),
+                existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
+            )
+
+        val row =
+            CsvRow(
+                rowIndex = 1,
+                values = listOf("15/12/2024", "Test payment", "-50.00", "Payee Account", "America/New_York"),
+            )
+        val result = mapper.mapRow(row)
+
+        assertIs<MappingResult.Success>(result)
+        // December 15, 2024 at 12:00 in America/New_York timezone
+        val expected =
+            LocalDateTime(2024, 12, 15, 12, 0, 0)
+                .toInstant(TimeZone.of("America/New_York"))
+        assertEquals(expected, result.transfer.timestamp)
+    }
+
+    @Test
+    fun `mapRow produces different timestamps for different timezones`() {
+        val now = Clock.System.now()
+
+        fun createStrategyWithTimezone(timezoneId: String): CsvImportStrategy =
+            CsvImportStrategy(
+                id = CsvImportStrategyId(Uuid.random()),
+                name = "Test Strategy With $timezoneId",
+                identificationColumns = setOf("Date", "Description", "Amount"),
+                fieldMappings =
+                    mapOf(
+                        TransferField.SOURCE_ACCOUNT to
+                            HardCodedAccountMapping(
+                                id = FieldMappingId(Uuid.random()),
+                                fieldType = TransferField.SOURCE_ACCOUNT,
+                                accountId = testSourceAccountId,
+                            ),
+                        TransferField.TARGET_ACCOUNT to
+                            AccountLookupMapping(
+                                id = FieldMappingId(Uuid.random()),
+                                fieldType = TransferField.TARGET_ACCOUNT,
+                                columnName = "Payee",
+                                createIfMissing = true,
+                            ),
+                        TransferField.TIMESTAMP to
+                            DateTimeParsingMapping(
+                                id = FieldMappingId(Uuid.random()),
+                                fieldType = TransferField.TIMESTAMP,
+                                dateColumnName = "Date",
+                                dateFormat = "dd/MM/yyyy",
+                            ),
+                        TransferField.DESCRIPTION to
+                            DirectColumnMapping(
+                                id = FieldMappingId(Uuid.random()),
+                                fieldType = TransferField.DESCRIPTION,
+                                columnName = "Description",
+                            ),
+                        TransferField.AMOUNT to
+                            AmountParsingMapping(
+                                id = FieldMappingId(Uuid.random()),
+                                fieldType = TransferField.AMOUNT,
+                                mode = AmountMode.SINGLE_COLUMN,
+                                amountColumnName = "Amount",
+                            ),
+                        TransferField.CURRENCY to
+                            HardCodedCurrencyMapping(
+                                id = FieldMappingId(Uuid.random()),
+                                fieldType = TransferField.CURRENCY,
+                                currencyId = testCurrencyId,
+                            ),
+                        TransferField.TIMEZONE to
+                            HardCodedTimezoneMapping(
+                                id = FieldMappingId(Uuid.random()),
+                                fieldType = TransferField.TIMEZONE,
+                                timezoneId = timezoneId,
+                            ),
+                    ),
+                createdAt = now,
+                updatedAt = now,
+            )
+
+        val utcMapper =
+            CsvTransferMapper(
+                strategy = createStrategyWithTimezone("UTC"),
+                columns = columns,
+                existingAccounts = mapOf("Payee Account" to testTargetAccount),
+                existingCurrencies = mapOf(testCurrencyId to testCurrency),
+                existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
+            )
+
+        val londonMapper =
+            CsvTransferMapper(
+                strategy = createStrategyWithTimezone("Europe/London"),
+                columns = columns,
+                existingAccounts = mapOf("Payee Account" to testTargetAccount),
+                existingCurrencies = mapOf(testCurrencyId to testCurrency),
+                existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
+            )
+
+        // June 15 is during BST (British Summer Time), so London is UTC+1
+        val row = CsvRow(rowIndex = 1, values = listOf("15/06/2024", "Test payment", "-50.00", "Payee Account"))
+
+        val utcResult = utcMapper.mapRow(row)
+        val londonResult = londonMapper.mapRow(row)
+
+        assertIs<MappingResult.Success>(utcResult)
+        assertIs<MappingResult.Success>(londonResult)
+
+        // During BST, the same local time in London is 1 hour behind UTC
+        // So 12:00 London time = 11:00 UTC
+        assertTrue(
+            utcResult.transfer.timestamp != londonResult.transfer.timestamp,
+            "UTC and London timestamps should differ during BST",
+        )
+
+        // UTC timestamp should be 2024-06-15T12:00:00Z
+        val expectedUtc =
+            LocalDateTime(2024, 6, 15, 12, 0, 0)
+                .toInstant(TimeZone.UTC)
+        assertEquals(expectedUtc, utcResult.transfer.timestamp)
+
+        // London timestamp should be 2024-06-15T11:00:00Z (12:00 London = 11:00 UTC during BST)
+        val expectedLondon =
+            LocalDateTime(2024, 6, 15, 12, 0, 0)
+                .toInstant(TimeZone.of("Europe/London"))
+        assertEquals(expectedLondon, londonResult.transfer.timestamp)
     }
 }

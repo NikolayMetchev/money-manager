@@ -131,3 +131,25 @@ data class CurrencyLookupMapping(
     override val fieldType: TransferField,
     val columnName: String,
 ) : FieldMapping
+
+/**
+ * Always uses a specific timezone, regardless of CSV data.
+ * The timezoneId should be a valid IANA timezone ID (e.g., "Europe/London", "UTC").
+ */
+@Serializable
+data class HardCodedTimezoneMapping(
+    override val id: FieldMappingId,
+    override val fieldType: TransferField,
+    val timezoneId: String,
+) : FieldMapping
+
+/**
+ * Looks up a timezone by IANA timezone ID from a CSV column.
+ * The column should contain valid timezone IDs (e.g., "Europe/London", "America/New_York").
+ */
+@Serializable
+data class TimezoneLookupMapping(
+    override val id: FieldMappingId,
+    override val fieldType: TransferField,
+    val columnName: String,
+) : FieldMapping

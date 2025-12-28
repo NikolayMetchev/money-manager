@@ -26,6 +26,8 @@ import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.FieldMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
+import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
+import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
@@ -179,9 +181,13 @@ class CsvTransferMapper(
                 targetAccountId = temp
             }
 
+            // Parse timezone (optional - defaults to system timezone)
+            val timezoneMapping = strategy.fieldMappings[TransferField.TIMEZONE]
+            val timezone = parseTimezone(timezoneMapping, values)
+
             // Parse timestamp
             val timestamp =
-                parseTimestamp(timestampMapping as DateTimeParsingMapping, values)
+                parseTimestamp(timestampMapping as DateTimeParsingMapping, values, timezone)
                     ?: return MappingResult.Error(row.rowIndex, "Failed to parse timestamp")
 
             // Parse description
@@ -280,6 +286,7 @@ class CsvTransferMapper(
     private fun parseTimestamp(
         mapping: DateTimeParsingMapping,
         values: List<String>,
+        timezone: TimeZone,
     ): Instant? {
         val dateValue = getColumnValue(mapping.dateColumnName, values)
         val timeValue =
@@ -288,7 +295,7 @@ class CsvTransferMapper(
 
         return try {
             // Parse date and time using the specified formats
-            val dateTime = parseDateTimeString(dateValue, mapping.dateFormat, timeValue, mapping.timeFormat)
+            val dateTime = parseDateTimeString(dateValue, mapping.dateFormat, timeValue, mapping.timeFormat, timezone)
             dateTime
         } catch (e: Exception) {
             null
@@ -300,6 +307,7 @@ class CsvTransferMapper(
         dateFormat: String,
         timeValue: String,
         timeFormat: String?,
+        timezone: TimeZone,
     ): Instant {
         val date = LocalDate.Format { byUnicodePattern(dateFormat) }.parse(dateValue.trim())
 
@@ -312,7 +320,21 @@ class CsvTransferMapper(
                 LocalTime.Format { byUnicodePattern("HH:mm[:ss]") }.parse(timeValue.trim())
             }
 
-        return LocalDateTime(date, time).toInstant(TimeZone.UTC)
+        return LocalDateTime(date, time).toInstant(timezone)
+    }
+
+    private fun parseTimezone(
+        mapping: FieldMapping?,
+        values: List<String>,
+    ): TimeZone {
+        return when (mapping) {
+            is HardCodedTimezoneMapping -> TimeZone.of(mapping.timezoneId)
+            is TimezoneLookupMapping -> {
+                val tzId = getColumnValue(mapping.columnName, values).trim()
+                if (tzId.isNotBlank()) TimeZone.of(tzId) else TimeZone.currentSystemDefault()
+            }
+            else -> TimeZone.currentSystemDefault()
+        }
     }
 
     private fun parseDescription(
