@@ -33,7 +33,6 @@ kotlin {
                 implementation(compose.uiTest)
 
                 implementation(libs.kotlinx.coroutines.test)
-                implementation(libs.metro.runtime)
                 implementation(libs.turbine)
                 implementation(projects.test.app.db)
             }
