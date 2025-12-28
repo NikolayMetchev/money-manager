@@ -3,6 +3,13 @@
   <component name="CsvFileAttributes">
     <option name="attributeMap">
       <map>
+        <entry key="$USER_HOME$/Downloads/MonzoDataExport_1Feb2022-12Dec2025_2025-12-12_225842.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value="," />
+            </Attribute>
+          </value>
+        </entry>
         <entry key="/app/ui/core/src/commonTest/resources/monzo_test_export.csv">
           <value>
             <Attribute>
