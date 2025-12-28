@@ -90,4 +90,3 @@ tasks.withType<Tar>().configureEach {
 tasks.withType<Zip>().configureEach {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
-
