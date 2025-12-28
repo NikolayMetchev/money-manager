@@ -1,4 +1,8 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
+@file:OptIn(
+    kotlin.time.ExperimentalTime::class,
+    kotlin.uuid.ExperimentalUuidApi::class,
+    kotlinx.datetime.format.FormatStringsInDatetimeFormats::class,
+)
 
 package com.moneymanager.database.csv
 
@@ -23,6 +27,12 @@ import com.moneymanager.domain.model.csvstrategy.FieldMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.LocalTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.format.byUnicodePattern
+import kotlinx.datetime.toInstant
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -291,80 +301,18 @@ class CsvTransferMapper(
         timeValue: String,
         timeFormat: String?,
     ): Instant {
-        // Simple date/time parsing - in a real implementation, use a proper date library
-        // For now, support common formats
-        val dateParts = parseDateParts(dateValue, dateFormat)
-        val timeParts = parseTimeParts(timeValue, timeFormat)
+        val date = LocalDate.Format { byUnicodePattern(dateFormat) }.parse(dateValue.trim())
 
-        val year = dateParts.year
-        val month = dateParts.month
-        val day = dateParts.day
-        val hour = timeParts.hour
-        val minute = timeParts.minute
-        val second = timeParts.second
-
-        // Create ISO string and parse
-        val isoString = "%04d-%02d-%02dT%02d:%02d:%02dZ".format(year, month, day, hour, minute, second)
-        return Instant.parse(isoString)
-    }
-
-    private data class DateParts(val year: Int, val month: Int, val day: Int)
-
-    private data class TimeParts(val hour: Int, val minute: Int, val second: Int)
-
-    private fun parseDateParts(
-        value: String,
-        format: String,
-    ): DateParts {
-        val cleanValue = value.trim()
-        val cleanFormat = format.trim()
-
-        // Find positions of year, month, day in format
-        val yearPos =
-            cleanFormat.indexOf("yyyy").takeIf { it >= 0 }
-                ?: cleanFormat.indexOf("yy").takeIf { it >= 0 }
-        val monthPos = cleanFormat.indexOf("MM")
-        val dayPos = cleanFormat.indexOf("dd")
-
-        // Determine separator
-        val separator = cleanFormat.firstOrNull { it !in "yMd" } ?: '/'
-
-        val parts = cleanValue.split(separator)
-        if (parts.size < 3) throw IllegalArgumentException("Invalid date: $value")
-
-        // Map format positions to value positions
-        val formatParts = cleanFormat.split(separator)
-        var year = 0
-        var month = 0
-        var day = 0
-
-        formatParts.forEachIndexed { index, formatPart ->
-            val valuePart = parts.getOrNull(index)?.trim()?.toIntOrNull() ?: 0
-            when {
-                formatPart.contains("y", ignoreCase = true) -> {
-                    year = if (valuePart < 100) 2000 + valuePart else valuePart
-                }
-                formatPart.contains("M") -> month = valuePart
-                formatPart.contains("d", ignoreCase = true) -> day = valuePart
+        val time =
+            if (timeValue.isBlank()) {
+                LocalTime(12, 0, 0)
+            } else if (timeFormat != null) {
+                LocalTime.Format { byUnicodePattern(timeFormat) }.parse(timeValue.trim())
+            } else {
+                LocalTime.Format { byUnicodePattern("HH:mm[:ss]") }.parse(timeValue.trim())
             }
-        }
 
-        return DateParts(year, month, day)
-    }
-
-    private fun parseTimeParts(
-        value: String,
-        format: String?,
-    ): TimeParts {
-        val cleanValue = value.trim()
-        if (cleanValue.isBlank()) return TimeParts(12, 0, 0)
-
-        val parts = cleanValue.split(":")
-        val hour = parts.getOrNull(0)?.toIntOrNull() ?: 12
-        val minute = parts.getOrNull(1)?.toIntOrNull() ?: 0
-        val second = parts.getOrNull(2)?.toIntOrNull() ?: 0
-
-        return TimeParts(hour, minute, second)
+        return LocalDateTime(date, time).toInstant(TimeZone.UTC)
     }
 
     private fun parseDescription(
