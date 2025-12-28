@@ -265,6 +265,12 @@ The project uses a **Money value class** to handle monetary amounts with proper 
 - Uses BigDecimal for display calculations
 - Type-safe amount handling throughout the application
 
+**BigDecimal-Only Policy**:
+- **NEVER** use `Double` or `Float` for monetary calculations or parsing
+- **ALWAYS** use `BigDecimal` for decimal number parsing and arithmetic
+- The `utils/bigdecimal` module provides the `BigDecimal(String)` constructor for parsing decimal strings with perfect precision
+- This avoids floating-point precision issues inherent in `Double` (e.g., `0.1 + 0.2 != 0.3`)
+
 **Key Components**:
 
 1. **Money Value Class** (`app/model/core/src/commonMain/kotlin/com/moneymanager/domain/model/Money.kt`):

@@ -54,6 +54,11 @@ expect class BigDecimal : Comparable<BigDecimal> {
     operator fun unaryMinus(): BigDecimal
 
     /**
+     * Returns a BigDecimal whose value is the absolute value of this BigDecimal.
+     */
+    fun abs(): BigDecimal
+
+    /**
      * Compares this BigDecimal with the specified BigDecimal.
      */
     override operator fun compareTo(other: BigDecimal): Int

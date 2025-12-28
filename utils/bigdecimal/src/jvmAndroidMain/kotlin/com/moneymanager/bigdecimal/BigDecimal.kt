@@ -48,6 +48,10 @@ actual class BigDecimal : Comparable<BigDecimal> {
         return BigDecimal(value.negate())
     }
 
+    actual fun abs(): BigDecimal {
+        return BigDecimal(value.abs())
+    }
+
     actual override operator fun compareTo(other: BigDecimal): Int {
         return value.compareTo(other.value)
     }

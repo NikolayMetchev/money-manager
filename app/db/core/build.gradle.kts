@@ -15,6 +15,7 @@ kotlin {
                 implementation(libs.kotlinx.datetime)
                 implementation(libs.kotlinx.serialization.json)
                 implementation(libs.sqldelight.coroutines.extensions)
+                implementation(projects.utils.bigdecimal)
                 implementation(projects.utils.currency)
             }
         }

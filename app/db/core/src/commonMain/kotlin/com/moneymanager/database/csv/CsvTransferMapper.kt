@@ -2,6 +2,7 @@
 
 package com.moneymanager.database.csv
 
+import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
@@ -157,7 +158,7 @@ class CsvTransferMapper(
             val flipAccounts =
                 amountMapping is AmountParsingMapping &&
                     amountMapping.flipAccountsOnPositive &&
-                    rawAmount > 0
+                    rawAmount > BigDecimal.ZERO
 
             // Parse accounts with potential flipping
             var sourceAccountId = parseAccount(sourceMapping, values)
@@ -177,7 +178,7 @@ class CsvTransferMapper(
             val description = parseDescription(descriptionMapping, values)
 
             // Create Money with absolute value (direction is indicated by source/target)
-            val amount = Money.fromDisplayValue(kotlin.math.abs(rawAmount), currency)
+            val amount = Money.fromDisplayValue(rawAmount.abs(), currency)
 
             val transfer =
                 Transfer(
@@ -214,7 +215,7 @@ class CsvTransferMapper(
         amountMapping: FieldMapping,
         targetMapping: FieldMapping,
         values: List<String>,
-    ): Pair<Double, String?> {
+    ): Pair<BigDecimal, String?> {
         val mapping = amountMapping as AmountParsingMapping
         val rawAmount =
             when (mapping.mode) {
@@ -223,7 +224,7 @@ class CsvTransferMapper(
                         mapping.amountColumnName
                             ?: throw IllegalStateException("amountColumnName required for SINGLE_COLUMN mode")
                     val value = getColumnValue(columnName, values)
-                    parseDouble(value) * if (mapping.negateValues) -1 else 1
+                    if (mapping.negateValues) -parseBigDecimal(value) else parseBigDecimal(value)
                 }
                 AmountMode.CREDIT_DEBIT_COLUMNS -> {
                     val creditColumnName =
@@ -234,8 +235,8 @@ class CsvTransferMapper(
                             ?: throw IllegalStateException("debitColumnName required")
                     val creditValue = getColumnValue(creditColumnName, values)
                     val debitValue = getColumnValue(debitColumnName, values)
-                    val credit = if (creditValue.isNotBlank()) parseDouble(creditValue) else 0.0
-                    val debit = if (debitValue.isNotBlank()) parseDouble(debitValue) else 0.0
+                    val credit = if (creditValue.isNotBlank()) parseBigDecimal(creditValue) else BigDecimal.ZERO
+                    val debit = if (debitValue.isNotBlank()) parseBigDecimal(debitValue) else BigDecimal.ZERO
                     credit - debit
                 }
             }
@@ -402,7 +403,7 @@ class CsvTransferMapper(
 
     private fun accountExists(name: String): Boolean = name in existingAccounts
 
-    private fun parseDouble(value: String): Double {
+    private fun parseBigDecimal(value: String): BigDecimal {
         val cleaned =
             value.trim()
                 .replace(",", "") // Remove thousand separators
@@ -410,6 +411,6 @@ class CsvTransferMapper(
                 .replace("$", "")
                 .replace("€", "")
                 .replace("£", "")
-        return cleaned.toDouble()
+        return BigDecimal(cleaned)
     }
 }
