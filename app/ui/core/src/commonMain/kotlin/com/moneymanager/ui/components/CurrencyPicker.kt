@@ -35,6 +35,7 @@ import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
  * @param modifier Optional modifier for the component
  * @param enabled Whether the picker is enabled
  * @param placeholder Placeholder text shown when dropdown is expanded
+ * @param isError Whether to show error state (red outline)
  */
 @Composable
 fun CurrencyPicker(
@@ -45,6 +46,7 @@ fun CurrencyPicker(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     placeholder: String = "Type to search...",
+    isError: Boolean = false,
 ) {
     val currencies by currencyRepository.getAllCurrencies()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
@@ -89,6 +91,7 @@ fun CurrencyPicker(
                     .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable),
             enabled = enabled,
             singleLine = true,
+            isError = isError,
         )
         ExposedDropdownMenu(
             expanded = expanded,

@@ -15,6 +15,7 @@ import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.FieldMapping
@@ -65,6 +66,7 @@ class CsvTransferMapper(
     private val columns: List<CsvColumn>,
     private val existingAccounts: Map<String, Account>,
     private val existingCurrencies: Map<CurrencyId, Currency>,
+    private val existingCurrenciesByCode: Map<String, Currency>,
 ) {
     private val columnIndexByName: Map<String, Int> =
         columns.associate { it.originalName to it.columnIndex }
@@ -148,7 +150,7 @@ class CsvTransferMapper(
 
             // Parse currency
             val currency =
-                parseCurrency(currencyMapping)
+                parseCurrency(currencyMapping, values)
                     ?: return MappingResult.Error(row.rowIndex, "Currency not found")
 
             // Determine if we need to flip accounts
@@ -374,9 +376,16 @@ class CsvTransferMapper(
         }
     }
 
-    private fun parseCurrency(mapping: FieldMapping): Currency? {
+    private fun parseCurrency(
+        mapping: FieldMapping,
+        values: List<String>,
+    ): Currency? {
         return when (mapping) {
             is HardCodedCurrencyMapping -> existingCurrencies[mapping.currencyId]
+            is CurrencyLookupMapping -> {
+                val code = getColumnValue(mapping.columnName, values).trim().uppercase()
+                existingCurrenciesByCode[code]
+            }
             else -> throw IllegalArgumentException("Invalid currency mapping type: ${mapping::class}")
         }
     }

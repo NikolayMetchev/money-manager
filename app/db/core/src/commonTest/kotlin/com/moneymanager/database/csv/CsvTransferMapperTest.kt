@@ -14,6 +14,7 @@ import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
+import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.FieldMappingId
@@ -128,6 +129,7 @@ class CsvTransferMapperTest {
                 columns = columns,
                 existingAccounts = mapOf("Payee Account" to testTargetAccount),
                 existingCurrencies = mapOf(testCurrencyId to testCurrency),
+                existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
             )
 
         val row = CsvRow(rowIndex = 1, values = listOf("15/12/2024", "Test payment", "-50.00", "Payee Account"))
@@ -149,6 +151,7 @@ class CsvTransferMapperTest {
                 columns = columns,
                 existingAccounts = emptyMap(),
                 existingCurrencies = mapOf(testCurrencyId to testCurrency),
+                existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
             )
 
         val row = CsvRow(rowIndex = 1, values = listOf("15/12/2024", "Test payment", "-50.00", "New Payee"))
@@ -167,6 +170,7 @@ class CsvTransferMapperTest {
                 columns = columns,
                 existingAccounts = mapOf("Payee Account" to testTargetAccount),
                 existingCurrencies = mapOf(testCurrencyId to testCurrency),
+                existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
             )
 
         val row = CsvRow(rowIndex = 1, values = listOf("invalid-date", "Test payment", "-50.00", "Payee Account"))
@@ -185,6 +189,7 @@ class CsvTransferMapperTest {
                 columns = columns,
                 existingAccounts = mapOf("Payee Account" to testTargetAccount),
                 existingCurrencies = emptyMap(),
+                existingCurrenciesByCode = emptyMap(),
             )
 
         val row = CsvRow(rowIndex = 1, values = listOf("15/12/2024", "Test payment", "-50.00", "Payee Account"))
@@ -203,6 +208,7 @@ class CsvTransferMapperTest {
                 columns = columns,
                 existingAccounts = mapOf("Payee Account" to testTargetAccount),
                 existingCurrencies = mapOf(testCurrencyId to testCurrency),
+                existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
             )
 
         val row = CsvRow(rowIndex = 1, values = listOf("15/12/2024", "Incoming payment", "100.00", "Payee Account"))
@@ -222,6 +228,7 @@ class CsvTransferMapperTest {
                 columns = columns,
                 existingAccounts = mapOf("Payee Account" to testTargetAccount),
                 existingCurrencies = mapOf(testCurrencyId to testCurrency),
+                existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
             )
 
         val row = CsvRow(rowIndex = 1, values = listOf("15/12/2024", "Outgoing payment", "-100.00", "Payee Account"))
@@ -241,6 +248,7 @@ class CsvTransferMapperTest {
                 columns = columns,
                 existingAccounts = mapOf("Payee Account" to testTargetAccount),
                 existingCurrencies = mapOf(testCurrencyId to testCurrency),
+                existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
             )
 
         val rows =
@@ -266,6 +274,7 @@ class CsvTransferMapperTest {
                 columns = columns,
                 existingAccounts = mapOf("Existing Payee" to testTargetAccount),
                 existingCurrencies = mapOf(testCurrencyId to testCurrency),
+                existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
             )
 
         val rows =
@@ -293,6 +302,7 @@ class CsvTransferMapperTest {
                 columns = columns,
                 existingAccounts = mapOf("Payee Account" to testTargetAccount),
                 existingCurrencies = mapOf(testCurrencyId to testCurrency),
+                existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
             )
 
         val row = CsvRow(rowIndex = 1, values = listOf("15/12/2024", "Test payment", "£50.00", "Payee Account"))
@@ -311,6 +321,7 @@ class CsvTransferMapperTest {
                 columns = columns,
                 existingAccounts = mapOf("Payee Account" to testTargetAccount),
                 existingCurrencies = mapOf(testCurrencyId to testCurrency),
+                existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
             )
 
         val row = CsvRow(rowIndex = 1, values = listOf("15/12/2024", "Large payment", "1,234.00", "Payee Account"))
@@ -318,5 +329,168 @@ class CsvTransferMapperTest {
 
         assertIs<MappingResult.Success>(result)
         assertEquals(123400L, result.transfer.amount.amount)
+    }
+
+    @Test
+    fun `mapRow with CurrencyLookupMapping parses currency from column`() {
+        val columnsWithCurrency =
+            listOf(
+                CsvColumn(CsvColumnId(Uuid.random()), 0, "Date"),
+                CsvColumn(CsvColumnId(Uuid.random()), 1, "Description"),
+                CsvColumn(CsvColumnId(Uuid.random()), 2, "Amount"),
+                CsvColumn(CsvColumnId(Uuid.random()), 3, "Payee"),
+                CsvColumn(CsvColumnId(Uuid.random()), 4, "Currency"),
+            )
+
+        val now = Clock.System.now()
+        val strategyWithCurrencyColumn =
+            CsvImportStrategy(
+                id = CsvImportStrategyId(Uuid.random()),
+                name = "Test Strategy With Currency Column",
+                identificationColumns = setOf("Date", "Description", "Amount", "Currency"),
+                fieldMappings =
+                    mapOf(
+                        TransferField.SOURCE_ACCOUNT to
+                            HardCodedAccountMapping(
+                                id = FieldMappingId(Uuid.random()),
+                                fieldType = TransferField.SOURCE_ACCOUNT,
+                                accountId = testSourceAccountId,
+                            ),
+                        TransferField.TARGET_ACCOUNT to
+                            AccountLookupMapping(
+                                id = FieldMappingId(Uuid.random()),
+                                fieldType = TransferField.TARGET_ACCOUNT,
+                                columnName = "Payee",
+                                createIfMissing = true,
+                            ),
+                        TransferField.TIMESTAMP to
+                            DateTimeParsingMapping(
+                                id = FieldMappingId(Uuid.random()),
+                                fieldType = TransferField.TIMESTAMP,
+                                dateColumnName = "Date",
+                                dateFormat = "dd/MM/yyyy",
+                            ),
+                        TransferField.DESCRIPTION to
+                            DirectColumnMapping(
+                                id = FieldMappingId(Uuid.random()),
+                                fieldType = TransferField.DESCRIPTION,
+                                columnName = "Description",
+                            ),
+                        TransferField.AMOUNT to
+                            AmountParsingMapping(
+                                id = FieldMappingId(Uuid.random()),
+                                fieldType = TransferField.AMOUNT,
+                                mode = AmountMode.SINGLE_COLUMN,
+                                amountColumnName = "Amount",
+                            ),
+                        TransferField.CURRENCY to
+                            CurrencyLookupMapping(
+                                id = FieldMappingId(Uuid.random()),
+                                fieldType = TransferField.CURRENCY,
+                                columnName = "Currency",
+                            ),
+                    ),
+                createdAt = now,
+                updatedAt = now,
+            )
+
+        val mapper =
+            CsvTransferMapper(
+                strategy = strategyWithCurrencyColumn,
+                columns = columnsWithCurrency,
+                existingAccounts = mapOf("Payee Account" to testTargetAccount),
+                existingCurrencies = mapOf(testCurrencyId to testCurrency),
+                existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
+            )
+
+        val row =
+            CsvRow(rowIndex = 1, values = listOf("15/12/2024", "Test payment", "-50.00", "Payee Account", "GBP"))
+        val result = mapper.mapRow(row)
+
+        assertIs<MappingResult.Success>(result)
+        assertEquals("Test payment", result.transfer.description)
+        assertEquals(testCurrencyId, result.transfer.amount.currency.id)
+        assertEquals(5000L, result.transfer.amount.amount)
+    }
+
+    @Test
+    fun `mapRow with CurrencyLookupMapping returns error when currency code not found`() {
+        val columnsWithCurrency =
+            listOf(
+                CsvColumn(CsvColumnId(Uuid.random()), 0, "Date"),
+                CsvColumn(CsvColumnId(Uuid.random()), 1, "Description"),
+                CsvColumn(CsvColumnId(Uuid.random()), 2, "Amount"),
+                CsvColumn(CsvColumnId(Uuid.random()), 3, "Payee"),
+                CsvColumn(CsvColumnId(Uuid.random()), 4, "Currency"),
+            )
+
+        val now = Clock.System.now()
+        val strategyWithCurrencyColumn =
+            CsvImportStrategy(
+                id = CsvImportStrategyId(Uuid.random()),
+                name = "Test Strategy With Currency Column",
+                identificationColumns = setOf("Date", "Description", "Amount", "Currency"),
+                fieldMappings =
+                    mapOf(
+                        TransferField.SOURCE_ACCOUNT to
+                            HardCodedAccountMapping(
+                                id = FieldMappingId(Uuid.random()),
+                                fieldType = TransferField.SOURCE_ACCOUNT,
+                                accountId = testSourceAccountId,
+                            ),
+                        TransferField.TARGET_ACCOUNT to
+                            AccountLookupMapping(
+                                id = FieldMappingId(Uuid.random()),
+                                fieldType = TransferField.TARGET_ACCOUNT,
+                                columnName = "Payee",
+                                createIfMissing = true,
+                            ),
+                        TransferField.TIMESTAMP to
+                            DateTimeParsingMapping(
+                                id = FieldMappingId(Uuid.random()),
+                                fieldType = TransferField.TIMESTAMP,
+                                dateColumnName = "Date",
+                                dateFormat = "dd/MM/yyyy",
+                            ),
+                        TransferField.DESCRIPTION to
+                            DirectColumnMapping(
+                                id = FieldMappingId(Uuid.random()),
+                                fieldType = TransferField.DESCRIPTION,
+                                columnName = "Description",
+                            ),
+                        TransferField.AMOUNT to
+                            AmountParsingMapping(
+                                id = FieldMappingId(Uuid.random()),
+                                fieldType = TransferField.AMOUNT,
+                                mode = AmountMode.SINGLE_COLUMN,
+                                amountColumnName = "Amount",
+                            ),
+                        TransferField.CURRENCY to
+                            CurrencyLookupMapping(
+                                id = FieldMappingId(Uuid.random()),
+                                fieldType = TransferField.CURRENCY,
+                                columnName = "Currency",
+                            ),
+                    ),
+                createdAt = now,
+                updatedAt = now,
+            )
+
+        val mapper =
+            CsvTransferMapper(
+                strategy = strategyWithCurrencyColumn,
+                columns = columnsWithCurrency,
+                existingAccounts = mapOf("Payee Account" to testTargetAccount),
+                existingCurrencies = mapOf(testCurrencyId to testCurrency),
+                existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
+            )
+
+        // Use a currency code that doesn't exist in the map
+        val row =
+            CsvRow(rowIndex = 1, values = listOf("15/12/2024", "Test payment", "-50.00", "Payee Account", "USD"))
+        val result = mapper.mapRow(row)
+
+        assertIs<MappingResult.Error>(result)
+        assertTrue(result.errorMessage.contains("Currency"))
     }
 }

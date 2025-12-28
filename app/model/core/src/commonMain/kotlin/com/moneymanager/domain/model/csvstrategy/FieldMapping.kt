@@ -120,3 +120,14 @@ data class HardCodedCurrencyMapping(
     override val fieldType: TransferField,
     val currencyId: CurrencyId,
 ) : FieldMapping
+
+/**
+ * Looks up a currency by code from a CSV column.
+ * The column should contain ISO 4217 currency codes (e.g., "GBP", "USD", "EUR").
+ */
+@Serializable
+data class CurrencyLookupMapping(
+    override val id: FieldMappingId,
+    override val fieldType: TransferField,
+    val columnName: String,
+) : FieldMapping

@@ -189,12 +189,13 @@ class ImportMonzoCsvE2ETest {
             // - Amount Column: "Amount"
             // - Description Column: "Description"
             // - Target Account Column: "Name"
+            // - Currency Column: "Currency" (auto-detected, mode set to FROM_COLUMN)
 
             // Wait for the dialog to fully load with auto-detected values
             waitForIdle()
 
-            // Verify the currency dropdown is ready (account is already selected)
-            waitUntilExactlyOneExists(hasText("Select Currency"), timeoutMillis = 10000)
+            // Verify currency mode is set to FROM_COLUMN because "Currency" column was auto-detected
+            waitUntilAtLeastOneExists(hasText("From CSV Column"), timeoutMillis = 10000)
 
             // Verify the auto-detected column names are shown in the dropdown fields
             // The Date column dropdown should show "Date" (not "Transaction ID")
@@ -222,6 +223,16 @@ class ImportMonzoCsvE2ETest {
 
             // The Time Format field should be visible since a time column was auto-detected
             waitUntilAtLeastOneExists(hasText("Time Format", substring = true), timeoutMillis = 10000)
+
+            // Step 7: Verify currency column auto-detection
+            // The currency column dropdown label should show "Column containing currency code"
+            waitUntilAtLeastOneExists(
+                hasText("Column containing currency code", substring = true),
+                timeoutMillis = 10000,
+            )
+
+            // The currency column sample should show "GBP" (from "Currency" column in Monzo format)
+            waitUntilAtLeastOneExists(hasText("GBP", substring = true), timeoutMillis = 10000)
 
             // Cancel the dialog to return to CSV detail screen
             onNodeWithText("Cancel").performClick()

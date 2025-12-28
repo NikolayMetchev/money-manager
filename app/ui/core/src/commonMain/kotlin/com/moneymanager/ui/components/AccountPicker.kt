@@ -39,6 +39,7 @@ import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
  * @param enabled Whether the picker is enabled
  * @param excludeAccountId Optional account ID to exclude from the list (e.g., the other account in a transfer)
  * @param placeholder Placeholder text shown when dropdown is expanded
+ * @param isError Whether to show error state (red outline)
  */
 @Composable
 fun AccountPicker(
@@ -51,6 +52,7 @@ fun AccountPicker(
     enabled: Boolean = true,
     excludeAccountId: AccountId? = null,
     placeholder: String = "Type to search...",
+    isError: Boolean = false,
 ) {
     val accounts by accountRepository.getAllAccounts()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
@@ -96,6 +98,7 @@ fun AccountPicker(
                     .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
             enabled = enabled,
             singleLine = true,
+            isError = isError,
         )
         ExposedDropdownMenu(
             expanded = expanded,
