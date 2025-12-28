@@ -14,6 +14,8 @@ import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.FieldMappingId
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
+import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
+import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -282,5 +284,43 @@ class FieldMappingJsonCodecTest {
         assertTrue(json.contains("SOURCE_ACCOUNT"))
         assertTrue(json.contains("HardCodedAccountMapping"))
         assertTrue(json.contains("42"))
+    }
+
+    @Test
+    fun `encode and decode HardCodedTimezoneMapping`() {
+        val mapping =
+            HardCodedTimezoneMapping(
+                id = FieldMappingId(Uuid.random()),
+                fieldType = TransferField.TIMEZONE,
+                timezoneId = "Europe/London",
+            )
+        val mappings = mapOf(TransferField.TIMEZONE to mapping)
+
+        val json = FieldMappingJsonCodec.encode(mappings)
+        val decoded = FieldMappingJsonCodec.decode(json)
+
+        val decodedMapping = decoded[TransferField.TIMEZONE]
+        assertIs<HardCodedTimezoneMapping>(decodedMapping)
+        assertEquals("Europe/London", decodedMapping.timezoneId)
+        assertEquals(TransferField.TIMEZONE, decodedMapping.fieldType)
+    }
+
+    @Test
+    fun `encode and decode TimezoneLookupMapping`() {
+        val mapping =
+            TimezoneLookupMapping(
+                id = FieldMappingId(Uuid.random()),
+                fieldType = TransferField.TIMEZONE,
+                columnName = "Timezone",
+            )
+        val mappings = mapOf(TransferField.TIMEZONE to mapping)
+
+        val json = FieldMappingJsonCodec.encode(mappings)
+        val decoded = FieldMappingJsonCodec.decode(json)
+
+        val decodedMapping = decoded[TransferField.TIMEZONE]
+        assertIs<TimezoneLookupMapping>(decodedMapping)
+        assertEquals("Timezone", decodedMapping.columnName)
+        assertEquals(TransferField.TIMEZONE, decodedMapping.fieldType)
     }
 }
