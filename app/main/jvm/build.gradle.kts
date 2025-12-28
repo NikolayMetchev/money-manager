@@ -90,8 +90,3 @@ tasks.withType<Tar>().configureEach {
 tasks.withType<Zip>().configureEach {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
-
-// Run release packaging as part of build to catch ProGuard issues early
-tasks.named("build") {
-    dependsOn("packageReleaseDistributionForCurrentOS")
-}
