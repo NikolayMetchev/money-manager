@@ -221,15 +221,41 @@ object ColumnDetector {
         sampleValues: Map<Int, String>? = null,
     ): String? = suggestColumn(columns, currencyNamePatterns, sampleValues, ::looksLikeCurrency)
 
+    // Columns that are unsuitable for account name fallbacks (IDs, dates, amounts, etc.)
+    private val excludedFallbackPatterns = listOf("id", "date", "time", "amount", "currency", "money")
+
+    // Preferred fallback column names (semantic columns that describe transaction type)
+    private val preferredFallbackPatterns = listOf("type", "category", "kind", "transaction type")
+
+    /**
+     * Checks if a column name should be excluded from fallback consideration.
+     */
+    private fun isExcludedForFallback(columnName: String): Boolean =
+        excludedFallbackPatterns.any { pattern ->
+            columnName.contains(pattern, ignoreCase = true)
+        }
+
+    /**
+     * Checks if a column name is a preferred fallback column.
+     */
+    private fun isPreferredFallback(columnName: String): Boolean =
+        preferredFallbackPatterns.any { pattern ->
+            columnName.equals(pattern, ignoreCase = true) ||
+                columnName.contains(pattern, ignoreCase = true)
+        }
+
     /**
      * Detects fallback columns for the target account.
      * Finds rows where the primary column is blank and identifies
      * which other columns consistently have values in those rows.
      *
+     * Excludes columns that are unsuitable for account names (IDs, dates, amounts)
+     * and prefers semantic columns like "Type" or "Category".
+     *
      * @param primaryColumn The primary column name for target account lookup
      * @param columns The available CSV columns
      * @param rows All CSV rows to analyze
-     * @return List of fallback column names, ordered by coverage (best first)
+     * @return List of fallback column names, ordered by preference (best first)
      */
     fun suggestFallbackColumns(
         primaryColumn: String,
@@ -249,19 +275,25 @@ object ColumnDetector {
         if (rowsWithBlankPrimary.isEmpty()) return emptyList()
 
         // For each other column, count how many blank-primary rows have a value
+        // Exclude columns unsuitable for account names
         val candidateColumns =
             columns
                 .filter { it.originalName != primaryColumn }
+                .filter { !isExcludedForFallback(it.originalName) }
                 .map { col ->
                     val filledCount =
                         rowsWithBlankPrimary.count { row ->
                             row.values.getOrNull(col.columnIndex)?.isNotBlank() == true
                         }
-                    col.originalName to filledCount
+                    Triple(col.originalName, filledCount, isPreferredFallback(col.originalName))
                 }
-                .filter { (_, count) -> count > 0 }
-                .sortedByDescending { (_, count) -> count }
-                .map { (name, _) -> name }
+                .filter { (_, count, _) -> count > 0 }
+                // Sort by: preferred columns first, then by coverage
+                .sortedWith(
+                    compareByDescending<Triple<String, Int, Boolean>> { (_, _, preferred) -> preferred }
+                        .thenByDescending { (_, count, _) -> count },
+                )
+                .map { (name, _, _) -> name }
 
         // Return top candidate(s) - typically just the best one
         return candidateColumns.take(1)
@@ -279,6 +311,22 @@ private fun getSampleValue(
     if (columnName == null || firstRow == null) return null
     val columnIndex = columns.find { it.originalName == columnName }?.columnIndex ?: return null
     return firstRow.values.getOrNull(columnIndex)
+}
+
+/**
+ * Finds the first row where the specified column is blank.
+ * Used to find a representative sample for fallback columns.
+ */
+private fun findRowWithBlankColumn(
+    columns: List<CsvColumn>,
+    rows: List<CsvRow>,
+    columnName: String?,
+): CsvRow? {
+    if (columnName == null) return null
+    val columnIndex = columns.find { it.originalName == columnName }?.columnIndex ?: return null
+    return rows.find { row ->
+        row.values.getOrNull(columnIndex)?.isBlank() == true
+    }
 }
 
 @Composable
@@ -437,14 +485,24 @@ fun CreateCsvStrategyDialog(
                     enabled = !isSaving,
                     isError = targetAccountColumnName == null,
                 )
-                if (targetAccountFallbackColumns.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Fallback column: ${targetAccountFallbackColumns.joinToString()}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "Fallback column (when primary is empty)",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                // Find a row where the primary column is blank to show a relevant sample
+                val fallbackSampleRow = findRowWithBlankColumn(csvColumns, rows, targetAccountColumnName)
+                OptionalColumnDropdown(
+                    columns = csvColumns,
+                    selectedColumn = targetAccountFallbackColumns.firstOrNull(),
+                    onColumnSelected = { selected ->
+                        targetAccountFallbackColumns = if (selected != null) listOf(selected) else emptyList()
+                    },
+                    label = "Fallback column for account name",
+                    sampleValue = getSampleValue(csvColumns, fallbackSampleRow, targetAccountFallbackColumns.firstOrNull()),
+                    enabled = !isSaving,
+                )
 
                 Spacer(modifier = Modifier.height(16.dp))
                 Text("Date Column", style = MaterialTheme.typography.titleSmall)
