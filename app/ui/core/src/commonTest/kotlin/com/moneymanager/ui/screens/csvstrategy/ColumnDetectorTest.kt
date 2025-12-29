@@ -32,11 +32,12 @@ class ColumnDetectorTest {
                 CsvRow(rowIndex = 3, values = listOf("17/12/2024", "Payment 2", "-25.00", "Another Payee", "Card payment")),
             )
 
-        val fallbacks = ColumnDetector.suggestFallbackColumns(
-            primaryColumn = "Name",
-            columns = columns,
-            rows = rows,
-        )
+        val fallbacks =
+            ColumnDetector.suggestFallbackColumns(
+                primaryColumn = "Name",
+                columns = columns,
+                rows = rows,
+            )
 
         // When Name is blank (1 row), all other columns have values
         // Function returns the first column with highest coverage (Date)
@@ -53,11 +54,12 @@ class ColumnDetectorTest {
                 CsvRow(rowIndex = 3, values = listOf("17/12/2024", "Payment 3", "-75.00", "Payee 3", "Direct Debit")),
             )
 
-        val fallbacks = ColumnDetector.suggestFallbackColumns(
-            primaryColumn = "Name",
-            columns = columns,
-            rows = rows,
-        )
+        val fallbacks =
+            ColumnDetector.suggestFallbackColumns(
+                primaryColumn = "Name",
+                columns = columns,
+                rows = rows,
+            )
 
         assertTrue(fallbacks.isEmpty())
     }
@@ -69,22 +71,24 @@ class ColumnDetectorTest {
                 CsvRow(rowIndex = 1, values = listOf("15/12/2024", "Payment", "-50.00", "", "Cheque")),
             )
 
-        val fallbacks = ColumnDetector.suggestFallbackColumns(
-            primaryColumn = "NonExistentColumn",
-            columns = columns,
-            rows = rows,
-        )
+        val fallbacks =
+            ColumnDetector.suggestFallbackColumns(
+                primaryColumn = "NonExistentColumn",
+                columns = columns,
+                rows = rows,
+            )
 
         assertTrue(fallbacks.isEmpty())
     }
 
     @Test
     fun `suggestFallbackColumns returns empty list when rows is empty`() {
-        val fallbacks = ColumnDetector.suggestFallbackColumns(
-            primaryColumn = "Name",
-            columns = columns,
-            rows = emptyList(),
-        )
+        val fallbacks =
+            ColumnDetector.suggestFallbackColumns(
+                primaryColumn = "Name",
+                columns = columns,
+                rows = emptyList(),
+            )
 
         assertTrue(fallbacks.isEmpty())
     }
@@ -112,11 +116,12 @@ class ColumnDetectorTest {
                 CsvRow(rowIndex = 3, values = listOf("17/12/2024", "Cheque 3", "10.00", "", "Cheque", "")),
             )
 
-        val fallbacks = ColumnDetector.suggestFallbackColumns(
-            primaryColumn = "Name",
-            columns = columnsWithNotes,
-            rows = rows,
-        )
+        val fallbacks =
+            ColumnDetector.suggestFallbackColumns(
+                primaryColumn = "Name",
+                columns = columnsWithNotes,
+                rows = rows,
+            )
 
         // All 3 rows have blank Name. Date/Description/Amount/Type have values in all 3.
         // Notes only has value in 1/3 rows.
@@ -135,11 +140,12 @@ class ColumnDetectorTest {
                 CsvRow(rowIndex = 1, values = listOf("15/12/2024", "Unknown", "10.00", "", "")),
             )
 
-        val fallbacks = ColumnDetector.suggestFallbackColumns(
-            primaryColumn = "Name",
-            columns = columns,
-            rows = rows,
-        )
+        val fallbacks =
+            ColumnDetector.suggestFallbackColumns(
+                primaryColumn = "Name",
+                columns = columns,
+                rows = rows,
+            )
 
         // Type is also blank, but Date, Description, Amount have values
         // The function should return one of those as fallback
@@ -155,11 +161,12 @@ class ColumnDetectorTest {
                 CsvRow(rowIndex = 1, values = listOf("15/12/2024", "Cheque", "2.40", "", "Cheque")),
             )
 
-        val fallbacks = ColumnDetector.suggestFallbackColumns(
-            primaryColumn = "Name",
-            columns = columns,
-            rows = rows,
-        )
+        val fallbacks =
+            ColumnDetector.suggestFallbackColumns(
+                primaryColumn = "Name",
+                columns = columns,
+                rows = rows,
+            )
 
         // Name should not be in the fallbacks list
         assertTrue("Name" !in fallbacks)

@@ -868,10 +868,11 @@ class CsvTransferMapperTest {
             )
 
         // Name is empty, should fall back to Type
-        val row = CsvRow(
-            rowIndex = 1,
-            values = listOf("15/12/2024", "Cheque credited", "2.40", "", "Cheque"),
-        )
+        val row =
+            CsvRow(
+                rowIndex = 1,
+                values = listOf("15/12/2024", "Cheque credited", "2.40", "", "Cheque"),
+            )
         val result = mapper.mapRow(row)
 
         assertIs<MappingResult.Success>(result)
@@ -891,10 +892,11 @@ class CsvTransferMapperTest {
             )
 
         // Name has value, should use it (not fallback)
-        val row = CsvRow(
-            rowIndex = 1,
-            values = listOf("15/12/2024", "Payment", "-50.00", "Payee Account", "Faster payment"),
-        )
+        val row =
+            CsvRow(
+                rowIndex = 1,
+                values = listOf("15/12/2024", "Payment", "-50.00", "Payee Account", "Faster payment"),
+            )
         val result = mapper.mapRow(row)
 
         assertIs<MappingResult.Success>(result)
@@ -914,10 +916,11 @@ class CsvTransferMapperTest {
             )
 
         // Name is empty, should identify "Cheque" from Type as new account
-        val row = CsvRow(
-            rowIndex = 1,
-            values = listOf("15/12/2024", "Cheque credited", "2.40", "", "Cheque"),
-        )
+        val row =
+            CsvRow(
+                rowIndex = 1,
+                values = listOf("15/12/2024", "Cheque credited", "2.40", "", "Cheque"),
+            )
         val result = mapper.mapRow(row)
 
         assertIs<MappingResult.Success>(result)
@@ -937,10 +940,11 @@ class CsvTransferMapperTest {
             )
 
         // Both Name and Type are empty
-        val row = CsvRow(
-            rowIndex = 1,
-            values = listOf("15/12/2024", "Unknown transaction", "10.00", "", ""),
-        )
+        val row =
+            CsvRow(
+                rowIndex = 1,
+                values = listOf("15/12/2024", "Unknown transaction", "10.00", "", ""),
+            )
         val result = mapper.mapRow(row)
 
         assertIs<MappingResult.Success>(result)
@@ -962,10 +966,11 @@ class CsvTransferMapperTest {
             CsvTransferMapper(
                 strategy = strategy,
                 columns = columnsWithType,
-                existingAccounts = mapOf(
-                    "Payee Account" to testTargetAccount,
-                    "Cheque" to chequeAccount,
-                ),
+                existingAccounts =
+                    mapOf(
+                        "Payee Account" to testTargetAccount,
+                        "Cheque" to chequeAccount,
+                    ),
                 existingCurrencies = mapOf(testCurrencyId to testCurrency),
                 existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
             )

@@ -236,28 +236,32 @@ object ColumnDetector {
         columns: List<CsvColumn>,
         rows: List<CsvRow>,
     ): List<String> {
-        val primaryIndex = columns.find { it.originalName == primaryColumn }?.columnIndex
-            ?: return emptyList()
+        val primaryIndex =
+            columns.find { it.originalName == primaryColumn }?.columnIndex
+                ?: return emptyList()
 
         // Find rows where primary column is blank
-        val rowsWithBlankPrimary = rows.filter { row ->
-            row.values.getOrNull(primaryIndex)?.isBlank() == true
-        }
+        val rowsWithBlankPrimary =
+            rows.filter { row ->
+                row.values.getOrNull(primaryIndex)?.isBlank() == true
+            }
 
         if (rowsWithBlankPrimary.isEmpty()) return emptyList()
 
         // For each other column, count how many blank-primary rows have a value
-        val candidateColumns = columns
-            .filter { it.originalName != primaryColumn }
-            .map { col ->
-                val filledCount = rowsWithBlankPrimary.count { row ->
-                    row.values.getOrNull(col.columnIndex)?.isNotBlank() == true
+        val candidateColumns =
+            columns
+                .filter { it.originalName != primaryColumn }
+                .map { col ->
+                    val filledCount =
+                        rowsWithBlankPrimary.count { row ->
+                            row.values.getOrNull(col.columnIndex)?.isNotBlank() == true
+                        }
+                    col.originalName to filledCount
                 }
-                col.originalName to filledCount
-            }
-            .filter { (_, count) -> count > 0 }
-            .sortedByDescending { (_, count) -> count }
-            .map { (name, _) -> name }
+                .filter { (_, count) -> count > 0 }
+                .sortedByDescending { (_, count) -> count }
+                .map { (name, _) -> name }
 
         // Return top candidate(s) - typically just the best one
         return candidateColumns.take(1)
@@ -366,11 +370,12 @@ fun CreateCsvStrategyDialog(
     LaunchedEffect(targetAccountColumnName, rows) {
         val primaryColumn = targetAccountColumnName
         if (primaryColumn != null && rows.isNotEmpty()) {
-            targetAccountFallbackColumns = ColumnDetector.suggestFallbackColumns(
-                primaryColumn = primaryColumn,
-                columns = csvColumns,
-                rows = rows,
-            )
+            targetAccountFallbackColumns =
+                ColumnDetector.suggestFallbackColumns(
+                    primaryColumn = primaryColumn,
+                    columns = csvColumns,
+                    rows = rows,
+                )
         }
     }
 
