@@ -81,13 +81,23 @@ data class DateTimeParsingMapping(
 /**
  * Directly copies a string value from a CSV column.
  * Used for the description field.
+ *
+ * When [fallbackColumns] is specified, if the primary [columnName] is empty,
+ * each fallback column is tried in order until a non-empty value is found.
  */
 @Serializable
 data class DirectColumnMapping(
     override val id: FieldMappingId,
     override val fieldType: TransferField,
     val columnName: String,
-) : FieldMapping
+    val fallbackColumns: List<String> = emptyList(),
+) : FieldMapping {
+    /**
+     * Returns all columns to check in priority order (primary first, then fallbacks).
+     */
+    val allColumns: List<String>
+        get() = listOf(columnName) + fallbackColumns
+}
 
 /**
  * Parses a numeric amount from CSV columns.
