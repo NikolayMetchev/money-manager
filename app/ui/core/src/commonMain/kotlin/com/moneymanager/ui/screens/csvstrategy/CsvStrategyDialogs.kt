@@ -220,6 +220,48 @@ object ColumnDetector {
         columns: List<CsvColumn>,
         sampleValues: Map<Int, String>? = null,
     ): String? = suggestColumn(columns, currencyNamePatterns, sampleValues, ::looksLikeCurrency)
+
+    /**
+     * Detects fallback columns for the target account.
+     * Finds rows where the primary column is blank and identifies
+     * which other columns consistently have values in those rows.
+     *
+     * @param primaryColumn The primary column name for target account lookup
+     * @param columns The available CSV columns
+     * @param rows All CSV rows to analyze
+     * @return List of fallback column names, ordered by coverage (best first)
+     */
+    fun suggestFallbackColumns(
+        primaryColumn: String,
+        columns: List<CsvColumn>,
+        rows: List<CsvRow>,
+    ): List<String> {
+        val primaryIndex = columns.find { it.originalName == primaryColumn }?.columnIndex
+            ?: return emptyList()
+
+        // Find rows where primary column is blank
+        val rowsWithBlankPrimary = rows.filter { row ->
+            row.values.getOrNull(primaryIndex)?.isBlank() == true
+        }
+
+        if (rowsWithBlankPrimary.isEmpty()) return emptyList()
+
+        // For each other column, count how many blank-primary rows have a value
+        val candidateColumns = columns
+            .filter { it.originalName != primaryColumn }
+            .map { col ->
+                val filledCount = rowsWithBlankPrimary.count { row ->
+                    row.values.getOrNull(col.columnIndex)?.isNotBlank() == true
+                }
+                col.originalName to filledCount
+            }
+            .filter { (_, count) -> count > 0 }
+            .sortedByDescending { (_, count) -> count }
+            .map { (name, _) -> name }
+
+        // Return top candidate(s) - typically just the best one
+        return candidateColumns.take(1)
+    }
 }
 
 /**
@@ -242,7 +284,7 @@ fun CreateCsvStrategyDialog(
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
     csvColumns: List<CsvColumn>,
-    firstRow: CsvRow?,
+    rows: List<CsvRow>,
     onDismiss: () -> Unit,
 ) {
     var name by remember { mutableStateOf("") }
@@ -261,11 +303,15 @@ fun CreateCsvStrategyDialog(
     var selectedTimezone by remember { mutableStateOf(TimeZone.currentSystemDefault().id) }
     var timezoneColumnName by remember { mutableStateOf<String?>(null) }
     var targetAccountColumnName by remember { mutableStateOf<String?>(null) }
+    var targetAccountFallbackColumns by remember { mutableStateOf<List<String>>(emptyList()) }
     var flipAccountsOnPositive by remember { mutableStateOf(true) }
 
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
     val scope = rememberSchemaAwareCoroutineScope()
+
+    // Use first row for sample values (backward compatible)
+    val firstRow = rows.firstOrNull()
 
     // Build sample values map for value-based detection
     val sampleValues: Map<Int, String>? =
@@ -313,6 +359,18 @@ fun CreateCsvStrategyDialog(
             if (currencyColumnName != null) {
                 currencyMode = CurrencyMode.FROM_COLUMN
             }
+        }
+    }
+
+    // Auto-detect fallback columns when target column is selected
+    LaunchedEffect(targetAccountColumnName, rows) {
+        val primaryColumn = targetAccountColumnName
+        if (primaryColumn != null && rows.isNotEmpty()) {
+            targetAccountFallbackColumns = ColumnDetector.suggestFallbackColumns(
+                primaryColumn = primaryColumn,
+                columns = csvColumns,
+                rows = rows,
+            )
         }
     }
 
@@ -374,6 +432,14 @@ fun CreateCsvStrategyDialog(
                     enabled = !isSaving,
                     isError = targetAccountColumnName == null,
                 )
+                if (targetAccountFallbackColumns.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Fallback column: ${targetAccountFallbackColumns.joinToString()}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(16.dp))
                 Text("Date Column", style = MaterialTheme.typography.titleSmall)
@@ -600,6 +666,7 @@ fun CreateCsvStrategyDialog(
                                                         id = FieldMappingId(Uuid.random()),
                                                         fieldType = TransferField.TARGET_ACCOUNT,
                                                         columnName = targetAccountColumnName!!,
+                                                        fallbackColumns = targetAccountFallbackColumns,
                                                         createIfMissing = true,
                                                     ),
                                                 TransferField.TIMESTAMP to
