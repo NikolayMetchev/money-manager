@@ -346,6 +346,7 @@ fun CreateCsvStrategyDialog(
     var timeColumnName by remember { mutableStateOf<String?>(null) }
     var timeFormat by remember { mutableStateOf("HH:mm:ss") }
     var descriptionColumnName by remember { mutableStateOf<String?>(null) }
+    var descriptionFallbackColumns by remember { mutableStateOf<List<String>>(emptyList()) }
     var amountColumnName by remember { mutableStateOf<String?>(null) }
     var selectedAccountId by remember { mutableStateOf<AccountId?>(null) }
     var selectedCurrencyId by remember { mutableStateOf<CurrencyId?>(null) }
@@ -419,6 +420,19 @@ fun CreateCsvStrategyDialog(
         val primaryColumn = targetAccountColumnName
         if (primaryColumn != null && rows.isNotEmpty()) {
             targetAccountFallbackColumns =
+                ColumnDetector.suggestFallbackColumns(
+                    primaryColumn = primaryColumn,
+                    columns = csvColumns,
+                    rows = rows,
+                )
+        }
+    }
+
+    // Auto-detect fallback columns when description column is selected
+    LaunchedEffect(descriptionColumnName, rows) {
+        val primaryColumn = descriptionColumnName
+        if (primaryColumn != null && rows.isNotEmpty()) {
+            descriptionFallbackColumns =
                 ColumnDetector.suggestFallbackColumns(
                     primaryColumn = primaryColumn,
                     columns = csvColumns,
@@ -573,6 +587,25 @@ fun CreateCsvStrategyDialog(
                     sampleValue = getSampleValue(csvColumns, firstRow, descriptionColumnName),
                     enabled = !isSaving,
                     isError = descriptionColumnName == null,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "Fallback column (when primary is empty)",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                // Find a row where the primary column is blank to show a relevant sample
+                val descriptionFallbackSampleRow =
+                    findRowWithBlankColumn(csvColumns, rows, descriptionColumnName)
+                OptionalColumnDropdown(
+                    columns = csvColumns,
+                    selectedColumn = descriptionFallbackColumns.firstOrNull(),
+                    onColumnSelected = { selected ->
+                        descriptionFallbackColumns = if (selected != null) listOf(selected) else emptyList()
+                    },
+                    label = "Fallback column for description",
+                    sampleValue = getSampleValue(csvColumns, descriptionFallbackSampleRow, descriptionFallbackColumns.firstOrNull()),
+                    enabled = !isSaving,
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -746,6 +779,7 @@ fun CreateCsvStrategyDialog(
                                                         id = FieldMappingId(Uuid.random()),
                                                         fieldType = TransferField.DESCRIPTION,
                                                         columnName = descriptionColumnName!!,
+                                                        fallbackColumns = descriptionFallbackColumns,
                                                     ),
                                                 TransferField.AMOUNT to
                                                     AmountParsingMapping(

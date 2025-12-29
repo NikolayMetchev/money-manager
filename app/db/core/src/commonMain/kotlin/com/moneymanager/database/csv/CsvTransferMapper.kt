@@ -350,9 +350,23 @@ class CsvTransferMapper(
         values: List<String>,
     ): String {
         return when (mapping) {
-            is DirectColumnMapping -> getColumnValue(mapping.columnName, values)
+            is DirectColumnMapping -> getDirectColumnValue(mapping, values)
             else -> throw IllegalArgumentException("Invalid description mapping type: ${mapping::class}")
         }
+    }
+
+    /**
+     * Gets the effective value from a DirectColumnMapping,
+     * trying the primary column first, then fallbacks in order.
+     */
+    private fun getDirectColumnValue(
+        mapping: DirectColumnMapping,
+        values: List<String>,
+    ): String {
+        return mapping.allColumns
+            .map { getColumnValue(it, values) }
+            .firstOrNull { it.isNotBlank() }
+            ?: ""
     }
 
     private fun parseCurrency(
