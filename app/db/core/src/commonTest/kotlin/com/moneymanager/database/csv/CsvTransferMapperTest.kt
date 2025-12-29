@@ -779,4 +779,216 @@ class CsvTransferMapperTest {
                 .toInstant(TimeZone.of("Europe/London"))
         assertEquals(expectedLondon, londonResult.transfer.timestamp)
     }
+
+    // ============= Fallback Column Tests =============
+
+    private val columnsWithType =
+        listOf(
+            CsvColumn(CsvColumnId(Uuid.random()), 0, "Date"),
+            CsvColumn(CsvColumnId(Uuid.random()), 1, "Description"),
+            CsvColumn(CsvColumnId(Uuid.random()), 2, "Amount"),
+            CsvColumn(CsvColumnId(Uuid.random()), 3, "Name"),
+            CsvColumn(CsvColumnId(Uuid.random()), 4, "Type"),
+        )
+
+    private fun createStrategyWithFallback(
+        primaryColumn: String = "Name",
+        fallbackColumns: List<String> = listOf("Type"),
+    ): CsvImportStrategy {
+        val now = Clock.System.now()
+        return CsvImportStrategy(
+            id = CsvImportStrategyId(Uuid.random()),
+            name = "Strategy With Fallback",
+            identificationColumns = setOf("Date", "Description", "Amount", "Name", "Type"),
+            fieldMappings =
+                mapOf(
+                    TransferField.SOURCE_ACCOUNT to
+                        HardCodedAccountMapping(
+                            id = FieldMappingId(Uuid.random()),
+                            fieldType = TransferField.SOURCE_ACCOUNT,
+                            accountId = testSourceAccountId,
+                        ),
+                    TransferField.TARGET_ACCOUNT to
+                        AccountLookupMapping(
+                            id = FieldMappingId(Uuid.random()),
+                            fieldType = TransferField.TARGET_ACCOUNT,
+                            columnName = primaryColumn,
+                            fallbackColumns = fallbackColumns,
+                            createIfMissing = true,
+                        ),
+                    TransferField.TIMESTAMP to
+                        DateTimeParsingMapping(
+                            id = FieldMappingId(Uuid.random()),
+                            fieldType = TransferField.TIMESTAMP,
+                            dateColumnName = "Date",
+                            dateFormat = "dd/MM/yyyy",
+                        ),
+                    TransferField.DESCRIPTION to
+                        DirectColumnMapping(
+                            id = FieldMappingId(Uuid.random()),
+                            fieldType = TransferField.DESCRIPTION,
+                            columnName = "Description",
+                        ),
+                    TransferField.AMOUNT to
+                        AmountParsingMapping(
+                            id = FieldMappingId(Uuid.random()),
+                            fieldType = TransferField.AMOUNT,
+                            mode = AmountMode.SINGLE_COLUMN,
+                            amountColumnName = "Amount",
+                        ),
+                    TransferField.CURRENCY to
+                        HardCodedCurrencyMapping(
+                            id = FieldMappingId(Uuid.random()),
+                            fieldType = TransferField.CURRENCY,
+                            currencyId = testCurrencyId,
+                        ),
+                ),
+            createdAt = now,
+            updatedAt = now,
+        )
+    }
+
+    @Test
+    fun `mapRow uses fallback column when primary column is empty`() {
+        val chequeAccount =
+            Account(
+                id = AccountId(3),
+                name = "Cheque",
+                openingDate = Clock.System.now(),
+            )
+
+        val strategy = createStrategyWithFallback()
+        val mapper =
+            CsvTransferMapper(
+                strategy = strategy,
+                columns = columnsWithType,
+                existingAccounts = mapOf("Cheque" to chequeAccount),
+                existingCurrencies = mapOf(testCurrencyId to testCurrency),
+                existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
+            )
+
+        // Name is empty, should fall back to Type
+        val row =
+            CsvRow(
+                rowIndex = 1,
+                values = listOf("15/12/2024", "Cheque credited", "2.40", "", "Cheque"),
+            )
+        val result = mapper.mapRow(row)
+
+        assertIs<MappingResult.Success>(result)
+        assertEquals(chequeAccount.id, result.transfer.targetAccountId)
+    }
+
+    @Test
+    fun `mapRow uses primary column when it has value`() {
+        val strategy = createStrategyWithFallback()
+        val mapper =
+            CsvTransferMapper(
+                strategy = strategy,
+                columns = columnsWithType,
+                existingAccounts = mapOf("Payee Account" to testTargetAccount),
+                existingCurrencies = mapOf(testCurrencyId to testCurrency),
+                existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
+            )
+
+        // Name has value, should use it (not fallback)
+        val row =
+            CsvRow(
+                rowIndex = 1,
+                values = listOf("15/12/2024", "Payment", "-50.00", "Payee Account", "Faster payment"),
+            )
+        val result = mapper.mapRow(row)
+
+        assertIs<MappingResult.Success>(result)
+        assertEquals(testTargetAccountId, result.transfer.targetAccountId)
+    }
+
+    @Test
+    fun `mapRow identifies new account from fallback column when primary is empty`() {
+        val strategy = createStrategyWithFallback()
+        val mapper =
+            CsvTransferMapper(
+                strategy = strategy,
+                columns = columnsWithType,
+                existingAccounts = emptyMap(),
+                existingCurrencies = mapOf(testCurrencyId to testCurrency),
+                existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
+            )
+
+        // Name is empty, should identify "Cheque" from Type as new account
+        val row =
+            CsvRow(
+                rowIndex = 1,
+                values = listOf("15/12/2024", "Cheque credited", "2.40", "", "Cheque"),
+            )
+        val result = mapper.mapRow(row)
+
+        assertIs<MappingResult.Success>(result)
+        assertEquals("Cheque", result.newAccountName)
+    }
+
+    @Test
+    fun `mapRow returns empty account name when both primary and fallback are empty`() {
+        val strategy = createStrategyWithFallback()
+        val mapper =
+            CsvTransferMapper(
+                strategy = strategy,
+                columns = columnsWithType,
+                existingAccounts = emptyMap(),
+                existingCurrencies = mapOf(testCurrencyId to testCurrency),
+                existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
+            )
+
+        // Both Name and Type are empty
+        val row =
+            CsvRow(
+                rowIndex = 1,
+                values = listOf("15/12/2024", "Unknown transaction", "10.00", "", ""),
+            )
+        val result = mapper.mapRow(row)
+
+        assertIs<MappingResult.Success>(result)
+        // newAccountName should be null (empty string is not a valid account name)
+        assertEquals(null, result.newAccountName)
+    }
+
+    @Test
+    fun `prepareImport handles mix of primary and fallback account lookups`() {
+        val chequeAccount =
+            Account(
+                id = AccountId(3),
+                name = "Cheque",
+                openingDate = Clock.System.now(),
+            )
+
+        val strategy = createStrategyWithFallback()
+        val mapper =
+            CsvTransferMapper(
+                strategy = strategy,
+                columns = columnsWithType,
+                existingAccounts =
+                    mapOf(
+                        "Payee Account" to testTargetAccount,
+                        "Cheque" to chequeAccount,
+                    ),
+                existingCurrencies = mapOf(testCurrencyId to testCurrency),
+                existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
+            )
+
+        val rows =
+            listOf(
+                // Normal payment - uses Name column
+                CsvRow(rowIndex = 1, values = listOf("15/12/2024", "Payment 1", "-50.00", "Payee Account", "Faster payment")),
+                // Cheque - Name empty, uses Type column
+                CsvRow(rowIndex = 2, values = listOf("16/12/2024", "Cheque credited", "2.40", "", "Cheque")),
+                // Another normal payment
+                CsvRow(rowIndex = 3, values = listOf("17/12/2024", "Payment 2", "-25.00", "Payee Account", "Card payment")),
+            )
+
+        val preparation = mapper.prepareImport(rows)
+
+        assertEquals(3, preparation.validTransfers.size)
+        assertEquals(0, preparation.errorRows.size)
+        assertEquals(0, preparation.newAccounts.size) // All accounts exist
+    }
 }

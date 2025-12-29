@@ -318,7 +318,7 @@ fun CsvImportDetailScreen(
             categoryRepository = categoryRepository,
             currencyRepository = currencyRepository,
             csvColumns = import!!.columns,
-            firstRow = rows.firstOrNull(),
+            rows = rows,
             onDismiss = { showCreateStrategyDialog = false },
         )
     }

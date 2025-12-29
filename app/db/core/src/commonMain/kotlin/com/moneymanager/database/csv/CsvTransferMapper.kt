@@ -209,15 +209,9 @@ class CsvTransferMapper(
             MappingResult.Success(
                 transfer = transfer,
                 newAccountName =
-                    if (targetMapping is AccountLookupMapping &&
-                        !accountExists(
-                            getColumnValue(
-                                targetMapping.columnName,
-                                values,
-                            ),
-                        )
-                    ) {
-                        getColumnValue(targetMapping.columnName, values)
+                    if (targetMapping is AccountLookupMapping) {
+                        val name = getAccountName(targetMapping, values)
+                        if (name.isNotBlank() && !accountExists(name)) name else null
                     } else {
                         null
                     },
@@ -259,8 +253,8 @@ class CsvTransferMapper(
 
         val newAccountName =
             if (targetMapping is AccountLookupMapping) {
-                val name = getColumnValue(targetMapping.columnName, values)
-                if (!accountExists(name)) name else null
+                val name = getAccountName(targetMapping, values)
+                if (name.isNotBlank() && !accountExists(name)) name else null
             } else {
                 null
             }
@@ -275,12 +269,26 @@ class CsvTransferMapper(
         return when (mapping) {
             is HardCodedAccountMapping -> mapping.accountId
             is AccountLookupMapping -> {
-                val name = getColumnValue(mapping.columnName, values)
+                val name = getAccountName(mapping, values)
                 existingAccounts[name]?.id
                     ?: AccountId(-1) // Placeholder for new accounts
             }
             else -> throw IllegalArgumentException("Invalid account mapping type: ${mapping::class}")
         }
+    }
+
+    /**
+     * Gets the effective account name from an AccountLookupMapping,
+     * trying the primary column first, then fallbacks in order.
+     */
+    private fun getAccountName(
+        mapping: AccountLookupMapping,
+        values: List<String>,
+    ): String {
+        return mapping.allColumns
+            .map { getColumnValue(it, values) }
+            .firstOrNull { it.isNotBlank() }
+            ?: ""
     }
 
     private fun parseTimestamp(

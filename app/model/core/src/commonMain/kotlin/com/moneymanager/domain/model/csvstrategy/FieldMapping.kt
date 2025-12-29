@@ -41,15 +41,27 @@ data class HardCodedAccountMapping(
 /**
  * Looks up an account by name from a CSV column.
  * Can optionally create a new account if not found.
+ *
+ * When [fallbackColumns] is specified, if the primary [columnName] is empty,
+ * each fallback column is tried in order until a non-empty value is found.
+ * This is useful for bank exports where some transaction types (e.g., cheques)
+ * have empty name columns but the transaction type can be used as a fallback.
  */
 @Serializable
 data class AccountLookupMapping(
     override val id: FieldMappingId,
     override val fieldType: TransferField,
     val columnName: String,
+    val fallbackColumns: List<String> = emptyList(),
     val createIfMissing: Boolean = true,
     val defaultCategoryId: Long = Category.UNCATEGORIZED_ID,
-) : FieldMapping
+) : FieldMapping {
+    /**
+     * Returns all columns to check in priority order (primary first, then fallbacks).
+     */
+    val allColumns: List<String>
+        get() = listOf(columnName) + fallbackColumns
+}
 
 /**
  * Parses a date/time from one or two CSV columns.
