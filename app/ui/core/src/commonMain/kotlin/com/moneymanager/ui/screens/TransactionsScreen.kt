@@ -198,11 +198,22 @@ fun AccountTransactionsScreen(
     // Highlighted transaction state
     var highlightedTransactionId by remember { mutableStateOf<TransactionId?>(null) }
 
-    // Edit transaction state
+    // Edit transaction state - stores the transfer ID to edit, actual transfer is fetched from repository
+    var transactionIdToEdit by remember { mutableStateOf<TransferId?>(null) }
     var transactionToEdit by remember { mutableStateOf<Transfer?>(null) }
 
     // Refresh trigger - increment to force reload after edits
     var refreshTrigger by remember { mutableStateOf(0) }
+
+    // Fetch the actual transfer when transactionIdToEdit changes
+    LaunchedEffect(transactionIdToEdit) {
+        val id = transactionIdToEdit
+        if (id != null) {
+            transactionToEdit = transactionRepository.getTransactionById(id.id).first()
+        } else {
+            transactionToEdit = null
+        }
+    }
 
     // Coroutine scope for scroll animations and pagination
     val scrollScope = rememberSchemaAwareCoroutineScope()
@@ -830,7 +841,7 @@ fun AccountTransactionsScreen(
                                 screenSizeClass = screenSizeClass,
                                 isHighlighted = highlightedTransactionId == runningBalance.transactionId,
                                 onEditClick = { transfer ->
-                                    transactionToEdit = transfer
+                                    transactionIdToEdit = transfer.id
                                 },
                                 onAuditClick = { transferId ->
                                     transactionIdToAudit = transferId
@@ -937,7 +948,7 @@ fun AccountTransactionsScreen(
             attributeTypeRepository = attributeTypeRepository,
             transferAttributeRepository = transferAttributeRepository,
             maintenanceService = maintenanceService,
-            onDismiss = { transactionToEdit = null },
+            onDismiss = { transactionIdToEdit = null },
             onSaved = { refreshTrigger++ },
         )
     }
@@ -1143,6 +1154,8 @@ fun TransactionEntryDialog(
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
+    attributeTypeRepository: AttributeTypeRepository,
+    transferAttributeRepository: TransferAttributeRepository,
     maintenanceService: DatabaseMaintenanceService,
     preSelectedSourceAccountId: AccountId? = null,
     preSelectedCurrencyId: CurrencyId? = null,
@@ -1165,6 +1178,21 @@ fun TransactionEntryDialog(
     var showTimePicker by remember { mutableStateOf(false) }
 
     val scope = rememberSchemaAwareCoroutineScope()
+
+    // Attribute state
+    var existingAttributeTypes by remember { mutableStateOf<List<AttributeType>>(emptyList()) }
+    // EditableAttribute represents the current state of each attribute in the UI
+    // key: a negative temp id for new ones
+    // value: Pair(attributeTypeName, value)
+    var editableAttributes by remember { mutableStateOf<Map<Long, Pair<String, String>>>(emptyMap()) }
+    var nextTempId by remember { mutableStateOf(-1L) }
+
+    // Load existing attribute types for autocomplete
+    LaunchedEffect(Unit) {
+        attributeTypeRepository.getAll().collect { types ->
+            existingAttributeTypes = types
+        }
+    }
 
     AlertDialog(
         onDismissRequest = { if (!isSaving) onDismiss() },
@@ -1296,6 +1324,74 @@ fun TransactionEntryDialog(
                     enabled = !isSaving,
                 )
 
+                // Attributes Section
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = "Attributes",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+
+                    // Display editable attributes
+                    editableAttributes.forEach { (id, pair) ->
+                        val (typeName, value) = pair
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            // Attribute type selector
+                            AttributeTypeField(
+                                value = typeName,
+                                onValueChange = { newTypeName ->
+                                    editableAttributes = editableAttributes + (id to Pair(newTypeName, value))
+                                },
+                                existingTypes = existingAttributeTypes,
+                                enabled = !isSaving,
+                                modifier = Modifier.weight(0.4f),
+                            )
+                            // Attribute value field
+                            OutlinedTextField(
+                                value = value,
+                                onValueChange = { newValue ->
+                                    editableAttributes = editableAttributes + (id to Pair(typeName, newValue))
+                                },
+                                label = { Text("Value") },
+                                modifier = Modifier.weight(0.5f),
+                                singleLine = true,
+                                enabled = !isSaving,
+                            )
+                            // Delete button
+                            IconButton(
+                                onClick = {
+                                    editableAttributes = editableAttributes - id
+                                },
+                                enabled = !isSaving,
+                            ) {
+                                Text(
+                                    text = "X",
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                )
+                            }
+                        }
+                    }
+
+                    // Add new attribute button
+                    TextButton(
+                        onClick = {
+                            editableAttributes = editableAttributes + (nextTempId to Pair("", ""))
+                            nextTempId--
+                        },
+                        enabled = !isSaving,
+                    ) {
+                        Text("+ Add Attribute")
+                    }
+                }
+
                 errorMessage?.let { error ->
                     Text(
                         text = error,
@@ -1349,6 +1445,29 @@ fun TransactionEntryDialog(
                                         revisionId = transfer.revisionId,
                                         deviceInfo = getDeviceInfo(),
                                     )
+
+                                    // Save any attributes that were added
+                                    val attributesToSave =
+                                        editableAttributes
+                                            .filter { (_, pair) ->
+                                                val (typeName, value) = pair
+                                                typeName.isNotBlank() && value.isNotBlank()
+                                            }
+                                    if (attributesToSave.isNotEmpty()) {
+                                        // Create attribute types and collect their IDs
+                                        val attributeData =
+                                            attributesToSave.map { (_, pair) ->
+                                                val (typeName, value) = pair
+                                                val typeId = attributeTypeRepository.getOrCreate(typeName.trim())
+                                                typeId to value.trim()
+                                            }
+                                        // Insert all attributes in batch mode (bypasses triggers)
+                                        transferAttributeRepository.insertBatch(
+                                            transactionId = transfer.id,
+                                            revisionId = transfer.revisionId,
+                                            attributes = attributeData,
+                                        )
+                                    }
 
                                     maintenanceService.refreshMaterializedViews()
 
@@ -2071,9 +2190,10 @@ fun TransactionAuditScreen(
             currentTransfer = transfer
             // Load current attributes if transfer exists
             if (transfer != null) {
-                currentAttributes = transferAttributeRepository
-                    .getByTransactionAndRevision(transferId, transfer.revisionId)
-                    .first()
+                currentAttributes =
+                    transferAttributeRepository
+                        .getByTransactionAndRevision(transferId, transfer.revisionId)
+                        .first()
             }
         } catch (e: Exception) {
             logger.error(e) { "Failed to load audit history: ${e.message}" }

@@ -444,6 +444,8 @@ private fun MoneyManagerAppContent(
                 accountRepository = repositorySet.accountRepository,
                 categoryRepository = repositorySet.categoryRepository,
                 currencyRepository = repositorySet.currencyRepository,
+                attributeTypeRepository = repositorySet.attributeTypeRepository,
+                transferAttributeRepository = repositorySet.transferAttributeRepository,
                 maintenanceService = repositorySet.maintenanceService,
                 preSelectedSourceAccountId = preSelectedAccountId,
                 preSelectedCurrencyId = preSelectedCurrencyId,

@@ -187,6 +187,7 @@ object DatabaseConfig {
      */
     private fun MoneyManagerDatabaseWrapper.createAttributeTriggers() {
         // Transfer UPDATE trigger - copies attributes only when non-revision fields change
+        // Uses _import_batch flag to prevent attribute INSERT trigger from firing
         execute(
             null,
             """
@@ -201,10 +202,16 @@ object DatabaseConfig {
                    OR OLD.currencyId != NEW.currencyId
                    OR OLD.amount != NEW.amount)
             BEGIN
+                -- Set flag to prevent attribute INSERT trigger from firing
+                INSERT INTO _import_batch VALUES (1);
+
                 INSERT INTO TransferAttribute (transactionId, revisionId, attributeTypeId, attributeValue)
                 SELECT transactionId, NEW.revisionId, attributeTypeId, attributeValue
                 FROM TransferAttribute
                 WHERE transactionId = NEW.id AND revisionId = OLD.revisionId;
+
+                -- Clear flag
+                DELETE FROM _import_batch;
             END
             """.trimIndent(),
             0,
