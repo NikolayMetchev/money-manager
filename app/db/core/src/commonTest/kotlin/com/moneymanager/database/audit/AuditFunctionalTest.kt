@@ -267,7 +267,7 @@ class AuditFunctionalTest : DbTest() {
             val description = "Test Transfer"
             val amount = Money.fromDisplayValue(100.0, currency)
 
-            repositories.transactionRepository.createTransfer(
+            createTransfer(
                 Transfer(
                     id = transferId,
                     timestamp = now,
@@ -296,7 +296,7 @@ class AuditFunctionalTest : DbTest() {
             val originalAmount = Money.fromDisplayValue(100.0, currency)
             val updatedAmount = Money.fromDisplayValue(200.0, currency)
 
-            repositories.transactionRepository.createTransfer(
+            createTransfer(
                 Transfer(
                     id = transferId,
                     timestamp = now,
@@ -335,7 +335,7 @@ class AuditFunctionalTest : DbTest() {
             val transferId = TransferId(Uuid.random())
             val now = Clock.System.now()
 
-            repositories.transactionRepository.createTransfer(
+            createTransfer(
                 Transfer(
                     id = transferId,
                     timestamp = now,
@@ -364,7 +364,7 @@ class AuditFunctionalTest : DbTest() {
             val now = Clock.System.now()
 
             // Create transfer (revisionId should be 1)
-            repositories.transactionRepository.createTransfer(
+            createTransfer(
                 Transfer(
                     id = transferId,
                     timestamp = now,
@@ -413,7 +413,7 @@ class AuditFunctionalTest : DbTest() {
             val now = Clock.System.now()
 
             // Create transfer (revisionId = 1)
-            repositories.transactionRepository.createTransfer(
+            createTransfer(
                 Transfer(
                     id = transferId,
                     timestamp = now,

@@ -448,9 +448,12 @@ class AccountsScreenTest {
                 hasPrevious = false,
             )
 
-        override suspend fun createTransfer(transfer: Transfer) {}
-
-        override suspend fun createTransfersBatch(transfers: List<Transfer>) {}
+        override suspend fun createTransfersWithAttributesAndSources(
+            transfersWithAttributes: List<Pair<Transfer, List<Pair<com.moneymanager.domain.model.AttributeTypeId, String>>>>,
+            sourceRecorder: com.moneymanager.domain.model.SourceRecorder,
+            deviceInfo: com.moneymanager.domain.model.DeviceInfo,
+            onProgress: (suspend (Int, Int) -> Unit)?,
+        ) {}
 
         override suspend fun updateTransfer(transfer: Transfer) {}
 

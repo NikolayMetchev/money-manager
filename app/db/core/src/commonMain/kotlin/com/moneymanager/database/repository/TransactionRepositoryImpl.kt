@@ -5,32 +5,41 @@ package com.moneymanager.database.repository
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
+import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.mapper.AccountBalanceMapper
 import com.moneymanager.database.mapper.AccountRowMapper
 import com.moneymanager.database.mapper.TransferMapper
-import com.moneymanager.database.sql.MoneyManagerDatabase
 import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
+import com.moneymanager.domain.model.AttributeTypeId
+import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.PageWithTargetIndex
 import com.moneymanager.domain.model.PagingInfo
 import com.moneymanager.domain.model.PagingResult
+import com.moneymanager.domain.model.SourceInserter
+import com.moneymanager.domain.model.SourceRecorder
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.repository.DeviceRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 class TransactionRepositoryImpl(
-    database: MoneyManagerDatabase,
+    private val database: MoneyManagerDatabaseWrapper,
+    private val deviceRepository: DeviceRepository,
 ) : TransactionRepository {
     private val transferQueries = database.transferQueries
     private val transactionIdQueries = database.transactionIdQueries
+    private val transferAttributeQueries = database.transferAttributeQueries
+    private val transferSourceQueries = database.transferSourceQueries
 
     override fun getTransactionById(id: Uuid): Flow<Transfer?> =
         transferQueries.selectById(id.toString(), TransferMapper::mapRaw)
@@ -286,39 +295,88 @@ class TransactionRepositoryImpl(
             )
         }
 
-    override suspend fun createTransfer(transfer: Transfer): Unit =
+    override suspend fun createTransfersWithAttributesAndSources(
+        transfersWithAttributes: List<Pair<Transfer, List<Pair<AttributeTypeId, String>>>>,
+        sourceRecorder: SourceRecorder,
+        deviceInfo: DeviceInfo,
+        onProgress: (suspend (created: Int, total: Int) -> Unit)?,
+    ): Unit =
         withContext(Dispatchers.Default) {
-            transferQueries.transaction {
-                transactionIdQueries.insert(transfer.id.toString())
-                transferQueries.insert(
-                    id = transfer.id.toString(),
-                    revisionId = transfer.revisionId,
-                    timestamp = transfer.timestamp.toEpochMilliseconds(),
-                    description = transfer.description,
-                    sourceAccountId = transfer.sourceAccountId.id,
-                    targetAccountId = transfer.targetAccountId.id,
-                    currencyId = transfer.amount.currency.id.toString(),
-                    amount = transfer.amount.amount,
-                )
-            }
-        }
+            val deviceId = deviceRepository.getOrCreateDevice(deviceInfo)
+            val now = Clock.System.now()
+            val total = transfersWithAttributes.size
 
-    override suspend fun createTransfersBatch(transfers: List<Transfer>): Unit =
-        withContext(Dispatchers.Default) {
-            transferQueries.transaction {
-                transfers.forEach { transfer ->
-                    transactionIdQueries.insert(transfer.id.toString())
-                    transferQueries.insert(
-                        id = transfer.id.toString(),
-                        revisionId = transfer.revisionId,
-                        timestamp = transfer.timestamp.toEpochMilliseconds(),
-                        description = transfer.description,
-                        sourceAccountId = transfer.sourceAccountId.id,
-                        targetAccountId = transfer.targetAccountId.id,
-                        currencyId = transfer.amount.currency.id.toString(),
-                        amount = transfer.amount.amount,
-                    )
+            val sourceInserter =
+                object : SourceInserter {
+                    override fun insertManual(
+                        transactionId: String,
+                        revisionId: Long,
+                        deviceId: Long,
+                        createdAt: Long,
+                    ) {
+                        transferSourceQueries.insertManual(transactionId, revisionId, deviceId, createdAt)
+                    }
+
+                    override fun insertSampleGenerator(
+                        transactionId: String,
+                        revisionId: Long,
+                        deviceId: Long,
+                        createdAt: Long,
+                    ) {
+                        transferSourceQueries.insertSampleGenerator(transactionId, revisionId, deviceId, createdAt)
+                    }
+
+                    override fun insertCsvImport(
+                        transactionId: String,
+                        revisionId: Long,
+                        deviceId: Long,
+                        csvImportId: String,
+                        csvRowIndex: Long,
+                        createdAt: Long,
+                    ) {
+                        transferSourceQueries.insertCsvImport(transactionId, revisionId, deviceId, csvImportId, csvRowIndex, createdAt)
+                    }
                 }
+
+            // Process in batches of 1000 to avoid holding transaction too long
+            val batchSize = 1000
+            var created = 0
+
+            for (batchStart in transfersWithAttributes.indices step batchSize) {
+                val batchEnd = minOf(batchStart + batchSize, transfersWithAttributes.size)
+                val batch = transfersWithAttributes.subList(batchStart, batchEnd)
+
+                transferQueries.transaction {
+                    batch.forEach { (transfer, attributes) ->
+                        // Create transfer (triggers INSERT audit)
+                        transactionIdQueries.insert(transfer.id.toString())
+                        transferQueries.insert(
+                            id = transfer.id.toString(),
+                            revisionId = transfer.revisionId,
+                            timestamp = transfer.timestamp.toEpochMilliseconds(),
+                            description = transfer.description,
+                            sourceAccountId = transfer.sourceAccountId.id,
+                            targetAccountId = transfer.targetAccountId.id,
+                            currencyId = transfer.amount.currency.id.toString(),
+                            amount = transfer.amount.amount,
+                        )
+
+                        // Insert attributes (triggers audit for each)
+                        attributes.forEach { (typeId, value) ->
+                            transferAttributeQueries.insert(
+                                transactionId = transfer.id.toString(),
+                                attributeTypeId = typeId.id,
+                                attributeValue = value,
+                            )
+                        }
+
+                        // Record source using strategy pattern
+                        sourceRecorder.insert(transfer, deviceId, now.toEpochMilliseconds(), sourceInserter)
+                    }
+                }
+
+                created += batch.size
+                onProgress?.invoke(created, total)
             }
         }
 

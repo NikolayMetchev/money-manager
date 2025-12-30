@@ -31,6 +31,7 @@ import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.Money
+import com.moneymanager.domain.model.SourceRecorder
 import com.moneymanager.domain.model.SourceType
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferAttribute
@@ -293,7 +294,7 @@ class AccountTransactionsScreenTest {
 
                 // Create a transfer
                 transferId = TransferId(Uuid.random())
-                repositories.transactionRepository.createTransfer(
+                val transfer =
                     Transfer(
                         id = transferId,
                         timestamp = now,
@@ -301,7 +302,11 @@ class AccountTransactionsScreenTest {
                         sourceAccountId = checkingAccountId,
                         targetAccountId = savingsAccountId,
                         amount = Money.fromDisplayValue(50.0, usdCurrency),
-                    ),
+                    )
+                repositories.transactionRepository.createTransfersWithAttributesAndSources(
+                    transfersWithAttributes = listOf(transfer to emptyList()),
+                    sourceRecorder = SourceRecorder.SampleGenerator,
+                    deviceInfo = DeviceInfo.Jvm("test-machine", "Test OS"),
                 )
 
                 // Refresh materialized views so the transaction appears
@@ -605,9 +610,12 @@ class AccountTransactionsScreenTest {
             )
         }
 
-        override suspend fun createTransfer(transfer: Transfer) {}
-
-        override suspend fun createTransfersBatch(transfers: List<Transfer>) {}
+        override suspend fun createTransfersWithAttributesAndSources(
+            transfersWithAttributes: List<Pair<Transfer, List<Pair<com.moneymanager.domain.model.AttributeTypeId, String>>>>,
+            sourceRecorder: com.moneymanager.domain.model.SourceRecorder,
+            deviceInfo: com.moneymanager.domain.model.DeviceInfo,
+            onProgress: (suspend (Int, Int) -> Unit)?,
+        ) {}
 
         override suspend fun updateTransfer(transfer: Transfer) {}
 

@@ -45,7 +45,9 @@ import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.database.csv.CsvTransferMapper
 import com.moneymanager.database.csv.ImportPreparation
 import com.moneymanager.database.csv.StrategyMatcher
+import com.moneymanager.domain.getDeviceInfo
 import com.moneymanager.domain.model.Account
+import com.moneymanager.domain.model.SourceRecorder
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvImport
@@ -54,12 +56,9 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CsvImportRepository
-import com.moneymanager.domain.repository.CsvImportSourceRecord
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.TransactionRepository
-import com.moneymanager.domain.repository.TransferAttributeRepository
-import com.moneymanager.domain.repository.TransferSourceRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.flow.first
@@ -90,10 +89,8 @@ fun ApplyStrategyDialog(
     accountRepository: AccountRepository,
     currencyRepository: CurrencyRepository,
     transactionRepository: TransactionRepository,
-    transferSourceRepository: TransferSourceRepository,
     csvImportRepository: CsvImportRepository,
     attributeTypeRepository: AttributeTypeRepository,
-    transferAttributeRepository: TransferAttributeRepository,
     maintenanceService: DatabaseMaintenanceService,
     onDismiss: () -> Unit,
     onImportComplete: (CsvImportResult) -> Unit,
@@ -247,9 +244,9 @@ fun ApplyStrategyDialog(
                             // Create transfers and track which rows they came from
                             logger.info { "Starting to create $validCount transfers" }
                             val rowTransferMap = mutableMapOf<Long, com.moneymanager.domain.model.TransferId>()
-                            val sourceRecords = mutableListOf<CsvImportSourceRecord>()
                             val failedRows = mutableListOf<CsvImportResult.FailedRow>()
                             var successCount = 0
+                            val deviceInfo = getDeviceInfo()
 
                             for ((index, transferWithAttrs) in finalPrep.validTransfers.withIndex()) {
                                 val transfer = transferWithAttrs.transfer
@@ -259,31 +256,24 @@ fun ApplyStrategyDialog(
                                         ?: continue
 
                                 try {
-                                    transactionRepository.createTransfer(transfer)
-                                    rowTransferMap[originalRowIndex] = transfer.id
-
-                                    // Save attributes if any (use individual inserts for audit trail)
-                                    if (transferWithAttrs.attributes.isNotEmpty()) {
-                                        transferWithAttrs.attributes.forEach { (typeName, value) ->
+                                    // Convert attributes from (typeName, value) to (typeId, value)
+                                    val attributesWithTypeIds =
+                                        transferWithAttrs.attributes.mapNotNull { (typeName, value) ->
                                             val typeId = attributeTypeIdByName[typeName]
-                                            if (typeId != null) {
-                                                transferAttributeRepository.insert(
-                                                    transactionId = transfer.id,
-                                                    attributeTypeId = typeId,
-                                                    value = value,
-                                                )
-                                            }
+                                            if (typeId != null) typeId to value else null
                                         }
-                                    }
 
-                                    // Track source record for batch insertion
-                                    sourceRecords.add(
-                                        CsvImportSourceRecord(
-                                            transactionId = transfer.id,
-                                            revisionId = transfer.revisionId,
-                                            rowIndex = originalRowIndex,
-                                        ),
+                                    // Create transfer with attributes and source in one operation
+                                    transactionRepository.createTransfersWithAttributesAndSources(
+                                        transfersWithAttributes = listOf(transfer to attributesWithTypeIds),
+                                        sourceRecorder =
+                                            SourceRecorder.CsvImport(
+                                                csvImportId = csvImport.id,
+                                                rowIndexForTransfer = { originalRowIndex },
+                                            ),
+                                        deviceInfo = deviceInfo,
                                     )
+                                    rowTransferMap[originalRowIndex] = transfer.id
                                     successCount++
                                 } catch (e: Exception) {
                                     // Log the error and continue with remaining rows
@@ -308,15 +298,6 @@ fun ApplyStrategyDialog(
                                 csvImportRepository.updateRowTransferIdsBatch(
                                     csvImport.id,
                                     rowTransferMap,
-                                )
-                            }
-
-                            // Record CSV import sources for all transfers
-                            if (sourceRecords.isNotEmpty()) {
-                                logger.info { "Recording ${sourceRecords.size} CSV import sources" }
-                                transferSourceRepository.recordCsvImportSourcesBatch(
-                                    csvImportId = csvImport.id,
-                                    sources = sourceRecords,
                                 )
                             }
 

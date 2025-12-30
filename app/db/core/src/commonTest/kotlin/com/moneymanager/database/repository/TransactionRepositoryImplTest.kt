@@ -48,7 +48,7 @@ class TransactionRepositoryImplTest : DbTest() {
                     targetAccountId = targetAccountId,
                     amount = Money.fromDisplayValue(100.0, currency),
                 )
-            repositories.transactionRepository.createTransfer(transfer)
+            createTransfer(transfer)
 
             val retrieved = repositories.transactionRepository.getTransactionById(transferId.id).first()
             assertNotNull(retrieved, "Retrieved transaction should not be null for ID: $transferId")
@@ -85,7 +85,7 @@ class TransactionRepositoryImplTest : DbTest() {
                         targetAccountId = accountId,
                         amount = Money.fromDisplayValue(100.0, currency),
                     )
-                repositories.transactionRepository.createTransfer(transfer)
+                createTransfer(transfer)
             }
         }
 
@@ -119,7 +119,7 @@ class TransactionRepositoryImplTest : DbTest() {
                     targetAccountId = targetAccountId,
                     amount = Money.fromDisplayValue(100.0, currency),
                 )
-            repositories.transactionRepository.createTransfer(transfer)
+            createTransfer(transfer)
 
             // Verify transaction was created
             val created = repositories.transactionRepository.getTransactionById(transferId.id).first()
@@ -172,7 +172,7 @@ class TransactionRepositoryImplTest : DbTest() {
                     targetAccountId = savingsAccountId,
                     amount = Money.fromDisplayValue(100.0, usd),
                 )
-            repositories.transactionRepository.createTransfer(transfer)
+            createTransfer(transfer)
 
             // Refresh materialized views
             repositories.maintenanceService.refreshMaterializedViews()
@@ -216,7 +216,7 @@ class TransactionRepositoryImplTest : DbTest() {
 
             // Create multiple transactions
             // 1. Checking -> Savings: 100
-            repositories.transactionRepository.createTransfer(
+            createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
                     timestamp = now,
@@ -228,7 +228,7 @@ class TransactionRepositoryImplTest : DbTest() {
             )
 
             // 2. Checking -> Credit Card: 50 (payment)
-            repositories.transactionRepository.createTransfer(
+            createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
                     timestamp = now,
@@ -240,7 +240,7 @@ class TransactionRepositoryImplTest : DbTest() {
             )
 
             // 3. Savings -> Checking: 30
-            repositories.transactionRepository.createTransfer(
+            createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
                     timestamp = now,
@@ -300,7 +300,7 @@ class TransactionRepositoryImplTest : DbTest() {
 
             // Create transactions in different currencies
             // USD: Checking -> Savings, 100
-            repositories.transactionRepository.createTransfer(
+            createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
                     timestamp = now,
@@ -312,7 +312,7 @@ class TransactionRepositoryImplTest : DbTest() {
             )
 
             // EUR: Checking -> Savings, 50
-            repositories.transactionRepository.createTransfer(
+            createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
                     timestamp = now,
@@ -394,7 +394,7 @@ class TransactionRepositoryImplTest : DbTest() {
                     targetAccountId = targetAccountId,
                     amount = Money.fromDisplayValue(100.0, currency),
                 )
-            repositories.transactionRepository.createTransfer(transfer)
+            createTransfer(transfer)
 
             // Delete transaction
             repositories.transactionRepository.deleteTransaction(transferId.id)

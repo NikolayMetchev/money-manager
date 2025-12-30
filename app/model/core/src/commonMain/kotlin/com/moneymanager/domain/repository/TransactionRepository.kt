@@ -5,9 +5,12 @@ package com.moneymanager.domain.repository
 import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
+import com.moneymanager.domain.model.AttributeTypeId
+import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.PageWithTargetIndex
 import com.moneymanager.domain.model.PagingInfo
 import com.moneymanager.domain.model.PagingResult
+import com.moneymanager.domain.model.SourceRecorder
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
@@ -72,9 +75,21 @@ interface TransactionRepository {
         pageSize: Int,
     ): PageWithTargetIndex<AccountRow>
 
-    suspend fun createTransfer(transfer: Transfer)
-
-    suspend fun createTransfersBatch(transfers: List<Transfer>)
+    /**
+     * Creates transfers with their attributes and sources in a single atomic operation.
+     * Works for single transfers (from UI), batch operations (sample data), and CSV imports.
+     *
+     * @param transfersWithAttributes List of transfers with their (attributeTypeId, value) pairs
+     * @param sourceRecorder Strategy for recording source information
+     * @param deviceInfo Device info for source recording
+     * @param onProgress Optional callback for batch progress (called after each batch of ~1000)
+     */
+    suspend fun createTransfersWithAttributesAndSources(
+        transfersWithAttributes: List<Pair<Transfer, List<Pair<AttributeTypeId, String>>>>,
+        sourceRecorder: SourceRecorder,
+        deviceInfo: DeviceInfo,
+        onProgress: (suspend (created: Int, total: Int) -> Unit)? = null,
+    )
 
     suspend fun updateTransfer(transfer: Transfer)
 

@@ -78,6 +78,7 @@ import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.Money
+import com.moneymanager.domain.model.SourceRecorder
 import com.moneymanager.domain.model.SourceType
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
@@ -1447,35 +1448,26 @@ fun TransactionEntryDialog(
                                         targetAccountId = targetAccountId!!,
                                         amount = Money.fromDisplayValue(amount, currency),
                                     )
-                                transactionRepository.createTransfer(transfer)
 
-                                // Record manual source for this transfer
-                                transferSourceRepository.recordManualSource(
-                                    transactionId = transfer.id,
-                                    revisionId = transfer.revisionId,
-                                    deviceInfo = getDeviceInfo(),
-                                )
-
-                                // Save any attributes that were added
+                                // Prepare attributes with their type IDs
                                 val attributesToSave =
                                     editableAttributes
                                         .filter { (_, pair) ->
                                             val (typeName, value) = pair
                                             typeName.isNotBlank() && value.isNotBlank()
                                         }
-                                if (attributesToSave.isNotEmpty()) {
-                                    // Create attribute types and insert attributes
-                                    // Use individual inserts (NOT batch) so triggers record to audit
-                                    attributesToSave.forEach { (_, pair) ->
-                                        val (typeName, value) = pair
-                                        val typeId = attributeTypeRepository.getOrCreate(typeName.trim())
-                                        transferAttributeRepository.insert(
-                                            transactionId = transfer.id,
-                                            attributeTypeId = typeId,
-                                            value = value.trim(),
-                                        )
-                                    }
-                                }
+                                        .map { (_, pair) ->
+                                            val (typeName, value) = pair
+                                            val typeId = attributeTypeRepository.getOrCreate(typeName.trim())
+                                            typeId to value.trim()
+                                        }
+
+                                // Create transfer with attributes and source in one transaction
+                                transactionRepository.createTransfersWithAttributesAndSources(
+                                    transfersWithAttributes = listOf(transfer to attributesToSave),
+                                    sourceRecorder = SourceRecorder.Manual,
+                                    deviceInfo = getDeviceInfo(),
+                                )
 
                                 maintenanceService.refreshMaterializedViews()
 
