@@ -69,30 +69,4 @@ class TransferAttributeRepositoryImpl(
         withContext(Dispatchers.Default) {
             queries.deleteById(id)
         }
-
-    override suspend fun insertBatch(
-        transactionId: TransferId,
-        attributes: List<Pair<AttributeTypeId, String>>,
-    ): Unit =
-        withContext(Dispatchers.Default) {
-            if (attributes.isEmpty()) return@withContext
-
-            database.transaction {
-                // Enable batch mode - triggers will skip
-                database.execute(null, "INSERT INTO _import_batch VALUES (1)", 0)
-
-                try {
-                    attributes.forEach { (attributeTypeId, value) ->
-                        queries.insert(
-                            transactionId.id.toString(),
-                            attributeTypeId.id,
-                            value,
-                        )
-                    }
-                } finally {
-                    // Disable batch mode
-                    database.execute(null, "DELETE FROM _import_batch", 0)
-                }
-            }
-        }
 }

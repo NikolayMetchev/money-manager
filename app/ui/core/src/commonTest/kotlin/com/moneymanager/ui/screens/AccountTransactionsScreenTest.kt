@@ -761,9 +761,6 @@ class AccountTransactionsScreenTest {
         private val attributes = mutableListOf<TransferAttribute>()
         private var nextId = 1L
 
-        // Track batch inserts for test verification
-        val batchInserts = mutableListOf<Pair<TransferId, List<Pair<AttributeTypeId, String>>>>()
-
         override fun getByTransaction(transactionId: TransferId): Flow<List<TransferAttribute>> =
             flowOf(attributes.filter { it.transactionId == transactionId })
 
@@ -796,16 +793,6 @@ class AccountTransactionsScreenTest {
 
         override suspend fun delete(id: Long) {
             attributes.removeAll { it.id == id }
-        }
-
-        override suspend fun insertBatch(
-            transactionId: TransferId,
-            attributes: List<Pair<AttributeTypeId, String>>,
-        ) {
-            batchInserts.add(Pair(transactionId, attributes))
-            attributes.forEach { (typeId, value) ->
-                insert(transactionId, typeId, value)
-            }
         }
 
         fun getInsertedAttributes(): List<TransferAttribute> = this.attributes.toList()

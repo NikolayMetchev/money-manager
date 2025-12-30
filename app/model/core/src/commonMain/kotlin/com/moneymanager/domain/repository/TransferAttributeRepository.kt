@@ -36,16 +36,4 @@ interface TransferAttributeRepository {
      * which bumps the transfer revision and records to audit.
      */
     suspend fun delete(id: Long)
-
-    /**
-     * Inserts multiple attributes in batch mode (triggers disabled).
-     * Used during CSV import to avoid audit entries for initial import.
-     *
-     * @param transactionId The transaction to add attributes to
-     * @param attributes List of (attributeTypeId, value) pairs
-     */
-    suspend fun insertBatch(
-        transactionId: TransferId,
-        attributes: List<Pair<AttributeTypeId, String>>,
-    )
 }

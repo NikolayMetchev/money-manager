@@ -262,18 +262,17 @@ fun ApplyStrategyDialog(
                                     transactionRepository.createTransfer(transfer)
                                     rowTransferMap[originalRowIndex] = transfer.id
 
-                                    // Save attributes if any
+                                    // Save attributes if any (use individual inserts for audit trail)
                                     if (transferWithAttrs.attributes.isNotEmpty()) {
-                                        val attributePairs =
-                                            transferWithAttrs.attributes.mapNotNull { (typeName, value) ->
-                                                val typeId = attributeTypeIdByName[typeName]
-                                                if (typeId != null) typeId to value else null
+                                        transferWithAttrs.attributes.forEach { (typeName, value) ->
+                                            val typeId = attributeTypeIdByName[typeName]
+                                            if (typeId != null) {
+                                                transferAttributeRepository.insert(
+                                                    transactionId = transfer.id,
+                                                    attributeTypeId = typeId,
+                                                    value = value,
+                                                )
                                             }
-                                        if (attributePairs.isNotEmpty()) {
-                                            transferAttributeRepository.insertBatch(
-                                                transactionId = transfer.id,
-                                                attributes = attributePairs,
-                                            )
                                         }
                                     }
 
