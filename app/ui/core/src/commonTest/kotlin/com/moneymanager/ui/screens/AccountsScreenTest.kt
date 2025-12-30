@@ -454,6 +454,8 @@ class AccountsScreenTest {
 
         override suspend fun updateTransfer(transfer: Transfer) {}
 
+        override suspend fun bumpRevisionOnly(id: TransferId): Long = 1L
+
         override suspend fun deleteTransaction(id: Uuid) {}
     }
 

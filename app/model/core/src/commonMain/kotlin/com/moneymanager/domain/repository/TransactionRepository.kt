@@ -78,5 +78,14 @@ interface TransactionRepository {
 
     suspend fun updateTransfer(transfer: Transfer)
 
+    /**
+     * Bumps the revision of a transfer without changing any other fields.
+     * This is used when only attributes change, to create an audit entry.
+     *
+     * @param id The transfer ID
+     * @return The new revision ID
+     */
+    suspend fun bumpRevisionOnly(id: TransferId): Long
+
     suspend fun deleteTransaction(id: Uuid)
 }

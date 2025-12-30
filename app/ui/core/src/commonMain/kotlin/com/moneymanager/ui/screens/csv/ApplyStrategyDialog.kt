@@ -52,11 +52,13 @@ import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.repository.AccountRepository
+import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CsvImportRepository
 import com.moneymanager.domain.repository.CsvImportSourceRecord
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.domain.repository.TransferAttributeRepository
 import com.moneymanager.domain.repository.TransferSourceRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -90,6 +92,8 @@ fun ApplyStrategyDialog(
     transactionRepository: TransactionRepository,
     transferSourceRepository: TransferSourceRepository,
     csvImportRepository: CsvImportRepository,
+    attributeTypeRepository: AttributeTypeRepository,
+    transferAttributeRepository: TransferAttributeRepository,
     maintenanceService: DatabaseMaintenanceService,
     onDismiss: () -> Unit,
     onImportComplete: (CsvImportResult) -> Unit,
@@ -229,6 +233,17 @@ fun ApplyStrategyDialog(
                             val errorCount = finalPrep.errorRows.size
                             logger.info { "Prepared $validCount valid transfers, $errorCount error rows" }
 
+                            // Pre-resolve attribute types
+                            val allAttributeTypeNames =
+                                finalPrep.validTransfers
+                                    .flatMap { it.attributes }
+                                    .map { it.first }
+                                    .toSet()
+                            val attributeTypeIdByName =
+                                allAttributeTypeNames.associateWith { name ->
+                                    attributeTypeRepository.getOrCreate(name)
+                                }
+
                             // Create transfers and track which rows they came from
                             logger.info { "Starting to create $validCount transfers" }
                             val rowTransferMap = mutableMapOf<Long, com.moneymanager.domain.model.TransferId>()
@@ -236,7 +251,8 @@ fun ApplyStrategyDialog(
                             val failedRows = mutableListOf<CsvImportResult.FailedRow>()
                             var successCount = 0
 
-                            for ((index, transfer) in finalPrep.validTransfers.withIndex()) {
+                            for ((index, transferWithAttrs) in finalPrep.validTransfers.withIndex()) {
+                                val transfer = transferWithAttrs.transfer
                                 // Find the original row index for this transfer
                                 val originalRowIndex =
                                     rows.getOrNull(index)?.rowIndex
@@ -245,6 +261,22 @@ fun ApplyStrategyDialog(
                                 try {
                                     transactionRepository.createTransfer(transfer)
                                     rowTransferMap[originalRowIndex] = transfer.id
+
+                                    // Save attributes if any
+                                    if (transferWithAttrs.attributes.isNotEmpty()) {
+                                        val attributePairs =
+                                            transferWithAttrs.attributes.mapNotNull { (typeName, value) ->
+                                                val typeId = attributeTypeIdByName[typeName]
+                                                if (typeId != null) typeId to value else null
+                                            }
+                                        if (attributePairs.isNotEmpty()) {
+                                            transferAttributeRepository.insertBatch(
+                                                transactionId = transfer.id,
+                                                revisionId = transfer.revisionId,
+                                                attributes = attributePairs,
+                                            )
+                                        }
+                                    }
 
                                     // Track source record for batch insertion
                                     sourceRecords.add(
@@ -524,7 +556,7 @@ private fun ImportPreviewSection(prep: ImportPreparation) {
                 style = MaterialTheme.typography.titleSmall,
             )
             Spacer(modifier = Modifier.height(4.dp))
-            TransferPreviewTable(prep.validTransfers.take(5))
+            TransferPreviewTable(prep.validTransfers.take(5).map { it.transfer })
         }
     }
 }

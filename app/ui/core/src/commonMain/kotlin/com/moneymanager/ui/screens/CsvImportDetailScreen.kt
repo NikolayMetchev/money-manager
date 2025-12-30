@@ -31,11 +31,13 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.repository.AccountRepository
+import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CsvImportRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.domain.repository.TransferAttributeRepository
 import com.moneymanager.domain.repository.TransferSourceRepository
 import com.moneymanager.ui.components.csv.CsvPreviewTable
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
@@ -56,6 +58,8 @@ fun CsvImportDetailScreen(
     currencyRepository: CurrencyRepository,
     transactionRepository: TransactionRepository,
     transferSourceRepository: TransferSourceRepository,
+    attributeTypeRepository: AttributeTypeRepository,
+    transferAttributeRepository: TransferAttributeRepository,
     maintenanceService: DatabaseMaintenanceService,
     onBack: () -> Unit,
     onDeleted: () -> Unit,
@@ -290,6 +294,8 @@ fun CsvImportDetailScreen(
             transactionRepository = transactionRepository,
             transferSourceRepository = transferSourceRepository,
             csvImportRepository = csvImportRepository,
+            attributeTypeRepository = attributeTypeRepository,
+            transferAttributeRepository = transferAttributeRepository,
             maintenanceService = maintenanceService,
             onDismiss = { showApplyStrategyDialog = false },
             onImportComplete = { result ->
@@ -317,6 +323,7 @@ fun CsvImportDetailScreen(
             accountRepository = accountRepository,
             categoryRepository = categoryRepository,
             currencyRepository = currencyRepository,
+            attributeTypeRepository = attributeTypeRepository,
             csvColumns = import!!.columns,
             rows = rows,
             onDismiss = { showCreateStrategyDialog = false },

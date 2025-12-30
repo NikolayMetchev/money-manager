@@ -1,0 +1,19 @@
+CREATE TABLE AttributeType (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE
+);
+
+selectAll:
+SELECT * FROM AttributeType ORDER BY name;
+
+selectById:
+SELECT * FROM AttributeType WHERE id = ?;
+
+selectByName:
+SELECT * FROM AttributeType WHERE name = ?;
+
+insert:
+INSERT INTO AttributeType (name) VALUES (?);
+
+insertOrIgnore:
+INSERT OR IGNORE INTO AttributeType (name) VALUES (?);

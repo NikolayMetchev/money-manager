@@ -21,6 +21,7 @@ data class CsvImportStrategy(
     val name: String,
     val identificationColumns: Set<String>,
     val fieldMappings: Map<TransferField, FieldMapping>,
+    val attributeMappings: List<AttributeColumnMapping> = emptyList(),
     val createdAt: Instant,
     val updatedAt: Instant,
 ) {

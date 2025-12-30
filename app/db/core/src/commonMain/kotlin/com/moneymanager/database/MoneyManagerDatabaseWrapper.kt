@@ -71,6 +71,9 @@ class MoneyManagerDatabaseWrapper(private val driver: SqlDriver) : MoneyManagerD
             "DeviceMake",
             "DeviceModel",
             "Device",
+            "AttributeType",
+            "TransferAttribute",
+            "_import_batch",
         )
 
     /**

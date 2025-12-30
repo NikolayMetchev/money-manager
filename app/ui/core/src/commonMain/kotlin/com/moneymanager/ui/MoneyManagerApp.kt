@@ -351,6 +351,8 @@ private fun MoneyManagerAppContent(
                             categoryRepository = repositorySet.categoryRepository,
                             currencyRepository = repositorySet.currencyRepository,
                             auditRepository = repositorySet.auditRepository,
+                            attributeTypeRepository = repositorySet.attributeTypeRepository,
+                            transferAttributeRepository = repositorySet.transferAttributeRepository,
                             maintenanceService = repositorySet.maintenanceService,
                             currentDeviceId = currentDeviceId,
                             onAccountIdChange = { accountId ->
@@ -387,6 +389,8 @@ private fun MoneyManagerAppContent(
                             currencyRepository = repositorySet.currencyRepository,
                             transactionRepository = repositorySet.transactionRepository,
                             transferSourceRepository = repositorySet.transferSourceRepository,
+                            attributeTypeRepository = repositorySet.attributeTypeRepository,
+                            transferAttributeRepository = repositorySet.transferAttributeRepository,
                             maintenanceService = repositorySet.maintenanceService,
                             onBack = { currentScreen = Screen.CsvImports },
                             onDeleted = { currentScreen = Screen.CsvImports },

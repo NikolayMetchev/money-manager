@@ -163,6 +163,146 @@ object DatabaseConfig {
         )
 
     /**
+     * Creates the temporary table used for batch import operations.
+     * When this table contains a row, attribute triggers skip revision bumping.
+     */
+    private fun MoneyManagerDatabaseWrapper.createBatchImportTable() =
+        execute(
+            null,
+            """
+            CREATE TABLE IF NOT EXISTS _import_batch (active INTEGER)
+            """.trimIndent(),
+            0,
+        )
+
+    /**
+     * Creates triggers for transfer attribute versioning.
+     *
+     * 1. Transfer UPDATE trigger - copies attributes when transfer fields (not just revision) change
+     * 2. Attribute INSERT trigger - bumps transfer revision and copies other attributes
+     * 3. Attribute UPDATE trigger - bumps transfer revision and copies all attributes
+     * 4. Attribute DELETE trigger - bumps transfer revision and copies remaining attributes
+     *
+     * All attribute triggers check for the _import_batch table to skip during bulk imports.
+     */
+    private fun MoneyManagerDatabaseWrapper.createAttributeTriggers() {
+        // Transfer UPDATE trigger - copies attributes only when non-revision fields change
+        execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_transfer_update_copy_attributes
+            AFTER UPDATE ON Transfer
+            FOR EACH ROW
+            WHEN OLD.revisionId != NEW.revisionId
+              AND (OLD.timestamp != NEW.timestamp
+                   OR OLD.description != NEW.description
+                   OR OLD.sourceAccountId != NEW.sourceAccountId
+                   OR OLD.targetAccountId != NEW.targetAccountId
+                   OR OLD.currencyId != NEW.currencyId
+                   OR OLD.amount != NEW.amount)
+            BEGIN
+                INSERT INTO TransferAttribute (transactionId, revisionId, attributeTypeId, attributeValue)
+                SELECT transactionId, NEW.revisionId, attributeTypeId, attributeValue
+                FROM TransferAttribute
+                WHERE transactionId = NEW.id AND revisionId = OLD.revisionId;
+            END
+            """.trimIndent(),
+            0,
+        )
+
+        // Attribute INSERT trigger - bumps transfer revision and copies other attributes
+        execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_attribute_insert_bump_revision
+            AFTER INSERT ON TransferAttribute
+            FOR EACH ROW
+            WHEN NOT EXISTS (SELECT 1 FROM _import_batch)
+              AND NEW.revisionId = (SELECT revisionId FROM Transfer WHERE id = NEW.transactionId)
+            BEGIN
+                -- Bump transfer revision FIRST (establishes the new revision ID)
+                UPDATE Transfer
+                SET revisionId = revisionId + 1
+                WHERE id = NEW.transactionId;
+
+                -- Copy all OTHER attributes at same revision to new revision (read from Transfer)
+                INSERT INTO TransferAttribute (transactionId, revisionId, attributeTypeId, attributeValue)
+                SELECT transactionId,
+                       (SELECT revisionId FROM Transfer WHERE id = NEW.transactionId),
+                       attributeTypeId, attributeValue
+                FROM TransferAttribute
+                WHERE transactionId = NEW.transactionId
+                  AND revisionId = NEW.revisionId
+                  AND id != NEW.id;
+
+                -- Update the newly inserted attribute to new revision (read from Transfer)
+                UPDATE TransferAttribute
+                SET revisionId = (SELECT revisionId FROM Transfer WHERE id = NEW.transactionId)
+                WHERE id = NEW.id;
+            END
+            """.trimIndent(),
+            0,
+        )
+
+        // Attribute UPDATE trigger - bumps transfer revision and copies all attributes
+        execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_attribute_update_bump_revision
+            AFTER UPDATE ON TransferAttribute
+            FOR EACH ROW
+            WHEN NOT EXISTS (SELECT 1 FROM _import_batch)
+              AND OLD.attributeValue != NEW.attributeValue
+            BEGIN
+                -- Bump transfer revision FIRST (establishes the new revision ID)
+                UPDATE Transfer
+                SET revisionId = revisionId + 1
+                WHERE id = NEW.transactionId;
+
+                -- Copy all attributes at same revision to new revision (read from Transfer)
+                INSERT INTO TransferAttribute (transactionId, revisionId, attributeTypeId, attributeValue)
+                SELECT transactionId,
+                       (SELECT revisionId FROM Transfer WHERE id = NEW.transactionId),
+                       attributeTypeId,
+                       CASE WHEN id = NEW.id THEN NEW.attributeValue ELSE attributeValue END
+                FROM TransferAttribute
+                WHERE transactionId = NEW.transactionId
+                  AND revisionId = OLD.revisionId;
+            END
+            """.trimIndent(),
+            0,
+        )
+
+        // Attribute DELETE trigger - bumps transfer revision and copies remaining attributes
+        execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_attribute_delete_bump_revision
+            AFTER DELETE ON TransferAttribute
+            FOR EACH ROW
+            WHEN NOT EXISTS (SELECT 1 FROM _import_batch)
+            BEGIN
+                -- Bump transfer revision FIRST (establishes the new revision ID)
+                UPDATE Transfer
+                SET revisionId = revisionId + 1
+                WHERE id = OLD.transactionId;
+
+                -- Copy remaining attributes to new revision (read from Transfer)
+                INSERT INTO TransferAttribute (transactionId, revisionId, attributeTypeId, attributeValue)
+                SELECT transactionId,
+                       (SELECT revisionId FROM Transfer WHERE id = OLD.transactionId),
+                       attributeTypeId, attributeValue
+                FROM TransferAttribute
+                WHERE transactionId = OLD.transactionId
+                  AND revisionId = OLD.revisionId
+                  AND id != OLD.id;
+            END
+            """.trimIndent(),
+            0,
+        )
+    }
+
+    /**
      * Creates audit triggers dynamically for all main tables.
      * Queries sqlite_master to discover tables and their columns, then generates triggers.
      *
@@ -265,6 +405,10 @@ object DatabaseConfig {
 
             // Create trigger for category deletion (children inherit grandparent)
             createCategoryDeleteTrigger()
+
+            // Create batch import table and attribute triggers
+            createBatchImportTable()
+            createAttributeTriggers()
 
             // Create audit triggers for all main tables
             createAuditTriggers()

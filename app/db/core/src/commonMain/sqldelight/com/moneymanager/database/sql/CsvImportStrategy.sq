@@ -4,6 +4,7 @@ CREATE TABLE CsvImportStrategy (
     name TEXT NOT NULL UNIQUE,
     identificationColumnsJson TEXT NOT NULL,
     fieldMappingsJson TEXT NOT NULL,
+    attributeMappingsJson TEXT NOT NULL,
     createdAt INTEGER NOT NULL,
     updatedAt INTEGER NOT NULL
 );
@@ -24,13 +25,13 @@ SELECT * FROM CsvImportStrategy WHERE name = ?;
 
 -- Insert a new strategy
 insert:
-INSERT INTO CsvImportStrategy (id, name, identificationColumnsJson, fieldMappingsJson, createdAt, updatedAt)
-VALUES (?, ?, ?, ?, ?, ?);
+INSERT INTO CsvImportStrategy (id, name, identificationColumnsJson, fieldMappingsJson, attributeMappingsJson, createdAt, updatedAt)
+VALUES (?, ?, ?, ?, ?, ?, ?);
 
 -- Update an existing strategy
 update:
 UPDATE CsvImportStrategy
-SET name = ?, identificationColumnsJson = ?, fieldMappingsJson = ?, updatedAt = ?
+SET name = ?, identificationColumnsJson = ?, fieldMappingsJson = ?, attributeMappingsJson = ?, updatedAt = ?
 WHERE id = ?;
 
 -- Delete a strategy by ID

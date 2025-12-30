@@ -6,6 +6,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Transfer
+import com.moneymanager.domain.model.TransferAttribute
 import com.moneymanager.domain.model.TransferAuditEntry
 import kotlin.time.Instant
 
@@ -40,6 +41,10 @@ fun computeAuditDiff(
                 targetAccountId = FieldChange.Created(entry.targetAccountId),
                 amount = FieldChange.Created(entry.amount),
                 source = entry.source,
+                attributeChanges =
+                    entry.attributes.map { attr ->
+                        AttributeChange.Added(attr.attributeType.name, attr.value)
+                    },
             )
         AuditType.DELETE ->
             AuditEntryDiff(
@@ -54,6 +59,10 @@ fun computeAuditDiff(
                 targetAccountId = FieldChange.Deleted(entry.targetAccountId),
                 amount = FieldChange.Deleted(entry.amount),
                 source = entry.source,
+                attributeChanges =
+                    entry.attributes.map { attr ->
+                        AttributeChange.Removed(attr.attributeType.name, attr.value)
+                    },
             )
         AuditType.UPDATE -> {
             requireNotNull(newValuesForUpdate) { "UPDATE entry must have new values to compare against" }
@@ -69,6 +78,7 @@ fun computeAuditDiff(
                 targetAccountId = computeFieldChange(entry.targetAccountId, newValuesForUpdate.targetAccountId),
                 amount = computeFieldChange(entry.amount, newValuesForUpdate.amount),
                 source = entry.source,
+                attributeChanges = computeAttributeChanges(entry.attributes, newValuesForUpdate.attributes),
             )
         }
     }
@@ -84,15 +94,20 @@ data class UpdateNewValues(
     val sourceAccountId: AccountId,
     val targetAccountId: AccountId,
     val amount: Money,
+    val attributes: List<TransferAttribute>,
 ) {
     companion object {
-        fun fromTransfer(transfer: Transfer): UpdateNewValues =
+        fun fromTransfer(
+            transfer: Transfer,
+            attributes: List<TransferAttribute> = emptyList(),
+        ): UpdateNewValues =
             UpdateNewValues(
                 timestamp = transfer.timestamp,
                 description = transfer.description,
                 sourceAccountId = transfer.sourceAccountId,
                 targetAccountId = transfer.targetAccountId,
                 amount = transfer.amount,
+                attributes = attributes,
             )
 
         fun fromAuditEntry(entry: TransferAuditEntry): UpdateNewValues =
@@ -102,6 +117,7 @@ data class UpdateNewValues(
                 sourceAccountId = entry.sourceAccountId,
                 targetAccountId = entry.targetAccountId,
                 amount = entry.amount,
+                attributes = entry.attributes,
             )
     }
 }

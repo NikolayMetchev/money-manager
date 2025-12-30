@@ -32,6 +32,7 @@ data class TransferAuditEntry(
     val targetAccountId: AccountId,
     val amount: Money,
     val source: TransferSource? = null,
+    val attributes: List<TransferAttribute> = emptyList(),
 )
 
 enum class AuditType {

@@ -496,3 +496,8 @@ selectBalancesFromView:
 SELECT accountId, currencyId, balance
 FROM AccountBalanceView
 ORDER BY accountId, currencyId;
+
+bumpRevisionOnly:
+UPDATE Transfer
+SET revisionId = revisionId + 1
+WHERE id = ?;

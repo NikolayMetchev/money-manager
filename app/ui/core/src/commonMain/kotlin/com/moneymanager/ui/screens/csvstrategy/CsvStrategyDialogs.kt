@@ -47,12 +47,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
+import com.moneymanager.domain.model.csvstrategy.AttributeColumnMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
@@ -65,6 +67,7 @@ import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.repository.AccountRepository
+import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
@@ -335,6 +338,7 @@ fun CreateCsvStrategyDialog(
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
+    attributeTypeRepository: AttributeTypeRepository,
     csvColumns: List<CsvColumn>,
     rows: List<CsvRow>,
     onDismiss: () -> Unit,
@@ -358,10 +362,20 @@ fun CreateCsvStrategyDialog(
     var targetAccountColumnName by remember { mutableStateOf<String?>(null) }
     var targetAccountFallbackColumns by remember { mutableStateOf<List<String>>(emptyList()) }
     var flipAccountsOnPositive by remember { mutableStateOf(true) }
+    // Map of columnName to attributeTypeName
+    var attributeMappings by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
 
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
     val scope = rememberSchemaAwareCoroutineScope()
+
+    // Fetch existing attribute types
+    var existingAttributeTypes by remember { mutableStateOf<List<AttributeType>>(emptyList()) }
+    LaunchedEffect(Unit) {
+        attributeTypeRepository.getAll().collect { types ->
+            existingAttributeTypes = types
+        }
+    }
 
     // Use first row for sample values (backward compatible)
     val firstRow = rows.firstOrNull()
@@ -724,6 +738,50 @@ fun CreateCsvStrategyDialog(
                     }
                 }
 
+                // Attributes section
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Attributes (Optional)", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    "Select columns to store as attributes (metadata)",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // Calculate used columns
+                val usedColumns =
+                    setOfNotNull(
+                        dateColumnName,
+                        timeColumnName,
+                        descriptionColumnName,
+                        amountColumnName,
+                        targetAccountColumnName,
+                        currencyColumnName,
+                        timezoneColumnName,
+                    ) +
+                        targetAccountFallbackColumns +
+                        descriptionFallbackColumns
+
+                // Show unused columns for attribute selection
+                val unusedColumns = csvColumns.filter { it.originalName !in usedColumns }
+
+                if (unusedColumns.isEmpty()) {
+                    Text(
+                        "All columns are used by field mappings",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    AttributeMappingsEditor(
+                        columns = unusedColumns,
+                        mappings = attributeMappings,
+                        onMappingsChanged = { attributeMappings = it },
+                        existingAttributeTypes = existingAttributeTypes,
+                        enabled = !isSaving,
+                        firstRow = firstRow,
+                    )
+                }
+
                 errorMessage?.let {
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
@@ -820,6 +878,13 @@ fun CreateCsvStrategyDialog(
                                                             )
                                                     },
                                             ),
+                                        attributeMappings =
+                                            attributeMappings.map { (columnName, attributeTypeName) ->
+                                                AttributeColumnMapping(
+                                                    columnName = columnName,
+                                                    attributeTypeName = attributeTypeName,
+                                                )
+                                            },
                                         createdAt = now,
                                         updatedAt = now,
                                     )
@@ -1278,6 +1343,248 @@ private fun TimezonePicker(
                     onClick = {},
                     enabled = false,
                 )
+            }
+        }
+    }
+}
+
+/**
+ * Editor for attribute column mappings.
+ * Allows mapping CSV columns to attribute types (existing or new).
+ */
+@Composable
+private fun AttributeMappingsEditor(
+    columns: List<CsvColumn>,
+    mappings: Map<String, String>,
+    onMappingsChanged: (Map<String, String>) -> Unit,
+    existingAttributeTypes: List<AttributeType>,
+    enabled: Boolean,
+    firstRow: CsvRow?,
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Column {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable(enabled = enabled) { expanded = !expanded }
+                    .padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text =
+                    if (mappings.isEmpty()) {
+                        "None configured (click to expand)"
+                    } else {
+                        "${mappings.size} attribute(s) configured"
+                    },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Icon(
+                imageVector =
+                    if (expanded) {
+                        Icons.Filled.KeyboardArrowUp
+                    } else {
+                        Icons.Filled.KeyboardArrowDown
+                    },
+                contentDescription = if (expanded) "Collapse" else "Expand",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        AnimatedVisibility(
+            visible = expanded,
+            enter = expandVertically(),
+            exit = shrinkVertically(),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                columns.sortedBy { it.columnIndex }.forEach { column ->
+                    val columnName = column.originalName
+                    val isEnabled = columnName in mappings
+                    val attributeTypeName = mappings[columnName] ?: columnName
+                    val sampleValue =
+                        firstRow?.values?.getOrNull(column.columnIndex)
+                            ?: ""
+
+                    AttributeColumnMappingRow(
+                        columnName = columnName,
+                        sampleValue = sampleValue,
+                        isEnabled = isEnabled,
+                        attributeTypeName = attributeTypeName,
+                        existingAttributeTypes = existingAttributeTypes,
+                        enabled = enabled,
+                        onEnabledChanged = { checked ->
+                            if (checked) {
+                                onMappingsChanged(mappings + (columnName to columnName))
+                            } else {
+                                onMappingsChanged(mappings - columnName)
+                            }
+                        },
+                        onAttributeTypeChanged = { newTypeName ->
+                            onMappingsChanged(mappings + (columnName to newTypeName))
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Single row for mapping a CSV column to an attribute type.
+ */
+@Composable
+private fun AttributeColumnMappingRow(
+    columnName: String,
+    sampleValue: String,
+    isEnabled: Boolean,
+    attributeTypeName: String,
+    existingAttributeTypes: List<AttributeType>,
+    enabled: Boolean,
+    onEnabledChanged: (Boolean) -> Unit,
+    onAttributeTypeChanged: (String) -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(start = 8.dp),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Checkbox(
+                checked = isEnabled,
+                onCheckedChange = onEnabledChanged,
+                enabled = enabled,
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = columnName,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (sampleValue.isNotBlank()) {
+                    Text(
+                        text = "Sample: $sampleValue",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+
+        // Show attribute type selector when enabled
+        AnimatedVisibility(
+            visible = isEnabled,
+            enter = expandVertically(),
+            exit = shrinkVertically(),
+        ) {
+            AttributeTypeSelector(
+                selectedTypeName = attributeTypeName,
+                existingAttributeTypes = existingAttributeTypes,
+                onTypeNameChanged = onAttributeTypeChanged,
+                enabled = enabled,
+                modifier = Modifier.padding(start = 40.dp, top = 4.dp, bottom = 4.dp),
+            )
+        }
+    }
+}
+
+/**
+ * Dropdown/text field for selecting or entering an attribute type name.
+ */
+@Composable
+private fun AttributeTypeSelector(
+    selectedTypeName: String,
+    existingAttributeTypes: List<AttributeType>,
+    onTypeNameChanged: (String) -> Unit,
+    enabled: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    var textValue by remember(selectedTypeName) { mutableStateOf(selectedTypeName) }
+
+    // Combine existing types with filtered suggestions
+    val suggestions =
+        remember(textValue, existingAttributeTypes) {
+            if (textValue.isBlank()) {
+                existingAttributeTypes.map { it.name }
+            } else {
+                existingAttributeTypes
+                    .map { it.name }
+                    .filter { it.contains(textValue, ignoreCase = true) }
+            }
+        }
+
+    ExposedDropdownMenuBox(
+        expanded = expanded && suggestions.isNotEmpty(),
+        onExpandedChange = { if (enabled) expanded = !expanded },
+        modifier = modifier,
+    ) {
+        OutlinedTextField(
+            value = textValue,
+            onValueChange = { newValue ->
+                textValue = newValue
+                onTypeNameChanged(newValue)
+                expanded = true
+            },
+            label = { Text("Attribute Type") },
+            trailingIcon = {
+                if (existingAttributeTypes.isNotEmpty()) {
+                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+                }
+            },
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable),
+            enabled = enabled,
+            singleLine = true,
+            supportingText = {
+                if (existingAttributeTypes.isEmpty()) {
+                    Text("Enter attribute type name")
+                } else {
+                    Text("Select existing or enter new")
+                }
+            },
+        )
+
+        if (suggestions.isNotEmpty()) {
+            ExposedDropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+            ) {
+                suggestions.forEach { typeName ->
+                    DropdownMenuItem(
+                        text = {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ) {
+                                Text(typeName)
+                                if (typeName == selectedTypeName) {
+                                    Text(
+                                        "✓",
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
+                            }
+                        },
+                        onClick = {
+                            textValue = typeName
+                            onTypeNameChanged(typeName)
+                            expanded = false
+                        },
+                    )
+                }
             }
         }
     }

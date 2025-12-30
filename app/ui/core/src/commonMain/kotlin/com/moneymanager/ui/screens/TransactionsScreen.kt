@@ -35,7 +35,11 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -69,6 +73,7 @@ import com.moneymanager.domain.getDeviceInfo
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
+import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DeviceInfo
@@ -76,15 +81,19 @@ import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.SourceType
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
+import com.moneymanager.domain.model.TransferAttribute
 import com.moneymanager.domain.model.TransferAuditEntry
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.TransferSource
 import com.moneymanager.domain.repository.AccountRepository
+import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.AuditRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.domain.repository.TransferAttributeRepository
 import com.moneymanager.domain.repository.TransferSourceRepository
+import com.moneymanager.ui.audit.AttributeChange
 import com.moneymanager.ui.audit.AuditEntryDiff
 import com.moneymanager.ui.audit.FieldChange
 import com.moneymanager.ui.audit.UpdateNewValues
@@ -146,6 +155,8 @@ fun AccountTransactionsScreen(
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
     auditRepository: AuditRepository,
+    attributeTypeRepository: AttributeTypeRepository,
+    transferAttributeRepository: TransferAttributeRepository,
     maintenanceService: DatabaseMaintenanceService,
     currentDeviceId: Long? = null,
     onAccountIdChange: (AccountId) -> Unit = {},
@@ -162,6 +173,7 @@ fun AccountTransactionsScreen(
             auditRepository = auditRepository,
             accountRepository = accountRepository,
             transactionRepository = transactionRepository,
+            transferAttributeRepository = transferAttributeRepository,
             currentDeviceId = currentDeviceId,
             onBack = { transactionIdToAudit = null },
         )
@@ -922,6 +934,8 @@ fun AccountTransactionsScreen(
             accountRepository = accountRepository,
             categoryRepository = categoryRepository,
             currencyRepository = currencyRepository,
+            attributeTypeRepository = attributeTypeRepository,
+            transferAttributeRepository = transferAttributeRepository,
             maintenanceService = maintenanceService,
             onDismiss = { transactionToEdit = null },
             onSaved = { refreshTrigger++ },
@@ -1451,6 +1465,8 @@ fun TransactionEditDialog(
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
+    attributeTypeRepository: AttributeTypeRepository,
+    transferAttributeRepository: TransferAttributeRepository,
     maintenanceService: DatabaseMaintenanceService,
     onDismiss: () -> Unit,
     onSaved: () -> Unit = {},
@@ -1474,6 +1490,51 @@ fun TransactionEditDialog(
 
     val scope = rememberSchemaAwareCoroutineScope()
 
+    // Attribute state
+    var existingAttributeTypes by remember { mutableStateOf<List<AttributeType>>(emptyList()) }
+    var originalAttributes by remember { mutableStateOf<List<TransferAttribute>>(emptyList()) }
+    var isLoadingAttributes by remember { mutableStateOf(true) }
+
+    // EditableAttribute represents the current state of each attribute in the UI
+    // key: a stable identifier (original attribute id or a negative temp id for new ones)
+    // value: Pair(attributeTypeName, value)
+    var editableAttributes by remember { mutableStateOf<Map<Long, Pair<String, String>>>(emptyMap()) }
+    var nextTempId by remember { mutableStateOf(-1L) }
+
+    // Load existing attribute types and attributes for this transaction
+    LaunchedEffect(transaction.id) {
+        attributeTypeRepository.getAll().collect { types ->
+            existingAttributeTypes = types
+        }
+    }
+    LaunchedEffect(transaction.id, transaction.revisionId) {
+        transferAttributeRepository.getByTransactionAndRevision(
+            transaction.id,
+            transaction.revisionId,
+        ).first().let { attrs ->
+            originalAttributes = attrs
+            editableAttributes =
+                attrs.associate { attr ->
+                    attr.id to Pair(attr.attributeType.name, attr.value)
+                }
+        }
+        isLoadingAttributes = false
+    }
+
+    // Helper to check if attributes have changed
+    fun hasAttributeChanges(): Boolean {
+        val originalMap = originalAttributes.associate { it.id to Pair(it.attributeType.name, it.value) }
+        // Check if any new attributes were added (negative IDs)
+        if (editableAttributes.keys.any { it < 0 }) return true
+        // Check if any original attributes were removed
+        if (originalMap.keys.any { it !in editableAttributes.keys }) return true
+        // Check if any attribute values changed
+        return editableAttributes.any { (id, pair) ->
+            val original = originalMap[id]
+            original == null || original != pair
+        }
+    }
+
     // Check if any field has changed from the original transaction
     val hasChanges =
         remember(
@@ -1485,6 +1546,8 @@ fun TransactionEditDialog(
             selectedDate,
             selectedHour,
             selectedMinute,
+            editableAttributes,
+            originalAttributes,
         ) {
             sourceAccountId != transaction.sourceAccountId ||
                 targetAccountId != transaction.targetAccountId ||
@@ -1493,7 +1556,8 @@ fun TransactionEditDialog(
                 description != transaction.description ||
                 selectedDate != transactionDateTime.date ||
                 selectedHour != transactionDateTime.hour ||
-                selectedMinute != transactionDateTime.minute
+                selectedMinute != transactionDateTime.minute ||
+                hasAttributeChanges()
         }
 
     AlertDialog(
@@ -1624,6 +1688,86 @@ fun TransactionEditDialog(
                     enabled = !isSaving,
                 )
 
+                // Attributes Section
+                if (isLoadingAttributes) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 2.dp,
+                        )
+                    }
+                } else {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            text = "Attributes",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+
+                        // Display editable attributes
+                        editableAttributes.forEach { (id, pair) ->
+                            val (typeName, value) = pair
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                // Attribute type selector
+                                AttributeTypeField(
+                                    value = typeName,
+                                    onValueChange = { newTypeName ->
+                                        editableAttributes = editableAttributes + (id to Pair(newTypeName, value))
+                                    },
+                                    existingTypes = existingAttributeTypes,
+                                    enabled = !isSaving,
+                                    modifier = Modifier.weight(0.4f),
+                                )
+                                // Attribute value field
+                                OutlinedTextField(
+                                    value = value,
+                                    onValueChange = { newValue ->
+                                        editableAttributes = editableAttributes + (id to Pair(typeName, newValue))
+                                    },
+                                    label = { Text("Value") },
+                                    modifier = Modifier.weight(0.5f),
+                                    singleLine = true,
+                                    enabled = !isSaving,
+                                )
+                                // Delete button
+                                IconButton(
+                                    onClick = {
+                                        editableAttributes = editableAttributes - id
+                                    },
+                                    enabled = !isSaving,
+                                ) {
+                                    Text(
+                                        text = "X",
+                                        color = MaterialTheme.colorScheme.error,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                    )
+                                }
+                            }
+                        }
+
+                        // Add new attribute button
+                        TextButton(
+                            onClick = {
+                                editableAttributes = editableAttributes + (nextTempId to Pair("", ""))
+                                nextTempId--
+                            },
+                            enabled = !isSaving,
+                        ) {
+                            Text("+ Add Attribute")
+                        }
+                    }
+                }
+
                 errorMessage?.let { error ->
                     Text(
                         text = error,
@@ -1656,28 +1800,143 @@ fun TransactionEditDialog(
                                         selectedDate
                                             .atTime(selectedHour, selectedMinute, originalSecond, originalNanosecond)
                                             .toInstant(TimeZone.currentSystemDefault())
-                                    val updatedTransfer =
-                                        Transfer(
-                                            id = transaction.id,
-                                            timestamp = timestamp,
-                                            description = description.trim(),
-                                            sourceAccountId = sourceAccountId,
-                                            targetAccountId = targetAccountId,
-                                            amount = Money.fromDisplayValue(amount, currency),
-                                        )
-                                    transactionRepository.updateTransfer(updatedTransfer)
 
-                                    // Get updated transfer to retrieve new revisionId
-                                    val updated =
-                                        transactionRepository.getTransactionById(transaction.id.id)
-                                            .first()
-                                    if (updated != null) {
-                                        // Record manual source for this update
-                                        transferSourceRepository.recordManualSource(
-                                            transactionId = updated.id,
-                                            revisionId = updated.revisionId,
-                                            deviceInfo = getDeviceInfo(),
-                                        )
+                                    // Check if transfer fields actually changed
+                                    val transferFieldsChanged =
+                                        sourceAccountId != transaction.sourceAccountId ||
+                                            targetAccountId != transaction.targetAccountId ||
+                                            currencyId != transaction.amount.currency.id ||
+                                            amount != transaction.amount.toDisplayValue().toString() ||
+                                            description.trim() != transaction.description ||
+                                            timestamp != transaction.timestamp
+
+                                    var currentRevisionId = transaction.revisionId
+
+                                    // Only update transfer if fields actually changed
+                                    if (transferFieldsChanged) {
+                                        val updatedTransfer =
+                                            Transfer(
+                                                id = transaction.id,
+                                                timestamp = timestamp,
+                                                description = description.trim(),
+                                                sourceAccountId = sourceAccountId,
+                                                targetAccountId = targetAccountId,
+                                                amount = Money.fromDisplayValue(amount, currency),
+                                            )
+                                        transactionRepository.updateTransfer(updatedTransfer)
+
+                                        // Get updated transfer to retrieve new revisionId
+                                        val updated =
+                                            transactionRepository.getTransactionById(transaction.id.id)
+                                                .first()
+                                        if (updated != null) {
+                                            currentRevisionId = updated.revisionId
+                                            // Record manual source for this update
+                                            transferSourceRepository.recordManualSource(
+                                                transactionId = updated.id,
+                                                revisionId = updated.revisionId,
+                                                deviceInfo = getDeviceInfo(),
+                                            )
+                                        }
+                                    }
+
+                                    // Handle attribute changes using batch mode to avoid multiple revision bumps
+                                    if (hasAttributeChanges()) {
+                                        // If only attributes changed (no transfer fields), bump revision to create audit entry
+                                        // Note: The attribute copy trigger only fires when transfer fields change,
+                                        // so we need to manually copy all attributes to the new revision
+                                        if (!transferFieldsChanged) {
+                                            currentRevisionId = transactionRepository.bumpRevisionOnly(transaction.id)
+                                            // Record manual source for the attribute-only update
+                                            transferSourceRepository.recordManualSource(
+                                                transactionId = transaction.id,
+                                                revisionId = currentRevisionId,
+                                                deviceInfo = getDeviceInfo(),
+                                            )
+
+                                            // Copy all existing attributes that will remain (not deleted) to new revision
+                                            // This includes both unchanged attributes and those with updated values
+                                            val editableIds = editableAttributes.keys.filter { it > 0 }.toSet()
+                                            val attributesToCopy =
+                                                originalAttributes
+                                                    .filter { it.id in editableIds }
+                                                    .map { attr ->
+                                                        val edited = editableAttributes[attr.id]!!
+                                                        val (typeName, value) = edited
+                                                        val typeId = attributeTypeRepository.getOrCreate(typeName)
+                                                        typeId to value
+                                                    }
+                                            if (attributesToCopy.isNotEmpty()) {
+                                                transferAttributeRepository.insertBatch(
+                                                    transactionId = transaction.id,
+                                                    revisionId = currentRevisionId,
+                                                    attributes = attributesToCopy,
+                                                )
+                                            }
+                                        }
+
+                                        // Collect all new attributes to add
+                                        val newAttributes =
+                                            editableAttributes
+                                                .filter { (id, _) -> id < 0 }
+                                                .mapNotNull { (_, pair) ->
+                                                    val (typeName, value) = pair
+                                                    if (typeName.isNotBlank() && value.isNotBlank()) {
+                                                        val typeId = attributeTypeRepository.getOrCreate(typeName)
+                                                        typeId to value
+                                                    } else {
+                                                        null
+                                                    }
+                                                }
+
+                                        // Use batch insert for new attributes (triggers disabled)
+                                        if (newAttributes.isNotEmpty()) {
+                                            transferAttributeRepository.insertBatch(
+                                                transactionId = transaction.id,
+                                                revisionId = currentRevisionId,
+                                                attributes = newAttributes,
+                                            )
+                                        }
+
+                                        // When only attributes changed, we've already handled everything above
+                                        // (copied existing, inserted new). No need for delete/update operations
+                                        // since we're creating a complete new set at the new revision.
+                                        if (transferFieldsChanged) {
+                                            // Handle deleted attributes (only when transfer fields changed,
+                                            // because the trigger already copied attributes)
+                                            val originalIds = originalAttributes.map { it.id }.toSet()
+                                            val editableIds = editableAttributes.keys
+                                            val deletedIds = originalIds - editableIds
+                                            deletedIds.forEach { id ->
+                                                transferAttributeRepository.delete(id)
+                                            }
+
+                                            // Handle updated attributes (value changes only for now)
+                                            editableAttributes.filter { (id, _) -> id > 0 }.forEach { (id, pair) ->
+                                                val (typeName, value) = pair
+                                                val original = originalAttributes.find { it.id == id }
+                                                if (original != null) {
+                                                    val typeChanged = original.attributeType.name != typeName
+                                                    val valueChanged = original.value != value
+                                                    when {
+                                                        typeChanged -> {
+                                                            // Type changed: delete and recreate using batch
+                                                            transferAttributeRepository.delete(id)
+                                                            val typeId = attributeTypeRepository.getOrCreate(typeName)
+                                                            transferAttributeRepository.insertBatch(
+                                                                transactionId = transaction.id,
+                                                                revisionId = currentRevisionId,
+                                                                attributes = listOf(typeId to value),
+                                                            )
+                                                        }
+                                                        valueChanged -> {
+                                                            // Only value changed: update in place
+                                                            transferAttributeRepository.updateValue(id, value)
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
 
                                     maintenanceService.refreshMaterializedViews()
@@ -1790,11 +2049,13 @@ fun TransactionAuditScreen(
     auditRepository: AuditRepository,
     accountRepository: AccountRepository,
     transactionRepository: TransactionRepository,
+    transferAttributeRepository: TransferAttributeRepository,
     currentDeviceId: Long? = null,
     onBack: () -> Unit,
 ) {
     var auditEntries by remember { mutableStateOf<List<TransferAuditEntry>>(emptyList()) }
     var currentTransfer by remember { mutableStateOf<Transfer?>(null) }
+    var currentAttributes by remember { mutableStateOf<List<TransferAttribute>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
@@ -1806,7 +2067,14 @@ fun TransactionAuditScreen(
         errorMessage = null
         try {
             auditEntries = auditRepository.getAuditHistoryForTransferWithSource(transferId)
-            currentTransfer = transactionRepository.getTransactionById(transferId.id).first()
+            val transfer = transactionRepository.getTransactionById(transferId.id).first()
+            currentTransfer = transfer
+            // Load current attributes if transfer exists
+            if (transfer != null) {
+                currentAttributes = transferAttributeRepository
+                    .getByTransactionAndRevision(transferId, transfer.revisionId)
+                    .first()
+            }
         } catch (e: Exception) {
             logger.error(e) { "Failed to load audit history: ${e.message}" }
             errorMessage = "Failed to load audit history: ${e.message}"
@@ -1870,14 +2138,14 @@ fun TransactionAuditScreen(
             // - Current transfer (if this is the most recent entry, index 0)
             // - Next audit entry's values (entries[index-1]) for older updates
             val auditDiffs =
-                remember(auditEntries, currentTransfer) {
+                remember(auditEntries, currentTransfer, currentAttributes) {
                     val transfer = currentTransfer
                     auditEntries.mapIndexed { index, entry ->
                         val newValuesForUpdate =
                             when {
                                 entry.auditType != AuditType.UPDATE -> null
                                 index == 0 && transfer != null ->
-                                    UpdateNewValues.fromTransfer(transfer)
+                                    UpdateNewValues.fromTransfer(transfer, currentAttributes)
                                 index > 0 ->
                                     UpdateNewValues.fromAuditEntry(auditEntries[index - 1])
                                 else -> null
@@ -2004,6 +2272,7 @@ private fun InsertDiffContent(
         FieldValueRow("To", resolveAccountName(diff.targetAccountId.value(), accounts))
         FieldValueRow("Amount", formatAmount(diff.amount.value()))
         FieldValueRow("Description", diff.description.value().ifBlank { "(none)" })
+        AttributesSection(diff.attributeChanges)
         SourceInfoSection(diff.source, currentDeviceId = currentDeviceId)
     }
 }
@@ -2076,6 +2345,11 @@ private fun UpdateDiffContent(
                     newValue = descriptionChange.newValue.ifBlank { "(none)" },
                 )
             }
+            // Show attribute changes (added, removed, changed - not unchanged)
+            val significantAttrChanges = diff.attributeChanges.filter { it !is AttributeChange.Unchanged }
+            if (significantAttrChanges.isNotEmpty()) {
+                AttributeChangesSection(significantAttrChanges)
+            }
         }
         SourceInfoSection(diff.source, currentDeviceId = currentDeviceId)
     }
@@ -2100,6 +2374,7 @@ private fun DeleteDiffContent(
         FieldValueRow("To", resolveAccountName(diff.targetAccountId.value(), accounts), errorColor)
         FieldValueRow("Amount", formatAmount(diff.amount.value()), errorColor)
         FieldValueRow("Description", diff.description.value().ifBlank { "(none)" }, errorColor)
+        AttributesSection(diff.attributeChanges, errorColor)
         SourceInfoSection(diff.source, currentDeviceId = currentDeviceId, labelColor = errorColor.copy(alpha = 0.8f))
     }
 }
@@ -2182,6 +2457,132 @@ private fun FieldChangeRow(
     }
 }
 
+@Composable
+private fun AttributesSection(
+    attributeChanges: List<AttributeChange>,
+    valueColor: Color = MaterialTheme.colorScheme.onSurface,
+) {
+    if (attributeChanges.isEmpty()) return
+
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+            text = "Attributes:",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        attributeChanges.forEach { change ->
+            val value =
+                when (change) {
+                    is AttributeChange.Added -> change.value
+                    is AttributeChange.Removed -> change.value
+                    is AttributeChange.Changed -> change.newValue
+                    is AttributeChange.Unchanged -> change.value
+                }
+            Row(
+                modifier = Modifier.padding(start = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    text = "${change.attributeTypeName}:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = value,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = valueColor,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AttributeChangesSection(attributeChanges: List<AttributeChange>) {
+    if (attributeChanges.isEmpty()) return
+
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        attributeChanges.forEach { change ->
+            when (change) {
+                is AttributeChange.Added -> {
+                    Row(
+                        modifier = Modifier.padding(start = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text(
+                            text = "+${change.attributeTypeName}:",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        Text(
+                            text = change.value,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
+                is AttributeChange.Removed -> {
+                    Row(
+                        modifier = Modifier.padding(start = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text(
+                            text = "-${change.attributeTypeName}:",
+                            style =
+                                MaterialTheme.typography.bodySmall.copy(
+                                    textDecoration = TextDecoration.LineThrough,
+                                ),
+                            color = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                        )
+                        Text(
+                            text = change.value,
+                            style =
+                                MaterialTheme.typography.bodySmall.copy(
+                                    textDecoration = TextDecoration.LineThrough,
+                                ),
+                            color = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                        )
+                    }
+                }
+                is AttributeChange.Changed -> {
+                    Row(
+                        modifier = Modifier.padding(start = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "${change.attributeTypeName}:",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            text = change.oldValue,
+                            style =
+                                MaterialTheme.typography.bodySmall.copy(
+                                    textDecoration = TextDecoration.LineThrough,
+                                ),
+                            color = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                        )
+                        Text(
+                            text = "\u2192",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            text = change.newValue,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
+                is AttributeChange.Unchanged -> {
+                    // Don't show unchanged attributes in the changes section
+                }
+            }
+        }
+    }
+}
+
 private fun resolveAccountName(
     accountId: AccountId,
     accounts: List<Account>,
@@ -2253,6 +2654,93 @@ private fun SourceInfoSection(
                     is DeviceInfo.Android -> {
                         FieldValueRow("Device", "${deviceInfo.deviceMake} ${deviceInfo.deviceModel}")
                     }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * A dropdown field for selecting or entering an attribute type name.
+ * Shows existing types in a dropdown, with the option to type a new one.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AttributeTypeField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    existingTypes: List<AttributeType>,
+    enabled: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    var textValue by remember(value) { mutableStateOf(value) }
+
+    // Filter suggestions based on current text
+    val suggestions =
+        remember(textValue, existingTypes) {
+            if (textValue.isBlank()) {
+                existingTypes.map { it.name }
+            } else {
+                existingTypes
+                    .map { it.name }
+                    .filter { it.contains(textValue, ignoreCase = true) }
+            }
+        }
+
+    ExposedDropdownMenuBox(
+        expanded = expanded && suggestions.isNotEmpty(),
+        onExpandedChange = { if (enabled) expanded = !expanded },
+        modifier = modifier,
+    ) {
+        OutlinedTextField(
+            value = textValue,
+            onValueChange = { newValue ->
+                textValue = newValue
+                onValueChange(newValue)
+                expanded = true
+            },
+            label = { Text("Type") },
+            trailingIcon = {
+                if (existingTypes.isNotEmpty()) {
+                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+                }
+            },
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable),
+            enabled = enabled,
+            singleLine = true,
+        )
+
+        if (suggestions.isNotEmpty()) {
+            ExposedDropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+            ) {
+                suggestions.forEach { typeName ->
+                    DropdownMenuItem(
+                        text = {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ) {
+                                Text(typeName)
+                                if (typeName == value) {
+                                    Text(
+                                        "\u2713",
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
+                            }
+                        },
+                        onClick = {
+                            textValue = typeName
+                            onValueChange(typeName)
+                            expanded = false
+                        },
+                    )
                 }
             }
         }
