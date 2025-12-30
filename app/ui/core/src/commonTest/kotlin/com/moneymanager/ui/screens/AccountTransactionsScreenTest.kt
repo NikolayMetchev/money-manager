@@ -9,12 +9,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.runComposeUiTest
+import androidx.compose.ui.test.waitUntilAtLeastOneExists
+import androidx.compose.ui.test.waitUntilExactlyOneExists
 import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.database.DbLocation
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
@@ -541,22 +544,21 @@ class AccountTransactionsScreenTest {
                     }
                 }
 
-                waitForIdle()
+                // Wait for the edit button to appear
+                waitUntilExactlyOneExists(hasText("\u270F\uFE0F"), timeoutMillis = 10000)
 
                 // Step 1: Open edit dialog
                 onNodeWithText("\u270F\uFE0F").performClick()
-                waitForIdle()
 
-                // Verify edit dialog is displayed
-                onNodeWithText("Edit Transaction").assertIsDisplayed()
-
-                // Wait for dialog to fully load
-                mainClock.advanceTimeBy(100)
-                waitForIdle()
+                // Wait for edit dialog to appear
+                waitUntilExactlyOneExists(hasText("Edit Transaction"), timeoutMillis = 10000)
 
                 // Step 2: Add a new attribute
+                waitUntilExactlyOneExists(hasText("+ Add Attribute"), timeoutMillis = 5000)
                 onNodeWithText("+ Add Attribute").performClick()
-                waitForIdle()
+
+                // Wait for attribute fields to appear
+                waitUntilAtLeastOneExists(hasText("Type"), timeoutMillis = 5000)
 
                 // Fill in the attribute type
                 onAllNodesWithText("Type")[0].performClick()
@@ -583,36 +585,28 @@ class AccountTransactionsScreenTest {
                     repositories!!.maintenanceService.fullRefreshMaterializedViews()
                 }
 
-                // Wait for UI to refresh
-                mainClock.advanceTimeBy(300)
-                waitForIdle()
+                // Wait for audit button to be visible (indicates UI has refreshed)
+                waitUntilExactlyOneExists(hasText("\uD83D\uDCDC"), timeoutMillis = 10000)
 
                 // Step 4: Open audit history and verify via UI
                 onNodeWithText("\uD83D\uDCDC").performClick()
-                waitForIdle()
-                mainClock.advanceTimeBy(500)
-                waitForIdle()
 
-                // Verify audit history dialog is displayed
-                onNodeWithText("Audit History:", substring = true).assertIsDisplayed()
-
-                // Wait for audit entries to load
-                mainClock.advanceTimeBy(1000)
-                waitForIdle()
+                // Wait for audit history dialog to appear
+                waitUntilExactlyOneExists(hasText("Audit History:", substring = true), timeoutMillis = 10000)
 
                 // Step 5: Verify both revisions are shown in the UI
                 // Rev 1 should be the initial INSERT
-                onNodeWithText("Rev 1", substring = true).assertIsDisplayed()
+                waitUntilExactlyOneExists(hasText("Rev 1", substring = true), timeoutMillis = 10000)
 
                 // Rev 2 should exist (UPDATE with attribute added)
-                onNodeWithText("Rev 2", substring = true).assertIsDisplayed()
+                waitUntilExactlyOneExists(hasText("Rev 2", substring = true), timeoutMillis = 10000)
 
                 // Verify the "Updated" (UPDATE) header exists for Rev 2
-                onNodeWithText("Updated", substring = true).assertIsDisplayed()
+                waitUntilAtLeastOneExists(hasText("Updated", substring = true), timeoutMillis = 10000)
 
                 // Verify the added attribute is shown with "+" prefix (indicates it was added in Rev 2)
-                onNodeWithText("+Test Attribute:", substring = true).assertIsDisplayed()
-                onNodeWithText("Test Value 123", substring = true).assertIsDisplayed()
+                waitUntilExactlyOneExists(hasText("+Test Attribute:", substring = true), timeoutMillis = 10000)
+                waitUntilAtLeastOneExists(hasText("Test Value 123", substring = true), timeoutMillis = 10000)
             }
         } finally {
             // Clean up database
@@ -717,27 +711,27 @@ class AccountTransactionsScreenTest {
                     }
                 }
 
-                waitForIdle()
+                // Wait for the edit button to appear
+                waitUntilExactlyOneExists(hasText("\u270F\uFE0F"), timeoutMillis = 10000)
 
                 // Step 1: Open edit dialog
                 onNodeWithText("\u270F\uFE0F").performClick()
-                waitForIdle()
 
-                // Verify edit dialog is displayed
-                onNodeWithText("Edit Transaction").assertIsDisplayed()
-
-                // Wait for dialog to fully load
-                mainClock.advanceTimeBy(100)
-                waitForIdle()
+                // Wait for edit dialog to appear
+                waitUntilExactlyOneExists(hasText("Edit Transaction"), timeoutMillis = 10000)
 
                 // Step 2: Change the description (index 1 is the editable text field in the dialog)
+                waitUntilAtLeastOneExists(hasText("Original Description"), timeoutMillis = 5000)
                 onAllNodesWithText("Original Description")[1]
                     .performTextReplacement("Updated Description")
                 waitForIdle()
 
                 // Step 3: Add a new attribute
+                waitUntilExactlyOneExists(hasText("+ Add Attribute"), timeoutMillis = 5000)
                 onNodeWithText("+ Add Attribute").performClick()
-                waitForIdle()
+
+                // Wait for attribute fields to appear
+                waitUntilAtLeastOneExists(hasText("Type"), timeoutMillis = 5000)
 
                 // Fill in the attribute type
                 onAllNodesWithText("Type")[0].performClick()
@@ -764,42 +758,34 @@ class AccountTransactionsScreenTest {
                     repositories!!.maintenanceService.fullRefreshMaterializedViews()
                 }
 
-                // Wait for UI to refresh
-                mainClock.advanceTimeBy(300)
-                waitForIdle()
-
                 // Verify the description was updated in the UI
-                onNodeWithText("Updated Description", substring = true).assertIsDisplayed()
+                waitUntilAtLeastOneExists(hasText("Updated Description", substring = true), timeoutMillis = 10000)
+
+                // Wait for audit button to be visible
+                waitUntilExactlyOneExists(hasText("\uD83D\uDCDC"), timeoutMillis = 10000)
 
                 // Step 5: Open audit history and verify via UI
                 onNodeWithText("\uD83D\uDCDC").performClick()
-                waitForIdle()
-                mainClock.advanceTimeBy(500)
-                waitForIdle()
 
-                // Verify audit history dialog is displayed
-                onNodeWithText("Audit History:", substring = true).assertIsDisplayed()
-
-                // Wait for audit entries to load
-                mainClock.advanceTimeBy(1000)
-                waitForIdle()
+                // Wait for audit history dialog to appear
+                waitUntilExactlyOneExists(hasText("Audit History:", substring = true), timeoutMillis = 10000)
 
                 // Step 6: Verify ONLY Rev 1 and Rev 2 exist (NOT Rev 3)
                 // Rev 1 should be the initial INSERT
-                onNodeWithText("Rev 1", substring = true).assertIsDisplayed()
+                waitUntilExactlyOneExists(hasText("Rev 1", substring = true), timeoutMillis = 10000)
 
                 // Rev 2 should exist (combined UPDATE with description change + attribute addition)
-                onNodeWithText("Rev 2", substring = true).assertIsDisplayed()
+                waitUntilExactlyOneExists(hasText("Rev 2", substring = true), timeoutMillis = 10000)
 
                 // Rev 3 should NOT exist - both changes should be in a single revision
                 onAllNodesWithText("Rev 3", substring = true).assertCountEquals(0)
 
                 // Verify the description change is shown
-                onNodeWithText("Updated Description", substring = true).assertIsDisplayed()
+                waitUntilAtLeastOneExists(hasText("Updated Description", substring = true), timeoutMillis = 10000)
 
                 // Verify the added attribute is shown with "+" prefix
-                onNodeWithText("+New Attribute:", substring = true).assertIsDisplayed()
-                onNodeWithText("New Value", substring = true).assertIsDisplayed()
+                waitUntilExactlyOneExists(hasText("+New Attribute:", substring = true), timeoutMillis = 10000)
+                waitUntilAtLeastOneExists(hasText("New Value", substring = true), timeoutMillis = 10000)
             }
         } finally {
             // Clean up database
