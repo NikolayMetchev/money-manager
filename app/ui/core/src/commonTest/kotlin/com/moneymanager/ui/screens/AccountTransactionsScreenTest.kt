@@ -44,6 +44,7 @@ import com.moneymanager.domain.repository.AuditRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CsvImportSourceRecord
 import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.domain.repository.SampleGeneratorSourceRecord
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.domain.repository.TransferAttributeRepository
 import com.moneymanager.domain.repository.TransferSourceRepository
@@ -725,6 +726,11 @@ class AccountTransactionsScreenTest {
         override suspend fun recordCsvImportSourcesBatch(
             csvImportId: CsvImportId,
             sources: List<CsvImportSourceRecord>,
+        ) {}
+
+        override suspend fun recordSampleGeneratorSourcesBatch(
+            deviceInfo: DeviceInfo,
+            sources: List<SampleGeneratorSourceRecord>,
         ) {}
 
         override suspend fun getSourcesForTransaction(transactionId: TransferId): List<TransferSource> =

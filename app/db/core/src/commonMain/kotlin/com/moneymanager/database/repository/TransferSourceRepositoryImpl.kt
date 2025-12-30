@@ -11,6 +11,7 @@ import com.moneymanager.domain.model.TransferSource
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.repository.CsvImportSourceRecord
 import com.moneymanager.domain.repository.DeviceRepository
+import com.moneymanager.domain.repository.SampleGeneratorSourceRecord
 import com.moneymanager.domain.repository.TransferSourceRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -115,5 +116,25 @@ class TransferSourceRepositoryImpl(
             queries.selectByTransactionIdAndRevision(transactionId.toString(), revisionId)
                 .executeAsOneOrNull()
                 ?.let(TransferSourceFromRevisionMapper::map)
+        }
+
+    override suspend fun recordSampleGeneratorSourcesBatch(
+        deviceInfo: DeviceInfo,
+        sources: List<SampleGeneratorSourceRecord>,
+    ): Unit =
+        withContext(Dispatchers.Default) {
+            val deviceId = deviceRepository.getOrCreateDevice(deviceInfo)
+            val now = Clock.System.now()
+
+            queries.transaction {
+                sources.forEach { source ->
+                    queries.insertSampleGenerator(
+                        transactionId = source.transactionId.toString(),
+                        revisionId = source.revisionId,
+                        deviceId = deviceId,
+                        createdAt = now.toEpochMilliseconds(),
+                    )
+                }
+            }
         }
 }

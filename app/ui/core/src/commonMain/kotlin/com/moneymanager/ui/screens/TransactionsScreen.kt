@@ -2765,6 +2765,21 @@ private fun SourceInfoSection(
                     }
                 }
             }
+            SourceType.SAMPLE_GENERATOR -> {
+                val deviceInfo = source.deviceInfo
+                val thisDeviceSuffix = if (isThisDevice) " (This Device)" else ""
+                when (deviceInfo) {
+                    is DeviceInfo.Jvm -> {
+                        FieldValueRow("Origin", "Sample Generator (Desktop)$thisDeviceSuffix")
+                        FieldValueRow("Machine", deviceInfo.machineName)
+                        FieldValueRow("OS", deviceInfo.osName)
+                    }
+                    is DeviceInfo.Android -> {
+                        FieldValueRow("Origin", "Sample Generator (Android)$thisDeviceSuffix")
+                        FieldValueRow("Device", "${deviceInfo.deviceMake} ${deviceInfo.deviceModel}")
+                    }
+                }
+            }
         }
     }
 }

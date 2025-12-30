@@ -356,6 +356,7 @@ object DatabaseConfig {
             // Seed SourceType lookup table
             sourceTypeQueries.insert(id = 1, name = "MANUAL")
             sourceTypeQueries.insert(id = 2, name = "CSV_IMPORT")
+            sourceTypeQueries.insert(id = 3, name = "SAMPLE_GENERATOR")
 
             // Seed Platform lookup table
             platformQueries.insert(id = 1, name = "JVM")
