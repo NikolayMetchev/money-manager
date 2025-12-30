@@ -44,6 +44,41 @@ class MoneyManagerDatabaseWrapper(private val driver: SqlDriver) : MoneyManagerD
     }
 
     /**
+     * Enables batch mode by inserting a row into _import_batch.
+     * When batch mode is active, attribute triggers are skipped.
+     * Must be paired with [endBatchMode] to restore normal trigger behavior.
+     */
+    fun beginBatchMode() {
+        execute(null, "INSERT INTO _import_batch (active) VALUES (1)", 0)
+    }
+
+    /**
+     * Disables batch mode by clearing _import_batch table.
+     * Restores normal trigger behavior for attribute changes.
+     */
+    fun endBatchMode() {
+        execute(null, "DELETE FROM _import_batch", 0)
+    }
+
+    /**
+     * Enables creation mode by inserting a row into _creation_mode.
+     * When creation mode is active, attribute triggers record audit but don't bump revision.
+     * Use this when creating a transfer with initial attributes.
+     * Must be paired with [endCreationMode] to restore normal trigger behavior.
+     */
+    fun beginCreationMode() {
+        execute(null, "INSERT INTO _creation_mode (active) VALUES (1)", 0)
+    }
+
+    /**
+     * Disables creation mode by clearing _creation_mode table.
+     * Restores normal trigger behavior (bump revision on attribute changes).
+     */
+    fun endCreationMode() {
+        execute(null, "DELETE FROM _creation_mode", 0)
+    }
+
+    /**
      * Tables to exclude from audit trail.
      * Includes audit tables themselves, materialized views, system tables, and CSV import tables.
      */
@@ -75,6 +110,7 @@ class MoneyManagerDatabaseWrapper(private val driver: SqlDriver) : MoneyManagerD
             "AttributeType",
             "TransferAttribute",
             "_import_batch",
+            "_creation_mode",
         )
 
     /**

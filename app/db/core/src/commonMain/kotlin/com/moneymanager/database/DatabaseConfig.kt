@@ -163,14 +163,28 @@ object DatabaseConfig {
         )
 
     /**
-     * Creates the temporary table used for batch import operations.
-     * When this table contains a row, attribute triggers skip revision bumping.
+     * Creates the temporary table used for batch import operations (CSV import).
+     * When this table contains a row, attribute triggers are SKIPPED entirely (no audit).
      */
     private fun MoneyManagerDatabaseWrapper.createBatchImportTable() =
         execute(
             null,
             """
             CREATE TABLE IF NOT EXISTS _import_batch (active INTEGER)
+            """.trimIndent(),
+            0,
+        )
+
+    /**
+     * Creates the temporary table used for initial transfer+attribute creation.
+     * When this table contains a row, attribute triggers RECORD audit but DON'T bump revision.
+     * This allows initial attributes to be recorded at revision 1 without incrementing.
+     */
+    private fun MoneyManagerDatabaseWrapper.createCreationModeTable() =
+        execute(
+            null,
+            """
+            CREATE TABLE IF NOT EXISTS _creation_mode (active INTEGER)
             """.trimIndent(),
             0,
         )
@@ -186,12 +200,15 @@ object DatabaseConfig {
      * - UPDATE: stores OLD value (value before the change)
      * - DELETE: stores OLD value (value that was removed)
      *
-     * All triggers check for the _import_batch table to skip during bulk imports.
+     * Flag tables control trigger behavior:
+     * - _import_batch: skip trigger entirely (CSV import - no audit)
+     * - _creation_mode: record audit but don't bump revision (initial creation)
+     * - neither: bump revision, then record audit (later modification)
      */
     private fun MoneyManagerDatabaseWrapper.createAttributeTriggers() {
         // Attribute INSERT trigger - records new attribute addition (stores NEW value)
-        // For newly created transfers (revisionId = 1), record at revision 1 without bumping
-        // For existing transfers, bump revision and record at new revision
+        // The _import_batch guard skips this trigger during CSV import.
+        // The _creation_mode guard prevents revision bump during initial creation.
         execute(
             null,
             """
@@ -200,13 +217,13 @@ object DatabaseConfig {
             FOR EACH ROW
             WHEN NOT EXISTS (SELECT 1 FROM _import_batch)
             BEGIN
-                -- Only bump revision if transfer already exists (revisionId > 1)
-                -- For revisionId = 1, attribute is part of initial creation
+                -- Only bump revision if NOT in creation mode
                 UPDATE Transfer
                 SET revisionId = revisionId + 1
-                WHERE id = NEW.transactionId AND revisionId > 1;
+                WHERE id = NEW.transactionId
+                  AND NOT EXISTS (SELECT 1 FROM _creation_mode);
 
-                -- Record the addition in audit table at current revision
+                -- Always record the addition in audit table at current revision
                 INSERT INTO TransferAttributeAudit (transactionId, revisionId, attributeTypeId, auditTypeId, attributeValue)
                 SELECT NEW.transactionId, revisionId, NEW.attributeTypeId, 1, NEW.attributeValue
                 FROM Transfer WHERE id = NEW.transactionId;
@@ -225,12 +242,13 @@ object DatabaseConfig {
             WHEN NOT EXISTS (SELECT 1 FROM _import_batch)
               AND OLD.attributeValue != NEW.attributeValue
             BEGIN
-                -- Bump transfer revision
+                -- Only bump revision if NOT in creation mode
                 UPDATE Transfer
                 SET revisionId = revisionId + 1
-                WHERE id = NEW.transactionId;
+                WHERE id = NEW.transactionId
+                  AND NOT EXISTS (SELECT 1 FROM _creation_mode);
 
-                -- Record the change in audit table (OLD value - what it was before)
+                -- Always record the change in audit table (OLD value - what it was before)
                 INSERT INTO TransferAttributeAudit (transactionId, revisionId, attributeTypeId, auditTypeId, attributeValue)
                 SELECT NEW.transactionId, revisionId, NEW.attributeTypeId, 2, OLD.attributeValue
                 FROM Transfer WHERE id = NEW.transactionId;
@@ -248,12 +266,13 @@ object DatabaseConfig {
             FOR EACH ROW
             WHEN NOT EXISTS (SELECT 1 FROM _import_batch)
             BEGIN
-                -- Bump transfer revision
+                -- Only bump revision if NOT in creation mode
                 UPDATE Transfer
                 SET revisionId = revisionId + 1
-                WHERE id = OLD.transactionId;
+                WHERE id = OLD.transactionId
+                  AND NOT EXISTS (SELECT 1 FROM _creation_mode);
 
-                -- Record the deletion in audit table (OLD value - what was deleted)
+                -- Always record the deletion in audit table (OLD value - what was deleted)
                 INSERT INTO TransferAttributeAudit (transactionId, revisionId, attributeTypeId, auditTypeId, attributeValue)
                 SELECT OLD.transactionId, revisionId, OLD.attributeTypeId, 3, OLD.attributeValue
                 FROM Transfer WHERE id = OLD.transactionId;
@@ -368,8 +387,9 @@ object DatabaseConfig {
             // Create trigger for category deletion (children inherit grandparent)
             createCategoryDeleteTrigger()
 
-            // Create batch import table and attribute triggers
+            // Create flag tables and attribute triggers
             createBatchImportTable()
+            createCreationModeTable()
             createAttributeTriggers()
 
             // Create audit triggers for all main tables

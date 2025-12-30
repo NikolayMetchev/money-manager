@@ -39,6 +39,7 @@ class TransactionRepositoryImpl(
     private val transferQueries = database.transferQueries
     private val transactionIdQueries = database.transactionIdQueries
     private val transferAttributeQueries = database.transferAttributeQueries
+    private val transferAttributeAuditQueries = database.transferAttributeAuditQueries
     private val transferSourceQueries = database.transferSourceQueries
 
     override fun getTransactionById(id: Uuid): Flow<Transfer?> =
@@ -347,31 +348,39 @@ class TransactionRepositoryImpl(
                 val batch = transfersWithAttributes.subList(batchStart, batchEnd)
 
                 transferQueries.transaction {
-                    batch.forEach { (transfer, attributes) ->
-                        // Create transfer (triggers INSERT audit)
-                        transactionIdQueries.insert(transfer.id.toString())
-                        transferQueries.insert(
-                            id = transfer.id.toString(),
-                            revisionId = transfer.revisionId,
-                            timestamp = transfer.timestamp.toEpochMilliseconds(),
-                            description = transfer.description,
-                            sourceAccountId = transfer.sourceAccountId.id,
-                            targetAccountId = transfer.targetAccountId.id,
-                            currencyId = transfer.amount.currency.id.toString(),
-                            amount = transfer.amount.amount,
-                        )
-
-                        // Insert attributes (triggers audit for each)
-                        attributes.forEach { (typeId, value) ->
-                            transferAttributeQueries.insert(
-                                transactionId = transfer.id.toString(),
-                                attributeTypeId = typeId.id,
-                                attributeValue = value,
+                    // Enable creation mode so attribute triggers record audit but don't bump revision.
+                    // This allows initial attributes to be recorded at revision 1.
+                    database.beginCreationMode()
+                    try {
+                        batch.forEach { (transfer, attributes) ->
+                            // Create transfer (triggers INSERT audit)
+                            transactionIdQueries.insert(transfer.id.toString())
+                            transferQueries.insert(
+                                id = transfer.id.toString(),
+                                revisionId = transfer.revisionId,
+                                timestamp = transfer.timestamp.toEpochMilliseconds(),
+                                description = transfer.description,
+                                sourceAccountId = transfer.sourceAccountId.id,
+                                targetAccountId = transfer.targetAccountId.id,
+                                currencyId = transfer.amount.currency.id.toString(),
+                                amount = transfer.amount.amount,
                             )
-                        }
 
-                        // Record source using strategy pattern
-                        sourceRecorder.insert(transfer, deviceId, now.toEpochMilliseconds(), sourceInserter)
+                            // Insert attributes (creation mode records audit at rev 1 without bumping)
+                            attributes.forEach { (typeId, value) ->
+                                transferAttributeQueries.insert(
+                                    transactionId = transfer.id.toString(),
+                                    attributeTypeId = typeId.id,
+                                    attributeValue = value,
+                                )
+                            }
+
+                            // Record source using strategy pattern
+                            sourceRecorder.insert(transfer, deviceId, now.toEpochMilliseconds(), sourceInserter)
+                        }
+                    } finally {
+                        // Always restore normal trigger behavior
+                        database.endCreationMode()
                     }
                 }
 

@@ -59,6 +59,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration
@@ -436,6 +437,181 @@ class AccountTransactionsScreenTest {
                 // The attribute is displayed as "+Reference Number:" and "REF-12345" as separate text nodes
                 onNodeWithText("Reference Number", substring = true).assertIsDisplayed()
                 onNodeWithText("REF-12345", substring = true).assertIsDisplayed()
+            }
+        } finally {
+            // Clean up database
+            testDbLocation?.let { deleteTestDatabase(it) }
+        }
+    }
+
+    @Test
+    fun editTransaction_addNewAttribute_createsAuditEntryWithNewRevision() {
+        // This test verifies that editing an existing transaction and adding a new attribute
+        // creates a new revision in the audit trail.
+        //
+        // The trigger logic only bumps revision for transfers with revisionId > 1,
+        // so we first update the transfer to bump it to revision 2, then add an attribute.
+
+        var testDbLocation: DbLocation? = null
+        lateinit var database: MoneyManagerDatabaseWrapper
+        var repositories: RepositorySet? = null
+        var checkingAccountId: AccountId? = null
+        var savingsAccountId: AccountId? = null
+        var transferId: TransferId? = null
+
+        try {
+            // Given: Set up a real database with accounts and a transaction
+            runBlocking {
+                testDbLocation = createTestDatabaseLocation()
+                val databaseManager = createTestDatabaseManager()
+                database = databaseManager.openDatabase(testDbLocation)
+                repositories = RepositorySet(database)
+
+                val now = Clock.System.now()
+
+                // Get USD currency (seeded by database)
+                val usdCurrency = repositories.currencyRepository.getCurrencyByCode("USD").first()!!
+
+                // Create accounts
+                checkingAccountId =
+                    repositories.accountRepository.createAccount(
+                        Account(
+                            id = AccountId(0L),
+                            name = "Audit Test Checking",
+                            openingDate = now,
+                        ),
+                    )
+                savingsAccountId =
+                    repositories.accountRepository.createAccount(
+                        Account(
+                            id = AccountId(0L),
+                            name = "Audit Test Savings",
+                            openingDate = now,
+                        ),
+                    )
+
+                // Create a transfer (revision 1)
+                transferId = TransferId(Uuid.random())
+                val transfer =
+                    Transfer(
+                        id = transferId,
+                        timestamp = now,
+                        description = "Audit Test Transaction",
+                        sourceAccountId = checkingAccountId,
+                        targetAccountId = savingsAccountId,
+                        amount = Money.fromDisplayValue(100.0, usdCurrency),
+                    )
+                repositories.transactionRepository.createTransfersWithAttributesAndSources(
+                    transfersWithAttributes = listOf(transfer to emptyList()),
+                    sourceRecorder = SourceRecorder.Manual,
+                    deviceInfo = DeviceInfo.Jvm("test-machine", "Test OS"),
+                )
+
+                // Verify initial revision is 1
+                val initialTransfer =
+                    repositories.transactionRepository.getTransactionById(transferId!!.id).first()!!
+                assertEquals(1L, initialTransfer.revisionId, "Initial revision should be 1")
+
+                // Refresh materialized views so the transaction appears
+                repositories.maintenanceService.fullRefreshMaterializedViews()
+            }
+
+            // Run the UI test
+            runComposeUiTest {
+                // When: Viewing the account transactions screen
+                setContent {
+                    ProvideSchemaAwareScope {
+                        var currentAccountId by remember { mutableStateOf(checkingAccountId!!) }
+
+                        AccountTransactionsScreen(
+                            accountId = currentAccountId,
+                            transactionRepository = repositories!!.transactionRepository,
+                            transferSourceRepository = repositories.transferSourceRepository,
+                            accountRepository = repositories.accountRepository,
+                            categoryRepository = repositories.categoryRepository,
+                            currencyRepository = repositories.currencyRepository,
+                            auditRepository = repositories.auditRepository,
+                            attributeTypeRepository = repositories.attributeTypeRepository,
+                            transferAttributeRepository = repositories.transferAttributeRepository,
+                            maintenanceService = repositories.maintenanceService,
+                            onAccountIdChange = { currentAccountId = it },
+                            onCurrencyIdChange = {},
+                        )
+                    }
+                }
+
+                waitForIdle()
+
+                // Step 1: Open edit dialog
+                onNodeWithText("\u270F\uFE0F").performClick()
+                waitForIdle()
+
+                // Verify edit dialog is displayed
+                onNodeWithText("Edit Transaction").assertIsDisplayed()
+
+                // Wait for dialog to fully load
+                mainClock.advanceTimeBy(100)
+                waitForIdle()
+
+                // Step 2: Add a new attribute
+                onNodeWithText("+ Add Attribute").performClick()
+                waitForIdle()
+
+                // Fill in the attribute type
+                onAllNodesWithText("Type")[0].performClick()
+                waitForIdle()
+                onAllNodesWithText("Type")[0].performTextInput("Test Attribute")
+                waitForIdle()
+
+                // Fill in the attribute value
+                onAllNodesWithText("Value")[0].performClick()
+                waitForIdle()
+                onAllNodesWithText("Value")[0].performTextInput("Test Value 123")
+                waitForIdle()
+
+                // Step 3: Click Update to save
+                onNodeWithText("Update").performClick()
+                waitForIdle()
+
+                // Wait for save operation to complete
+                mainClock.advanceTimeBy(500)
+                waitForIdle()
+
+                // Refresh materialized views
+                runBlocking {
+                    repositories!!.maintenanceService.fullRefreshMaterializedViews()
+                }
+
+                // Wait for UI to refresh
+                mainClock.advanceTimeBy(300)
+                waitForIdle()
+
+                // Step 4: Open audit history and verify via UI
+                onNodeWithText("\uD83D\uDCDC").performClick()
+                waitForIdle()
+                mainClock.advanceTimeBy(500)
+                waitForIdle()
+
+                // Verify audit history dialog is displayed
+                onNodeWithText("Audit History:", substring = true).assertIsDisplayed()
+
+                // Wait for audit entries to load
+                mainClock.advanceTimeBy(1000)
+                waitForIdle()
+
+                // Step 5: Verify both revisions are shown in the UI
+                // Rev 1 should be the initial INSERT
+                onNodeWithText("Rev 1", substring = true).assertIsDisplayed()
+
+                // Rev 2 should exist (UPDATE with attribute added)
+                onNodeWithText("Rev 2", substring = true).assertIsDisplayed()
+
+                // Verify the "Updated" (UPDATE) header exists for Rev 2
+                onNodeWithText("Updated", substring = true).assertIsDisplayed()
+
+                // Verify the added attribute is shown with "+" prefix (indicates it was added in Rev 2)
+                onNodeWithText("+Test Attribute:", substring = true).assertIsDisplayed()
+                onNodeWithText("Test Value 123", substring = true).assertIsDisplayed()
             }
         } finally {
             // Clean up database
