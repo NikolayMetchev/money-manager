@@ -162,6 +162,7 @@ fun AccountTransactionsScreen(
     onAccountIdChange: (AccountId) -> Unit = {},
     onCurrencyIdChange: (CurrencyId?) -> Unit = {},
     scrollToTransferId: TransferId? = null,
+    externalRefreshTrigger: Int = 0,
 ) {
     // Audit transaction state - when set, shows full-screen audit view
     var transactionIdToAudit by remember { mutableStateOf<TransferId?>(null) }
@@ -311,9 +312,9 @@ fun AccountTransactionsScreen(
                 (visibleItems * 1.5).toInt().coerceAtLeast(20)
             }
 
-        // Load first page when account changes or after edits (via refreshTrigger)
+        // Load first page when account changes or after edits (via refreshTrigger or externalRefreshTrigger)
         // If scrollToTransferId is provided, load the page containing that transaction
-        LaunchedEffect(selectedAccountId, pageSize, scrollToTransferId, refreshTrigger) {
+        LaunchedEffect(selectedAccountId, pageSize, scrollToTransferId, refreshTrigger, externalRefreshTrigger) {
             runningBalances = emptyList()
             currentPagingInfo = null
             hasLoadedFirstPage = false
@@ -1160,6 +1161,7 @@ fun TransactionEntryDialog(
     preSelectedSourceAccountId: AccountId? = null,
     preSelectedCurrencyId: CurrencyId? = null,
     onDismiss: () -> Unit,
+    onTransactionCreated: () -> Unit = {},
 ) {
     var sourceAccountId by remember { mutableStateOf(preSelectedSourceAccountId) }
     var targetAccountId by remember { mutableStateOf<AccountId?>(null) }
@@ -1194,6 +1196,16 @@ fun TransactionEntryDialog(
         }
     }
 
+    // Compute form validity - all required fields must be populated
+    val isAmountValid = amount.isNotBlank() && amount.toDoubleOrNull()?.let { it > 0 } == true
+    val isFormValid =
+        sourceAccountId != null &&
+            targetAccountId != null &&
+            sourceAccountId != targetAccountId &&
+            currencyId != null &&
+            isAmountValid &&
+            description.isNotBlank()
+
     AlertDialog(
         onDismissRequest = { if (!isSaving) onDismiss() },
         title = { Text("Create New Transaction") },
@@ -1215,6 +1227,7 @@ fun TransactionEntryDialog(
                     categoryRepository = categoryRepository,
                     enabled = !isSaving,
                     excludeAccountId = targetAccountId,
+                    isError = sourceAccountId == null,
                 )
 
                 // Target Account Picker
@@ -1226,6 +1239,7 @@ fun TransactionEntryDialog(
                     categoryRepository = categoryRepository,
                     enabled = !isSaving,
                     excludeAccountId = sourceAccountId,
+                    isError = targetAccountId == null || targetAccountId == sourceAccountId,
                 )
 
                 // Currency Picker
@@ -1235,6 +1249,7 @@ fun TransactionEntryDialog(
                     label = "Currency",
                     currencyRepository = currencyRepository,
                     enabled = !isSaving,
+                    isError = currencyId == null,
                 )
 
                 // Date and Time Pickers
@@ -1312,6 +1327,7 @@ fun TransactionEntryDialog(
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     enabled = !isSaving,
+                    isError = !isAmountValid,
                 )
 
                 // Description Input
@@ -1322,6 +1338,7 @@ fun TransactionEntryDialog(
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     enabled = !isSaving,
+                    isError = description.isBlank(),
                 )
 
                 // Attributes Section
@@ -1404,84 +1421,75 @@ fun TransactionEntryDialog(
         confirmButton = {
             TextButton(
                 onClick = {
-                    when {
-                        sourceAccountId == null -> errorMessage = "Please select a source account"
-                        targetAccountId == null -> errorMessage = "Please select a target account"
-                        sourceAccountId == targetAccountId -> errorMessage = "Source and target accounts must be different"
-                        currencyId == null -> errorMessage = "Please select a currency"
-                        amount.isBlank() -> errorMessage = "Amount is required"
-                        amount.toDoubleOrNull() == null -> errorMessage = "Invalid amount"
-                        amount.toDouble() <= 0 -> errorMessage = "Amount must be greater than 0"
-                        description.isBlank() -> errorMessage = "Description is required"
-                        else -> {
-                            isSaving = true
-                            errorMessage = null
-                            scope.launch {
-                                try {
-                                    // Get the currency object from repository
-                                    val currency =
-                                        currencyRepository.getCurrencyById(currencyId!!).first()
-                                            ?: throw IllegalStateException("Currency not found")
+                    // Form is validated via isFormValid, button is disabled when invalid
+                    // This check is a safety net
+                    if (isFormValid) {
+                        isSaving = true
+                        errorMessage = null
+                        scope.launch {
+                            try {
+                                // Get the currency object from repository
+                                val currency =
+                                    currencyRepository.getCurrencyById(currencyId!!).first()
+                                        ?: throw IllegalStateException("Currency not found")
 
-                                    // Convert selected date and time to Instant
-                                    val timestamp =
-                                        selectedDate
-                                            .atTime(selectedHour, selectedMinute, 0)
-                                            .toInstant(TimeZone.currentSystemDefault())
-                                    val transfer =
-                                        Transfer(
-                                            id = TransferId(Uuid.random()),
-                                            timestamp = timestamp,
-                                            description = description.trim(),
-                                            sourceAccountId = sourceAccountId!!,
-                                            targetAccountId = targetAccountId!!,
-                                            amount = Money.fromDisplayValue(amount, currency),
-                                        )
-                                    transactionRepository.createTransfer(transfer)
-
-                                    // Record manual source for this transfer
-                                    transferSourceRepository.recordManualSource(
-                                        transactionId = transfer.id,
-                                        revisionId = transfer.revisionId,
-                                        deviceInfo = getDeviceInfo(),
+                                // Convert selected date and time to Instant
+                                val timestamp =
+                                    selectedDate
+                                        .atTime(selectedHour, selectedMinute, 0)
+                                        .toInstant(TimeZone.currentSystemDefault())
+                                val transfer =
+                                    Transfer(
+                                        id = TransferId(Uuid.random()),
+                                        timestamp = timestamp,
+                                        description = description.trim(),
+                                        sourceAccountId = sourceAccountId!!,
+                                        targetAccountId = targetAccountId!!,
+                                        amount = Money.fromDisplayValue(amount, currency),
                                     )
+                                transactionRepository.createTransfer(transfer)
 
-                                    // Save any attributes that were added
-                                    val attributesToSave =
-                                        editableAttributes
-                                            .filter { (_, pair) ->
-                                                val (typeName, value) = pair
-                                                typeName.isNotBlank() && value.isNotBlank()
-                                            }
-                                    if (attributesToSave.isNotEmpty()) {
-                                        // Create attribute types and collect their IDs
-                                        val attributeData =
-                                            attributesToSave.map { (_, pair) ->
-                                                val (typeName, value) = pair
-                                                val typeId = attributeTypeRepository.getOrCreate(typeName.trim())
-                                                typeId to value.trim()
-                                            }
-                                        // Insert all attributes in batch mode (bypasses triggers)
-                                        transferAttributeRepository.insertBatch(
+                                // Record manual source for this transfer
+                                transferSourceRepository.recordManualSource(
+                                    transactionId = transfer.id,
+                                    revisionId = transfer.revisionId,
+                                    deviceInfo = getDeviceInfo(),
+                                )
+
+                                // Save any attributes that were added
+                                val attributesToSave =
+                                    editableAttributes
+                                        .filter { (_, pair) ->
+                                            val (typeName, value) = pair
+                                            typeName.isNotBlank() && value.isNotBlank()
+                                        }
+                                if (attributesToSave.isNotEmpty()) {
+                                    // Create attribute types and insert attributes
+                                    // Use individual inserts (NOT batch) so triggers record to audit
+                                    attributesToSave.forEach { (_, pair) ->
+                                        val (typeName, value) = pair
+                                        val typeId = attributeTypeRepository.getOrCreate(typeName.trim())
+                                        transferAttributeRepository.insert(
                                             transactionId = transfer.id,
-                                            revisionId = transfer.revisionId,
-                                            attributes = attributeData,
+                                            attributeTypeId = typeId,
+                                            value = value.trim(),
                                         )
                                     }
-
-                                    maintenanceService.refreshMaterializedViews()
-
-                                    onDismiss()
-                                } catch (e: Exception) {
-                                    logger.error(e) { "Failed to create transaction: ${e.message}" }
-                                    errorMessage = "Failed to create transaction: ${e.message}"
-                                    isSaving = false
                                 }
+
+                                maintenanceService.refreshMaterializedViews()
+
+                                onTransactionCreated()
+                                onDismiss()
+                            } catch (e: Exception) {
+                                logger.error(e) { "Failed to create transaction: ${e.message}" }
+                                errorMessage = "Failed to create transaction: ${e.message}"
+                                isSaving = false
                             }
                         }
                     }
                 },
-                enabled = !isSaving,
+                enabled = isFormValid && !isSaving,
             ) {
                 if (isSaving) {
                     CircularProgressIndicator(
@@ -1626,11 +1634,8 @@ fun TransactionEditDialog(
             existingAttributeTypes = types
         }
     }
-    LaunchedEffect(transaction.id, transaction.revisionId) {
-        transferAttributeRepository.getByTransactionAndRevision(
-            transaction.id,
-            transaction.revisionId,
-        ).first().let { attrs ->
+    LaunchedEffect(transaction.id) {
+        transferAttributeRepository.getByTransaction(transaction.id).first().let { attrs ->
             originalAttributes = attrs
             editableAttributes =
                 attrs.associate { attr ->
@@ -1959,101 +1964,56 @@ fun TransactionEditDialog(
                                         }
                                     }
 
-                                    // Handle attribute changes using batch mode to avoid multiple revision bumps
+                                    // Handle attribute changes
+                                    // With the new design, attributes are "live" (no revisionId).
+                                    // Each attribute operation (delete/update/insert) triggers:
+                                    // 1. Revision bump on the transfer
+                                    // 2. Audit entry in TransferAttributeAudit
                                     if (hasAttributeChanges()) {
-                                        // If only attributes changed (no transfer fields), bump revision to create audit entry
-                                        // Note: The attribute copy trigger only fires when transfer fields change,
-                                        // so we need to manually copy all attributes to the new revision
-                                        if (!transferFieldsChanged) {
-                                            currentRevisionId = transactionRepository.bumpRevisionOnly(transaction.id)
-                                            // Record manual source for the attribute-only update
-                                            transferSourceRepository.recordManualSource(
-                                                transactionId = transaction.id,
-                                                revisionId = currentRevisionId,
-                                                deviceInfo = getDeviceInfo(),
-                                            )
+                                        // Handle deleted attributes
+                                        val originalIds = originalAttributes.map { it.id }.toSet()
+                                        val editableIds = editableAttributes.keys
+                                        val deletedIds = originalIds - editableIds
+                                        deletedIds.forEach { id ->
+                                            transferAttributeRepository.delete(id)
+                                        }
 
-                                            // Copy all existing attributes that will remain (not deleted) to new revision
-                                            // This includes both unchanged attributes and those with updated values
-                                            val editableIds = editableAttributes.keys.filter { it > 0 }.toSet()
-                                            val attributesToCopy =
-                                                originalAttributes
-                                                    .filter { it.id in editableIds }
-                                                    .map { attr ->
-                                                        val edited = editableAttributes[attr.id]!!
-                                                        val (typeName, value) = edited
+                                        // Handle updated attributes (value or type changes)
+                                        editableAttributes.filter { (id, _) -> id > 0 }.forEach { (id, pair) ->
+                                            val (typeName, value) = pair
+                                            val original = originalAttributes.find { it.id == id }
+                                            if (original != null) {
+                                                val typeChanged = original.attributeType.name != typeName
+                                                val valueChanged = original.value != value
+                                                when {
+                                                    typeChanged -> {
+                                                        // Type changed: delete and recreate
+                                                        transferAttributeRepository.delete(id)
                                                         val typeId = attributeTypeRepository.getOrCreate(typeName)
-                                                        typeId to value
+                                                        transferAttributeRepository.insert(
+                                                            transactionId = transaction.id,
+                                                            attributeTypeId = typeId,
+                                                            value = value,
+                                                        )
                                                     }
-                                            if (attributesToCopy.isNotEmpty()) {
-                                                transferAttributeRepository.insertBatch(
+                                                    valueChanged -> {
+                                                        // Only value changed: update in place
+                                                        transferAttributeRepository.updateValue(id, value)
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // Handle new attributes
+                                        editableAttributes.filter { (id, _) -> id < 0 }.forEach { (_, pair) ->
+                                            val (typeName, value) = pair
+                                            if (typeName.isNotBlank() && value.isNotBlank()) {
+                                                val typeId = attributeTypeRepository.getOrCreate(typeName)
+                                                transferAttributeRepository.insert(
                                                     transactionId = transaction.id,
-                                                    revisionId = currentRevisionId,
-                                                    attributes = attributesToCopy,
+                                                    attributeTypeId = typeId,
+                                                    value = value,
                                                 )
-                                            }
-                                        }
-
-                                        // Collect all new attributes to add
-                                        val newAttributes =
-                                            editableAttributes
-                                                .filter { (id, _) -> id < 0 }
-                                                .mapNotNull { (_, pair) ->
-                                                    val (typeName, value) = pair
-                                                    if (typeName.isNotBlank() && value.isNotBlank()) {
-                                                        val typeId = attributeTypeRepository.getOrCreate(typeName)
-                                                        typeId to value
-                                                    } else {
-                                                        null
-                                                    }
-                                                }
-
-                                        // Use batch insert for new attributes (triggers disabled)
-                                        if (newAttributes.isNotEmpty()) {
-                                            transferAttributeRepository.insertBatch(
-                                                transactionId = transaction.id,
-                                                revisionId = currentRevisionId,
-                                                attributes = newAttributes,
-                                            )
-                                        }
-
-                                        // When only attributes changed, we've already handled everything above
-                                        // (copied existing, inserted new). No need for delete/update operations
-                                        // since we're creating a complete new set at the new revision.
-                                        if (transferFieldsChanged) {
-                                            // Handle deleted attributes (only when transfer fields changed,
-                                            // because the trigger already copied attributes)
-                                            val originalIds = originalAttributes.map { it.id }.toSet()
-                                            val editableIds = editableAttributes.keys
-                                            val deletedIds = originalIds - editableIds
-                                            deletedIds.forEach { id ->
-                                                transferAttributeRepository.delete(id)
-                                            }
-
-                                            // Handle updated attributes (value changes only for now)
-                                            editableAttributes.filter { (id, _) -> id > 0 }.forEach { (id, pair) ->
-                                                val (typeName, value) = pair
-                                                val original = originalAttributes.find { it.id == id }
-                                                if (original != null) {
-                                                    val typeChanged = original.attributeType.name != typeName
-                                                    val valueChanged = original.value != value
-                                                    when {
-                                                        typeChanged -> {
-                                                            // Type changed: delete and recreate using batch
-                                                            transferAttributeRepository.delete(id)
-                                                            val typeId = attributeTypeRepository.getOrCreate(typeName)
-                                                            transferAttributeRepository.insertBatch(
-                                                                transactionId = transaction.id,
-                                                                revisionId = currentRevisionId,
-                                                                attributes = listOf(typeId to value),
-                                                            )
-                                                        }
-                                                        valueChanged -> {
-                                                            // Only value changed: update in place
-                                                            transferAttributeRepository.updateValue(id, value)
-                                                        }
-                                                    }
-                                                }
                                             }
                                         }
                                     }
@@ -2192,7 +2152,7 @@ fun TransactionAuditScreen(
             if (transfer != null) {
                 currentAttributes =
                     transferAttributeRepository
-                        .getByTransactionAndRevision(transferId, transfer.revisionId)
+                        .getByTransaction(transferId)
                         .first()
             }
         } catch (e: Exception) {
@@ -2257,15 +2217,17 @@ fun TransactionAuditScreen(
             // For UPDATE entries: entry stores OLD values, NEW values come from:
             // - Current transfer (if this is the most recent entry, index 0)
             // - Next audit entry's values (entries[index-1]) for older updates
+            // Attribute changes are now stored directly in TransferAttributeAudit,
+            // so we don't need to compare attributes between entries.
             val auditDiffs =
-                remember(auditEntries, currentTransfer, currentAttributes) {
+                remember(auditEntries, currentTransfer) {
                     val transfer = currentTransfer
                     auditEntries.mapIndexed { index, entry ->
                         val newValuesForUpdate =
                             when {
                                 entry.auditType != AuditType.UPDATE -> null
                                 index == 0 && transfer != null ->
-                                    UpdateNewValues.fromTransfer(transfer, currentAttributes)
+                                    UpdateNewValues.fromTransfer(transfer)
                                 index > 0 ->
                                     UpdateNewValues.fromAuditEntry(auditEntries[index - 1])
                                 else -> null
@@ -2596,6 +2558,7 @@ private fun AttributesSection(
                     is AttributeChange.Added -> change.value
                     is AttributeChange.Removed -> change.value
                     is AttributeChange.Changed -> change.newValue
+                    is AttributeChange.ModifiedFrom -> change.oldValue
                     is AttributeChange.Unchanged -> change.value
                 }
             Row(
@@ -2692,6 +2655,32 @@ private fun AttributeChangesSection(attributeChanges: List<AttributeChange>) {
                             text = change.newValue,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
+                is AttributeChange.ModifiedFrom -> {
+                    Row(
+                        modifier = Modifier.padding(start = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "${change.attributeTypeName}:",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            text = change.oldValue,
+                            style =
+                                MaterialTheme.typography.bodySmall.copy(
+                                    textDecoration = TextDecoration.LineThrough,
+                                ),
+                            color = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                        )
+                        Text(
+                            text = "\u2192 ?",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }

@@ -21,11 +21,8 @@ class TransferAttributeRepositoryImpl(
 ) : TransferAttributeRepository {
     private val queries = database.transferAttributeQueries
 
-    override fun getByTransactionAndRevision(
-        transactionId: TransferId,
-        revisionId: Long,
-    ): Flow<List<TransferAttribute>> =
-        queries.selectByTransactionAndRevision(transactionId.id.toString(), revisionId)
+    override fun getByTransaction(transactionId: TransferId): Flow<List<TransferAttribute>> =
+        queries.selectByTransaction(transactionId.id.toString())
             .asFlow()
             .mapToList(Dispatchers.Default)
             .map { list ->
@@ -33,27 +30,6 @@ class TransferAttributeRepositoryImpl(
                     TransferAttribute(
                         id = row.id,
                         transactionId = TransferId(Uuid.parse(row.transactionId)),
-                        revisionId = row.revisionId,
-                        attributeType =
-                            AttributeType(
-                                id = AttributeTypeId(row.attributeType_id),
-                                name = row.attributeType_name,
-                            ),
-                        value = row.attributeValue,
-                    )
-                }
-            }
-
-    override fun getAllByTransaction(transactionId: TransferId): Flow<List<TransferAttribute>> =
-        queries.selectAllByTransaction(transactionId.id.toString())
-            .asFlow()
-            .mapToList(Dispatchers.Default)
-            .map { list ->
-                list.map { row ->
-                    TransferAttribute(
-                        id = row.id,
-                        transactionId = TransferId(Uuid.parse(row.transactionId)),
-                        revisionId = row.revisionId,
                         attributeType =
                             AttributeType(
                                 id = AttributeTypeId(row.attributeType_id),
@@ -66,7 +42,6 @@ class TransferAttributeRepositoryImpl(
 
     override suspend fun insert(
         transactionId: TransferId,
-        revisionId: Long,
         attributeTypeId: AttributeTypeId,
         value: String,
     ): Long =
@@ -74,7 +49,6 @@ class TransferAttributeRepositoryImpl(
             queries.transactionWithResult {
                 queries.insert(
                     transactionId.id.toString(),
-                    revisionId,
                     attributeTypeId.id,
                     value,
                 )
@@ -98,7 +72,6 @@ class TransferAttributeRepositoryImpl(
 
     override suspend fun insertBatch(
         transactionId: TransferId,
-        revisionId: Long,
         attributes: List<Pair<AttributeTypeId, String>>,
     ): Unit =
         withContext(Dispatchers.Default) {
@@ -112,7 +85,6 @@ class TransferAttributeRepositoryImpl(
                     attributes.forEach { (attributeTypeId, value) ->
                         queries.insert(
                             transactionId.id.toString(),
-                            revisionId,
                             attributeTypeId.id,
                             value,
                         )

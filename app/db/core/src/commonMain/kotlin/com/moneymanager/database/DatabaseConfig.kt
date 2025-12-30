@@ -176,133 +176,87 @@ object DatabaseConfig {
         )
 
     /**
-     * Creates triggers for transfer attribute versioning.
+     * Creates triggers for transfer attribute auditing.
      *
-     * 1. Transfer UPDATE trigger - copies attributes when transfer fields (not just revision) change
-     * 2. Attribute INSERT trigger - bumps transfer revision and copies other attributes
-     * 3. Attribute UPDATE trigger - bumps transfer revision and copies all attributes
-     * 4. Attribute DELETE trigger - bumps transfer revision and copies remaining attributes
+     * Each attribute change (INSERT/UPDATE/DELETE) bumps the transfer revision
+     * and records the change in TransferAttributeAudit.
      *
-     * All attribute triggers check for the _import_batch table to skip during bulk imports.
+     * Storage pattern (same as Transfer_Audit):
+     * - INSERT: stores NEW value (attribute that was added)
+     * - UPDATE: stores OLD value (value before the change)
+     * - DELETE: stores OLD value (value that was removed)
+     *
+     * All triggers check for the _import_batch table to skip during bulk imports.
      */
     private fun MoneyManagerDatabaseWrapper.createAttributeTriggers() {
-        // Transfer UPDATE trigger - copies attributes only when non-revision fields change
-        // Uses _import_batch flag to prevent attribute INSERT trigger from firing
+        // Attribute INSERT trigger - records new attribute addition (stores NEW value)
+        // For newly created transfers (revisionId = 1), record at revision 1 without bumping
+        // For existing transfers, bump revision and record at new revision
         execute(
             null,
             """
-            CREATE TRIGGER IF NOT EXISTS trigger_transfer_update_copy_attributes
-            AFTER UPDATE ON Transfer
-            FOR EACH ROW
-            WHEN OLD.revisionId != NEW.revisionId
-              AND (OLD.timestamp != NEW.timestamp
-                   OR OLD.description != NEW.description
-                   OR OLD.sourceAccountId != NEW.sourceAccountId
-                   OR OLD.targetAccountId != NEW.targetAccountId
-                   OR OLD.currencyId != NEW.currencyId
-                   OR OLD.amount != NEW.amount)
-            BEGIN
-                -- Set flag to prevent attribute INSERT trigger from firing
-                INSERT INTO _import_batch VALUES (1);
-
-                INSERT INTO TransferAttribute (transactionId, revisionId, attributeTypeId, attributeValue)
-                SELECT transactionId, NEW.revisionId, attributeTypeId, attributeValue
-                FROM TransferAttribute
-                WHERE transactionId = NEW.id AND revisionId = OLD.revisionId;
-
-                -- Clear flag
-                DELETE FROM _import_batch;
-            END
-            """.trimIndent(),
-            0,
-        )
-
-        // Attribute INSERT trigger - bumps transfer revision and copies other attributes
-        execute(
-            null,
-            """
-            CREATE TRIGGER IF NOT EXISTS trigger_attribute_insert_bump_revision
+            CREATE TRIGGER IF NOT EXISTS trigger_attribute_insert_audit
             AFTER INSERT ON TransferAttribute
             FOR EACH ROW
             WHEN NOT EXISTS (SELECT 1 FROM _import_batch)
-              AND NEW.revisionId = (SELECT revisionId FROM Transfer WHERE id = NEW.transactionId)
             BEGIN
-                -- Bump transfer revision FIRST (establishes the new revision ID)
+                -- Only bump revision if transfer already exists (revisionId > 1)
+                -- For revisionId = 1, attribute is part of initial creation
                 UPDATE Transfer
                 SET revisionId = revisionId + 1
-                WHERE id = NEW.transactionId;
+                WHERE id = NEW.transactionId AND revisionId > 1;
 
-                -- Copy all OTHER attributes at same revision to new revision (read from Transfer)
-                INSERT INTO TransferAttribute (transactionId, revisionId, attributeTypeId, attributeValue)
-                SELECT transactionId,
-                       (SELECT revisionId FROM Transfer WHERE id = NEW.transactionId),
-                       attributeTypeId, attributeValue
-                FROM TransferAttribute
-                WHERE transactionId = NEW.transactionId
-                  AND revisionId = NEW.revisionId
-                  AND id != NEW.id;
-
-                -- Update the newly inserted attribute to new revision (read from Transfer)
-                UPDATE TransferAttribute
-                SET revisionId = (SELECT revisionId FROM Transfer WHERE id = NEW.transactionId)
-                WHERE id = NEW.id;
+                -- Record the addition in audit table at current revision
+                INSERT INTO TransferAttributeAudit (transactionId, revisionId, attributeTypeId, auditTypeId, attributeValue)
+                SELECT NEW.transactionId, revisionId, NEW.attributeTypeId, 1, NEW.attributeValue
+                FROM Transfer WHERE id = NEW.transactionId;
             END
             """.trimIndent(),
             0,
         )
 
-        // Attribute UPDATE trigger - bumps transfer revision and copies all attributes
+        // Attribute UPDATE trigger - records attribute value change (stores OLD value)
         execute(
             null,
             """
-            CREATE TRIGGER IF NOT EXISTS trigger_attribute_update_bump_revision
+            CREATE TRIGGER IF NOT EXISTS trigger_attribute_update_audit
             AFTER UPDATE ON TransferAttribute
             FOR EACH ROW
             WHEN NOT EXISTS (SELECT 1 FROM _import_batch)
               AND OLD.attributeValue != NEW.attributeValue
             BEGIN
-                -- Bump transfer revision FIRST (establishes the new revision ID)
+                -- Bump transfer revision
                 UPDATE Transfer
                 SET revisionId = revisionId + 1
                 WHERE id = NEW.transactionId;
 
-                -- Copy all attributes at same revision to new revision (read from Transfer)
-                INSERT INTO TransferAttribute (transactionId, revisionId, attributeTypeId, attributeValue)
-                SELECT transactionId,
-                       (SELECT revisionId FROM Transfer WHERE id = NEW.transactionId),
-                       attributeTypeId,
-                       CASE WHEN id = NEW.id THEN NEW.attributeValue ELSE attributeValue END
-                FROM TransferAttribute
-                WHERE transactionId = NEW.transactionId
-                  AND revisionId = OLD.revisionId;
+                -- Record the change in audit table (OLD value - what it was before)
+                INSERT INTO TransferAttributeAudit (transactionId, revisionId, attributeTypeId, auditTypeId, attributeValue)
+                SELECT NEW.transactionId, revisionId, NEW.attributeTypeId, 2, OLD.attributeValue
+                FROM Transfer WHERE id = NEW.transactionId;
             END
             """.trimIndent(),
             0,
         )
 
-        // Attribute DELETE trigger - bumps transfer revision and copies remaining attributes
+        // Attribute DELETE trigger - records attribute removal (stores OLD value)
         execute(
             null,
             """
-            CREATE TRIGGER IF NOT EXISTS trigger_attribute_delete_bump_revision
+            CREATE TRIGGER IF NOT EXISTS trigger_attribute_delete_audit
             AFTER DELETE ON TransferAttribute
             FOR EACH ROW
             WHEN NOT EXISTS (SELECT 1 FROM _import_batch)
             BEGIN
-                -- Bump transfer revision FIRST (establishes the new revision ID)
+                -- Bump transfer revision
                 UPDATE Transfer
                 SET revisionId = revisionId + 1
                 WHERE id = OLD.transactionId;
 
-                -- Copy remaining attributes to new revision (read from Transfer)
-                INSERT INTO TransferAttribute (transactionId, revisionId, attributeTypeId, attributeValue)
-                SELECT transactionId,
-                       (SELECT revisionId FROM Transfer WHERE id = OLD.transactionId),
-                       attributeTypeId, attributeValue
-                FROM TransferAttribute
-                WHERE transactionId = OLD.transactionId
-                  AND revisionId = OLD.revisionId
-                  AND id != OLD.id;
+                -- Record the deletion in audit table (OLD value - what was deleted)
+                INSERT INTO TransferAttributeAudit (transactionId, revisionId, attributeTypeId, auditTypeId, attributeValue)
+                SELECT OLD.transactionId, revisionId, OLD.attributeTypeId, 3, OLD.attributeValue
+                FROM Transfer WHERE id = OLD.transactionId;
             END
             """.trimIndent(),
             0,

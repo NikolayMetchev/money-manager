@@ -55,6 +55,7 @@ class MoneyManagerDatabaseWrapper(private val driver: SqlDriver) : MoneyManagerD
             "Currency_Audit",
             "Category_Audit",
             "Transfer_Audit",
+            "TransferAttributeAudit",
             "AccountBalanceMaterializedView",
             "RunningBalanceMaterializedView",
             "PendingMaterializedViewChanges",

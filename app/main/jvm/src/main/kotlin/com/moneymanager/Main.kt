@@ -50,7 +50,7 @@ private fun MainWindow(onExit: () -> Unit) {
     Window(
         onCloseRequest = onExit,
         title = "Money Manager",
-        state = rememberWindowState(width = 1000.dp, height = 700.dp),
+        state = rememberWindowState(width = 1000.dp, height = 900.dp),
     ) {
         MoneyManagerApp(
             databaseManager = component.databaseManager,

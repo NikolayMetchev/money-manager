@@ -205,6 +205,7 @@ private fun MoneyManagerAppContent(
     var currentlyViewedAccountId by remember { mutableStateOf<AccountId?>(null) }
     var preSelectedCurrencyId by remember { mutableStateOf<CurrencyId?>(null) }
     var currentlyViewedCurrencyId by remember { mutableStateOf<CurrencyId?>(null) }
+    var transactionRefreshTrigger by remember { mutableStateOf(0) }
 
     // Use schema-error-aware collection for flows that may fail on old databases
     val accounts by repositorySet.accountRepository.getAllAccounts()
@@ -362,6 +363,7 @@ private fun MoneyManagerAppContent(
                                 currentlyViewedCurrencyId = currencyId
                             },
                             scrollToTransferId = screen.scrollToTransferId,
+                            externalRefreshTrigger = transactionRefreshTrigger,
                         )
                     }
                     is Screen.CsvImports -> {
@@ -453,6 +455,9 @@ private fun MoneyManagerAppContent(
                     showTransactionDialog = false
                     preSelectedAccountId = null
                     preSelectedCurrencyId = null
+                },
+                onTransactionCreated = {
+                    transactionRefreshTrigger++
                 },
             )
         }

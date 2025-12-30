@@ -272,7 +272,6 @@ fun ApplyStrategyDialog(
                                         if (attributePairs.isNotEmpty()) {
                                             transferAttributeRepository.insertBatch(
                                                 transactionId = transfer.id,
-                                                revisionId = transfer.revisionId,
                                                 attributes = attributePairs,
                                             )
                                         }

@@ -8,7 +8,7 @@ import com.moneymanager.database.sql.MoneyManagerDatabase
 import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.AuditType
-import com.moneymanager.domain.model.TransferAttribute
+import com.moneymanager.domain.model.TransferAttributeAuditEntry
 import com.moneymanager.domain.model.TransferAuditEntry
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.AuditRepository
@@ -20,7 +20,7 @@ class AuditRepositoryImpl(
     database: MoneyManagerDatabase,
 ) : AuditRepository {
     private val queries = database.auditQueries
-    private val attributeQueries = database.transferAttributeQueries
+    private val attributeAuditQueries = database.transferAttributeAuditQueries
 
     override suspend fun getAuditHistoryForTransfer(transferId: TransferId): List<TransferAuditEntry> =
         withContext(Dispatchers.Default) {
@@ -29,7 +29,7 @@ class AuditRepositoryImpl(
                     .executeAsList()
                     .map(TransferAuditEntryMapper::map)
 
-            attachAttributes(transferId, entries)
+            attachAttributeChanges(transferId, entries)
         }
 
     override suspend fun getAuditHistoryForTransferWithSource(transferId: TransferId): List<TransferAuditEntry> =
@@ -39,19 +39,19 @@ class AuditRepositoryImpl(
                     .executeAsList()
                     .map(TransferAuditEntryWithSourceMapper::map)
 
-            attachAttributes(transferId, entries)
+            attachAttributeChanges(transferId, entries)
         }
 
-    private fun attachAttributes(
+    private fun attachAttributeChanges(
         transferId: TransferId,
         entries: List<TransferAuditEntry>,
     ): List<TransferAuditEntry> {
-        // Fetch all attributes for this transfer
-        val allAttributes =
-            attributeQueries.selectAllByTransaction(transferId.id.toString())
+        // Fetch all attribute audit entries for this transfer
+        val allAttributeChanges =
+            attributeAuditQueries.selectAllByTransaction(transferId.id.toString())
                 .executeAsList()
                 .map { row ->
-                    TransferAttribute(
+                    TransferAttributeAuditEntry(
                         id = row.id,
                         transactionId = TransferId(Uuid.parse(row.transactionId)),
                         revisionId = row.revisionId,
@@ -60,23 +60,25 @@ class AuditRepositoryImpl(
                                 id = AttributeTypeId(row.attributeType_id),
                                 name = row.attributeType_name,
                             ),
+                        auditType = mapAuditType(row.auditType_name),
                         value = row.attributeValue,
                     )
                 }
 
-        // Group attributes by revisionId
-        val attributesByRevision = allAttributes.groupBy { it.revisionId }
+        // Group attribute changes by revisionId
+        val changesByRevision = allAttributeChanges.groupBy { it.revisionId }
 
-        // Attach attributes to each audit entry based on revisionId
-        // For UPDATE entries: the audit trigger stores OLD field values but NEW revisionId,
-        // so we need to attach attributes from revisionId - 1 (the state BEFORE the update)
+        // Attach attribute changes to each audit entry based on revisionId
         return entries.map { entry ->
-            val attributeRevision =
-                when (entry.auditType) {
-                    AuditType.UPDATE -> entry.revisionId - 1
-                    else -> entry.revisionId
-                }
-            entry.copy(attributes = attributesByRevision[attributeRevision] ?: emptyList())
+            entry.copy(attributeChanges = changesByRevision[entry.revisionId] ?: emptyList())
         }
     }
+
+    private fun mapAuditType(name: String): AuditType =
+        when (name) {
+            "INSERT" -> AuditType.INSERT
+            "UPDATE" -> AuditType.UPDATE
+            "DELETE" -> AuditType.DELETE
+            else -> error("Unknown audit type: $name")
+        }
 }

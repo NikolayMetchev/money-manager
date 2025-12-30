@@ -56,11 +56,17 @@ sealed class AttributeChange {
         val value: String,
     ) : AttributeChange()
 
-    /** Attribute value changed. */
+    /** Attribute value changed (both old and new values known). */
     data class Changed(
         override val attributeTypeName: String,
         val oldValue: String,
         val newValue: String,
+    ) : AttributeChange()
+
+    /** Attribute value was modified (only old value known from audit). */
+    data class ModifiedFrom(
+        override val attributeTypeName: String,
+        val oldValue: String,
     ) : AttributeChange()
 
     /** Attribute value stayed the same. */
