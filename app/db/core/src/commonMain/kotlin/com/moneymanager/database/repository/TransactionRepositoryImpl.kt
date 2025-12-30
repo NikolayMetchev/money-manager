@@ -402,6 +402,79 @@ class TransactionRepositoryImpl(
             )
         }
 
+    override suspend fun updateTransferAndAttributes(
+        transfer: Transfer?,
+        deletedAttributeIds: Set<Long>,
+        updatedAttributes: Map<Long, Pair<AttributeTypeId, String>>,
+        newAttributes: List<Pair<AttributeTypeId, String>>,
+        transactionId: TransferId,
+    ): Unit =
+        withContext(Dispatchers.Default) {
+            val hasAttributeChanges =
+                deletedAttributeIds.isNotEmpty() ||
+                    updatedAttributes.isNotEmpty() ||
+                    newAttributes.isNotEmpty()
+
+            transferQueries.transaction {
+                // Step 1: Update transfer if provided (bumps revision via trigger)
+                if (transfer != null) {
+                    transferQueries.update(
+                        timestamp = transfer.timestamp.toEpochMilliseconds(),
+                        description = transfer.description,
+                        sourceAccountId = transfer.sourceAccountId.id,
+                        targetAccountId = transfer.targetAccountId.id,
+                        currencyId = transfer.amount.currency.id.toString(),
+                        amount = transfer.amount.amount,
+                        id = transfer.id.toString(),
+                    )
+                } else if (hasAttributeChanges) {
+                    // No transfer change but has attribute changes - need to bump revision first
+                    transferQueries.bumpRevisionOnly(transactionId.id.toString())
+                }
+
+                // Step 2: Apply attribute changes in creation mode (record audit but don't bump again)
+                if (hasAttributeChanges) {
+                    database.beginCreationMode()
+                    try {
+                        // Delete attributes
+                        deletedAttributeIds.forEach { id ->
+                            transferAttributeQueries.deleteById(id)
+                        }
+
+                        // Update attributes
+                        updatedAttributes.forEach { (id, pair) ->
+                            val (typeId, value) = pair
+                            // Check if type changed (requires delete + insert)
+                            val current = transferAttributeQueries.selectById(id).executeAsOneOrNull()
+                            if (current != null && current.attributeTypeId != typeId.id) {
+                                // Type changed: delete and recreate
+                                transferAttributeQueries.deleteById(id)
+                                transferAttributeQueries.insert(
+                                    transactionId = transactionId.id.toString(),
+                                    attributeTypeId = typeId.id,
+                                    attributeValue = value,
+                                )
+                            } else {
+                                // Only value changed
+                                transferAttributeQueries.updateValue(value, id)
+                            }
+                        }
+
+                        // Insert new attributes
+                        newAttributes.forEach { (typeId, value) ->
+                            transferAttributeQueries.insert(
+                                transactionId = transactionId.id.toString(),
+                                attributeTypeId = typeId.id,
+                                attributeValue = value,
+                            )
+                        }
+                    } finally {
+                        database.endCreationMode()
+                    }
+                }
+            }
+        }
+
     override suspend fun bumpRevisionOnly(id: TransferId): Long =
         withContext(Dispatchers.Default) {
             transferQueries.transactionWithResult {

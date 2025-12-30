@@ -94,6 +94,32 @@ interface TransactionRepository {
     suspend fun updateTransfer(transfer: Transfer)
 
     /**
+     * Updates a transfer and its attributes atomically, creating only ONE revision bump.
+     *
+     * This method handles the case where both transfer fields AND attributes change.
+     * Without this method, updating the transfer would bump revision (1→2), and then
+     * each attribute change would bump it again (2→3, etc.).
+     *
+     * With this method:
+     * - If only transfer changes: bumps to rev 2
+     * - If only attributes change: bumps to rev 2
+     * - If BOTH change: bumps to rev 2 (not 3+)
+     *
+     * @param transfer The updated transfer (null if transfer fields didn't change)
+     * @param deletedAttributeIds IDs of attributes to delete
+     * @param updatedAttributes Map of attribute ID to (typeId, value) for updates
+     * @param newAttributes List of (typeId, value) pairs for new attributes
+     * @param transactionId The transaction ID (needed when transfer is null)
+     */
+    suspend fun updateTransferAndAttributes(
+        transfer: Transfer?,
+        deletedAttributeIds: Set<Long>,
+        updatedAttributes: Map<Long, Pair<AttributeTypeId, String>>,
+        newAttributes: List<Pair<AttributeTypeId, String>>,
+        transactionId: TransferId,
+    )
+
+    /**
      * Bumps the revision of a transfer without changing any other fields.
      * This is used when only attributes change, to create an audit entry.
      *

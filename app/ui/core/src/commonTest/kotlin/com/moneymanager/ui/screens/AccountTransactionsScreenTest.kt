@@ -13,6 +13,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.runComposeUiTest
 import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.database.DbLocation
@@ -619,6 +620,193 @@ class AccountTransactionsScreenTest {
         }
     }
 
+    @Test
+    fun editTransaction_changeDescriptionAndAddAttribute_createsOnlyOneNewRevision() {
+        // This test verifies that editing a transaction and changing BOTH the description
+        // AND adding a new attribute creates only ONE new revision (Rev 2), not two.
+        //
+        // Bug scenario: If the save operation is not atomic, updating the transfer
+        // (bumps to Rev 2) and then adding an attribute (bumps to Rev 3) would create
+        // two revisions instead of one.
+
+        var testDbLocation: DbLocation? = null
+        lateinit var database: MoneyManagerDatabaseWrapper
+        var repositories: RepositorySet? = null
+        var checkingAccountId: AccountId? = null
+        var savingsAccountId: AccountId? = null
+        var transferId: TransferId? = null
+
+        try {
+            // Given: Set up a real database with accounts and a transaction
+            runBlocking {
+                testDbLocation = createTestDatabaseLocation()
+                val databaseManager = createTestDatabaseManager()
+                database = databaseManager.openDatabase(testDbLocation)
+                repositories = RepositorySet(database)
+
+                val now = Clock.System.now()
+
+                // Get USD currency (seeded by database)
+                val usdCurrency = repositories.currencyRepository.getCurrencyByCode("USD").first()!!
+
+                // Create accounts
+                checkingAccountId =
+                    repositories.accountRepository.createAccount(
+                        Account(
+                            id = AccountId(0L),
+                            name = "Combined Edit Checking",
+                            openingDate = now,
+                        ),
+                    )
+                savingsAccountId =
+                    repositories.accountRepository.createAccount(
+                        Account(
+                            id = AccountId(0L),
+                            name = "Combined Edit Savings",
+                            openingDate = now,
+                        ),
+                    )
+
+                // Create a transfer (revision 1)
+                transferId = TransferId(Uuid.random())
+                val transfer =
+                    Transfer(
+                        id = transferId,
+                        timestamp = now,
+                        description = "Original Description",
+                        sourceAccountId = checkingAccountId,
+                        targetAccountId = savingsAccountId,
+                        amount = Money.fromDisplayValue(100.0, usdCurrency),
+                    )
+                repositories.transactionRepository.createTransfersWithAttributesAndSources(
+                    transfersWithAttributes = listOf(transfer to emptyList()),
+                    sourceRecorder = SourceRecorder.Manual,
+                    deviceInfo = DeviceInfo.Jvm("test-machine", "Test OS"),
+                )
+
+                // Verify initial revision is 1
+                val initialTransfer =
+                    repositories.transactionRepository.getTransactionById(transferId!!.id).first()!!
+                assertEquals(1L, initialTransfer.revisionId, "Initial revision should be 1")
+
+                // Refresh materialized views so the transaction appears
+                repositories.maintenanceService.fullRefreshMaterializedViews()
+            }
+
+            // Run the UI test
+            runComposeUiTest {
+                // When: Viewing the account transactions screen
+                setContent {
+                    ProvideSchemaAwareScope {
+                        var currentAccountId by remember { mutableStateOf(checkingAccountId!!) }
+
+                        AccountTransactionsScreen(
+                            accountId = currentAccountId,
+                            transactionRepository = repositories!!.transactionRepository,
+                            transferSourceRepository = repositories.transferSourceRepository,
+                            accountRepository = repositories.accountRepository,
+                            categoryRepository = repositories.categoryRepository,
+                            currencyRepository = repositories.currencyRepository,
+                            auditRepository = repositories.auditRepository,
+                            attributeTypeRepository = repositories.attributeTypeRepository,
+                            transferAttributeRepository = repositories.transferAttributeRepository,
+                            maintenanceService = repositories.maintenanceService,
+                            onAccountIdChange = { currentAccountId = it },
+                            onCurrencyIdChange = {},
+                        )
+                    }
+                }
+
+                waitForIdle()
+
+                // Step 1: Open edit dialog
+                onNodeWithText("\u270F\uFE0F").performClick()
+                waitForIdle()
+
+                // Verify edit dialog is displayed
+                onNodeWithText("Edit Transaction").assertIsDisplayed()
+
+                // Wait for dialog to fully load
+                mainClock.advanceTimeBy(100)
+                waitForIdle()
+
+                // Step 2: Change the description (index 1 is the editable text field in the dialog)
+                onAllNodesWithText("Original Description")[1]
+                    .performTextReplacement("Updated Description")
+                waitForIdle()
+
+                // Step 3: Add a new attribute
+                onNodeWithText("+ Add Attribute").performClick()
+                waitForIdle()
+
+                // Fill in the attribute type
+                onAllNodesWithText("Type")[0].performClick()
+                waitForIdle()
+                onAllNodesWithText("Type")[0].performTextInput("New Attribute")
+                waitForIdle()
+
+                // Fill in the attribute value
+                onAllNodesWithText("Value")[0].performClick()
+                waitForIdle()
+                onAllNodesWithText("Value")[0].performTextInput("New Value")
+                waitForIdle()
+
+                // Step 4: Click Update to save (both changes should be atomic)
+                onNodeWithText("Update").performClick()
+                waitForIdle()
+
+                // Wait for save operation to complete
+                mainClock.advanceTimeBy(500)
+                waitForIdle()
+
+                // Refresh materialized views
+                runBlocking {
+                    repositories!!.maintenanceService.fullRefreshMaterializedViews()
+                }
+
+                // Wait for UI to refresh
+                mainClock.advanceTimeBy(300)
+                waitForIdle()
+
+                // Verify the description was updated in the UI
+                onNodeWithText("Updated Description", substring = true).assertIsDisplayed()
+
+                // Step 5: Open audit history and verify via UI
+                onNodeWithText("\uD83D\uDCDC").performClick()
+                waitForIdle()
+                mainClock.advanceTimeBy(500)
+                waitForIdle()
+
+                // Verify audit history dialog is displayed
+                onNodeWithText("Audit History:", substring = true).assertIsDisplayed()
+
+                // Wait for audit entries to load
+                mainClock.advanceTimeBy(1000)
+                waitForIdle()
+
+                // Step 6: Verify ONLY Rev 1 and Rev 2 exist (NOT Rev 3)
+                // Rev 1 should be the initial INSERT
+                onNodeWithText("Rev 1", substring = true).assertIsDisplayed()
+
+                // Rev 2 should exist (combined UPDATE with description change + attribute addition)
+                onNodeWithText("Rev 2", substring = true).assertIsDisplayed()
+
+                // Rev 3 should NOT exist - both changes should be in a single revision
+                onAllNodesWithText("Rev 3", substring = true).assertCountEquals(0)
+
+                // Verify the description change is shown
+                onNodeWithText("Updated Description", substring = true).assertIsDisplayed()
+
+                // Verify the added attribute is shown with "+" prefix
+                onNodeWithText("+New Attribute:", substring = true).assertIsDisplayed()
+                onNodeWithText("New Value", substring = true).assertIsDisplayed()
+            }
+        } finally {
+            // Clean up database
+            testDbLocation?.let { deleteTestDatabase(it) }
+        }
+    }
+
     private class FakeAccountRepository(
         private val accounts: List<Account>,
     ) : AccountRepository {
@@ -794,6 +982,14 @@ class AccountTransactionsScreenTest {
         ) {}
 
         override suspend fun updateTransfer(transfer: Transfer) {}
+
+        override suspend fun updateTransferAndAttributes(
+            transfer: Transfer?,
+            deletedAttributeIds: Set<Long>,
+            updatedAttributes: Map<Long, Pair<com.moneymanager.domain.model.AttributeTypeId, String>>,
+            newAttributes: List<Pair<com.moneymanager.domain.model.AttributeTypeId, String>>,
+            transactionId: TransferId,
+        ) {}
 
         override suspend fun bumpRevisionOnly(id: TransferId): Long = 1L
 

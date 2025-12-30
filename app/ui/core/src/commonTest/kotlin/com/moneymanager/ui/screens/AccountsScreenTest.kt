@@ -457,6 +457,14 @@ class AccountsScreenTest {
 
         override suspend fun updateTransfer(transfer: Transfer) {}
 
+        override suspend fun updateTransferAndAttributes(
+            transfer: Transfer?,
+            deletedAttributeIds: Set<Long>,
+            updatedAttributes: Map<Long, Pair<com.moneymanager.domain.model.AttributeTypeId, String>>,
+            newAttributes: List<Pair<com.moneymanager.domain.model.AttributeTypeId, String>>,
+            transactionId: TransferId,
+        ) {}
+
         override suspend fun bumpRevisionOnly(id: TransferId): Long = 1L
 
         override suspend fun deleteTransaction(id: Uuid) {}

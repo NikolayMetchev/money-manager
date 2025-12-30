@@ -74,6 +74,7 @@ import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
 import com.moneymanager.domain.model.AttributeType
+import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DeviceInfo
@@ -1926,11 +1927,9 @@ fun TransactionEditDialog(
                                             description.trim() != transaction.description ||
                                             timestamp != transaction.timestamp
 
-                                    var currentRevisionId = transaction.revisionId
-
-                                    // Only update transfer if fields actually changed
-                                    if (transferFieldsChanged) {
-                                        val updatedTransfer =
+                                    // Build the transfer object if fields changed
+                                    val updatedTransfer =
+                                        if (transferFieldsChanged) {
                                             Transfer(
                                                 id = transaction.id,
                                                 timestamp = timestamp,
@@ -1939,75 +1938,59 @@ fun TransactionEditDialog(
                                                 targetAccountId = targetAccountId,
                                                 amount = Money.fromDisplayValue(amount, currency),
                                             )
-                                        transactionRepository.updateTransfer(updatedTransfer)
+                                        } else {
+                                            null
+                                        }
 
-                                        // Get updated transfer to retrieve new revisionId
-                                        val updated =
-                                            transactionRepository.getTransactionById(transaction.id.id)
-                                                .first()
-                                        if (updated != null) {
-                                            currentRevisionId = updated.revisionId
-                                            // Record manual source for this update
-                                            transferSourceRepository.recordManualSource(
-                                                transactionId = updated.id,
-                                                revisionId = updated.revisionId,
-                                                deviceInfo = getDeviceInfo(),
-                                            )
+                                    // Build attribute change data structures
+                                    val originalIds = originalAttributes.map { it.id }.toSet()
+                                    val editableIds = editableAttributes.keys
+                                    val deletedAttributeIds = originalIds - editableIds
+
+                                    // Build updated attributes map (id -> (typeId, value))
+                                    val updatedAttributes = mutableMapOf<Long, Pair<AttributeTypeId, String>>()
+                                    editableAttributes.filter { (id, _) -> id > 0 }.forEach { (id, pair) ->
+                                        val (typeName, value) = pair
+                                        val original = originalAttributes.find { it.id == id }
+                                        if (original != null) {
+                                            val typeChanged = original.attributeType.name != typeName
+                                            val valueChanged = original.value != value
+                                            if (typeChanged || valueChanged) {
+                                                val typeId = attributeTypeRepository.getOrCreate(typeName)
+                                                updatedAttributes[id] = typeId to value
+                                            }
                                         }
                                     }
 
-                                    // Handle attribute changes
-                                    // With the new design, attributes are "live" (no revisionId).
-                                    // Each attribute operation (delete/update/insert) triggers:
-                                    // 1. Revision bump on the transfer
-                                    // 2. Audit entry in TransferAttributeAudit
-                                    if (hasAttributeChanges()) {
-                                        // Handle deleted attributes
-                                        val originalIds = originalAttributes.map { it.id }.toSet()
-                                        val editableIds = editableAttributes.keys
-                                        val deletedIds = originalIds - editableIds
-                                        deletedIds.forEach { id ->
-                                            transferAttributeRepository.delete(id)
+                                    // Build new attributes list (typeId, value)
+                                    val newAttributes = mutableListOf<Pair<AttributeTypeId, String>>()
+                                    editableAttributes.filter { (id, _) -> id < 0 }.forEach { (_, pair) ->
+                                        val (typeName, value) = pair
+                                        if (typeName.isNotBlank() && value.isNotBlank()) {
+                                            val typeId = attributeTypeRepository.getOrCreate(typeName)
+                                            newAttributes.add(typeId to value)
                                         }
+                                    }
 
-                                        // Handle updated attributes (value or type changes)
-                                        editableAttributes.filter { (id, _) -> id > 0 }.forEach { (id, pair) ->
-                                            val (typeName, value) = pair
-                                            val original = originalAttributes.find { it.id == id }
-                                            if (original != null) {
-                                                val typeChanged = original.attributeType.name != typeName
-                                                val valueChanged = original.value != value
-                                                when {
-                                                    typeChanged -> {
-                                                        // Type changed: delete and recreate
-                                                        transferAttributeRepository.delete(id)
-                                                        val typeId = attributeTypeRepository.getOrCreate(typeName)
-                                                        transferAttributeRepository.insert(
-                                                            transactionId = transaction.id,
-                                                            attributeTypeId = typeId,
-                                                            value = value,
-                                                        )
-                                                    }
-                                                    valueChanged -> {
-                                                        // Only value changed: update in place
-                                                        transferAttributeRepository.updateValue(id, value)
-                                                    }
-                                                }
-                                            }
-                                        }
+                                    // Use the atomic method to update transfer and attributes together
+                                    // This ensures only ONE revision bump even if both change
+                                    transactionRepository.updateTransferAndAttributes(
+                                        transfer = updatedTransfer,
+                                        deletedAttributeIds = deletedAttributeIds,
+                                        updatedAttributes = updatedAttributes,
+                                        newAttributes = newAttributes,
+                                        transactionId = transaction.id,
+                                    )
 
-                                        // Handle new attributes
-                                        editableAttributes.filter { (id, _) -> id < 0 }.forEach { (_, pair) ->
-                                            val (typeName, value) = pair
-                                            if (typeName.isNotBlank() && value.isNotBlank()) {
-                                                val typeId = attributeTypeRepository.getOrCreate(typeName)
-                                                transferAttributeRepository.insert(
-                                                    transactionId = transaction.id,
-                                                    attributeTypeId = typeId,
-                                                    value = value,
-                                                )
-                                            }
-                                        }
+                                    // Record manual source for this update
+                                    val updated =
+                                        transactionRepository.getTransactionById(transaction.id.id).first()
+                                    if (updated != null) {
+                                        transferSourceRepository.recordManualSource(
+                                            transactionId = updated.id,
+                                            revisionId = updated.revisionId,
+                                            deviceInfo = getDeviceInfo(),
+                                        )
                                     }
 
                                     maintenanceService.refreshMaterializedViews()
