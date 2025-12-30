@@ -98,7 +98,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
             val now = Clock.System.now()
 
             // Insert first transfer
-            repositories.transactionRepository.createTransfer(
+            createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
                     timestamp = now,
@@ -113,7 +113,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
             repositories.maintenanceService.fullRefreshMaterializedViews()
 
             // Insert transfer with timestamp AFTER existing
-            repositories.transactionRepository.createTransfer(
+            createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
                     timestamp = now.plus(kotlin.time.Duration.parse("1h")),
@@ -151,7 +151,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
             val now = Clock.System.now()
 
             // Insert first transfer
-            repositories.transactionRepository.createTransfer(
+            createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
                     timestamp = now,
@@ -163,7 +163,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
             )
 
             // Insert third transfer (leaving gap for middle insert)
-            repositories.transactionRepository.createTransfer(
+            createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
                     timestamp = now.plus(kotlin.time.Duration.parse("2h")),
@@ -178,7 +178,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
             repositories.maintenanceService.fullRefreshMaterializedViews()
 
             // Insert transfer with timestamp IN THE MIDDLE
-            repositories.transactionRepository.createTransfer(
+            createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
                     timestamp = now.plus(kotlin.time.Duration.parse("1h")),
@@ -203,7 +203,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
             val now = Clock.System.now()
 
             // Insert transfer at current time
-            repositories.transactionRepository.createTransfer(
+            createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
                     timestamp = now,
@@ -218,7 +218,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
             repositories.maintenanceService.fullRefreshMaterializedViews()
 
             // Insert transfer with timestamp BEFORE existing
-            repositories.transactionRepository.createTransfer(
+            createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
                     timestamp = now.minus(kotlin.time.Duration.parse("1h")),
@@ -246,7 +246,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
 
             // Insert two transfers
             val transfer1Id = TransferId(Uuid.random())
-            repositories.transactionRepository.createTransfer(
+            createTransfer(
                 Transfer(
                     id = transfer1Id,
                     timestamp = now,
@@ -257,7 +257,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
                 ),
             )
 
-            repositories.transactionRepository.createTransfer(
+            createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
                     timestamp = now.plus(kotlin.time.Duration.parse("1h")),
@@ -315,7 +315,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
 
             // Insert transfer between account1 and account2
             val transferId = TransferId(Uuid.random())
-            repositories.transactionRepository.createTransfer(
+            createTransfer(
                 Transfer(
                     id = transferId,
                     timestamp = now,
@@ -367,7 +367,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
 
             // Insert two transfers
             val transfer1Id = TransferId(Uuid.random())
-            repositories.transactionRepository.createTransfer(
+            createTransfer(
                 Transfer(
                     id = transfer1Id,
                     timestamp = now,
@@ -378,7 +378,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
                 ),
             )
 
-            repositories.transactionRepository.createTransfer(
+            createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
                     timestamp = now.plus(kotlin.time.Duration.parse("1h")),
@@ -416,7 +416,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
 
             // Insert single transfer
             val transferId = TransferId(Uuid.random())
-            repositories.transactionRepository.createTransfer(
+            createTransfer(
                 Transfer(
                     id = transferId,
                     timestamp = now,
@@ -471,7 +471,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
             val currencyId = repositories.currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
             val currency = repositories.currencyRepository.getCurrencyById(currencyId).first()!!
 
-            repositories.transactionRepository.createTransfer(
+            createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
                     timestamp = now,
@@ -491,7 +491,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
                     Account(id = AccountId(0), name = "Account 3 (NEW)", openingDate = now),
                 )
 
-            repositories.transactionRepository.createTransfer(
+            createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
                     timestamp = now.plus(kotlin.time.Duration.parse("1h")),
@@ -522,7 +522,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
             // Insert transfer with USD
             val usdId = repositories.currencyRepository.upsertCurrencyByCode("USD", "US Dollar")
             val usdCurrency = repositories.currencyRepository.getCurrencyById(usdId).first()!!
-            repositories.transactionRepository.createTransfer(
+            createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
                     timestamp = now,
@@ -539,7 +539,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
             // Insert transfer with NEW currency (EUR)
             val eurId = repositories.currencyRepository.upsertCurrencyByCode("EUR", "Euro")
             val eurCurrency = repositories.currencyRepository.getCurrencyById(eurId).first()!!
-            repositories.transactionRepository.createTransfer(
+            createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
                     timestamp = now.plus(kotlin.time.Duration.parse("1h")),
@@ -573,7 +573,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
             val now = Clock.System.now()
 
             // Insert initial transfer
-            repositories.transactionRepository.createTransfer(
+            createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
                     timestamp = now,
@@ -588,7 +588,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
             repositories.maintenanceService.fullRefreshMaterializedViews()
 
             // Make MULTIPLE changes WITHOUT refreshing in between
-            repositories.transactionRepository.createTransfer(
+            createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
                     timestamp = now.plus(kotlin.time.Duration.parse("1h")),
@@ -599,7 +599,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
                 ),
             )
 
-            repositories.transactionRepository.createTransfer(
+            createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
                     timestamp = now.plus(kotlin.time.Duration.parse("2h")),
@@ -610,7 +610,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
                 ),
             )
 
-            repositories.transactionRepository.createTransfer(
+            createTransfer(
                 Transfer(
                     id = TransferId(Uuid.random()),
                     timestamp = now.plus(kotlin.time.Duration.parse("3h")),
@@ -652,7 +652,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
 
             // Insert several transfers
             repeat(5) { i ->
-                repositories.transactionRepository.createTransfer(
+                createTransfer(
                     Transfer(
                         id = TransferId(Uuid.random()),
                         timestamp = now.plus(kotlin.time.Duration.parse("${i}h")),

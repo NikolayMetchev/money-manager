@@ -205,6 +205,7 @@ private fun MoneyManagerAppContent(
     var currentlyViewedAccountId by remember { mutableStateOf<AccountId?>(null) }
     var preSelectedCurrencyId by remember { mutableStateOf<CurrencyId?>(null) }
     var currentlyViewedCurrencyId by remember { mutableStateOf<CurrencyId?>(null) }
+    var transactionRefreshTrigger by remember { mutableStateOf(0) }
 
     // Use schema-error-aware collection for flows that may fail on old databases
     val accounts by repositorySet.accountRepository.getAllAccounts()
@@ -351,6 +352,8 @@ private fun MoneyManagerAppContent(
                             categoryRepository = repositorySet.categoryRepository,
                             currencyRepository = repositorySet.currencyRepository,
                             auditRepository = repositorySet.auditRepository,
+                            attributeTypeRepository = repositorySet.attributeTypeRepository,
+                            transferAttributeRepository = repositorySet.transferAttributeRepository,
                             maintenanceService = repositorySet.maintenanceService,
                             currentDeviceId = currentDeviceId,
                             onAccountIdChange = { accountId ->
@@ -360,6 +363,7 @@ private fun MoneyManagerAppContent(
                                 currentlyViewedCurrencyId = currencyId
                             },
                             scrollToTransferId = screen.scrollToTransferId,
+                            externalRefreshTrigger = transactionRefreshTrigger,
                         )
                     }
                     is Screen.CsvImports -> {
@@ -386,7 +390,7 @@ private fun MoneyManagerAppContent(
                             categoryRepository = repositorySet.categoryRepository,
                             currencyRepository = repositorySet.currencyRepository,
                             transactionRepository = repositorySet.transactionRepository,
-                            transferSourceRepository = repositorySet.transferSourceRepository,
+                            attributeTypeRepository = repositorySet.attributeTypeRepository,
                             maintenanceService = repositorySet.maintenanceService,
                             onBack = { currentScreen = Screen.CsvImports },
                             onDeleted = { currentScreen = Screen.CsvImports },
@@ -440,6 +444,8 @@ private fun MoneyManagerAppContent(
                 accountRepository = repositorySet.accountRepository,
                 categoryRepository = repositorySet.categoryRepository,
                 currencyRepository = repositorySet.currencyRepository,
+                attributeTypeRepository = repositorySet.attributeTypeRepository,
+                transferAttributeRepository = repositorySet.transferAttributeRepository,
                 maintenanceService = repositorySet.maintenanceService,
                 preSelectedSourceAccountId = preSelectedAccountId,
                 preSelectedCurrencyId = preSelectedCurrencyId,
@@ -447,6 +453,9 @@ private fun MoneyManagerAppContent(
                     showTransactionDialog = false
                     preSelectedAccountId = null
                     preSelectedCurrencyId = null
+                },
+                onTransactionCreated = {
+                    transactionRefreshTrigger++
                 },
             )
         }

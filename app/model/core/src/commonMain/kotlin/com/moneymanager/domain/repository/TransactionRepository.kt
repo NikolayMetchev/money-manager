@@ -5,9 +5,12 @@ package com.moneymanager.domain.repository
 import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
+import com.moneymanager.domain.model.AttributeTypeId
+import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.PageWithTargetIndex
 import com.moneymanager.domain.model.PagingInfo
 import com.moneymanager.domain.model.PagingResult
+import com.moneymanager.domain.model.SourceRecorder
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
@@ -72,11 +75,58 @@ interface TransactionRepository {
         pageSize: Int,
     ): PageWithTargetIndex<AccountRow>
 
-    suspend fun createTransfer(transfer: Transfer)
-
-    suspend fun createTransfersBatch(transfers: List<Transfer>)
+    /**
+     * Creates transfers with their attributes and sources in a single atomic operation.
+     * Works for single transfers (from UI), batch operations (sample data), and CSV imports.
+     *
+     * @param transfersWithAttributes List of transfers with their (attributeTypeId, value) pairs
+     * @param sourceRecorder Strategy for recording source information
+     * @param deviceInfo Device info for source recording
+     * @param onProgress Optional callback for batch progress (called after each batch of ~1000)
+     */
+    suspend fun createTransfersWithAttributesAndSources(
+        transfersWithAttributes: List<Pair<Transfer, List<Pair<AttributeTypeId, String>>>>,
+        sourceRecorder: SourceRecorder,
+        deviceInfo: DeviceInfo,
+        onProgress: (suspend (created: Int, total: Int) -> Unit)? = null,
+    )
 
     suspend fun updateTransfer(transfer: Transfer)
+
+    /**
+     * Updates a transfer and its attributes atomically, creating only ONE revision bump.
+     *
+     * This method handles the case where both transfer fields AND attributes change.
+     * Without this method, updating the transfer would bump revision (1→2), and then
+     * each attribute change would bump it again (2→3, etc.).
+     *
+     * With this method:
+     * - If only transfer changes: bumps to rev 2
+     * - If only attributes change: bumps to rev 2
+     * - If BOTH change: bumps to rev 2 (not 3+)
+     *
+     * @param transfer The updated transfer (null if transfer fields didn't change)
+     * @param deletedAttributeIds IDs of attributes to delete
+     * @param updatedAttributes Map of attribute ID to (typeId, value) for updates
+     * @param newAttributes List of (typeId, value) pairs for new attributes
+     * @param transactionId The transaction ID (needed when transfer is null)
+     */
+    suspend fun updateTransferAndAttributes(
+        transfer: Transfer?,
+        deletedAttributeIds: Set<Long>,
+        updatedAttributes: Map<Long, Pair<AttributeTypeId, String>>,
+        newAttributes: List<Pair<AttributeTypeId, String>>,
+        transactionId: TransferId,
+    )
+
+    /**
+     * Bumps the revision of a transfer without changing any other fields.
+     * This is used when only attributes change, to create an audit entry.
+     *
+     * @param id The transfer ID
+     * @return The new revision ID
+     */
+    suspend fun bumpRevisionOnly(id: TransferId): Long
 
     suspend fun deleteTransaction(id: Uuid)
 }

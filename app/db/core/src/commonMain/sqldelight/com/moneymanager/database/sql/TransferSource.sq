@@ -105,6 +105,15 @@ INSERT INTO TransferSource (
 )
 VALUES (?, ?, 2, ?, ?, ?, ?);
 
+-- Insert a new source record for sample data generator
+insertSampleGenerator:
+INSERT INTO TransferSource (
+    transactionId, revisionId, sourceTypeId,
+    deviceId,
+    createdAt
+)
+VALUES (?, ?, 3, ?, ?);
+
 -- Select sources by CSV import ID
 selectByCsvImportId:
 SELECT

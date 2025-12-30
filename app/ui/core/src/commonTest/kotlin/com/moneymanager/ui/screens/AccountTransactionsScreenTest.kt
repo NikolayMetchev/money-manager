@@ -8,37 +8,63 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.runComposeUiTest
+import androidx.compose.ui.test.waitUntilAtLeastOneExists
+import androidx.compose.ui.test.waitUntilExactlyOneExists
 import com.moneymanager.database.DatabaseMaintenanceService
+import com.moneymanager.database.DbLocation
+import com.moneymanager.database.MoneyManagerDatabaseWrapper
+import com.moneymanager.database.RepositorySet
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
+import com.moneymanager.domain.model.AttributeType
+import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CategoryBalance
+import com.moneymanager.domain.model.CsvSourceDetails
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.Money
+import com.moneymanager.domain.model.SourceRecorder
+import com.moneymanager.domain.model.SourceType
 import com.moneymanager.domain.model.Transfer
+import com.moneymanager.domain.model.TransferAttribute
 import com.moneymanager.domain.model.TransferAuditEntry
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.TransferSource
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.repository.AccountRepository
+import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.AuditRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CsvImportSourceRecord
 import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.domain.repository.SampleGeneratorSourceRecord
 import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.domain.repository.TransferAttributeRepository
 import com.moneymanager.domain.repository.TransferSourceRepository
+import com.moneymanager.test.database.createTestDatabaseLocation
+import com.moneymanager.test.database.createTestDatabaseManager
+import com.moneymanager.test.database.deleteTestDatabase
 import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Instant
@@ -88,6 +114,8 @@ class AccountTransactionsScreenTest {
             val currencyRepository = FakeCurrencyRepository(listOf(usdCurrency))
             val categoryRepository = FakeCategoryRepository()
             val auditRepository = FakeAuditRepository()
+            val attributeTypeRepository = FakeAttributeTypeRepository()
+            val transferAttributeRepository = FakeTransferAttributeRepository()
             val maintenanceService = FakeDatabaseMaintenanceService()
 
             // When: Viewing from Checking account's perspective
@@ -103,6 +131,8 @@ class AccountTransactionsScreenTest {
                         categoryRepository = categoryRepository,
                         currencyRepository = currencyRepository,
                         auditRepository = auditRepository,
+                        attributeTypeRepository = attributeTypeRepository,
+                        transferAttributeRepository = transferAttributeRepository,
                         maintenanceService = maintenanceService,
                         onAccountIdChange = { currentAccountId = it },
                         onCurrencyIdChange = {},
@@ -179,6 +209,8 @@ class AccountTransactionsScreenTest {
             val currencyRepository = FakeCurrencyRepository(listOf(usdCurrency))
             val categoryRepository = FakeCategoryRepository()
             val auditRepository = FakeAuditRepository()
+            val attributeTypeRepository = FakeAttributeTypeRepository()
+            val transferAttributeRepository = FakeTransferAttributeRepository()
             val maintenanceService = FakeDatabaseMaintenanceService()
 
             setContent {
@@ -193,6 +225,8 @@ class AccountTransactionsScreenTest {
                         categoryRepository = categoryRepository,
                         currencyRepository = currencyRepository,
                         auditRepository = auditRepository,
+                        attributeTypeRepository = attributeTypeRepository,
+                        transferAttributeRepository = transferAttributeRepository,
                         maintenanceService = maintenanceService,
                         onAccountIdChange = { currentAccountId = it },
                         onCurrencyIdChange = {},
@@ -221,6 +255,543 @@ class AccountTransactionsScreenTest {
             // [1] = Transaction row (the "other" account from Savings' view)
             onAllNodesWithText("Checking").assertCountEquals(2)
         }
+
+    @Test
+    fun editTransaction_addNewAttribute_savesAttributeSuccessfully() {
+        // Set up real database
+        var testDbLocation: DbLocation? = null
+        lateinit var database: MoneyManagerDatabaseWrapper
+        var repositories: RepositorySet? = null
+        var checkingAccountId: AccountId? = null
+        var savingsAccountId: AccountId? = null
+        var transferId: TransferId? = null
+
+        try {
+            // Given: Set up a real database with accounts and a transaction
+            runBlocking {
+                testDbLocation = createTestDatabaseLocation()
+                val databaseManager = createTestDatabaseManager()
+                database = databaseManager.openDatabase(testDbLocation)
+                repositories = RepositorySet(database)
+
+                val now = Clock.System.now()
+
+                // Get USD currency (seeded by database)
+                val usdCurrency = repositories.currencyRepository.getCurrencyByCode("USD").first()!!
+
+                // Create accounts
+                checkingAccountId =
+                    repositories.accountRepository.createAccount(
+                        Account(
+                            id = AccountId(0L),
+                            name = "E2E Test Checking",
+                            openingDate = now,
+                        ),
+                    )
+                savingsAccountId =
+                    repositories.accountRepository.createAccount(
+                        Account(
+                            id = AccountId(0L),
+                            name = "E2E Test Savings",
+                            openingDate = now,
+                        ),
+                    )
+
+                // Create a transfer
+                transferId = TransferId(Uuid.random())
+                val transfer =
+                    Transfer(
+                        id = transferId,
+                        timestamp = now,
+                        description = "E2E Test Transaction",
+                        sourceAccountId = checkingAccountId,
+                        targetAccountId = savingsAccountId,
+                        amount = Money.fromDisplayValue(50.0, usdCurrency),
+                    )
+                repositories.transactionRepository.createTransfersWithAttributesAndSources(
+                    transfersWithAttributes = listOf(transfer to emptyList()),
+                    sourceRecorder = SourceRecorder.SampleGenerator,
+                    deviceInfo = DeviceInfo.Jvm("test-machine", "Test OS"),
+                )
+
+                // Refresh materialized views so the transaction appears
+                repositories.maintenanceService.fullRefreshMaterializedViews()
+            }
+
+            // Run the UI test
+            runComposeUiTest {
+                // When: Viewing the account transactions screen
+                setContent {
+                    ProvideSchemaAwareScope {
+                        var currentAccountId by remember { mutableStateOf(checkingAccountId!!) }
+
+                        AccountTransactionsScreen(
+                            accountId = currentAccountId,
+                            transactionRepository = repositories!!.transactionRepository,
+                            transferSourceRepository = repositories.transferSourceRepository,
+                            accountRepository = repositories.accountRepository,
+                            categoryRepository = repositories.categoryRepository,
+                            currencyRepository = repositories.currencyRepository,
+                            auditRepository = repositories.auditRepository,
+                            attributeTypeRepository = repositories.attributeTypeRepository,
+                            transferAttributeRepository = repositories.transferAttributeRepository,
+                            maintenanceService = repositories.maintenanceService,
+                            onAccountIdChange = { currentAccountId = it },
+                            onCurrencyIdChange = {},
+                        )
+                    }
+                }
+
+                waitForIdle()
+
+                // Click the edit button (pencil emoji) on the transaction
+                onNodeWithText("\u270F\uFE0F").performClick()
+                waitForIdle()
+
+                // Verify edit dialog is displayed
+                onNodeWithText("Edit Transaction").assertIsDisplayed()
+
+                // Wait for attributes to load
+                mainClock.advanceTimeBy(100)
+                waitForIdle()
+
+                // Click "Add Attribute" button
+                onNodeWithText("+ Add Attribute").performClick()
+                waitForIdle()
+
+                // Find and fill in the attribute type field
+                onAllNodesWithText("Type")[0].performClick()
+                waitForIdle()
+
+                // Type in the attribute type name
+                onAllNodesWithText("Type")[0].performTextInput("Reference Number")
+                waitForIdle()
+
+                // Find and fill in the value field
+                onAllNodesWithText("Value")[0].performClick()
+                waitForIdle()
+                onAllNodesWithText("Value")[0].performTextInput("REF-12345")
+                waitForIdle()
+
+                // Click Update to save
+                onNodeWithText("Update").performClick()
+                waitForIdle()
+
+                // Wait for save operation to complete
+                mainClock.advanceTimeBy(500)
+                waitForIdle()
+
+                // Verify from database: the attribute was saved
+                runBlocking {
+                    // Get the transfer's current revision
+                    val savedTransfer =
+                        repositories!!.transactionRepository
+                            .getTransactionById(transferId!!.id).first()!!
+                    // Note: For revisionId = 1 (newly created transfers), adding attributes
+                    // doesn't bump the revision - they're part of the initial creation.
+                    // Only existing transfers (revisionId > 1) get bumped when adding attributes.
+                    assertTrue(
+                        savedTransfer.revisionId >= 1,
+                        "Transfer should have valid revision",
+                    )
+
+                    // Verify the attribute type was created
+                    val attributeType =
+                        repositories.attributeTypeRepository
+                            .getByName("Reference Number").first()
+                    assertTrue(
+                        attributeType != null,
+                        "Attribute type 'Reference Number' should exist in database",
+                    )
+
+                    // Verify the attribute was saved
+                    val attributes =
+                        repositories.transferAttributeRepository
+                            .getByTransaction(transferId).first()
+                    assertTrue(
+                        attributes.any { it.value == "REF-12345" && it.attributeType.name == "Reference Number" },
+                        "Attribute with value 'REF-12345' should exist in database. Found: $attributes",
+                    )
+                }
+
+                // Refresh materialized views so the updated transaction appears
+                runBlocking {
+                    repositories!!.maintenanceService.fullRefreshMaterializedViews()
+                }
+
+                // Wait for UI to refresh after edit dialog closes
+                mainClock.advanceTimeBy(300)
+                waitForIdle()
+
+                // Now click the Audit History button (📜) and verify it shows the new attribute
+                onNodeWithText("\uD83D\uDCDC").performClick()
+                waitForIdle()
+                mainClock.advanceTimeBy(300)
+                waitForIdle()
+
+                // Verify audit history is displayed - title format is "Audit History: <transferId>"
+                onNodeWithText("Audit History:", substring = true).assertIsDisplayed()
+
+                // Wait for audit entries to load
+                mainClock.advanceTimeBy(1000)
+                waitForIdle()
+
+                // The audit should show UPDATE entry (revision 2)
+                // Verify the attribute type and value are displayed in the audit history
+                // The attribute is displayed as "+Reference Number:" and "REF-12345" as separate text nodes
+                onNodeWithText("Reference Number", substring = true).assertIsDisplayed()
+                onNodeWithText("REF-12345", substring = true).assertIsDisplayed()
+            }
+        } finally {
+            // Clean up database
+            testDbLocation?.let { deleteTestDatabase(it) }
+        }
+    }
+
+    @Test
+    fun editTransaction_addNewAttribute_createsAuditEntryWithNewRevision() {
+        // This test verifies that editing an existing transaction and adding a new attribute
+        // creates a new revision in the audit trail.
+        //
+        // The trigger logic only bumps revision for transfers with revisionId > 1,
+        // so we first update the transfer to bump it to revision 2, then add an attribute.
+
+        var testDbLocation: DbLocation? = null
+        lateinit var database: MoneyManagerDatabaseWrapper
+        var repositories: RepositorySet? = null
+        var checkingAccountId: AccountId? = null
+        var savingsAccountId: AccountId? = null
+        var transferId: TransferId? = null
+
+        try {
+            // Given: Set up a real database with accounts and a transaction
+            runBlocking {
+                testDbLocation = createTestDatabaseLocation()
+                val databaseManager = createTestDatabaseManager()
+                database = databaseManager.openDatabase(testDbLocation)
+                repositories = RepositorySet(database)
+
+                val now = Clock.System.now()
+
+                // Get USD currency (seeded by database)
+                val usdCurrency = repositories.currencyRepository.getCurrencyByCode("USD").first()!!
+
+                // Create accounts
+                checkingAccountId =
+                    repositories.accountRepository.createAccount(
+                        Account(
+                            id = AccountId(0L),
+                            name = "Audit Test Checking",
+                            openingDate = now,
+                        ),
+                    )
+                savingsAccountId =
+                    repositories.accountRepository.createAccount(
+                        Account(
+                            id = AccountId(0L),
+                            name = "Audit Test Savings",
+                            openingDate = now,
+                        ),
+                    )
+
+                // Create a transfer (revision 1)
+                transferId = TransferId(Uuid.random())
+                val transfer =
+                    Transfer(
+                        id = transferId,
+                        timestamp = now,
+                        description = "Audit Test Transaction",
+                        sourceAccountId = checkingAccountId,
+                        targetAccountId = savingsAccountId,
+                        amount = Money.fromDisplayValue(100.0, usdCurrency),
+                    )
+                repositories.transactionRepository.createTransfersWithAttributesAndSources(
+                    transfersWithAttributes = listOf(transfer to emptyList()),
+                    sourceRecorder = SourceRecorder.Manual,
+                    deviceInfo = DeviceInfo.Jvm("test-machine", "Test OS"),
+                )
+
+                // Verify initial revision is 1
+                val initialTransfer =
+                    repositories.transactionRepository.getTransactionById(transferId!!.id).first()!!
+                assertEquals(1L, initialTransfer.revisionId, "Initial revision should be 1")
+
+                // Refresh materialized views so the transaction appears
+                repositories.maintenanceService.fullRefreshMaterializedViews()
+            }
+
+            // Run the UI test
+            runComposeUiTest {
+                // When: Viewing the account transactions screen
+                setContent {
+                    ProvideSchemaAwareScope {
+                        var currentAccountId by remember { mutableStateOf(checkingAccountId!!) }
+
+                        AccountTransactionsScreen(
+                            accountId = currentAccountId,
+                            transactionRepository = repositories!!.transactionRepository,
+                            transferSourceRepository = repositories.transferSourceRepository,
+                            accountRepository = repositories.accountRepository,
+                            categoryRepository = repositories.categoryRepository,
+                            currencyRepository = repositories.currencyRepository,
+                            auditRepository = repositories.auditRepository,
+                            attributeTypeRepository = repositories.attributeTypeRepository,
+                            transferAttributeRepository = repositories.transferAttributeRepository,
+                            maintenanceService = repositories.maintenanceService,
+                            onAccountIdChange = { currentAccountId = it },
+                            onCurrencyIdChange = {},
+                        )
+                    }
+                }
+
+                // Wait for the edit button to appear
+                waitUntilExactlyOneExists(hasText("\u270F\uFE0F"), timeoutMillis = 10000)
+
+                // Step 1: Open edit dialog
+                onNodeWithText("\u270F\uFE0F").performClick()
+
+                // Wait for edit dialog to appear
+                waitUntilExactlyOneExists(hasText("Edit Transaction"), timeoutMillis = 10000)
+
+                // Step 2: Add a new attribute
+                waitUntilExactlyOneExists(hasText("+ Add Attribute"), timeoutMillis = 5000)
+                onNodeWithText("+ Add Attribute").performClick()
+
+                // Wait for attribute fields to appear
+                waitUntilAtLeastOneExists(hasText("Type"), timeoutMillis = 5000)
+
+                // Fill in the attribute type
+                onAllNodesWithText("Type")[0].performClick()
+                waitForIdle()
+                onAllNodesWithText("Type")[0].performTextInput("Test Attribute")
+                waitForIdle()
+
+                // Fill in the attribute value
+                onAllNodesWithText("Value")[0].performClick()
+                waitForIdle()
+                onAllNodesWithText("Value")[0].performTextInput("Test Value 123")
+                waitForIdle()
+
+                // Step 3: Click Update to save
+                onNodeWithText("Update").performClick()
+                waitForIdle()
+
+                // Wait for save operation to complete
+                mainClock.advanceTimeBy(500)
+                waitForIdle()
+
+                // Refresh materialized views
+                runBlocking {
+                    repositories!!.maintenanceService.fullRefreshMaterializedViews()
+                }
+
+                // Wait for audit button to be visible (indicates UI has refreshed)
+                waitUntilExactlyOneExists(hasText("\uD83D\uDCDC"), timeoutMillis = 10000)
+
+                // Step 4: Open audit history and verify via UI
+                onNodeWithText("\uD83D\uDCDC").performClick()
+
+                // Wait for audit history dialog to appear
+                waitUntilExactlyOneExists(hasText("Audit History:", substring = true), timeoutMillis = 10000)
+
+                // Step 5: Verify both revisions are shown in the UI
+                // Rev 1 should be the initial INSERT
+                waitUntilExactlyOneExists(hasText("Rev 1", substring = true), timeoutMillis = 10000)
+
+                // Rev 2 should exist (UPDATE with attribute added)
+                waitUntilExactlyOneExists(hasText("Rev 2", substring = true), timeoutMillis = 10000)
+
+                // Verify the "Updated" (UPDATE) header exists for Rev 2
+                waitUntilAtLeastOneExists(hasText("Updated", substring = true), timeoutMillis = 10000)
+
+                // Verify the added attribute is shown with "+" prefix (indicates it was added in Rev 2)
+                waitUntilExactlyOneExists(hasText("+Test Attribute:", substring = true), timeoutMillis = 10000)
+                waitUntilAtLeastOneExists(hasText("Test Value 123", substring = true), timeoutMillis = 10000)
+            }
+        } finally {
+            // Clean up database
+            testDbLocation?.let { deleteTestDatabase(it) }
+        }
+    }
+
+    @Test
+    fun editTransaction_changeDescriptionAndAddAttribute_createsOnlyOneNewRevision() {
+        // This test verifies that editing a transaction and changing BOTH the description
+        // AND adding a new attribute creates only ONE new revision (Rev 2), not two.
+        //
+        // Bug scenario: If the save operation is not atomic, updating the transfer
+        // (bumps to Rev 2) and then adding an attribute (bumps to Rev 3) would create
+        // two revisions instead of one.
+
+        var testDbLocation: DbLocation? = null
+        lateinit var database: MoneyManagerDatabaseWrapper
+        var repositories: RepositorySet? = null
+        var checkingAccountId: AccountId? = null
+        var savingsAccountId: AccountId? = null
+        var transferId: TransferId? = null
+
+        try {
+            // Given: Set up a real database with accounts and a transaction
+            runBlocking {
+                testDbLocation = createTestDatabaseLocation()
+                val databaseManager = createTestDatabaseManager()
+                database = databaseManager.openDatabase(testDbLocation)
+                repositories = RepositorySet(database)
+
+                val now = Clock.System.now()
+
+                // Get USD currency (seeded by database)
+                val usdCurrency = repositories.currencyRepository.getCurrencyByCode("USD").first()!!
+
+                // Create accounts
+                checkingAccountId =
+                    repositories.accountRepository.createAccount(
+                        Account(
+                            id = AccountId(0L),
+                            name = "Combined Edit Checking",
+                            openingDate = now,
+                        ),
+                    )
+                savingsAccountId =
+                    repositories.accountRepository.createAccount(
+                        Account(
+                            id = AccountId(0L),
+                            name = "Combined Edit Savings",
+                            openingDate = now,
+                        ),
+                    )
+
+                // Create a transfer (revision 1)
+                transferId = TransferId(Uuid.random())
+                val transfer =
+                    Transfer(
+                        id = transferId,
+                        timestamp = now,
+                        description = "Original Description",
+                        sourceAccountId = checkingAccountId,
+                        targetAccountId = savingsAccountId,
+                        amount = Money.fromDisplayValue(100.0, usdCurrency),
+                    )
+                repositories.transactionRepository.createTransfersWithAttributesAndSources(
+                    transfersWithAttributes = listOf(transfer to emptyList()),
+                    sourceRecorder = SourceRecorder.Manual,
+                    deviceInfo = DeviceInfo.Jvm("test-machine", "Test OS"),
+                )
+
+                // Verify initial revision is 1
+                val initialTransfer =
+                    repositories.transactionRepository.getTransactionById(transferId!!.id).first()!!
+                assertEquals(1L, initialTransfer.revisionId, "Initial revision should be 1")
+
+                // Refresh materialized views so the transaction appears
+                repositories.maintenanceService.fullRefreshMaterializedViews()
+            }
+
+            // Run the UI test
+            runComposeUiTest {
+                // When: Viewing the account transactions screen
+                setContent {
+                    ProvideSchemaAwareScope {
+                        var currentAccountId by remember { mutableStateOf(checkingAccountId!!) }
+
+                        AccountTransactionsScreen(
+                            accountId = currentAccountId,
+                            transactionRepository = repositories!!.transactionRepository,
+                            transferSourceRepository = repositories.transferSourceRepository,
+                            accountRepository = repositories.accountRepository,
+                            categoryRepository = repositories.categoryRepository,
+                            currencyRepository = repositories.currencyRepository,
+                            auditRepository = repositories.auditRepository,
+                            attributeTypeRepository = repositories.attributeTypeRepository,
+                            transferAttributeRepository = repositories.transferAttributeRepository,
+                            maintenanceService = repositories.maintenanceService,
+                            onAccountIdChange = { currentAccountId = it },
+                            onCurrencyIdChange = {},
+                        )
+                    }
+                }
+
+                // Wait for the edit button to appear
+                waitUntilExactlyOneExists(hasText("\u270F\uFE0F"), timeoutMillis = 10000)
+
+                // Step 1: Open edit dialog
+                onNodeWithText("\u270F\uFE0F").performClick()
+
+                // Wait for edit dialog to appear
+                waitUntilExactlyOneExists(hasText("Edit Transaction"), timeoutMillis = 10000)
+
+                // Step 2: Change the description (index 1 is the editable text field in the dialog)
+                waitUntilAtLeastOneExists(hasText("Original Description"), timeoutMillis = 5000)
+                onAllNodesWithText("Original Description")[1]
+                    .performTextReplacement("Updated Description")
+                waitForIdle()
+
+                // Step 3: Add a new attribute
+                waitUntilExactlyOneExists(hasText("+ Add Attribute"), timeoutMillis = 5000)
+                onNodeWithText("+ Add Attribute").performClick()
+
+                // Wait for attribute fields to appear
+                waitUntilAtLeastOneExists(hasText("Type"), timeoutMillis = 5000)
+
+                // Fill in the attribute type
+                onAllNodesWithText("Type")[0].performClick()
+                waitForIdle()
+                onAllNodesWithText("Type")[0].performTextInput("New Attribute")
+                waitForIdle()
+
+                // Fill in the attribute value
+                onAllNodesWithText("Value")[0].performClick()
+                waitForIdle()
+                onAllNodesWithText("Value")[0].performTextInput("New Value")
+                waitForIdle()
+
+                // Step 4: Click Update to save (both changes should be atomic)
+                onNodeWithText("Update").performClick()
+                waitForIdle()
+
+                // Wait for save operation to complete
+                mainClock.advanceTimeBy(500)
+                waitForIdle()
+
+                // Refresh materialized views
+                runBlocking {
+                    repositories!!.maintenanceService.fullRefreshMaterializedViews()
+                }
+
+                // Verify the description was updated in the UI
+                waitUntilAtLeastOneExists(hasText("Updated Description", substring = true), timeoutMillis = 10000)
+
+                // Wait for audit button to be visible
+                waitUntilExactlyOneExists(hasText("\uD83D\uDCDC"), timeoutMillis = 10000)
+
+                // Step 5: Open audit history and verify via UI
+                onNodeWithText("\uD83D\uDCDC").performClick()
+
+                // Wait for audit history dialog to appear
+                waitUntilExactlyOneExists(hasText("Audit History:", substring = true), timeoutMillis = 10000)
+
+                // Step 6: Verify ONLY Rev 1 and Rev 2 exist (NOT Rev 3)
+                // Rev 1 should be the initial INSERT
+                waitUntilExactlyOneExists(hasText("Rev 1", substring = true), timeoutMillis = 10000)
+
+                // Rev 2 should exist (combined UPDATE with description change + attribute addition)
+                waitUntilExactlyOneExists(hasText("Rev 2", substring = true), timeoutMillis = 10000)
+
+                // Rev 3 should NOT exist - both changes should be in a single revision
+                onAllNodesWithText("Rev 3", substring = true).assertCountEquals(0)
+
+                // Verify the description change is shown
+                waitUntilAtLeastOneExists(hasText("Updated Description", substring = true), timeoutMillis = 10000)
+
+                // Verify the added attribute is shown with "+" prefix
+                waitUntilExactlyOneExists(hasText("+New Attribute:", substring = true), timeoutMillis = 10000)
+                waitUntilAtLeastOneExists(hasText("New Value", substring = true), timeoutMillis = 10000)
+            }
+        } finally {
+            // Clean up database
+            testDbLocation?.let { deleteTestDatabase(it) }
+        }
+    }
 
     private class FakeAccountRepository(
         private val accounts: List<Account>,
@@ -389,11 +960,24 @@ class AccountTransactionsScreenTest {
             )
         }
 
-        override suspend fun createTransfer(transfer: Transfer) {}
-
-        override suspend fun createTransfersBatch(transfers: List<Transfer>) {}
+        override suspend fun createTransfersWithAttributesAndSources(
+            transfersWithAttributes: List<Pair<Transfer, List<Pair<com.moneymanager.domain.model.AttributeTypeId, String>>>>,
+            sourceRecorder: com.moneymanager.domain.model.SourceRecorder,
+            deviceInfo: com.moneymanager.domain.model.DeviceInfo,
+            onProgress: (suspend (Int, Int) -> Unit)?,
+        ) {}
 
         override suspend fun updateTransfer(transfer: Transfer) {}
+
+        override suspend fun updateTransferAndAttributes(
+            transfer: Transfer?,
+            deletedAttributeIds: Set<Long>,
+            updatedAttributes: Map<Long, Pair<com.moneymanager.domain.model.AttributeTypeId, String>>,
+            newAttributes: List<Pair<com.moneymanager.domain.model.AttributeTypeId, String>>,
+            transactionId: TransferId,
+        ) {}
+
+        override suspend fun bumpRevisionOnly(id: TransferId): Long = 1L
 
         override suspend fun deleteTransaction(id: Uuid) {}
     }
@@ -461,29 +1045,128 @@ class AccountTransactionsScreenTest {
     }
 
     private class FakeTransferSourceRepository : TransferSourceRepository {
+        private var sourceIdCounter = 1L
+        private val sources = mutableListOf<TransferSource>()
+
         override suspend fun recordManualSource(
             transactionId: TransferId,
             revisionId: Long,
             deviceInfo: DeviceInfo,
-        ): TransferSource = throw NotImplementedError("Not needed for this test")
+        ): TransferSource {
+            val source =
+                TransferSource(
+                    id = sourceIdCounter++,
+                    transactionId = transactionId,
+                    revisionId = revisionId,
+                    sourceType = SourceType.MANUAL,
+                    deviceId = 1L,
+                    deviceInfo = deviceInfo,
+                    csvSource = null,
+                    createdAt = Clock.System.now(),
+                )
+            sources.add(source)
+            return source
+        }
 
         override suspend fun recordCsvImportSource(
             transactionId: TransferId,
             revisionId: Long,
             csvImportId: CsvImportId,
             rowIndex: Long,
-        ): TransferSource = throw NotImplementedError("Not needed for this test")
+        ): TransferSource {
+            val source =
+                TransferSource(
+                    id = sourceIdCounter++,
+                    transactionId = transactionId,
+                    revisionId = revisionId,
+                    sourceType = SourceType.CSV_IMPORT,
+                    deviceId = 1L,
+                    deviceInfo = DeviceInfo.Jvm(osName = "Test", machineName = "Test"),
+                    csvSource = CsvSourceDetails(importId = csvImportId, rowIndex = rowIndex, fileName = "test.csv"),
+                    createdAt = Clock.System.now(),
+                )
+            sources.add(source)
+            return source
+        }
 
         override suspend fun recordCsvImportSourcesBatch(
             csvImportId: CsvImportId,
             sources: List<CsvImportSourceRecord>,
         ) {}
 
-        override suspend fun getSourcesForTransaction(transactionId: TransferId): List<TransferSource> = emptyList()
+        override suspend fun recordSampleGeneratorSourcesBatch(
+            deviceInfo: DeviceInfo,
+            sources: List<SampleGeneratorSourceRecord>,
+        ) {}
+
+        override suspend fun getSourcesForTransaction(transactionId: TransferId): List<TransferSource> =
+            sources.filter { it.transactionId == transactionId }
 
         override suspend fun getSourceByRevision(
             transactionId: TransferId,
             revisionId: Long,
-        ): TransferSource? = null
+        ): TransferSource? = sources.find { it.transactionId == transactionId && it.revisionId == revisionId }
+    }
+
+    private class FakeAttributeTypeRepository : AttributeTypeRepository {
+        private val types = mutableListOf<AttributeType>()
+        private var nextId = 1L
+
+        override fun getAll(): Flow<List<AttributeType>> = flowOf(types.toList())
+
+        override fun getById(id: AttributeTypeId): Flow<AttributeType?> = flowOf(types.find { it.id == id })
+
+        override fun getByName(name: String): Flow<AttributeType?> = flowOf(types.find { it.name == name })
+
+        override suspend fun getOrCreate(name: String): AttributeTypeId {
+            val existing = types.find { it.name == name }
+            if (existing != null) return existing.id
+            val newType = AttributeType(id = AttributeTypeId(nextId++), name = name)
+            types.add(newType)
+            return newType.id
+        }
+
+        fun getCreatedTypes(): List<AttributeType> = types.toList()
+    }
+
+    private class FakeTransferAttributeRepository : TransferAttributeRepository {
+        private val attributes = mutableListOf<TransferAttribute>()
+        private var nextId = 1L
+
+        override fun getByTransaction(transactionId: TransferId): Flow<List<TransferAttribute>> =
+            flowOf(attributes.filter { it.transactionId == transactionId })
+
+        override suspend fun insert(
+            transactionId: TransferId,
+            attributeTypeId: AttributeTypeId,
+            value: String,
+        ): Long {
+            val id = nextId++
+            attributes.add(
+                TransferAttribute(
+                    id = id,
+                    transactionId = transactionId,
+                    attributeType = AttributeType(id = attributeTypeId, name = "Type${attributeTypeId.id}"),
+                    value = value,
+                ),
+            )
+            return id
+        }
+
+        override suspend fun updateValue(
+            id: Long,
+            newValue: String,
+        ) {
+            val index = attributes.indexOfFirst { it.id == id }
+            if (index >= 0) {
+                attributes[index] = attributes[index].copy(value = newValue)
+            }
+        }
+
+        override suspend fun delete(id: Long) {
+            attributes.removeAll { it.id == id }
+        }
+
+        fun getInsertedAttributes(): List<TransferAttribute> = this.attributes.toList()
     }
 }

@@ -3,10 +3,13 @@
 package com.moneymanager.ui.util
 
 import com.moneymanager.database.RepositorySet
+import com.moneymanager.domain.getDeviceInfo
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Money
+import com.moneymanager.domain.model.SourceRecorder
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -183,7 +186,7 @@ suspend fun generateSampleData(
         ),
     )
 
-    // Step 6: Generate transactions in batches
+    // Step 6: Create sample attribute types first (needed for generating attributes)
     progressFlow.emit(
         GenerationProgress(
             categoriesCreated = categoriesCreated,
@@ -191,7 +194,37 @@ suspend fun generateSampleData(
             accountsCreated = 100,
             totalAccounts = 100,
             totalTransactions = totalExpectedTransactions,
-            currentOperation = "Generating transactions...",
+            currentOperation = "Creating attribute types...",
+        ),
+    )
+
+    val attributeTypeNames =
+        listOf(
+            "Reference Number",
+            "Merchant ID",
+            "Order ID",
+            "Invoice Number",
+            "Receipt Number",
+            "Confirmation Code",
+            "Transaction Code",
+            "Check Number",
+        )
+
+    val attributeTypeIds = mutableListOf<AttributeTypeId>()
+    for (typeName in attributeTypeNames) {
+        val typeId = repositorySet.attributeTypeRepository.getOrCreate(typeName)
+        attributeTypeIds.add(typeId)
+    }
+
+    // Step 7: Generate transactions with attributes
+    progressFlow.emit(
+        GenerationProgress(
+            categoriesCreated = categoriesCreated,
+            totalCategories = totalCategories,
+            accountsCreated = 100,
+            totalAccounts = 100,
+            totalTransactions = totalExpectedTransactions,
+            currentOperation = "Generating transactions with attributes...",
         ),
     )
 
@@ -199,8 +232,8 @@ suspend fun generateSampleData(
     val endDate = Instant.parse("2025-12-31T23:59:59Z")
     val dateRangeMillis = endDate.toEpochMilliseconds() - startDate.toEpochMilliseconds()
 
-    // Generate all transactions first, then insert in batches
-    val allTransfers = mutableListOf<Transfer>()
+    // Generate all transactions with their attributes
+    val allTransfersWithAttributes = mutableListOf<Pair<Transfer, List<Pair<AttributeTypeId, String>>>>()
 
     for ((accountIndex, accountId) in accountIds.withIndex()) {
         val transactionCount = transactionCounts[accountIndex]
@@ -232,33 +265,44 @@ suspend fun generateSampleData(
                     amount = Money.fromDisplayValue(amount, currency),
                 )
 
-            allTransfers.add(transfer)
+            // 50% of transactions get 1-3 attributes
+            val attributes: List<Pair<AttributeTypeId, String>> =
+                if (random.nextBoolean()) {
+                    val numAttributes = random.nextInt(1, 4) // 1-3 attributes
+                    attributeTypeIds.shuffled(random).take(numAttributes).map { typeId ->
+                        typeId to generateAttributeValue(random)
+                    }
+                } else {
+                    emptyList()
+                }
+
+            allTransfersWithAttributes.add(transfer to attributes)
         }
     }
 
-    // Insert transfers in batches of 1000 for better progress tracking
-    val batchSize = 1000
+    // Step 8: Create transactions with attributes and sources in batches
+    val deviceInfo = getDeviceInfo()
     var transactionsCreated = 0
 
-    for (batchStart in allTransfers.indices step batchSize) {
-        val batchEnd = minOf(batchStart + batchSize, allTransfers.size)
-        val batch = allTransfers.subList(batchStart, batchEnd)
-
-        repositorySet.transactionRepository.createTransfersBatch(batch)
-        transactionsCreated += batch.size
-
-        progressFlow.emit(
-            GenerationProgress(
-                categoriesCreated = categoriesCreated,
-                totalCategories = totalCategories,
-                accountsCreated = 100,
-                totalAccounts = 100,
-                transactionsCreated = transactionsCreated,
-                totalTransactions = totalExpectedTransactions,
-                currentOperation = "Inserted $transactionsCreated/$totalExpectedTransactions transactions...",
-            ),
-        )
-    }
+    repositorySet.transactionRepository.createTransfersWithAttributesAndSources(
+        transfersWithAttributes = allTransfersWithAttributes,
+        sourceRecorder = SourceRecorder.SampleGenerator,
+        deviceInfo = deviceInfo,
+        onProgress = { created, total ->
+            transactionsCreated = created
+            progressFlow.emit(
+                GenerationProgress(
+                    categoriesCreated = categoriesCreated,
+                    totalCategories = totalCategories,
+                    accountsCreated = 100,
+                    totalAccounts = 100,
+                    transactionsCreated = created,
+                    totalTransactions = total,
+                    currentOperation = "Created $created/$total transactions...",
+                ),
+            )
+        },
+    )
 
     // Refresh materialized views
     progressFlow.emit(
@@ -327,6 +371,13 @@ private fun generateAccountNames(count: Int): List<String> {
     }
 
     return names.take(count)
+}
+
+private fun generateAttributeValue(random: Random): String {
+    val prefixes = listOf("REF", "ORD", "INV", "TXN", "CHK", "REC", "CNF", "MID")
+    val prefix = prefixes.random(random)
+    val number = random.nextInt(100000, 999999)
+    return "$prefix-$number"
 }
 
 private fun generateTransactionDescription(random: Random): String {

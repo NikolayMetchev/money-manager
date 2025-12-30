@@ -17,6 +17,12 @@ import kotlin.time.Instant
  * - X = OLD values from this entry
  * - Y = NEW values (from nextEntry or currentTransfer)
  *
+ * Attribute changes are stored directly in TransferAttributeAudit and attached
+ * to each TransferAuditEntry. Each attribute audit entry indicates:
+ * - INSERT: attribute was added (value = new value)
+ * - UPDATE: attribute was changed (value = old value)
+ * - DELETE: attribute was removed (value = old value)
+ *
  * @param entry The audit entry
  * @param newValuesForUpdate For UPDATE entries: the values AFTER the update
  *        (from the next audit entry or current transfer). Ignored for INSERT/DELETE.
@@ -26,6 +32,16 @@ fun computeAuditDiff(
     entry: TransferAuditEntry,
     newValuesForUpdate: UpdateNewValues?,
 ): AuditEntryDiff {
+    // Convert attribute audit entries to AttributeChange display model
+    val attributeChanges =
+        entry.attributeChanges.map { attrAudit ->
+            when (attrAudit.auditType) {
+                AuditType.INSERT -> AttributeChange.Added(attrAudit.attributeType.name, attrAudit.value)
+                AuditType.UPDATE -> AttributeChange.ModifiedFrom(attrAudit.attributeType.name, attrAudit.value)
+                AuditType.DELETE -> AttributeChange.Removed(attrAudit.attributeType.name, attrAudit.value)
+            }
+        }
+
     return when (entry.auditType) {
         AuditType.INSERT ->
             AuditEntryDiff(
@@ -40,6 +56,7 @@ fun computeAuditDiff(
                 targetAccountId = FieldChange.Created(entry.targetAccountId),
                 amount = FieldChange.Created(entry.amount),
                 source = entry.source,
+                attributeChanges = attributeChanges,
             )
         AuditType.DELETE ->
             AuditEntryDiff(
@@ -54,6 +71,7 @@ fun computeAuditDiff(
                 targetAccountId = FieldChange.Deleted(entry.targetAccountId),
                 amount = FieldChange.Deleted(entry.amount),
                 source = entry.source,
+                attributeChanges = attributeChanges,
             )
         AuditType.UPDATE -> {
             requireNotNull(newValuesForUpdate) { "UPDATE entry must have new values to compare against" }
@@ -69,6 +87,7 @@ fun computeAuditDiff(
                 targetAccountId = computeFieldChange(entry.targetAccountId, newValuesForUpdate.targetAccountId),
                 amount = computeFieldChange(entry.amount, newValuesForUpdate.amount),
                 source = entry.source,
+                attributeChanges = attributeChanges,
             )
         }
     }

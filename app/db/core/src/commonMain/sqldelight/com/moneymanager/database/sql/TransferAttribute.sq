@@ -1,0 +1,55 @@
+CREATE TABLE TransferAttribute (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    transactionId TEXT NOT NULL,
+    attributeTypeId INTEGER NOT NULL,
+    attributeValue TEXT NOT NULL,
+    FOREIGN KEY (transactionId) REFERENCES TransactionId(id) ON DELETE CASCADE,
+    FOREIGN KEY (attributeTypeId) REFERENCES AttributeType(id) ON DELETE RESTRICT,
+    UNIQUE (transactionId, attributeTypeId)
+);
+
+CREATE INDEX idx_transfer_attribute_transaction ON TransferAttribute(transactionId);
+CREATE INDEX idx_transfer_attribute_type ON TransferAttribute(attributeTypeId);
+
+selectByTransaction:
+SELECT
+    TransferAttribute.id,
+    TransferAttribute.transactionId,
+    TransferAttribute.attributeTypeId,
+    TransferAttribute.attributeValue,
+    AttributeType.id AS attributeType_id,
+    AttributeType.name AS attributeType_name
+FROM TransferAttribute
+JOIN AttributeType ON TransferAttribute.attributeTypeId = AttributeType.id
+WHERE TransferAttribute.transactionId = ?
+ORDER BY AttributeType.name;
+
+selectById:
+SELECT
+    TransferAttribute.id,
+    TransferAttribute.transactionId,
+    TransferAttribute.attributeTypeId,
+    TransferAttribute.attributeValue,
+    AttributeType.id AS attributeType_id,
+    AttributeType.name AS attributeType_name
+FROM TransferAttribute
+JOIN AttributeType ON TransferAttribute.attributeTypeId = AttributeType.id
+WHERE TransferAttribute.id = ?;
+
+insert:
+INSERT INTO TransferAttribute (transactionId, attributeTypeId, attributeValue)
+VALUES (?, ?, ?);
+
+selectLastInsertedId:
+SELECT last_insert_rowid();
+
+updateValue:
+UPDATE TransferAttribute
+SET attributeValue = ?
+WHERE id = ?;
+
+deleteById:
+DELETE FROM TransferAttribute WHERE id = ?;
+
+deleteAllByTransaction:
+DELETE FROM TransferAttribute WHERE transactionId = ?;

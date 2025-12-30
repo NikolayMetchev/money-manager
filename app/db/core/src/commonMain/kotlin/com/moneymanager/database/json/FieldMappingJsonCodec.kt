@@ -1,5 +1,6 @@
 package com.moneymanager.database.json
 
+import com.moneymanager.domain.model.csvstrategy.AttributeColumnMapping
 import com.moneymanager.domain.model.csvstrategy.FieldMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.serialization.UuidSerializersModule
@@ -36,4 +37,14 @@ object FieldMappingJsonCodec {
      * Decodes identification columns from JSON array string.
      */
     fun decodeColumns(jsonString: String): Set<String> = json.decodeFromString(jsonString)
+
+    /**
+     * Encodes attribute column mappings to JSON array string.
+     */
+    fun encodeAttributeMappings(mappings: List<AttributeColumnMapping>): String = json.encodeToString(mappings)
+
+    /**
+     * Decodes attribute column mappings from JSON array string.
+     */
+    fun decodeAttributeMappings(jsonString: String): List<AttributeColumnMapping> = json.decodeFromString(jsonString)
 }

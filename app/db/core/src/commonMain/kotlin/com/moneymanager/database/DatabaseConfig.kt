@@ -163,6 +163,126 @@ object DatabaseConfig {
         )
 
     /**
+     * Creates the temporary table used for batch import operations (CSV import).
+     * When this table contains a row, attribute triggers are SKIPPED entirely (no audit).
+     */
+    private fun MoneyManagerDatabaseWrapper.createBatchImportTable() =
+        execute(
+            null,
+            """
+            CREATE TABLE IF NOT EXISTS _import_batch (active INTEGER)
+            """.trimIndent(),
+            0,
+        )
+
+    /**
+     * Creates the temporary table used for initial transfer+attribute creation.
+     * When this table contains a row, attribute triggers RECORD audit but DON'T bump revision.
+     * This allows initial attributes to be recorded at revision 1 without incrementing.
+     */
+    private fun MoneyManagerDatabaseWrapper.createCreationModeTable() =
+        execute(
+            null,
+            """
+            CREATE TABLE IF NOT EXISTS _creation_mode (active INTEGER)
+            """.trimIndent(),
+            0,
+        )
+
+    /**
+     * Creates triggers for transfer attribute auditing.
+     *
+     * Each attribute change (INSERT/UPDATE/DELETE) bumps the transfer revision
+     * and records the change in TransferAttributeAudit.
+     *
+     * Storage pattern (same as Transfer_Audit):
+     * - INSERT: stores NEW value (attribute that was added)
+     * - UPDATE: stores OLD value (value before the change)
+     * - DELETE: stores OLD value (value that was removed)
+     *
+     * Flag tables control trigger behavior:
+     * - _import_batch: skip trigger entirely (CSV import - no audit)
+     * - _creation_mode: record audit but don't bump revision (initial creation)
+     * - neither: bump revision, then record audit (later modification)
+     */
+    private fun MoneyManagerDatabaseWrapper.createAttributeTriggers() {
+        // Attribute INSERT trigger - records new attribute addition (stores NEW value)
+        // The _import_batch guard skips this trigger during CSV import.
+        // The _creation_mode guard prevents revision bump during initial creation.
+        execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_attribute_insert_audit
+            AFTER INSERT ON TransferAttribute
+            FOR EACH ROW
+            WHEN NOT EXISTS (SELECT 1 FROM _import_batch)
+            BEGIN
+                -- Only bump revision if NOT in creation mode
+                UPDATE Transfer
+                SET revisionId = revisionId + 1
+                WHERE id = NEW.transactionId
+                  AND NOT EXISTS (SELECT 1 FROM _creation_mode);
+
+                -- Always record the addition in audit table at current revision
+                INSERT INTO TransferAttributeAudit (transactionId, revisionId, attributeTypeId, auditTypeId, attributeValue)
+                SELECT NEW.transactionId, revisionId, NEW.attributeTypeId, 1, NEW.attributeValue
+                FROM Transfer WHERE id = NEW.transactionId;
+            END
+            """.trimIndent(),
+            0,
+        )
+
+        // Attribute UPDATE trigger - records attribute value change (stores OLD value)
+        execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_attribute_update_audit
+            AFTER UPDATE ON TransferAttribute
+            FOR EACH ROW
+            WHEN NOT EXISTS (SELECT 1 FROM _import_batch)
+              AND OLD.attributeValue != NEW.attributeValue
+            BEGIN
+                -- Only bump revision if NOT in creation mode
+                UPDATE Transfer
+                SET revisionId = revisionId + 1
+                WHERE id = NEW.transactionId
+                  AND NOT EXISTS (SELECT 1 FROM _creation_mode);
+
+                -- Always record the change in audit table (OLD value - what it was before)
+                INSERT INTO TransferAttributeAudit (transactionId, revisionId, attributeTypeId, auditTypeId, attributeValue)
+                SELECT NEW.transactionId, revisionId, NEW.attributeTypeId, 2, OLD.attributeValue
+                FROM Transfer WHERE id = NEW.transactionId;
+            END
+            """.trimIndent(),
+            0,
+        )
+
+        // Attribute DELETE trigger - records attribute removal (stores OLD value)
+        execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_attribute_delete_audit
+            AFTER DELETE ON TransferAttribute
+            FOR EACH ROW
+            WHEN NOT EXISTS (SELECT 1 FROM _import_batch)
+            BEGIN
+                -- Only bump revision if NOT in creation mode
+                UPDATE Transfer
+                SET revisionId = revisionId + 1
+                WHERE id = OLD.transactionId
+                  AND NOT EXISTS (SELECT 1 FROM _creation_mode);
+
+                -- Always record the deletion in audit table (OLD value - what was deleted)
+                INSERT INTO TransferAttributeAudit (transactionId, revisionId, attributeTypeId, auditTypeId, attributeValue)
+                SELECT OLD.transactionId, revisionId, OLD.attributeTypeId, 3, OLD.attributeValue
+                FROM Transfer WHERE id = OLD.transactionId;
+            END
+            """.trimIndent(),
+            0,
+        )
+    }
+
+    /**
      * Creates audit triggers dynamically for all main tables.
      * Queries sqlite_master to discover tables and their columns, then generates triggers.
      *
@@ -255,6 +375,7 @@ object DatabaseConfig {
             // Seed SourceType lookup table
             sourceTypeQueries.insert(id = 1, name = "MANUAL")
             sourceTypeQueries.insert(id = 2, name = "CSV_IMPORT")
+            sourceTypeQueries.insert(id = 3, name = "SAMPLE_GENERATOR")
 
             // Seed Platform lookup table
             platformQueries.insert(id = 1, name = "JVM")
@@ -265,6 +386,11 @@ object DatabaseConfig {
 
             // Create trigger for category deletion (children inherit grandparent)
             createCategoryDeleteTrigger()
+
+            // Create flag tables and attribute triggers
+            createBatchImportTable()
+            createCreationModeTable()
+            createAttributeTriggers()
 
             // Create audit triggers for all main tables
             createAuditTriggers()

@@ -72,7 +72,26 @@ interface TransferSourceRepository {
         transactionId: TransferId,
         revisionId: Long,
     ): TransferSource?
+
+    /**
+     * Records sources for multiple transfers from the sample data generator in batch.
+     *
+     * @param deviceInfo Device information from the platform
+     * @param sources List of (transactionId, revisionId) tuples
+     */
+    suspend fun recordSampleGeneratorSourcesBatch(
+        deviceInfo: DeviceInfo,
+        sources: List<SampleGeneratorSourceRecord>,
+    )
 }
+
+/**
+ * Record for batch sample generator source recording.
+ */
+data class SampleGeneratorSourceRecord(
+    val transactionId: TransferId,
+    val revisionId: Long,
+)
 
 /**
  * Record for batch CSV import source recording.

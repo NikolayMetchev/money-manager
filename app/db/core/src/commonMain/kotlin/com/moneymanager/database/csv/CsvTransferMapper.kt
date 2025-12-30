@@ -42,9 +42,15 @@ import kotlin.uuid.Uuid
  * Result of mapping a CSV row to a Transfer.
  */
 sealed interface MappingResult {
+    /**
+     * @property transfer The mapped transfer
+     * @property newAccountName Name of new account to create (if any)
+     * @property attributes List of (attributeTypeName, value) pairs extracted from CSV
+     */
     data class Success(
         val transfer: Transfer,
         val newAccountName: String?,
+        val attributes: List<Pair<String, String>> = emptyList(),
     ) : MappingResult
 
     data class Error(
@@ -62,10 +68,18 @@ data class NewAccount(
 )
 
 /**
+ * A transfer with its associated attributes extracted from CSV.
+ */
+data class TransferWithAttributes(
+    val transfer: Transfer,
+    val attributes: List<Pair<String, String>>,
+)
+
+/**
  * Result of preparing an import batch.
  */
 data class ImportPreparation(
-    val validTransfers: List<Transfer>,
+    val validTransfers: List<TransferWithAttributes>,
     val errorRows: List<MappingResult.Error>,
     val newAccounts: Set<NewAccount>,
     val existingAccountMatches: Map<String, AccountId>,
@@ -88,7 +102,7 @@ class CsvTransferMapper(
      * Prepares an import by mapping all rows and collecting new accounts to create.
      */
     fun prepareImport(rows: List<CsvRow>): ImportPreparation {
-        val validTransfers = mutableListOf<Transfer>()
+        val validTransfers = mutableListOf<TransferWithAttributes>()
         val errorRows = mutableListOf<MappingResult.Error>()
         val newAccounts = mutableSetOf<NewAccount>()
         val existingMatches = mutableMapOf<String, AccountId>()
@@ -96,7 +110,7 @@ class CsvTransferMapper(
         for (row in rows) {
             when (val result = mapRow(row)) {
                 is MappingResult.Success -> {
-                    validTransfers.add(result.transfer)
+                    validTransfers.add(TransferWithAttributes(result.transfer, result.attributes))
                     if (result.newAccountName != null) {
                         val lookupMapping = strategy.fieldMappings[TransferField.TARGET_ACCOUNT]
                         val categoryId =
@@ -112,9 +126,11 @@ class CsvTransferMapper(
         }
 
         // Collect existing account matches
-        for (transfer in validTransfers) {
+        for (transferWithAttrs in validTransfers) {
             for ((name, account) in existingAccounts) {
-                if (account.id == transfer.sourceAccountId || account.id == transfer.targetAccountId) {
+                if (account.id == transferWithAttrs.transfer.sourceAccountId ||
+                    account.id == transferWithAttrs.transfer.targetAccountId
+                ) {
                     existingMatches[name] = account.id
                 }
             }
@@ -206,6 +222,9 @@ class CsvTransferMapper(
                     amount = amount,
                 )
 
+            // Extract attributes from mapped columns
+            val attributes = extractAttributes(values)
+
             MappingResult.Success(
                 transfer = transfer,
                 newAccountName =
@@ -215,10 +234,37 @@ class CsvTransferMapper(
                     } else {
                         null
                     },
+                attributes = attributes,
             )
         } catch (e: Exception) {
             MappingResult.Error(row.rowIndex, e.message ?: "Unknown error")
         }
+    }
+
+    /**
+     * Extracts attribute values from CSV row based on strategy.attributeMappings.
+     * Skips attributes with blank values.
+     */
+    private fun extractAttributes(values: List<String>): List<Pair<String, String>> {
+        return strategy.attributeMappings.mapNotNull { mapping ->
+            val value = getColumnValueOrNull(mapping.columnName, values)?.trim()
+            if (value.isNullOrBlank()) {
+                null
+            } else {
+                mapping.attributeTypeName to value
+            }
+        }
+    }
+
+    /**
+     * Gets a column value by name, returning null if the column doesn't exist.
+     */
+    private fun getColumnValueOrNull(
+        columnName: String,
+        values: List<String>,
+    ): String? {
+        val index = columnIndexByName[columnName] ?: return null
+        return values.getOrNull(index)
     }
 
     private fun parseAmountAndAccount(
