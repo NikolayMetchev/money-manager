@@ -392,6 +392,8 @@ private fun MoneyManagerAppContent(
                             transactionRepository = repositorySet.transactionRepository,
                             attributeTypeRepository = repositorySet.attributeTypeRepository,
                             maintenanceService = repositorySet.maintenanceService,
+                            transferSourceQueries = repositorySet.transferSourceQueries,
+                            deviceRepository = repositorySet.deviceRepository,
                             onBack = { currentScreen = Screen.CsvImports },
                             onDeleted = { currentScreen = Screen.CsvImports },
                             onTransferClick = { transferId, isPositiveAmount ->
@@ -441,6 +443,8 @@ private fun MoneyManagerAppContent(
             TransactionEntryDialog(
                 transactionRepository = repositorySet.transactionRepository,
                 transferSourceRepository = repositorySet.transferSourceRepository,
+                transferSourceQueries = repositorySet.transferSourceQueries,
+                deviceRepository = repositorySet.deviceRepository,
                 accountRepository = repositorySet.accountRepository,
                 categoryRepository = repositorySet.categoryRepository,
                 currencyRepository = repositorySet.currencyRepository,

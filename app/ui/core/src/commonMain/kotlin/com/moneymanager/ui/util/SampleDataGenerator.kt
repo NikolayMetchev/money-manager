@@ -3,15 +3,17 @@
 package com.moneymanager.ui.util
 
 import com.moneymanager.database.RepositorySet
+import com.moneymanager.database.SampleGeneratorSourceRecorder
 import com.moneymanager.domain.getDeviceInfo
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Money
-import com.moneymanager.domain.model.SourceRecorder
+import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.TransferWithAttributes
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlin.random.Random
@@ -233,7 +235,7 @@ suspend fun generateSampleData(
     val dateRangeMillis = endDate.toEpochMilliseconds() - startDate.toEpochMilliseconds()
 
     // Generate all transactions with their attributes
-    val allTransfersWithAttributes = mutableListOf<Pair<Transfer, List<Pair<AttributeTypeId, String>>>>()
+    val allTransfersWithAttributes = mutableListOf<TransferWithAttributes>()
 
     for ((accountIndex, accountId) in accountIds.withIndex()) {
         val transactionCount = transactionCounts[accountIndex]
@@ -266,28 +268,27 @@ suspend fun generateSampleData(
                 )
 
             // 50% of transactions get 1-3 attributes
-            val attributes: List<Pair<AttributeTypeId, String>> =
+            val attributes: List<NewAttribute> =
                 if (random.nextBoolean()) {
                     val numAttributes = random.nextInt(1, 4) // 1-3 attributes
                     attributeTypeIds.shuffled(random).take(numAttributes).map { typeId ->
-                        typeId to generateAttributeValue(random)
+                        NewAttribute(typeId, generateAttributeValue(random))
                     }
                 } else {
                     emptyList()
                 }
 
-            allTransfersWithAttributes.add(transfer to attributes)
+            allTransfersWithAttributes.add(TransferWithAttributes(transfer, attributes))
         }
     }
 
     // Step 8: Create transactions with attributes and sources in batches
-    val deviceInfo = getDeviceInfo()
+    val deviceId = repositorySet.deviceRepository.getOrCreateDevice(getDeviceInfo())
     var transactionsCreated = 0
 
     repositorySet.transactionRepository.createTransfersWithAttributesAndSources(
         transfersWithAttributes = allTransfersWithAttributes,
-        sourceRecorder = SourceRecorder.SampleGenerator,
-        deviceInfo = deviceInfo,
+        sourceRecorder = SampleGeneratorSourceRecorder(repositorySet.transferSourceQueries, deviceId),
         onProgress = { created, total ->
             transactionsCreated = created
             progressFlow.emit(

@@ -5,10 +5,11 @@ package com.moneymanager.test.database
 import com.moneymanager.database.DbLocation
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.RepositorySet
+import com.moneymanager.database.SampleGeneratorSourceRecorder
 import com.moneymanager.di.AppComponent
 import com.moneymanager.domain.model.DeviceInfo
-import com.moneymanager.domain.model.SourceRecorder
 import com.moneymanager.domain.model.Transfer
+import com.moneymanager.domain.model.TransferWithAttributes
 import kotlinx.coroutines.test.runTest
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -38,10 +39,10 @@ abstract class DbTest {
      * Uses SampleGenerator source type for test data.
      */
     protected suspend fun createTransfer(transfer: Transfer) {
+        val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
         repositories.transactionRepository.createTransfersWithAttributesAndSources(
-            transfersWithAttributes = listOf(transfer to emptyList()),
-            sourceRecorder = SourceRecorder.SampleGenerator,
-            deviceInfo = DeviceInfo.Jvm("test-machine", "Test OS"),
+            transfersWithAttributes = listOf(TransferWithAttributes(transfer, emptyList())),
+            sourceRecorder = SampleGeneratorSourceRecorder(repositories.transferSourceQueries, deviceId),
         )
     }
 }

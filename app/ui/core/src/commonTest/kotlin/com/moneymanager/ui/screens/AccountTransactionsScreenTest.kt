@@ -20,8 +20,10 @@ import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import androidx.compose.ui.test.waitUntilExactlyOneExists
 import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.database.DbLocation
+import com.moneymanager.database.ManualSourceRecorder
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.RepositorySet
+import com.moneymanager.database.SampleGeneratorSourceRecorder
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
@@ -35,7 +37,6 @@ import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.Money
-import com.moneymanager.domain.model.SourceRecorder
 import com.moneymanager.domain.model.SourceType
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferAttribute
@@ -308,10 +309,10 @@ class AccountTransactionsScreenTest {
                         targetAccountId = savingsAccountId,
                         amount = Money.fromDisplayValue(50.0, usdCurrency),
                     )
+                val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
                 repositories.transactionRepository.createTransfersWithAttributesAndSources(
-                    transfersWithAttributes = listOf(transfer to emptyList()),
-                    sourceRecorder = SourceRecorder.SampleGenerator,
-                    deviceInfo = DeviceInfo.Jvm("test-machine", "Test OS"),
+                    transfersWithAttributes = listOf(com.moneymanager.domain.model.TransferWithAttributes(transfer, emptyList())),
+                    sourceRecorder = SampleGeneratorSourceRecorder(repositories.transferSourceQueries, deviceId),
                 )
 
                 // Refresh materialized views so the transaction appears
@@ -505,10 +506,10 @@ class AccountTransactionsScreenTest {
                         targetAccountId = savingsAccountId,
                         amount = Money.fromDisplayValue(100.0, usdCurrency),
                     )
+                val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
                 repositories.transactionRepository.createTransfersWithAttributesAndSources(
-                    transfersWithAttributes = listOf(transfer to emptyList()),
-                    sourceRecorder = SourceRecorder.Manual,
-                    deviceInfo = DeviceInfo.Jvm("test-machine", "Test OS"),
+                    transfersWithAttributes = listOf(com.moneymanager.domain.model.TransferWithAttributes(transfer, emptyList())),
+                    sourceRecorder = ManualSourceRecorder(repositories.transferSourceQueries, deviceId),
                 )
 
                 // Verify initial revision is 1
@@ -672,10 +673,10 @@ class AccountTransactionsScreenTest {
                         targetAccountId = savingsAccountId,
                         amount = Money.fromDisplayValue(100.0, usdCurrency),
                     )
+                val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
                 repositories.transactionRepository.createTransfersWithAttributesAndSources(
-                    transfersWithAttributes = listOf(transfer to emptyList()),
-                    sourceRecorder = SourceRecorder.Manual,
-                    deviceInfo = DeviceInfo.Jvm("test-machine", "Test OS"),
+                    transfersWithAttributes = listOf(com.moneymanager.domain.model.TransferWithAttributes(transfer, emptyList())),
+                    sourceRecorder = ManualSourceRecorder(repositories.transferSourceQueries, deviceId),
                 )
 
                 // Verify initial revision is 1
@@ -961,19 +962,16 @@ class AccountTransactionsScreenTest {
         }
 
         override suspend fun createTransfersWithAttributesAndSources(
-            transfersWithAttributes: List<Pair<Transfer, List<Pair<com.moneymanager.domain.model.AttributeTypeId, String>>>>,
+            transfersWithAttributes: List<com.moneymanager.domain.model.TransferWithAttributes>,
             sourceRecorder: com.moneymanager.domain.model.SourceRecorder,
-            deviceInfo: com.moneymanager.domain.model.DeviceInfo,
             onProgress: (suspend (Int, Int) -> Unit)?,
         ) {}
-
-        override suspend fun updateTransfer(transfer: Transfer) {}
 
         override suspend fun updateTransferAndAttributes(
             transfer: Transfer?,
             deletedAttributeIds: Set<Long>,
-            updatedAttributes: Map<Long, Pair<com.moneymanager.domain.model.AttributeTypeId, String>>,
-            newAttributes: List<Pair<com.moneymanager.domain.model.AttributeTypeId, String>>,
+            updatedAttributes: Map<Long, com.moneymanager.domain.model.NewAttribute>,
+            newAttributes: List<com.moneymanager.domain.model.NewAttribute>,
             transactionId: TransferId,
         ) {}
 

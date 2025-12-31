@@ -449,19 +449,16 @@ class AccountsScreenTest {
             )
 
         override suspend fun createTransfersWithAttributesAndSources(
-            transfersWithAttributes: List<Pair<Transfer, List<Pair<com.moneymanager.domain.model.AttributeTypeId, String>>>>,
+            transfersWithAttributes: List<com.moneymanager.domain.model.TransferWithAttributes>,
             sourceRecorder: com.moneymanager.domain.model.SourceRecorder,
-            deviceInfo: com.moneymanager.domain.model.DeviceInfo,
             onProgress: (suspend (Int, Int) -> Unit)?,
         ) {}
-
-        override suspend fun updateTransfer(transfer: Transfer) {}
 
         override suspend fun updateTransferAndAttributes(
             transfer: Transfer?,
             deletedAttributeIds: Set<Long>,
-            updatedAttributes: Map<Long, Pair<com.moneymanager.domain.model.AttributeTypeId, String>>,
-            newAttributes: List<Pair<com.moneymanager.domain.model.AttributeTypeId, String>>,
+            updatedAttributes: Map<Long, com.moneymanager.domain.model.NewAttribute>,
+            newAttributes: List<com.moneymanager.domain.model.NewAttribute>,
             transactionId: TransferId,
         ) {}
 

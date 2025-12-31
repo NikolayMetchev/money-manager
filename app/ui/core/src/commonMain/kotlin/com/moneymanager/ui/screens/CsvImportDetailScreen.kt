@@ -27,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.database.DatabaseMaintenanceService
+import com.moneymanager.database.sql.TransferSourceQueries
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csv.CsvRow
@@ -36,6 +37,7 @@ import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CsvImportRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.domain.repository.DeviceRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.ui.components.csv.CsvPreviewTable
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
@@ -57,6 +59,8 @@ fun CsvImportDetailScreen(
     transactionRepository: TransactionRepository,
     attributeTypeRepository: AttributeTypeRepository,
     maintenanceService: DatabaseMaintenanceService,
+    transferSourceQueries: TransferSourceQueries,
+    deviceRepository: DeviceRepository,
     onBack: () -> Unit,
     onDeleted: () -> Unit,
     onTransferClick: ((TransferId, Boolean) -> Unit)? = null,
@@ -291,6 +295,8 @@ fun CsvImportDetailScreen(
             csvImportRepository = csvImportRepository,
             attributeTypeRepository = attributeTypeRepository,
             maintenanceService = maintenanceService,
+            transferSourceQueries = transferSourceQueries,
+            deviceRepository = deviceRepository,
             onDismiss = { showApplyStrategyDialog = false },
             onImportComplete = { result ->
                 showApplyStrategyDialog = false

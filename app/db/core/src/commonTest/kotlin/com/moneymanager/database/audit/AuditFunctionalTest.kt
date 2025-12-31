@@ -307,15 +307,20 @@ class AuditFunctionalTest : DbTest() {
                 ),
             )
 
-            repositories.transactionRepository.updateTransfer(
-                Transfer(
-                    id = transferId,
-                    timestamp = now,
-                    description = "Updated Description",
-                    sourceAccountId = sourceAccountId,
-                    targetAccountId = targetAccountId,
-                    amount = updatedAmount,
-                ),
+            repositories.transactionRepository.updateTransferAndAttributes(
+                transfer =
+                    Transfer(
+                        id = transferId,
+                        timestamp = now,
+                        description = "Updated Description",
+                        sourceAccountId = sourceAccountId,
+                        targetAccountId = targetAccountId,
+                        amount = updatedAmount,
+                    ),
+                deletedAttributeIds = emptySet(),
+                updatedAttributes = emptyMap(),
+                newAttributes = emptyList(),
+                transactionId = transferId,
             )
 
             val auditHistory = database.auditQueries.selectAuditHistoryForTransfer(transferId.toString()).executeAsList()
@@ -376,15 +381,20 @@ class AuditFunctionalTest : DbTest() {
             )
 
             // Update transfer (revisionId should be 2)
-            repositories.transactionRepository.updateTransfer(
-                Transfer(
-                    id = transferId,
-                    timestamp = now,
-                    description = "Updated Description",
-                    sourceAccountId = sourceAccountId,
-                    targetAccountId = targetAccountId,
-                    amount = Money.fromDisplayValue(200.0, currency),
-                ),
+            repositories.transactionRepository.updateTransferAndAttributes(
+                transfer =
+                    Transfer(
+                        id = transferId,
+                        timestamp = now,
+                        description = "Updated Description",
+                        sourceAccountId = sourceAccountId,
+                        targetAccountId = targetAccountId,
+                        amount = Money.fromDisplayValue(200.0, currency),
+                    ),
+                deletedAttributeIds = emptySet(),
+                updatedAttributes = emptyMap(),
+                newAttributes = emptyList(),
+                transactionId = transferId,
             )
 
             val auditHistory = database.auditQueries.selectAuditHistoryForTransfer(transferId.toString()).executeAsList()
@@ -425,27 +435,37 @@ class AuditFunctionalTest : DbTest() {
             )
 
             // First update (revisionId = 2)
-            repositories.transactionRepository.updateTransfer(
-                Transfer(
-                    id = transferId,
-                    timestamp = now,
-                    description = "Version 2",
-                    sourceAccountId = sourceAccountId,
-                    targetAccountId = targetAccountId,
-                    amount = Money.fromDisplayValue(200.0, currency),
-                ),
+            repositories.transactionRepository.updateTransferAndAttributes(
+                transfer =
+                    Transfer(
+                        id = transferId,
+                        timestamp = now,
+                        description = "Version 2",
+                        sourceAccountId = sourceAccountId,
+                        targetAccountId = targetAccountId,
+                        amount = Money.fromDisplayValue(200.0, currency),
+                    ),
+                deletedAttributeIds = emptySet(),
+                updatedAttributes = emptyMap(),
+                newAttributes = emptyList(),
+                transactionId = transferId,
             )
 
             // Second update (revisionId = 3)
-            repositories.transactionRepository.updateTransfer(
-                Transfer(
-                    id = transferId,
-                    timestamp = now,
-                    description = "Version 3",
-                    sourceAccountId = sourceAccountId,
-                    targetAccountId = targetAccountId,
-                    amount = Money.fromDisplayValue(300.0, currency),
-                ),
+            repositories.transactionRepository.updateTransferAndAttributes(
+                transfer =
+                    Transfer(
+                        id = transferId,
+                        timestamp = now,
+                        description = "Version 3",
+                        sourceAccountId = sourceAccountId,
+                        targetAccountId = targetAccountId,
+                        amount = Money.fromDisplayValue(300.0, currency),
+                    ),
+                deletedAttributeIds = emptySet(),
+                updatedAttributes = emptyMap(),
+                newAttributes = emptyList(),
+                transactionId = transferId,
             )
 
             val auditHistory = database.auditQueries.selectAuditHistoryForTransfer(transferId.toString()).executeAsList()

@@ -69,17 +69,18 @@ import com.moneymanager.compose.scrollbar.HorizontalScrollbarForScrollState
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForScrollState
 import com.moneymanager.database.DatabaseMaintenanceService
+import com.moneymanager.database.ManualSourceRecorder
+import com.moneymanager.database.sql.TransferSourceQueries
 import com.moneymanager.domain.getDeviceInfo
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
 import com.moneymanager.domain.model.AttributeType
-import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.Money
-import com.moneymanager.domain.model.SourceRecorder
+import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.SourceType
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
@@ -87,11 +88,13 @@ import com.moneymanager.domain.model.TransferAttribute
 import com.moneymanager.domain.model.TransferAuditEntry
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.TransferSource
+import com.moneymanager.domain.model.TransferWithAttributes
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.AuditRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.domain.repository.DeviceRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.domain.repository.TransferAttributeRepository
 import com.moneymanager.domain.repository.TransferSourceRepository
@@ -1154,6 +1157,8 @@ fun AccountTransactionCard(
 fun TransactionEntryDialog(
     transactionRepository: TransactionRepository,
     transferSourceRepository: TransferSourceRepository,
+    transferSourceQueries: TransferSourceQueries,
+    deviceRepository: DeviceRepository,
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
@@ -1460,14 +1465,14 @@ fun TransactionEntryDialog(
                                         .map { (_, pair) ->
                                             val (typeName, value) = pair
                                             val typeId = attributeTypeRepository.getOrCreate(typeName.trim())
-                                            typeId to value.trim()
+                                            NewAttribute(typeId, value.trim())
                                         }
 
                                 // Create transfer with attributes and source in one transaction
+                                val deviceId = deviceRepository.getOrCreateDevice(getDeviceInfo())
                                 transactionRepository.createTransfersWithAttributesAndSources(
-                                    transfersWithAttributes = listOf(transfer to attributesToSave),
-                                    sourceRecorder = SourceRecorder.Manual,
-                                    deviceInfo = getDeviceInfo(),
+                                    transfersWithAttributes = listOf(TransferWithAttributes(transfer, attributesToSave)),
+                                    sourceRecorder = ManualSourceRecorder(transferSourceQueries, deviceId),
                                 )
 
                                 maintenanceService.refreshMaterializedViews()
@@ -1947,8 +1952,8 @@ fun TransactionEditDialog(
                                     val editableIds = editableAttributes.keys
                                     val deletedAttributeIds = originalIds - editableIds
 
-                                    // Build updated attributes map (id -> (typeId, value))
-                                    val updatedAttributes = mutableMapOf<Long, Pair<AttributeTypeId, String>>()
+                                    // Build updated attributes map (id -> NewAttribute)
+                                    val updatedAttributes = mutableMapOf<Long, NewAttribute>()
                                     editableAttributes.filter { (id, _) -> id > 0 }.forEach { (id, pair) ->
                                         val (typeName, value) = pair
                                         val original = originalAttributes.find { it.id == id }
@@ -1957,18 +1962,18 @@ fun TransactionEditDialog(
                                             val valueChanged = original.value != value
                                             if (typeChanged || valueChanged) {
                                                 val typeId = attributeTypeRepository.getOrCreate(typeName)
-                                                updatedAttributes[id] = typeId to value
+                                                updatedAttributes[id] = NewAttribute(typeId, value)
                                             }
                                         }
                                     }
 
-                                    // Build new attributes list (typeId, value)
-                                    val newAttributes = mutableListOf<Pair<AttributeTypeId, String>>()
+                                    // Build new attributes list
+                                    val newAttributes = mutableListOf<NewAttribute>()
                                     editableAttributes.filter { (id, _) -> id < 0 }.forEach { (_, pair) ->
                                         val (typeName, value) = pair
                                         if (typeName.isNotBlank() && value.isNotBlank()) {
                                             val typeId = attributeTypeRepository.getOrCreate(typeName)
-                                            newAttributes.add(typeId to value)
+                                            newAttributes.add(NewAttribute(typeId, value))
                                         }
                                     }
 

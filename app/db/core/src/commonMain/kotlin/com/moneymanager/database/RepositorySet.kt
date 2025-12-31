@@ -13,6 +13,7 @@ import com.moneymanager.database.repository.TransactionRepositoryImpl
 import com.moneymanager.database.repository.TransferAttributeAuditRepositoryImpl
 import com.moneymanager.database.repository.TransferAttributeRepositoryImpl
 import com.moneymanager.database.repository.TransferSourceRepositoryImpl
+import com.moneymanager.database.sql.TransferSourceQueries
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.AuditRepository
@@ -34,6 +35,9 @@ import com.moneymanager.domain.repository.TransferSourceRepository
 class RepositorySet(
     database: MoneyManagerDatabaseWrapper,
 ) {
+    /** Exposed for creating SourceRecorder implementations in UI layer. */
+    val transferSourceQueries: TransferSourceQueries = database.transferSourceQueries
+
     val accountRepository: AccountRepository = AccountRepositoryImpl(database)
     val attributeTypeRepository: AttributeTypeRepository = AttributeTypeRepositoryImpl(database)
     val auditRepository: AuditRepository = AuditRepositoryImpl(database)
