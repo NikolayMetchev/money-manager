@@ -451,7 +451,6 @@ class AccountsScreenTest {
         override suspend fun createTransfersWithAttributesAndSources(
             transfersWithAttributes: List<Pair<Transfer, List<Pair<com.moneymanager.domain.model.AttributeTypeId, String>>>>,
             sourceRecorder: com.moneymanager.domain.model.SourceRecorder,
-            deviceInfo: com.moneymanager.domain.model.DeviceInfo,
             onProgress: (suspend (Int, Int) -> Unit)?,
         ) {}
 

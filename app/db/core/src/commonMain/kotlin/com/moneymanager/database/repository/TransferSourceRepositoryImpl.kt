@@ -1,4 +1,4 @@
-@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class, kotlin.time.ExperimentalTime::class)
+@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
 
 package com.moneymanager.database.repository
 
@@ -15,7 +15,6 @@ import com.moneymanager.domain.repository.SampleGeneratorSourceRecord
 import com.moneymanager.domain.repository.TransferSourceRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlin.time.Clock
 
 /**
  * Implementation of TransferSourceRepository using SQLDelight.
@@ -35,13 +34,11 @@ class TransferSourceRepositoryImpl(
     ): TransferSource =
         withContext(Dispatchers.Default) {
             val deviceId = deviceRepository.getOrCreateDevice(deviceInfo)
-            val now = Clock.System.now()
 
             queries.insertManual(
                 transactionId = transactionId.toString(),
                 revisionId = revisionId,
                 deviceId = deviceId,
-                createdAt = now.toEpochMilliseconds(),
             )
 
             queries.selectByTransactionIdAndRevision(transactionId.toString(), revisionId)
@@ -63,14 +60,12 @@ class TransferSourceRepositoryImpl(
                         .executeAsOne().tableName,
                 ).executeAsOne()
 
-            val now = Clock.System.now()
             queries.insertCsvImport(
                 transactionId = transactionId.toString(),
                 revisionId = revisionId,
                 deviceId = csvImport.device_id,
                 csvImportId = csvImportId.toString(),
                 csvRowIndex = rowIndex,
-                createdAt = now.toEpochMilliseconds(),
             )
             queries.selectByTransactionIdAndRevision(transactionId.toString(), revisionId)
                 .executeAsOne()
@@ -86,7 +81,6 @@ class TransferSourceRepositoryImpl(
             val csvImport = csvImportQueries.selectImportById(csvImportId.toString()).executeAsOne()
             val deviceId = csvImport.device_id
 
-            val now = Clock.System.now()
             queries.transaction {
                 sources.forEach { source ->
                     queries.insertCsvImport(
@@ -95,7 +89,6 @@ class TransferSourceRepositoryImpl(
                         deviceId = deviceId,
                         csvImportId = csvImportId.toString(),
                         csvRowIndex = source.rowIndex,
-                        createdAt = now.toEpochMilliseconds(),
                     )
                 }
             }
@@ -124,7 +117,6 @@ class TransferSourceRepositoryImpl(
     ): Unit =
         withContext(Dispatchers.Default) {
             val deviceId = deviceRepository.getOrCreateDevice(deviceInfo)
-            val now = Clock.System.now()
 
             queries.transaction {
                 sources.forEach { source ->
@@ -132,7 +124,6 @@ class TransferSourceRepositoryImpl(
                         transactionId = source.transactionId.toString(),
                         revisionId = source.revisionId,
                         deviceId = deviceId,
-                        createdAt = now.toEpochMilliseconds(),
                     )
                 }
             }

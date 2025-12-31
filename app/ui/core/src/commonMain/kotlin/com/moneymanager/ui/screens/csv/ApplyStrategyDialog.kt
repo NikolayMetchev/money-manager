@@ -41,13 +41,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.moneymanager.database.CsvImportSourceRecorder
 import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.database.csv.CsvTransferMapper
 import com.moneymanager.database.csv.ImportPreparation
 import com.moneymanager.database.csv.StrategyMatcher
+import com.moneymanager.database.sql.TransferSourceQueries
 import com.moneymanager.domain.getDeviceInfo
 import com.moneymanager.domain.model.Account
-import com.moneymanager.domain.model.SourceRecorder
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvImport
@@ -58,6 +59,7 @@ import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CsvImportRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.domain.repository.DeviceRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -92,6 +94,8 @@ fun ApplyStrategyDialog(
     csvImportRepository: CsvImportRepository,
     attributeTypeRepository: AttributeTypeRepository,
     maintenanceService: DatabaseMaintenanceService,
+    transferSourceQueries: TransferSourceQueries,
+    deviceRepository: DeviceRepository,
     onDismiss: () -> Unit,
     onImportComplete: (CsvImportResult) -> Unit,
 ) {
@@ -246,7 +250,7 @@ fun ApplyStrategyDialog(
                             val rowTransferMap = mutableMapOf<Long, com.moneymanager.domain.model.TransferId>()
                             val failedRows = mutableListOf<CsvImportResult.FailedRow>()
                             var successCount = 0
-                            val deviceInfo = getDeviceInfo()
+                            val deviceId = deviceRepository.getOrCreateDevice(getDeviceInfo())
 
                             for ((index, transferWithAttrs) in finalPrep.validTransfers.withIndex()) {
                                 val transfer = transferWithAttrs.transfer
@@ -267,11 +271,12 @@ fun ApplyStrategyDialog(
                                     transactionRepository.createTransfersWithAttributesAndSources(
                                         transfersWithAttributes = listOf(transfer to attributesWithTypeIds),
                                         sourceRecorder =
-                                            SourceRecorder.CsvImport(
+                                            CsvImportSourceRecorder(
+                                                queries = transferSourceQueries,
+                                                deviceId = deviceId,
                                                 csvImportId = csvImport.id,
                                                 rowIndexForTransfer = { originalRowIndex },
                                             ),
-                                        deviceInfo = deviceInfo,
                                     )
                                     rowTransferMap[originalRowIndex] = transfer.id
                                     successCount++

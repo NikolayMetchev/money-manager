@@ -3,13 +3,13 @@
 package com.moneymanager.ui.util
 
 import com.moneymanager.database.RepositorySet
+import com.moneymanager.database.SampleGeneratorSourceRecorder
 import com.moneymanager.domain.getDeviceInfo
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Money
-import com.moneymanager.domain.model.SourceRecorder
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -281,13 +281,12 @@ suspend fun generateSampleData(
     }
 
     // Step 8: Create transactions with attributes and sources in batches
-    val deviceInfo = getDeviceInfo()
+    val deviceId = repositorySet.deviceRepository.getOrCreateDevice(getDeviceInfo())
     var transactionsCreated = 0
 
     repositorySet.transactionRepository.createTransfersWithAttributesAndSources(
         transfersWithAttributes = allTransfersWithAttributes,
-        sourceRecorder = SourceRecorder.SampleGenerator,
-        deviceInfo = deviceInfo,
+        sourceRecorder = SampleGeneratorSourceRecorder(repositorySet.transferSourceQueries, deviceId),
         onProgress = { created, total ->
             transactionsCreated = created
             progressFlow.emit(

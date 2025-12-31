@@ -11,8 +11,8 @@ CREATE TABLE TransferSource (
     -- CSV import fields (NULL for MANUAL sources)
     csvImportId TEXT,
     csvRowIndex INTEGER,
-    -- Timestamp
-    createdAt INTEGER NOT NULL,
+    -- Timestamp (defaults to current epoch milliseconds)
+    createdAt INTEGER NOT NULL DEFAULT (strftime('%s', 'now') * 1000),
     FOREIGN KEY (transactionId) REFERENCES TransactionId(id),
     FOREIGN KEY (sourceTypeId) REFERENCES SourceType(id),
     FOREIGN KEY (deviceId) REFERENCES Device(id),
@@ -90,29 +90,26 @@ ORDER BY TransferSource.revisionId DESC;
 insertManual:
 INSERT INTO TransferSource (
     transactionId, revisionId, sourceTypeId,
-    deviceId,
-    createdAt
+    deviceId
 )
-VALUES (?, ?, 1, ?, ?);
+VALUES (?, ?, 1, ?);
 
 -- Insert a new source record for CSV import
 insertCsvImport:
 INSERT INTO TransferSource (
     transactionId, revisionId, sourceTypeId,
     deviceId,
-    csvImportId, csvRowIndex,
-    createdAt
+    csvImportId, csvRowIndex
 )
-VALUES (?, ?, 2, ?, ?, ?, ?);
+VALUES (?, ?, 2, ?, ?, ?);
 
 -- Insert a new source record for sample data generator
 insertSampleGenerator:
 INSERT INTO TransferSource (
     transactionId, revisionId, sourceTypeId,
-    deviceId,
-    createdAt
+    deviceId
 )
-VALUES (?, ?, 3, ?, ?);
+VALUES (?, ?, 3, ?);
 
 -- Select sources by CSV import ID
 selectByCsvImportId:

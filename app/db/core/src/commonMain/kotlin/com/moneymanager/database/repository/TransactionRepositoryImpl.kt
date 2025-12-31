@@ -13,11 +13,9 @@ import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
 import com.moneymanager.domain.model.AttributeTypeId
-import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.PageWithTargetIndex
 import com.moneymanager.domain.model.PagingInfo
 import com.moneymanager.domain.model.PagingResult
-import com.moneymanager.domain.model.SourceInserter
 import com.moneymanager.domain.model.SourceRecorder
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
@@ -28,7 +26,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
-import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -299,45 +296,10 @@ class TransactionRepositoryImpl(
     override suspend fun createTransfersWithAttributesAndSources(
         transfersWithAttributes: List<Pair<Transfer, List<Pair<AttributeTypeId, String>>>>,
         sourceRecorder: SourceRecorder,
-        deviceInfo: DeviceInfo,
         onProgress: (suspend (created: Int, total: Int) -> Unit)?,
     ): Unit =
         withContext(Dispatchers.Default) {
-            val deviceId = deviceRepository.getOrCreateDevice(deviceInfo)
-            val now = Clock.System.now()
             val total = transfersWithAttributes.size
-
-            val sourceInserter =
-                object : SourceInserter {
-                    override fun insertManual(
-                        transactionId: String,
-                        revisionId: Long,
-                        deviceId: Long,
-                        createdAt: Long,
-                    ) {
-                        transferSourceQueries.insertManual(transactionId, revisionId, deviceId, createdAt)
-                    }
-
-                    override fun insertSampleGenerator(
-                        transactionId: String,
-                        revisionId: Long,
-                        deviceId: Long,
-                        createdAt: Long,
-                    ) {
-                        transferSourceQueries.insertSampleGenerator(transactionId, revisionId, deviceId, createdAt)
-                    }
-
-                    override fun insertCsvImport(
-                        transactionId: String,
-                        revisionId: Long,
-                        deviceId: Long,
-                        csvImportId: String,
-                        csvRowIndex: Long,
-                        createdAt: Long,
-                    ) {
-                        transferSourceQueries.insertCsvImport(transactionId, revisionId, deviceId, csvImportId, csvRowIndex, createdAt)
-                    }
-                }
 
             // Process in batches of 1000 to avoid holding transaction too long
             val batchSize = 1000
@@ -376,7 +338,7 @@ class TransactionRepositoryImpl(
                             }
 
                             // Record source using strategy pattern
-                            sourceRecorder.insert(transfer, deviceId, now.toEpochMilliseconds(), sourceInserter)
+                            sourceRecorder.insert(transfer)
                         }
                     } finally {
                         // Always restore normal trigger behavior

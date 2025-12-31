@@ -69,6 +69,8 @@ import com.moneymanager.compose.scrollbar.HorizontalScrollbarForScrollState
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForScrollState
 import com.moneymanager.database.DatabaseMaintenanceService
+import com.moneymanager.database.ManualSourceRecorder
+import com.moneymanager.database.sql.TransferSourceQueries
 import com.moneymanager.domain.getDeviceInfo
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
@@ -79,7 +81,6 @@ import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.Money
-import com.moneymanager.domain.model.SourceRecorder
 import com.moneymanager.domain.model.SourceType
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
@@ -92,6 +93,7 @@ import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.AuditRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.domain.repository.DeviceRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.domain.repository.TransferAttributeRepository
 import com.moneymanager.domain.repository.TransferSourceRepository
@@ -1154,6 +1156,8 @@ fun AccountTransactionCard(
 fun TransactionEntryDialog(
     transactionRepository: TransactionRepository,
     transferSourceRepository: TransferSourceRepository,
+    transferSourceQueries: TransferSourceQueries,
+    deviceRepository: DeviceRepository,
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
@@ -1464,10 +1468,10 @@ fun TransactionEntryDialog(
                                         }
 
                                 // Create transfer with attributes and source in one transaction
+                                val deviceId = deviceRepository.getOrCreateDevice(getDeviceInfo())
                                 transactionRepository.createTransfersWithAttributesAndSources(
                                     transfersWithAttributes = listOf(transfer to attributesToSave),
-                                    sourceRecorder = SourceRecorder.Manual,
-                                    deviceInfo = getDeviceInfo(),
+                                    sourceRecorder = ManualSourceRecorder(transferSourceQueries, deviceId),
                                 )
 
                                 maintenanceService.refreshMaterializedViews()

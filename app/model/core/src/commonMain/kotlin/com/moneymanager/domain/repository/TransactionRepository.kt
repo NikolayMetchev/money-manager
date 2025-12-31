@@ -6,7 +6,6 @@ import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
 import com.moneymanager.domain.model.AttributeTypeId
-import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.PageWithTargetIndex
 import com.moneymanager.domain.model.PagingInfo
 import com.moneymanager.domain.model.PagingResult
@@ -80,14 +79,12 @@ interface TransactionRepository {
      * Works for single transfers (from UI), batch operations (sample data), and CSV imports.
      *
      * @param transfersWithAttributes List of transfers with their (attributeTypeId, value) pairs
-     * @param sourceRecorder Strategy for recording source information
-     * @param deviceInfo Device info for source recording
+     * @param sourceRecorder Strategy for recording source information (includes device info)
      * @param onProgress Optional callback for batch progress (called after each batch of ~1000)
      */
     suspend fun createTransfersWithAttributesAndSources(
         transfersWithAttributes: List<Pair<Transfer, List<Pair<AttributeTypeId, String>>>>,
         sourceRecorder: SourceRecorder,
-        deviceInfo: DeviceInfo,
         onProgress: (suspend (created: Int, total: Int) -> Unit)? = null,
     )
 
