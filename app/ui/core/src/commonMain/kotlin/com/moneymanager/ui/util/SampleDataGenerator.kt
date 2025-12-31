@@ -286,7 +286,7 @@ suspend fun generateSampleData(
     val deviceId = repositorySet.deviceRepository.getOrCreateDevice(getDeviceInfo())
     var transactionsCreated = 0
 
-    repositorySet.transactionRepository.createTransfersWithAttributesAndSources(
+    repositorySet.transactionRepository.createTransfers(
         transfersWithAttributes = allTransfersWithAttributes,
         sourceRecorder = SampleGeneratorSourceRecorder(repositorySet.transferSourceQueries, deviceId),
         onProgress = { created, total ->

@@ -310,7 +310,7 @@ class AccountTransactionsScreenTest {
                         amount = Money.fromDisplayValue(50.0, usdCurrency),
                     )
                 val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
-                repositories.transactionRepository.createTransfersWithAttributesAndSources(
+                repositories.transactionRepository.createTransfers(
                     transfersWithAttributes = listOf(com.moneymanager.domain.model.TransferWithAttributes(transfer, emptyList())),
                     sourceRecorder = SampleGeneratorSourceRecorder(repositories.transferSourceQueries, deviceId),
                 )
@@ -507,14 +507,14 @@ class AccountTransactionsScreenTest {
                         amount = Money.fromDisplayValue(100.0, usdCurrency),
                     )
                 val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
-                repositories.transactionRepository.createTransfersWithAttributesAndSources(
+                repositories.transactionRepository.createTransfers(
                     transfersWithAttributes = listOf(com.moneymanager.domain.model.TransferWithAttributes(transfer, emptyList())),
                     sourceRecorder = ManualSourceRecorder(repositories.transferSourceQueries, deviceId),
                 )
 
                 // Verify initial revision is 1
                 val initialTransfer =
-                    repositories.transactionRepository.getTransactionById(transferId!!.id).first()!!
+                    repositories.transactionRepository.getTransactionById(transferId.id).first()!!
                 assertEquals(1L, initialTransfer.revisionId, "Initial revision should be 1")
 
                 // Refresh materialized views so the transaction appears
@@ -674,14 +674,14 @@ class AccountTransactionsScreenTest {
                         amount = Money.fromDisplayValue(100.0, usdCurrency),
                     )
                 val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
-                repositories.transactionRepository.createTransfersWithAttributesAndSources(
+                repositories.transactionRepository.createTransfers(
                     transfersWithAttributes = listOf(com.moneymanager.domain.model.TransferWithAttributes(transfer, emptyList())),
                     sourceRecorder = ManualSourceRecorder(repositories.transferSourceQueries, deviceId),
                 )
 
                 // Verify initial revision is 1
                 val initialTransfer =
-                    repositories.transactionRepository.getTransactionById(transferId!!.id).first()!!
+                    repositories.transactionRepository.getTransactionById(transferId.id).first()!!
                 assertEquals(1L, initialTransfer.revisionId, "Initial revision should be 1")
 
                 // Refresh materialized views so the transaction appears
@@ -961,13 +961,13 @@ class AccountTransactionsScreenTest {
             )
         }
 
-        override suspend fun createTransfersWithAttributesAndSources(
+        override suspend fun createTransfers(
             transfersWithAttributes: List<com.moneymanager.domain.model.TransferWithAttributes>,
             sourceRecorder: com.moneymanager.domain.model.SourceRecorder,
             onProgress: (suspend (Int, Int) -> Unit)?,
         ) {}
 
-        override suspend fun updateTransferAndAttributes(
+        override suspend fun updateTransfer(
             transfer: Transfer?,
             deletedAttributeIds: Set<Long>,
             updatedAttributes: Map<Long, com.moneymanager.domain.model.NewAttribute>,

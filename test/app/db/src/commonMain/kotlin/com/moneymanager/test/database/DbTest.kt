@@ -40,7 +40,7 @@ abstract class DbTest {
      */
     protected suspend fun createTransfer(transfer: Transfer) {
         val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
-        repositories.transactionRepository.createTransfersWithAttributesAndSources(
+        repositories.transactionRepository.createTransfers(
             transfersWithAttributes = listOf(TransferWithAttributes(transfer, emptyList())),
             sourceRecorder = SampleGeneratorSourceRecorder(repositories.transferSourceQueries, deviceId),
         )

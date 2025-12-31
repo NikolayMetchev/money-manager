@@ -270,7 +270,7 @@ fun ApplyStrategyDialog(
                                         }
 
                                     // Create transfer with attributes and source in one operation
-                                    transactionRepository.createTransfersWithAttributesAndSources(
+                                    transactionRepository.createTransfers(
                                         transfersWithAttributes = listOf(TransferWithAttributes(transfer, attributes)),
                                         sourceRecorder =
                                             CsvImportSourceRecorder(

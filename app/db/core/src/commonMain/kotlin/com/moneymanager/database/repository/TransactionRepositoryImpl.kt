@@ -294,7 +294,7 @@ class TransactionRepositoryImpl(
             )
         }
 
-    override suspend fun createTransfersWithAttributesAndSources(
+    override suspend fun createTransfers(
         transfersWithAttributes: List<TransferWithAttributes>,
         sourceRecorder: SourceRecorder,
         onProgress: (suspend (created: Int, total: Int) -> Unit)?,
@@ -353,7 +353,7 @@ class TransactionRepositoryImpl(
             }
         }
 
-    override suspend fun updateTransferAndAttributes(
+    override suspend fun updateTransfer(
         transfer: Transfer?,
         deletedAttributeIds: Set<Long>,
         updatedAttributes: Map<Long, NewAttribute>,

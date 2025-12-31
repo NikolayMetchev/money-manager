@@ -137,7 +137,7 @@ class TransactionRepositoryImplTest : DbTest() {
                         targetAccountId = sourceAccountId,
                         amount = Money.fromDisplayValue(100.0, currency),
                     )
-                repositories.transactionRepository.updateTransferAndAttributes(
+                repositories.transactionRepository.updateTransfer(
                     transfer = invalidTransfer,
                     deletedAttributeIds = emptySet(),
                     updatedAttributes = emptyMap(),

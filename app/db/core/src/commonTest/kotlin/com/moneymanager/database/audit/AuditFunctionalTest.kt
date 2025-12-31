@@ -307,7 +307,7 @@ class AuditFunctionalTest : DbTest() {
                 ),
             )
 
-            repositories.transactionRepository.updateTransferAndAttributes(
+            repositories.transactionRepository.updateTransfer(
                 transfer =
                     Transfer(
                         id = transferId,
@@ -381,7 +381,7 @@ class AuditFunctionalTest : DbTest() {
             )
 
             // Update transfer (revisionId should be 2)
-            repositories.transactionRepository.updateTransferAndAttributes(
+            repositories.transactionRepository.updateTransfer(
                 transfer =
                     Transfer(
                         id = transferId,
@@ -435,7 +435,7 @@ class AuditFunctionalTest : DbTest() {
             )
 
             // First update (revisionId = 2)
-            repositories.transactionRepository.updateTransferAndAttributes(
+            repositories.transactionRepository.updateTransfer(
                 transfer =
                     Transfer(
                         id = transferId,
@@ -452,7 +452,7 @@ class AuditFunctionalTest : DbTest() {
             )
 
             // Second update (revisionId = 3)
-            repositories.transactionRepository.updateTransferAndAttributes(
+            repositories.transactionRepository.updateTransfer(
                 transfer =
                     Transfer(
                         id = transferId,
