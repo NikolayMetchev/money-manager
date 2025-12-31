@@ -5,7 +5,7 @@ package com.moneymanager.domain.repository
 import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
-import com.moneymanager.domain.model.AttributeTypeId
+import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.PageWithTargetIndex
 import com.moneymanager.domain.model.PagingInfo
 import com.moneymanager.domain.model.PagingResult
@@ -13,6 +13,7 @@ import com.moneymanager.domain.model.SourceRecorder
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.TransferWithAttributes
 import kotlinx.coroutines.flow.Flow
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -78,17 +79,15 @@ interface TransactionRepository {
      * Creates transfers with their attributes and sources in a single atomic operation.
      * Works for single transfers (from UI), batch operations (sample data), and CSV imports.
      *
-     * @param transfersWithAttributes List of transfers with their (attributeTypeId, value) pairs
+     * @param transfersWithAttributes List of transfers with their attributes
      * @param sourceRecorder Strategy for recording source information (includes device info)
      * @param onProgress Optional callback for batch progress (called after each batch of ~1000)
      */
     suspend fun createTransfersWithAttributesAndSources(
-        transfersWithAttributes: List<Pair<Transfer, List<Pair<AttributeTypeId, String>>>>,
+        transfersWithAttributes: List<TransferWithAttributes>,
         sourceRecorder: SourceRecorder,
         onProgress: (suspend (created: Int, total: Int) -> Unit)? = null,
     )
-
-    suspend fun updateTransfer(transfer: Transfer)
 
     /**
      * Updates a transfer and its attributes atomically, creating only ONE revision bump.
@@ -111,8 +110,8 @@ interface TransactionRepository {
     suspend fun updateTransferAndAttributes(
         transfer: Transfer?,
         deletedAttributeIds: Set<Long>,
-        updatedAttributes: Map<Long, Pair<AttributeTypeId, String>>,
-        newAttributes: List<Pair<AttributeTypeId, String>>,
+        updatedAttributes: Map<Long, NewAttribute>,
+        newAttributes: List<NewAttribute>,
         transactionId: TransferId,
     )
 

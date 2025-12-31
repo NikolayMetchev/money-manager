@@ -12,7 +12,7 @@ import com.moneymanager.database.mapper.TransferMapper
 import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
-import com.moneymanager.domain.model.AttributeTypeId
+import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.PageWithTargetIndex
 import com.moneymanager.domain.model.PagingInfo
 import com.moneymanager.domain.model.PagingResult
@@ -20,6 +20,7 @@ import com.moneymanager.domain.model.SourceRecorder
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.TransferWithAttributes
 import com.moneymanager.domain.repository.DeviceRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import kotlinx.coroutines.Dispatchers
@@ -294,7 +295,7 @@ class TransactionRepositoryImpl(
         }
 
     override suspend fun createTransfersWithAttributesAndSources(
-        transfersWithAttributes: List<Pair<Transfer, List<Pair<AttributeTypeId, String>>>>,
+        transfersWithAttributes: List<TransferWithAttributes>,
         sourceRecorder: SourceRecorder,
         onProgress: (suspend (created: Int, total: Int) -> Unit)?,
     ): Unit =
@@ -314,7 +315,8 @@ class TransactionRepositoryImpl(
                     // This allows initial attributes to be recorded at revision 1.
                     database.beginCreationMode()
                     try {
-                        batch.forEach { (transfer, attributes) ->
+                        batch.forEach { transferWithAttributes ->
+                            val transfer = transferWithAttributes.transfer
                             // Create transfer (triggers INSERT audit)
                             transactionIdQueries.insert(transfer.id.toString())
                             transferQueries.insert(
@@ -329,11 +331,11 @@ class TransactionRepositoryImpl(
                             )
 
                             // Insert attributes (creation mode records audit at rev 1 without bumping)
-                            attributes.forEach { (typeId, value) ->
+                            transferWithAttributes.attributes.forEach { attr ->
                                 transferAttributeQueries.insert(
                                     transactionId = transfer.id.toString(),
-                                    attributeTypeId = typeId.id,
-                                    attributeValue = value,
+                                    attributeTypeId = attr.typeId.id,
+                                    attributeValue = attr.value,
                                 )
                             }
 
@@ -351,24 +353,11 @@ class TransactionRepositoryImpl(
             }
         }
 
-    override suspend fun updateTransfer(transfer: Transfer): Unit =
-        withContext(Dispatchers.Default) {
-            transferQueries.update(
-                timestamp = transfer.timestamp.toEpochMilliseconds(),
-                description = transfer.description,
-                sourceAccountId = transfer.sourceAccountId.id,
-                targetAccountId = transfer.targetAccountId.id,
-                currencyId = transfer.amount.currency.id.toString(),
-                amount = transfer.amount.amount,
-                id = transfer.id.toString(),
-            )
-        }
-
     override suspend fun updateTransferAndAttributes(
         transfer: Transfer?,
         deletedAttributeIds: Set<Long>,
-        updatedAttributes: Map<Long, Pair<AttributeTypeId, String>>,
-        newAttributes: List<Pair<AttributeTypeId, String>>,
+        updatedAttributes: Map<Long, NewAttribute>,
+        newAttributes: List<NewAttribute>,
         transactionId: TransferId,
     ): Unit =
         withContext(Dispatchers.Default) {
@@ -376,6 +365,9 @@ class TransactionRepositoryImpl(
                 deletedAttributeIds.isNotEmpty() ||
                     updatedAttributes.isNotEmpty() ||
                     newAttributes.isNotEmpty()
+
+            // Use transfer.id when available, fall back to transactionId for attribute-only updates
+            val effectiveTransactionId = transfer?.id ?: transactionId
 
             transferQueries.transaction {
                 // Step 1: Update transfer if provided (bumps revision via trigger)
@@ -391,7 +383,7 @@ class TransactionRepositoryImpl(
                     )
                 } else if (hasAttributeChanges) {
                     // No transfer change but has attribute changes - need to bump revision first
-                    transferQueries.bumpRevisionOnly(transactionId.id.toString())
+                    transferQueries.bumpRevisionOnly(effectiveTransactionId.id.toString())
                 }
 
                 // Step 2: Apply attribute changes in creation mode (record audit but don't bump again)
@@ -404,30 +396,29 @@ class TransactionRepositoryImpl(
                         }
 
                         // Update attributes
-                        updatedAttributes.forEach { (id, pair) ->
-                            val (typeId, value) = pair
+                        updatedAttributes.forEach { (id, attr) ->
                             // Check if type changed (requires delete + insert)
                             val current = transferAttributeQueries.selectById(id).executeAsOneOrNull()
-                            if (current != null && current.attributeTypeId != typeId.id) {
+                            if (current != null && current.attributeTypeId != attr.typeId.id) {
                                 // Type changed: delete and recreate
                                 transferAttributeQueries.deleteById(id)
                                 transferAttributeQueries.insert(
-                                    transactionId = transactionId.id.toString(),
-                                    attributeTypeId = typeId.id,
-                                    attributeValue = value,
+                                    transactionId = effectiveTransactionId.id.toString(),
+                                    attributeTypeId = attr.typeId.id,
+                                    attributeValue = attr.value,
                                 )
                             } else {
                                 // Only value changed
-                                transferAttributeQueries.updateValue(value, id)
+                                transferAttributeQueries.updateValue(attr.value, id)
                             }
                         }
 
                         // Insert new attributes
-                        newAttributes.forEach { (typeId, value) ->
+                        newAttributes.forEach { attr ->
                             transferAttributeQueries.insert(
-                                transactionId = transactionId.id.toString(),
-                                attributeTypeId = typeId.id,
-                                attributeValue = value,
+                                transactionId = effectiveTransactionId.id.toString(),
+                                attributeTypeId = attr.typeId.id,
+                                attributeValue = attr.value,
                             )
                         }
                     } finally {

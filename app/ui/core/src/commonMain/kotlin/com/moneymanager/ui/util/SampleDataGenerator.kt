@@ -10,8 +10,10 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Money
+import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.TransferWithAttributes
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlin.random.Random
@@ -233,7 +235,7 @@ suspend fun generateSampleData(
     val dateRangeMillis = endDate.toEpochMilliseconds() - startDate.toEpochMilliseconds()
 
     // Generate all transactions with their attributes
-    val allTransfersWithAttributes = mutableListOf<Pair<Transfer, List<Pair<AttributeTypeId, String>>>>()
+    val allTransfersWithAttributes = mutableListOf<TransferWithAttributes>()
 
     for ((accountIndex, accountId) in accountIds.withIndex()) {
         val transactionCount = transactionCounts[accountIndex]
@@ -266,17 +268,17 @@ suspend fun generateSampleData(
                 )
 
             // 50% of transactions get 1-3 attributes
-            val attributes: List<Pair<AttributeTypeId, String>> =
+            val attributes: List<NewAttribute> =
                 if (random.nextBoolean()) {
                     val numAttributes = random.nextInt(1, 4) // 1-3 attributes
                     attributeTypeIds.shuffled(random).take(numAttributes).map { typeId ->
-                        typeId to generateAttributeValue(random)
+                        NewAttribute(typeId, generateAttributeValue(random))
                     }
                 } else {
                     emptyList()
                 }
 
-            allTransfersWithAttributes.add(transfer to attributes)
+            allTransfersWithAttributes.add(TransferWithAttributes(transfer, attributes))
         }
     }
 

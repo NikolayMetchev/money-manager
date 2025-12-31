@@ -311,7 +311,7 @@ class AccountTransactionsScreenTest {
                     )
                 val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
                 repositories.transactionRepository.createTransfersWithAttributesAndSources(
-                    transfersWithAttributes = listOf(transfer to emptyList()),
+                    transfersWithAttributes = listOf(com.moneymanager.domain.model.TransferWithAttributes(transfer, emptyList())),
                     sourceRecorder = SampleGeneratorSourceRecorder(repositories.transferSourceQueries, deviceId),
                 )
 
@@ -508,7 +508,7 @@ class AccountTransactionsScreenTest {
                     )
                 val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
                 repositories.transactionRepository.createTransfersWithAttributesAndSources(
-                    transfersWithAttributes = listOf(transfer to emptyList()),
+                    transfersWithAttributes = listOf(com.moneymanager.domain.model.TransferWithAttributes(transfer, emptyList())),
                     sourceRecorder = ManualSourceRecorder(repositories.transferSourceQueries, deviceId),
                 )
 
@@ -675,7 +675,7 @@ class AccountTransactionsScreenTest {
                     )
                 val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
                 repositories.transactionRepository.createTransfersWithAttributesAndSources(
-                    transfersWithAttributes = listOf(transfer to emptyList()),
+                    transfersWithAttributes = listOf(com.moneymanager.domain.model.TransferWithAttributes(transfer, emptyList())),
                     sourceRecorder = ManualSourceRecorder(repositories.transferSourceQueries, deviceId),
                 )
 
@@ -962,18 +962,16 @@ class AccountTransactionsScreenTest {
         }
 
         override suspend fun createTransfersWithAttributesAndSources(
-            transfersWithAttributes: List<Pair<Transfer, List<Pair<com.moneymanager.domain.model.AttributeTypeId, String>>>>,
+            transfersWithAttributes: List<com.moneymanager.domain.model.TransferWithAttributes>,
             sourceRecorder: com.moneymanager.domain.model.SourceRecorder,
             onProgress: (suspend (Int, Int) -> Unit)?,
         ) {}
 
-        override suspend fun updateTransfer(transfer: Transfer) {}
-
         override suspend fun updateTransferAndAttributes(
             transfer: Transfer?,
             deletedAttributeIds: Set<Long>,
-            updatedAttributes: Map<Long, Pair<com.moneymanager.domain.model.AttributeTypeId, String>>,
-            newAttributes: List<Pair<com.moneymanager.domain.model.AttributeTypeId, String>>,
+            updatedAttributes: Map<Long, com.moneymanager.domain.model.NewAttribute>,
+            newAttributes: List<com.moneymanager.domain.model.NewAttribute>,
             transactionId: TransferId,
         ) {}
 

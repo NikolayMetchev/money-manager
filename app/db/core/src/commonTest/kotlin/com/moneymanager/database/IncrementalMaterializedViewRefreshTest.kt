@@ -272,15 +272,20 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
             repositories.maintenanceService.fullRefreshMaterializedViews()
 
             // UPDATE first transfer to have timestamp AFTER second
-            repositories.transactionRepository.updateTransfer(
-                Transfer(
-                    id = transfer1Id,
-                    timestamp = now.plus(kotlin.time.Duration.parse("2h")),
-                    description = "Transfer 1 (updated)",
-                    sourceAccountId = account1Id,
-                    targetAccountId = account2Id,
-                    amount = Money.fromDisplayValue(100.0, currency),
-                ),
+            repositories.transactionRepository.updateTransferAndAttributes(
+                transfer =
+                    Transfer(
+                        id = transfer1Id,
+                        timestamp = now.plus(kotlin.time.Duration.parse("2h")),
+                        description = "Transfer 1 (updated)",
+                        sourceAccountId = account1Id,
+                        targetAccountId = account2Id,
+                        amount = Money.fromDisplayValue(100.0, currency),
+                    ),
+                deletedAttributeIds = emptySet(),
+                updatedAttributes = emptyMap(),
+                newAttributes = emptyList(),
+                transactionId = transfer1Id,
             )
 
             // Verify incremental refresh produces correct results
@@ -330,15 +335,20 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
             repositories.maintenanceService.fullRefreshMaterializedViews()
 
             // UPDATE to change BOTH source and target accounts (account1→account2 becomes account3→account4)
-            repositories.transactionRepository.updateTransfer(
-                Transfer(
-                    id = transferId,
-                    timestamp = now,
-                    description = "Updated transfer",
-                    sourceAccountId = account3Id,
-                    targetAccountId = account4Id,
-                    amount = Money.fromDisplayValue(100.0, currency),
-                ),
+            repositories.transactionRepository.updateTransferAndAttributes(
+                transfer =
+                    Transfer(
+                        id = transferId,
+                        timestamp = now,
+                        description = "Updated transfer",
+                        sourceAccountId = account3Id,
+                        targetAccountId = account4Id,
+                        amount = Money.fromDisplayValue(100.0, currency),
+                    ),
+                deletedAttributeIds = emptySet(),
+                updatedAttributes = emptyMap(),
+                newAttributes = emptyList(),
+                transactionId = transferId,
             )
 
             // Should track 4 account-currency pairs:

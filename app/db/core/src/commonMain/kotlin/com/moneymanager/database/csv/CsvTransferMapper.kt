@@ -69,8 +69,9 @@ data class NewAccount(
 
 /**
  * A transfer with its associated attributes extracted from CSV.
+ * Uses attribute type names (not IDs) since types may need to be created.
  */
-data class TransferWithAttributes(
+data class CsvTransferWithAttributes(
     val transfer: Transfer,
     val attributes: List<Pair<String, String>>,
 )
@@ -79,7 +80,7 @@ data class TransferWithAttributes(
  * Result of preparing an import batch.
  */
 data class ImportPreparation(
-    val validTransfers: List<TransferWithAttributes>,
+    val validTransfers: List<CsvTransferWithAttributes>,
     val errorRows: List<MappingResult.Error>,
     val newAccounts: Set<NewAccount>,
     val existingAccountMatches: Map<String, AccountId>,
@@ -102,7 +103,7 @@ class CsvTransferMapper(
      * Prepares an import by mapping all rows and collecting new accounts to create.
      */
     fun prepareImport(rows: List<CsvRow>): ImportPreparation {
-        val validTransfers = mutableListOf<TransferWithAttributes>()
+        val validTransfers = mutableListOf<CsvTransferWithAttributes>()
         val errorRows = mutableListOf<MappingResult.Error>()
         val newAccounts = mutableSetOf<NewAccount>()
         val existingMatches = mutableMapOf<String, AccountId>()
@@ -110,7 +111,7 @@ class CsvTransferMapper(
         for (row in rows) {
             when (val result = mapRow(row)) {
                 is MappingResult.Success -> {
-                    validTransfers.add(TransferWithAttributes(result.transfer, result.attributes))
+                    validTransfers.add(CsvTransferWithAttributes(result.transfer, result.attributes))
                     if (result.newAccountName != null) {
                         val lookupMapping = strategy.fieldMappings[TransferField.TARGET_ACCOUNT]
                         val categoryId =

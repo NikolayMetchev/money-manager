@@ -49,7 +49,9 @@ import com.moneymanager.database.csv.StrategyMatcher
 import com.moneymanager.database.sql.TransferSourceQueries
 import com.moneymanager.domain.getDeviceInfo
 import com.moneymanager.domain.model.Account
+import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Transfer
+import com.moneymanager.domain.model.TransferWithAttributes
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvRow
@@ -260,16 +262,16 @@ fun ApplyStrategyDialog(
                                         ?: continue
 
                                 try {
-                                    // Convert attributes from (typeName, value) to (typeId, value)
-                                    val attributesWithTypeIds =
+                                    // Convert attributes from (typeName, value) to NewAttribute
+                                    val attributes =
                                         transferWithAttrs.attributes.mapNotNull { (typeName, value) ->
                                             val typeId = attributeTypeIdByName[typeName]
-                                            if (typeId != null) typeId to value else null
+                                            if (typeId != null) NewAttribute(typeId, value) else null
                                         }
 
                                     // Create transfer with attributes and source in one operation
                                     transactionRepository.createTransfersWithAttributesAndSources(
-                                        transfersWithAttributes = listOf(transfer to attributesWithTypeIds),
+                                        transfersWithAttributes = listOf(TransferWithAttributes(transfer, attributes)),
                                         sourceRecorder =
                                             CsvImportSourceRecorder(
                                                 queries = transferSourceQueries,
