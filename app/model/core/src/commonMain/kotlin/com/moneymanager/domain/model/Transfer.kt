@@ -13,6 +13,7 @@ data class Transfer(
     val sourceAccountId: AccountId,
     val targetAccountId: AccountId,
     val amount: Money,
+    val attributes: List<TransferAttribute> = emptyList(),
 )
 
 @JvmInline

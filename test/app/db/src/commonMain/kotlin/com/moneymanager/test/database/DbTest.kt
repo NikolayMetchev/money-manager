@@ -9,7 +9,6 @@ import com.moneymanager.database.SampleGeneratorSourceRecorder
 import com.moneymanager.di.AppComponent
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.Transfer
-import com.moneymanager.domain.model.TransferWithAttributes
 import kotlinx.coroutines.test.runTest
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -41,7 +40,7 @@ open class DbTest {
     protected suspend fun createTransfer(transfer: Transfer) {
         val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
         repositories.transactionRepository.createTransfers(
-            transfersWithAttributes = listOf(TransferWithAttributes(transfer, emptyList())),
+            transfers = listOf(transfer),
             sourceRecorder = SampleGeneratorSourceRecorder(repositories.transferSourceQueries, deviceId),
         )
     }

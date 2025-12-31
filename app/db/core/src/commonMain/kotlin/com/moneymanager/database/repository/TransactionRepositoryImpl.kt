@@ -12,6 +12,8 @@ import com.moneymanager.database.mapper.TransferMapper
 import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
+import com.moneymanager.domain.model.AttributeType
+import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.PageWithTargetIndex
 import com.moneymanager.domain.model.PagingInfo
@@ -19,8 +21,8 @@ import com.moneymanager.domain.model.PagingResult
 import com.moneymanager.domain.model.SourceRecorder
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
+import com.moneymanager.domain.model.TransferAttribute
 import com.moneymanager.domain.model.TransferId
-import com.moneymanager.domain.model.TransferWithAttributes
 import com.moneymanager.domain.repository.TransactionRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -36,15 +38,46 @@ class TransactionRepositoryImpl(
     private val transactionIdQueries = database.transactionIdQueries
     private val transferAttributeQueries = database.transferAttributeQueries
 
+    private fun loadAttributesForTransfers(transfers: List<Transfer>): List<Transfer> {
+        if (transfers.isEmpty()) return transfers
+        val ids = transfers.map { it.id.id.toString() }
+        val attributesByTransferId =
+            transferAttributeQueries.selectByTransactionIds(ids)
+                .executeAsList()
+                .groupBy { TransferId(Uuid.parse(it.transactionId)) }
+                .mapValues { (_, rows) ->
+                    rows.map { row ->
+                        TransferAttribute(
+                            id = row.id,
+                            transactionId = TransferId(Uuid.parse(row.transactionId)),
+                            attributeType =
+                                AttributeType(
+                                    id = AttributeTypeId(row.attributeType_id),
+                                    name = row.attributeType_name,
+                                ),
+                            value = row.attributeValue,
+                        )
+                    }
+                }
+        return transfers.map { it.copy(attributes = attributesByTransferId[it.id].orEmpty()) }
+    }
+
+    private fun loadAttributesForTransfer(transfer: Transfer?): Transfer? {
+        if (transfer == null) return null
+        return loadAttributesForTransfers(listOf(transfer)).first()
+    }
+
     override fun getTransactionById(id: Uuid): Flow<Transfer?> =
         transferQueries.selectById(id.toString(), TransferMapper::mapRaw)
             .asFlow()
             .mapToOneOrNull(Dispatchers.Default)
+            .map { loadAttributesForTransfer(it) }
 
     override fun getTransactionsByAccount(accountId: AccountId): Flow<List<Transfer>> =
         transferQueries.selectByAccount(accountId.id, accountId.id, TransferMapper::mapRaw)
             .asFlow()
             .mapToList(Dispatchers.Default)
+            .map { loadAttributesForTransfers(it) }
 
     override fun getTransactionsByDateRange(
         startDate: Instant,
@@ -57,6 +90,7 @@ class TransactionRepositoryImpl(
         )
             .asFlow()
             .mapToList(Dispatchers.Default)
+            .map { loadAttributesForTransfers(it) }
 
     override fun getTransactionsByAccountAndDateRange(
         accountId: AccountId,
@@ -72,6 +106,7 @@ class TransactionRepositoryImpl(
         )
             .asFlow()
             .mapToList(Dispatchers.Default)
+            .map { loadAttributesForTransfers(it) }
 
     override fun getAccountBalances(): Flow<List<AccountBalance>> =
         transferQueries.selectAllBalances()
@@ -291,28 +326,28 @@ class TransactionRepositoryImpl(
         }
 
     override suspend fun createTransfers(
-        transfersWithAttributes: List<TransferWithAttributes>,
+        transfers: List<Transfer>,
+        newAttributes: Map<TransferId, List<NewAttribute>>,
         sourceRecorder: SourceRecorder,
         onProgress: (suspend (created: Int, total: Int) -> Unit)?,
     ): Unit =
         withContext(Dispatchers.Default) {
-            val total = transfersWithAttributes.size
+            val total = transfers.size
 
             // Process in batches of 1000 to avoid holding transaction too long
             val batchSize = 1000
             var created = 0
 
-            for (batchStart in transfersWithAttributes.indices step batchSize) {
-                val batchEnd = minOf(batchStart + batchSize, transfersWithAttributes.size)
-                val batch = transfersWithAttributes.subList(batchStart, batchEnd)
+            for (batchStart in transfers.indices step batchSize) {
+                val batchEnd = minOf(batchStart + batchSize, transfers.size)
+                val batch = transfers.subList(batchStart, batchEnd)
 
                 transferQueries.transaction {
                     // Enable creation mode so attribute triggers record audit but don't bump revision.
                     // This allows initial attributes to be recorded at revision 1.
                     database.beginCreationMode()
                     try {
-                        batch.forEach { transferWithAttributes ->
-                            val transfer = transferWithAttributes.transfer
+                        batch.forEach { transfer ->
                             // Create transfer (triggers INSERT audit)
                             transactionIdQueries.insert(transfer.id.toString())
                             transferQueries.insert(
@@ -327,7 +362,7 @@ class TransactionRepositoryImpl(
                             )
 
                             // Insert attributes (creation mode records audit at rev 1 without bumping)
-                            transferWithAttributes.attributes.forEach { attr ->
+                            newAttributes[transfer.id].orEmpty().forEach { attr ->
                                 transferAttributeQueries.insert(
                                     transactionId = transfer.id.toString(),
                                     attributeTypeId = attr.typeId.id,

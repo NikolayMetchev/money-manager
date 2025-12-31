@@ -37,7 +37,13 @@ import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.Money
+import com.moneymanager.domain.model.NewAttribute
+import com.moneymanager.domain.model.PageWithTargetIndex
+import com.moneymanager.domain.model.PagingInfo
+import com.moneymanager.domain.model.PagingResult
+import com.moneymanager.domain.model.SourceRecorder
 import com.moneymanager.domain.model.SourceType
+import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferAttribute
 import com.moneymanager.domain.model.TransferAuditEntry
@@ -311,7 +317,7 @@ class AccountTransactionsScreenTest {
                     )
                 val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
                 repositories.transactionRepository.createTransfers(
-                    transfersWithAttributes = listOf(com.moneymanager.domain.model.TransferWithAttributes(transfer, emptyList())),
+                    transfers = listOf(transfer),
                     sourceRecorder = SampleGeneratorSourceRecorder(repositories.transferSourceQueries, deviceId),
                 )
 
@@ -508,7 +514,7 @@ class AccountTransactionsScreenTest {
                     )
                 val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
                 repositories.transactionRepository.createTransfers(
-                    transfersWithAttributes = listOf(com.moneymanager.domain.model.TransferWithAttributes(transfer, emptyList())),
+                    transfers = listOf(transfer),
                     sourceRecorder = ManualSourceRecorder(repositories.transferSourceQueries, deviceId),
                 )
 
@@ -675,7 +681,7 @@ class AccountTransactionsScreenTest {
                     )
                 val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
                 repositories.transactionRepository.createTransfers(
-                    transfersWithAttributes = listOf(com.moneymanager.domain.model.TransferWithAttributes(transfer, emptyList())),
+                    transfers = listOf(transfer),
                     sourceRecorder = ManualSourceRecorder(repositories.transferSourceQueries, deviceId),
                 )
 
@@ -847,8 +853,8 @@ class AccountTransactionsScreenTest {
         override suspend fun getRunningBalanceByAccountPaginated(
             accountId: AccountId,
             pageSize: Int,
-            pagingInfo: com.moneymanager.domain.model.PagingInfo?,
-        ): com.moneymanager.domain.model.PagingResult<AccountRow> {
+            pagingInfo: PagingInfo?,
+        ): PagingResult<AccountRow> {
             // Simulate the materialized view logic: create TWO AccountRow entries per transfer
             // One from the source account's perspective (outgoing = negative)
             // One from the target account's perspective (incoming = positive)
@@ -885,10 +891,10 @@ class AccountTransactionsScreenTest {
             val items = allRows.take(pageSize)
             val hasMore = allRows.size > pageSize
 
-            return com.moneymanager.domain.model.PagingResult(
+            return PagingResult(
                 items = items,
                 pagingInfo =
-                    com.moneymanager.domain.model.PagingInfo(
+                    PagingInfo(
                         lastTimestamp = items.lastOrNull()?.timestamp,
                         lastId = items.lastOrNull()?.transactionId,
                         hasMore = hasMore,
@@ -900,12 +906,12 @@ class AccountTransactionsScreenTest {
             accountId: AccountId,
             pageSize: Int,
             firstTimestamp: Instant,
-            firstId: com.moneymanager.domain.model.TransactionId,
-        ): com.moneymanager.domain.model.PagingResult<AccountRow> =
-            com.moneymanager.domain.model.PagingResult(
+            firstId: TransactionId,
+        ): PagingResult<AccountRow> =
+            PagingResult(
                 items = emptyList(),
                 pagingInfo =
-                    com.moneymanager.domain.model.PagingInfo(
+                    PagingInfo(
                         lastTimestamp = null,
                         lastId = null,
                         hasMore = false,
@@ -916,7 +922,7 @@ class AccountTransactionsScreenTest {
             accountId: AccountId,
             transactionId: TransferId,
             pageSize: Int,
-        ): com.moneymanager.domain.model.PageWithTargetIndex<AccountRow> {
+        ): PageWithTargetIndex<AccountRow> {
             val allRows =
                 transfers.flatMap { transfer ->
                     listOf(
@@ -948,11 +954,11 @@ class AccountTransactionsScreenTest {
             val items = allRows.take(pageSize)
             val hasMore = allRows.size > pageSize
 
-            return com.moneymanager.domain.model.PageWithTargetIndex(
+            return PageWithTargetIndex(
                 items = items,
                 targetIndex = targetIndex,
                 pagingInfo =
-                    com.moneymanager.domain.model.PagingInfo(
+                    PagingInfo(
                         lastTimestamp = items.lastOrNull()?.timestamp,
                         lastId = items.lastOrNull()?.transactionId,
                         hasMore = hasMore,
@@ -962,16 +968,17 @@ class AccountTransactionsScreenTest {
         }
 
         override suspend fun createTransfers(
-            transfersWithAttributes: List<com.moneymanager.domain.model.TransferWithAttributes>,
-            sourceRecorder: com.moneymanager.domain.model.SourceRecorder,
+            transfers: List<Transfer>,
+            newAttributes: Map<TransferId, List<NewAttribute>>,
+            sourceRecorder: SourceRecorder,
             onProgress: (suspend (Int, Int) -> Unit)?,
         ) {}
 
         override suspend fun updateTransfer(
             transfer: Transfer?,
             deletedAttributeIds: Set<Long>,
-            updatedAttributes: Map<Long, com.moneymanager.domain.model.NewAttribute>,
-            newAttributes: List<com.moneymanager.domain.model.NewAttribute>,
+            updatedAttributes: Map<Long, NewAttribute>,
+            newAttributes: List<NewAttribute>,
             transactionId: TransferId,
         ) {}
 

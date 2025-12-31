@@ -51,7 +51,6 @@ import com.moneymanager.domain.getDeviceInfo
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Transfer
-import com.moneymanager.domain.model.TransferWithAttributes
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvRow
@@ -271,7 +270,8 @@ fun ApplyStrategyDialog(
 
                                     // Create transfer with attributes and source in one operation
                                     transactionRepository.createTransfers(
-                                        transfersWithAttributes = listOf(TransferWithAttributes(transfer, attributes)),
+                                        transfers = listOf(transfer),
+                                        newAttributes = mapOf(transfer.id to attributes),
                                         sourceRecorder =
                                             CsvImportSourceRecorder(
                                                 queries = transferSourceQueries,
