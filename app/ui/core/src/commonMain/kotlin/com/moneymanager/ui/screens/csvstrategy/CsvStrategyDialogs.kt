@@ -383,7 +383,7 @@ fun CreateCsvStrategyDialog(
     // Build sample values map for value-based detection
     val sampleValues: Map<Int, String>? =
         firstRow?.let { row ->
-            csvColumns.associate { col -> col.columnIndex to (row.values.getOrNull(col.columnIndex) ?: "") }
+            csvColumns.associate { col -> col.columnIndex to row.values.getOrNull(col.columnIndex).orEmpty() }
         }
 
     // Compute form validity - all required fields must be populated
@@ -1120,7 +1120,7 @@ private fun ColumnDropdown(
         onExpandedChange = { if (enabled) expanded = !expanded },
     ) {
         OutlinedTextField(
-            value = selectedColumn ?: "",
+            value = selectedColumn.orEmpty(),
             onValueChange = {},
             readOnly = true,
             label = { Text(label) },
@@ -1407,7 +1407,7 @@ private fun AttributeMappingsEditor(
                     val attributeTypeName = mappings[columnName] ?: columnName
                     val sampleValue =
                         firstRow?.values?.getOrNull(column.columnIndex)
-                            ?: ""
+                            .orEmpty()
 
                     AttributeColumnMappingRow(
                         columnName = columnName,

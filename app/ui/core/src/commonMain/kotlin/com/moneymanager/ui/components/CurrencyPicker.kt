@@ -79,7 +79,7 @@ fun CurrencyPicker(
                 if (expanded) {
                     searchQuery
                 } else {
-                    selectedCurrency?.let { "${it.code} - ${it.name}" } ?: ""
+                    selectedCurrency?.let { "${it.code} - ${it.name}" }.orEmpty()
                 },
             onValueChange = { searchQuery = it },
             label = { Text(label) },

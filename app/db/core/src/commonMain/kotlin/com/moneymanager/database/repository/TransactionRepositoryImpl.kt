@@ -21,7 +21,6 @@ import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.TransferWithAttributes
-import com.moneymanager.domain.repository.DeviceRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -32,13 +31,10 @@ import kotlin.uuid.Uuid
 
 class TransactionRepositoryImpl(
     private val database: MoneyManagerDatabaseWrapper,
-    private val deviceRepository: DeviceRepository,
 ) : TransactionRepository {
     private val transferQueries = database.transferQueries
     private val transactionIdQueries = database.transactionIdQueries
     private val transferAttributeQueries = database.transferAttributeQueries
-    private val transferAttributeAuditQueries = database.transferAttributeAuditQueries
-    private val transferSourceQueries = database.transferSourceQueries
 
     override fun getTransactionById(id: Uuid): Flow<Transfer?> =
         transferQueries.selectById(id.toString(), TransferMapper::mapRaw)

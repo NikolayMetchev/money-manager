@@ -151,7 +151,7 @@ fun CategoriesScreen(
     // Get descendants of dragged item to prevent invalid drops
     val draggedDescendants =
         remember(draggedCategoryId, forest) {
-            draggedCategoryId?.let { getDescendantIds(it, forest) } ?: emptySet()
+            draggedCategoryId?.let { getDescendantIds(it, forest) }.orEmpty()
         }
 
     Column(
@@ -248,7 +248,7 @@ fun CategoriesScreen(
 
                         CategoryTreeItem(
                             node = node,
-                            balances = balancesByCategoryId[node.category.id] ?: emptyList(),
+                            balances = balancesByCategoryId[node.category.id].orEmpty(),
                             currenciesWithBalances = currenciesWithBalances,
                             columnWidths = columnWidths,
                             balancesScrollState = balancesScrollState,

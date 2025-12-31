@@ -95,7 +95,7 @@ class CsvTableManager(private val database: MoneyManagerDatabaseWrapper) {
                     val transferId = transferIdStr?.let { TransferId(Uuid.parse(it)) }
                     val values =
                         (0 until columnCount).map { i ->
-                            cursor.getString(i + 2) ?: ""
+                            cursor.getString(i + 2).orEmpty()
                         }
                     result.add(CsvRow(rowIndex = rowIndex, values = values, transferId = transferId))
                 }

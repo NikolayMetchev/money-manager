@@ -75,9 +75,7 @@ class AndroidDatabaseManager(private val context: Context) : DatabaseManager {
     override suspend fun backupDatabase(location: DbLocation): DbLocation =
         withContext(Dispatchers.IO) {
             val dbFile = context.getDatabasePath(location.name)
-            if (!dbFile.exists()) {
-                throw IllegalArgumentException("Database does not exist: ${location.name}")
-            }
+            require(dbFile.exists()) { "Database does not exist: ${location.name}" }
 
             val backupName = "${location.name}.backup"
             val backupFile = context.getDatabasePath(backupName)

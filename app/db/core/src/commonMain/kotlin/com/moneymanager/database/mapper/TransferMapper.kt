@@ -3,7 +3,6 @@
 package com.moneymanager.database.mapper
 
 import com.moneymanager.database.sql.SelectAll
-import com.moneymanager.database.sql.SelectByDateRange
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Money
@@ -54,14 +53,6 @@ object TransferMapper :
 }
 
 private fun SelectAll.toCurrency(): Currency =
-    Currency(
-        id = CurrencyId(Uuid.parse(currency_id)),
-        code = currency_code,
-        name = currency_name,
-        scaleFactor = currency_scaleFactor,
-    )
-
-private fun SelectByDateRange.toCurrency(): Currency =
     Currency(
         id = CurrencyId(Uuid.parse(currency_id)),
         code = currency_code,

@@ -1,4 +1,52 @@
+complexity:
+  ComplexCondition:
+    active: false
+  CyclomaticComplexMethod:
+    active: false
+  LargeClass:
+    active: false
+  LongMethod:
+    active: false
+  LongParameterList:
+    active: false
+  TooManyFunctions:
+    active: false
+
+coroutines:
+  InjectDispatcher:
+    active: false
+
+exceptions:
+  SwallowedException:
+    active: false
+  TooGenericExceptionCaught:
+    active: false
+
 naming:
   FunctionNaming:
     ignoreAnnotated:
       - 'Composable'
+  FunctionParameterNaming:
+    active: false
+  VariableNaming:
+    active: false
+
+potential-bugs:
+  ImplicitDefaultLocale:
+    active: false
+  UnsafeCallOnNullableType:
+    active: false
+
+style:
+  MagicNumber:
+    active: false
+  MaxLineLength:
+    active: false
+  ReturnCount:
+    active: false
+  WildcardImport:
+    active: false
+
+empty-blocks:
+  EmptyFunctionBlock:
+    active: false

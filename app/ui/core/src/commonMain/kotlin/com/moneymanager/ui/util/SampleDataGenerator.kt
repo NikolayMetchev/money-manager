@@ -22,16 +22,6 @@ import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
-data class GenerationProgress(
-    val accountsCreated: Int = 0,
-    val totalAccounts: Int = 100,
-    val categoriesCreated: Int = 0,
-    val totalCategories: Int = 0,
-    val transactionsCreated: Int = 0,
-    val totalTransactions: Int = 0,
-    val currentOperation: String = "Initializing...",
-)
-
 suspend fun generateSampleData(
     repositorySet: RepositorySet,
     progressFlow: MutableStateFlow<GenerationProgress>,
@@ -46,9 +36,7 @@ suspend fun generateSampleData(
     )
 
     val allCurrencies = repositorySet.currencyRepository.getAllCurrencies().first()
-    if (allCurrencies.isEmpty()) {
-        throw IllegalStateException("No currencies found in database. Please create currencies first.")
-    }
+    check(allCurrencies.isNotEmpty()) { "No currencies found in database. Please create currencies first." }
 
     // Pick 10-20 popular currencies (or all if less than 20)
     val popularCurrencyCodes =
@@ -62,9 +50,7 @@ suspend fun generateSampleData(
             popularCurrencyCodes.contains(currency.code)
         }.take(20).ifEmpty { allCurrencies.take(20) }
 
-    if (selectedCurrencies.isEmpty()) {
-        throw IllegalStateException("No currencies available for sample data generation.")
-    }
+    check(selectedCurrencies.isNotEmpty()) { "No currencies available for sample data generation." }
 
     // Step 2: Generate and create categories with hierarchical structure
     progressFlow.emit(
@@ -240,7 +226,7 @@ suspend fun generateSampleData(
     for ((accountIndex, accountId) in accountIds.withIndex()) {
         val transactionCount = transactionCounts[accountIndex]
 
-        for (txIndex in 0 until transactionCount) {
+        repeat(transactionCount) { _ ->
             // Random timestamp between 2015-2025
             val randomMillis = random.nextLong(dateRangeMillis)
             val timestamp = Instant.fromEpochMilliseconds(startDate.toEpochMilliseconds() + randomMillis)
@@ -625,3 +611,13 @@ private fun generateCategoryHierarchy(): List<CategoryWithChildren> {
         ),
     )
 }
+
+data class GenerationProgress(
+    val accountsCreated: Int = 0,
+    val totalAccounts: Int = 100,
+    val categoriesCreated: Int = 0,
+    val totalCategories: Int = 0,
+    val transactionsCreated: Int = 0,
+    val totalTransactions: Int = 0,
+    val currentOperation: String = "Initializing...",
+)

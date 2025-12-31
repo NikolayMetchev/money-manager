@@ -69,9 +69,7 @@ class JvmDatabaseManager : DatabaseManager {
 
     override suspend fun backupDatabase(location: DbLocation): DbLocation =
         withContext(Dispatchers.IO) {
-            if (!location.exists()) {
-                throw IllegalArgumentException("Database does not exist at: $location")
-            }
+            require(location.exists()) { "Database does not exist at: $location" }
 
             val backupPath = location.path.resolveSibling("${location.path.fileName}.backup")
             val backupLocation = DbLocation(backupPath)

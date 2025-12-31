@@ -210,8 +210,6 @@ private fun MoneyManagerAppContent(
     // Use schema-error-aware collection for flows that may fail on old databases
     val accounts by repositorySet.accountRepository.getAllAccounts()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val currencies by repositorySet.currencyRepository.getAllCurrencies()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
 
     MaterialTheme {
         Scaffold(

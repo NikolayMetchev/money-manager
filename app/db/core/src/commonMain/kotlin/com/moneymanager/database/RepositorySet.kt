@@ -48,7 +48,7 @@ class RepositorySet(
     val currencyRepository: CurrencyRepository = CurrencyRepositoryImpl(database)
     val maintenanceService: DatabaseMaintenanceService = DatabaseMaintenanceServiceImpl(database)
     val transactionIdRepository: TransactionIdRepository = TransactionIdRepositoryImpl(database)
-    val transactionRepository: TransactionRepository = TransactionRepositoryImpl(database, deviceRepository)
+    val transactionRepository: TransactionRepository = TransactionRepositoryImpl(database)
     val transferAttributeRepository: TransferAttributeRepository = TransferAttributeRepositoryImpl(database)
     val transferAttributeAuditRepository: TransferAttributeAuditRepository =
         TransferAttributeAuditRepositoryImpl(database)
