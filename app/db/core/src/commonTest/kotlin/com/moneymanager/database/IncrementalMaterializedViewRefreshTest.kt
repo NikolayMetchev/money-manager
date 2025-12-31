@@ -272,7 +272,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
             repositories.maintenanceService.fullRefreshMaterializedViews()
 
             // UPDATE first transfer to have timestamp AFTER second
-            repositories.transactionRepository.updateTransferAndAttributes(
+            repositories.transactionRepository.updateTransfer(
                 transfer =
                     Transfer(
                         id = transfer1Id,
@@ -335,7 +335,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
             repositories.maintenanceService.fullRefreshMaterializedViews()
 
             // UPDATE to change BOTH source and target accounts (account1→account2 becomes account3→account4)
-            repositories.transactionRepository.updateTransferAndAttributes(
+            repositories.transactionRepository.updateTransfer(
                 transfer =
                     Transfer(
                         id = transferId,

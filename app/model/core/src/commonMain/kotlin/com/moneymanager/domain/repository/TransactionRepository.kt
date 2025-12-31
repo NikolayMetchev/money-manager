@@ -83,7 +83,7 @@ interface TransactionRepository {
      * @param sourceRecorder Strategy for recording source information (includes device info)
      * @param onProgress Optional callback for batch progress (called after each batch of ~1000)
      */
-    suspend fun createTransfersWithAttributesAndSources(
+    suspend fun createTransfers(
         transfersWithAttributes: List<TransferWithAttributes>,
         sourceRecorder: SourceRecorder,
         onProgress: (suspend (created: Int, total: Int) -> Unit)? = null,
@@ -107,7 +107,7 @@ interface TransactionRepository {
      * @param newAttributes List of (typeId, value) pairs for new attributes
      * @param transactionId The transaction ID (needed when transfer is null)
      */
-    suspend fun updateTransferAndAttributes(
+    suspend fun updateTransfer(
         transfer: Transfer?,
         deletedAttributeIds: Set<Long>,
         updatedAttributes: Map<Long, NewAttribute>,

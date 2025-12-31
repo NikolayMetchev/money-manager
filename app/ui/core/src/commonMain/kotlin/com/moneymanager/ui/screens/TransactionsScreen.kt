@@ -1470,7 +1470,7 @@ fun TransactionEntryDialog(
 
                                 // Create transfer with attributes and source in one transaction
                                 val deviceId = deviceRepository.getOrCreateDevice(getDeviceInfo())
-                                transactionRepository.createTransfersWithAttributesAndSources(
+                                transactionRepository.createTransfers(
                                     transfersWithAttributes = listOf(TransferWithAttributes(transfer, attributesToSave)),
                                     sourceRecorder = ManualSourceRecorder(transferSourceQueries, deviceId),
                                 )
@@ -1979,7 +1979,7 @@ fun TransactionEditDialog(
 
                                     // Use the atomic method to update transfer and attributes together
                                     // This ensures only ONE revision bump even if both change
-                                    transactionRepository.updateTransferAndAttributes(
+                                    transactionRepository.updateTransfer(
                                         transfer = updatedTransfer,
                                         deletedAttributeIds = deletedAttributeIds,
                                         updatedAttributes = updatedAttributes,

@@ -448,13 +448,13 @@ class AccountsScreenTest {
                 hasPrevious = false,
             )
 
-        override suspend fun createTransfersWithAttributesAndSources(
+        override suspend fun createTransfers(
             transfersWithAttributes: List<com.moneymanager.domain.model.TransferWithAttributes>,
             sourceRecorder: com.moneymanager.domain.model.SourceRecorder,
             onProgress: (suspend (Int, Int) -> Unit)?,
         ) {}
 
-        override suspend fun updateTransferAndAttributes(
+        override suspend fun updateTransfer(
             transfer: Transfer?,
             deletedAttributeIds: Set<Long>,
             updatedAttributes: Map<Long, com.moneymanager.domain.model.NewAttribute>,
