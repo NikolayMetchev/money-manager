@@ -1,3 +1,5 @@
+@file:Suppress("UnusedPrivateProperty") // False positive: javaCurrency and formatter are used
+
 package com.moneymanager.currency
 
 import java.text.NumberFormat

@@ -27,10 +27,17 @@ tasks {
     withType<Detekt>().configureEach {
         // Detekt only supports up to JVM target 24
         jvmTarget = minOf(jvmTargetVersion.toInt(), 24).toString()
+        // Exclude generated code from analysis
+        exclude { it.file.absolutePath.contains("/build/generated/") }
     }
 
     withType<JavaCompile>().configureEach {
         targetCompatibility = jvmTargetVersion
+    }
+
+    // Make detekt aggregate task include type-resolution tasks for KMP modules
+    named("detekt") {
+        dependsOn(matching { it.name.startsWith("detektMain") || it.name.startsWith("detektTest") })
     }
 }
 

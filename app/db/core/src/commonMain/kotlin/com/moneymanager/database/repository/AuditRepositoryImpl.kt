@@ -70,7 +70,7 @@ class AuditRepositoryImpl(
 
         // Attach attribute changes to each audit entry based on revisionId
         return entries.map { entry ->
-            entry.copy(attributeChanges = changesByRevision[entry.revisionId] ?: emptyList())
+            entry.copy(attributeChanges = changesByRevision[entry.revisionId].orEmpty())
         }
     }
 

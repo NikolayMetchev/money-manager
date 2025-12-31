@@ -11,7 +11,7 @@ actual fun copyDatabaseFromResources(resourcePath: String): DbLocation {
         Thread.currentThread().contextClassLoader?.getResourceAsStream(resourcePath.trimStart('/'))
             ?: object {}.javaClass.getResourceAsStream(resourcePath)
             ?: object {}.javaClass.classLoader?.getResourceAsStream(resourcePath.trimStart('/'))
-            ?: throw IllegalStateException(
+            ?: error(
                 "Test database not found at $resourcePath. " +
                     "Tried paths: ${resourcePath.trimStart('/')}, $resourcePath",
             )

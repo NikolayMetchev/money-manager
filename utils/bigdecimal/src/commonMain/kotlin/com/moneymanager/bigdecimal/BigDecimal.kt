@@ -1,3 +1,5 @@
+@file:Suppress("UnusedPrivateProperty") // False positive: expect class constructor params
+
 package com.moneymanager.bigdecimal
 
 /**

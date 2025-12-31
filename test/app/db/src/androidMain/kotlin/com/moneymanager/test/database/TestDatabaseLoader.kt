@@ -12,7 +12,7 @@ actual fun copyDatabaseFromResources(resourcePath: String): DbLocation {
         Thread.currentThread().contextClassLoader?.getResourceAsStream(normalizedPath)
             ?: TestDatabaseLoader::class.java.getResourceAsStream(resourcePath)
             ?: TestDatabaseLoader::class.java.classLoader?.getResourceAsStream(normalizedPath)
-            ?: throw IllegalStateException(
+            ?: error(
                 "Test database not found at $resourcePath. " +
                     "Tried classpath paths: $normalizedPath, $resourcePath",
             )

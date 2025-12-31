@@ -14,7 +14,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 
-abstract class DbTest {
+open class DbTest {
     protected lateinit var database: MoneyManagerDatabaseWrapper
     private lateinit var testDbLocation: DbLocation
     protected lateinit var repositories: RepositorySet

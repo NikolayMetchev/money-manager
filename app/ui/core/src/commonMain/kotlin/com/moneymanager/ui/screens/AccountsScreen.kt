@@ -124,6 +124,7 @@ fun AccountsScreen(
 }
 
 @Composable
+@Suppress("UnusedParameter")
 fun AccountCard(
     account: Account,
     category: Category?,

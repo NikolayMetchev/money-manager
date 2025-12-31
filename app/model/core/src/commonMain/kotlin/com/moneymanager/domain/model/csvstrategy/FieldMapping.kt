@@ -121,12 +121,15 @@ data class AmountParsingMapping(
     init {
         when (mode) {
             AmountMode.SINGLE_COLUMN ->
-                require(amountColumnName != null) {
+                requireNotNull(amountColumnName) {
                     "amountColumnName is required for SINGLE_COLUMN mode"
                 }
             AmountMode.CREDIT_DEBIT_COLUMNS -> {
-                require(creditColumnName != null && debitColumnName != null) {
-                    "creditColumnName and debitColumnName are required for CREDIT_DEBIT_COLUMNS mode"
+                requireNotNull(creditColumnName) {
+                    "creditColumnName is required for CREDIT_DEBIT_COLUMNS mode"
+                }
+                requireNotNull(debitColumnName) {
+                    "debitColumnName is required for CREDIT_DEBIT_COLUMNS mode"
                 }
             }
         }

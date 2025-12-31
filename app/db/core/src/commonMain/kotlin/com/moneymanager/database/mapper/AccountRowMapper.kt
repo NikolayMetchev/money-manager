@@ -18,7 +18,7 @@ object AccountRowMapper {
         timestamp: Long,
         description: String,
         accountId: Long,
-        currencyId: String,
+        @Suppress("UnusedParameter") currencyId: String,
         transactionAmount: Long,
         runningBalance: Long,
         currency_id: String,

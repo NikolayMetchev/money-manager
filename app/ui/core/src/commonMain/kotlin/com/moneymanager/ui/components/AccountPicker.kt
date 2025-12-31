@@ -42,6 +42,7 @@ import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
  * @param isError Whether to show error state (red outline)
  */
 @Composable
+@Suppress("UnusedParameter")
 fun AccountPicker(
     selectedAccountId: AccountId?,
     onAccountSelected: (AccountId) -> Unit,

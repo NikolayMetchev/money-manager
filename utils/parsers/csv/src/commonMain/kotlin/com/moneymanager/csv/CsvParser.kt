@@ -25,7 +25,7 @@ class CsvParser {
         }
 
         return if (options.hasHeaders) {
-            val headers = lines.firstOrNull() ?: emptyList()
+            val headers = lines.firstOrNull().orEmpty()
             val rows =
                 if (lines.size > 1) {
                     normalizeRows(lines.drop(1), headers.size)

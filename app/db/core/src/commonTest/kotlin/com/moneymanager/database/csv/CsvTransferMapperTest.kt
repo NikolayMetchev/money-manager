@@ -44,12 +44,6 @@ class CsvTransferMapperTest {
         )
 
     private val testSourceAccountId = AccountId(1)
-    private val testSourceAccount =
-        Account(
-            id = testSourceAccountId,
-            name = "Main Account",
-            openingDate = Clock.System.now(),
-        )
 
     private val testTargetAccountId = AccountId(2)
     private val testTargetAccount =

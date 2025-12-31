@@ -1154,6 +1154,7 @@ fun AccountTransactionCard(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+@Suppress("UnusedParameter")
 fun TransactionEntryDialog(
     transactionRepository: TransactionRepository,
     transferSourceRepository: TransferSourceRepository,
@@ -1438,7 +1439,7 @@ fun TransactionEntryDialog(
                                 // Get the currency object from repository
                                 val currency =
                                     currencyRepository.getCurrencyById(currencyId!!).first()
-                                        ?: throw IllegalStateException("Currency not found")
+                                        ?: error("Currency not found")
 
                                 // Convert selected date and time to Instant
                                 val timestamp =
@@ -1916,7 +1917,7 @@ fun TransactionEditDialog(
                                     // Get the currency object from repository
                                     val currency =
                                         currencyRepository.getCurrencyById(currencyId).first()
-                                            ?: throw IllegalStateException("Currency not found")
+                                            ?: error("Currency not found")
 
                                     val timestamp =
                                         selectedDate

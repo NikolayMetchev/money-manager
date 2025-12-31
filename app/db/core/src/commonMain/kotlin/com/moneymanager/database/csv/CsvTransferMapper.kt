@@ -171,7 +171,7 @@ class CsvTransferMapper(
                     ?: return MappingResult.Error(row.rowIndex, "Missing CURRENCY mapping")
 
             // Parse amount first (needed for account flipping)
-            val (rawAmount, newAccountName) =
+            val (rawAmount, _) =
                 parseAmountAndAccount(
                     amountMapping,
                     targetMapping,
@@ -279,17 +279,17 @@ class CsvTransferMapper(
                 AmountMode.SINGLE_COLUMN -> {
                     val columnName =
                         mapping.amountColumnName
-                            ?: throw IllegalStateException("amountColumnName required for SINGLE_COLUMN mode")
+                            ?: error("amountColumnName required for SINGLE_COLUMN mode")
                     val value = getColumnValue(columnName, values)
                     if (mapping.negateValues) -parseBigDecimal(value) else parseBigDecimal(value)
                 }
                 AmountMode.CREDIT_DEBIT_COLUMNS -> {
                     val creditColumnName =
                         mapping.creditColumnName
-                            ?: throw IllegalStateException("creditColumnName required")
+                            ?: error("creditColumnName required")
                     val debitColumnName =
                         mapping.debitColumnName
-                            ?: throw IllegalStateException("debitColumnName required")
+                            ?: error("debitColumnName required")
                     val creditValue = getColumnValue(creditColumnName, values)
                     val debitValue = getColumnValue(debitColumnName, values)
                     val credit = if (creditValue.isNotBlank()) parseBigDecimal(creditValue) else BigDecimal.ZERO
@@ -335,7 +335,7 @@ class CsvTransferMapper(
         return mapping.allColumns
             .map { getColumnValue(it, values) }
             .firstOrNull { it.isNotBlank() }
-            ?: ""
+            .orEmpty()
     }
 
     private fun parseTimestamp(
@@ -413,7 +413,7 @@ class CsvTransferMapper(
         return mapping.allColumns
             .map { getColumnValue(it, values) }
             .firstOrNull { it.isNotBlank() }
-            ?: ""
+            .orEmpty()
     }
 
     private fun parseCurrency(
@@ -437,7 +437,7 @@ class CsvTransferMapper(
         val index =
             columnIndexByName[columnName]
                 ?: throw IllegalArgumentException("Column not found: $columnName")
-        return values.getOrNull(index) ?: ""
+        return values.getOrNull(index).orEmpty()
     }
 
     private fun accountExists(name: String): Boolean = name in existingAccounts
