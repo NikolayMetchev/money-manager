@@ -36,9 +36,9 @@ class TransferSourceRepositoryImpl(
             val deviceId = deviceRepository.getOrCreateDevice(deviceInfo)
 
             queries.insertManual(
-                transactionId = transactionId.toString(),
-                revisionId = revisionId,
-                deviceId = deviceId,
+                transaction_id = transactionId.toString(),
+                revision_id = revisionId,
+                device_id = deviceId,
             )
 
             queries.selectByTransactionIdAndRevision(transactionId.toString(), revisionId)
@@ -57,21 +57,21 @@ class TransferSourceRepositoryImpl(
             val csvImport =
                 csvImportQueries.selectImportByTableName(
                     csvImportQueries.selectImportById(csvImportId.toString())
-                        .executeAsOne().tableName,
+                        .executeAsOne().table_name,
                 ).executeAsOne()
 
             // Insert base TransferSource record
             queries.insertCsvImportBase(
-                transactionId = transactionId.toString(),
-                revisionId = revisionId,
-                deviceId = csvImport.device_id,
+                transaction_id = transactionId.toString(),
+                revision_id = revisionId,
+                device_id = csvImport.device_id,
             )
             // Get the auto-generated ID and insert CSV-specific details
             val transferSourceId = queries.lastInsertedId().executeAsOne()
             queries.insertCsvImportDetails(
                 id = transferSourceId,
-                csvImportId = csvImportId.toString(),
-                csvRowIndex = rowIndex,
+                csv_import_id = csvImportId.toString(),
+                csv_row_index = rowIndex,
             )
 
             queries.selectByTransactionIdAndRevision(transactionId.toString(), revisionId)
@@ -92,16 +92,16 @@ class TransferSourceRepositoryImpl(
                 sources.forEach { source ->
                     // Insert base TransferSource record
                     queries.insertCsvImportBase(
-                        transactionId = source.transactionId.toString(),
-                        revisionId = source.revisionId,
-                        deviceId = deviceId,
+                        transaction_id = source.transactionId.toString(),
+                        revision_id = source.revisionId,
+                        device_id = deviceId,
                     )
                     // Get the auto-generated ID and insert CSV-specific details
                     val transferSourceId = queries.lastInsertedId().executeAsOne()
                     queries.insertCsvImportDetails(
                         id = transferSourceId,
-                        csvImportId = csvImportId.toString(),
-                        csvRowIndex = source.rowIndex,
+                        csv_import_id = csvImportId.toString(),
+                        csv_row_index = source.rowIndex,
                     )
                 }
             }
@@ -134,9 +134,9 @@ class TransferSourceRepositoryImpl(
             queries.transaction {
                 sources.forEach { source ->
                     queries.insertSampleGenerator(
-                        transactionId = source.transactionId.toString(),
-                        revisionId = source.revisionId,
-                        deviceId = deviceId,
+                        transaction_id = source.transactionId.toString(),
+                        revision_id = source.revisionId,
+                        device_id = deviceId,
                     )
                 }
             }

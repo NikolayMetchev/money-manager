@@ -1,11 +1,11 @@
--- DeviceMake: Lookup table for device manufacturers
-CREATE TABLE DeviceMake (
+-- device_make: Lookup table for device manufacturers
+CREATE TABLE device_make (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE
 );
 
 selectByName:
-SELECT id FROM DeviceMake WHERE name = ?;
+SELECT id FROM device_make WHERE name = ?;
 
 insertOrIgnore:
-INSERT OR IGNORE INTO DeviceMake (name) VALUES (?);
+INSERT OR IGNORE INTO device_make (name) VALUES (?);

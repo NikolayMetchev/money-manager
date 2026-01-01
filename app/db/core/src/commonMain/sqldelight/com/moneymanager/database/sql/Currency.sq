@@ -1,4 +1,4 @@
-CREATE TABLE Currency (
+CREATE TABLE currency (
     id TEXT PRIMARY KEY NOT NULL
         CHECK (
             length(id) = 36
@@ -11,26 +11,26 @@ CREATE TABLE Currency (
         ),
     code TEXT NOT NULL UNIQUE CHECK(length(trim(code)) > 0),
     name TEXT NOT NULL CHECK(length(trim(name)) > 0),
-    scaleFactor INTEGER NOT NULL DEFAULT 100
+    scale_factor INTEGER NOT NULL DEFAULT 100
 );
 
 selectAll:
-SELECT * FROM Currency ORDER BY code;
+SELECT * FROM currency ORDER BY code;
 
 selectById:
-SELECT * FROM Currency WHERE id = ?;
+SELECT * FROM currency WHERE id = ?;
 
 selectByCode:
-SELECT * FROM Currency WHERE code = ?;
+SELECT * FROM currency WHERE code = ?;
 
 insert:
-INSERT INTO Currency(id, code, name, scaleFactor)
+INSERT INTO currency(id, code, name, scale_factor)
 VALUES (?, ?, ?, ?);
 
 update:
-UPDATE Currency
-SET code = ?, name = ?, scaleFactor = ?
+UPDATE currency
+SET code = ?, name = ?, scale_factor = ?
 WHERE id = ?;
 
 delete:
-DELETE FROM Currency WHERE id = ?;
+DELETE FROM currency WHERE id = ?;

@@ -1,11 +1,11 @@
--- DeviceModel: Lookup table for device models
-CREATE TABLE DeviceModel (
+-- device_model: Lookup table for device models
+CREATE TABLE device_model (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE
 );
 
 selectByName:
-SELECT id FROM DeviceModel WHERE name = ?;
+SELECT id FROM device_model WHERE name = ?;
 
 insertOrIgnore:
-INSERT OR IGNORE INTO DeviceModel (name) VALUES (?);
+INSERT OR IGNORE INTO device_model (name) VALUES (?);

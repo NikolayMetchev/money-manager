@@ -44,18 +44,18 @@ class TransactionRepositoryImpl(
         val attributesByTransferId =
             transferAttributeQueries.selectByTransactionIds(ids)
                 .executeAsList()
-                .groupBy { TransferId(Uuid.parse(it.transactionId)) }
+                .groupBy { TransferId(Uuid.parse(it.transaction_id)) }
                 .mapValues { (_, rows) ->
                     rows.map { row ->
                         TransferAttribute(
                             id = row.id,
-                            transactionId = TransferId(Uuid.parse(row.transactionId)),
+                            transactionId = TransferId(Uuid.parse(row.transaction_id)),
                             attributeType =
                                 AttributeType(
-                                    id = AttributeTypeId(row.attributeType_id),
-                                    name = row.attributeType_name,
+                                    id = AttributeTypeId(row.attribute_type_id),
+                                    name = row.attribute_type_name,
                                 ),
-                            value = row.attributeValue,
+                            value = row.attribute_value,
                         )
                     }
                 }
@@ -126,23 +126,23 @@ class TransactionRepositoryImpl(
                     pagingInfo?.lastTimestamp?.toEpochMilliseconds(),
                     pagingInfo?.lastId?.toString(),
                     (pageSize + 1).toLong(),
-                ) { id, timestamp, description, accountId_, currencyId, transactionAmount, runningBalance,
-                    currency_id, currency_code, currency_name, currency_scaleFactor, sourceAccountId, targetAccountId,
+                ) { id, timestamp, description, account_id, currency_id, transaction_amount, running_balance,
+                    currency_id_, currency_code, currency_name, currency_scale_factor, source_account_id, target_account_id,
                     ->
                     AccountRowMapper.mapRaw(
                         id,
                         timestamp,
                         description,
-                        accountId_,
-                        currencyId,
-                        transactionAmount,
-                        runningBalance,
+                        account_id,
                         currency_id,
+                        transaction_amount,
+                        running_balance,
+                        currency_id_,
                         currency_code,
                         currency_name,
-                        currency_scaleFactor,
-                        sourceAccountId,
-                        targetAccountId,
+                        currency_scale_factor,
+                        source_account_id,
+                        target_account_id,
                     )
                 }
                     .executeAsList()
@@ -185,23 +185,23 @@ class TransactionRepositoryImpl(
                     firstTimestamp.toEpochMilliseconds(),
                     firstId.id.toString(),
                     (pageSize + 1).toLong(),
-                ) { id, timestamp, description, accountId_, currencyId, transactionAmount, runningBalance,
-                    currency_id, currency_code, currency_name, currency_scaleFactor, sourceAccountId, targetAccountId,
+                ) { id, timestamp, description, account_id, currency_id, transaction_amount, running_balance,
+                    currency_id_, currency_code, currency_name, currency_scale_factor, source_account_id, target_account_id,
                     ->
                     AccountRowMapper.mapRaw(
                         id,
                         timestamp,
                         description,
-                        accountId_,
-                        currencyId,
-                        transactionAmount,
-                        runningBalance,
+                        account_id,
                         currency_id,
+                        transaction_amount,
+                        running_balance,
+                        currency_id_,
                         currency_code,
                         currency_name,
-                        currency_scaleFactor,
-                        sourceAccountId,
-                        targetAccountId,
+                        currency_scale_factor,
+                        source_account_id,
+                        target_account_id,
                     )
                 }
                     .executeAsList()
@@ -273,23 +273,23 @@ class TransactionRepositoryImpl(
                     accountId = accountId.id,
                     limit = pageSize.toLong(),
                     offset = offset,
-                ) { id, timestamp, description, accountId_, currencyId, transactionAmount, runningBalance,
-                    currency_id, currency_code, currency_name, currency_scaleFactor, sourceAccountId, targetAccountId,
+                ) { id, timestamp, description, account_id, currency_id, transaction_amount, running_balance,
+                    currency_id_, currency_code, currency_name, currency_scale_factor, source_account_id, target_account_id,
                     ->
                     AccountRowMapper.mapRaw(
                         id,
                         timestamp,
                         description,
-                        accountId_,
-                        currencyId,
-                        transactionAmount,
-                        runningBalance,
+                        account_id,
                         currency_id,
+                        transaction_amount,
+                        running_balance,
+                        currency_id_,
                         currency_code,
                         currency_name,
-                        currency_scaleFactor,
-                        sourceAccountId,
-                        targetAccountId,
+                        currency_scale_factor,
+                        source_account_id,
+                        target_account_id,
                     )
                 }
                     .executeAsList()
@@ -352,21 +352,21 @@ class TransactionRepositoryImpl(
                             transactionIdQueries.insert(transfer.id.toString())
                             transferQueries.insert(
                                 id = transfer.id.toString(),
-                                revisionId = transfer.revisionId,
+                                revision_id = transfer.revisionId,
                                 timestamp = transfer.timestamp.toEpochMilliseconds(),
                                 description = transfer.description,
-                                sourceAccountId = transfer.sourceAccountId.id,
-                                targetAccountId = transfer.targetAccountId.id,
-                                currencyId = transfer.amount.currency.id.toString(),
+                                source_account_id = transfer.sourceAccountId.id,
+                                target_account_id = transfer.targetAccountId.id,
+                                currency_id = transfer.amount.currency.id.toString(),
                                 amount = transfer.amount.amount,
                             )
 
                             // Insert attributes (creation mode records audit at rev 1 without bumping)
                             newAttributes[transfer.id].orEmpty().forEach { attr ->
                                 transferAttributeQueries.insert(
-                                    transactionId = transfer.id.toString(),
-                                    attributeTypeId = attr.typeId.id,
-                                    attributeValue = attr.value,
+                                    transaction_id = transfer.id.toString(),
+                                    attribute_type_id = attr.typeId.id,
+                                    attribute_value = attr.value,
                                 )
                             }
 
@@ -406,9 +406,9 @@ class TransactionRepositoryImpl(
                     transferQueries.update(
                         timestamp = transfer.timestamp.toEpochMilliseconds(),
                         description = transfer.description,
-                        sourceAccountId = transfer.sourceAccountId.id,
-                        targetAccountId = transfer.targetAccountId.id,
-                        currencyId = transfer.amount.currency.id.toString(),
+                        source_account_id = transfer.sourceAccountId.id,
+                        target_account_id = transfer.targetAccountId.id,
+                        currency_id = transfer.amount.currency.id.toString(),
                         amount = transfer.amount.amount,
                         id = transfer.id.toString(),
                     )
@@ -430,13 +430,13 @@ class TransactionRepositoryImpl(
                         updatedAttributes.forEach { (id, attr) ->
                             // Check if type changed (requires delete + insert)
                             val current = transferAttributeQueries.selectById(id).executeAsOneOrNull()
-                            if (current != null && current.attributeTypeId != attr.typeId.id) {
+                            if (current != null && current.attribute_type_id != attr.typeId.id) {
                                 // Type changed: delete and recreate
                                 transferAttributeQueries.deleteById(id)
                                 transferAttributeQueries.insert(
-                                    transactionId = effectiveTransactionId.id.toString(),
-                                    attributeTypeId = attr.typeId.id,
-                                    attributeValue = attr.value,
+                                    transaction_id = effectiveTransactionId.id.toString(),
+                                    attribute_type_id = attr.typeId.id,
+                                    attribute_value = attr.value,
                                 )
                             } else {
                                 // Only value changed
@@ -447,9 +447,9 @@ class TransactionRepositoryImpl(
                         // Insert new attributes
                         newAttributes.forEach { attr ->
                             transferAttributeQueries.insert(
-                                transactionId = effectiveTransactionId.id.toString(),
-                                attributeTypeId = attr.typeId.id,
-                                attributeValue = attr.value,
+                                transaction_id = effectiveTransactionId.id.toString(),
+                                attribute_type_id = attr.typeId.id,
+                                attribute_value = attr.value,
                             )
                         }
                     } finally {
@@ -463,7 +463,7 @@ class TransactionRepositoryImpl(
         withContext(Dispatchers.Default) {
             transferQueries.transactionWithResult {
                 transferQueries.bumpRevisionOnly(id.id.toString())
-                transferQueries.selectById(id.id.toString()).executeAsOne().revisionId
+                transferQueries.selectById(id.id.toString()).executeAsOne().revision_id
             }
         }
 

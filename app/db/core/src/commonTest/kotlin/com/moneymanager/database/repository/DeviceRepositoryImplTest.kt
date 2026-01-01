@@ -24,7 +24,7 @@ class DeviceRepositoryImplTest : DbTest() {
      * Retrieves all platforms using raw SQL.
      */
     private fun selectAllPlatforms(): List<PlatformRecord> {
-        val sql = "SELECT id, name FROM Platform"
+        val sql = "SELECT id, name FROM platform"
         return database.executeQuery(
             identifier = null,
             sql = sql,

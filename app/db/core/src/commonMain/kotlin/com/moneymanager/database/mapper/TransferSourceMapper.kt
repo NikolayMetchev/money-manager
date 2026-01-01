@@ -20,17 +20,17 @@ object TransferSourceFromRevisionMapper :
     SourceTypeConversions {
     override fun map(from: SelectByTransactionIdAndRevision): TransferSource {
         return mapping {
-            TransferSource::transactionId fromValue toTransferId(from.transactionId)
+            TransferSource::transactionId fromValue toTransferId(from.transaction_id)
             TransferSource::deviceInfo fromValue
                 DeviceRepositoryImpl.createDeviceInfo(
-                    platformName = from.platformName,
-                    osName = from.osName,
-                    machineName = from.machineName,
-                    deviceMake = from.deviceMake,
-                    deviceModel = from.deviceModel,
+                    platformName = from.platform_name,
+                    osName = from.os_name,
+                    machineName = from.machine_name,
+                    deviceMake = from.device_make,
+                    deviceModel = from.device_model,
                 )
             TransferSource::csvSource fromValue
-                mapCsvSource(toSourceType(from.sourceType), from.csvImportId, from.csvRowIndex, from.csvFileName)
+                mapCsvSource(toSourceType(from.source_type), from.csv_import_id, from.csv_row_index, from.csv_file_name)
         }
     }
 }
@@ -42,17 +42,17 @@ object TransferSourceFromTransactionIdMapper :
     SourceTypeConversions {
     override fun map(from: SelectAllByTransactionId): TransferSource {
         return mapping {
-            TransferSource::transactionId fromValue toTransferId(from.transactionId)
+            TransferSource::transactionId fromValue toTransferId(from.transaction_id)
             TransferSource::deviceInfo fromValue
                 DeviceRepositoryImpl.createDeviceInfo(
-                    platformName = from.platformName,
-                    osName = from.osName,
-                    machineName = from.machineName,
-                    deviceMake = from.deviceMake,
-                    deviceModel = from.deviceModel,
+                    platformName = from.platform_name,
+                    osName = from.os_name,
+                    machineName = from.machine_name,
+                    deviceMake = from.device_make,
+                    deviceModel = from.device_model,
                 )
             TransferSource::csvSource fromValue
-                mapCsvSource(toSourceType(from.sourceType), from.csvImportId, from.csvRowIndex, from.csvFileName)
+                mapCsvSource(toSourceType(from.source_type), from.csv_import_id, from.csv_row_index, from.csv_file_name)
         }
     }
 }
@@ -63,15 +63,15 @@ object TransferSourceFromAuditMapper :
     InstantConversions,
     SourceTypeConversions {
     override fun map(from: SelectAuditHistoryForTransferWithSource): TransferSource {
-        val sourceType = toSourceType(from.sourceType!!)
+        val sourceType = toSourceType(from.source_type!!)
         return mapping {
-            TransferSource::id fromValue from.sourceId!!
+            TransferSource::id fromValue from.source_id!!
             TransferSource::transactionId fromValue toTransferId(from.id)
             TransferSource::sourceType fromValue sourceType
-            TransferSource::deviceId fromValue from.deviceId!!
+            TransferSource::deviceId fromValue from.device_id!!
             TransferSource::deviceInfo fromValue
                 DeviceRepositoryImpl.createDeviceInfo(
-                    platformName = from.sourcePlatformName!!,
+                    platformName = from.source_platform_name!!,
                     osName = from.source_os_name,
                     machineName = from.source_machine_name,
                     deviceMake = from.source_device_make,
@@ -84,7 +84,7 @@ object TransferSourceFromAuditMapper :
                     from.source_csv_row_index,
                     from.source_csv_file_name,
                 )
-            TransferSource::createdAt fromValue toInstant(from.sourceCreatedAt!!)
+            TransferSource::createdAt fromValue toInstant(from.source_created_at!!)
         }
     }
 }

@@ -1,16 +1,16 @@
-CREATE TABLE AttributeType (
+CREATE TABLE attribute_type (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE
 );
 
 selectAll:
-SELECT * FROM AttributeType ORDER BY name;
+SELECT * FROM attribute_type ORDER BY name;
 
 selectById:
-SELECT * FROM AttributeType WHERE id = ?;
+SELECT * FROM attribute_type WHERE id = ?;
 
 selectByName:
-SELECT * FROM AttributeType WHERE name = ?;
+SELECT * FROM attribute_type WHERE name = ?;
 
 insert:
-INSERT INTO AttributeType (name) VALUES (?);
+INSERT INTO attribute_type (name) VALUES (?);

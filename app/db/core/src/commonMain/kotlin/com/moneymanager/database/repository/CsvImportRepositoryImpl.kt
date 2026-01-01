@@ -56,11 +56,11 @@ class CsvImportRepositoryImpl(
             // Insert metadata
             csvImportQueries.insertImport(
                 id = importId.id.toString(),
-                tableName = tableName,
-                originalFileName = fileName,
-                importTimestamp = timestamp.toEpochMilliseconds(),
-                rowCount = rows.size.toLong(),
-                columnCount = columnCount.toLong(),
+                table_name = tableName,
+                original_file_name = fileName,
+                import_timestamp = timestamp.toEpochMilliseconds(),
+                row_count = rows.size.toLong(),
+                column_count = columnCount.toLong(),
                 device_id = deviceId,
             )
 
@@ -69,9 +69,9 @@ class CsvImportRepositoryImpl(
                 val columnId = Uuid.random()
                 csvImportQueries.insertColumn(
                     id = columnId.toString(),
-                    importId = importId.id.toString(),
-                    columnIndex = index.toLong(),
-                    originalName = header,
+                    import_id = importId.id.toString(),
+                    column_index = index.toLong(),
+                    original_name = header,
                 )
             }
 
@@ -90,26 +90,26 @@ class CsvImportRepositoryImpl(
                             .map { col ->
                                 CsvColumn(
                                     id = CsvColumnId(Uuid.parse(col.id)),
-                                    columnIndex = col.columnIndex.toInt(),
-                                    originalName = col.originalName,
+                                    columnIndex = col.column_index.toInt(),
+                                    originalName = col.original_name,
                                 )
                             }
 
                     CsvImport(
                         id = CsvImportId(Uuid.parse(import.id)),
-                        tableName = import.tableName,
-                        originalFileName = import.originalFileName,
-                        importTimestamp = Instant.fromEpochMilliseconds(import.importTimestamp),
-                        rowCount = import.rowCount.toInt(),
-                        columnCount = import.columnCount.toInt(),
+                        tableName = import.table_name,
+                        originalFileName = import.original_file_name,
+                        importTimestamp = Instant.fromEpochMilliseconds(import.import_timestamp),
+                        rowCount = import.row_count.toInt(),
+                        columnCount = import.column_count.toInt(),
                         columns = columns,
                         deviceInfo =
                             DeviceRepositoryImpl.createDeviceInfo(
-                                platformName = import.platformName,
-                                osName = import.osName,
-                                machineName = import.machineName,
-                                deviceMake = import.deviceMake,
-                                deviceModel = import.deviceModel,
+                                platformName = import.platform_name,
+                                osName = import.os_name,
+                                machineName = import.machine_name,
+                                deviceMake = import.device_make,
+                                deviceModel = import.device_model,
                             ),
                     )
                 }
@@ -133,26 +133,26 @@ class CsvImportRepositoryImpl(
                     columnEntities.map { col ->
                         CsvColumn(
                             id = CsvColumnId(Uuid.parse(col.id)),
-                            columnIndex = col.columnIndex.toInt(),
-                            originalName = col.originalName,
+                            columnIndex = col.column_index.toInt(),
+                            originalName = col.original_name,
                         )
                     }
 
                 CsvImport(
                     id = CsvImportId(Uuid.parse(it.id)),
-                    tableName = it.tableName,
-                    originalFileName = it.originalFileName,
-                    importTimestamp = Instant.fromEpochMilliseconds(it.importTimestamp),
-                    rowCount = it.rowCount.toInt(),
-                    columnCount = it.columnCount.toInt(),
+                    tableName = it.table_name,
+                    originalFileName = it.original_file_name,
+                    importTimestamp = Instant.fromEpochMilliseconds(it.import_timestamp),
+                    rowCount = it.row_count.toInt(),
+                    columnCount = it.column_count.toInt(),
                     columns = columns,
                     deviceInfo =
                         DeviceRepositoryImpl.createDeviceInfo(
-                            platformName = it.platformName,
-                            osName = it.osName,
-                            machineName = it.machineName,
-                            deviceMake = it.deviceMake,
-                            deviceModel = it.deviceModel,
+                            platformName = it.platform_name,
+                            osName = it.os_name,
+                            machineName = it.machine_name,
+                            deviceMake = it.device_make,
+                            deviceModel = it.device_model,
                         ),
                 )
             }
@@ -170,8 +170,8 @@ class CsvImportRepositoryImpl(
                     ?: return@withContext emptyList()
 
             tableManager.queryRows(
-                tableName = import.tableName,
-                columnCount = import.columnCount.toInt(),
+                tableName = import.table_name,
+                columnCount = import.column_count.toInt(),
                 limit = limit,
                 offset = offset,
             )
@@ -184,7 +184,7 @@ class CsvImportRepositoryImpl(
                     ?: return@withContext
 
             // Drop the dynamic table first
-            tableManager.dropCsvTable(import.tableName)
+            tableManager.dropCsvTable(import.table_name)
 
             // Delete column metadata (cascades from import delete, but be explicit)
             csvImportQueries.deleteColumnsByImportId(id.id.toString())
@@ -203,7 +203,7 @@ class CsvImportRepositoryImpl(
                 csvImportQueries.selectImportById(id.id.toString()).executeAsOneOrNull()
                     ?: return@withContext
 
-            tableManager.updateTransferId(import.tableName, rowIndex, transferId)
+            tableManager.updateTransferId(import.table_name, rowIndex, transferId)
         }
 
     override suspend fun updateRowTransferIdsBatch(
@@ -217,6 +217,6 @@ class CsvImportRepositoryImpl(
                 csvImportQueries.selectImportById(id.id.toString()).executeAsOneOrNull()
                     ?: return@withContext
 
-            tableManager.updateTransferIdsBatch(import.tableName, rowTransferMap)
+            tableManager.updateTransferIdsBatch(import.table_name, rowTransferMap)
         }
 }

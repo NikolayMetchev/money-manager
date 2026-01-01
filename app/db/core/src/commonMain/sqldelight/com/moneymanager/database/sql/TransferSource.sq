@@ -1,134 +1,133 @@
--- TransferSource: Tracks the provenance (source) of each Transfer audit entry
+-- transfer_source: Tracks the provenance (source) of each transfer audit entry
 -- Each audit entry (INSERT, UPDATE, DELETE) can have its own source record
--- Links Transfer → Transfer_Audit → TransferSource via transactionId + revisionId
-CREATE TABLE TransferSource (
+-- Links transfer → transfer_audit → transfer_source via transaction_id + revision_id
+CREATE TABLE transfer_source (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    transactionId TEXT NOT NULL,
-    revisionId INTEGER NOT NULL,
-    sourceTypeId INTEGER NOT NULL,
+    transaction_id TEXT NOT NULL,
+    revision_id INTEGER NOT NULL,
+    source_type_id INTEGER NOT NULL,
     -- Device that performed the action (always required)
-    deviceId INTEGER NOT NULL,
+    device_id INTEGER NOT NULL,
     -- Timestamp (defaults to current epoch milliseconds)
-    createdAt INTEGER NOT NULL DEFAULT (strftime('%s', 'now') * 1000),
-    FOREIGN KEY (transactionId) REFERENCES TransactionId(id),
-    FOREIGN KEY (sourceTypeId) REFERENCES SourceType(id),
-    FOREIGN KEY (deviceId) REFERENCES Device(id),
-    UNIQUE (transactionId, revisionId)
+    created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now') * 1000),
+    FOREIGN KEY (transaction_id) REFERENCES transaction_id(id),
+    FOREIGN KEY (source_type_id) REFERENCES source_type(id),
+    FOREIGN KEY (device_id) REFERENCES device(id),
+    UNIQUE (transaction_id, revision_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_transfer_source_transaction ON TransferSource(transactionId);
-CREATE INDEX IF NOT EXISTS idx_transfer_source_type ON TransferSource(sourceTypeId);
-CREATE INDEX IF NOT EXISTS idx_transfer_source_transaction_revision ON TransferSource(transactionId, revisionId);
-CREATE INDEX IF NOT EXISTS idx_transfer_source_device ON TransferSource(deviceId);
+CREATE INDEX IF NOT EXISTS idx_transfer_source_transaction ON transfer_source(transaction_id);
+CREATE INDEX IF NOT EXISTS idx_transfer_source_type ON transfer_source(source_type_id);
+CREATE INDEX IF NOT EXISTS idx_transfer_source_transaction_revision ON transfer_source(transaction_id, revision_id);
+CREATE INDEX IF NOT EXISTS idx_transfer_source_device ON transfer_source(device_id);
 
--- CsvTransferSource: CSV-specific data for CSV_IMPORT sources (sourceTypeId = 2)
--- 1:1 relationship with TransferSource
-CREATE TABLE CsvTransferSource (
-    id INTEGER PRIMARY KEY,  -- Same as TransferSource.id
-    csvImportId TEXT NOT NULL,
-    csvRowIndex INTEGER NOT NULL,
-    FOREIGN KEY (id) REFERENCES TransferSource(id),
-    FOREIGN KEY (csvImportId) REFERENCES CsvImportMetadata(id)
+-- csv_transfer_source: CSV-specific data for CSV_IMPORT sources (source_type_id = 2)
+-- 1:1 relationship with transfer_source
+CREATE TABLE csv_transfer_source (
+    id INTEGER PRIMARY KEY,  -- Same as transfer_source.id
+    csv_import_id TEXT NOT NULL,
+    csv_row_index INTEGER NOT NULL,
+    FOREIGN KEY (id) REFERENCES transfer_source(id),
+    FOREIGN KEY (csv_import_id) REFERENCES csv_import_metadata(id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_csv_transfer_source_import ON CsvTransferSource(csvImportId);
+CREATE INDEX IF NOT EXISTS idx_csv_transfer_source_import ON csv_transfer_source(csv_import_id);
 
--- Note: Validation that CsvTransferSource.id references a CSV_IMPORT source (sourceTypeId = 2)
+-- Note: Validation that csv_transfer_source.id references a CSV_IMPORT source (source_type_id = 2)
 -- is enforced at the application level. SQLDelight's dialect doesn't support trigger validation syntax.
 
 -- Select source by transaction ID and revision with device info
 selectByTransactionIdAndRevision:
 SELECT
-    TransferSource.id,
-    TransferSource.transactionId,
-    TransferSource.revisionId,
-    TransferSource.sourceTypeId,
-    TransferSource.deviceId,
-    CsvTransferSource.csvImportId,
-    CsvTransferSource.csvRowIndex,
-    TransferSource.createdAt,
-    SourceType.name AS sourceType,
-    CsvImportMetadata.originalFileName AS csvFileName,
-    Platform.name AS platformName,
-    OsName.name AS osName,
-    MachineName.name AS machineName,
-    DeviceMake.name AS deviceMake,
-    DeviceModel.name AS deviceModel
-FROM TransferSource
-JOIN SourceType ON TransferSource.sourceTypeId = SourceType.id
-JOIN Device ON TransferSource.deviceId = Device.id
-JOIN Platform ON Device.platform_id = Platform.id
-LEFT JOIN OsName ON Device.os_id = OsName.id
-LEFT JOIN MachineName ON Device.machine_id = MachineName.id
-LEFT JOIN DeviceMake ON Device.device_make_id = DeviceMake.id
-LEFT JOIN DeviceModel ON Device.device_model_id = DeviceModel.id
-LEFT JOIN CsvTransferSource ON TransferSource.id = CsvTransferSource.id
-LEFT JOIN CsvImportMetadata ON CsvTransferSource.csvImportId = CsvImportMetadata.id
-WHERE TransferSource.transactionId = ? AND TransferSource.revisionId = ?;
+    transfer_source.id,
+    transfer_source.transaction_id,
+    transfer_source.revision_id,
+    transfer_source.source_type_id,
+    transfer_source.device_id,
+    csv_transfer_source.csv_import_id,
+    csv_transfer_source.csv_row_index,
+    transfer_source.created_at,
+    source_type.name AS source_type,
+    csv_import_metadata.original_file_name AS csv_file_name,
+    platform.name AS platform_name,
+    os_name.name AS os_name,
+    machine_name.name AS machine_name,
+    device_make.name AS device_make,
+    device_model.name AS device_model
+FROM transfer_source
+JOIN source_type ON transfer_source.source_type_id = source_type.id
+JOIN device ON transfer_source.device_id = device.id
+JOIN platform ON device.platform_id = platform.id
+LEFT JOIN os_name ON device.os_id = os_name.id
+LEFT JOIN machine_name ON device.machine_id = machine_name.id
+LEFT JOIN device_make ON device.device_make_id = device_make.id
+LEFT JOIN device_model ON device.device_model_id = device_model.id
+LEFT JOIN csv_transfer_source ON transfer_source.id = csv_transfer_source.id
+LEFT JOIN csv_import_metadata ON csv_transfer_source.csv_import_id = csv_import_metadata.id
+WHERE transfer_source.transaction_id = ? AND transfer_source.revision_id = ?;
 
 -- Select all sources for a transaction (across all revisions)
 selectAllByTransactionId:
 SELECT
-    TransferSource.id,
-    TransferSource.transactionId,
-    TransferSource.revisionId,
-    TransferSource.sourceTypeId,
-    TransferSource.deviceId,
-    CsvTransferSource.csvImportId,
-    CsvTransferSource.csvRowIndex,
-    TransferSource.createdAt,
-    SourceType.name AS sourceType,
-    CsvImportMetadata.originalFileName AS csvFileName,
-    Platform.name AS platformName,
-    OsName.name AS osName,
-    MachineName.name AS machineName,
-    DeviceMake.name AS deviceMake,
-    DeviceModel.name AS deviceModel
-FROM TransferSource
-JOIN SourceType ON TransferSource.sourceTypeId = SourceType.id
-JOIN Device ON TransferSource.deviceId = Device.id
-JOIN Platform ON Device.platform_id = Platform.id
-LEFT JOIN OsName ON Device.os_id = OsName.id
-LEFT JOIN MachineName ON Device.machine_id = MachineName.id
-LEFT JOIN DeviceMake ON Device.device_make_id = DeviceMake.id
-LEFT JOIN DeviceModel ON Device.device_model_id = DeviceModel.id
-LEFT JOIN CsvTransferSource ON TransferSource.id = CsvTransferSource.id
-LEFT JOIN CsvImportMetadata ON CsvTransferSource.csvImportId = CsvImportMetadata.id
-WHERE TransferSource.transactionId = ?
-ORDER BY TransferSource.revisionId DESC;
+    transfer_source.id,
+    transfer_source.transaction_id,
+    transfer_source.revision_id,
+    transfer_source.source_type_id,
+    transfer_source.device_id,
+    csv_transfer_source.csv_import_id,
+    csv_transfer_source.csv_row_index,
+    transfer_source.created_at,
+    source_type.name AS source_type,
+    csv_import_metadata.original_file_name AS csv_file_name,
+    platform.name AS platform_name,
+    os_name.name AS os_name,
+    machine_name.name AS machine_name,
+    device_make.name AS device_make,
+    device_model.name AS device_model
+FROM transfer_source
+JOIN source_type ON transfer_source.source_type_id = source_type.id
+JOIN device ON transfer_source.device_id = device.id
+JOIN platform ON device.platform_id = platform.id
+LEFT JOIN os_name ON device.os_id = os_name.id
+LEFT JOIN machine_name ON device.machine_id = machine_name.id
+LEFT JOIN device_make ON device.device_make_id = device_make.id
+LEFT JOIN device_model ON device.device_model_id = device_model.id
+LEFT JOIN csv_transfer_source ON transfer_source.id = csv_transfer_source.id
+LEFT JOIN csv_import_metadata ON csv_transfer_source.csv_import_id = csv_import_metadata.id
+WHERE transfer_source.transaction_id = ?
+ORDER BY transfer_source.revision_id DESC;
 
 -- Insert a new source record for manual entry
 insertManual:
-INSERT INTO TransferSource (
-    transactionId, revisionId, sourceTypeId,
-    deviceId
+INSERT INTO transfer_source (
+    transaction_id, revision_id, source_type_id,
+    device_id
 )
 VALUES (?, ?, 1, ?);
 
 -- Insert a new source record for CSV import (base record)
 insertCsvImportBase:
-INSERT INTO TransferSource (
-    transactionId, revisionId, sourceTypeId,
-    deviceId
+INSERT INTO transfer_source (
+    transaction_id, revision_id, source_type_id,
+    device_id
 )
 VALUES (?, ?, 2, ?);
 
 -- Insert CSV-specific details (must be called after insertCsvImportBase)
 insertCsvImportDetails:
-INSERT INTO CsvTransferSource (
-    id, csvImportId, csvRowIndex
+INSERT INTO csv_transfer_source (
+    id, csv_import_id, csv_row_index
 )
 VALUES (?, ?, ?);
 
--- Get the last inserted TransferSource ID
+-- Get the last inserted transfer_source ID
 lastInsertedId:
 SELECT last_insert_rowid();
 
 -- Insert a new source record for sample data generator
 insertSampleGenerator:
-INSERT INTO TransferSource (
-    transactionId, revisionId, sourceTypeId,
-    deviceId
+INSERT INTO transfer_source (
+    transaction_id, revision_id, source_type_id,
+    device_id
 )
 VALUES (?, ?, 3, ?);
-

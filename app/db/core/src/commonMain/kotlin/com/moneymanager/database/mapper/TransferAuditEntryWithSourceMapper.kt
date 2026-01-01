@@ -20,7 +20,7 @@ object TransferAuditEntryWithSourceMapper :
             TransferAuditEntry::transferId fromValue toTransferId(from.id)
             TransferAuditEntry::amount fromValue Money(from.amount, from.toCurrency())
             TransferAuditEntry::source fromValue
-                from.sourceId?.let {
+                from.source_id?.let {
                     TransferSourceFromAuditMapper.map(from)
                 }
         }
@@ -31,5 +31,5 @@ private fun SelectAuditHistoryForTransferWithSource.toCurrency(): Currency =
         id = CurrencyId(Uuid.parse(currency_id)),
         code = currency_code,
         name = currency_name,
-        scaleFactor = currency_scaleFactor,
+        scaleFactor = currency_scale_factor,
     )

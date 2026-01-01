@@ -63,15 +63,15 @@ class AuditFunctionalTest : DbTest() {
         val sql =
             """
             SELECT
-                Account_Audit.auditId,
-                Account_Audit.auditTimestamp,
-                AuditType.name AS auditType,
-                Account_Audit.id,
-                Account_Audit.name
-            FROM Account_Audit
-            JOIN AuditType ON Account_Audit.auditTypeId = AuditType.id
-            WHERE Account_Audit.id = $accountId
-            ORDER BY Account_Audit.auditTimestamp DESC, Account_Audit.auditId DESC
+                account_audit.audit_id,
+                account_audit.audit_timestamp,
+                audit_type.name AS auditType,
+                account_audit.id,
+                account_audit.name
+            FROM account_audit
+            JOIN audit_type ON account_audit.audit_type_id = audit_type.id
+            WHERE account_audit.id = $accountId
+            ORDER BY account_audit.audit_timestamp DESC, account_audit.audit_id DESC
             """.trimIndent()
 
         return database.executeQuery(
@@ -104,16 +104,16 @@ class AuditFunctionalTest : DbTest() {
         val sql =
             """
             SELECT
-                Currency_Audit.auditId,
-                Currency_Audit.auditTimestamp,
-                AuditType.name AS auditType,
-                Currency_Audit.id,
-                Currency_Audit.code,
-                Currency_Audit.name
-            FROM Currency_Audit
-            JOIN AuditType ON Currency_Audit.auditTypeId = AuditType.id
-            WHERE Currency_Audit.id = '$currencyId'
-            ORDER BY Currency_Audit.auditTimestamp DESC, Currency_Audit.auditId DESC
+                currency_audit.audit_id,
+                currency_audit.audit_timestamp,
+                audit_type.name AS auditType,
+                currency_audit.id,
+                currency_audit.code,
+                currency_audit.name
+            FROM currency_audit
+            JOIN audit_type ON currency_audit.audit_type_id = audit_type.id
+            WHERE currency_audit.id = '$currencyId'
+            ORDER BY currency_audit.audit_timestamp DESC, currency_audit.audit_id DESC
             """.trimIndent()
 
         return database.executeQuery(
@@ -147,15 +147,15 @@ class AuditFunctionalTest : DbTest() {
         val sql =
             """
             SELECT
-                Category_Audit.auditId,
-                Category_Audit.auditTimestamp,
-                AuditType.name AS auditType,
-                Category_Audit.id,
-                Category_Audit.name
-            FROM Category_Audit
-            JOIN AuditType ON Category_Audit.auditTypeId = AuditType.id
-            WHERE Category_Audit.id = $categoryId
-            ORDER BY Category_Audit.auditTimestamp DESC, Category_Audit.auditId DESC
+                category_audit.audit_id,
+                category_audit.audit_timestamp,
+                audit_type.name AS auditType,
+                category_audit.id,
+                category_audit.name
+            FROM category_audit
+            JOIN audit_type ON category_audit.audit_type_id = audit_type.id
+            WHERE category_audit.id = $categoryId
+            ORDER BY category_audit.audit_timestamp DESC, category_audit.audit_id DESC
             """.trimIndent()
 
         return database.executeQuery(
@@ -318,7 +318,7 @@ class AuditFunctionalTest : DbTest() {
             database.currencyQueries.update(
                 code = "TST2",
                 name = "Updated Name",
-                scaleFactor = 100,
+                scale_factor = 100,
                 id = currencyId.toString(),
             )
 
@@ -441,7 +441,7 @@ class AuditFunctionalTest : DbTest() {
             val auditHistory = database.auditQueries.selectAuditHistoryForTransfer(transferId.toString()).executeAsList()
 
             assertEquals(1, auditHistory.size)
-            assertEquals("INSERT", auditHistory[0].auditType)
+            assertEquals("INSERT", auditHistory[0].audit_type)
             assertEquals(description, auditHistory[0].description)
             assertEquals(amount.amount, auditHistory[0].amount)
         }
@@ -487,7 +487,7 @@ class AuditFunctionalTest : DbTest() {
 
             assertEquals(2, auditHistory.size)
             val updateAudit = auditHistory[0]
-            assertEquals("UPDATE", updateAudit.auditType)
+            assertEquals("UPDATE", updateAudit.audit_type)
             assertEquals("Original Description", updateAudit.description, "Should store OLD description")
             assertEquals(originalAmount.amount, updateAudit.amount, "Should store OLD amount")
         }
@@ -516,7 +516,7 @@ class AuditFunctionalTest : DbTest() {
             val auditHistory = database.auditQueries.selectAuditHistoryForTransfer(transferId.toString()).executeAsList()
 
             assertEquals(2, auditHistory.size)
-            assertEquals("DELETE", auditHistory[0].auditType)
+            assertEquals("DELETE", auditHistory[0].audit_type)
             assertEquals("To Be Deleted", auditHistory[0].description)
         }
 
@@ -563,15 +563,15 @@ class AuditFunctionalTest : DbTest() {
 
             // Most recent first (UPDATE)
             val updateAudit = auditHistory[0]
-            assertEquals("UPDATE", updateAudit.auditType)
+            assertEquals("UPDATE", updateAudit.audit_type)
             // Bug: UPDATE trigger captures OLD.revisionId (1) instead of NEW.revisionId (2)
             // This test will fail until the trigger is fixed
-            assertEquals(2L, updateAudit.revisionId, "UPDATE audit should have revisionId 2 (after increment)")
+            assertEquals(2L, updateAudit.revision_id, "UPDATE audit should have revisionId 2 (after increment)")
 
             // INSERT entry
             val insertAudit = auditHistory[1]
-            assertEquals("INSERT", insertAudit.auditType)
-            assertEquals(1L, insertAudit.revisionId, "INSERT audit should have revisionId 1")
+            assertEquals("INSERT", insertAudit.audit_type)
+            assertEquals(1L, insertAudit.revision_id, "INSERT audit should have revisionId 1")
         }
 
     @Test
@@ -633,16 +633,16 @@ class AuditFunctionalTest : DbTest() {
             assertEquals(3, auditHistory.size, "Should have 3 audit records (INSERT + 2 UPDATEs)")
 
             // Most recent first - second UPDATE (revisionId = 3)
-            assertEquals("UPDATE", auditHistory[0].auditType)
-            assertEquals(3L, auditHistory[0].revisionId, "Second UPDATE should have revisionId 3")
+            assertEquals("UPDATE", auditHistory[0].audit_type)
+            assertEquals(3L, auditHistory[0].revision_id, "Second UPDATE should have revisionId 3")
 
             // First UPDATE (revisionId = 2)
-            assertEquals("UPDATE", auditHistory[1].auditType)
-            assertEquals(2L, auditHistory[1].revisionId, "First UPDATE should have revisionId 2")
+            assertEquals("UPDATE", auditHistory[1].audit_type)
+            assertEquals(2L, auditHistory[1].revision_id, "First UPDATE should have revisionId 2")
 
             // INSERT (revisionId = 1)
-            assertEquals("INSERT", auditHistory[2].auditType)
-            assertEquals(1L, auditHistory[2].revisionId, "INSERT should have revisionId 1")
+            assertEquals("INSERT", auditHistory[2].audit_type)
+            assertEquals(1L, auditHistory[2].revision_id, "INSERT should have revisionId 1")
         }
 
     private suspend fun setupTransferPrerequisites(): Triple<AccountId, AccountId, Currency> {

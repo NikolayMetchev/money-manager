@@ -62,7 +62,7 @@ class CurrencyRepositoryImpl(
             queries.update(
                 code = currency.code,
                 name = currency.name,
-                scaleFactor = currency.scaleFactor,
+                scale_factor = currency.scaleFactor,
                 id = currency.id.toString(),
             )
         }

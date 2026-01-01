@@ -1,39 +1,39 @@
--- Stores reusable CSV import strategies for mapping CSV columns to Transfer fields
-CREATE TABLE CsvImportStrategy (
+-- Stores reusable CSV import strategies for mapping CSV columns to transfer fields
+CREATE TABLE csv_import_strategy (
     id TEXT PRIMARY KEY NOT NULL,
     name TEXT NOT NULL UNIQUE,
-    identificationColumnsJson TEXT NOT NULL,
-    fieldMappingsJson TEXT NOT NULL,
-    attributeMappingsJson TEXT NOT NULL,
-    createdAt INTEGER NOT NULL,
-    updatedAt INTEGER NOT NULL
+    identification_columns_json TEXT NOT NULL,
+    field_mappings_json TEXT NOT NULL,
+    attribute_mappings_json TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
 );
 
-CREATE INDEX idx_csv_import_strategy_name ON CsvImportStrategy(name);
+CREATE INDEX idx_csv_import_strategy_name ON csv_import_strategy(name);
 
 -- Select all strategies ordered by name
 selectAll:
-SELECT * FROM CsvImportStrategy ORDER BY name;
+SELECT * FROM csv_import_strategy ORDER BY name;
 
 -- Select a strategy by ID
 selectById:
-SELECT * FROM CsvImportStrategy WHERE id = ?;
+SELECT * FROM csv_import_strategy WHERE id = ?;
 
 -- Select a strategy by name
 selectByName:
-SELECT * FROM CsvImportStrategy WHERE name = ?;
+SELECT * FROM csv_import_strategy WHERE name = ?;
 
 -- Insert a new strategy
 insert:
-INSERT INTO CsvImportStrategy (id, name, identificationColumnsJson, fieldMappingsJson, attributeMappingsJson, createdAt, updatedAt)
+INSERT INTO csv_import_strategy (id, name, identification_columns_json, field_mappings_json, attribute_mappings_json, created_at, updated_at)
 VALUES (?, ?, ?, ?, ?, ?, ?);
 
 -- Update an existing strategy
 update:
-UPDATE CsvImportStrategy
-SET name = ?, identificationColumnsJson = ?, fieldMappingsJson = ?, attributeMappingsJson = ?, updatedAt = ?
+UPDATE csv_import_strategy
+SET name = ?, identification_columns_json = ?, field_mappings_json = ?, attribute_mappings_json = ?, updated_at = ?
 WHERE id = ?;
 
 -- Delete a strategy by ID
 deleteById:
-DELETE FROM CsvImportStrategy WHERE id = ?;
+DELETE FROM csv_import_strategy WHERE id = ?;

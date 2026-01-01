@@ -27,5 +27,5 @@ private fun SelectAuditHistoryForTransfer.toCurrency(): Currency =
         id = CurrencyId(Uuid.parse(currency_id)),
         code = currency_code,
         name = currency_name,
-        scaleFactor = currency_scaleFactor,
+        scaleFactor = currency_scale_factor,
     )

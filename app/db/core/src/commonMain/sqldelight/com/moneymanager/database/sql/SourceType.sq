@@ -1,10 +1,10 @@
--- SourceType lookup table for transfer source types
+-- source_type lookup table for transfer source types
 -- Tracks how each transfer audit entry was initiated
-CREATE TABLE SourceType (
+CREATE TABLE source_type (
     id INTEGER PRIMARY KEY,
     name TEXT NOT NULL UNIQUE
 );
 
 -- Insert source type (used during seeding)
 insert:
-INSERT INTO SourceType (id, name) VALUES (?, ?);
+INSERT INTO source_type (id, name) VALUES (?, ?);

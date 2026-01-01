@@ -1,29 +1,29 @@
-CREATE TABLE Account (
+CREATE TABLE account (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL CHECK(length(trim(name)) > 0),
-    openingDate INTEGER NOT NULL,
-    categoryId INTEGER NOT NULL DEFAULT -1,
-    FOREIGN KEY (categoryId) REFERENCES Category(id)
+    opening_date INTEGER NOT NULL,
+    category_id INTEGER NOT NULL DEFAULT -1,
+    FOREIGN KEY (category_id) REFERENCES category(id)
 );
 
 selectAll:
-SELECT * FROM Account ORDER BY name;
+SELECT * FROM account ORDER BY name;
 
 selectById:
-SELECT * FROM Account WHERE id = ?;
+SELECT * FROM account WHERE id = ?;
 
 insert:
-INSERT INTO Account(name, openingDate, categoryId)
+INSERT INTO account(name, opening_date, category_id)
 VALUES (?, ?, ?);
 
 update:
-UPDATE Account
+UPDATE account
 SET name = ?,
-    categoryId = ?
+    category_id = ?
 WHERE id = ?;
 
 delete:
-DELETE FROM Account WHERE id = ?;
+DELETE FROM account WHERE id = ?;
 
 lastInsertRowId:
 SELECT last_insert_rowid();

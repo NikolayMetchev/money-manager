@@ -53,15 +53,15 @@ class AuditRepositoryImpl(
                 .map { row ->
                     TransferAttributeAuditEntry(
                         id = row.id,
-                        transactionId = TransferId(Uuid.parse(row.transactionId)),
-                        revisionId = row.revisionId,
+                        transactionId = TransferId(Uuid.parse(row.transaction_id)),
+                        revisionId = row.revision_id,
                         attributeType =
                             AttributeType(
-                                id = AttributeTypeId(row.attributeType_id),
-                                name = row.attributeType_name,
+                                id = AttributeTypeId(row.attribute_type_id),
+                                name = row.attribute_type_name,
                             ),
-                        auditType = mapAuditType(row.auditType_name),
-                        value = row.attributeValue,
+                        auditType = mapAuditType(row.audit_type_name),
+                        value = row.attribute_value,
                     )
                 }
 
