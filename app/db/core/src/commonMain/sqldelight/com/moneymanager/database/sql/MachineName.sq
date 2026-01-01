@@ -1,11 +1,11 @@
--- MachineName: Lookup table for machine names/hostnames
-CREATE TABLE MachineName (
+-- machine_name: Lookup table for machine names/hostnames
+CREATE TABLE machine_name (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE
 );
 
 selectByName:
-SELECT id FROM MachineName WHERE name = ?;
+SELECT id FROM machine_name WHERE name = ?;
 
 insertOrIgnore:
-INSERT OR IGNORE INTO MachineName (name) VALUES (?);
+INSERT OR IGNORE INTO machine_name (name) VALUES (?);

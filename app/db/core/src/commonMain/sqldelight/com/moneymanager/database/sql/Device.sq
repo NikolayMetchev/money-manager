@@ -1,18 +1,18 @@
--- Device: Normalized device information table
+-- device: Normalized device information table
 -- JVM devices: platform_id, os_id, machine_id are set; device_make_id, device_model_id are NULL
 -- Android devices: platform_id, device_make_id, device_model_id are set; os_id, machine_id are NULL
-CREATE TABLE Device (
+CREATE TABLE device (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     platform_id INTEGER NOT NULL,
     os_id INTEGER,
     machine_id INTEGER,
     device_make_id INTEGER,
     device_model_id INTEGER,
-    FOREIGN KEY (platform_id) REFERENCES Platform(id),
-    FOREIGN KEY (os_id) REFERENCES OsName(id),
-    FOREIGN KEY (machine_id) REFERENCES MachineName(id),
-    FOREIGN KEY (device_make_id) REFERENCES DeviceMake(id),
-    FOREIGN KEY (device_model_id) REFERENCES DeviceModel(id),
+    FOREIGN KEY (platform_id) REFERENCES platform(id),
+    FOREIGN KEY (os_id) REFERENCES os_name(id),
+    FOREIGN KEY (machine_id) REFERENCES machine_name(id),
+    FOREIGN KEY (device_make_id) REFERENCES device_make(id),
+    FOREIGN KEY (device_model_id) REFERENCES device_model(id),
     UNIQUE (platform_id, os_id, machine_id, device_make_id, device_model_id),
     -- JVM devices must have os_id and machine_id (platform_id = 1)
     CHECK (platform_id != 1 OR (os_id IS NOT NULL AND machine_id IS NOT NULL)),
@@ -20,28 +20,28 @@ CREATE TABLE Device (
     CHECK (platform_id != 2 OR (device_make_id IS NOT NULL AND device_model_id IS NOT NULL))
 );
 
-CREATE INDEX IF NOT EXISTS idx_device_platform ON Device(platform_id);
+CREATE INDEX IF NOT EXISTS idx_device_platform ON device(platform_id);
 
 -- Select device by ID with all related data
 selectById:
 SELECT
-    Device.id,
-    Platform.name AS platformName,
-    OsName.name AS osName,
-    MachineName.name AS machineName,
-    DeviceMake.name AS deviceMake,
-    DeviceModel.name AS deviceModel
-FROM Device
-JOIN Platform ON Device.platform_id = Platform.id
-LEFT JOIN OsName ON Device.os_id = OsName.id
-LEFT JOIN MachineName ON Device.machine_id = MachineName.id
-LEFT JOIN DeviceMake ON Device.device_make_id = DeviceMake.id
-LEFT JOIN DeviceModel ON Device.device_model_id = DeviceModel.id
-WHERE Device.id = ?;
+    device.id,
+    platform.name AS platformName,
+    os_name.name AS osName,
+    machine_name.name AS machineName,
+    device_make.name AS deviceMake,
+    device_model.name AS deviceModel
+FROM device
+JOIN platform ON device.platform_id = platform.id
+LEFT JOIN os_name ON device.os_id = os_name.id
+LEFT JOIN machine_name ON device.machine_id = machine_name.id
+LEFT JOIN device_make ON device.device_make_id = device_make.id
+LEFT JOIN device_model ON device.device_model_id = device_model.id
+WHERE device.id = ?;
 
 -- Find existing device by all attributes (for deduplication)
 selectByAttributes:
-SELECT id FROM Device
+SELECT id FROM device
 WHERE platform_id = ?
   AND (os_id IS ? OR (os_id IS NOT NULL AND os_id = ?))
   AND (machine_id IS ? OR (machine_id IS NOT NULL AND machine_id = ?))
@@ -50,10 +50,10 @@ WHERE platform_id = ?
 
 -- Insert JVM device
 insertJvm:
-INSERT INTO Device (platform_id, os_id, machine_id, device_make_id, device_model_id)
+INSERT INTO device (platform_id, os_id, machine_id, device_make_id, device_model_id)
 VALUES (1, ?, ?, NULL, NULL);
 
 -- Insert Android device
 insertAndroid:
-INSERT INTO Device (platform_id, os_id, machine_id, device_make_id, device_model_id)
+INSERT INTO device (platform_id, os_id, machine_id, device_make_id, device_model_id)
 VALUES (2, NULL, NULL, ?, ?);

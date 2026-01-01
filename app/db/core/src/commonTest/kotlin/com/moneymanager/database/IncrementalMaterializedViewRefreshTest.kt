@@ -42,7 +42,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
      * Counts pending changes using raw SQL.
      */
     private fun countPendingChanges(): Long {
-        val sql = "SELECT COUNT(*) FROM PendingMaterializedViewChanges"
+        val sql = "SELECT COUNT(*) FROM pending_materialized_view_changes"
         return database.executeQuery(
             identifier = null,
             sql = sql,
@@ -59,7 +59,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
      * Retrieves balances from AccountBalanceView using raw SQL.
      */
     private fun selectBalancesFromView(): List<BalanceViewRecord> {
-        val sql = "SELECT account_id, currency_id, balance FROM AccountBalanceView ORDER BY account_id, currency_id"
+        val sql = "SELECT account_id, currency_id, balance FROM account_balance_view ORDER BY account_id, currency_id"
         return database.executeQuery(
             identifier = null,
             sql = sql,

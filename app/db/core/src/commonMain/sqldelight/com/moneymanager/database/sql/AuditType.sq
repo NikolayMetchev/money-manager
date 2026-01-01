@@ -1,9 +1,9 @@
--- AuditType lookup table for audit operations
-CREATE TABLE AuditType (
+-- audit_type lookup table for audit operations
+CREATE TABLE audit_type (
     id INTEGER PRIMARY KEY,
     name TEXT NOT NULL UNIQUE
 );
 
 -- Insert audit type (used during seeding)
 insert:
-INSERT INTO AuditType (id, name) VALUES (?, ?);
+INSERT INTO audit_type (id, name) VALUES (?, ?);

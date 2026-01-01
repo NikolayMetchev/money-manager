@@ -1,7 +1,7 @@
--- TransactionId: Permanent transaction ID table
--- This table is NEVER deleted from. When a Transfer is deleted, the TransactionId remains.
+-- transaction_id: Permanent transaction ID table
+-- This table is NEVER deleted from. When a transfer is deleted, the transaction_id remains.
 -- This ensures we always have a valid ID to reference in source tracking and audit history.
-CREATE TABLE TransactionId (
+CREATE TABLE transaction_id (
     id TEXT PRIMARY KEY NOT NULL
         CHECK (
             length(id) = 36
@@ -16,4 +16,4 @@ CREATE TABLE TransactionId (
 
 -- Insert a new transaction ID
 insert:
-INSERT INTO TransactionId (id) VALUES (?);
+INSERT INTO transaction_id (id) VALUES (?);

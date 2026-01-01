@@ -1,8 +1,8 @@
--- Platform: Lookup table for platform types (JVM, ANDROID)
-CREATE TABLE Platform (
+-- platform: Lookup table for platform types (JVM, ANDROID)
+CREATE TABLE platform (
     id INTEGER PRIMARY KEY NOT NULL,
     name TEXT NOT NULL UNIQUE
 );
 
 insert:
-INSERT OR IGNORE INTO Platform (id, name) VALUES (?, ?);
+INSERT OR IGNORE INTO platform (id, name) VALUES (?, ?);

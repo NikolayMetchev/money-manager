@@ -27,6 +27,29 @@ class SnakeCaseNamingConventionTest : DbTest() {
     private val dynamicTablePrefix = "csv_import_"
 
     @Test
+    fun `all table and view names use snake_case naming`() {
+        val violations = mutableListOf<String>()
+
+        // Get all tables and views
+        val tablesAndViews = getTablesAndViews()
+
+        assertTrue(tablesAndViews.isNotEmpty(), "Should have at least one table or view")
+
+        tablesAndViews.forEach { name ->
+            if (!snakeCasePattern.matches(name)) {
+                violations.add(name)
+            }
+        }
+
+        if (violations.isNotEmpty()) {
+            fail(
+                "Found ${violations.size} table/view name(s) not using snake_case naming:\n" +
+                    violations.sorted().joinToString("\n") { "  - $it" },
+            )
+        }
+    }
+
+    @Test
     fun `all table and view columns use snake_case naming`() {
         val violations = mutableListOf<String>()
 

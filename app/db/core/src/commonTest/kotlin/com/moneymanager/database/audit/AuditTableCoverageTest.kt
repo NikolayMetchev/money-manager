@@ -17,7 +17,7 @@ class AuditTableCoverageTest : DbTest() {
 
         // For each regular table, verify audit table exists and has correct schema
         regularTables.forEach { tableName ->
-            val auditTableName = "${tableName}_Audit"
+            val auditTableName = "${tableName}_audit"
 
             // Verify audit table exists
             var auditTableExists = false

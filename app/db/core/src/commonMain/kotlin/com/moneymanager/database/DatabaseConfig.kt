@@ -38,22 +38,22 @@ object DatabaseConfig {
             null,
             """
             CREATE TRIGGER IF NOT EXISTS trigger_transfer_insert_track_changes
-            AFTER INSERT ON Transfer
+            AFTER INSERT ON transfer
             FOR EACH ROW
             BEGIN
-                INSERT OR IGNORE INTO PendingMaterializedViewChanges (account_id, currency_id, min_timestamp)
+                INSERT OR IGNORE INTO pending_materialized_view_changes (account_id, currency_id, min_timestamp)
                 VALUES (NEW.source_account_id, NEW.currency_id, NEW.timestamp);
 
-                UPDATE PendingMaterializedViewChanges
+                UPDATE pending_materialized_view_changes
                 SET min_timestamp = NEW.timestamp
                 WHERE account_id = NEW.source_account_id
                   AND currency_id = NEW.currency_id
                   AND min_timestamp > NEW.timestamp;
 
-                INSERT OR IGNORE INTO PendingMaterializedViewChanges (account_id, currency_id, min_timestamp)
+                INSERT OR IGNORE INTO pending_materialized_view_changes (account_id, currency_id, min_timestamp)
                 VALUES (NEW.target_account_id, NEW.currency_id, NEW.timestamp);
 
-                UPDATE PendingMaterializedViewChanges
+                UPDATE pending_materialized_view_changes
                 SET min_timestamp = NEW.timestamp
                 WHERE account_id = NEW.target_account_id
                   AND currency_id = NEW.currency_id
@@ -68,40 +68,40 @@ object DatabaseConfig {
             null,
             """
             CREATE TRIGGER IF NOT EXISTS trigger_transfer_update_track_changes
-            AFTER UPDATE ON Transfer
+            AFTER UPDATE ON transfer
             FOR EACH ROW
             BEGIN
-                INSERT OR IGNORE INTO PendingMaterializedViewChanges (account_id, currency_id, min_timestamp)
+                INSERT OR IGNORE INTO pending_materialized_view_changes (account_id, currency_id, min_timestamp)
                 VALUES (OLD.source_account_id, OLD.currency_id, MIN(OLD.timestamp, NEW.timestamp));
 
-                UPDATE PendingMaterializedViewChanges
+                UPDATE pending_materialized_view_changes
                 SET min_timestamp = MIN(OLD.timestamp, NEW.timestamp)
                 WHERE account_id = OLD.source_account_id
                   AND currency_id = OLD.currency_id
                   AND min_timestamp > MIN(OLD.timestamp, NEW.timestamp);
 
-                INSERT OR IGNORE INTO PendingMaterializedViewChanges (account_id, currency_id, min_timestamp)
+                INSERT OR IGNORE INTO pending_materialized_view_changes (account_id, currency_id, min_timestamp)
                 VALUES (NEW.source_account_id, NEW.currency_id, MIN(OLD.timestamp, NEW.timestamp));
 
-                UPDATE PendingMaterializedViewChanges
+                UPDATE pending_materialized_view_changes
                 SET min_timestamp = MIN(OLD.timestamp, NEW.timestamp)
                 WHERE account_id = NEW.source_account_id
                   AND currency_id = NEW.currency_id
                   AND min_timestamp > MIN(OLD.timestamp, NEW.timestamp);
 
-                INSERT OR IGNORE INTO PendingMaterializedViewChanges (account_id, currency_id, min_timestamp)
+                INSERT OR IGNORE INTO pending_materialized_view_changes (account_id, currency_id, min_timestamp)
                 VALUES (OLD.target_account_id, OLD.currency_id, MIN(OLD.timestamp, NEW.timestamp));
 
-                UPDATE PendingMaterializedViewChanges
+                UPDATE pending_materialized_view_changes
                 SET min_timestamp = MIN(OLD.timestamp, NEW.timestamp)
                 WHERE account_id = OLD.target_account_id
                   AND currency_id = OLD.currency_id
                   AND min_timestamp > MIN(OLD.timestamp, NEW.timestamp);
 
-                INSERT OR IGNORE INTO PendingMaterializedViewChanges (account_id, currency_id, min_timestamp)
+                INSERT OR IGNORE INTO pending_materialized_view_changes (account_id, currency_id, min_timestamp)
                 VALUES (NEW.target_account_id, NEW.currency_id, MIN(OLD.timestamp, NEW.timestamp));
 
-                UPDATE PendingMaterializedViewChanges
+                UPDATE pending_materialized_view_changes
                 SET min_timestamp = MIN(OLD.timestamp, NEW.timestamp)
                 WHERE account_id = NEW.target_account_id
                   AND currency_id = NEW.currency_id
@@ -116,22 +116,22 @@ object DatabaseConfig {
             null,
             """
             CREATE TRIGGER IF NOT EXISTS trigger_transfer_delete_track_changes
-            AFTER DELETE ON Transfer
+            AFTER DELETE ON transfer
             FOR EACH ROW
             BEGIN
-                INSERT OR IGNORE INTO PendingMaterializedViewChanges (account_id, currency_id, min_timestamp)
+                INSERT OR IGNORE INTO pending_materialized_view_changes (account_id, currency_id, min_timestamp)
                 VALUES (OLD.source_account_id, OLD.currency_id, OLD.timestamp);
 
-                UPDATE PendingMaterializedViewChanges
+                UPDATE pending_materialized_view_changes
                 SET min_timestamp = OLD.timestamp
                 WHERE account_id = OLD.source_account_id
                   AND currency_id = OLD.currency_id
                   AND min_timestamp > OLD.timestamp;
 
-                INSERT OR IGNORE INTO PendingMaterializedViewChanges (account_id, currency_id, min_timestamp)
+                INSERT OR IGNORE INTO pending_materialized_view_changes (account_id, currency_id, min_timestamp)
                 VALUES (OLD.target_account_id, OLD.currency_id, OLD.timestamp);
 
-                UPDATE PendingMaterializedViewChanges
+                UPDATE pending_materialized_view_changes
                 SET min_timestamp = OLD.timestamp
                 WHERE account_id = OLD.target_account_id
                   AND currency_id = OLD.currency_id
@@ -151,10 +151,10 @@ object DatabaseConfig {
             null,
             """
             CREATE TRIGGER IF NOT EXISTS trigger_category_delete_update_children
-            BEFORE DELETE ON Category
+            BEFORE DELETE ON category
             FOR EACH ROW
             BEGIN
-                UPDATE Category
+                UPDATE category
                 SET parent_id = OLD.parent_id
                 WHERE parent_id = OLD.id;
             END
@@ -213,20 +213,20 @@ object DatabaseConfig {
             null,
             """
             CREATE TRIGGER IF NOT EXISTS trigger_attribute_insert_audit
-            AFTER INSERT ON TransferAttribute
+            AFTER INSERT ON transfer_attribute
             FOR EACH ROW
             WHEN NOT EXISTS (SELECT 1 FROM _import_batch)
             BEGIN
                 -- Only bump revision if NOT in creation mode
-                UPDATE Transfer
+                UPDATE transfer
                 SET revision_id = revision_id + 1
                 WHERE id = NEW.transaction_id
                   AND NOT EXISTS (SELECT 1 FROM _creation_mode);
 
                 -- Always record the addition in audit table at current revision
-                INSERT INTO TransferAttributeAudit (transaction_id, revision_id, attribute_type_id, audit_type_id, attribute_value)
+                INSERT INTO transfer_attribute_audit (transaction_id, revision_id, attribute_type_id, audit_type_id, attribute_value)
                 SELECT NEW.transaction_id, revision_id, NEW.attribute_type_id, 1, NEW.attribute_value
-                FROM Transfer WHERE id = NEW.transaction_id;
+                FROM transfer WHERE id = NEW.transaction_id;
             END
             """.trimIndent(),
             0,
@@ -237,21 +237,21 @@ object DatabaseConfig {
             null,
             """
             CREATE TRIGGER IF NOT EXISTS trigger_attribute_update_audit
-            AFTER UPDATE ON TransferAttribute
+            AFTER UPDATE ON transfer_attribute
             FOR EACH ROW
             WHEN NOT EXISTS (SELECT 1 FROM _import_batch)
               AND OLD.attribute_value != NEW.attribute_value
             BEGIN
                 -- Only bump revision if NOT in creation mode
-                UPDATE Transfer
+                UPDATE transfer
                 SET revision_id = revision_id + 1
                 WHERE id = NEW.transaction_id
                   AND NOT EXISTS (SELECT 1 FROM _creation_mode);
 
                 -- Always record the change in audit table (OLD value - what it was before)
-                INSERT INTO TransferAttributeAudit (transaction_id, revision_id, attribute_type_id, audit_type_id, attribute_value)
+                INSERT INTO transfer_attribute_audit (transaction_id, revision_id, attribute_type_id, audit_type_id, attribute_value)
                 SELECT NEW.transaction_id, revision_id, NEW.attribute_type_id, 2, OLD.attribute_value
-                FROM Transfer WHERE id = NEW.transaction_id;
+                FROM transfer WHERE id = NEW.transaction_id;
             END
             """.trimIndent(),
             0,
@@ -262,20 +262,20 @@ object DatabaseConfig {
             null,
             """
             CREATE TRIGGER IF NOT EXISTS trigger_attribute_delete_audit
-            AFTER DELETE ON TransferAttribute
+            AFTER DELETE ON transfer_attribute
             FOR EACH ROW
             WHEN NOT EXISTS (SELECT 1 FROM _import_batch)
             BEGIN
                 -- Only bump revision if NOT in creation mode
-                UPDATE Transfer
+                UPDATE transfer
                 SET revision_id = revision_id + 1
                 WHERE id = OLD.transaction_id
                   AND NOT EXISTS (SELECT 1 FROM _creation_mode);
 
                 -- Always record the deletion in audit table (OLD value - what was deleted)
-                INSERT INTO TransferAttributeAudit (transaction_id, revision_id, attribute_type_id, audit_type_id, attribute_value)
+                INSERT INTO transfer_attribute_audit (transaction_id, revision_id, attribute_type_id, audit_type_id, attribute_value)
                 SELECT OLD.transaction_id, revision_id, OLD.attribute_type_id, 3, OLD.attribute_value
-                FROM Transfer WHERE id = OLD.transaction_id;
+                FROM transfer WHERE id = OLD.transaction_id;
             END
             """.trimIndent(),
             0,
@@ -298,7 +298,7 @@ object DatabaseConfig {
         val tables = getAuditableTables()
 
         tables.forEach { tableName ->
-            val auditTableName = "${tableName}_Audit"
+            val auditTableName = "${tableName}_audit"
             val columns = getTableColumns(tableName)
 
             val columnList = columns.joinToString(", ")

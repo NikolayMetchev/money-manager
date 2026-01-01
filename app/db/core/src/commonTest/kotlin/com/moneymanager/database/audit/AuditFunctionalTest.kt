@@ -63,15 +63,15 @@ class AuditFunctionalTest : DbTest() {
         val sql =
             """
             SELECT
-                Account_Audit.audit_id,
-                Account_Audit.audit_timestamp,
-                AuditType.name AS auditType,
-                Account_Audit.id,
-                Account_Audit.name
-            FROM Account_Audit
-            JOIN AuditType ON Account_Audit.audit_type_id = AuditType.id
-            WHERE Account_Audit.id = $accountId
-            ORDER BY Account_Audit.audit_timestamp DESC, Account_Audit.audit_id DESC
+                account_audit.audit_id,
+                account_audit.audit_timestamp,
+                audit_type.name AS auditType,
+                account_audit.id,
+                account_audit.name
+            FROM account_audit
+            JOIN audit_type ON account_audit.audit_type_id = audit_type.id
+            WHERE account_audit.id = $accountId
+            ORDER BY account_audit.audit_timestamp DESC, account_audit.audit_id DESC
             """.trimIndent()
 
         return database.executeQuery(
@@ -104,16 +104,16 @@ class AuditFunctionalTest : DbTest() {
         val sql =
             """
             SELECT
-                Currency_Audit.audit_id,
-                Currency_Audit.audit_timestamp,
-                AuditType.name AS auditType,
-                Currency_Audit.id,
-                Currency_Audit.code,
-                Currency_Audit.name
-            FROM Currency_Audit
-            JOIN AuditType ON Currency_Audit.audit_type_id = AuditType.id
-            WHERE Currency_Audit.id = '$currencyId'
-            ORDER BY Currency_Audit.audit_timestamp DESC, Currency_Audit.audit_id DESC
+                currency_audit.audit_id,
+                currency_audit.audit_timestamp,
+                audit_type.name AS auditType,
+                currency_audit.id,
+                currency_audit.code,
+                currency_audit.name
+            FROM currency_audit
+            JOIN audit_type ON currency_audit.audit_type_id = audit_type.id
+            WHERE currency_audit.id = '$currencyId'
+            ORDER BY currency_audit.audit_timestamp DESC, currency_audit.audit_id DESC
             """.trimIndent()
 
         return database.executeQuery(
@@ -147,15 +147,15 @@ class AuditFunctionalTest : DbTest() {
         val sql =
             """
             SELECT
-                Category_Audit.audit_id,
-                Category_Audit.audit_timestamp,
-                AuditType.name AS auditType,
-                Category_Audit.id,
-                Category_Audit.name
-            FROM Category_Audit
-            JOIN AuditType ON Category_Audit.audit_type_id = AuditType.id
-            WHERE Category_Audit.id = $categoryId
-            ORDER BY Category_Audit.audit_timestamp DESC, Category_Audit.audit_id DESC
+                category_audit.audit_id,
+                category_audit.audit_timestamp,
+                audit_type.name AS auditType,
+                category_audit.id,
+                category_audit.name
+            FROM category_audit
+            JOIN audit_type ON category_audit.audit_type_id = audit_type.id
+            WHERE category_audit.id = $categoryId
+            ORDER BY category_audit.audit_timestamp DESC, category_audit.audit_id DESC
             """.trimIndent()
 
         return database.executeQuery(

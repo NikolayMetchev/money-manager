@@ -1,8 +1,8 @@
 -- Audit tables store historical records of changes to main tables
 -- Each audit table mirrors its source table structure plus audit metadata
 
--- Account_Audit: Audit trail for Account table
-CREATE TABLE Account_Audit (
+-- account_audit: Audit trail for account table
+CREATE TABLE account_audit (
     audit_id INTEGER PRIMARY KEY AUTOINCREMENT,
     audit_timestamp INTEGER NOT NULL,
     audit_type_id INTEGER NOT NULL,
@@ -10,16 +10,16 @@ CREATE TABLE Account_Audit (
     name TEXT NOT NULL,
     opening_date INTEGER NOT NULL,
     category_id INTEGER NOT NULL,
-    FOREIGN KEY (audit_type_id) REFERENCES AuditType(id)
+    FOREIGN KEY (audit_type_id) REFERENCES audit_type(id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_account_audit_id ON Account_Audit(id);
-CREATE INDEX IF NOT EXISTS idx_account_audit_timestamp ON Account_Audit(audit_timestamp);
-CREATE INDEX IF NOT EXISTS idx_account_audit_type ON Account_Audit(audit_type_id);
-CREATE INDEX IF NOT EXISTS idx_account_audit_id_timestamp ON Account_Audit(id, audit_timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_account_audit_id ON account_audit(id);
+CREATE INDEX IF NOT EXISTS idx_account_audit_timestamp ON account_audit(audit_timestamp);
+CREATE INDEX IF NOT EXISTS idx_account_audit_type ON account_audit(audit_type_id);
+CREATE INDEX IF NOT EXISTS idx_account_audit_id_timestamp ON account_audit(id, audit_timestamp DESC);
 
--- Currency_Audit: Audit trail for Currency table
-CREATE TABLE Currency_Audit (
+-- currency_audit: Audit trail for currency table
+CREATE TABLE currency_audit (
     audit_id INTEGER PRIMARY KEY AUTOINCREMENT,
     audit_timestamp INTEGER NOT NULL,
     audit_type_id INTEGER NOT NULL,
@@ -27,32 +27,32 @@ CREATE TABLE Currency_Audit (
     code TEXT NOT NULL,
     name TEXT NOT NULL,
     scale_factor INTEGER NOT NULL,
-    FOREIGN KEY (audit_type_id) REFERENCES AuditType(id)
+    FOREIGN KEY (audit_type_id) REFERENCES audit_type(id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_currency_audit_id ON Currency_Audit(id);
-CREATE INDEX IF NOT EXISTS idx_currency_audit_timestamp ON Currency_Audit(audit_timestamp);
-CREATE INDEX IF NOT EXISTS idx_currency_audit_type ON Currency_Audit(audit_type_id);
-CREATE INDEX IF NOT EXISTS idx_currency_audit_id_timestamp ON Currency_Audit(id, audit_timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_currency_audit_id ON currency_audit(id);
+CREATE INDEX IF NOT EXISTS idx_currency_audit_timestamp ON currency_audit(audit_timestamp);
+CREATE INDEX IF NOT EXISTS idx_currency_audit_type ON currency_audit(audit_type_id);
+CREATE INDEX IF NOT EXISTS idx_currency_audit_id_timestamp ON currency_audit(id, audit_timestamp DESC);
 
--- Category_Audit: Audit trail for Category table
-CREATE TABLE Category_Audit (
+-- category_audit: Audit trail for category table
+CREATE TABLE category_audit (
     audit_id INTEGER PRIMARY KEY AUTOINCREMENT,
     audit_timestamp INTEGER NOT NULL,
     audit_type_id INTEGER NOT NULL,
     id INTEGER NOT NULL,
     name TEXT NOT NULL,
     parent_id INTEGER,
-    FOREIGN KEY (audit_type_id) REFERENCES AuditType(id)
+    FOREIGN KEY (audit_type_id) REFERENCES audit_type(id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_category_audit_id ON Category_Audit(id);
-CREATE INDEX IF NOT EXISTS idx_category_audit_timestamp ON Category_Audit(audit_timestamp);
-CREATE INDEX IF NOT EXISTS idx_category_audit_type ON Category_Audit(audit_type_id);
-CREATE INDEX IF NOT EXISTS idx_category_audit_id_timestamp ON Category_Audit(id, audit_timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_category_audit_id ON category_audit(id);
+CREATE INDEX IF NOT EXISTS idx_category_audit_timestamp ON category_audit(audit_timestamp);
+CREATE INDEX IF NOT EXISTS idx_category_audit_type ON category_audit(audit_type_id);
+CREATE INDEX IF NOT EXISTS idx_category_audit_id_timestamp ON category_audit(id, audit_timestamp DESC);
 
--- Transfer_Audit: Audit trail for Transfer table
-CREATE TABLE Transfer_Audit (
+-- transfer_audit: Audit trail for transfer table
+CREATE TABLE transfer_audit (
     audit_id INTEGER PRIMARY KEY AUTOINCREMENT,
     audit_timestamp INTEGER NOT NULL,
     audit_type_id INTEGER NOT NULL,
@@ -64,84 +64,84 @@ CREATE TABLE Transfer_Audit (
     target_account_id INTEGER NOT NULL,
     currency_id TEXT NOT NULL,
     amount INTEGER NOT NULL,
-    FOREIGN KEY (audit_type_id) REFERENCES AuditType(id)
+    FOREIGN KEY (audit_type_id) REFERENCES audit_type(id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_transfer_audit_id ON Transfer_Audit(id);
-CREATE INDEX IF NOT EXISTS idx_transfer_audit_timestamp ON Transfer_Audit(audit_timestamp);
-CREATE INDEX IF NOT EXISTS idx_transfer_audit_type ON Transfer_Audit(audit_type_id);
-CREATE INDEX IF NOT EXISTS idx_transfer_audit_id_timestamp ON Transfer_Audit(id, audit_timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_transfer_audit_id ON transfer_audit(id);
+CREATE INDEX IF NOT EXISTS idx_transfer_audit_timestamp ON transfer_audit(audit_timestamp);
+CREATE INDEX IF NOT EXISTS idx_transfer_audit_type ON transfer_audit(audit_type_id);
+CREATE INDEX IF NOT EXISTS idx_transfer_audit_id_timestamp ON transfer_audit(id, audit_timestamp DESC);
 
 -- Queries to retrieve audit history for each table
 
 selectAuditHistoryForTransfer:
 SELECT
-    Transfer_Audit.audit_id,
-    Transfer_Audit.audit_timestamp,
-    AuditType.name AS audit_type,
-    Transfer_Audit.id,
-    Transfer_Audit.revision_id,
-    Transfer_Audit.timestamp,
-    Transfer_Audit.description,
-    Transfer_Audit.source_account_id,
-    Transfer_Audit.target_account_id,
-    Transfer_Audit.currency_id,
-    Transfer_Audit.amount,
-    Currency.id AS currency_id,
-    Currency.code AS currency_code,
-    Currency.name AS currency_name,
-    Currency.scale_factor AS currency_scale_factor
-FROM Transfer_Audit
-JOIN AuditType ON Transfer_Audit.audit_type_id = AuditType.id
-JOIN Currency ON Transfer_Audit.currency_id = Currency.id
-WHERE Transfer_Audit.id = ?
-ORDER BY Transfer_Audit.audit_timestamp DESC, Transfer_Audit.audit_id DESC;
+    transfer_audit.audit_id,
+    transfer_audit.audit_timestamp,
+    audit_type.name AS audit_type,
+    transfer_audit.id,
+    transfer_audit.revision_id,
+    transfer_audit.timestamp,
+    transfer_audit.description,
+    transfer_audit.source_account_id,
+    transfer_audit.target_account_id,
+    transfer_audit.currency_id,
+    transfer_audit.amount,
+    currency.id AS currency_id,
+    currency.code AS currency_code,
+    currency.name AS currency_name,
+    currency.scale_factor AS currency_scale_factor
+FROM transfer_audit
+JOIN audit_type ON transfer_audit.audit_type_id = audit_type.id
+JOIN currency ON transfer_audit.currency_id = currency.id
+WHERE transfer_audit.id = ?
+ORDER BY transfer_audit.audit_timestamp DESC, transfer_audit.audit_id DESC;
 
 -- Get audit history for a transfer with source information
 selectAuditHistoryForTransferWithSource:
 SELECT
-    Transfer_Audit.audit_id,
-    Transfer_Audit.audit_timestamp,
-    AuditType.name AS audit_type,
-    Transfer_Audit.id,
-    Transfer_Audit.revision_id,
-    Transfer_Audit.timestamp,
-    Transfer_Audit.description,
-    Transfer_Audit.source_account_id,
-    Transfer_Audit.target_account_id,
-    Transfer_Audit.currency_id,
-    Transfer_Audit.amount,
-    Currency.id AS currency_id,
-    Currency.code AS currency_code,
-    Currency.name AS currency_name,
-    Currency.scale_factor AS currency_scale_factor,
+    transfer_audit.audit_id,
+    transfer_audit.audit_timestamp,
+    audit_type.name AS audit_type,
+    transfer_audit.id,
+    transfer_audit.revision_id,
+    transfer_audit.timestamp,
+    transfer_audit.description,
+    transfer_audit.source_account_id,
+    transfer_audit.target_account_id,
+    transfer_audit.currency_id,
+    transfer_audit.amount,
+    currency.id AS currency_id,
+    currency.code AS currency_code,
+    currency.name AS currency_name,
+    currency.scale_factor AS currency_scale_factor,
     -- Source information
-    TransferSource.id AS source_id,
-    TransferSource.device_id,
-    SourceType.id AS source_type_id,
-    SourceType.name AS source_type,
-    CsvTransferSource.csv_import_id AS source_csv_import_id,
-    CsvTransferSource.csv_row_index AS source_csv_row_index,
-    CsvImportMetadata.original_file_name AS source_csv_file_name,
-    Platform.name AS source_platform_name,
-    OsName.name AS source_os_name,
-    MachineName.name AS source_machine_name,
-    DeviceMake.name AS source_device_make,
-    DeviceModel.name AS source_device_model,
-    TransferSource.created_at AS source_created_at
-FROM Transfer_Audit
-JOIN AuditType ON Transfer_Audit.audit_type_id = AuditType.id
-JOIN Currency ON Transfer_Audit.currency_id = Currency.id
-LEFT JOIN TransferSource ON Transfer_Audit.id = TransferSource.transaction_id
-    AND Transfer_Audit.revision_id = TransferSource.revision_id
-LEFT JOIN SourceType ON TransferSource.source_type_id = SourceType.id
-LEFT JOIN CsvTransferSource ON TransferSource.id = CsvTransferSource.id
-LEFT JOIN CsvImportMetadata ON CsvTransferSource.csv_import_id = CsvImportMetadata.id
-LEFT JOIN Device ON TransferSource.device_id = Device.id
-LEFT JOIN Platform ON Device.platform_id = Platform.id
-LEFT JOIN OsName ON Device.os_id = OsName.id
-LEFT JOIN MachineName ON Device.machine_id = MachineName.id
-LEFT JOIN DeviceMake ON Device.device_make_id = DeviceMake.id
-LEFT JOIN DeviceModel ON Device.device_model_id = DeviceModel.id
-WHERE Transfer_Audit.id = ?
-ORDER BY Transfer_Audit.audit_timestamp DESC, Transfer_Audit.audit_id DESC;
+    transfer_source.id AS source_id,
+    transfer_source.device_id,
+    source_type.id AS source_type_id,
+    source_type.name AS source_type,
+    csv_transfer_source.csv_import_id AS source_csv_import_id,
+    csv_transfer_source.csv_row_index AS source_csv_row_index,
+    csv_import_metadata.original_file_name AS source_csv_file_name,
+    platform.name AS source_platform_name,
+    os_name.name AS source_os_name,
+    machine_name.name AS source_machine_name,
+    device_make.name AS source_device_make,
+    device_model.name AS source_device_model,
+    transfer_source.created_at AS source_created_at
+FROM transfer_audit
+JOIN audit_type ON transfer_audit.audit_type_id = audit_type.id
+JOIN currency ON transfer_audit.currency_id = currency.id
+LEFT JOIN transfer_source ON transfer_audit.id = transfer_source.transaction_id
+    AND transfer_audit.revision_id = transfer_source.revision_id
+LEFT JOIN source_type ON transfer_source.source_type_id = source_type.id
+LEFT JOIN csv_transfer_source ON transfer_source.id = csv_transfer_source.id
+LEFT JOIN csv_import_metadata ON csv_transfer_source.csv_import_id = csv_import_metadata.id
+LEFT JOIN device ON transfer_source.device_id = device.id
+LEFT JOIN platform ON device.platform_id = platform.id
+LEFT JOIN os_name ON device.os_id = os_name.id
+LEFT JOIN machine_name ON device.machine_id = machine_name.id
+LEFT JOIN device_make ON device.device_make_id = device_make.id
+LEFT JOIN device_model ON device.device_model_id = device_model.id
+WHERE transfer_audit.id = ?
+ORDER BY transfer_audit.audit_timestamp DESC, transfer_audit.audit_id DESC;

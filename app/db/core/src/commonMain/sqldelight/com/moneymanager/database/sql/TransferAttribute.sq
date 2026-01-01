@@ -1,65 +1,65 @@
-CREATE TABLE TransferAttribute (
+CREATE TABLE transfer_attribute (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     transaction_id TEXT NOT NULL,
     attribute_type_id INTEGER NOT NULL,
     attribute_value TEXT NOT NULL,
-    FOREIGN KEY (transaction_id) REFERENCES TransactionId(id) ON DELETE CASCADE,
-    FOREIGN KEY (attribute_type_id) REFERENCES AttributeType(id) ON DELETE RESTRICT,
+    FOREIGN KEY (transaction_id) REFERENCES transaction_id(id) ON DELETE CASCADE,
+    FOREIGN KEY (attribute_type_id) REFERENCES attribute_type(id) ON DELETE RESTRICT,
     UNIQUE (transaction_id, attribute_type_id)
 );
 
-CREATE INDEX idx_transfer_attribute_transaction ON TransferAttribute(transaction_id);
-CREATE INDEX idx_transfer_attribute_type ON TransferAttribute(attribute_type_id);
+CREATE INDEX idx_transfer_attribute_transaction ON transfer_attribute(transaction_id);
+CREATE INDEX idx_transfer_attribute_type ON transfer_attribute(attribute_type_id);
 
 selectByTransaction:
 SELECT
-    TransferAttribute.id,
-    TransferAttribute.transaction_id,
-    TransferAttribute.attribute_type_id,
-    TransferAttribute.attribute_value,
-    AttributeType.id AS attribute_type_id,
-    AttributeType.name AS attribute_type_name
-FROM TransferAttribute
-JOIN AttributeType ON TransferAttribute.attribute_type_id = AttributeType.id
-WHERE TransferAttribute.transaction_id = ?
-ORDER BY AttributeType.name;
+    transfer_attribute.id,
+    transfer_attribute.transaction_id,
+    transfer_attribute.attribute_type_id,
+    transfer_attribute.attribute_value,
+    attribute_type.id AS attribute_type_id,
+    attribute_type.name AS attribute_type_name
+FROM transfer_attribute
+JOIN attribute_type ON transfer_attribute.attribute_type_id = attribute_type.id
+WHERE transfer_attribute.transaction_id = ?
+ORDER BY attribute_type.name;
 
 selectById:
 SELECT
-    TransferAttribute.id,
-    TransferAttribute.transaction_id,
-    TransferAttribute.attribute_type_id,
-    TransferAttribute.attribute_value,
-    AttributeType.id AS attribute_type_id,
-    AttributeType.name AS attribute_type_name
-FROM TransferAttribute
-JOIN AttributeType ON TransferAttribute.attribute_type_id = AttributeType.id
-WHERE TransferAttribute.id = ?;
+    transfer_attribute.id,
+    transfer_attribute.transaction_id,
+    transfer_attribute.attribute_type_id,
+    transfer_attribute.attribute_value,
+    attribute_type.id AS attribute_type_id,
+    attribute_type.name AS attribute_type_name
+FROM transfer_attribute
+JOIN attribute_type ON transfer_attribute.attribute_type_id = attribute_type.id
+WHERE transfer_attribute.id = ?;
 
 insert:
-INSERT INTO TransferAttribute (transaction_id, attribute_type_id, attribute_value)
+INSERT INTO transfer_attribute (transaction_id, attribute_type_id, attribute_value)
 VALUES (?, ?, ?);
 
 selectLastInsertedId:
 SELECT last_insert_rowid();
 
 updateValue:
-UPDATE TransferAttribute
+UPDATE transfer_attribute
 SET attribute_value = ?
 WHERE id = ?;
 
 deleteById:
-DELETE FROM TransferAttribute WHERE id = ?;
+DELETE FROM transfer_attribute WHERE id = ?;
 
 selectByTransactionIds:
 SELECT
-    TransferAttribute.id,
-    TransferAttribute.transaction_id,
-    TransferAttribute.attribute_type_id,
-    TransferAttribute.attribute_value,
-    AttributeType.id AS attribute_type_id,
-    AttributeType.name AS attribute_type_name
-FROM TransferAttribute
-JOIN AttributeType ON TransferAttribute.attribute_type_id = AttributeType.id
-WHERE TransferAttribute.transaction_id IN ?
-ORDER BY TransferAttribute.transaction_id, AttributeType.name;
+    transfer_attribute.id,
+    transfer_attribute.transaction_id,
+    transfer_attribute.attribute_type_id,
+    transfer_attribute.attribute_value,
+    attribute_type.id AS attribute_type_id,
+    attribute_type.name AS attribute_type_name
+FROM transfer_attribute
+JOIN attribute_type ON transfer_attribute.attribute_type_id = attribute_type.id
+WHERE transfer_attribute.transaction_id IN ?
+ORDER BY transfer_attribute.transaction_id, attribute_type.name;

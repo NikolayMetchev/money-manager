@@ -83,7 +83,7 @@ class CsvImportStrategyRepositoryImpl(
             queries.deleteById(id.id.toString())
         }
 
-    private fun toDomain(entity: com.moneymanager.database.sql.CsvImportStrategy): CsvImportStrategy =
+    private fun toDomain(entity: com.moneymanager.database.sql.Csv_import_strategy): CsvImportStrategy =
         CsvImportStrategy(
             id = CsvImportStrategyId(Uuid.parse(entity.id)),
             name = entity.name,
