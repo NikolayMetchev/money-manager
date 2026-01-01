@@ -178,7 +178,6 @@ fun AccountTransactionsScreen(
             auditRepository = auditRepository,
             accountRepository = accountRepository,
             transactionRepository = transactionRepository,
-            transferAttributeRepository = transferAttributeRepository,
             currentDeviceId = currentDeviceId,
             onBack = { transactionIdToAudit = null },
         )
@@ -2106,13 +2105,11 @@ fun TransactionAuditScreen(
     auditRepository: AuditRepository,
     accountRepository: AccountRepository,
     transactionRepository: TransactionRepository,
-    transferAttributeRepository: TransferAttributeRepository,
     currentDeviceId: Long? = null,
     onBack: () -> Unit,
 ) {
     var auditEntries by remember { mutableStateOf<List<TransferAuditEntry>>(emptyList()) }
     var currentTransfer by remember { mutableStateOf<Transfer?>(null) }
-    var currentAttributes by remember { mutableStateOf<List<TransferAttribute>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
@@ -2126,13 +2123,6 @@ fun TransactionAuditScreen(
             auditEntries = auditRepository.getAuditHistoryForTransferWithSource(transferId)
             val transfer = transactionRepository.getTransactionById(transferId.id).first()
             currentTransfer = transfer
-            // Load current attributes if transfer exists
-            if (transfer != null) {
-                currentAttributes =
-                    transferAttributeRepository
-                        .getByTransaction(transferId)
-                        .first()
-            }
         } catch (expected: Exception) {
             logger.error(expected) { "Failed to load audit history: ${expected.message}" }
             errorMessage = "Failed to load audit history: ${expected.message}"
