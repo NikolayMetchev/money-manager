@@ -890,8 +890,8 @@ fun CreateCsvStrategyDialog(
                                     )
                                 csvImportStrategyRepository.createStrategy(strategy)
                                 onDismiss()
-                            } catch (e: Exception) {
-                                errorMessage = "Failed to create strategy: ${e.message}"
+                            } catch (expected: Exception) {
+                                errorMessage = "Failed to create strategy: ${expected.message}"
                                 isSaving = false
                             }
                         }
@@ -960,8 +960,8 @@ fun DeleteCsvStrategyDialog(
                         try {
                             csvImportStrategyRepository.deleteStrategy(strategy.id)
                             onDismiss()
-                        } catch (e: Exception) {
-                            errorMessage = "Failed to delete: ${e.message}"
+                        } catch (expected: Exception) {
+                            errorMessage = "Failed to delete: ${expected.message}"
                             isDeleting = false
                         }
                     }

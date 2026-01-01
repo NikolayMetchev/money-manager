@@ -232,8 +232,8 @@ class CsvTransferMapper(
                     },
                 attributes = attributes,
             )
-        } catch (e: Exception) {
-            MappingResult.Error(row.rowIndex, e.message ?: "Unknown error")
+        } catch (expected: Exception) {
+            MappingResult.Error(row.rowIndex, expected.message ?: "Unknown error")
         }
     }
 
@@ -335,7 +335,7 @@ class CsvTransferMapper(
             // Parse date and time using the specified formats
             val dateTime = parseDateTimeString(dateValue, mapping.dateFormat, timeValue, mapping.timeFormat, timezone)
             dateTime
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
         }
     }

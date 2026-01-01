@@ -140,8 +140,8 @@ fun ApplyStrategyDialog(
                         )
                     importPreparation = mapper.prepareImport(rows)
                     errorMessage = null
-                } catch (e: Exception) {
-                    errorMessage = "Failed to prepare import: ${e.message}"
+                } catch (expected: Exception) {
+                    errorMessage = "Failed to prepare import: ${expected.message}"
                     importPreparation = null
                 }
             }
@@ -209,8 +209,8 @@ fun ApplyStrategyDialog(
                                         )
                                     accountRepository.createAccount(account)
                                     logger.info { "Created new account: ${newAccount.name}" }
-                                } catch (e: Exception) {
-                                    logger.warn(e) { "Skipping account '${newAccount.name}': ${e.message}" }
+                                } catch (expected: Exception) {
+                                    logger.warn(expected) { "Skipping account '${newAccount.name}': ${expected.message}" }
                                 }
                             }
 
@@ -282,10 +282,10 @@ fun ApplyStrategyDialog(
                                     )
                                     rowTransferMap[originalRowIndex] = transfer.id
                                     successCount++
-                                } catch (e: Exception) {
+                                } catch (expected: Exception) {
                                     // Log the error and continue with remaining rows
-                                    val errorMsg = e.message ?: "Unknown error"
-                                    logger.warn(e) {
+                                    val errorMsg = expected.message ?: "Unknown error"
+                                    logger.warn(expected) {
                                         "Failed to import row $originalRowIndex: $errorMsg"
                                     }
                                     failedRows.add(
@@ -333,9 +333,9 @@ fun ApplyStrategyDialog(
                                 }
                                 onImportComplete(result)
                             }
-                        } catch (e: Exception) {
-                            logger.error(e) { "Import failed: ${e.message}" }
-                            errorMessage = "Import failed: ${e.message}"
+                        } catch (expected: Exception) {
+                            logger.error(expected) { "Import failed: ${expected.message}" }
+                            errorMessage = "Import failed: ${expected.message}"
                             isImporting = false
                         }
                     }

@@ -20,16 +20,15 @@ object TransferMapper {
         description: String,
         source_account_id: Long,
         target_account_id: Long,
-        @Suppress("UNUSED_PARAMETER") currency_id: String,
         amount: Long,
-        currency_id_: String,
+        currency_id: String,
         currency_code: String,
         currency_name: String,
         currency_scale_factor: Long,
     ): Transfer {
         val currency =
             Currency(
-                id = CurrencyId(Uuid.parse(currency_id_)),
+                id = CurrencyId(Uuid.parse(currency_id)),
                 code = currency_code,
                 name = currency_name,
                 scaleFactor = currency_scale_factor,

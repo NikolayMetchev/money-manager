@@ -13,8 +13,6 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CategoryBalance
-import com.moneymanager.domain.model.Currency
-import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.PageWithTargetIndex
 import com.moneymanager.domain.model.PagingInfo
@@ -25,7 +23,6 @@ import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.CategoryRepository
-import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import kotlinx.coroutines.flow.Flow
@@ -51,7 +48,6 @@ class AccountsScreenTest {
                         accountRepository = repository,
                         categoryRepository = FakeCategoryRepository(),
                         transactionRepository = FakeTransactionRepository(),
-                        currencyRepository = FakeCurrencyRepository(),
                         onAccountClick = {},
                     )
                 }
@@ -89,7 +85,6 @@ class AccountsScreenTest {
                         accountRepository = repository,
                         categoryRepository = FakeCategoryRepository(),
                         transactionRepository = FakeTransactionRepository(),
-                        currencyRepository = FakeCurrencyRepository(),
                         onAccountClick = {},
                     )
                 }
@@ -113,7 +108,6 @@ class AccountsScreenTest {
                         accountRepository = repository,
                         categoryRepository = FakeCategoryRepository(),
                         transactionRepository = FakeTransactionRepository(),
-                        currencyRepository = FakeCurrencyRepository(),
                         onAccountClick = {},
                     )
                 }
@@ -136,7 +130,6 @@ class AccountsScreenTest {
                         accountRepository = repository,
                         categoryRepository = FakeCategoryRepository(),
                         transactionRepository = FakeTransactionRepository(),
-                        currencyRepository = FakeCurrencyRepository(),
                         onAccountClick = {},
                     )
                 }
@@ -169,7 +162,6 @@ class AccountsScreenTest {
                         accountRepository = repository,
                         categoryRepository = FakeCategoryRepository(),
                         transactionRepository = FakeTransactionRepository(),
-                        currencyRepository = FakeCurrencyRepository(),
                         onAccountClick = {},
                     )
                 }
@@ -199,7 +191,6 @@ class AccountsScreenTest {
                         accountRepository = repository,
                         categoryRepository = FakeCategoryRepository(),
                         transactionRepository = FakeTransactionRepository(),
-                        currencyRepository = FakeCurrencyRepository(),
                         onAccountClick = {},
                     )
                 }
@@ -226,7 +217,6 @@ class AccountsScreenTest {
                         accountRepository = repository,
                         categoryRepository = FakeCategoryRepository(),
                         transactionRepository = FakeTransactionRepository(),
-                        currencyRepository = FakeCurrencyRepository(),
                         onAccountClick = {},
                     )
                 }
@@ -255,7 +245,6 @@ class AccountsScreenTest {
                         accountRepository = repository,
                         categoryRepository = FakeCategoryRepository(),
                         transactionRepository = FakeTransactionRepository(),
-                        currencyRepository = FakeCurrencyRepository(),
                         onAccountClick = {},
                     )
                 }
@@ -292,7 +281,6 @@ class AccountsScreenTest {
                         accountRepository = repository,
                         categoryRepository = FakeCategoryRepository(),
                         transactionRepository = FakeTransactionRepository(),
-                        currencyRepository = FakeCurrencyRepository(),
                         onAccountClick = {},
                     )
                 }
@@ -341,7 +329,6 @@ class AccountsScreenTest {
                         accountRepository = repository,
                         categoryRepository = FakeCategoryRepository(),
                         transactionRepository = FakeTransactionRepository(),
-                        currencyRepository = FakeCurrencyRepository(),
                         onAccountClick = {},
                     )
                 }
@@ -472,23 +459,6 @@ class AccountsScreenTest {
         override suspend fun bumpRevisionOnly(id: TransferId): Long = 1L
 
         override suspend fun deleteTransaction(id: Uuid) {}
-    }
-
-    private class FakeCurrencyRepository : CurrencyRepository {
-        override fun getAllCurrencies(): Flow<List<Currency>> = flowOf(emptyList())
-
-        override fun getCurrencyById(id: CurrencyId): Flow<Currency?> = flowOf(null)
-
-        override fun getCurrencyByCode(code: String): Flow<Currency?> = flowOf(null)
-
-        override suspend fun upsertCurrencyByCode(
-            code: String,
-            name: String,
-        ): CurrencyId = CurrencyId(Uuid.random())
-
-        override suspend fun updateCurrency(currency: Currency) {}
-
-        override suspend fun deleteCurrency(id: CurrencyId) {}
     }
 
     private class FakeCategoryRepository : CategoryRepository {

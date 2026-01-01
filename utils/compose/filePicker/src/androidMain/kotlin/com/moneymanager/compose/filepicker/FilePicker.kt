@@ -48,7 +48,7 @@ private fun readFileContent(
         val inputStream = context.contentResolver.openInputStream(uri) ?: return null
         val content = readStreamAsString(inputStream)
         FilePickerResult(fileName = fileName, content = content)
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         null
     }
 }

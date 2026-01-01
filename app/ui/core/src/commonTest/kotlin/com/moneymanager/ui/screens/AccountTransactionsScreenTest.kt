@@ -355,14 +355,11 @@ class AccountTransactionsScreenTest {
                 onNodeWithText("\u270F\uFE0F").performClick()
                 waitForIdle()
 
-                // Verify edit dialog is displayed
-                onNodeWithText("Edit Transaction").assertIsDisplayed()
+                // Wait for edit dialog to appear
+                waitUntilExactlyOneExists(hasText("Edit Transaction"), timeoutMillis = 5000)
 
-                // Wait for attributes to load
-                mainClock.advanceTimeBy(100)
-                waitForIdle()
-
-                // Click "Add Attribute" button
+                // Wait for "+ Add Attribute" button to be available and click it
+                waitUntilExactlyOneExists(hasText("+ Add Attribute"), timeoutMillis = 5000)
                 onNodeWithText("+ Add Attribute").performClick()
                 waitForIdle()
 

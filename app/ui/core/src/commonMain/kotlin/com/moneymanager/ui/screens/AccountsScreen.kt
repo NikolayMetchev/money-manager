@@ -21,10 +21,8 @@ import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Category
-import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.CategoryRepository
-import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -40,15 +38,12 @@ fun AccountsScreen(
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
     transactionRepository: TransactionRepository,
-    currencyRepository: CurrencyRepository,
     onAccountClick: (Account) -> Unit,
 ) {
     // Use schema-error-aware collection for flows that may fail on old databases
     val accounts by accountRepository.getAllAccounts()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
     val balances by transactionRepository.getAccountBalances()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val currencies by currencyRepository.getAllCurrencies()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
     val categories by categoryRepository.getAllCategories()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
@@ -100,7 +95,6 @@ fun AccountsScreen(
                             account = account,
                             category = category,
                             balances = accountBalances,
-                            currencies = currencies,
                             accountRepository = accountRepository,
                             onClick = { onAccountClick(account) },
                         )
@@ -124,12 +118,10 @@ fun AccountsScreen(
 }
 
 @Composable
-@Suppress("UnusedParameter")
 fun AccountCard(
     account: Account,
     category: Category?,
     balances: List<AccountBalance>,
-    currencies: List<Currency>,
     accountRepository: AccountRepository,
     onClick: () -> Unit,
 ) {
@@ -333,9 +325,9 @@ fun CreateAccountDialog(
                                     )
                                 accountRepository.createAccount(newAccount)
                                 onDismiss()
-                            } catch (e: Exception) {
-                                logger.error(e) { "Failed to create account: ${e.message}" }
-                                errorMessage = "Failed to create account: ${e.message}"
+                            } catch (expected: Exception) {
+                                logger.error(expected) { "Failed to create account: ${expected.message}" }
+                                errorMessage = "Failed to create account: ${expected.message}"
                                 isSaving = false
                             }
                         }
@@ -427,9 +419,9 @@ fun DeleteAccountDialog(
                         try {
                             accountRepository.deleteAccount(account.id)
                             onDismiss()
-                        } catch (e: Exception) {
-                            logger.error(e) { "Failed to delete account: ${e.message}" }
-                            errorMessage = "Failed to delete account: ${e.message}"
+                        } catch (expected: Exception) {
+                            logger.error(expected) { "Failed to delete account: ${expected.message}" }
+                            errorMessage = "Failed to delete account: ${expected.message}"
                             isDeleting = false
                         }
                     }
@@ -565,9 +557,9 @@ fun CreateCategoryDialog(
                                     )
                                 val categoryId = categoryRepository.createCategory(newCategory)
                                 onCategoryCreated(categoryId, name.trim())
-                            } catch (e: Exception) {
-                                logger.error(e) { "Failed to create category: ${e.message}" }
-                                errorMessage = "Failed to create category: ${e.message}"
+                            } catch (expected: Exception) {
+                                logger.error(expected) { "Failed to create category: ${expected.message}" }
+                                errorMessage = "Failed to create category: ${expected.message}"
                                 isSaving = false
                             }
                         }
