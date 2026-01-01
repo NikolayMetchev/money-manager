@@ -171,12 +171,7 @@ class CsvTransferMapper(
                     ?: return MappingResult.Error(row.rowIndex, "Missing CURRENCY mapping")
 
             // Parse amount first (needed for account flipping)
-            val (rawAmount, _) =
-                parseAmountAndAccount(
-                    amountMapping,
-                    targetMapping,
-                    values,
-                )
+            val rawAmount = parseAmount(amountMapping, values)
 
             // Parse currency
             val currency =
@@ -268,45 +263,33 @@ class CsvTransferMapper(
         return values.getOrNull(index)
     }
 
-    private fun parseAmountAndAccount(
+    private fun parseAmount(
         amountMapping: FieldMapping,
-        targetMapping: FieldMapping,
         values: List<String>,
-    ): Pair<BigDecimal, String?> {
+    ): BigDecimal {
         val mapping = amountMapping as AmountParsingMapping
-        val rawAmount =
-            when (mapping.mode) {
-                AmountMode.SINGLE_COLUMN -> {
-                    val columnName =
-                        mapping.amountColumnName
-                            ?: error("amountColumnName required for SINGLE_COLUMN mode")
-                    val value = getColumnValue(columnName, values)
-                    if (mapping.negateValues) -parseBigDecimal(value) else parseBigDecimal(value)
-                }
-                AmountMode.CREDIT_DEBIT_COLUMNS -> {
-                    val creditColumnName =
-                        mapping.creditColumnName
-                            ?: error("creditColumnName required")
-                    val debitColumnName =
-                        mapping.debitColumnName
-                            ?: error("debitColumnName required")
-                    val creditValue = getColumnValue(creditColumnName, values)
-                    val debitValue = getColumnValue(debitColumnName, values)
-                    val credit = if (creditValue.isNotBlank()) parseBigDecimal(creditValue) else BigDecimal.ZERO
-                    val debit = if (debitValue.isNotBlank()) parseBigDecimal(debitValue) else BigDecimal.ZERO
-                    credit - debit
-                }
+        return when (mapping.mode) {
+            AmountMode.SINGLE_COLUMN -> {
+                val columnName =
+                    mapping.amountColumnName
+                        ?: error("amountColumnName required for SINGLE_COLUMN mode")
+                val value = getColumnValue(columnName, values)
+                if (mapping.negateValues) -parseBigDecimal(value) else parseBigDecimal(value)
             }
-
-        val newAccountName =
-            if (targetMapping is AccountLookupMapping) {
-                val name = getAccountName(targetMapping, values)
-                if (name.isNotBlank() && !accountExists(name)) name else null
-            } else {
-                null
+            AmountMode.CREDIT_DEBIT_COLUMNS -> {
+                val creditColumnName =
+                    mapping.creditColumnName
+                        ?: error("creditColumnName required")
+                val debitColumnName =
+                    mapping.debitColumnName
+                        ?: error("debitColumnName required")
+                val creditValue = getColumnValue(creditColumnName, values)
+                val debitValue = getColumnValue(debitColumnName, values)
+                val credit = if (creditValue.isNotBlank()) parseBigDecimal(creditValue) else BigDecimal.ZERO
+                val debit = if (debitValue.isNotBlank()) parseBigDecimal(debitValue) else BigDecimal.ZERO
+                credit - debit
             }
-
-        return rawAmount to newAccountName
+        }
     }
 
     private fun parseAccount(
