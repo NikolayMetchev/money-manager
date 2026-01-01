@@ -44,10 +44,16 @@ class CsvImportSourceRecorder(
     private val rowIndexForTransfer: (TransferId) -> Long,
 ) : SourceRecorder {
     override fun insert(transfer: Transfer) {
-        queries.insertCsvImport(
+        // Insert base TransferSource record
+        queries.insertCsvImportBase(
             transfer.id.id.toString(),
             transfer.revisionId,
             deviceId,
+        )
+        // Get the auto-generated ID and insert CSV-specific details
+        val transferSourceId = queries.lastInsertedId().executeAsOne()
+        queries.insertCsvImportDetails(
+            transferSourceId,
             csvImportId.id.toString(),
             rowIndexForTransfer(transfer.id),
         )

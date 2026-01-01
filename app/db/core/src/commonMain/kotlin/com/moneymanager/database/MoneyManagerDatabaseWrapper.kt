@@ -84,6 +84,7 @@ class MoneyManagerDatabaseWrapper(private val driver: SqlDriver) : MoneyManagerD
             "TransactionId",
             "SourceType",
             "TransferSource",
+            "CsvTransferSource",
             "Platform",
             "OsName",
             "MachineName",
