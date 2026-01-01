@@ -26,7 +26,7 @@ import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 class CsvImportRepositoryImpl(
-    private val database: MoneyManagerDatabaseWrapper,
+    database: MoneyManagerDatabaseWrapper,
     private val deviceId: DeviceId,
     private val coroutineContext: CoroutineContext = Dispatchers.Default,
 ) : CsvImportRepository {

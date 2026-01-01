@@ -23,8 +23,7 @@ import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
-import com.moneymanager.ui.MoneyManagerApp
-import com.moneymanager.ui.test.testCreateRepositories
+import com.moneymanager.ui.test.TestMoneyManagerApp
 import kotlin.test.AfterTest
 import kotlin.test.Test
 
@@ -64,10 +63,9 @@ class ImportMonzoCsvE2ETest {
                 )
 
             setContent {
-                MoneyManagerApp(
+                TestMoneyManagerApp(
                     databaseManager = testDatabaseManager,
                     appVersion = AppVersion("1.0.0-test"),
-                    createRepositories = testCreateRepositories,
                 )
             }
 
@@ -117,10 +115,9 @@ class ImportMonzoCsvE2ETest {
                 )
 
             setContent {
-                MoneyManagerApp(
+                TestMoneyManagerApp(
                     databaseManager = testDatabaseManager,
                     appVersion = AppVersion("1.0.0-test"),
-                    createRepositories = testCreateRepositories,
                 )
             }
 

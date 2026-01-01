@@ -13,6 +13,7 @@ dependencies {
     implementation(libs.compose.ui.unit.desktop)
     implementation(libs.diamondedge.logging)
     implementation(libs.kmlogging)
+    implementation(libs.kotlinx.coroutines.core)
     implementation(projects.app.db.core)
     implementation(projects.app.di.core)
     implementation(projects.app.model.core)
