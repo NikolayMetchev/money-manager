@@ -1,5 +1,3 @@
-@file:Suppress("UnusedPrivateProperty") // False positive: value is used throughout
-
 package com.moneymanager.bigdecimal
 
 import java.math.RoundingMode
