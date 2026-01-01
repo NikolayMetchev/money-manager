@@ -15,6 +15,12 @@ import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CategoryBalance
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.NewAttribute
+import com.moneymanager.domain.model.PageWithTargetIndex
+import com.moneymanager.domain.model.PagingInfo
+import com.moneymanager.domain.model.PagingResult
+import com.moneymanager.domain.model.SourceRecorder
+import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.AccountRepository
@@ -403,12 +409,12 @@ class AccountsScreenTest {
         override suspend fun getRunningBalanceByAccountPaginated(
             accountId: AccountId,
             pageSize: Int,
-            pagingInfo: com.moneymanager.domain.model.PagingInfo?,
-        ): com.moneymanager.domain.model.PagingResult<AccountRow> =
-            com.moneymanager.domain.model.PagingResult(
+            pagingInfo: PagingInfo?,
+        ): PagingResult<AccountRow> =
+            PagingResult(
                 items = emptyList(),
                 pagingInfo =
-                    com.moneymanager.domain.model.PagingInfo(
+                    PagingInfo(
                         lastTimestamp = null,
                         lastId = null,
                         hasMore = false,
@@ -419,12 +425,12 @@ class AccountsScreenTest {
             accountId: AccountId,
             pageSize: Int,
             firstTimestamp: Instant,
-            firstId: com.moneymanager.domain.model.TransactionId,
-        ): com.moneymanager.domain.model.PagingResult<AccountRow> =
-            com.moneymanager.domain.model.PagingResult(
+            firstId: TransactionId,
+        ): PagingResult<AccountRow> =
+            PagingResult(
                 items = emptyList(),
                 pagingInfo =
-                    com.moneymanager.domain.model.PagingInfo(
+                    PagingInfo(
                         lastTimestamp = null,
                         lastId = null,
                         hasMore = false,
@@ -435,12 +441,12 @@ class AccountsScreenTest {
             accountId: AccountId,
             transactionId: TransferId,
             pageSize: Int,
-        ): com.moneymanager.domain.model.PageWithTargetIndex<AccountRow> =
-            com.moneymanager.domain.model.PageWithTargetIndex(
+        ): PageWithTargetIndex<AccountRow> =
+            PageWithTargetIndex(
                 items = emptyList(),
                 targetIndex = -1,
                 pagingInfo =
-                    com.moneymanager.domain.model.PagingInfo(
+                    PagingInfo(
                         lastTimestamp = null,
                         lastId = null,
                         hasMore = false,
@@ -449,16 +455,17 @@ class AccountsScreenTest {
             )
 
         override suspend fun createTransfers(
-            transfersWithAttributes: List<com.moneymanager.domain.model.TransferWithAttributes>,
-            sourceRecorder: com.moneymanager.domain.model.SourceRecorder,
+            transfers: List<Transfer>,
+            newAttributes: Map<TransferId, List<NewAttribute>>,
+            sourceRecorder: SourceRecorder,
             onProgress: (suspend (Int, Int) -> Unit)?,
         ) {}
 
         override suspend fun updateTransfer(
             transfer: Transfer?,
             deletedAttributeIds: Set<Long>,
-            updatedAttributes: Map<Long, com.moneymanager.domain.model.NewAttribute>,
-            newAttributes: List<com.moneymanager.domain.model.NewAttribute>,
+            updatedAttributes: Map<Long, NewAttribute>,
+            newAttributes: List<NewAttribute>,
             transactionId: TransferId,
         ) {}
 

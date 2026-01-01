@@ -182,8 +182,11 @@ class TransactionAttributeAuditE2ETest {
 
             // Step 5: Add an attribute
             // Wait for UI to settle and ensure Attributes section is visible
-            mainClock.advanceTimeBy(500)
+            mainClock.advanceTimeBy(1000)
             waitForIdle()
+
+            // Verify dialog is still open before adding attribute
+            waitUntilExactlyOneExists(hasText("Create New Transaction"), timeoutMillis = 5000)
 
             // Try to find the Attributes section header first
             onNodeWithText("Attributes").assertIsDisplayed()
@@ -191,11 +194,20 @@ class TransactionAttributeAuditE2ETest {
             // The button might be below the visible area, so scroll to it first
             onNodeWithText("+ Add Attribute").performScrollTo()
             waitForIdle()
+            mainClock.advanceTimeBy(500)
+            waitForIdle()
             onNodeWithText("+ Add Attribute").performClick()
             waitForIdle()
+            mainClock.advanceTimeBy(500)
+            waitForIdle()
+
+            // Wait for attribute input fields to appear
+            waitUntilExactlyOneExists(hasText("Type"), timeoutMillis = 5000)
 
             // Enter attribute type name
             onNodeWithText("Type").performTextInput("Reference Number")
+            waitForIdle()
+            mainClock.advanceTimeBy(300)
             waitForIdle()
 
             // Enter attribute value
@@ -205,11 +217,13 @@ class TransactionAttributeAuditE2ETest {
                 waitForIdle()
                 onAllNodesWithText("Value")[0].performTextInput("REF-001")
                 waitForIdle()
+                mainClock.advanceTimeBy(300)
+                waitForIdle()
             }
 
             // Step 6: Create the transaction
             // Verify dialog is still open
-            onNodeWithText("Create New Transaction").assertIsDisplayed()
+            waitUntilExactlyOneExists(hasText("Create New Transaction"), timeoutMillis = 5000)
 
             // Verify Create button is enabled (all required fields should be filled)
             onAllNodesWithText("Create")[0].assertIsEnabled()

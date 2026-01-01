@@ -13,7 +13,6 @@ import com.moneymanager.domain.model.SourceRecorder
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
-import com.moneymanager.domain.model.TransferWithAttributes
 import kotlinx.coroutines.flow.Flow
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -79,12 +78,14 @@ interface TransactionRepository {
      * Creates transfers with their attributes and sources in a single atomic operation.
      * Works for single transfers (from UI), batch operations (sample data), and CSV imports.
      *
-     * @param transfersWithAttributes List of transfers with their attributes
+     * @param transfers List of transfers to create
+     * @param newAttributes Map of transfer ID to attributes to create (attributes don't have IDs yet)
      * @param sourceRecorder Strategy for recording source information (includes device info)
      * @param onProgress Optional callback for batch progress (called after each batch of ~1000)
      */
     suspend fun createTransfers(
-        transfersWithAttributes: List<TransferWithAttributes>,
+        transfers: List<Transfer>,
+        newAttributes: Map<TransferId, List<NewAttribute>> = emptyMap(),
         sourceRecorder: SourceRecorder,
         onProgress: (suspend (created: Int, total: Int) -> Unit)? = null,
     )

@@ -88,7 +88,6 @@ import com.moneymanager.domain.model.TransferAttribute
 import com.moneymanager.domain.model.TransferAuditEntry
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.TransferSource
-import com.moneymanager.domain.model.TransferWithAttributes
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.AuditRepository
@@ -1472,7 +1471,8 @@ fun TransactionEntryDialog(
                                 // Create transfer with attributes and source in one transaction
                                 val deviceId = deviceRepository.getOrCreateDevice(getDeviceInfo())
                                 transactionRepository.createTransfers(
-                                    transfersWithAttributes = listOf(TransferWithAttributes(transfer, attributesToSave)),
+                                    transfers = listOf(transfer),
+                                    newAttributes = mapOf(transfer.id to attributesToSave),
                                     sourceRecorder = ManualSourceRecorder(transferSourceQueries, deviceId),
                                 )
 

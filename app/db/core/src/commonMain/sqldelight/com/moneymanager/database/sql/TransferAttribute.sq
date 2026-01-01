@@ -53,3 +53,16 @@ DELETE FROM TransferAttribute WHERE id = ?;
 
 deleteAllByTransaction:
 DELETE FROM TransferAttribute WHERE transactionId = ?;
+
+selectByTransactionIds:
+SELECT
+    TransferAttribute.id,
+    TransferAttribute.transactionId,
+    TransferAttribute.attributeTypeId,
+    TransferAttribute.attributeValue,
+    AttributeType.id AS attributeType_id,
+    AttributeType.name AS attributeType_name
+FROM TransferAttribute
+JOIN AttributeType ON TransferAttribute.attributeTypeId = AttributeType.id
+WHERE TransferAttribute.transactionId IN ?
+ORDER BY TransferAttribute.transactionId, AttributeType.name;

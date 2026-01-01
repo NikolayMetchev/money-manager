@@ -13,7 +13,6 @@ import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
-import com.moneymanager.domain.model.TransferWithAttributes
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlin.random.Random
@@ -221,7 +220,8 @@ suspend fun generateSampleData(
     val dateRangeMillis = endDate.toEpochMilliseconds() - startDate.toEpochMilliseconds()
 
     // Generate all transactions with their attributes
-    val allTransfersWithAttributes = mutableListOf<TransferWithAttributes>()
+    val allTransfers = mutableListOf<Transfer>()
+    val allNewAttributes = mutableMapOf<TransferId, List<NewAttribute>>()
 
     for ((accountIndex, accountId) in accountIds.withIndex()) {
         val transactionCount = transactionCounts[accountIndex]
@@ -264,7 +264,10 @@ suspend fun generateSampleData(
                     emptyList()
                 }
 
-            allTransfersWithAttributes.add(TransferWithAttributes(transfer, attributes))
+            allTransfers.add(transfer)
+            if (attributes.isNotEmpty()) {
+                allNewAttributes[transfer.id] = attributes
+            }
         }
     }
 
@@ -273,7 +276,8 @@ suspend fun generateSampleData(
     var transactionsCreated = 0
 
     repositorySet.transactionRepository.createTransfers(
-        transfersWithAttributes = allTransfersWithAttributes,
+        transfers = allTransfers,
+        newAttributes = allNewAttributes,
         sourceRecorder = SampleGeneratorSourceRecorder(repositorySet.transferSourceQueries, deviceId),
         onProgress = { created, total ->
             transactionsCreated = created

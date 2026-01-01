@@ -15,11 +15,3 @@ data class NewAttribute(
     val typeId: AttributeTypeId,
     val value: String,
 )
-
-/**
- * A transfer bundled with its attributes for batch creation.
- */
-data class TransferWithAttributes(
-    val transfer: Transfer,
-    val attributes: List<NewAttribute>,
-)
