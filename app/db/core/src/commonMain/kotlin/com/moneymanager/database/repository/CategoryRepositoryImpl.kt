@@ -41,10 +41,10 @@ class CategoryRepositoryImpl(
                             id = CurrencyId(Uuid.parse(row.currency_id)),
                             code = row.currency_code,
                             name = row.currency_name,
-                            scaleFactor = row.currency_scaleFactor,
+                            scaleFactor = row.currency_scale_factor,
                         )
                     CategoryBalance(
-                        categoryId = row.categoryId,
+                        categoryId = row.category_id,
                         balance = Money(row.balance ?: 0, currency),
                     )
                 }
@@ -73,7 +73,7 @@ class CategoryRepositoryImpl(
             queries.transactionWithResult {
                 queries.insert(
                     name = category.name,
-                    parentId = category.parentId,
+                    parent_id = category.parentId,
                 )
                 queries.lastInsertRowId().executeAsOne()
             }
@@ -83,7 +83,7 @@ class CategoryRepositoryImpl(
         withContext(Dispatchers.Default) {
             queries.update(
                 name = category.name,
-                parentId = category.parentId,
+                parent_id = category.parentId,
                 id = category.id,
             )
         }

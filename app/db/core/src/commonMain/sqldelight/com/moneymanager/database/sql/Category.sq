@@ -1,35 +1,35 @@
 CREATE TABLE Category (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL CHECK(length(trim(name)) > 0),
-    parentId INTEGER,
-    FOREIGN KEY (parentId) REFERENCES Category(id) ON DELETE SET NULL
+    parent_id INTEGER,
+    FOREIGN KEY (parent_id) REFERENCES Category(id) ON DELETE SET NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_category_parent ON Category(parentId);
+CREATE INDEX IF NOT EXISTS idx_category_parent ON Category(parent_id);
 
 -- View that shows balances aggregated by category (including all descendant categories)
 -- Uses a recursive CTE to traverse the category hierarchy
 CREATE VIEW CategoryBalanceView AS
 WITH RECURSIVE CategoryHierarchy AS (
     -- Base case: each category includes itself
-    SELECT id AS ancestorId, id AS descendantId
+    SELECT id AS ancestor_id, id AS descendant_id
     FROM Category
 
     UNION ALL
 
     -- Recursive case: find all descendants
-    SELECT ch.ancestorId, c.id AS descendantId
+    SELECT ch.ancestor_id, c.id AS descendant_id
     FROM CategoryHierarchy ch
-    JOIN Category c ON c.parentId = ch.descendantId
+    JOIN Category c ON c.parent_id = ch.descendant_id
 )
 SELECT
-    ch.ancestorId AS categoryId,
-    abv.currencyId,
+    ch.ancestor_id AS category_id,
+    abv.currency_id,
     SUM(abv.balance) AS balance
 FROM CategoryHierarchy ch
-JOIN Account a ON a.categoryId = ch.descendantId
-JOIN AccountBalanceMaterializedView abv ON abv.accountId = a.id
-GROUP BY ch.ancestorId, abv.currencyId;
+JOIN Account a ON a.category_id = ch.descendant_id
+JOIN AccountBalanceMaterializedView abv ON abv.account_id = a.id
+GROUP BY ch.ancestor_id, abv.currency_id;
 
 selectAll:
 SELECT * FROM Category ORDER BY name;
@@ -38,22 +38,22 @@ selectById:
 SELECT * FROM Category WHERE id = ?;
 
 selectTopLevel:
-SELECT * FROM Category WHERE parentId IS NULL ORDER BY name;
+SELECT * FROM Category WHERE parent_id IS NULL ORDER BY name;
 
 selectByParent:
-SELECT * FROM Category WHERE parentId = ? ORDER BY name;
+SELECT * FROM Category WHERE parent_id = ? ORDER BY name;
 
 insert:
-INSERT INTO Category(name, parentId)
+INSERT INTO Category(name, parent_id)
 VALUES (?, ?);
 
 insertWithId:
-INSERT INTO Category(id, name, parentId)
+INSERT INTO Category(id, name, parent_id)
 VALUES (?, ?, ?);
 
 update:
 UPDATE Category
-SET name = ?, parentId = ?
+SET name = ?, parent_id = ?
 WHERE id = ?;
 
 delete:
@@ -64,14 +64,14 @@ SELECT last_insert_rowid();
 
 selectAllCategoryBalances:
 SELECT
-    CategoryBalanceView.categoryId,
-    CategoryBalanceView.currencyId,
+    CategoryBalanceView.category_id,
+    CategoryBalanceView.currency_id,
     CategoryBalanceView.balance,
     Currency.id AS currency_id,
     Currency.code AS currency_code,
     Currency.name AS currency_name,
-    Currency.scaleFactor AS currency_scaleFactor
+    Currency.scale_factor AS currency_scale_factor
 FROM CategoryBalanceView
-JOIN Currency ON CategoryBalanceView.currencyId = Currency.id
-ORDER BY categoryId, currencyId;
+JOIN Currency ON CategoryBalanceView.currency_id = Currency.id
+ORDER BY category_id, currency_id;
 

@@ -11,7 +11,7 @@ CREATE TABLE Currency (
         ),
     code TEXT NOT NULL UNIQUE CHECK(length(trim(code)) > 0),
     name TEXT NOT NULL CHECK(length(trim(name)) > 0),
-    scaleFactor INTEGER NOT NULL DEFAULT 100
+    scale_factor INTEGER NOT NULL DEFAULT 100
 );
 
 selectAll:
@@ -24,12 +24,12 @@ selectByCode:
 SELECT * FROM Currency WHERE code = ?;
 
 insert:
-INSERT INTO Currency(id, code, name, scaleFactor)
+INSERT INTO Currency(id, code, name, scale_factor)
 VALUES (?, ?, ?, ?);
 
 update:
 UPDATE Currency
-SET code = ?, name = ?, scaleFactor = ?
+SET code = ?, name = ?, scale_factor = ?
 WHERE id = ?;
 
 delete:

@@ -1,32 +1,32 @@
 CREATE TABLE TransferAttributeAudit (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    transactionId TEXT NOT NULL,
-    revisionId INTEGER NOT NULL,
-    attributeTypeId INTEGER NOT NULL,
-    auditTypeId INTEGER NOT NULL,
-    attributeValue TEXT NOT NULL,
-    FOREIGN KEY (transactionId) REFERENCES TransactionId(id) ON DELETE CASCADE,
-    FOREIGN KEY (attributeTypeId) REFERENCES AttributeType(id) ON DELETE RESTRICT,
-    FOREIGN KEY (auditTypeId) REFERENCES AuditType(id) ON DELETE RESTRICT
+    transaction_id TEXT NOT NULL,
+    revision_id INTEGER NOT NULL,
+    attribute_type_id INTEGER NOT NULL,
+    audit_type_id INTEGER NOT NULL,
+    attribute_value TEXT NOT NULL,
+    FOREIGN KEY (transaction_id) REFERENCES TransactionId(id) ON DELETE CASCADE,
+    FOREIGN KEY (attribute_type_id) REFERENCES AttributeType(id) ON DELETE RESTRICT,
+    FOREIGN KEY (audit_type_id) REFERENCES AuditType(id) ON DELETE RESTRICT
 );
 
-CREATE INDEX idx_transfer_attribute_audit_transaction ON TransferAttributeAudit(transactionId);
-CREATE INDEX idx_transfer_attribute_audit_revision ON TransferAttributeAudit(transactionId, revisionId);
+CREATE INDEX idx_transfer_attribute_audit_transaction ON TransferAttributeAudit(transaction_id);
+CREATE INDEX idx_transfer_attribute_audit_revision ON TransferAttributeAudit(transaction_id, revision_id);
 
 selectAllByTransaction:
 SELECT
     TransferAttributeAudit.id,
-    TransferAttributeAudit.transactionId,
-    TransferAttributeAudit.revisionId,
-    TransferAttributeAudit.attributeTypeId,
-    TransferAttributeAudit.auditTypeId,
-    TransferAttributeAudit.attributeValue,
-    AttributeType.id AS attributeType_id,
-    AttributeType.name AS attributeType_name,
-    AuditType.id AS auditType_id,
-    AuditType.name AS auditType_name
+    TransferAttributeAudit.transaction_id,
+    TransferAttributeAudit.revision_id,
+    TransferAttributeAudit.attribute_type_id,
+    TransferAttributeAudit.audit_type_id,
+    TransferAttributeAudit.attribute_value,
+    AttributeType.id AS attribute_type_id,
+    AttributeType.name AS attribute_type_name,
+    AuditType.id AS audit_type_id,
+    AuditType.name AS audit_type_name
 FROM TransferAttributeAudit
-JOIN AttributeType ON TransferAttributeAudit.attributeTypeId = AttributeType.id
-JOIN AuditType ON TransferAttributeAudit.auditTypeId = AuditType.id
-WHERE TransferAttributeAudit.transactionId = ?
-ORDER BY TransferAttributeAudit.revisionId DESC, AttributeType.name;
+JOIN AttributeType ON TransferAttributeAudit.attribute_type_id = AttributeType.id
+JOIN AuditType ON TransferAttributeAudit.audit_type_id = AuditType.id
+WHERE TransferAttributeAudit.transaction_id = ?
+ORDER BY TransferAttributeAudit.revision_id DESC, AttributeType.name;

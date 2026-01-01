@@ -44,16 +44,16 @@ class AuditTableCoverageTest : DbTest() {
 
             // Verify audit table has audit metadata columns
             assertTrue(
-                auditTableColumns.contains("auditId"),
-                "Audit table $auditTableName is missing auditId column",
+                auditTableColumns.contains("audit_id"),
+                "Audit table $auditTableName is missing audit_id column",
             )
             assertTrue(
-                auditTableColumns.contains("auditTimestamp"),
-                "Audit table $auditTableName is missing auditTimestamp column",
+                auditTableColumns.contains("audit_timestamp"),
+                "Audit table $auditTableName is missing audit_timestamp column",
             )
             assertTrue(
-                auditTableColumns.contains("auditTypeId"),
-                "Audit table $auditTableName is missing auditTypeId column",
+                auditTableColumns.contains("audit_type_id"),
+                "Audit table $auditTableName is missing audit_type_id column",
             )
 
             // Verify audit table has all columns from main table

@@ -41,23 +41,23 @@ object DatabaseConfig {
             AFTER INSERT ON Transfer
             FOR EACH ROW
             BEGIN
-                INSERT OR IGNORE INTO PendingMaterializedViewChanges (accountId, currencyId, minTimestamp)
-                VALUES (NEW.sourceAccountId, NEW.currencyId, NEW.timestamp);
+                INSERT OR IGNORE INTO PendingMaterializedViewChanges (account_id, currency_id, min_timestamp)
+                VALUES (NEW.source_account_id, NEW.currency_id, NEW.timestamp);
 
                 UPDATE PendingMaterializedViewChanges
-                SET minTimestamp = NEW.timestamp
-                WHERE accountId = NEW.sourceAccountId
-                  AND currencyId = NEW.currencyId
-                  AND minTimestamp > NEW.timestamp;
+                SET min_timestamp = NEW.timestamp
+                WHERE account_id = NEW.source_account_id
+                  AND currency_id = NEW.currency_id
+                  AND min_timestamp > NEW.timestamp;
 
-                INSERT OR IGNORE INTO PendingMaterializedViewChanges (accountId, currencyId, minTimestamp)
-                VALUES (NEW.targetAccountId, NEW.currencyId, NEW.timestamp);
+                INSERT OR IGNORE INTO PendingMaterializedViewChanges (account_id, currency_id, min_timestamp)
+                VALUES (NEW.target_account_id, NEW.currency_id, NEW.timestamp);
 
                 UPDATE PendingMaterializedViewChanges
-                SET minTimestamp = NEW.timestamp
-                WHERE accountId = NEW.targetAccountId
-                  AND currencyId = NEW.currencyId
-                  AND minTimestamp > NEW.timestamp;
+                SET min_timestamp = NEW.timestamp
+                WHERE account_id = NEW.target_account_id
+                  AND currency_id = NEW.currency_id
+                  AND min_timestamp > NEW.timestamp;
             END
             """.trimIndent(),
             0,
@@ -71,41 +71,41 @@ object DatabaseConfig {
             AFTER UPDATE ON Transfer
             FOR EACH ROW
             BEGIN
-                INSERT OR IGNORE INTO PendingMaterializedViewChanges (accountId, currencyId, minTimestamp)
-                VALUES (OLD.sourceAccountId, OLD.currencyId, MIN(OLD.timestamp, NEW.timestamp));
+                INSERT OR IGNORE INTO PendingMaterializedViewChanges (account_id, currency_id, min_timestamp)
+                VALUES (OLD.source_account_id, OLD.currency_id, MIN(OLD.timestamp, NEW.timestamp));
 
                 UPDATE PendingMaterializedViewChanges
-                SET minTimestamp = MIN(OLD.timestamp, NEW.timestamp)
-                WHERE accountId = OLD.sourceAccountId
-                  AND currencyId = OLD.currencyId
-                  AND minTimestamp > MIN(OLD.timestamp, NEW.timestamp);
+                SET min_timestamp = MIN(OLD.timestamp, NEW.timestamp)
+                WHERE account_id = OLD.source_account_id
+                  AND currency_id = OLD.currency_id
+                  AND min_timestamp > MIN(OLD.timestamp, NEW.timestamp);
 
-                INSERT OR IGNORE INTO PendingMaterializedViewChanges (accountId, currencyId, minTimestamp)
-                VALUES (NEW.sourceAccountId, NEW.currencyId, MIN(OLD.timestamp, NEW.timestamp));
-
-                UPDATE PendingMaterializedViewChanges
-                SET minTimestamp = MIN(OLD.timestamp, NEW.timestamp)
-                WHERE accountId = NEW.sourceAccountId
-                  AND currencyId = NEW.currencyId
-                  AND minTimestamp > MIN(OLD.timestamp, NEW.timestamp);
-
-                INSERT OR IGNORE INTO PendingMaterializedViewChanges (accountId, currencyId, minTimestamp)
-                VALUES (OLD.targetAccountId, OLD.currencyId, MIN(OLD.timestamp, NEW.timestamp));
+                INSERT OR IGNORE INTO PendingMaterializedViewChanges (account_id, currency_id, min_timestamp)
+                VALUES (NEW.source_account_id, NEW.currency_id, MIN(OLD.timestamp, NEW.timestamp));
 
                 UPDATE PendingMaterializedViewChanges
-                SET minTimestamp = MIN(OLD.timestamp, NEW.timestamp)
-                WHERE accountId = OLD.targetAccountId
-                  AND currencyId = OLD.currencyId
-                  AND minTimestamp > MIN(OLD.timestamp, NEW.timestamp);
+                SET min_timestamp = MIN(OLD.timestamp, NEW.timestamp)
+                WHERE account_id = NEW.source_account_id
+                  AND currency_id = NEW.currency_id
+                  AND min_timestamp > MIN(OLD.timestamp, NEW.timestamp);
 
-                INSERT OR IGNORE INTO PendingMaterializedViewChanges (accountId, currencyId, minTimestamp)
-                VALUES (NEW.targetAccountId, NEW.currencyId, MIN(OLD.timestamp, NEW.timestamp));
+                INSERT OR IGNORE INTO PendingMaterializedViewChanges (account_id, currency_id, min_timestamp)
+                VALUES (OLD.target_account_id, OLD.currency_id, MIN(OLD.timestamp, NEW.timestamp));
 
                 UPDATE PendingMaterializedViewChanges
-                SET minTimestamp = MIN(OLD.timestamp, NEW.timestamp)
-                WHERE accountId = NEW.targetAccountId
-                  AND currencyId = NEW.currencyId
-                  AND minTimestamp > MIN(OLD.timestamp, NEW.timestamp);
+                SET min_timestamp = MIN(OLD.timestamp, NEW.timestamp)
+                WHERE account_id = OLD.target_account_id
+                  AND currency_id = OLD.currency_id
+                  AND min_timestamp > MIN(OLD.timestamp, NEW.timestamp);
+
+                INSERT OR IGNORE INTO PendingMaterializedViewChanges (account_id, currency_id, min_timestamp)
+                VALUES (NEW.target_account_id, NEW.currency_id, MIN(OLD.timestamp, NEW.timestamp));
+
+                UPDATE PendingMaterializedViewChanges
+                SET min_timestamp = MIN(OLD.timestamp, NEW.timestamp)
+                WHERE account_id = NEW.target_account_id
+                  AND currency_id = NEW.currency_id
+                  AND min_timestamp > MIN(OLD.timestamp, NEW.timestamp);
             END
             """.trimIndent(),
             0,
@@ -119,23 +119,23 @@ object DatabaseConfig {
             AFTER DELETE ON Transfer
             FOR EACH ROW
             BEGIN
-                INSERT OR IGNORE INTO PendingMaterializedViewChanges (accountId, currencyId, minTimestamp)
-                VALUES (OLD.sourceAccountId, OLD.currencyId, OLD.timestamp);
+                INSERT OR IGNORE INTO PendingMaterializedViewChanges (account_id, currency_id, min_timestamp)
+                VALUES (OLD.source_account_id, OLD.currency_id, OLD.timestamp);
 
                 UPDATE PendingMaterializedViewChanges
-                SET minTimestamp = OLD.timestamp
-                WHERE accountId = OLD.sourceAccountId
-                  AND currencyId = OLD.currencyId
-                  AND minTimestamp > OLD.timestamp;
+                SET min_timestamp = OLD.timestamp
+                WHERE account_id = OLD.source_account_id
+                  AND currency_id = OLD.currency_id
+                  AND min_timestamp > OLD.timestamp;
 
-                INSERT OR IGNORE INTO PendingMaterializedViewChanges (accountId, currencyId, minTimestamp)
-                VALUES (OLD.targetAccountId, OLD.currencyId, OLD.timestamp);
+                INSERT OR IGNORE INTO PendingMaterializedViewChanges (account_id, currency_id, min_timestamp)
+                VALUES (OLD.target_account_id, OLD.currency_id, OLD.timestamp);
 
                 UPDATE PendingMaterializedViewChanges
-                SET minTimestamp = OLD.timestamp
-                WHERE accountId = OLD.targetAccountId
-                  AND currencyId = OLD.currencyId
-                  AND minTimestamp > OLD.timestamp;
+                SET min_timestamp = OLD.timestamp
+                WHERE account_id = OLD.target_account_id
+                  AND currency_id = OLD.currency_id
+                  AND min_timestamp > OLD.timestamp;
             END
             """.trimIndent(),
             0,
@@ -155,8 +155,8 @@ object DatabaseConfig {
             FOR EACH ROW
             BEGIN
                 UPDATE Category
-                SET parentId = OLD.parentId
-                WHERE parentId = OLD.id;
+                SET parent_id = OLD.parent_id
+                WHERE parent_id = OLD.id;
             END
             """.trimIndent(),
             0,
@@ -219,14 +219,14 @@ object DatabaseConfig {
             BEGIN
                 -- Only bump revision if NOT in creation mode
                 UPDATE Transfer
-                SET revisionId = revisionId + 1
-                WHERE id = NEW.transactionId
+                SET revision_id = revision_id + 1
+                WHERE id = NEW.transaction_id
                   AND NOT EXISTS (SELECT 1 FROM _creation_mode);
 
                 -- Always record the addition in audit table at current revision
-                INSERT INTO TransferAttributeAudit (transactionId, revisionId, attributeTypeId, auditTypeId, attributeValue)
-                SELECT NEW.transactionId, revisionId, NEW.attributeTypeId, 1, NEW.attributeValue
-                FROM Transfer WHERE id = NEW.transactionId;
+                INSERT INTO TransferAttributeAudit (transaction_id, revision_id, attribute_type_id, audit_type_id, attribute_value)
+                SELECT NEW.transaction_id, revision_id, NEW.attribute_type_id, 1, NEW.attribute_value
+                FROM Transfer WHERE id = NEW.transaction_id;
             END
             """.trimIndent(),
             0,
@@ -240,18 +240,18 @@ object DatabaseConfig {
             AFTER UPDATE ON TransferAttribute
             FOR EACH ROW
             WHEN NOT EXISTS (SELECT 1 FROM _import_batch)
-              AND OLD.attributeValue != NEW.attributeValue
+              AND OLD.attribute_value != NEW.attribute_value
             BEGIN
                 -- Only bump revision if NOT in creation mode
                 UPDATE Transfer
-                SET revisionId = revisionId + 1
-                WHERE id = NEW.transactionId
+                SET revision_id = revision_id + 1
+                WHERE id = NEW.transaction_id
                   AND NOT EXISTS (SELECT 1 FROM _creation_mode);
 
                 -- Always record the change in audit table (OLD value - what it was before)
-                INSERT INTO TransferAttributeAudit (transactionId, revisionId, attributeTypeId, auditTypeId, attributeValue)
-                SELECT NEW.transactionId, revisionId, NEW.attributeTypeId, 2, OLD.attributeValue
-                FROM Transfer WHERE id = NEW.transactionId;
+                INSERT INTO TransferAttributeAudit (transaction_id, revision_id, attribute_type_id, audit_type_id, attribute_value)
+                SELECT NEW.transaction_id, revision_id, NEW.attribute_type_id, 2, OLD.attribute_value
+                FROM Transfer WHERE id = NEW.transaction_id;
             END
             """.trimIndent(),
             0,
@@ -268,14 +268,14 @@ object DatabaseConfig {
             BEGIN
                 -- Only bump revision if NOT in creation mode
                 UPDATE Transfer
-                SET revisionId = revisionId + 1
-                WHERE id = OLD.transactionId
+                SET revision_id = revision_id + 1
+                WHERE id = OLD.transaction_id
                   AND NOT EXISTS (SELECT 1 FROM _creation_mode);
 
                 -- Always record the deletion in audit table (OLD value - what was deleted)
-                INSERT INTO TransferAttributeAudit (transactionId, revisionId, attributeTypeId, auditTypeId, attributeValue)
-                SELECT OLD.transactionId, revisionId, OLD.attributeTypeId, 3, OLD.attributeValue
-                FROM Transfer WHERE id = OLD.transactionId;
+                INSERT INTO TransferAttributeAudit (transaction_id, revision_id, attribute_type_id, audit_type_id, attribute_value)
+                SELECT OLD.transaction_id, revision_id, OLD.attribute_type_id, 3, OLD.attribute_value
+                FROM Transfer WHERE id = OLD.transaction_id;
             END
             """.trimIndent(),
             0,
@@ -304,14 +304,14 @@ object DatabaseConfig {
             val columnList = columns.joinToString(", ")
             val newColumnList = columns.joinToString(", ") { "NEW.$it" }
             val oldColumnList = columns.joinToString(", ") { "OLD.$it" }
-            // For UPDATE: use OLD values for all columns EXCEPT revisionId, which uses NEW
-            // (revisionId is incremented during UPDATE, so OLD.revisionId is pre-increment)
+            // For UPDATE: use OLD values for all columns EXCEPT revision_id, which uses NEW
+            // (revision_id is incremented during UPDATE, so OLD.revision_id is pre-increment)
             val updateColumnList =
                 columns.joinToString(", ") { col ->
-                    if (col == "revisionId") "NEW.$col" else "OLD.$col"
+                    if (col == "revision_id") "NEW.$col" else "OLD.$col"
                 }
 
-            // INSERT trigger - stores NEW values with auditTypeId 1
+            // INSERT trigger - stores NEW values with audit_type_id 1
             // Uses strftime('%s', 'now') for cross-platform compatibility (works on all SQLite versions)
             execute(
                 null,
@@ -320,14 +320,14 @@ object DatabaseConfig {
                 AFTER INSERT ON $tableName
                 FOR EACH ROW
                 BEGIN
-                    INSERT INTO $auditTableName (auditTimestamp, auditTypeId, $columnList)
+                    INSERT INTO $auditTableName (audit_timestamp, audit_type_id, $columnList)
                     VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, $newColumnList);
                 END
                 """.trimIndent(),
                 0,
             )
 
-            // UPDATE trigger - stores OLD values (except revisionId uses NEW) with auditTypeId 2
+            // UPDATE trigger - stores OLD values (except revision_id uses NEW) with audit_type_id 2
             execute(
                 null,
                 """
@@ -335,14 +335,14 @@ object DatabaseConfig {
                 AFTER UPDATE ON $tableName
                 FOR EACH ROW
                 BEGIN
-                    INSERT INTO $auditTableName (auditTimestamp, auditTypeId, $columnList)
+                    INSERT INTO $auditTableName (audit_timestamp, audit_type_id, $columnList)
                     VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, $updateColumnList);
                 END
                 """.trimIndent(),
                 0,
             )
 
-            // DELETE trigger - stores OLD values with auditTypeId 3
+            // DELETE trigger - stores OLD values with audit_type_id 3
             execute(
                 null,
                 """
@@ -350,7 +350,7 @@ object DatabaseConfig {
                 AFTER DELETE ON $tableName
                 FOR EACH ROW
                 BEGIN
-                    INSERT INTO $auditTableName (auditTimestamp, auditTypeId, $columnList)
+                    INSERT INTO $auditTableName (audit_timestamp, audit_type_id, $columnList)
                     VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, $oldColumnList);
                 END
                 """.trimIndent(),
@@ -399,7 +399,7 @@ object DatabaseConfig {
             categoryQueries.insertWithId(
                 id = -1,
                 name = "Uncategorized",
-                parentId = null,
+                parent_id = null,
             )
 
             // Seed currencies

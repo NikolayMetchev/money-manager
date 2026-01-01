@@ -2,11 +2,11 @@
 CREATE TABLE CsvImportStrategy (
     id TEXT PRIMARY KEY NOT NULL,
     name TEXT NOT NULL UNIQUE,
-    identificationColumnsJson TEXT NOT NULL,
-    fieldMappingsJson TEXT NOT NULL,
-    attributeMappingsJson TEXT NOT NULL,
-    createdAt INTEGER NOT NULL,
-    updatedAt INTEGER NOT NULL
+    identification_columns_json TEXT NOT NULL,
+    field_mappings_json TEXT NOT NULL,
+    attribute_mappings_json TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
 );
 
 CREATE INDEX idx_csv_import_strategy_name ON CsvImportStrategy(name);
@@ -25,13 +25,13 @@ SELECT * FROM CsvImportStrategy WHERE name = ?;
 
 -- Insert a new strategy
 insert:
-INSERT INTO CsvImportStrategy (id, name, identificationColumnsJson, fieldMappingsJson, attributeMappingsJson, createdAt, updatedAt)
+INSERT INTO CsvImportStrategy (id, name, identification_columns_json, field_mappings_json, attribute_mappings_json, created_at, updated_at)
 VALUES (?, ?, ?, ?, ?, ?, ?);
 
 -- Update an existing strategy
 update:
 UPDATE CsvImportStrategy
-SET name = ?, identificationColumnsJson = ?, fieldMappingsJson = ?, attributeMappingsJson = ?, updatedAt = ?
+SET name = ?, identification_columns_json = ?, field_mappings_json = ?, attribute_mappings_json = ?, updated_at = ?
 WHERE id = ?;
 
 -- Delete a strategy by ID

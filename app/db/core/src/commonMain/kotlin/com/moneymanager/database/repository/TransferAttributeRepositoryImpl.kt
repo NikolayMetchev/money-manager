@@ -29,13 +29,13 @@ class TransferAttributeRepositoryImpl(
                 list.map { row ->
                     TransferAttribute(
                         id = row.id,
-                        transactionId = TransferId(Uuid.parse(row.transactionId)),
+                        transactionId = TransferId(Uuid.parse(row.transaction_id)),
                         attributeType =
                             AttributeType(
-                                id = AttributeTypeId(row.attributeType_id),
-                                name = row.attributeType_name,
+                                id = AttributeTypeId(row.attribute_type_id),
+                                name = row.attribute_type_name,
                             ),
-                        value = row.attributeValue,
+                        value = row.attribute_value,
                     )
                 }
             }

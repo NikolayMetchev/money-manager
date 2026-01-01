@@ -56,11 +56,11 @@ class CsvImportStrategyRepositoryImpl(
             queries.insert(
                 id = strategy.id.id.toString(),
                 name = strategy.name,
-                identificationColumnsJson = FieldMappingJsonCodec.encodeColumns(strategy.identificationColumns),
-                fieldMappingsJson = FieldMappingJsonCodec.encode(strategy.fieldMappings),
-                attributeMappingsJson = FieldMappingJsonCodec.encodeAttributeMappings(strategy.attributeMappings),
-                createdAt = now.toEpochMilliseconds(),
-                updatedAt = now.toEpochMilliseconds(),
+                identification_columns_json = FieldMappingJsonCodec.encodeColumns(strategy.identificationColumns),
+                field_mappings_json = FieldMappingJsonCodec.encode(strategy.fieldMappings),
+                attribute_mappings_json = FieldMappingJsonCodec.encodeAttributeMappings(strategy.attributeMappings),
+                created_at = now.toEpochMilliseconds(),
+                updated_at = now.toEpochMilliseconds(),
             )
             strategy.id
         }
@@ -70,10 +70,10 @@ class CsvImportStrategyRepositoryImpl(
             val now = Clock.System.now()
             queries.update(
                 name = strategy.name,
-                identificationColumnsJson = FieldMappingJsonCodec.encodeColumns(strategy.identificationColumns),
-                fieldMappingsJson = FieldMappingJsonCodec.encode(strategy.fieldMappings),
-                attributeMappingsJson = FieldMappingJsonCodec.encodeAttributeMappings(strategy.attributeMappings),
-                updatedAt = now.toEpochMilliseconds(),
+                identification_columns_json = FieldMappingJsonCodec.encodeColumns(strategy.identificationColumns),
+                field_mappings_json = FieldMappingJsonCodec.encode(strategy.fieldMappings),
+                attribute_mappings_json = FieldMappingJsonCodec.encodeAttributeMappings(strategy.attributeMappings),
+                updated_at = now.toEpochMilliseconds(),
                 id = strategy.id.id.toString(),
             )
         }
@@ -87,10 +87,10 @@ class CsvImportStrategyRepositoryImpl(
         CsvImportStrategy(
             id = CsvImportStrategyId(Uuid.parse(entity.id)),
             name = entity.name,
-            identificationColumns = FieldMappingJsonCodec.decodeColumns(entity.identificationColumnsJson),
-            fieldMappings = FieldMappingJsonCodec.decode(entity.fieldMappingsJson),
-            attributeMappings = FieldMappingJsonCodec.decodeAttributeMappings(entity.attributeMappingsJson),
-            createdAt = Instant.fromEpochMilliseconds(entity.createdAt),
-            updatedAt = Instant.fromEpochMilliseconds(entity.updatedAt),
+            identificationColumns = FieldMappingJsonCodec.decodeColumns(entity.identification_columns_json),
+            fieldMappings = FieldMappingJsonCodec.decode(entity.field_mappings_json),
+            attributeMappings = FieldMappingJsonCodec.decodeAttributeMappings(entity.attribute_mappings_json),
+            createdAt = Instant.fromEpochMilliseconds(entity.created_at),
+            updatedAt = Instant.fromEpochMilliseconds(entity.updated_at),
         )
 }

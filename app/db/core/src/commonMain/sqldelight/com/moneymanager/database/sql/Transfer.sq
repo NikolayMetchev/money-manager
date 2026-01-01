@@ -9,133 +9,133 @@ CREATE TABLE Transfer (
             AND substr(id, 15, 1) IN ('1','2','3','4','5','6','7','8')
             AND lower(substr(id, 20, 1)) IN ('8','9','a','b')
         ),
-    revisionId INTEGER NOT NULL DEFAULT 1,
+    revision_id INTEGER NOT NULL DEFAULT 1,
     timestamp INTEGER NOT NULL,
     description TEXT NOT NULL,
-    sourceAccountId INTEGER NOT NULL,
-    targetAccountId INTEGER NOT NULL,
-    currencyId TEXT NOT NULL
+    source_account_id INTEGER NOT NULL,
+    target_account_id INTEGER NOT NULL,
+    currency_id TEXT NOT NULL
         CHECK (
-            length(currencyId) = 36
-            AND substr(currencyId, 9, 1) = '-'
-            AND substr(currencyId, 14, 1) = '-'
-            AND substr(currencyId, 19, 1) = '-'
-            AND substr(currencyId, 24, 1) = '-'
-            AND substr(currencyId, 15, 1) IN ('1','2','3','4','5','6','7','8')
-            AND lower(substr(currencyId, 20, 1)) IN ('8','9','a','b')
+            length(currency_id) = 36
+            AND substr(currency_id, 9, 1) = '-'
+            AND substr(currency_id, 14, 1) = '-'
+            AND substr(currency_id, 19, 1) = '-'
+            AND substr(currency_id, 24, 1) = '-'
+            AND substr(currency_id, 15, 1) IN ('1','2','3','4','5','6','7','8')
+            AND lower(substr(currency_id, 20, 1)) IN ('8','9','a','b')
         ),
     amount INTEGER NOT NULL,
-    CHECK (sourceAccountId != targetAccountId),
+    CHECK (source_account_id != target_account_id),
     FOREIGN KEY (id) REFERENCES TransactionId(id) ON DELETE RESTRICT,
-    FOREIGN KEY (sourceAccountId) REFERENCES Account(id) ON DELETE CASCADE,
-    FOREIGN KEY (targetAccountId) REFERENCES Account(id) ON DELETE CASCADE,
-    FOREIGN KEY (currencyId) REFERENCES Currency(id) ON DELETE RESTRICT
+    FOREIGN KEY (source_account_id) REFERENCES Account(id) ON DELETE CASCADE,
+    FOREIGN KEY (target_account_id) REFERENCES Account(id) ON DELETE CASCADE,
+    FOREIGN KEY (currency_id) REFERENCES Currency(id) ON DELETE RESTRICT
 );
 
-CREATE INDEX IF NOT EXISTS idx_transfer_source_account ON Transfer(sourceAccountId);
-CREATE INDEX IF NOT EXISTS idx_transfer_target_account ON Transfer(targetAccountId);
-CREATE INDEX IF NOT EXISTS idx_transfer_currency ON Transfer(currencyId);
+CREATE INDEX IF NOT EXISTS idx_transfer_source_account ON Transfer(source_account_id);
+CREATE INDEX IF NOT EXISTS idx_transfer_target_account ON Transfer(target_account_id);
+CREATE INDEX IF NOT EXISTS idx_transfer_currency ON Transfer(currency_id);
 
 -- Materialized table for account balances (manually refreshed)
 CREATE TABLE AccountBalanceMaterializedView (
-    accountId INTEGER NOT NULL,
-    currencyId TEXT NOT NULL,
+    account_id INTEGER NOT NULL,
+    currency_id TEXT NOT NULL,
     balance INTEGER NOT NULL,
-    PRIMARY KEY (accountId, currencyId),
-    FOREIGN KEY (accountId) REFERENCES Account(id) ON DELETE CASCADE,
-    FOREIGN KEY (currencyId) REFERENCES Currency(id) ON DELETE CASCADE
+    PRIMARY KEY (account_id, currency_id),
+    FOREIGN KEY (account_id) REFERENCES Account(id) ON DELETE CASCADE,
+    FOREIGN KEY (currency_id) REFERENCES Currency(id) ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS idx_account_balance_mv_account ON AccountBalanceMaterializedView(accountId);
-CREATE INDEX IF NOT EXISTS idx_account_balance_mv_currency ON AccountBalanceMaterializedView(currencyId);
+CREATE INDEX IF NOT EXISTS idx_account_balance_mv_account ON AccountBalanceMaterializedView(account_id);
+CREATE INDEX IF NOT EXISTS idx_account_balance_mv_currency ON AccountBalanceMaterializedView(currency_id);
 
 -- Materialized table for running balances (manually refreshed)
 CREATE TABLE RunningBalanceMaterializedView (
     id TEXT NOT NULL,
     timestamp INTEGER NOT NULL,
     description TEXT NOT NULL,
-    accountId INTEGER NOT NULL,
-    currencyId TEXT NOT NULL,
-    transactionAmount INTEGER NOT NULL,
-    runningBalance INTEGER NOT NULL,
-    PRIMARY KEY (id, accountId),
-    FOREIGN KEY (accountId) REFERENCES Account(id) ON DELETE CASCADE,
-    FOREIGN KEY (currencyId) REFERENCES Currency(id) ON DELETE CASCADE
+    account_id INTEGER NOT NULL,
+    currency_id TEXT NOT NULL,
+    transaction_amount INTEGER NOT NULL,
+    running_balance INTEGER NOT NULL,
+    PRIMARY KEY (id, account_id),
+    FOREIGN KEY (account_id) REFERENCES Account(id) ON DELETE CASCADE,
+    FOREIGN KEY (currency_id) REFERENCES Currency(id) ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS idx_running_balance_mv_account ON RunningBalanceMaterializedView(accountId);
+CREATE INDEX IF NOT EXISTS idx_running_balance_mv_account ON RunningBalanceMaterializedView(account_id);
 CREATE INDEX IF NOT EXISTS idx_running_balance_mv_timestamp ON RunningBalanceMaterializedView(timestamp DESC);
-CREATE INDEX IF NOT EXISTS idx_running_balance_mv_account_timestamp ON RunningBalanceMaterializedView(accountId, timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_running_balance_mv_account_timestamp ON RunningBalanceMaterializedView(account_id, timestamp DESC);
 
 -- Views for computing balances (used for incremental refresh)
 CREATE VIEW AccountBalanceView AS
 SELECT
-    accountId,
-    currencyId,
+    account_id,
+    currency_id,
     SUM(COALESCE(incoming, 0) - COALESCE(outgoing, 0)) AS balance
 FROM (
     SELECT
-        targetAccountId AS accountId,
-        currencyId,
+        target_account_id AS account_id,
+        currency_id,
         SUM(amount) AS incoming,
         0 AS outgoing
     FROM Transfer
-    GROUP BY targetAccountId, currencyId
+    GROUP BY target_account_id, currency_id
 
     UNION ALL
 
     SELECT
-        sourceAccountId AS accountId,
-        currencyId,
+        source_account_id AS account_id,
+        currency_id,
         0 AS incoming,
         SUM(amount) AS outgoing
     FROM Transfer
-    GROUP BY sourceAccountId, currencyId
+    GROUP BY source_account_id, currency_id
 )
-GROUP BY accountId, currencyId;
+GROUP BY account_id, currency_id;
 
 CREATE VIEW RunningBalanceView AS
 SELECT
     m.id,
     m.timestamp,
     m.description,
-    m.accountId,
-    m.currencyId,
-    m.transactionAmount,
+    m.account_id,
+    m.currency_id,
+    m.transaction_amount,
     (
-        SELECT SUM(m2.transactionAmount)
+        SELECT SUM(m2.transaction_amount)
         FROM (
-            SELECT tr.id, tr.timestamp, tr.targetAccountId AS accountId, tr.currencyId, tr.amount AS transactionAmount
+            SELECT tr.id, tr.timestamp, tr.target_account_id AS account_id, tr.currency_id, tr.amount AS transaction_amount
             FROM Transfer tr
             UNION ALL
-            SELECT tr.id, tr.timestamp, tr.sourceAccountId AS accountId, tr.currencyId, -tr.amount AS transactionAmount
+            SELECT tr.id, tr.timestamp, tr.source_account_id AS account_id, tr.currency_id, -tr.amount AS transaction_amount
             FROM Transfer tr
         ) m2
-        WHERE m2.accountId = m.accountId
-          AND m2.currencyId = m.currencyId
+        WHERE m2.account_id = m.account_id
+          AND m2.currency_id = m.currency_id
           AND (m2.timestamp < m.timestamp OR (m2.timestamp = m.timestamp AND m2.id <= m.id))
-    ) AS runningBalance
+    ) AS running_balance
 FROM (
-    SELECT tr.id, tr.timestamp, tr.description, tr.targetAccountId AS accountId, tr.currencyId, tr.amount AS transactionAmount
+    SELECT tr.id, tr.timestamp, tr.description, tr.target_account_id AS account_id, tr.currency_id, tr.amount AS transaction_amount
     FROM Transfer tr
     UNION ALL
-    SELECT tr.id, tr.timestamp, tr.description, tr.sourceAccountId AS accountId, tr.currencyId, -tr.amount AS transactionAmount
+    SELECT tr.id, tr.timestamp, tr.description, tr.source_account_id AS account_id, tr.currency_id, -tr.amount AS transaction_amount
     FROM Transfer tr
 ) m;
 
 -- Table to track pending changes for incremental refresh
 CREATE TABLE PendingMaterializedViewChanges (
-    accountId INTEGER NOT NULL,
-    currencyId TEXT NOT NULL,
-    minTimestamp INTEGER NOT NULL,
-    PRIMARY KEY (accountId, currencyId),
-    FOREIGN KEY (accountId) REFERENCES Account(id) ON DELETE CASCADE,
-    FOREIGN KEY (currencyId) REFERENCES Currency(id) ON DELETE CASCADE
+    account_id INTEGER NOT NULL,
+    currency_id TEXT NOT NULL,
+    min_timestamp INTEGER NOT NULL,
+    PRIMARY KEY (account_id, currency_id),
+    FOREIGN KEY (account_id) REFERENCES Account(id) ON DELETE CASCADE,
+    FOREIGN KEY (currency_id) REFERENCES Currency(id) ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS idx_pending_changes_account ON PendingMaterializedViewChanges(accountId);
-CREATE INDEX IF NOT EXISTS idx_pending_changes_currency ON PendingMaterializedViewChanges(currencyId);
-CREATE INDEX IF NOT EXISTS idx_pending_changes_timestamp ON PendingMaterializedViewChanges(minTimestamp);
+CREATE INDEX IF NOT EXISTS idx_pending_changes_account ON PendingMaterializedViewChanges(account_id);
+CREATE INDEX IF NOT EXISTS idx_pending_changes_currency ON PendingMaterializedViewChanges(currency_id);
+CREATE INDEX IF NOT EXISTS idx_pending_changes_timestamp ON PendingMaterializedViewChanges(min_timestamp);
 
 -- NOTE: Triggers are created at runtime via DatabaseConfig.createIncrementalRefreshTriggers()
 -- SQLDelight 2.2.1 has limited trigger support, so we create them dynamically
@@ -146,62 +146,62 @@ refreshAccountBalances:
 DELETE FROM AccountBalanceMaterializedView;
 
 populateAccountBalances:
-INSERT INTO AccountBalanceMaterializedView (accountId, currencyId, balance)
+INSERT INTO AccountBalanceMaterializedView (account_id, currency_id, balance)
 SELECT
-    accountId,
-    currencyId,
+    account_id,
+    currency_id,
     SUM(COALESCE(incoming, 0) - COALESCE(outgoing, 0)) AS balance
 FROM (
     SELECT
-        targetAccountId AS accountId,
-        currencyId,
+        target_account_id AS account_id,
+        currency_id,
         SUM(amount) AS incoming,
         0 AS outgoing
     FROM Transfer
-    GROUP BY targetAccountId, currencyId
+    GROUP BY target_account_id, currency_id
 
     UNION ALL
 
     SELECT
-        sourceAccountId AS accountId,
-        currencyId,
+        source_account_id AS account_id,
+        currency_id,
         0 AS incoming,
         SUM(amount) AS outgoing
     FROM Transfer
-    GROUP BY sourceAccountId, currencyId
+    GROUP BY source_account_id, currency_id
 )
-GROUP BY accountId, currencyId;
+GROUP BY account_id, currency_id;
 
 refreshRunningBalances:
 DELETE FROM RunningBalanceMaterializedView;
 
 populateRunningBalances:
-INSERT INTO RunningBalanceMaterializedView (id, timestamp, description, accountId, currencyId, transactionAmount, runningBalance)
+INSERT INTO RunningBalanceMaterializedView (id, timestamp, description, account_id, currency_id, transaction_amount, running_balance)
 SELECT
     m.id,
     m.timestamp,
     m.description,
-    m.accountId,
-    m.currencyId,
-    m.transactionAmount,
+    m.account_id,
+    m.currency_id,
+    m.transaction_amount,
     (
-        SELECT SUM(m2.transactionAmount)
+        SELECT SUM(m2.transaction_amount)
         FROM (
-            SELECT tr.id, tr.timestamp, tr.targetAccountId AS accountId, tr.currencyId, tr.amount AS transactionAmount
+            SELECT tr.id, tr.timestamp, tr.target_account_id AS account_id, tr.currency_id, tr.amount AS transaction_amount
             FROM Transfer tr
             UNION ALL
-            SELECT tr.id, tr.timestamp, tr.sourceAccountId AS accountId, tr.currencyId, -tr.amount AS transactionAmount
+            SELECT tr.id, tr.timestamp, tr.source_account_id AS account_id, tr.currency_id, -tr.amount AS transaction_amount
             FROM Transfer tr
         ) m2
-        WHERE m2.accountId = m.accountId
-          AND m2.currencyId = m.currencyId
+        WHERE m2.account_id = m.account_id
+          AND m2.currency_id = m.currency_id
           AND (m2.timestamp < m.timestamp OR (m2.timestamp = m.timestamp AND m2.id <= m.id))
-    ) AS runningBalance
+    ) AS running_balance
 FROM (
-    SELECT tr.id, tr.timestamp, tr.description, tr.targetAccountId AS accountId, tr.currencyId, tr.amount AS transactionAmount
+    SELECT tr.id, tr.timestamp, tr.description, tr.target_account_id AS account_id, tr.currency_id, tr.amount AS transaction_amount
     FROM Transfer tr
     UNION ALL
-    SELECT tr.id, tr.timestamp, tr.description, tr.sourceAccountId AS accountId, tr.currencyId, -tr.amount AS transactionAmount
+    SELECT tr.id, tr.timestamp, tr.description, tr.source_account_id AS account_id, tr.currency_id, -tr.amount AS transaction_amount
     FROM Transfer tr
 ) m;
 
@@ -209,46 +209,46 @@ FROM (
 
 incrementalRefreshAccountBalances:
 DELETE FROM AccountBalanceMaterializedView
-WHERE (accountId, currencyId) IN (
-    SELECT accountId, currencyId FROM PendingMaterializedViewChanges
+WHERE (account_id, currency_id) IN (
+    SELECT account_id, currency_id FROM PendingMaterializedViewChanges
 );
 
 incrementalPopulateAccountBalances:
-INSERT INTO AccountBalanceMaterializedView (accountId, currencyId, balance)
+INSERT INTO AccountBalanceMaterializedView (account_id, currency_id, balance)
 SELECT
-    v.accountId,
-    v.currencyId,
+    v.account_id,
+    v.currency_id,
     v.balance
 FROM AccountBalanceView v
 INNER JOIN PendingMaterializedViewChanges p
-    ON v.accountId = p.accountId AND v.currencyId = p.currencyId;
+    ON v.account_id = p.account_id AND v.currency_id = p.currency_id;
 
 incrementalRefreshRunningBalances:
 DELETE FROM RunningBalanceMaterializedView
-WHERE (accountId, currencyId) IN (
-    SELECT accountId, currencyId FROM PendingMaterializedViewChanges
+WHERE (account_id, currency_id) IN (
+    SELECT account_id, currency_id FROM PendingMaterializedViewChanges
 )
 AND timestamp >= (
-    SELECT minTimestamp
+    SELECT min_timestamp
     FROM PendingMaterializedViewChanges p
-    WHERE p.accountId = RunningBalanceMaterializedView.accountId
-      AND p.currencyId = RunningBalanceMaterializedView.currencyId
+    WHERE p.account_id = RunningBalanceMaterializedView.account_id
+      AND p.currency_id = RunningBalanceMaterializedView.currency_id
 );
 
 incrementalPopulateRunningBalances:
-INSERT INTO RunningBalanceMaterializedView (id, timestamp, description, accountId, currencyId, transactionAmount, runningBalance)
+INSERT INTO RunningBalanceMaterializedView (id, timestamp, description, account_id, currency_id, transaction_amount, running_balance)
 SELECT
     v.id,
     v.timestamp,
     v.description,
-    v.accountId,
-    v.currencyId,
-    v.transactionAmount,
-    v.runningBalance
+    v.account_id,
+    v.currency_id,
+    v.transaction_amount,
+    v.running_balance
 FROM RunningBalanceView v
 INNER JOIN PendingMaterializedViewChanges p
-    ON v.accountId = p.accountId AND v.currencyId = p.currencyId
-WHERE v.timestamp >= p.minTimestamp;
+    ON v.account_id = p.account_id AND v.currency_id = p.currency_id
+WHERE v.timestamp >= p.min_timestamp;
 
 clearPendingChanges:
 DELETE FROM PendingMaterializedViewChanges;
@@ -256,86 +256,86 @@ DELETE FROM PendingMaterializedViewChanges;
 selectById:
 SELECT
     Transfer.id,
-    Transfer.revisionId,
+    Transfer.revision_id,
     Transfer.timestamp,
     Transfer.description,
-    Transfer.sourceAccountId,
-    Transfer.targetAccountId,
-    Transfer.currencyId,
+    Transfer.source_account_id,
+    Transfer.target_account_id,
+    Transfer.currency_id,
     Transfer.amount,
     Currency.id AS currency_id,
     Currency.code AS currency_code,
     Currency.name AS currency_name,
-    Currency.scaleFactor AS currency_scaleFactor
+    Currency.scale_factor AS currency_scale_factor
 FROM Transfer
-JOIN Currency ON Transfer.currencyId = Currency.id
+JOIN Currency ON Transfer.currency_id = Currency.id
 WHERE Transfer.id = ?;
 
 selectByAccount:
 SELECT
     Transfer.id,
-    Transfer.revisionId,
+    Transfer.revision_id,
     Transfer.timestamp,
     Transfer.description,
-    Transfer.sourceAccountId,
-    Transfer.targetAccountId,
-    Transfer.currencyId,
+    Transfer.source_account_id,
+    Transfer.target_account_id,
+    Transfer.currency_id,
     Transfer.amount,
     Currency.id AS currency_id,
     Currency.code AS currency_code,
     Currency.name AS currency_name,
-    Currency.scaleFactor AS currency_scaleFactor
+    Currency.scale_factor AS currency_scale_factor
 FROM Transfer
-JOIN Currency ON Transfer.currencyId = Currency.id
-WHERE sourceAccountId = ? OR targetAccountId = ?
+JOIN Currency ON Transfer.currency_id = Currency.id
+WHERE source_account_id = ? OR target_account_id = ?
 ORDER BY timestamp DESC;
 
 selectByDateRange:
 SELECT
     Transfer.id,
-    Transfer.revisionId,
+    Transfer.revision_id,
     Transfer.timestamp,
     Transfer.description,
-    Transfer.sourceAccountId,
-    Transfer.targetAccountId,
-    Transfer.currencyId,
+    Transfer.source_account_id,
+    Transfer.target_account_id,
+    Transfer.currency_id,
     Transfer.amount,
     Currency.id AS currency_id,
     Currency.code AS currency_code,
     Currency.name AS currency_name,
-    Currency.scaleFactor AS currency_scaleFactor
+    Currency.scale_factor AS currency_scale_factor
 FROM Transfer
-JOIN Currency ON Transfer.currencyId = Currency.id
+JOIN Currency ON Transfer.currency_id = Currency.id
 WHERE timestamp >= ? AND timestamp <= ?
 ORDER BY timestamp DESC;
 
 selectByAccountAndDateRange:
 SELECT
     Transfer.id,
-    Transfer.revisionId,
+    Transfer.revision_id,
     Transfer.timestamp,
     Transfer.description,
-    Transfer.sourceAccountId,
-    Transfer.targetAccountId,
-    Transfer.currencyId,
+    Transfer.source_account_id,
+    Transfer.target_account_id,
+    Transfer.currency_id,
     Transfer.amount,
     Currency.id AS currency_id,
     Currency.code AS currency_code,
     Currency.name AS currency_name,
-    Currency.scaleFactor AS currency_scaleFactor
+    Currency.scale_factor AS currency_scale_factor
 FROM Transfer
-JOIN Currency ON Transfer.currencyId = Currency.id
-WHERE (sourceAccountId = ? OR targetAccountId = ?)
+JOIN Currency ON Transfer.currency_id = Currency.id
+WHERE (source_account_id = ? OR target_account_id = ?)
 AND timestamp >= ? AND timestamp <= ?
 ORDER BY timestamp DESC;
 
 insert:
-INSERT INTO Transfer(id, revisionId, timestamp, description, sourceAccountId, targetAccountId, currencyId, amount)
+INSERT INTO Transfer(id, revision_id, timestamp, description, source_account_id, target_account_id, currency_id, amount)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?);
 
 update:
 UPDATE Transfer
-SET revisionId = revisionId + 1, timestamp = ?, description = ?, sourceAccountId = ?, targetAccountId = ?, currencyId = ?, amount = ?
+SET revision_id = revision_id + 1, timestamp = ?, description = ?, source_account_id = ?, target_account_id = ?, currency_id = ?, amount = ?
 WHERE id = ?;
 
 delete:
@@ -343,16 +343,16 @@ DELETE FROM Transfer WHERE id = ?;
 
 selectAllBalances:
 SELECT
-    AccountBalanceMaterializedView.accountId,
-    AccountBalanceMaterializedView.currencyId,
+    AccountBalanceMaterializedView.account_id,
+    AccountBalanceMaterializedView.currency_id,
     AccountBalanceMaterializedView.balance,
     Currency.id AS currency_id,
     Currency.code AS currency_code,
     Currency.name AS currency_name,
-    Currency.scaleFactor AS currency_scaleFactor
+    Currency.scale_factor AS currency_scale_factor
 FROM AccountBalanceMaterializedView
-JOIN Account ON AccountBalanceMaterializedView.accountId = Account.id
-JOIN Currency ON AccountBalanceMaterializedView.currencyId = Currency.id
+JOIN Account ON AccountBalanceMaterializedView.account_id = Account.id
+JOIN Currency ON AccountBalanceMaterializedView.currency_id = Currency.id
 ORDER BY Currency.code, Account.name;
 
 selectRunningBalanceByAccountPaginated:
@@ -360,20 +360,20 @@ SELECT
     RunningBalanceMaterializedView.id,
     RunningBalanceMaterializedView.timestamp,
     RunningBalanceMaterializedView.description,
-    RunningBalanceMaterializedView.accountId,
-    RunningBalanceMaterializedView.currencyId,
-    RunningBalanceMaterializedView.transactionAmount,
-    RunningBalanceMaterializedView.runningBalance,
+    RunningBalanceMaterializedView.account_id,
+    RunningBalanceMaterializedView.currency_id,
+    RunningBalanceMaterializedView.transaction_amount,
+    RunningBalanceMaterializedView.running_balance,
     Currency.id AS currency_id,
     Currency.code AS currency_code,
     Currency.name AS currency_name,
-    Currency.scaleFactor AS currency_scaleFactor,
-    Transfer.sourceAccountId,
-    Transfer.targetAccountId
+    Currency.scale_factor AS currency_scale_factor,
+    Transfer.source_account_id,
+    Transfer.target_account_id
 FROM RunningBalanceMaterializedView
-JOIN Currency ON RunningBalanceMaterializedView.currencyId = Currency.id
+JOIN Currency ON RunningBalanceMaterializedView.currency_id = Currency.id
 JOIN Transfer ON RunningBalanceMaterializedView.id = Transfer.id
-WHERE RunningBalanceMaterializedView.accountId = ?
+WHERE RunningBalanceMaterializedView.account_id = ?
   AND ((:lastTimestamp IS NULL AND :lastId IS NULL)
        OR RunningBalanceMaterializedView.timestamp < :lastTimestamp
        OR (RunningBalanceMaterializedView.timestamp = :lastTimestamp
@@ -388,20 +388,20 @@ SELECT
     RunningBalanceMaterializedView.id,
     RunningBalanceMaterializedView.timestamp,
     RunningBalanceMaterializedView.description,
-    RunningBalanceMaterializedView.accountId,
-    RunningBalanceMaterializedView.currencyId,
-    RunningBalanceMaterializedView.transactionAmount,
-    RunningBalanceMaterializedView.runningBalance,
+    RunningBalanceMaterializedView.account_id,
+    RunningBalanceMaterializedView.currency_id,
+    RunningBalanceMaterializedView.transaction_amount,
+    RunningBalanceMaterializedView.running_balance,
     Currency.id AS currency_id,
     Currency.code AS currency_code,
     Currency.name AS currency_name,
-    Currency.scaleFactor AS currency_scaleFactor,
-    Transfer.sourceAccountId,
-    Transfer.targetAccountId
+    Currency.scale_factor AS currency_scale_factor,
+    Transfer.source_account_id,
+    Transfer.target_account_id
 FROM RunningBalanceMaterializedView
-JOIN Currency ON RunningBalanceMaterializedView.currencyId = Currency.id
+JOIN Currency ON RunningBalanceMaterializedView.currency_id = Currency.id
 JOIN Transfer ON RunningBalanceMaterializedView.id = Transfer.id
-WHERE RunningBalanceMaterializedView.accountId = ?
+WHERE RunningBalanceMaterializedView.account_id = ?
   AND (RunningBalanceMaterializedView.timestamp > :firstTimestamp
        OR (RunningBalanceMaterializedView.timestamp = :firstTimestamp
            AND RunningBalanceMaterializedView.id > :firstId))
@@ -411,9 +411,9 @@ LIMIT ?;
 -- Get the row position (0-indexed) of a transaction within an account's transaction list
 -- Returns the count of transactions that come BEFORE this one (i.e., have higher timestamp or same timestamp but higher id)
 getTransactionRowPosition:
-SELECT COUNT(*) AS rowPosition
+SELECT COUNT(*) AS row_position
 FROM RunningBalanceMaterializedView
-WHERE accountId = :accountId
+WHERE account_id = :accountId
   AND (timestamp > :targetTimestamp
        OR (timestamp = :targetTimestamp AND id > :targetId));
 
@@ -423,20 +423,20 @@ SELECT
     RunningBalanceMaterializedView.id,
     RunningBalanceMaterializedView.timestamp,
     RunningBalanceMaterializedView.description,
-    RunningBalanceMaterializedView.accountId,
-    RunningBalanceMaterializedView.currencyId,
-    RunningBalanceMaterializedView.transactionAmount,
-    RunningBalanceMaterializedView.runningBalance,
+    RunningBalanceMaterializedView.account_id,
+    RunningBalanceMaterializedView.currency_id,
+    RunningBalanceMaterializedView.transaction_amount,
+    RunningBalanceMaterializedView.running_balance,
     Currency.id AS currency_id,
     Currency.code AS currency_code,
     Currency.name AS currency_name,
-    Currency.scaleFactor AS currency_scaleFactor,
-    Transfer.sourceAccountId,
-    Transfer.targetAccountId
+    Currency.scale_factor AS currency_scale_factor,
+    Transfer.source_account_id,
+    Transfer.target_account_id
 FROM RunningBalanceMaterializedView
-JOIN Currency ON RunningBalanceMaterializedView.currencyId = Currency.id
+JOIN Currency ON RunningBalanceMaterializedView.currency_id = Currency.id
 JOIN Transfer ON RunningBalanceMaterializedView.id = Transfer.id
-WHERE RunningBalanceMaterializedView.accountId = :accountId
+WHERE RunningBalanceMaterializedView.account_id = :accountId
 ORDER BY RunningBalanceMaterializedView.timestamp DESC, RunningBalanceMaterializedView.id DESC
 LIMIT :limit OFFSET :offset;
 
@@ -444,9 +444,9 @@ LIMIT :limit OFFSET :offset;
 countTransactionsByAccount:
 SELECT COUNT(*) AS count
 FROM RunningBalanceMaterializedView
-WHERE accountId = :accountId;
+WHERE account_id = :accountId;
 
 bumpRevisionOnly:
 UPDATE Transfer
-SET revisionId = revisionId + 1
+SET revision_id = revision_id + 1
 WHERE id = ?;
