@@ -154,9 +154,9 @@ fun CreateAccountDialog(
                                     )
                                 val accountId = accountRepository.createAccount(newAccount)
                                 onAccountCreated(accountId)
-                            } catch (e: Exception) {
-                                logger.error(e) { "Failed to create account: ${e.message}" }
-                                errorMessage = "Failed to create account: ${e.message}"
+                            } catch (expected: Exception) {
+                                logger.error(expected) { "Failed to create account: ${expected.message}" }
+                                errorMessage = "Failed to create account: ${expected.message}"
                                 isSaving = false
                             }
                         }

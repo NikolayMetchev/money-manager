@@ -20,7 +20,8 @@ exceptions:
   SwallowedException:
     active: false
   TooGenericExceptionCaught:
-    active: false
+    active: true
+    allowedExceptionNameRegex: '_|(expected).*'
 
 naming:
   FunctionNaming:

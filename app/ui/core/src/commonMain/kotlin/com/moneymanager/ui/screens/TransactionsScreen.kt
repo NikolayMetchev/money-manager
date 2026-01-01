@@ -354,8 +354,8 @@ fun AccountTransactionsScreen(
             } catch (e: kotlinx.coroutines.CancellationException) {
                 // Cancellation is expected when user navigates away quickly
                 throw e
-            } catch (e: Exception) {
-                logger.error(e) { "Failed to load transactions: ${e.message}" }
+            } catch (expected: Exception) {
+                logger.error(expected) { "Failed to load transactions: ${expected.message}" }
             } finally {
                 isLoadingPage = false
             }
@@ -379,8 +379,8 @@ fun AccountTransactionsScreen(
                 // Cancellation is expected when user navigates away or scrolls fast
                 // Rethrow to let coroutine machinery handle it properly
                 throw e
-            } catch (e: Exception) {
-                logger.error(e) { "Failed to load more transactions: ${e.message}" }
+            } catch (expected: Exception) {
+                logger.error(expected) { "Failed to load more transactions: ${expected.message}" }
             } finally {
                 isLoadingPage = false
             }
@@ -406,8 +406,8 @@ fun AccountTransactionsScreen(
                 hasPreviousPage = result.pagingInfo.hasMore
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
-            } catch (e: Exception) {
-                logger.error(e) { "Failed to load previous transactions: ${e.message}" }
+            } catch (expected: Exception) {
+                logger.error(expected) { "Failed to load previous transactions: ${expected.message}" }
             } finally {
                 isLoadingPreviousPage = false
             }
@@ -1153,17 +1153,14 @@ fun AccountTransactionCard(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-@Suppress("UnusedParameter")
 fun TransactionEntryDialog(
     transactionRepository: TransactionRepository,
-    transferSourceRepository: TransferSourceRepository,
     transferSourceQueries: TransferSourceQueries,
     deviceRepository: DeviceRepository,
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
     attributeTypeRepository: AttributeTypeRepository,
-    transferAttributeRepository: TransferAttributeRepository,
     maintenanceService: DatabaseMaintenanceService,
     preSelectedSourceAccountId: AccountId? = null,
     preSelectedCurrencyId: CurrencyId? = null,
@@ -1480,9 +1477,9 @@ fun TransactionEntryDialog(
 
                                 onTransactionCreated()
                                 onDismiss()
-                            } catch (e: Exception) {
-                                logger.error(e) { "Failed to create transaction: ${e.message}" }
-                                errorMessage = "Failed to create transaction: ${e.message}"
+                            } catch (expected: Exception) {
+                                logger.error(expected) { "Failed to create transaction: ${expected.message}" }
+                                errorMessage = "Failed to create transaction: ${expected.message}"
                                 isSaving = false
                             }
                         }
@@ -2003,9 +2000,9 @@ fun TransactionEditDialog(
 
                                     onSaved()
                                     onDismiss()
-                                } catch (e: Exception) {
-                                    logger.error(e) { "Failed to update transaction: ${e.message}" }
-                                    errorMessage = "Failed to update transaction: ${e.message}"
+                                } catch (expected: Exception) {
+                                    logger.error(expected) { "Failed to update transaction: ${expected.message}" }
+                                    errorMessage = "Failed to update transaction: ${expected.message}"
                                     isSaving = false
                                 }
                             }
@@ -2136,9 +2133,9 @@ fun TransactionAuditScreen(
                         .getByTransaction(transferId)
                         .first()
             }
-        } catch (e: Exception) {
-            logger.error(e) { "Failed to load audit history: ${e.message}" }
-            errorMessage = "Failed to load audit history: ${e.message}"
+        } catch (expected: Exception) {
+            logger.error(expected) { "Failed to load audit history: ${expected.message}" }
+            errorMessage = "Failed to load audit history: ${expected.message}"
         } finally {
             isLoading = false
         }

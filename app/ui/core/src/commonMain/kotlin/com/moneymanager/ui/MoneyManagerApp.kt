@@ -91,11 +91,11 @@ private fun MoneyManagerAppImpl(
                 // which updates GlobalSchemaErrorState - no need for explicit validation queries here
                 databaseState = DatabaseState.DatabaseLoaded(defaultLocation, repositories)
                 onLog("Database opened successfully", null)
-            } catch (e: Exception) {
-                onLog("Failed to open database: ${e.message}", e)
+            } catch (expected: Exception) {
+                onLog("Failed to open database: ${expected.message}", expected)
                 // Store error info to show schema error dialog
-                schemaErrorInfo = defaultLocation to e
-                databaseState = DatabaseState.Error(e)
+                schemaErrorInfo = defaultLocation to expected
+                databaseState = DatabaseState.Error(expected)
             }
         } else {
             onLog("No existing database, creating new one...", null)
@@ -105,10 +105,10 @@ private fun MoneyManagerAppImpl(
                 currentDeviceId = repositories.deviceRepository.getOrCreateDevice(getDeviceInfo())
                 databaseState = DatabaseState.DatabaseLoaded(defaultLocation, repositories)
                 onLog("New database created successfully", null)
-            } catch (e: Exception) {
-                onLog("Failed to create database: ${e.message}", e)
-                schemaErrorInfo = defaultLocation to e
-                databaseState = DatabaseState.Error(e)
+            } catch (expected: Exception) {
+                onLog("Failed to create database: ${expected.message}", expected)
+                schemaErrorInfo = defaultLocation to expected
+                databaseState = DatabaseState.Error(expected)
             }
         }
     }
@@ -160,9 +160,9 @@ private fun MoneyManagerAppImpl(
                         schemaErrorInfo = null
                         GlobalSchemaErrorState.clearError()
                         onLog("New database created successfully", null)
-                    } catch (e: Exception) {
-                        onLog("Failed to backup and create new database: ${e.message}", e)
-                        schemaErrorInfo = location to e
+                    } catch (expected: Exception) {
+                        onLog("Failed to backup and create new database: ${expected.message}", expected)
+                        schemaErrorInfo = location to expected
                     }
                 }
             },
@@ -180,9 +180,9 @@ private fun MoneyManagerAppImpl(
                         schemaErrorInfo = null
                         GlobalSchemaErrorState.clearError()
                         onLog("New database created successfully", null)
-                    } catch (e: Exception) {
-                        onLog("Failed to delete and create new database: ${e.message}", e)
-                        schemaErrorInfo = location to e
+                    } catch (expected: Exception) {
+                        onLog("Failed to delete and create new database: ${expected.message}", expected)
+                        schemaErrorInfo = location to expected
                     }
                 }
             },
@@ -304,7 +304,6 @@ private fun MoneyManagerAppContent(
                             accountRepository = repositorySet.accountRepository,
                             categoryRepository = repositorySet.categoryRepository,
                             transactionRepository = repositorySet.transactionRepository,
-                            currencyRepository = repositorySet.currencyRepository,
                             onAccountClick = { account ->
                                 currentScreen = Screen.AccountTransactions(account.id, account.name)
                             },
@@ -440,14 +439,12 @@ private fun MoneyManagerAppContent(
         if (showTransactionDialog) {
             TransactionEntryDialog(
                 transactionRepository = repositorySet.transactionRepository,
-                transferSourceRepository = repositorySet.transferSourceRepository,
                 transferSourceQueries = repositorySet.transferSourceQueries,
                 deviceRepository = repositorySet.deviceRepository,
                 accountRepository = repositorySet.accountRepository,
                 categoryRepository = repositorySet.categoryRepository,
                 currencyRepository = repositorySet.currencyRepository,
                 attributeTypeRepository = repositorySet.attributeTypeRepository,
-                transferAttributeRepository = repositorySet.transferAttributeRepository,
                 maintenanceService = repositorySet.maintenanceService,
                 preSelectedSourceAccountId = preSelectedAccountId,
                 preSelectedCurrencyId = preSelectedCurrencyId,

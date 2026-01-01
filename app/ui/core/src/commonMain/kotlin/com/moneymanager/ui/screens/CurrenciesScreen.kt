@@ -206,9 +206,9 @@ fun CreateCurrencyDialog(
                                 try {
                                     currencyRepository.upsertCurrencyByCode(code.trim(), name.trim())
                                     onDismiss()
-                                } catch (e: Exception) {
-                                    logger.error(e) { "Failed to create currency: ${e.message}" }
-                                    errorMessage = "Failed to create currency: ${e.message}"
+                                } catch (expected: Exception) {
+                                    logger.error(expected) { "Failed to create currency: ${expected.message}" }
+                                    errorMessage = "Failed to create currency: ${expected.message}"
                                     isSaving = false
                                 }
                             }
@@ -289,9 +289,9 @@ fun DeleteCurrencyDialog(
                         try {
                             currencyRepository.deleteCurrency(currency.id)
                             onDismiss()
-                        } catch (e: Exception) {
-                            logger.error(e) { "Failed to delete currency: ${e.message}" }
-                            errorMessage = "Failed to delete currency: ${e.message}"
+                        } catch (expected: Exception) {
+                            logger.error(expected) { "Failed to delete currency: ${expected.message}" }
+                            errorMessage = "Failed to delete currency: ${expected.message}"
                             isDeleting = false
                         }
                     }

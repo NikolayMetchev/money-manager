@@ -21,7 +21,6 @@ fun initializeVersionReader(context: Context) {
  * Android implementation of version reader.
  * Reads the VERSION file from the assets folder.
  */
-@Suppress("TooGenericExceptionCaught")
 actual fun readAppVersion(): AppVersion {
     return try {
         val versionString =
@@ -29,7 +28,7 @@ actual fun readAppVersion(): AppVersion {
                 .bufferedReader()
                 .use { it.readText().trim() }
         AppVersion(versionString)
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         AppVersion("Unknown")
     }
 }

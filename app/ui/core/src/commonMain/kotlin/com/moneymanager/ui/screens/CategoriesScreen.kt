@@ -306,9 +306,9 @@ fun CategoriesScreen(
                                                     categoryRepository.updateCategory(
                                                         draggedCategory.copy(parentId = newParentId),
                                                     )
-                                                } catch (e: Exception) {
-                                                    logger.error(e) {
-                                                        "Failed to update category hierarchy: ${e.message}"
+                                                } catch (expected: Exception) {
+                                                    logger.error(expected) {
+                                                        "Failed to update category hierarchy: ${expected.message}"
                                                     }
                                                 }
                                             }
@@ -709,9 +709,9 @@ fun CreateCategoryDialogInCategories(
                                     )
                                 categoryRepository.createCategory(newCategory)
                                 onDismiss()
-                            } catch (e: Exception) {
-                                logger.error(e) { "Failed to create category: ${e.message}" }
-                                errorMessage = "Failed to create category: ${e.message}"
+                            } catch (expected: Exception) {
+                                logger.error(expected) { "Failed to create category: ${expected.message}" }
+                                errorMessage = "Failed to create category: ${expected.message}"
                                 isSaving = false
                             }
                         }
@@ -895,9 +895,9 @@ fun EditCategoryDialog(
                                     ),
                                 )
                                 onDismiss()
-                            } catch (e: Exception) {
-                                logger.error(e) { "Failed to update category: ${e.message}" }
-                                errorMessage = "Failed to update category: ${e.message}"
+                            } catch (expected: Exception) {
+                                logger.error(expected) { "Failed to update category: ${expected.message}" }
+                                errorMessage = "Failed to update category: ${expected.message}"
                                 isSaving = false
                             }
                         }
@@ -989,9 +989,9 @@ fun DeleteCategoryDialog(
                         try {
                             categoryRepository.deleteCategory(category.id)
                             onDeleted()
-                        } catch (e: Exception) {
-                            logger.error(e) { "Failed to delete category: ${e.message}" }
-                            errorMessage = "Failed to delete category: ${e.message}"
+                        } catch (expected: Exception) {
+                            logger.error(expected) { "Failed to delete category: ${expected.message}" }
+                            errorMessage = "Failed to delete category: ${expected.message}"
                             isDeleting = false
                         }
                     }

@@ -80,6 +80,6 @@ internal fun readFileAsResult(file: File): FilePickerResult? =
     try {
         val content = file.readText(Charsets.UTF_8)
         FilePickerResult(fileName = file.name, content = content)
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         null
     }

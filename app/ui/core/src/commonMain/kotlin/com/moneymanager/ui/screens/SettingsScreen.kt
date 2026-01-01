@@ -171,11 +171,11 @@ fun SettingsScreen(repositorySet: RepositorySet) {
                                                 runningOperation = null,
                                                 lastResults = maintenanceState.lastResults + (operation to duration),
                                             )
-                                    } catch (e: Exception) {
+                                    } catch (expected: Exception) {
                                         maintenanceState =
                                             maintenanceState.copy(
                                                 runningOperation = null,
-                                                error = "${operation.name} failed: ${e.message}",
+                                                error = "${operation.name} failed: ${expected.message}",
                                             )
                                     }
                                 }
@@ -218,8 +218,8 @@ fun SettingsScreen(repositorySet: RepositorySet) {
                                     scope.launch {
                                         try {
                                             incrementalRefreshDuration = repositorySet.maintenanceService.refreshMaterializedViews()
-                                        } catch (e: Exception) {
-                                            refreshViewsError = "Incremental refresh failed: ${e.message}"
+                                        } catch (expected: Exception) {
+                                            refreshViewsError = "Incremental refresh failed: ${expected.message}"
                                         } finally {
                                             isRefreshingViews = false
                                         }
@@ -255,8 +255,8 @@ fun SettingsScreen(repositorySet: RepositorySet) {
                                     scope.launch {
                                         try {
                                             fullRefreshDuration = repositorySet.maintenanceService.fullRefreshMaterializedViews()
-                                        } catch (e: Exception) {
-                                            refreshViewsError = "Full refresh failed: ${e.message}"
+                                        } catch (expected: Exception) {
+                                            refreshViewsError = "Full refresh failed: ${expected.message}"
                                         } finally {
                                             isFullRefreshingViews = false
                                         }
@@ -384,8 +384,8 @@ fun SettingsScreen(repositorySet: RepositorySet) {
                                     "Created ${generationProgress.accountsCreated} accounts and " +
                                     "${generationProgress.transactionsCreated} transactions."
                                 showProgressDialog = false
-                            } catch (e: Exception) {
-                                errorMessage = "Failed to generate sample data: ${e.message}"
+                            } catch (expected: Exception) {
+                                errorMessage = "Failed to generate sample data: ${expected.message}"
                                 showProgressDialog = false
                             } finally {
                                 isGenerating = false

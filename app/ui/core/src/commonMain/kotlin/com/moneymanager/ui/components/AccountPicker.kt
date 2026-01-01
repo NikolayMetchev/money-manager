@@ -35,24 +35,19 @@ import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
  * @param label The label text displayed on the dropdown
  * @param accountRepository Repository to fetch accounts and create new ones
  * @param categoryRepository Repository needed for account creation (accounts have categories)
- * @param modifier Optional modifier for the component
  * @param enabled Whether the picker is enabled
  * @param excludeAccountId Optional account ID to exclude from the list (e.g., the other account in a transfer)
- * @param placeholder Placeholder text shown when dropdown is expanded
  * @param isError Whether to show error state (red outline)
  */
 @Composable
-@Suppress("UnusedParameter")
 fun AccountPicker(
     selectedAccountId: AccountId?,
     onAccountSelected: (AccountId) -> Unit,
     label: String,
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
-    modifier: Modifier = Modifier,
     enabled: Boolean = true,
     excludeAccountId: AccountId? = null,
-    placeholder: String = "Type to search...",
     isError: Boolean = false,
 ) {
     val accounts by accountRepository.getAllAccounts()

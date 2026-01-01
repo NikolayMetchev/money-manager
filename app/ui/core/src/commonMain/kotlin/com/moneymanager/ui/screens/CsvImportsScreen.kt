@@ -75,8 +75,8 @@ fun CsvImportsScreen(
                             rows = parseResult.rows,
                             deviceInfo = getDeviceInfo(),
                         )
-                    } catch (e: Exception) {
-                        importError = "Failed to import CSV: ${e.message}"
+                    } catch (expected: Exception) {
+                        importError = "Failed to import CSV: ${expected.message}"
                     } finally {
                         isImporting = false
                     }

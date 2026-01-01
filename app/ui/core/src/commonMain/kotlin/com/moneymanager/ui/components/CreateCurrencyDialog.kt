@@ -100,9 +100,9 @@ fun CreateCurrencyDialog(
                                 try {
                                     val currencyId = currencyRepository.upsertCurrencyByCode(code.trim(), name.trim())
                                     onCurrencyCreated(currencyId)
-                                } catch (e: Exception) {
-                                    logger.error(e) { "Failed to create currency: ${e.message}" }
-                                    errorMessage = "Failed to create currency: ${e.message}"
+                                } catch (expected: Exception) {
+                                    logger.error(expected) { "Failed to create currency: ${expected.message}" }
+                                    errorMessage = "Failed to create currency: ${expected.message}"
                                     isSaving = false
                                 }
                             }

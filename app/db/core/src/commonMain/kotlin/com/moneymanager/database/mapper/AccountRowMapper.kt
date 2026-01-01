@@ -17,10 +17,9 @@ object AccountRowMapper {
         timestamp: Long,
         description: String,
         account_id: Long,
-        @Suppress("UnusedParameter") currency_id: String,
         transaction_amount: Long,
         running_balance: Long,
-        currency_id_: String,
+        currency_id: String,
         currency_code: String,
         currency_name: String,
         currency_scale_factor: Long,
@@ -36,7 +35,7 @@ object AccountRowMapper {
                 Money(
                     transaction_amount,
                     Currency(
-                        id = CurrencyId(Uuid.parse(currency_id_)),
+                        id = CurrencyId(Uuid.parse(currency_id)),
                         code = currency_code,
                         name = currency_name,
                         scaleFactor = currency_scale_factor,
@@ -46,7 +45,7 @@ object AccountRowMapper {
                 Money(
                     running_balance,
                     Currency(
-                        id = CurrencyId(Uuid.parse(currency_id_)),
+                        id = CurrencyId(Uuid.parse(currency_id)),
                         code = currency_code,
                         name = currency_name,
                         scaleFactor = currency_scale_factor,
