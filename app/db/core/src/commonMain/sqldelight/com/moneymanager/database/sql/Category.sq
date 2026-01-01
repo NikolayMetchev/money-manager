@@ -75,7 +75,3 @@ FROM CategoryBalanceView
 JOIN Currency ON CategoryBalanceView.currencyId = Currency.id
 ORDER BY categoryId, currencyId;
 
-selectCategoryBalanceById:
-SELECT categoryId, currencyId, balance
-FROM CategoryBalanceView
-WHERE categoryId = ?;

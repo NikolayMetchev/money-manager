@@ -14,6 +14,3 @@ SELECT * FROM AttributeType WHERE name = ?;
 
 insert:
 INSERT INTO AttributeType (name) VALUES (?);
-
-insertOrIgnore:
-INSERT OR IGNORE INTO AttributeType (name) VALUES (?);

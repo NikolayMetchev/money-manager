@@ -17,11 +17,3 @@ CREATE TABLE TransactionId (
 -- Insert a new transaction ID
 insert:
 INSERT INTO TransactionId (id) VALUES (?);
-
--- Check if a transaction ID exists
-selectById:
-SELECT * FROM TransactionId WHERE id = ?;
-
--- Check existence (returns 1 if exists, 0 if not)
-exists:
-SELECT COUNT(*) AS count FROM TransactionId WHERE id = ?;

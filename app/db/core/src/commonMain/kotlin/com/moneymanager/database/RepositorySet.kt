@@ -8,9 +8,7 @@ import com.moneymanager.database.repository.CsvImportRepositoryImpl
 import com.moneymanager.database.repository.CsvImportStrategyRepositoryImpl
 import com.moneymanager.database.repository.CurrencyRepositoryImpl
 import com.moneymanager.database.repository.DeviceRepositoryImpl
-import com.moneymanager.database.repository.TransactionIdRepositoryImpl
 import com.moneymanager.database.repository.TransactionRepositoryImpl
-import com.moneymanager.database.repository.TransferAttributeAuditRepositoryImpl
 import com.moneymanager.database.repository.TransferAttributeRepositoryImpl
 import com.moneymanager.database.repository.TransferSourceRepositoryImpl
 import com.moneymanager.database.sql.TransferSourceQueries
@@ -22,9 +20,7 @@ import com.moneymanager.domain.repository.CsvImportRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.DeviceRepository
-import com.moneymanager.domain.repository.TransactionIdRepository
 import com.moneymanager.domain.repository.TransactionRepository
-import com.moneymanager.domain.repository.TransferAttributeAuditRepository
 import com.moneymanager.domain.repository.TransferAttributeRepository
 import com.moneymanager.domain.repository.TransferSourceRepository
 
@@ -47,10 +43,7 @@ class RepositorySet(
     val csvImportStrategyRepository: CsvImportStrategyRepository = CsvImportStrategyRepositoryImpl(database)
     val currencyRepository: CurrencyRepository = CurrencyRepositoryImpl(database)
     val maintenanceService: DatabaseMaintenanceService = DatabaseMaintenanceServiceImpl(database)
-    val transactionIdRepository: TransactionIdRepository = TransactionIdRepositoryImpl(database)
     val transactionRepository: TransactionRepository = TransactionRepositoryImpl(database)
     val transferAttributeRepository: TransferAttributeRepository = TransferAttributeRepositoryImpl(database)
-    val transferAttributeAuditRepository: TransferAttributeAuditRepository =
-        TransferAttributeAuditRepositoryImpl(database)
     val transferSourceRepository: TransferSourceRepository = TransferSourceRepositoryImpl(database, deviceRepository)
 }

@@ -4,17 +4,8 @@ CREATE TABLE MachineName (
     name TEXT NOT NULL UNIQUE
 );
 
-selectAll:
-SELECT * FROM MachineName ORDER BY name;
-
-selectById:
-SELECT * FROM MachineName WHERE id = ?;
-
 selectByName:
 SELECT id FROM MachineName WHERE name = ?;
 
 insertOrIgnore:
 INSERT OR IGNORE INTO MachineName (name) VALUES (?);
-
-lastInsertRowId:
-SELECT last_insert_rowid();

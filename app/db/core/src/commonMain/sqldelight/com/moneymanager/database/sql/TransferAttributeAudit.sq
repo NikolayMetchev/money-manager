@@ -13,24 +13,6 @@ CREATE TABLE TransferAttributeAudit (
 CREATE INDEX idx_transfer_attribute_audit_transaction ON TransferAttributeAudit(transactionId);
 CREATE INDEX idx_transfer_attribute_audit_revision ON TransferAttributeAudit(transactionId, revisionId);
 
-selectByTransactionAndRevision:
-SELECT
-    TransferAttributeAudit.id,
-    TransferAttributeAudit.transactionId,
-    TransferAttributeAudit.revisionId,
-    TransferAttributeAudit.attributeTypeId,
-    TransferAttributeAudit.auditTypeId,
-    TransferAttributeAudit.attributeValue,
-    AttributeType.id AS attributeType_id,
-    AttributeType.name AS attributeType_name,
-    AuditType.id AS auditType_id,
-    AuditType.name AS auditType_name
-FROM TransferAttributeAudit
-JOIN AttributeType ON TransferAttributeAudit.attributeTypeId = AttributeType.id
-JOIN AuditType ON TransferAttributeAudit.auditTypeId = AuditType.id
-WHERE TransferAttributeAudit.transactionId = ? AND TransferAttributeAudit.revisionId = ?
-ORDER BY AttributeType.name;
-
 selectAllByTransaction:
 SELECT
     TransferAttributeAudit.id,
@@ -48,7 +30,3 @@ JOIN AttributeType ON TransferAttributeAudit.attributeTypeId = AttributeType.id
 JOIN AuditType ON TransferAttributeAudit.auditTypeId = AuditType.id
 WHERE TransferAttributeAudit.transactionId = ?
 ORDER BY TransferAttributeAudit.revisionId DESC, AttributeType.name;
-
-insert:
-INSERT INTO TransferAttributeAudit (transactionId, revisionId, attributeTypeId, auditTypeId, attributeValue)
-VALUES (?, ?, ?, ?, ?);

@@ -4,17 +4,8 @@ CREATE TABLE OsName (
     name TEXT NOT NULL UNIQUE
 );
 
-selectAll:
-SELECT * FROM OsName ORDER BY name;
-
-selectById:
-SELECT * FROM OsName WHERE id = ?;
-
 selectByName:
 SELECT id FROM OsName WHERE name = ?;
 
 insertOrIgnore:
 INSERT OR IGNORE INTO OsName (name) VALUES (?);
-
-lastInsertRowId:
-SELECT last_insert_rowid();

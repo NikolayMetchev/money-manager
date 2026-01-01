@@ -4,17 +4,8 @@ CREATE TABLE DeviceMake (
     name TEXT NOT NULL UNIQUE
 );
 
-selectAll:
-SELECT * FROM DeviceMake ORDER BY name;
-
-selectById:
-SELECT * FROM DeviceMake WHERE id = ?;
-
 selectByName:
 SELECT id FROM DeviceMake WHERE name = ?;
 
 insertOrIgnore:
 INSERT OR IGNORE INTO DeviceMake (name) VALUES (?);
-
-lastInsertRowId:
-SELECT last_insert_rowid();
