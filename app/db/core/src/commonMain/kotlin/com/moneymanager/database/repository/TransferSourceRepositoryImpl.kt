@@ -60,13 +60,20 @@ class TransferSourceRepositoryImpl(
                         .executeAsOne().tableName,
                 ).executeAsOne()
 
-            queries.insertCsvImport(
+            // Insert base TransferSource record
+            queries.insertCsvImportBase(
                 transactionId = transactionId.toString(),
                 revisionId = revisionId,
                 deviceId = csvImport.device_id,
+            )
+            // Get the auto-generated ID and insert CSV-specific details
+            val transferSourceId = queries.lastInsertedId().executeAsOne()
+            queries.insertCsvImportDetails(
+                id = transferSourceId,
                 csvImportId = csvImportId.toString(),
                 csvRowIndex = rowIndex,
             )
+
             queries.selectByTransactionIdAndRevision(transactionId.toString(), revisionId)
                 .executeAsOne()
                 .let(TransferSourceFromRevisionMapper::map)
@@ -83,10 +90,16 @@ class TransferSourceRepositoryImpl(
 
             queries.transaction {
                 sources.forEach { source ->
-                    queries.insertCsvImport(
+                    // Insert base TransferSource record
+                    queries.insertCsvImportBase(
                         transactionId = source.transactionId.toString(),
                         revisionId = source.revisionId,
                         deviceId = deviceId,
+                    )
+                    // Get the auto-generated ID and insert CSV-specific details
+                    val transferSourceId = queries.lastInsertedId().executeAsOne()
+                    queries.insertCsvImportDetails(
+                        id = transferSourceId,
                         csvImportId = csvImportId.toString(),
                         csvRowIndex = source.rowIndex,
                     )

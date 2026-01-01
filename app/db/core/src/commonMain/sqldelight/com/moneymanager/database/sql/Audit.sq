@@ -120,8 +120,8 @@ SELECT
     TransferSource.deviceId,
     SourceType.id AS sourceTypeId,
     SourceType.name AS sourceType,
-    TransferSource.csvImportId AS source_csv_import_id,
-    TransferSource.csvRowIndex AS source_csv_row_index,
+    CsvTransferSource.csvImportId AS source_csv_import_id,
+    CsvTransferSource.csvRowIndex AS source_csv_row_index,
     CsvImportMetadata.originalFileName AS source_csv_file_name,
     Platform.name AS sourcePlatformName,
     OsName.name AS source_os_name,
@@ -135,7 +135,8 @@ JOIN Currency ON Transfer_Audit.currencyId = Currency.id
 LEFT JOIN TransferSource ON Transfer_Audit.id = TransferSource.transactionId
     AND Transfer_Audit.revisionId = TransferSource.revisionId
 LEFT JOIN SourceType ON TransferSource.sourceTypeId = SourceType.id
-LEFT JOIN CsvImportMetadata ON TransferSource.csvImportId = CsvImportMetadata.id
+LEFT JOIN CsvTransferSource ON TransferSource.id = CsvTransferSource.id
+LEFT JOIN CsvImportMetadata ON CsvTransferSource.csvImportId = CsvImportMetadata.id
 LEFT JOIN Device ON TransferSource.deviceId = Device.id
 LEFT JOIN Platform ON Device.platform_id = Platform.id
 LEFT JOIN OsName ON Device.os_id = OsName.id
