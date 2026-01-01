@@ -111,36 +111,3 @@ INSERT INTO TransferSource (
 )
 VALUES (?, ?, 3, ?);
 
--- Select sources by CSV import ID
-selectByCsvImportId:
-SELECT
-    TransferSource.id,
-    TransferSource.transactionId,
-    TransferSource.revisionId,
-    TransferSource.sourceTypeId,
-    TransferSource.deviceId,
-    TransferSource.csvImportId,
-    TransferSource.csvRowIndex,
-    TransferSource.createdAt,
-    SourceType.name AS sourceType,
-    CsvImportMetadata.originalFileName AS csvFileName,
-    Platform.name AS platformName,
-    OsName.name AS osName,
-    MachineName.name AS machineName,
-    DeviceMake.name AS deviceMake,
-    DeviceModel.name AS deviceModel
-FROM TransferSource
-JOIN SourceType ON TransferSource.sourceTypeId = SourceType.id
-JOIN Device ON TransferSource.deviceId = Device.id
-JOIN Platform ON Device.platform_id = Platform.id
-LEFT JOIN OsName ON Device.os_id = OsName.id
-LEFT JOIN MachineName ON Device.machine_id = MachineName.id
-LEFT JOIN DeviceMake ON Device.device_make_id = DeviceMake.id
-LEFT JOIN DeviceModel ON Device.device_model_id = DeviceModel.id
-LEFT JOIN CsvImportMetadata ON TransferSource.csvImportId = CsvImportMetadata.id
-WHERE TransferSource.csvImportId = ?
-ORDER BY TransferSource.csvRowIndex;
-
--- Count sources by CSV import ID
-countByCsvImportId:
-SELECT COUNT(*) AS count FROM TransferSource WHERE csvImportId = ?;

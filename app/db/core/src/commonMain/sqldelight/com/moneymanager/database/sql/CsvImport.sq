@@ -77,9 +77,6 @@ insertImport:
 INSERT INTO CsvImportMetadata (id, tableName, originalFileName, importTimestamp, rowCount, columnCount, device_id)
 VALUES (?, ?, ?, ?, ?, ?, ?);
 
-updateImportRowCount:
-UPDATE CsvImportMetadata SET rowCount = ? WHERE id = ?;
-
 deleteImport:
 DELETE FROM CsvImportMetadata WHERE id = ?;
 

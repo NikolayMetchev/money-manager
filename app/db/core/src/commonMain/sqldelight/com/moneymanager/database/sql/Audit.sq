@@ -74,47 +74,6 @@ CREATE INDEX IF NOT EXISTS idx_transfer_audit_id_timestamp ON Transfer_Audit(id,
 
 -- Queries to retrieve audit history for each table
 
-selectAuditHistoryForAccount:
-SELECT
-    Account_Audit.auditId,
-    Account_Audit.auditTimestamp,
-    AuditType.name AS auditType,
-    Account_Audit.id,
-    Account_Audit.name,
-    Account_Audit.openingDate,
-    Account_Audit.categoryId
-FROM Account_Audit
-JOIN AuditType ON Account_Audit.auditTypeId = AuditType.id
-WHERE Account_Audit.id = ?
-ORDER BY Account_Audit.auditTimestamp DESC, Account_Audit.auditId DESC;
-
-selectAuditHistoryForCurrency:
-SELECT
-    Currency_Audit.auditId,
-    Currency_Audit.auditTimestamp,
-    AuditType.name AS auditType,
-    Currency_Audit.id,
-    Currency_Audit.code,
-    Currency_Audit.name,
-    Currency_Audit.scaleFactor
-FROM Currency_Audit
-JOIN AuditType ON Currency_Audit.auditTypeId = AuditType.id
-WHERE Currency_Audit.id = ?
-ORDER BY Currency_Audit.auditTimestamp DESC, Currency_Audit.auditId DESC;
-
-selectAuditHistoryForCategory:
-SELECT
-    Category_Audit.auditId,
-    Category_Audit.auditTimestamp,
-    AuditType.name AS auditType,
-    Category_Audit.id,
-    Category_Audit.name,
-    Category_Audit.parentId
-FROM Category_Audit
-JOIN AuditType ON Category_Audit.auditTypeId = AuditType.id
-WHERE Category_Audit.id = ?
-ORDER BY Category_Audit.auditTimestamp DESC, Category_Audit.auditId DESC;
-
 selectAuditHistoryForTransfer:
 SELECT
     Transfer_Audit.auditId,

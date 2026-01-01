@@ -4,17 +4,8 @@ CREATE TABLE DeviceModel (
     name TEXT NOT NULL UNIQUE
 );
 
-selectAll:
-SELECT * FROM DeviceModel ORDER BY name;
-
-selectById:
-SELECT * FROM DeviceModel WHERE id = ?;
-
 selectByName:
 SELECT id FROM DeviceModel WHERE name = ?;
 
 insertOrIgnore:
 INSERT OR IGNORE INTO DeviceModel (name) VALUES (?);
-
-lastInsertRowId:
-SELECT last_insert_rowid();

@@ -51,9 +51,6 @@ WHERE id = ?;
 deleteById:
 DELETE FROM TransferAttribute WHERE id = ?;
 
-deleteAllByTransaction:
-DELETE FROM TransferAttribute WHERE transactionId = ?;
-
 selectByTransactionIds:
 SELECT
     TransferAttribute.id,

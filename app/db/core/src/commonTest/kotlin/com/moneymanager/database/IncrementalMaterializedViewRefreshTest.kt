@@ -2,6 +2,7 @@
 
 package com.moneymanager.database
 
+import app.cash.sqldelight.db.QueryResult
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Money
@@ -17,6 +18,15 @@ import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 /**
+ * Data class for balance view records (test-only).
+ */
+private data class BalanceViewRecord(
+    val accountId: Long,
+    val currencyId: String,
+    val balance: Long?,
+)
+
+/**
  * Comprehensive tests for incremental materialized view refresh.
  *
  * Tests verify that:
@@ -27,6 +37,49 @@ import kotlin.uuid.Uuid
  * 5. Multiple changes are batched correctly
  */
 class IncrementalMaterializedViewRefreshTest : DbTest() {
+    /**
+     * Test-only query: countPendingChanges
+     * Counts pending changes using raw SQL.
+     */
+    private fun countPendingChanges(): Long {
+        val sql = "SELECT COUNT(*) FROM PendingMaterializedViewChanges"
+        return database.executeQuery(
+            identifier = null,
+            sql = sql,
+            mapper = { cursor ->
+                cursor.next()
+                QueryResult.Value(cursor.getLong(0)!!)
+            },
+            parameters = 0,
+        ).value
+    }
+
+    /**
+     * Test-only query: selectBalancesFromView
+     * Retrieves balances from AccountBalanceView using raw SQL.
+     */
+    private fun selectBalancesFromView(): List<BalanceViewRecord> {
+        val sql = "SELECT accountId, currencyId, balance FROM AccountBalanceView ORDER BY accountId, currencyId"
+        return database.executeQuery(
+            identifier = null,
+            sql = sql,
+            mapper = { cursor ->
+                val results = mutableListOf<BalanceViewRecord>()
+                while (cursor.next().value) {
+                    results.add(
+                        BalanceViewRecord(
+                            accountId = cursor.getLong(0)!!,
+                            currencyId = cursor.getString(1)!!,
+                            balance = cursor.getLong(2),
+                        ),
+                    )
+                }
+                QueryResult.Value(results)
+            },
+            parameters = 0,
+        ).value
+    }
+
     // Helper to verify materialized views match the source views
     private suspend fun verifyMaterializedViewsMatchViews() {
         // Refresh incrementally
@@ -38,9 +91,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
                 .executeAsList()
                 .sortedBy { "${it.accountId}-${it.currencyId}" }
 
-        val viewBalances =
-            database.transferQueries.selectBalancesFromView()
-                .executeAsList()
+        val viewBalances = selectBalancesFromView()
 
         // Verify same number of rows
         assertEquals(
@@ -70,7 +121,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
     }
 
     // Helper to get count of pending changes
-    private fun getPendingChangesCount(): Long = database.transferQueries.countPendingChanges().executeAsOne()
+    private fun getPendingChangesCount(): Long = countPendingChanges()
 
     // Helper to create test data
     private suspend fun createTestAccounts(): Pair<AccountId, AccountId> {

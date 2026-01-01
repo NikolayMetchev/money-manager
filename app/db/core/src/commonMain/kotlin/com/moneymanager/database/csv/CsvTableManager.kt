@@ -107,28 +107,6 @@ class CsvTableManager(private val database: MoneyManagerDatabaseWrapper) {
     }
 
     /**
-     * Gets the total row count of a CSV table.
-     *
-     * @param tableName The name of the table
-     * @return The number of rows
-     */
-    fun getRowCount(tableName: String): Long {
-        var count = 0L
-        database.executeQuery(
-            null,
-            "SELECT COUNT(*) FROM $tableName",
-            { cursor ->
-                if (cursor.next().value) {
-                    count = cursor.getLong(0) ?: 0L
-                }
-                QueryResult.Unit
-            },
-            0,
-        )
-        return count
-    }
-
-    /**
      * Drops a CSV table.
      *
      * @param tableName The name of the table to drop
@@ -173,22 +151,5 @@ class CsvTableManager(private val database: MoneyManagerDatabaseWrapper) {
         rowTransferMap.forEach { (rowIndex, transferId) ->
             updateTransferId(tableName, rowIndex, transferId)
         }
-    }
-
-    /**
-     * Clears the transfer ID for a specific row.
-     *
-     * @param tableName The name of the table
-     * @param rowIndex The row index to clear
-     */
-    fun clearTransferId(
-        tableName: String,
-        rowIndex: Long,
-    ) {
-        database.execute(
-            null,
-            "UPDATE $tableName SET transaction_id = NULL WHERE row_index = $rowIndex",
-            0,
-        )
     }
 }

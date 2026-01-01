@@ -1,5 +1,6 @@
 package com.moneymanager.database.repository
 
+import app.cash.sqldelight.db.QueryResult
 import com.moneymanager.domain.getDeviceInfo
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.test.database.DbTest
@@ -9,12 +10,45 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
+/**
+ * Data class for platform records (test-only).
+ */
+private data class PlatformRecord(
+    val id: Long,
+    val name: String,
+)
+
 class DeviceRepositoryImplTest : DbTest() {
+    /**
+     * Test-only query: selectAllPlatforms
+     * Retrieves all platforms using raw SQL.
+     */
+    private fun selectAllPlatforms(): List<PlatformRecord> {
+        val sql = "SELECT id, name FROM Platform"
+        return database.executeQuery(
+            identifier = null,
+            sql = sql,
+            mapper = { cursor ->
+                val results = mutableListOf<PlatformRecord>()
+                while (cursor.next().value) {
+                    results.add(
+                        PlatformRecord(
+                            id = cursor.getLong(0)!!,
+                            name = cursor.getString(1)!!,
+                        ),
+                    )
+                }
+                QueryResult.Value(results)
+            },
+            parameters = 0,
+        ).value
+    }
+
     @Test
     fun `getOrCreateDevice should create device and return valid id`() =
         runTest {
             // First check if Platform table is seeded
-            val platforms = database.platformQueries.selectAll().executeAsList()
+            val platforms = selectAllPlatforms()
             assertTrue(platforms.isNotEmpty(), "Platform table should be seeded. Found: ${platforms.size} entries")
             assertTrue(platforms.any { it.id == 1L }, "Platform(id=1) should exist. Found: ${platforms.map { "${it.id}:${it.name}" }}")
             assertTrue(platforms.any { it.id == 2L }, "Platform(id=2) should exist. Found: ${platforms.map { "${it.id}:${it.name}" }}")
@@ -54,7 +88,7 @@ class DeviceRepositoryImplTest : DbTest() {
     fun `Platform table should be seeded with JVM entry`() =
         runTest {
             // Check that Platform(id=1) exists
-            val platforms = database.platformQueries.selectAll().executeAsList()
+            val platforms = selectAllPlatforms()
             assertTrue(platforms.isNotEmpty(), "Platform table should be seeded")
 
             val jvmPlatform = platforms.find { it.id == 1L }

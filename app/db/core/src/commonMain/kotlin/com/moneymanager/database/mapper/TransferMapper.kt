@@ -2,23 +2,16 @@
 
 package com.moneymanager.database.mapper
 
-import com.moneymanager.database.sql.SelectAll
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Transfer
-import tech.mappie.api.ObjectMappie
+import com.moneymanager.domain.model.TransferId
+import kotlin.time.Instant.Companion.fromEpochMilliseconds
 import kotlin.uuid.Uuid
 
-object TransferMapper :
-    ObjectMappie<SelectAll, Transfer>(),
-    IdConversions,
-    InstantConversions {
-    override fun map(from: SelectAll): Transfer =
-        mapping {
-            Transfer::amount fromValue Money(from.amount, from.toCurrency())
-        }
-
+object TransferMapper {
     @Suppress("LongParameterList")
     fun mapRaw(
         id: String,
@@ -33,29 +26,23 @@ object TransferMapper :
         currency_code: String,
         currency_name: String,
         currency_scaleFactor: Long,
-    ): Transfer =
-        map(
-            SelectAll(
-                id = id,
-                revisionId = revisionId,
-                timestamp = timestamp,
-                description = description,
-                sourceAccountId = sourceAccountId,
-                targetAccountId = targetAccountId,
-                currencyId = currencyId,
-                amount = amount,
-                currency_id = currency_id,
-                currency_code = currency_code,
-                currency_name = currency_name,
-                currency_scaleFactor = currency_scaleFactor,
-            ),
+    ): Transfer {
+        val currency =
+            Currency(
+                id = CurrencyId(Uuid.parse(currency_id)),
+                code = currency_code,
+                name = currency_name,
+                scaleFactor = currency_scaleFactor,
+            )
+        return Transfer(
+            id = TransferId(Uuid.parse(id)),
+            revisionId = revisionId,
+            timestamp = fromEpochMilliseconds(timestamp),
+            description = description,
+            sourceAccountId = AccountId(sourceAccountId),
+            targetAccountId = AccountId(targetAccountId),
+            amount = Money(amount, currency),
+            attributes = emptyList(),
         )
+    }
 }
-
-private fun SelectAll.toCurrency(): Currency =
-    Currency(
-        id = CurrencyId(Uuid.parse(currency_id)),
-        code = currency_code,
-        name = currency_name,
-        scaleFactor = currency_scaleFactor,
-    )

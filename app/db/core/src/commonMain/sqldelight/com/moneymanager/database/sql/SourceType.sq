@@ -5,18 +5,6 @@ CREATE TABLE SourceType (
     name TEXT NOT NULL UNIQUE
 );
 
--- Query all source types
-selectAll:
-SELECT * FROM SourceType ORDER BY id;
-
--- Select by ID
-selectById:
-SELECT * FROM SourceType WHERE id = ?;
-
--- Select by name
-selectByName:
-SELECT * FROM SourceType WHERE name = ?;
-
 -- Insert source type (used during seeding)
 insert:
 INSERT INTO SourceType (id, name) VALUES (?, ?);

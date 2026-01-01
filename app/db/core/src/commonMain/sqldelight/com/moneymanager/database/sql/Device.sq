@@ -48,15 +48,6 @@ WHERE platform_id = ?
   AND (device_make_id IS ? OR (device_make_id IS NOT NULL AND device_make_id = ?))
   AND (device_model_id IS ? OR (device_model_id IS NOT NULL AND device_model_id = ?));
 
--- Insert a new device
-insert:
-INSERT INTO Device (platform_id, os_id, machine_id, device_make_id, device_model_id)
-VALUES (?, ?, ?, ?, ?);
-
--- Get last inserted ID
-lastInsertRowId:
-SELECT last_insert_rowid();
-
 -- Insert JVM device
 insertJvm:
 INSERT INTO Device (platform_id, os_id, machine_id, device_make_id, device_model_id)
