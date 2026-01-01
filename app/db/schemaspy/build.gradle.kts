@@ -5,6 +5,7 @@ plugins {
 
 dependencies {
     implementation(projects.app.db.core)
+    implementation(projects.app.model.core)
 }
 
 // SchemaSpy configuration for database documentation

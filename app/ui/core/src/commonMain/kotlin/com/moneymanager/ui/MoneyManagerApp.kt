@@ -22,14 +22,26 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.database.DatabaseManager
-import com.moneymanager.database.DatabaseState
-import com.moneymanager.database.DbLocation
-import com.moneymanager.database.RepositorySet
-import com.moneymanager.domain.getDeviceInfo
+import com.moneymanager.database.MoneyManagerDatabaseWrapper
+import com.moneymanager.database.sql.TransferSourceQueries
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.DbLocation
+import com.moneymanager.domain.model.DeviceId
+import com.moneymanager.domain.repository.AccountRepository
+import com.moneymanager.domain.repository.AttributeTypeRepository
+import com.moneymanager.domain.repository.AuditRepository
+import com.moneymanager.domain.repository.CategoryRepository
+import com.moneymanager.domain.repository.CsvImportRepository
+import com.moneymanager.domain.repository.CsvImportStrategyRepository
+import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.domain.repository.DeviceRepository
+import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.domain.repository.TransferAttributeRepository
+import com.moneymanager.domain.repository.TransferSourceRepository
 import com.moneymanager.ui.components.DatabaseSchemaErrorDialog
 import com.moneymanager.ui.error.GlobalSchemaErrorState
 import com.moneymanager.ui.error.ProvideSchemaAwareScope
@@ -47,16 +59,46 @@ import com.moneymanager.ui.screens.TransactionEntryDialog
 import com.moneymanager.ui.screens.csvstrategy.CsvStrategiesScreen
 import kotlinx.coroutines.launch
 
+private data class LoadedRepositories(
+    val accountRepository: AccountRepository,
+    val attributeTypeRepository: AttributeTypeRepository,
+    val auditRepository: AuditRepository,
+    val categoryRepository: CategoryRepository,
+    val csvImportRepository: CsvImportRepository,
+    val csvImportStrategyRepository: CsvImportStrategyRepository,
+    val currencyRepository: CurrencyRepository,
+    val deviceRepository: DeviceRepository,
+    val maintenanceService: DatabaseMaintenanceService,
+    val transactionRepository: TransactionRepository,
+    val transferAttributeRepository: TransferAttributeRepository,
+    val transferSourceRepository: TransferSourceRepository,
+    val transferSourceQueries: TransferSourceQueries,
+    val deviceId: DeviceId,
+)
+
+private sealed class AppDatabaseState {
+    data object Loading : AppDatabaseState()
+
+    data class Loaded(
+        val location: DbLocation,
+        val database: MoneyManagerDatabaseWrapper,
+        val repositories: LoadedRepositories,
+    ) : AppDatabaseState()
+
+    data class Error(val location: DbLocation, val error: Throwable) : AppDatabaseState()
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MoneyManagerApp(
     databaseManager: DatabaseManager,
     appVersion: AppVersion,
+    createRepositories: (MoneyManagerDatabaseWrapper, RepositoryCallback) -> Unit,
     onLog: (String, Throwable?) -> Unit = { _, _ -> },
 ) {
     // Provide schema-aware coroutine scope to all child composables
     ProvideSchemaAwareScope {
-        MoneyManagerAppImpl(databaseManager, appVersion, onLog)
+        MoneyManagerAppImpl(databaseManager, appVersion, createRepositories, onLog)
     }
 }
 
@@ -65,78 +107,111 @@ fun MoneyManagerApp(
 private fun MoneyManagerAppImpl(
     databaseManager: DatabaseManager,
     appVersion: AppVersion,
+    createRepositories: (MoneyManagerDatabaseWrapper, RepositoryCallback) -> Unit,
     onLog: (String, Throwable?) -> Unit,
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
-    var databaseState by remember { mutableStateOf<DatabaseState>(DatabaseState.NoDatabaseSelected) }
-    var schemaErrorInfo by remember { mutableStateOf<Pair<DbLocation, Throwable>?>(null) }
-    var currentDeviceId by remember { mutableStateOf<Long?>(null) }
+    var databaseState by remember { mutableStateOf<AppDatabaseState>(AppDatabaseState.Loading) }
+
+    // Open database on first composition
+    LaunchedEffect(Unit) {
+        try {
+            val location = databaseManager.getDefaultLocation()
+            onLog("Opening database at: $location", null)
+            val database = databaseManager.openDatabase(location)
+
+            // Create repositories via callback
+            createRepositories(
+                database,
+                object : RepositoryCallback {
+                    override fun onRepositoriesReady(
+                        accountRepository: AccountRepository,
+                        attributeTypeRepository: AttributeTypeRepository,
+                        auditRepository: AuditRepository,
+                        categoryRepository: CategoryRepository,
+                        csvImportRepository: CsvImportRepository,
+                        csvImportStrategyRepository: CsvImportStrategyRepository,
+                        currencyRepository: CurrencyRepository,
+                        deviceRepository: DeviceRepository,
+                        maintenanceService: DatabaseMaintenanceService,
+                        transactionRepository: TransactionRepository,
+                        transferAttributeRepository: TransferAttributeRepository,
+                        transferSourceRepository: TransferSourceRepository,
+                        transferSourceQueries: TransferSourceQueries,
+                        deviceId: DeviceId,
+                    ) {
+                        databaseState =
+                            AppDatabaseState.Loaded(
+                                location = location,
+                                database = database,
+                                repositories =
+                                    LoadedRepositories(
+                                        accountRepository = accountRepository,
+                                        attributeTypeRepository = attributeTypeRepository,
+                                        auditRepository = auditRepository,
+                                        categoryRepository = categoryRepository,
+                                        csvImportRepository = csvImportRepository,
+                                        csvImportStrategyRepository = csvImportStrategyRepository,
+                                        currencyRepository = currencyRepository,
+                                        deviceRepository = deviceRepository,
+                                        maintenanceService = maintenanceService,
+                                        transactionRepository = transactionRepository,
+                                        transferAttributeRepository = transferAttributeRepository,
+                                        transferSourceRepository = transferSourceRepository,
+                                        transferSourceQueries = transferSourceQueries,
+                                        deviceId = deviceId,
+                                    ),
+                            )
+                    }
+                },
+            )
+            onLog("Database opened successfully", null)
+        } catch (expected: Exception) {
+            onLog("Failed to open database: ${expected.message}", expected)
+            databaseState = AppDatabaseState.Error(databaseManager.getDefaultLocation(), expected)
+        }
+    }
 
     // Observe global schema error state from Flow collection error handlers
     val globalSchemaError by GlobalSchemaErrorState.schemaError.collectAsState()
-
-    // Initialize database on startup
-    LaunchedEffect(Unit) {
-        val defaultLocation = databaseManager.getDefaultLocation()
-        val dbExists = databaseManager.databaseExists(defaultLocation)
-        onLog("Default database location: $defaultLocation, exists: $dbExists", null)
-
-        if (dbExists) {
-            onLog("Existing database found, opening...", null)
-            try {
-                val database = databaseManager.openDatabase(defaultLocation)
-                val repositories = RepositorySet(database)
-                currentDeviceId = repositories.deviceRepository.getOrCreateDevice(getDeviceInfo())
-                // Schema errors at runtime are now caught globally by the uncaught exception handler
-                // which updates GlobalSchemaErrorState - no need for explicit validation queries here
-                databaseState = DatabaseState.DatabaseLoaded(defaultLocation, repositories)
-                onLog("Database opened successfully", null)
-            } catch (expected: Exception) {
-                onLog("Failed to open database: ${expected.message}", expected)
-                // Store error info to show schema error dialog
-                schemaErrorInfo = defaultLocation to expected
-                databaseState = DatabaseState.Error(expected)
-            }
-        } else {
-            onLog("No existing database, creating new one...", null)
-            try {
-                val database = databaseManager.openDatabase(defaultLocation)
-                val repositories = RepositorySet(database)
-                currentDeviceId = repositories.deviceRepository.getOrCreateDevice(getDeviceInfo())
-                databaseState = DatabaseState.DatabaseLoaded(defaultLocation, repositories)
-                onLog("New database created successfully", null)
-            } catch (expected: Exception) {
-                onLog("Failed to create database: ${expected.message}", expected)
-                schemaErrorInfo = defaultLocation to expected
-                databaseState = DatabaseState.Error(expected)
-            }
-        }
-    }
 
     // Determine which error to show - prioritize global errors (runtime) over local (startup)
     val effectiveSchemaError: Pair<DbLocation, Throwable>? =
         globalSchemaError?.let { info ->
             // For global errors, get the current database location from state if available
             val location =
-                (databaseState as? DatabaseState.DatabaseLoaded)?.location
+                (databaseState as? AppDatabaseState.Loaded)?.location
                     ?: databaseManager.getDefaultLocation()
             location to info.error
-        } ?: schemaErrorInfo
+        } ?: (databaseState as? AppDatabaseState.Error)?.let { it.location to it.error }
 
     // Show main app once database is loaded
     when (val state = databaseState) {
-        is DatabaseState.DatabaseLoaded -> {
+        is AppDatabaseState.Loaded -> {
+            val repos = state.repositories
             MoneyManagerAppContent(
-                repositorySet = state.repositories,
                 appVersion = appVersion,
                 databaseLocation = state.location,
-                currentDeviceId = currentDeviceId,
+                accountRepository = repos.accountRepository,
+                attributeTypeRepository = repos.attributeTypeRepository,
+                auditRepository = repos.auditRepository,
+                categoryRepository = repos.categoryRepository,
+                csvImportRepository = repos.csvImportRepository,
+                csvImportStrategyRepository = repos.csvImportStrategyRepository,
+                currencyRepository = repos.currencyRepository,
+                deviceRepository = repos.deviceRepository,
+                maintenanceService = repos.maintenanceService,
+                transactionRepository = repos.transactionRepository,
+                transferAttributeRepository = repos.transferAttributeRepository,
+                transferSourceRepository = repos.transferSourceRepository,
+                transferSourceQueries = repos.transferSourceQueries,
+                deviceId = repos.deviceId,
             )
         }
-        is DatabaseState.NoDatabaseSelected -> {
+        is AppDatabaseState.Loading -> {
             // Loading...
         }
-        is DatabaseState.Error -> {
+        is AppDatabaseState.Error -> {
             // Error dialog is shown below
         }
     }
@@ -154,15 +229,55 @@ private fun MoneyManagerAppImpl(
                         onLog("Database backed up to: $backupLocation", null)
 
                         val database = databaseManager.openDatabase(location)
-                        val repositories = RepositorySet(database)
-                        currentDeviceId = repositories.deviceRepository.getOrCreateDevice(getDeviceInfo())
-                        databaseState = DatabaseState.DatabaseLoaded(location, repositories)
-                        schemaErrorInfo = null
+                        createRepositories(
+                            database,
+                            object : RepositoryCallback {
+                                override fun onRepositoriesReady(
+                                    accountRepository: AccountRepository,
+                                    attributeTypeRepository: AttributeTypeRepository,
+                                    auditRepository: AuditRepository,
+                                    categoryRepository: CategoryRepository,
+                                    csvImportRepository: CsvImportRepository,
+                                    csvImportStrategyRepository: CsvImportStrategyRepository,
+                                    currencyRepository: CurrencyRepository,
+                                    deviceRepository: DeviceRepository,
+                                    maintenanceService: DatabaseMaintenanceService,
+                                    transactionRepository: TransactionRepository,
+                                    transferAttributeRepository: TransferAttributeRepository,
+                                    transferSourceRepository: TransferSourceRepository,
+                                    transferSourceQueries: TransferSourceQueries,
+                                    deviceId: DeviceId,
+                                ) {
+                                    databaseState =
+                                        AppDatabaseState.Loaded(
+                                            location = location,
+                                            database = database,
+                                            repositories =
+                                                LoadedRepositories(
+                                                    accountRepository = accountRepository,
+                                                    attributeTypeRepository = attributeTypeRepository,
+                                                    auditRepository = auditRepository,
+                                                    categoryRepository = categoryRepository,
+                                                    csvImportRepository = csvImportRepository,
+                                                    csvImportStrategyRepository = csvImportStrategyRepository,
+                                                    currencyRepository = currencyRepository,
+                                                    deviceRepository = deviceRepository,
+                                                    maintenanceService = maintenanceService,
+                                                    transactionRepository = transactionRepository,
+                                                    transferAttributeRepository = transferAttributeRepository,
+                                                    transferSourceRepository = transferSourceRepository,
+                                                    transferSourceQueries = transferSourceQueries,
+                                                    deviceId = deviceId,
+                                                ),
+                                        )
+                                }
+                            },
+                        )
                         GlobalSchemaErrorState.clearError()
                         onLog("New database created successfully", null)
                     } catch (expected: Exception) {
                         onLog("Failed to backup and create new database: ${expected.message}", expected)
-                        schemaErrorInfo = location to expected
+                        databaseState = AppDatabaseState.Error(location, expected)
                     }
                 }
             },
@@ -174,15 +289,55 @@ private fun MoneyManagerAppImpl(
                         onLog("Database deleted", null)
 
                         val database = databaseManager.openDatabase(location)
-                        val repositories = RepositorySet(database)
-                        currentDeviceId = repositories.deviceRepository.getOrCreateDevice(getDeviceInfo())
-                        databaseState = DatabaseState.DatabaseLoaded(location, repositories)
-                        schemaErrorInfo = null
+                        createRepositories(
+                            database,
+                            object : RepositoryCallback {
+                                override fun onRepositoriesReady(
+                                    accountRepository: AccountRepository,
+                                    attributeTypeRepository: AttributeTypeRepository,
+                                    auditRepository: AuditRepository,
+                                    categoryRepository: CategoryRepository,
+                                    csvImportRepository: CsvImportRepository,
+                                    csvImportStrategyRepository: CsvImportStrategyRepository,
+                                    currencyRepository: CurrencyRepository,
+                                    deviceRepository: DeviceRepository,
+                                    maintenanceService: DatabaseMaintenanceService,
+                                    transactionRepository: TransactionRepository,
+                                    transferAttributeRepository: TransferAttributeRepository,
+                                    transferSourceRepository: TransferSourceRepository,
+                                    transferSourceQueries: TransferSourceQueries,
+                                    deviceId: DeviceId,
+                                ) {
+                                    databaseState =
+                                        AppDatabaseState.Loaded(
+                                            location = location,
+                                            database = database,
+                                            repositories =
+                                                LoadedRepositories(
+                                                    accountRepository = accountRepository,
+                                                    attributeTypeRepository = attributeTypeRepository,
+                                                    auditRepository = auditRepository,
+                                                    categoryRepository = categoryRepository,
+                                                    csvImportRepository = csvImportRepository,
+                                                    csvImportStrategyRepository = csvImportStrategyRepository,
+                                                    currencyRepository = currencyRepository,
+                                                    deviceRepository = deviceRepository,
+                                                    maintenanceService = maintenanceService,
+                                                    transactionRepository = transactionRepository,
+                                                    transferAttributeRepository = transferAttributeRepository,
+                                                    transferSourceRepository = transferSourceRepository,
+                                                    transferSourceQueries = transferSourceQueries,
+                                                    deviceId = deviceId,
+                                                ),
+                                        )
+                                }
+                            },
+                        )
                         GlobalSchemaErrorState.clearError()
                         onLog("New database created successfully", null)
                     } catch (expected: Exception) {
                         onLog("Failed to delete and create new database: ${expected.message}", expected)
-                        schemaErrorInfo = location to expected
+                        databaseState = AppDatabaseState.Error(location, expected)
                     }
                 }
             },
@@ -193,10 +348,22 @@ private fun MoneyManagerAppImpl(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MoneyManagerAppContent(
-    repositorySet: RepositorySet,
     appVersion: AppVersion,
     databaseLocation: DbLocation,
-    currentDeviceId: Long?,
+    accountRepository: AccountRepository,
+    attributeTypeRepository: AttributeTypeRepository,
+    auditRepository: AuditRepository,
+    categoryRepository: CategoryRepository,
+    csvImportRepository: CsvImportRepository,
+    csvImportStrategyRepository: CsvImportStrategyRepository,
+    currencyRepository: CurrencyRepository,
+    deviceRepository: DeviceRepository,
+    maintenanceService: DatabaseMaintenanceService,
+    transactionRepository: TransactionRepository,
+    transferAttributeRepository: TransferAttributeRepository,
+    transferSourceRepository: TransferSourceRepository,
+    transferSourceQueries: TransferSourceQueries,
+    deviceId: DeviceId,
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Accounts) }
@@ -208,7 +375,7 @@ private fun MoneyManagerAppContent(
     var transactionRefreshTrigger by remember { mutableStateOf(0) }
 
     // Use schema-error-aware collection for flows that may fail on old databases
-    val accounts by repositorySet.accountRepository.getAllAccounts()
+    val accounts by accountRepository.getAllAccounts()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
 
     MaterialTheme {
@@ -220,7 +387,7 @@ private fun MoneyManagerAppContent(
                             Column {
                                 Text(currentScreen.title)
                                 Text(
-                                    text = "v${appVersion.value}",
+                                    text = "v$appVersion",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
                                 )
@@ -242,31 +409,31 @@ private fun MoneyManagerAppContent(
             bottomBar = {
                 NavigationBar {
                     NavigationBarItem(
-                        icon = { Text("💰") },
+                        icon = { Text("\uD83D\uDCB0") },
                         label = { Text("Accounts") },
                         selected = currentScreen is Screen.Accounts || currentScreen is Screen.AccountTransactions,
                         onClick = { currentScreen = Screen.Accounts },
                     )
                     NavigationBarItem(
-                        icon = { Text("💱") },
+                        icon = { Text("\uD83D\uDCB1") },
                         label = { Text("Currencies") },
                         selected = currentScreen is Screen.Currencies,
                         onClick = { currentScreen = Screen.Currencies },
                     )
                     NavigationBarItem(
-                        icon = { Text("📁") },
+                        icon = { Text("\uD83D\uDCC1") },
                         label = { Text("Categories") },
                         selected = currentScreen is Screen.Categories,
                         onClick = { currentScreen = Screen.Categories },
                     )
                     NavigationBarItem(
-                        icon = { Text("📄") },
+                        icon = { Text("\uD83D\uDCC4") },
                         label = { Text("CSV") },
                         selected = currentScreen is Screen.CsvImports || currentScreen is Screen.CsvImportDetail,
                         onClick = { currentScreen = Screen.CsvImports },
                     )
                     NavigationBarItem(
-                        icon = { Text("⚙️") },
+                        icon = { Text("\u2699\uFE0F") },
                         label = { Text("Settings") },
                         selected = currentScreen is Screen.Settings,
                         onClick = { currentScreen = Screen.Settings },
@@ -301,9 +468,9 @@ private fun MoneyManagerAppContent(
                             currentlyViewedCurrencyId = null
                         }
                         AccountsScreen(
-                            accountRepository = repositorySet.accountRepository,
-                            categoryRepository = repositorySet.categoryRepository,
-                            transactionRepository = repositorySet.transactionRepository,
+                            accountRepository = accountRepository,
+                            categoryRepository = categoryRepository,
+                            transactionRepository = transactionRepository,
                             onAccountClick = { account ->
                                 currentScreen = Screen.AccountTransactions(account.id, account.name)
                             },
@@ -315,7 +482,7 @@ private fun MoneyManagerAppContent(
                             currentlyViewedAccountId = null
                             currentlyViewedCurrencyId = null
                         }
-                        CurrenciesScreen(repositorySet.currencyRepository)
+                        CurrenciesScreen(currencyRepository)
                     }
                     is Screen.Categories -> {
                         // Reset currentlyViewedAccountId and currentlyViewedCurrencyId when on other screens
@@ -324,8 +491,8 @@ private fun MoneyManagerAppContent(
                             currentlyViewedCurrencyId = null
                         }
                         CategoriesScreen(
-                            categoryRepository = repositorySet.categoryRepository,
-                            currencyRepository = repositorySet.currencyRepository,
+                            categoryRepository = categoryRepository,
+                            currencyRepository = currencyRepository,
                         )
                     }
                     is Screen.Settings -> {
@@ -334,7 +501,16 @@ private fun MoneyManagerAppContent(
                             currentlyViewedAccountId = null
                             currentlyViewedCurrencyId = null
                         }
-                        SettingsScreen(repositorySet = repositorySet)
+                        SettingsScreen(
+                            currencyRepository = currencyRepository,
+                            categoryRepository = categoryRepository,
+                            accountRepository = accountRepository,
+                            attributeTypeRepository = attributeTypeRepository,
+                            transactionRepository = transactionRepository,
+                            maintenanceService = maintenanceService,
+                            transferSourceQueries = transferSourceQueries,
+                            deviceId = deviceId,
+                        )
                     }
                     is Screen.AccountTransactions -> {
                         // Initialize currentlyViewedAccountId when first entering the screen
@@ -343,16 +519,16 @@ private fun MoneyManagerAppContent(
                         }
                         AccountTransactionsScreen(
                             accountId = currentlyViewedAccountId ?: screen.accountId,
-                            transactionRepository = repositorySet.transactionRepository,
-                            transferSourceRepository = repositorySet.transferSourceRepository,
-                            accountRepository = repositorySet.accountRepository,
-                            categoryRepository = repositorySet.categoryRepository,
-                            currencyRepository = repositorySet.currencyRepository,
-                            auditRepository = repositorySet.auditRepository,
-                            attributeTypeRepository = repositorySet.attributeTypeRepository,
-                            transferAttributeRepository = repositorySet.transferAttributeRepository,
-                            maintenanceService = repositorySet.maintenanceService,
-                            currentDeviceId = currentDeviceId,
+                            transactionRepository = transactionRepository,
+                            transferSourceRepository = transferSourceRepository,
+                            accountRepository = accountRepository,
+                            categoryRepository = categoryRepository,
+                            currencyRepository = currencyRepository,
+                            auditRepository = auditRepository,
+                            attributeTypeRepository = attributeTypeRepository,
+                            transferAttributeRepository = transferAttributeRepository,
+                            maintenanceService = maintenanceService,
+                            currentDeviceId = deviceId,
                             onAccountIdChange = { accountId ->
                                 currentlyViewedAccountId = accountId
                             },
@@ -369,7 +545,7 @@ private fun MoneyManagerAppContent(
                             currentlyViewedCurrencyId = null
                         }
                         CsvImportsScreen(
-                            csvImportRepository = repositorySet.csvImportRepository,
+                            csvImportRepository = csvImportRepository,
                             onImportClick = { importId ->
                                 currentScreen = Screen.CsvImportDetail(importId)
                             },
@@ -381,21 +557,21 @@ private fun MoneyManagerAppContent(
                     is Screen.CsvImportDetail -> {
                         CsvImportDetailScreen(
                             importId = screen.importId,
-                            csvImportRepository = repositorySet.csvImportRepository,
-                            csvImportStrategyRepository = repositorySet.csvImportStrategyRepository,
-                            accountRepository = repositorySet.accountRepository,
-                            categoryRepository = repositorySet.categoryRepository,
-                            currencyRepository = repositorySet.currencyRepository,
-                            transactionRepository = repositorySet.transactionRepository,
-                            attributeTypeRepository = repositorySet.attributeTypeRepository,
-                            maintenanceService = repositorySet.maintenanceService,
-                            transferSourceQueries = repositorySet.transferSourceQueries,
-                            deviceRepository = repositorySet.deviceRepository,
+                            csvImportRepository = csvImportRepository,
+                            csvImportStrategyRepository = csvImportStrategyRepository,
+                            accountRepository = accountRepository,
+                            categoryRepository = categoryRepository,
+                            currencyRepository = currencyRepository,
+                            transactionRepository = transactionRepository,
+                            attributeTypeRepository = attributeTypeRepository,
+                            maintenanceService = maintenanceService,
+                            transferSourceQueries = transferSourceQueries,
+                            deviceRepository = deviceRepository,
                             onBack = { currentScreen = Screen.CsvImports },
                             onDeleted = { currentScreen = Screen.CsvImports },
                             onTransferClick = { transferId, isPositiveAmount ->
                                 scope.launch {
-                                    repositorySet.transactionRepository
+                                    transactionRepository
                                         .getTransactionById(transferId.id)
                                         .collect { transfer ->
                                             transfer?.let {
@@ -428,7 +604,7 @@ private fun MoneyManagerAppContent(
                             currentlyViewedCurrencyId = null
                         }
                         CsvStrategiesScreen(
-                            csvImportStrategyRepository = repositorySet.csvImportStrategyRepository,
+                            csvImportStrategyRepository = csvImportStrategyRepository,
                             onBack = { currentScreen = Screen.CsvImports },
                         )
                     }
@@ -438,14 +614,14 @@ private fun MoneyManagerAppContent(
 
         if (showTransactionDialog) {
             TransactionEntryDialog(
-                transactionRepository = repositorySet.transactionRepository,
-                transferSourceQueries = repositorySet.transferSourceQueries,
-                deviceRepository = repositorySet.deviceRepository,
-                accountRepository = repositorySet.accountRepository,
-                categoryRepository = repositorySet.categoryRepository,
-                currencyRepository = repositorySet.currencyRepository,
-                attributeTypeRepository = repositorySet.attributeTypeRepository,
-                maintenanceService = repositorySet.maintenanceService,
+                transactionRepository = transactionRepository,
+                transferSourceQueries = transferSourceQueries,
+                deviceRepository = deviceRepository,
+                accountRepository = accountRepository,
+                categoryRepository = categoryRepository,
+                currencyRepository = currencyRepository,
+                attributeTypeRepository = attributeTypeRepository,
+                maintenanceService = maintenanceService,
                 preSelectedSourceAccountId = preSelectedAccountId,
                 preSelectedCurrencyId = preSelectedCurrencyId,
                 onDismiss = {

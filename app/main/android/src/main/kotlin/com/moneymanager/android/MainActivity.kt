@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import com.moneymanager.di.AppComponent
 import com.moneymanager.di.AppComponentParams
+import com.moneymanager.di.database.DatabaseComponent
 import com.moneymanager.di.initializeVersionReader
 import com.moneymanager.ui.MoneyManagerApp
 import com.moneymanager.ui.error.GlobalSchemaErrorState
@@ -44,6 +45,25 @@ class MainActivity : ComponentActivity() {
             MoneyManagerApp(
                 databaseManager = component.databaseManager,
                 appVersion = component.appVersion,
+                createRepositories = { database, callback ->
+                    val databaseComponent = DatabaseComponent.create(database)
+                    callback.onRepositoriesReady(
+                        accountRepository = databaseComponent.accountRepository,
+                        attributeTypeRepository = databaseComponent.attributeTypeRepository,
+                        auditRepository = databaseComponent.auditRepository,
+                        categoryRepository = databaseComponent.categoryRepository,
+                        csvImportRepository = databaseComponent.csvImportRepository,
+                        csvImportStrategyRepository = databaseComponent.csvImportStrategyRepository,
+                        currencyRepository = databaseComponent.currencyRepository,
+                        deviceRepository = databaseComponent.deviceRepository,
+                        maintenanceService = databaseComponent.maintenanceService,
+                        transactionRepository = databaseComponent.transactionRepository,
+                        transferAttributeRepository = databaseComponent.transferAttributeRepository,
+                        transferSourceRepository = databaseComponent.transferSourceRepository,
+                        transferSourceQueries = databaseComponent.transferSourceQueries,
+                        deviceId = databaseComponent.deviceId,
+                    )
+                },
                 onLog = { message, error ->
                     if (error != null) {
                         Log.e(TAG, message, error)

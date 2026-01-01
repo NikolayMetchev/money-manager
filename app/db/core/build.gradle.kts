@@ -15,6 +15,7 @@ kotlin {
                 implementation(libs.kotlinx.datetime)
                 implementation(libs.kotlinx.serialization.json)
                 implementation(libs.sqldelight.coroutines.extensions)
+                implementation(projects.app.model.core)
                 implementation(projects.utils.bigdecimal)
                 implementation(projects.utils.currency)
             }
@@ -23,7 +24,6 @@ kotlin {
         val commonTest by getting {
             dependencies {
                 implementation(libs.kotlinx.coroutines.test)
-                implementation(projects.app.di.core)
                 implementation(projects.app.model.core)
                 implementation(projects.test.app.db)
             }
@@ -50,7 +50,6 @@ kotlin {
                 implementation(libs.androidx.test.core)
                 implementation(libs.androidx.test.runner)
                 implementation(libs.kotlinx.coroutines.test)
-                implementation(projects.app.di.core)
                 implementation(projects.test.app.db)
             }
             // Include repository tests from commonTest (not the expect declarations file)

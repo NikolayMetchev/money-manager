@@ -2,8 +2,8 @@ package com.moneymanager.test.database
 
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.platform.app.InstrumentationRegistry
-import com.moneymanager.database.DbLocation
 import com.moneymanager.di.AppComponentParams
+import com.moneymanager.domain.model.DbLocation
 
 actual fun createTestDatabaseLocation(): DbLocation {
     val context = InstrumentationRegistry.getInstrumentation().targetContext

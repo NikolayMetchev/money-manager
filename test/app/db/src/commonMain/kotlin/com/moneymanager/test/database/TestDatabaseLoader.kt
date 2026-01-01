@@ -1,6 +1,6 @@
 package com.moneymanager.test.database
 
-import com.moneymanager.database.DbLocation
+import com.moneymanager.domain.model.DbLocation
 
 /**
  * Copies a database file from test resources to a test location.

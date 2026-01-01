@@ -1,6 +1,7 @@
 package com.moneymanager.database.repository
 
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
+import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.Platform
 import com.moneymanager.domain.repository.DeviceRepository
@@ -8,14 +9,14 @@ import com.moneymanager.domain.repository.DeviceRepository
 class DeviceRepositoryImpl(
     private val database: MoneyManagerDatabaseWrapper,
 ) : DeviceRepository {
-    override fun getOrCreateDevice(deviceInfo: DeviceInfo): Long {
+    override fun getOrCreateDevice(deviceInfo: DeviceInfo): DeviceId {
         return when (deviceInfo) {
             is DeviceInfo.Jvm -> getOrCreateJvmDevice(deviceInfo)
             is DeviceInfo.Android -> getOrCreateAndroidDevice(deviceInfo)
         }
     }
 
-    private fun getOrCreateJvmDevice(deviceInfo: DeviceInfo.Jvm): Long {
+    private fun getOrCreateJvmDevice(deviceInfo: DeviceInfo.Jvm): DeviceId {
         // Get or create OsName
         database.osNameQueries.insertOrIgnore(deviceInfo.osName)
         val osId = database.osNameQueries.selectByName(deviceInfo.osName).executeAsOne()
@@ -39,7 +40,7 @@ class DeviceRepositoryImpl(
             ).executeAsOneOrNull()
 
         if (existingDevice != null) {
-            return existingDevice
+            return DeviceId(existingDevice)
         }
 
         // Create new device
@@ -48,20 +49,22 @@ class DeviceRepositoryImpl(
             machine_id = machineId,
         )
         // Re-query to get the ID (lastInsertRowId doesn't work reliably with JDBC)
-        return database.deviceQueries.selectByAttributes(
-            platform_id = 1L,
-            os_id = osId,
-            os_id_ = osId,
-            machine_id = machineId,
-            machine_id_ = machineId,
-            device_make_id = null,
-            device_make_id_ = null,
-            device_model_id = null,
-            device_model_id_ = null,
-        ).executeAsOne()
+        return DeviceId(
+            database.deviceQueries.selectByAttributes(
+                platform_id = 1L,
+                os_id = osId,
+                os_id_ = osId,
+                machine_id = machineId,
+                machine_id_ = machineId,
+                device_make_id = null,
+                device_make_id_ = null,
+                device_model_id = null,
+                device_model_id_ = null,
+            ).executeAsOne(),
+        )
     }
 
-    private fun getOrCreateAndroidDevice(deviceInfo: DeviceInfo.Android): Long {
+    private fun getOrCreateAndroidDevice(deviceInfo: DeviceInfo.Android): DeviceId {
         // Get or create DeviceMake
         database.deviceMakeQueries.insertOrIgnore(deviceInfo.deviceMake)
         val makeId = database.deviceMakeQueries.selectByName(deviceInfo.deviceMake).executeAsOne()
@@ -85,7 +88,7 @@ class DeviceRepositoryImpl(
             ).executeAsOneOrNull()
 
         if (existingDevice != null) {
-            return existingDevice
+            return DeviceId(existingDevice)
         }
 
         // Create new device
@@ -94,21 +97,23 @@ class DeviceRepositoryImpl(
             device_model_id = modelId,
         )
         // Re-query to get the ID (lastInsertRowId doesn't work reliably with JDBC)
-        return database.deviceQueries.selectByAttributes(
-            platform_id = 2L,
-            os_id = null,
-            os_id_ = null,
-            machine_id = null,
-            machine_id_ = null,
-            device_make_id = makeId,
-            device_make_id_ = makeId,
-            device_model_id = modelId,
-            device_model_id_ = modelId,
-        ).executeAsOne()
+        return DeviceId(
+            database.deviceQueries.selectByAttributes(
+                platform_id = 2L,
+                os_id = null,
+                os_id_ = null,
+                machine_id = null,
+                machine_id_ = null,
+                device_make_id = makeId,
+                device_make_id_ = makeId,
+                device_model_id = modelId,
+                device_model_id_ = modelId,
+            ).executeAsOne(),
+        )
     }
 
-    override suspend fun getDeviceById(id: Long): DeviceInfo? {
-        val device = database.deviceQueries.selectById(id).executeAsOneOrNull() ?: return null
+    override suspend fun getDeviceById(id: DeviceId): DeviceInfo? {
+        val device = database.deviceQueries.selectById(id.id).executeAsOneOrNull() ?: return null
 
         return when (device.platformName) {
             "JVM" ->

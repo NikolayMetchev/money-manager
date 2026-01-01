@@ -38,7 +38,7 @@ class TransferSourceRepositoryImpl(
             queries.insertManual(
                 transaction_id = transactionId.toString(),
                 revision_id = revisionId,
-                device_id = deviceId,
+                device_id = deviceId.id,
             )
 
             queries.selectByTransactionIdAndRevision(transactionId.toString(), revisionId)
@@ -136,7 +136,7 @@ class TransferSourceRepositoryImpl(
                     queries.insertSampleGenerator(
                         transaction_id = source.transactionId.toString(),
                         revision_id = source.revisionId,
-                        device_id = deviceId,
+                        device_id = deviceId.id,
                     )
                 }
             }

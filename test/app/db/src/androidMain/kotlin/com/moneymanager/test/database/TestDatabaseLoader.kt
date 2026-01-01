@@ -1,7 +1,7 @@
 package com.moneymanager.test.database
 
 import androidx.test.platform.app.InstrumentationRegistry
-import com.moneymanager.database.DbLocation
+import com.moneymanager.domain.model.DbLocation
 
 actual fun copyDatabaseFromResources(resourcePath: String): DbLocation {
     val targetContext = InstrumentationRegistry.getInstrumentation().targetContext

@@ -3,6 +3,7 @@
 package com.moneymanager.database
 
 import com.moneymanager.database.sql.TransferSourceQueries
+import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.SourceRecorder
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
@@ -11,13 +12,13 @@ import com.moneymanager.domain.model.csv.CsvImportId
 /** Manual entry from UI. */
 class ManualSourceRecorder(
     private val queries: TransferSourceQueries,
-    private val deviceId: Long,
+    private val deviceId: DeviceId,
 ) : SourceRecorder {
     override fun insert(transfer: Transfer) {
         queries.insertManual(
             transfer.id.id.toString(),
             transfer.revisionId,
-            deviceId,
+            deviceId.id,
         )
     }
 }
@@ -25,13 +26,13 @@ class ManualSourceRecorder(
 /** Generated sample data. */
 class SampleGeneratorSourceRecorder(
     private val queries: TransferSourceQueries,
-    private val deviceId: Long,
+    private val deviceId: DeviceId,
 ) : SourceRecorder {
     override fun insert(transfer: Transfer) {
         queries.insertSampleGenerator(
             transfer.id.id.toString(),
             transfer.revisionId,
-            deviceId,
+            deviceId.id,
         )
     }
 }
@@ -39,7 +40,7 @@ class SampleGeneratorSourceRecorder(
 /** CSV import with row tracking. */
 class CsvImportSourceRecorder(
     private val queries: TransferSourceQueries,
-    private val deviceId: Long,
+    private val deviceId: DeviceId,
     private val csvImportId: CsvImportId,
     private val rowIndexForTransfer: (TransferId) -> Long,
 ) : SourceRecorder {
@@ -48,7 +49,7 @@ class CsvImportSourceRecorder(
         queries.insertCsvImportBase(
             transfer.id.id.toString(),
             transfer.revisionId,
-            deviceId,
+            deviceId.id,
         )
         // Get the auto-generated ID and insert CSV-specific details
         val transferSourceId = queries.lastInsertedId().executeAsOne()

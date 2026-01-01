@@ -57,7 +57,7 @@ class DeviceRepositoryImplTest : DbTest() {
 
             // Test through the repository (which handles device creation)
             val deviceId = repositories.deviceRepository.getOrCreateDevice(deviceInfo)
-            assertTrue(deviceId > 0, "Repository device ID should be positive: $deviceId")
+            assertTrue(deviceId.id > 0, "Repository device ID should be positive: $deviceId")
 
             // Verify we can retrieve the device
             val retrievedDevice = repositories.deviceRepository.getDeviceById(deviceId)

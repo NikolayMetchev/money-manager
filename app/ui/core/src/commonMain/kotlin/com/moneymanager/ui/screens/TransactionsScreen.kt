@@ -78,6 +78,7 @@ import com.moneymanager.domain.model.AccountRow
 import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
@@ -162,7 +163,7 @@ fun AccountTransactionsScreen(
     attributeTypeRepository: AttributeTypeRepository,
     transferAttributeRepository: TransferAttributeRepository,
     maintenanceService: DatabaseMaintenanceService,
-    currentDeviceId: Long? = null,
+    currentDeviceId: DeviceId? = null,
     onAccountIdChange: (AccountId) -> Unit = {},
     onCurrencyIdChange: (CurrencyId?) -> Unit = {},
     scrollToTransferId: TransferId? = null,
@@ -2105,7 +2106,7 @@ fun TransactionAuditScreen(
     auditRepository: AuditRepository,
     accountRepository: AccountRepository,
     transactionRepository: TransactionRepository,
-    currentDeviceId: Long? = null,
+    currentDeviceId: DeviceId? = null,
     onBack: () -> Unit,
 ) {
     var auditEntries by remember { mutableStateOf<List<TransferAuditEntry>>(emptyList()) }
@@ -2231,7 +2232,7 @@ fun TransactionAuditScreen(
 private fun AuditDiffCard(
     diff: AuditEntryDiff,
     accounts: List<Account>,
-    currentDeviceId: Long? = null,
+    currentDeviceId: DeviceId? = null,
 ) {
     val auditDateTime = diff.auditTimestamp.toLocalDateTime(TimeZone.currentSystemDefault())
 
@@ -2308,7 +2309,7 @@ private fun AuditDiffCard(
 private fun InsertDiffContent(
     diff: AuditEntryDiff,
     accounts: List<Account>,
-    currentDeviceId: Long? = null,
+    currentDeviceId: DeviceId? = null,
 ) {
     val transactionDateTime = diff.timestamp.value().toLocalDateTime(TimeZone.currentSystemDefault())
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -2331,7 +2332,7 @@ private fun InsertDiffContent(
 private fun UpdateDiffContent(
     diff: AuditEntryDiff,
     accounts: List<Account>,
-    currentDeviceId: Long? = null,
+    currentDeviceId: DeviceId? = null,
 ) {
     val hasAnyChanges = diff.hasChanges
 
@@ -2409,7 +2410,7 @@ private fun UpdateDiffContent(
 private fun DeleteDiffContent(
     diff: AuditEntryDiff,
     accounts: List<Account>,
-    currentDeviceId: Long? = null,
+    currentDeviceId: DeviceId? = null,
 ) {
     val errorColor = MaterialTheme.colorScheme.error
     val transactionDateTime = diff.timestamp.value().toLocalDateTime(TimeZone.currentSystemDefault())
@@ -2677,12 +2678,12 @@ private fun formatTimeDiff(
 @Composable
 private fun SourceInfoSection(
     source: TransferSource?,
-    currentDeviceId: Long? = null,
+    currentDeviceId: DeviceId? = null,
     labelColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
 ) {
     if (source == null) return
 
-    val isThisDevice = currentDeviceId != null && source.deviceId == currentDeviceId
+    val isThisDevice = currentDeviceId != null && source.deviceId == currentDeviceId.id
 
     Column(
         modifier = Modifier.padding(top = 8.dp),

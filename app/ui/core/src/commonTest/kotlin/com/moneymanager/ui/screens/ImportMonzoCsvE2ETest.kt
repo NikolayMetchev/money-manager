@@ -17,14 +17,14 @@ import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import androidx.compose.ui.test.waitUntilDoesNotExist
 import androidx.compose.ui.test.waitUntilExactlyOneExists
 import com.moneymanager.database.DatabaseManager
-import com.moneymanager.database.DbLocation
-import com.moneymanager.database.RepositorySet
-import com.moneymanager.domain.getDeviceInfo
+import com.moneymanager.di.database.DatabaseComponent
 import com.moneymanager.domain.model.AppVersion
+import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
 import com.moneymanager.ui.MoneyManagerApp
+import com.moneymanager.ui.test.testCreateRepositories
 import kotlin.test.AfterTest
 import kotlin.test.Test
 
@@ -67,6 +67,7 @@ class ImportMonzoCsvE2ETest {
                 MoneyManagerApp(
                     databaseManager = testDatabaseManager,
                     appVersion = AppVersion("1.0.0-test"),
+                    createRepositories = testCreateRepositories,
                 )
             }
 
@@ -93,7 +94,7 @@ class ImportMonzoCsvE2ETest {
             // Create and populate the database
             kotlinx.coroutines.runBlocking {
                 val db = databaseManager.openDatabase(testDbLocation!!)
-                val repositorySet = RepositorySet(db)
+                val databaseComponent = DatabaseComponent.create(db)
 
                 // Parse and inject CSV data
                 val csvContent = loadTestCsvContent()
@@ -101,11 +102,10 @@ class ImportMonzoCsvE2ETest {
                 val headers = parseCsvLine(lines.first())
                 val rows = lines.drop(1).map { parseCsvLine(it) }
 
-                repositorySet.csvImportRepository.createImport(
+                databaseComponent.csvImportRepository.createImport(
                     fileName = "monzo_test_export.csv",
                     headers = headers,
                     rows = rows,
-                    deviceInfo = getDeviceInfo(),
                 )
             }
 
@@ -120,6 +120,7 @@ class ImportMonzoCsvE2ETest {
                 MoneyManagerApp(
                     databaseManager = testDatabaseManager,
                     appVersion = AppVersion("1.0.0-test"),
+                    createRepositories = testCreateRepositories,
                 )
             }
 

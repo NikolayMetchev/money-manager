@@ -1,5 +1,6 @@
 package com.moneymanager.domain.repository
 
+import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.DeviceInfo
 
 /**
@@ -16,7 +17,7 @@ interface DeviceRepository {
      * @param deviceInfo The device information
      * @return The device ID (existing or newly created)
      */
-    fun getOrCreateDevice(deviceInfo: DeviceInfo): Long
+    fun getOrCreateDevice(deviceInfo: DeviceInfo): DeviceId
 
     /**
      * Gets device info by ID.
@@ -24,5 +25,5 @@ interface DeviceRepository {
      * @param id The device ID
      * @return The device info or null if not found
      */
-    suspend fun getDeviceById(id: Long): DeviceInfo?
+    suspend fun getDeviceById(id: DeviceId): DeviceInfo?
 }

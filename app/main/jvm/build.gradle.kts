@@ -15,6 +15,7 @@ dependencies {
     implementation(libs.kmlogging)
     implementation(projects.app.db.core)
     implementation(projects.app.di.core)
+    implementation(projects.app.model.core)
     implementation(projects.app.ui.core)
 
     runtimeOnly(compose.desktop.currentOs)

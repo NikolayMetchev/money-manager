@@ -9,12 +9,13 @@ import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.waitUntilDoesNotExist
 import androidx.compose.ui.test.waitUntilExactlyOneExists
 import com.moneymanager.database.DatabaseManager
-import com.moneymanager.database.DbLocation
 import com.moneymanager.domain.model.AppVersion
+import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.test.database.copyDatabaseFromResources
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
 import com.moneymanager.ui.MoneyManagerApp
+import com.moneymanager.ui.test.testCreateRepositories
 import kotlin.test.AfterTest
 import kotlin.test.Test
 
@@ -54,6 +55,7 @@ class DatabaseSchemaErrorDialogE2ETest {
                             testLocation = testDbLocation!!,
                         ),
                     appVersion = AppVersion("1.0.0-test"),
+                    createRepositories = testCreateRepositories,
                 )
             }
 
@@ -91,6 +93,7 @@ class DatabaseSchemaErrorDialogE2ETest {
                             testLocation = testDbLocation!!,
                         ),
                     appVersion = AppVersion("1.0.0-test"),
+                    createRepositories = testCreateRepositories,
                 )
             }
 
@@ -125,6 +128,7 @@ class DatabaseSchemaErrorDialogE2ETest {
                             testLocation = testDbLocation!!,
                         ),
                     appVersion = AppVersion("1.0.0-test"),
+                    createRepositories = testCreateRepositories,
                 )
             }
 

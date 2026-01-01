@@ -2,17 +2,23 @@
 
 package com.moneymanager.ui.util
 
-import com.moneymanager.database.RepositorySet
+import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.database.SampleGeneratorSourceRecorder
-import com.moneymanager.domain.getDeviceInfo
+import com.moneymanager.database.sql.TransferSourceQueries
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Category
+import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.repository.AccountRepository
+import com.moneymanager.domain.repository.AttributeTypeRepository
+import com.moneymanager.domain.repository.CategoryRepository
+import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.domain.repository.TransactionRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlin.random.Random
@@ -22,7 +28,14 @@ import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 suspend fun generateSampleData(
-    repositorySet: RepositorySet,
+    currencyRepository: CurrencyRepository,
+    categoryRepository: CategoryRepository,
+    accountRepository: AccountRepository,
+    attributeTypeRepository: AttributeTypeRepository,
+    transactionRepository: TransactionRepository,
+    maintenanceService: DatabaseMaintenanceService,
+    transferSourceQueries: TransferSourceQueries,
+    deviceId: DeviceId,
     progressFlow: MutableStateFlow<GenerationProgress>,
 ) {
     val random = Random.Default
@@ -34,7 +47,7 @@ suspend fun generateSampleData(
         ),
     )
 
-    val allCurrencies = repositorySet.currencyRepository.getAllCurrencies().first()
+    val allCurrencies = currencyRepository.getAllCurrencies().first()
     check(allCurrencies.isNotEmpty()) { "No currencies found in database. Please create currencies first." }
 
     // Pick 10-20 popular currencies (or all if less than 20)
@@ -72,7 +85,7 @@ suspend fun generateSampleData(
     var categoriesCreated = 0
 
     for (parent in categoryHierarchy) {
-        val parentId = repositorySet.categoryRepository.createCategory(parent.category)
+        val parentId = categoryRepository.createCategory(parent.category)
         categoryIds.add(parentId)
         categoriesCreated++
 
@@ -86,7 +99,7 @@ suspend fun generateSampleData(
 
         for (child in parent.children) {
             val childId =
-                repositorySet.categoryRepository.createCategory(
+                categoryRepository.createCategory(
                     child.copy(parentId = parentId),
                 )
             categoryIds.add(childId)
@@ -160,7 +173,7 @@ suspend fun generateSampleData(
             )
         }
 
-    val accountIds = repositorySet.accountRepository.createAccountsBatch(accountsToCreate)
+    val accountIds = accountRepository.createAccountsBatch(accountsToCreate)
 
     progressFlow.emit(
         GenerationProgress(
@@ -199,7 +212,7 @@ suspend fun generateSampleData(
 
     val attributeTypeIds = mutableListOf<AttributeTypeId>()
     for (typeName in attributeTypeNames) {
-        val typeId = repositorySet.attributeTypeRepository.getOrCreate(typeName)
+        val typeId = attributeTypeRepository.getOrCreate(typeName)
         attributeTypeIds.add(typeId)
     }
 
@@ -272,13 +285,12 @@ suspend fun generateSampleData(
     }
 
     // Step 8: Create transactions with attributes and sources in batches
-    val deviceId = repositorySet.deviceRepository.getOrCreateDevice(getDeviceInfo())
     var transactionsCreated = 0
 
-    repositorySet.transactionRepository.createTransfers(
+    transactionRepository.createTransfers(
         transfers = allTransfers,
         newAttributes = allNewAttributes,
-        sourceRecorder = SampleGeneratorSourceRecorder(repositorySet.transferSourceQueries, deviceId),
+        sourceRecorder = SampleGeneratorSourceRecorder(transferSourceQueries, deviceId),
         onProgress = { created, total ->
             transactionsCreated = created
             progressFlow.emit(
@@ -307,7 +319,7 @@ suspend fun generateSampleData(
             currentOperation = "Refreshing materialized views...",
         ),
     )
-    repositorySet.maintenanceService.refreshMaterializedViews()
+    maintenanceService.refreshMaterializedViews()
 
     // Final progress update
     progressFlow.emit(

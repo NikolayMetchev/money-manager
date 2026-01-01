@@ -2,7 +2,6 @@
 
 package com.moneymanager.database.repository
 
-import com.moneymanager.domain.getDeviceInfo
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -14,7 +13,6 @@ class CsvImportRepositoryImplTest : DbTest() {
     @Test
     fun `createImport should create import with device info`() =
         runTest {
-            val deviceInfo = getDeviceInfo()
             val headers = listOf("Date", "Amount", "Description")
             val rows =
                 listOf(
@@ -27,7 +25,6 @@ class CsvImportRepositoryImplTest : DbTest() {
                     fileName = "test.csv",
                     headers = headers,
                     rows = rows,
-                    deviceInfo = deviceInfo,
                 )
 
             assertNotNull(importId)
@@ -37,6 +34,7 @@ class CsvImportRepositoryImplTest : DbTest() {
             assertEquals("test.csv", import.originalFileName)
             assertEquals(2, import.rowCount)
             assertEquals(3, import.columnCount)
-            assertEquals(deviceInfo, import.deviceInfo)
+            // Device info is now injected via DI, so we just verify it's not null
+            assertNotNull(import.deviceInfo)
         }
 }

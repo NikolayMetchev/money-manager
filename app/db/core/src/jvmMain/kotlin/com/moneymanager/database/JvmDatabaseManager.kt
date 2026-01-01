@@ -1,7 +1,10 @@
 package com.moneymanager.database
 
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
+import com.moneymanager.database.repository.CurrencyRepositoryImpl
 import com.moneymanager.database.sql.MoneyManagerDatabase
+import com.moneymanager.domain.model.DEFAULT_DATABASE_PATH
+import com.moneymanager.domain.model.DbLocation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.nio.file.Files
@@ -54,7 +57,7 @@ class JvmDatabaseManager : DatabaseManager {
             val database = MoneyManagerDatabaseWrapper(driver)
 
             if (isNewDatabase) {
-                DatabaseConfig.seedDatabase(database)
+                DatabaseConfig.seedDatabase(database, CurrencyRepositoryImpl(database))
             }
 
             database
