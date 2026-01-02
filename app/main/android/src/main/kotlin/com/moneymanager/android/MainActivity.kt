@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -74,7 +75,7 @@ private sealed class AppDatabaseState {
 }
 
 @Suppress("FunctionName")
-@androidx.compose.runtime.Composable
+@Composable
 private fun MainContent(
     databaseManager: DatabaseManager,
     appVersion: AppVersion,
