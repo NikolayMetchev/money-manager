@@ -49,19 +49,14 @@ SELECT
     transfer_source.created_at,
     source_type.name AS source_type,
     csv_import_metadata.original_file_name AS csv_file_name,
-    platform.name AS platform_name,
-    os_name.name AS os_name,
-    machine_name.name AS machine_name,
-    device_make.name AS device_make,
-    device_model.name AS device_model
+    device_view.platform_name,
+    device_view.os_name,
+    device_view.machine_name,
+    device_view.device_make,
+    device_view.device_model
 FROM transfer_source
 JOIN source_type ON transfer_source.source_type_id = source_type.id
-JOIN device ON transfer_source.device_id = device.id
-JOIN platform ON device.platform_id = platform.id
-LEFT JOIN os_name ON device.os_id = os_name.id
-LEFT JOIN machine_name ON device.machine_id = machine_name.id
-LEFT JOIN device_make ON device.device_make_id = device_make.id
-LEFT JOIN device_model ON device.device_model_id = device_model.id
+JOIN device_view ON transfer_source.device_id = device_view.id
 LEFT JOIN csv_transfer_source ON transfer_source.id = csv_transfer_source.id
 LEFT JOIN csv_import_metadata ON csv_transfer_source.csv_import_id = csv_import_metadata.id
 WHERE transfer_source.transaction_id = ? AND transfer_source.revision_id = ?;
@@ -79,19 +74,14 @@ SELECT
     transfer_source.created_at,
     source_type.name AS source_type,
     csv_import_metadata.original_file_name AS csv_file_name,
-    platform.name AS platform_name,
-    os_name.name AS os_name,
-    machine_name.name AS machine_name,
-    device_make.name AS device_make,
-    device_model.name AS device_model
+    device_view.platform_name,
+    device_view.os_name,
+    device_view.machine_name,
+    device_view.device_make,
+    device_view.device_model
 FROM transfer_source
 JOIN source_type ON transfer_source.source_type_id = source_type.id
-JOIN device ON transfer_source.device_id = device.id
-JOIN platform ON device.platform_id = platform.id
-LEFT JOIN os_name ON device.os_id = os_name.id
-LEFT JOIN machine_name ON device.machine_id = machine_name.id
-LEFT JOIN device_make ON device.device_make_id = device_make.id
-LEFT JOIN device_model ON device.device_model_id = device_model.id
+JOIN device_view ON transfer_source.device_id = device_view.id
 LEFT JOIN csv_transfer_source ON transfer_source.id = csv_transfer_source.id
 LEFT JOIN csv_import_metadata ON csv_transfer_source.csv_import_id = csv_import_metadata.id
 WHERE transfer_source.transaction_id = ?

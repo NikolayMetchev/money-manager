@@ -17,26 +17,19 @@ class DeviceRepositoryImpl(
     }
 
     private fun getOrCreateJvmDevice(deviceInfo: DeviceInfo.Jvm): DeviceId {
-        // Get or create OsName
-        database.osNameQueries.insertOrIgnore(deviceInfo.osName)
-        val osId = database.osNameQueries.selectByName(deviceInfo.osName).executeAsOne()
+        // Get or create OS
+        database.deviceQueries.insertOrIgnoreOs(deviceInfo.osName)
+        val osId = database.deviceQueries.selectOsByName(deviceInfo.osName).executeAsOne()
 
-        // Get or create MachineName
-        database.machineNameQueries.insertOrIgnore(deviceInfo.machineName)
-        val machineId = database.machineNameQueries.selectByName(deviceInfo.machineName).executeAsOne()
+        // Get or create Machine
+        database.deviceQueries.insertOrIgnoreMachine(deviceInfo.machineName)
+        val machineId = database.deviceQueries.selectMachineByName(deviceInfo.machineName).executeAsOne()
 
-        // Try to find existing device (platform_id = 1 for JVM)
+        // Try to find existing device
         val existingDevice =
-            database.deviceQueries.selectByAttributes(
-                platform_id = 1L,
+            database.deviceQueries.selectByAttributesJvm(
                 os_id = osId,
-                os_id_ = osId,
                 machine_id = machineId,
-                machine_id_ = machineId,
-                device_make_id = null,
-                device_make_id_ = null,
-                device_model_id = null,
-                device_model_id_ = null,
             ).executeAsOneOrNull()
 
         if (existingDevice != null) {
@@ -50,41 +43,27 @@ class DeviceRepositoryImpl(
         )
         // Re-query to get the ID (lastInsertRowId doesn't work reliably with JDBC)
         return DeviceId(
-            database.deviceQueries.selectByAttributes(
-                platform_id = 1L,
+            database.deviceQueries.selectByAttributesJvm(
                 os_id = osId,
-                os_id_ = osId,
                 machine_id = machineId,
-                machine_id_ = machineId,
-                device_make_id = null,
-                device_make_id_ = null,
-                device_model_id = null,
-                device_model_id_ = null,
             ).executeAsOne(),
         )
     }
 
     private fun getOrCreateAndroidDevice(deviceInfo: DeviceInfo.Android): DeviceId {
         // Get or create DeviceMake
-        database.deviceMakeQueries.insertOrIgnore(deviceInfo.deviceMake)
-        val makeId = database.deviceMakeQueries.selectByName(deviceInfo.deviceMake).executeAsOne()
+        database.deviceQueries.insertOrIgnoreDeviceMake(deviceInfo.deviceMake)
+        val makeId = database.deviceQueries.selectDeviceMakeByName(deviceInfo.deviceMake).executeAsOne()
 
         // Get or create DeviceModel
-        database.deviceModelQueries.insertOrIgnore(deviceInfo.deviceModel)
-        val modelId = database.deviceModelQueries.selectByName(deviceInfo.deviceModel).executeAsOne()
+        database.deviceQueries.insertOrIgnoreDeviceModel(deviceInfo.deviceModel)
+        val modelId = database.deviceQueries.selectDeviceModelByName(deviceInfo.deviceModel).executeAsOne()
 
-        // Try to find existing device (platform_id = 2 for Android)
+        // Try to find existing device
         val existingDevice =
-            database.deviceQueries.selectByAttributes(
-                platform_id = 2L,
-                os_id = null,
-                os_id_ = null,
-                machine_id = null,
-                machine_id_ = null,
+            database.deviceQueries.selectByAttributesAndroid(
                 device_make_id = makeId,
-                device_make_id_ = makeId,
                 device_model_id = modelId,
-                device_model_id_ = modelId,
             ).executeAsOneOrNull()
 
         if (existingDevice != null) {
@@ -98,16 +77,9 @@ class DeviceRepositoryImpl(
         )
         // Re-query to get the ID (lastInsertRowId doesn't work reliably with JDBC)
         return DeviceId(
-            database.deviceQueries.selectByAttributes(
-                platform_id = 2L,
-                os_id = null,
-                os_id_ = null,
-                machine_id = null,
-                machine_id_ = null,
+            database.deviceQueries.selectByAttributesAndroid(
                 device_make_id = makeId,
-                device_make_id_ = makeId,
                 device_model_id = modelId,
-                device_model_id_ = modelId,
             ).executeAsOne(),
         )
     }
