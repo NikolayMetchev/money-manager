@@ -22,6 +22,12 @@ CREATE TABLE device_model (
     name TEXT NOT NULL UNIQUE
 );
 
+-- Indexes for lookup table name searches
+CREATE INDEX idx_os_name ON os(name);
+CREATE INDEX idx_machine_name ON machine(name);
+CREATE INDEX idx_device_make_name ON device_make(name);
+CREATE INDEX idx_device_model_name ON device_model(name);
+
 -- device: Normalized device information table
 -- JVM devices: platform_id, os_id, machine_id are set; device_make_id, device_model_id are NULL
 -- Android devices: platform_id, device_make_id, device_model_id are set; os_id, machine_id are NULL
@@ -45,6 +51,7 @@ CREATE TABLE device (
 );
 
 CREATE INDEX IF NOT EXISTS idx_device_platform ON device(platform_id);
+CREATE INDEX idx_device_lookup ON device(platform_id, os_id, machine_id, device_make_id, device_model_id);
 
 -- View that joins device with all related lookup tables
 CREATE VIEW device_view AS
