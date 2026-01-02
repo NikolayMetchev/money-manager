@@ -80,12 +80,14 @@ data class NewAccount(
  * @property attributes List of (attributeTypeName, value) pairs
  * @property importStatus The import status (IMPORTED, DUPLICATE, UPDATED)
  * @property existingTransferId If status is DUPLICATE or UPDATED, the ID of the existing transfer
+ * @property rowIndex The original CSV row index for status tracking
  */
 data class CsvTransferWithAttributes(
     val transfer: Transfer,
     val attributes: List<Pair<String, String>>,
     val importStatus: ImportStatus = ImportStatus.IMPORTED,
     val existingTransferId: TransferId? = null,
+    val rowIndex: Long,
 )
 
 /**
@@ -160,6 +162,7 @@ class CsvTransferMapper(
                             attributes = result.attributes,
                             importStatus = result.importStatus,
                             existingTransferId = result.existingTransferId,
+                            rowIndex = row.rowIndex,
                         ),
                     )
                     // Count by status

@@ -290,10 +290,38 @@ fun ApplyStrategyDialog(
                                     existingTransfers = existingTransferInfoList,
                                 )
 
-                            val finalPrep = mapper.prepareImport(rows)
+                            // Only process rows that need processing: ERROR status or no status (never processed)
+                            val rowsToProcess =
+                                rows.filter { row ->
+                                    row.importStatus == null || row.importStatus == ImportStatus.ERROR
+                                }
+
+                            // Handle case when all rows are already processed
+                            if (rowsToProcess.isEmpty()) {
+                                logger.info { "No rows to process - all rows already imported" }
+                                onImportComplete(
+                                    CsvImportResult(
+                                        successCount = 0,
+                                        failedRows = emptyList(),
+                                    ),
+                                )
+                                return@launch
+                            }
+
+                            val finalPrep = mapper.prepareImport(rowsToProcess)
                             val validCount = finalPrep.validTransfers.size
                             val errorCount = finalPrep.errorRows.size
                             logger.info { "Prepared $validCount valid transfers, $errorCount error rows" }
+
+                            // Mark mapping errors as ERROR status in database
+                            for (errorRow in finalPrep.errorRows) {
+                                csvImportRepository.updateRowStatus(
+                                    csvImport.id,
+                                    errorRow.rowIndex,
+                                    ImportStatus.ERROR.name,
+                                    null,
+                                )
+                            }
 
                             // Pre-resolve attribute types
                             val allAttributeTypeNames =
@@ -313,14 +341,11 @@ fun ApplyStrategyDialog(
                             var successCount = 0
                             val deviceId = deviceRepository.getOrCreateDevice(getDeviceInfo())
 
-                            for ((index, transferWithAttrs) in finalPrep.validTransfers.withIndex()) {
+                            for (transferWithAttrs in finalPrep.validTransfers) {
                                 val transfer = transferWithAttrs.transfer
                                 val importStatus = transferWithAttrs.importStatus
                                 val existingTransferId = transferWithAttrs.existingTransferId
-                                // Find the original row index for this transfer
-                                val originalRowIndex =
-                                    rows.getOrNull(index)?.rowIndex
-                                        ?: continue
+                                val originalRowIndex = transferWithAttrs.rowIndex
 
                                 try {
                                     // Convert attributes from (typeName, value) to NewAttribute
@@ -383,8 +408,19 @@ fun ApplyStrategyDialog(
                                                 successCount++
                                             }
                                         }
+                                        ImportStatus.ERROR -> {
+                                            // ERROR status shouldn't come from mapper, but handle gracefully
+                                            logger.warn { "Unexpected ERROR status for row $originalRowIndex" }
+                                        }
                                     }
                                 } catch (expected: Exception) {
+                                    // Mark row as ERROR in database
+                                    csvImportRepository.updateRowStatus(
+                                        csvImport.id,
+                                        originalRowIndex,
+                                        ImportStatus.ERROR.name,
+                                        null,
+                                    )
                                     // Log the error and continue with remaining rows
                                     val errorMsg = expected.message ?: "Unknown error"
                                     logger.warn(expected) {

@@ -19,4 +19,9 @@ enum class ImportStatus {
      * Existing transaction found with different values - transaction updated.
      */
     UPDATED,
+
+    /**
+     * An error occurred while processing this CSV row.
+     */
+    ERROR,
 }

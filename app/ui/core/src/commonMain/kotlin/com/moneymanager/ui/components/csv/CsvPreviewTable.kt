@@ -204,6 +204,7 @@ fun CsvPreviewTable(
                                         ImportStatus.IMPORTED -> "New" to MaterialTheme.colorScheme.primary
                                         ImportStatus.DUPLICATE -> "Duplicate" to MaterialTheme.colorScheme.secondary
                                         ImportStatus.UPDATED -> "Updated" to MaterialTheme.colorScheme.tertiary
+                                        ImportStatus.ERROR -> "Error" to MaterialTheme.colorScheme.error
                                     }
                                 Text(
                                     text = statusText,
