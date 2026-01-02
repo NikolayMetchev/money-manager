@@ -73,12 +73,6 @@ class TransactionRepositoryImpl(
             .mapToOneOrNull(Dispatchers.Default)
             .map { loadAttributesForTransfer(it) }
 
-    override fun getAllTransactions(): Flow<List<Transfer>> =
-        transferQueries.selectAll(TransferMapper::mapRaw)
-            .asFlow()
-            .mapToList(Dispatchers.Default)
-            .map { loadAttributesForTransfers(it) }
-
     override fun getTransactionsByAccount(accountId: AccountId): Flow<List<Transfer>> =
         transferQueries.selectByAccount(accountId.id, accountId.id, TransferMapper::mapRaw)
             .asFlow()

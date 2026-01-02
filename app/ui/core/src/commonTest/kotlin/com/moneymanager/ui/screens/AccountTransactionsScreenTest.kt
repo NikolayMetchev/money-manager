@@ -831,8 +831,6 @@ class AccountTransactionsScreenTest {
     ) : TransactionRepository {
         override fun getTransactionById(id: Uuid): Flow<Transfer?> = flowOf(transfers.find { it.id.id == id })
 
-        override fun getAllTransactions(): Flow<List<Transfer>> = flowOf(transfers)
-
         override fun getTransactionsByAccount(accountId: AccountId): Flow<List<Transfer>> =
             flowOf(transfers.filter { it.sourceAccountId == accountId || it.targetAccountId == accountId })
 

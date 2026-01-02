@@ -20,8 +20,6 @@ import kotlin.uuid.Uuid
 interface TransactionRepository {
     fun getTransactionById(id: Uuid): Flow<Transfer?>
 
-    fun getAllTransactions(): Flow<List<Transfer>>
-
     fun getTransactionsByAccount(accountId: AccountId): Flow<List<Transfer>>
 
     fun getTransactionsByDateRange(

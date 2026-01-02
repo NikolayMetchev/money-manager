@@ -183,7 +183,8 @@ class CsvImportDuplicateDetectionIntegrationTest : DbTest() {
             )
 
             // Verify transfer was created
-            val allTransfersBeforeImport = repositories.transactionRepository.getAllTransactions().first()
+            val allTransfersBeforeImport =
+                repositories.transactionRepository.getTransactionsByAccount(sourceAccount.id).first()
             assertEquals(1, allTransfersBeforeImport.size, "Should have 1 existing transfer")
             assertEquals(1, allTransfersBeforeImport[0].attributes.size, "Transfer should have 1 attribute")
             assertEquals("Transaction ID", allTransfersBeforeImport[0].attributes[0].attributeType.name)
@@ -193,8 +194,13 @@ class CsvImportDuplicateDetectionIntegrationTest : DbTest() {
             val strategy = createTestStrategy()
             val columns = createTestColumns()
 
-            // Fetch existing transfers (this is what was missing in the bug!)
-            val existingTransfers = repositories.transactionRepository.getAllTransactions().first()
+            // Fetch existing transfers by account and date range (optimized approach)
+            val existingTransfers =
+                repositories.transactionRepository.getTransactionsByAccountAndDateRange(
+                    accountId = sourceAccount.id,
+                    startDate = timestamp,
+                    endDate = timestamp,
+                ).first()
 
             // Build ExistingTransferInfo list like ApplyStrategyDialog does
             val existingTransferInfoList =
@@ -313,8 +319,13 @@ class CsvImportDuplicateDetectionIntegrationTest : DbTest() {
                     updatedAt = Clock.System.now(),
                 )
 
-            // Fetch existing transfers and build info list
-            val existingTransfers = repositories.transactionRepository.getAllTransactions().first()
+            // Fetch existing transfers by account and date range
+            val existingTransfers =
+                repositories.transactionRepository.getTransactionsByAccountAndDateRange(
+                    accountId = sourceAccount.id,
+                    startDate = timestamp,
+                    endDate = timestamp,
+                ).first()
             val existingTransferInfoList =
                 existingTransfers.map { transfer ->
                     ExistingTransferInfo(

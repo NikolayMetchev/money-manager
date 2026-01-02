@@ -223,8 +223,34 @@ fun ApplyStrategyDialog(
                             val currenciesByCode = currencies.associateBy { it.code.uppercase() }
 
                             // Fetch existing transfers for duplicate detection
-                            logger.info { "Fetching existing transfers for duplicate detection" }
-                            val existingTransfers = transactionRepository.getAllTransactions().first()
+                            // Only fetch transfers that overlap with the CSV's date range and accounts
+                            logger.info { "Determining date range and accounts for duplicate detection" }
+                            val allAccountIds =
+                                prep.validTransfers
+                                    .flatMap { listOf(it.transfer.sourceAccountId, it.transfer.targetAccountId) }
+                                    .toSet()
+                            val minTimestamp =
+                                prep.validTransfers.minOfOrNull { it.transfer.timestamp }
+                                    ?: Clock.System.now()
+                            val maxTimestamp =
+                                prep.validTransfers.maxOfOrNull { it.transfer.timestamp }
+                                    ?: Clock.System.now()
+
+                            logger.info {
+                                "Fetching existing transfers: ${allAccountIds.size} accounts, " +
+                                    "date range $minTimestamp to $maxTimestamp"
+                            }
+
+                            // Fetch existing transfers within the CSV's date range that involve any of the CSV's accounts
+                            val existingTransfers =
+                                allAccountIds.flatMap { accountId ->
+                                    transactionRepository.getTransactionsByAccountAndDateRange(
+                                        accountId = accountId,
+                                        startDate = minTimestamp,
+                                        endDate = maxTimestamp,
+                                    ).first()
+                                }.distinctBy { it.id }
+
                             val existingTransferInfoList =
                                 existingTransfers.map { transfer ->
                                     // Build attribute map (typeName -> value)
