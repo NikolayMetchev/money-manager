@@ -1,7 +1,7 @@
 package com.moneymanager.test.database
 
-import com.moneymanager.database.DbLocation
 import com.moneymanager.di.AppComponentParams
+import com.moneymanager.domain.model.DbLocation
 
 expect fun createTestDatabaseLocation(): DbLocation
 

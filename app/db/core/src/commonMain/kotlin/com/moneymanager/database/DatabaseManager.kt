@@ -1,9 +1,6 @@
 package com.moneymanager.database
 
-/**
- * Default database filename used across all platforms.
- */
-const val DEFAULT_DATABASE_NAME = "money_manager.db"
+import com.moneymanager.domain.model.DbLocation
 
 /**
  * Manages MoneyManager databases.

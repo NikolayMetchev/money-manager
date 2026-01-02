@@ -1,7 +1,7 @@
 package com.moneymanager.schemaspy
 
-import com.moneymanager.database.DbLocation
 import com.moneymanager.database.JvmDatabaseManager
+import com.moneymanager.domain.model.DbLocation
 import java.nio.file.Paths
 
 /**

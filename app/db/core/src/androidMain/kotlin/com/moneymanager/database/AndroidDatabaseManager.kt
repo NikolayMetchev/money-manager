@@ -1,8 +1,12 @@
 package com.moneymanager.database
 
 import android.content.Context
+import androidx.sqlite.db.SupportSQLiteDatabase
 import app.cash.sqldelight.driver.android.AndroidSqliteDriver
+import com.moneymanager.database.repository.CurrencyRepositoryImpl
 import com.moneymanager.database.sql.MoneyManagerDatabase
+import com.moneymanager.domain.model.DEFAULT_DATABASE_NAME
+import com.moneymanager.domain.model.DbLocation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -27,7 +31,7 @@ class AndroidDatabaseManager(private val context: Context) : DatabaseManager {
                     name = location.name,
                     callback =
                         object : AndroidSqliteDriver.Callback(MoneyManagerDatabase.Schema) {
-                            override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                            override fun onCreate(db: SupportSQLiteDatabase) {
                                 // Only create schema for truly new databases
                                 if (isNewDatabase) {
                                     super.onCreate(db)
@@ -38,7 +42,7 @@ class AndroidDatabaseManager(private val context: Context) : DatabaseManager {
                             }
 
                             override fun onUpgrade(
-                                db: androidx.sqlite.db.SupportSQLiteDatabase,
+                                db: SupportSQLiteDatabase,
                                 oldVersion: Int,
                                 newVersion: Int,
                             ) {
@@ -46,7 +50,7 @@ class AndroidDatabaseManager(private val context: Context) : DatabaseManager {
                                 // The global schema error handler will show DatabaseSchemaErrorDialog
                             }
 
-                            override fun onOpen(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                            override fun onOpen(db: SupportSQLiteDatabase) {
                                 super.onOpen(db)
                                 // Apply connection-level PRAGMA settings
                                 DatabaseConfig.connectionPragmas.forEach { pragma ->
@@ -59,7 +63,7 @@ class AndroidDatabaseManager(private val context: Context) : DatabaseManager {
             val database = MoneyManagerDatabaseWrapper(driver)
 
             if (isNewDatabase) {
-                DatabaseConfig.seedDatabase(database)
+                DatabaseConfig.seedDatabase(database, CurrencyRepositoryImpl(database))
             }
 
             database

@@ -3,6 +3,7 @@
 package com.moneymanager.database
 
 import com.moneymanager.currency.Currency
+import com.moneymanager.domain.repository.CurrencyRepository
 
 /**
  * Centralized database configuration for SQLite PRAGMA settings and seed data.
@@ -365,7 +366,10 @@ object DatabaseConfig {
      *
      * @param database The database to seed
      */
-    suspend fun seedDatabase(database: MoneyManagerDatabaseWrapper) {
+    suspend fun seedDatabase(
+        database: MoneyManagerDatabaseWrapper,
+        currencyRepository: CurrencyRepository,
+    ) {
         with(database) {
             // Seed AuditType lookup table
             auditTypeQueries.insert(id = 1, name = "INSERT")
@@ -403,7 +407,6 @@ object DatabaseConfig {
             )
 
             // Seed currencies
-            val currencyRepository = RepositorySet(database).currencyRepository
             allCurrencies.forEach { currency ->
                 currencyRepository.upsertCurrencyByCode(currency.code, currency.displayName)
             }

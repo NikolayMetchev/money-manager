@@ -19,11 +19,10 @@ import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import androidx.compose.ui.test.waitUntilExactlyOneExists
 import com.moneymanager.database.DatabaseMaintenanceService
-import com.moneymanager.database.DbLocation
 import com.moneymanager.database.ManualSourceRecorder
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
-import com.moneymanager.database.RepositorySet
 import com.moneymanager.database.SampleGeneratorSourceRecorder
+import com.moneymanager.di.database.DatabaseComponent
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
@@ -35,6 +34,7 @@ import com.moneymanager.domain.model.CategoryBalance
 import com.moneymanager.domain.model.CsvSourceDetails
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
@@ -268,7 +268,7 @@ class AccountTransactionsScreenTest {
         // Set up real database
         var testDbLocation: DbLocation? = null
         lateinit var database: MoneyManagerDatabaseWrapper
-        var repositories: RepositorySet? = null
+        lateinit var repositories: DatabaseComponent
         var checkingAccountId: AccountId? = null
         var savingsAccountId: AccountId? = null
         var transferId: TransferId? = null
@@ -279,7 +279,7 @@ class AccountTransactionsScreenTest {
                 testDbLocation = createTestDatabaseLocation()
                 val databaseManager = createTestDatabaseManager()
                 database = databaseManager.openDatabase(testDbLocation)
-                repositories = RepositorySet(database)
+                repositories = DatabaseComponent.create(database)
 
                 val now = Clock.System.now()
 
@@ -334,7 +334,7 @@ class AccountTransactionsScreenTest {
 
                         AccountTransactionsScreen(
                             accountId = currentAccountId,
-                            transactionRepository = repositories!!.transactionRepository,
+                            transactionRepository = repositories.transactionRepository,
                             transferSourceRepository = repositories.transferSourceRepository,
                             accountRepository = repositories.accountRepository,
                             categoryRepository = repositories.categoryRepository,
@@ -389,7 +389,7 @@ class AccountTransactionsScreenTest {
                 runBlocking {
                     // Get the transfer's current revision
                     val savedTransfer =
-                        repositories!!.transactionRepository
+                        repositories.transactionRepository
                             .getTransactionById(transferId!!.id).first()!!
                     // Note: For revisionId = 1 (newly created transfers), adding attributes
                     // doesn't bump the revision - they're part of the initial creation.
@@ -420,7 +420,7 @@ class AccountTransactionsScreenTest {
 
                 // Refresh materialized views so the updated transaction appears
                 runBlocking {
-                    repositories!!.maintenanceService.fullRefreshMaterializedViews()
+                    repositories.maintenanceService.fullRefreshMaterializedViews()
                 }
 
                 // Wait for UI to refresh after edit dialog closes
@@ -462,7 +462,7 @@ class AccountTransactionsScreenTest {
 
         var testDbLocation: DbLocation? = null
         lateinit var database: MoneyManagerDatabaseWrapper
-        var repositories: RepositorySet? = null
+        lateinit var repositories: DatabaseComponent
         var checkingAccountId: AccountId? = null
         var savingsAccountId: AccountId? = null
         var transferId: TransferId? = null
@@ -473,7 +473,7 @@ class AccountTransactionsScreenTest {
                 testDbLocation = createTestDatabaseLocation()
                 val databaseManager = createTestDatabaseManager()
                 database = databaseManager.openDatabase(testDbLocation)
-                repositories = RepositorySet(database)
+                repositories = DatabaseComponent.create(database)
 
                 val now = Clock.System.now()
 
@@ -533,7 +533,7 @@ class AccountTransactionsScreenTest {
 
                         AccountTransactionsScreen(
                             accountId = currentAccountId,
-                            transactionRepository = repositories!!.transactionRepository,
+                            transactionRepository = repositories.transactionRepository,
                             transferSourceRepository = repositories.transferSourceRepository,
                             accountRepository = repositories.accountRepository,
                             categoryRepository = repositories.categoryRepository,
@@ -586,7 +586,7 @@ class AccountTransactionsScreenTest {
 
                 // Refresh materialized views
                 runBlocking {
-                    repositories!!.maintenanceService.fullRefreshMaterializedViews()
+                    repositories.maintenanceService.fullRefreshMaterializedViews()
                 }
 
                 // Wait for audit button to be visible (indicates UI has refreshed)
@@ -629,7 +629,7 @@ class AccountTransactionsScreenTest {
 
         var testDbLocation: DbLocation? = null
         lateinit var database: MoneyManagerDatabaseWrapper
-        var repositories: RepositorySet? = null
+        lateinit var repositories: DatabaseComponent
         var checkingAccountId: AccountId? = null
         var savingsAccountId: AccountId? = null
         var transferId: TransferId? = null
@@ -640,7 +640,7 @@ class AccountTransactionsScreenTest {
                 testDbLocation = createTestDatabaseLocation()
                 val databaseManager = createTestDatabaseManager()
                 database = databaseManager.openDatabase(testDbLocation)
-                repositories = RepositorySet(database)
+                repositories = DatabaseComponent.create(database)
 
                 val now = Clock.System.now()
 
@@ -700,7 +700,7 @@ class AccountTransactionsScreenTest {
 
                         AccountTransactionsScreen(
                             accountId = currentAccountId,
-                            transactionRepository = repositories!!.transactionRepository,
+                            transactionRepository = repositories.transactionRepository,
                             transferSourceRepository = repositories.transferSourceRepository,
                             accountRepository = repositories.accountRepository,
                             categoryRepository = repositories.categoryRepository,
@@ -759,7 +759,7 @@ class AccountTransactionsScreenTest {
 
                 // Refresh materialized views
                 runBlocking {
-                    repositories!!.maintenanceService.fullRefreshMaterializedViews()
+                    repositories.maintenanceService.fullRefreshMaterializedViews()
                 }
 
                 // Verify the description was updated in the UI

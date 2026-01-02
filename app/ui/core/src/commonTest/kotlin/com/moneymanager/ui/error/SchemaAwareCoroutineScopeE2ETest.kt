@@ -9,12 +9,12 @@ import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.waitUntilDoesNotExist
 import androidx.compose.ui.test.waitUntilExactlyOneExists
 import com.moneymanager.database.DatabaseManager
-import com.moneymanager.database.DbLocation
 import com.moneymanager.domain.model.AppVersion
+import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.test.database.copyDatabaseFromResources
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
-import com.moneymanager.ui.MoneyManagerApp
+import com.moneymanager.ui.test.TestMoneyManagerApp
 import kotlin.test.AfterTest
 import kotlin.test.Test
 
@@ -52,7 +52,7 @@ class SchemaAwareCoroutineScopeE2ETest {
 
             // When: MoneyManagerApp is initialized
             setContent {
-                MoneyManagerApp(
+                TestMoneyManagerApp(
                     databaseManager =
                         TestDatabaseManager(
                             databaseManager = databaseManager,
@@ -81,7 +81,7 @@ class SchemaAwareCoroutineScopeE2ETest {
             val databaseManager = createTestDatabaseManager()
 
             setContent {
-                MoneyManagerApp(
+                TestMoneyManagerApp(
                     databaseManager =
                         TestDatabaseManager(
                             databaseManager = databaseManager,

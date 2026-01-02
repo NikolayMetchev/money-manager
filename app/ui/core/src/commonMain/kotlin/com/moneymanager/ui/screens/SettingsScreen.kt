@@ -34,7 +34,14 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.moneymanager.database.RepositorySet
+import com.moneymanager.database.DatabaseMaintenanceService
+import com.moneymanager.database.sql.TransferSourceQueries
+import com.moneymanager.domain.model.DeviceId
+import com.moneymanager.domain.repository.AccountRepository
+import com.moneymanager.domain.repository.AttributeTypeRepository
+import com.moneymanager.domain.repository.CategoryRepository
+import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.util.GenerationProgress
 import com.moneymanager.ui.util.generateSampleData
@@ -95,7 +102,16 @@ private fun AutoSizeText(
 }
 
 @Composable
-fun SettingsScreen(repositorySet: RepositorySet) {
+fun SettingsScreen(
+    currencyRepository: CurrencyRepository,
+    categoryRepository: CategoryRepository,
+    accountRepository: AccountRepository,
+    attributeTypeRepository: AttributeTypeRepository,
+    transactionRepository: TransactionRepository,
+    maintenanceService: DatabaseMaintenanceService,
+    transferSourceQueries: TransferSourceQueries,
+    deviceId: DeviceId,
+) {
     var showWarningDialog by remember { mutableStateOf(false) }
     var isGenerating by remember { mutableStateOf(false) }
     var showProgressDialog by remember { mutableStateOf(false) }
@@ -158,13 +174,13 @@ fun SettingsScreen(repositorySet: RepositorySet) {
                                         val duration =
                                             when (operation) {
                                                 MaintenanceOperation.REINDEX ->
-                                                    repositorySet.maintenanceService.reindex()
+                                                    maintenanceService.reindex()
 
                                                 MaintenanceOperation.VACUUM ->
-                                                    repositorySet.maintenanceService.vacuum()
+                                                    maintenanceService.vacuum()
 
                                                 MaintenanceOperation.ANALYZE ->
-                                                    repositorySet.maintenanceService.analyze()
+                                                    maintenanceService.analyze()
                                             }
                                         maintenanceState =
                                             maintenanceState.copy(
@@ -217,7 +233,7 @@ fun SettingsScreen(repositorySet: RepositorySet) {
                                     refreshViewsError = null
                                     scope.launch {
                                         try {
-                                            incrementalRefreshDuration = repositorySet.maintenanceService.refreshMaterializedViews()
+                                            incrementalRefreshDuration = maintenanceService.refreshMaterializedViews()
                                         } catch (expected: Exception) {
                                             refreshViewsError = "Incremental refresh failed: ${expected.message}"
                                         } finally {
@@ -254,7 +270,7 @@ fun SettingsScreen(repositorySet: RepositorySet) {
                                     refreshViewsError = null
                                     scope.launch {
                                         try {
-                                            fullRefreshDuration = repositorySet.maintenanceService.fullRefreshMaterializedViews()
+                                            fullRefreshDuration = maintenanceService.fullRefreshMaterializedViews()
                                         } catch (expected: Exception) {
                                             refreshViewsError = "Full refresh failed: ${expected.message}"
                                         } finally {
@@ -378,7 +394,17 @@ fun SettingsScreen(repositorySet: RepositorySet) {
                                 }
 
                                 // Generate sample data
-                                generateSampleData(repositorySet, progressFlow)
+                                generateSampleData(
+                                    currencyRepository = currencyRepository,
+                                    categoryRepository = categoryRepository,
+                                    accountRepository = accountRepository,
+                                    attributeTypeRepository = attributeTypeRepository,
+                                    transactionRepository = transactionRepository,
+                                    maintenanceService = maintenanceService,
+                                    transferSourceQueries = transferSourceQueries,
+                                    deviceId = deviceId,
+                                    progressFlow = progressFlow,
+                                )
 
                                 successMessage = "Sample data generated successfully! " +
                                     "Created ${generationProgress.accountsCreated} accounts and " +

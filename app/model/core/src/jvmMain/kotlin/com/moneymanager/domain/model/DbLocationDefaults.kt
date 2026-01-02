@@ -1,8 +1,6 @@
-package com.moneymanager.database
+package com.moneymanager.domain.model
 
-import java.nio.file.Path
 import java.nio.file.Paths
-import kotlin.io.path.exists
 
 val DEFAULT_DATABASE_PATH: DbLocation =
     DbLocation(
@@ -12,9 +10,3 @@ val DEFAULT_DATABASE_PATH: DbLocation =
             DEFAULT_DATABASE_NAME,
         ),
     )
-
-actual data class DbLocation(val path: Path) {
-    actual fun exists() = path.exists()
-
-    override fun toString() = path.toString()
-}

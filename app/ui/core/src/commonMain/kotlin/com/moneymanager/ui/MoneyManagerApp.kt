@@ -16,22 +16,29 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import com.moneymanager.database.DatabaseManager
-import com.moneymanager.database.DatabaseState
-import com.moneymanager.database.DbLocation
-import com.moneymanager.database.RepositorySet
-import com.moneymanager.domain.getDeviceInfo
+import com.moneymanager.database.DatabaseMaintenanceService
+import com.moneymanager.database.sql.TransferSourceQueries
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.CurrencyId
-import com.moneymanager.ui.components.DatabaseSchemaErrorDialog
-import com.moneymanager.ui.error.GlobalSchemaErrorState
+import com.moneymanager.domain.model.DbLocation
+import com.moneymanager.domain.model.DeviceId
+import com.moneymanager.domain.repository.AccountRepository
+import com.moneymanager.domain.repository.AttributeTypeRepository
+import com.moneymanager.domain.repository.AuditRepository
+import com.moneymanager.domain.repository.CategoryRepository
+import com.moneymanager.domain.repository.CsvImportRepository
+import com.moneymanager.domain.repository.CsvImportStrategyRepository
+import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.domain.repository.DeviceRepository
+import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.domain.repository.TransferAttributeRepository
+import com.moneymanager.domain.repository.TransferSourceRepository
 import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -50,413 +57,293 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MoneyManagerApp(
-    databaseManager: DatabaseManager,
-    appVersion: AppVersion,
-    onLog: (String, Throwable?) -> Unit = { _, _ -> },
-) {
-    // Provide schema-aware coroutine scope to all child composables
-    ProvideSchemaAwareScope {
-        MoneyManagerAppImpl(databaseManager, appVersion, onLog)
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun MoneyManagerAppImpl(
-    databaseManager: DatabaseManager,
-    appVersion: AppVersion,
-    onLog: (String, Throwable?) -> Unit,
-) {
-    val scope = rememberSchemaAwareCoroutineScope()
-    var databaseState by remember { mutableStateOf<DatabaseState>(DatabaseState.NoDatabaseSelected) }
-    var schemaErrorInfo by remember { mutableStateOf<Pair<DbLocation, Throwable>?>(null) }
-    var currentDeviceId by remember { mutableStateOf<Long?>(null) }
-
-    // Observe global schema error state from Flow collection error handlers
-    val globalSchemaError by GlobalSchemaErrorState.schemaError.collectAsState()
-
-    // Initialize database on startup
-    LaunchedEffect(Unit) {
-        val defaultLocation = databaseManager.getDefaultLocation()
-        val dbExists = databaseManager.databaseExists(defaultLocation)
-        onLog("Default database location: $defaultLocation, exists: $dbExists", null)
-
-        if (dbExists) {
-            onLog("Existing database found, opening...", null)
-            try {
-                val database = databaseManager.openDatabase(defaultLocation)
-                val repositories = RepositorySet(database)
-                currentDeviceId = repositories.deviceRepository.getOrCreateDevice(getDeviceInfo())
-                // Schema errors at runtime are now caught globally by the uncaught exception handler
-                // which updates GlobalSchemaErrorState - no need for explicit validation queries here
-                databaseState = DatabaseState.DatabaseLoaded(defaultLocation, repositories)
-                onLog("Database opened successfully", null)
-            } catch (expected: Exception) {
-                onLog("Failed to open database: ${expected.message}", expected)
-                // Store error info to show schema error dialog
-                schemaErrorInfo = defaultLocation to expected
-                databaseState = DatabaseState.Error(expected)
-            }
-        } else {
-            onLog("No existing database, creating new one...", null)
-            try {
-                val database = databaseManager.openDatabase(defaultLocation)
-                val repositories = RepositorySet(database)
-                currentDeviceId = repositories.deviceRepository.getOrCreateDevice(getDeviceInfo())
-                databaseState = DatabaseState.DatabaseLoaded(defaultLocation, repositories)
-                onLog("New database created successfully", null)
-            } catch (expected: Exception) {
-                onLog("Failed to create database: ${expected.message}", expected)
-                schemaErrorInfo = defaultLocation to expected
-                databaseState = DatabaseState.Error(expected)
-            }
-        }
-    }
-
-    // Determine which error to show - prioritize global errors (runtime) over local (startup)
-    val effectiveSchemaError: Pair<DbLocation, Throwable>? =
-        globalSchemaError?.let { info ->
-            // For global errors, get the current database location from state if available
-            val location =
-                (databaseState as? DatabaseState.DatabaseLoaded)?.location
-                    ?: databaseManager.getDefaultLocation()
-            location to info.error
-        } ?: schemaErrorInfo
-
-    // Show main app once database is loaded
-    when (val state = databaseState) {
-        is DatabaseState.DatabaseLoaded -> {
-            MoneyManagerAppContent(
-                repositorySet = state.repositories,
-                appVersion = appVersion,
-                databaseLocation = state.location,
-                currentDeviceId = currentDeviceId,
-            )
-        }
-        is DatabaseState.NoDatabaseSelected -> {
-            // Loading...
-        }
-        is DatabaseState.Error -> {
-            // Error dialog is shown below
-        }
-    }
-
-    // Show database schema error dialog if there's an error (rendered AFTER content to appear on top)
-    effectiveSchemaError?.let { (location, error) ->
-        DatabaseSchemaErrorDialog(
-            databaseLocation = location.toString(),
-            error = error,
-            onBackupAndCreateNew = {
-                scope.launch {
-                    try {
-                        onLog("Backing up database and creating new one...", null)
-                        val backupLocation = databaseManager.backupDatabase(location)
-                        onLog("Database backed up to: $backupLocation", null)
-
-                        val database = databaseManager.openDatabase(location)
-                        val repositories = RepositorySet(database)
-                        currentDeviceId = repositories.deviceRepository.getOrCreateDevice(getDeviceInfo())
-                        databaseState = DatabaseState.DatabaseLoaded(location, repositories)
-                        schemaErrorInfo = null
-                        GlobalSchemaErrorState.clearError()
-                        onLog("New database created successfully", null)
-                    } catch (expected: Exception) {
-                        onLog("Failed to backup and create new database: ${expected.message}", expected)
-                        schemaErrorInfo = location to expected
-                    }
-                }
-            },
-            onDeleteAndCreateNew = {
-                scope.launch {
-                    try {
-                        onLog("Deleting database and creating new one...", null)
-                        databaseManager.deleteDatabase(location)
-                        onLog("Database deleted", null)
-
-                        val database = databaseManager.openDatabase(location)
-                        val repositories = RepositorySet(database)
-                        currentDeviceId = repositories.deviceRepository.getOrCreateDevice(getDeviceInfo())
-                        databaseState = DatabaseState.DatabaseLoaded(location, repositories)
-                        schemaErrorInfo = null
-                        GlobalSchemaErrorState.clearError()
-                        onLog("New database created successfully", null)
-                    } catch (expected: Exception) {
-                        onLog("Failed to delete and create new database: ${expected.message}", expected)
-                        schemaErrorInfo = location to expected
-                    }
-                }
-            },
-        )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun MoneyManagerAppContent(
-    repositorySet: RepositorySet,
     appVersion: AppVersion,
     databaseLocation: DbLocation,
-    currentDeviceId: Long?,
+    accountRepository: AccountRepository,
+    attributeTypeRepository: AttributeTypeRepository,
+    auditRepository: AuditRepository,
+    categoryRepository: CategoryRepository,
+    csvImportRepository: CsvImportRepository,
+    csvImportStrategyRepository: CsvImportStrategyRepository,
+    currencyRepository: CurrencyRepository,
+    deviceRepository: DeviceRepository,
+    maintenanceService: DatabaseMaintenanceService,
+    transactionRepository: TransactionRepository,
+    transferAttributeRepository: TransferAttributeRepository,
+    transferSourceRepository: TransferSourceRepository,
+    transferSourceQueries: TransferSourceQueries,
+    deviceId: DeviceId,
 ) {
-    val scope = rememberSchemaAwareCoroutineScope()
-    var currentScreen by remember { mutableStateOf<Screen>(Screen.Accounts) }
-    var showTransactionDialog by remember { mutableStateOf(false) }
-    var preSelectedAccountId by remember { mutableStateOf<AccountId?>(null) }
-    var currentlyViewedAccountId by remember { mutableStateOf<AccountId?>(null) }
-    var preSelectedCurrencyId by remember { mutableStateOf<CurrencyId?>(null) }
-    var currentlyViewedCurrencyId by remember { mutableStateOf<CurrencyId?>(null) }
-    var transactionRefreshTrigger by remember { mutableStateOf(0) }
+    ProvideSchemaAwareScope {
+        val scope = rememberSchemaAwareCoroutineScope()
+        var currentScreen by remember { mutableStateOf<Screen>(Screen.Accounts) }
+        var showTransactionDialog by remember { mutableStateOf(false) }
+        var preSelectedAccountId by remember { mutableStateOf<AccountId?>(null) }
+        var currentlyViewedAccountId by remember { mutableStateOf<AccountId?>(null) }
+        var preSelectedCurrencyId by remember { mutableStateOf<CurrencyId?>(null) }
+        var currentlyViewedCurrencyId by remember { mutableStateOf<CurrencyId?>(null) }
+        var transactionRefreshTrigger by remember { mutableStateOf(0) }
 
-    // Use schema-error-aware collection for flows that may fail on old databases
-    val accounts by repositorySet.accountRepository.getAllAccounts()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+        // Use schema-error-aware collection for flows that may fail on old databases
+        val accounts by accountRepository.getAllAccounts()
+            .collectAsStateWithSchemaErrorHandling(initial = emptyList())
 
-    MaterialTheme {
-        Scaffold(
-            topBar = {
-                if (currentScreen !is Screen.AccountTransactions) {
-                    TopAppBar(
-                        title = {
-                            Column {
-                                Text(currentScreen.title)
-                                Text(
-                                    text = "v${appVersion.value}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
-                                )
-                                Text(
-                                    text = "Database: $databaseLocation",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
-                                )
-                            }
-                        },
-                        colors =
-                            TopAppBarDefaults.topAppBarColors(
-                                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                            ),
-                    )
-                }
-            },
-            bottomBar = {
-                NavigationBar {
-                    NavigationBarItem(
-                        icon = { Text("💰") },
-                        label = { Text("Accounts") },
-                        selected = currentScreen is Screen.Accounts || currentScreen is Screen.AccountTransactions,
-                        onClick = { currentScreen = Screen.Accounts },
-                    )
-                    NavigationBarItem(
-                        icon = { Text("💱") },
-                        label = { Text("Currencies") },
-                        selected = currentScreen is Screen.Currencies,
-                        onClick = { currentScreen = Screen.Currencies },
-                    )
-                    NavigationBarItem(
-                        icon = { Text("📁") },
-                        label = { Text("Categories") },
-                        selected = currentScreen is Screen.Categories,
-                        onClick = { currentScreen = Screen.Categories },
-                    )
-                    NavigationBarItem(
-                        icon = { Text("📄") },
-                        label = { Text("CSV") },
-                        selected = currentScreen is Screen.CsvImports || currentScreen is Screen.CsvImportDetail,
-                        onClick = { currentScreen = Screen.CsvImports },
-                    )
-                    NavigationBarItem(
-                        icon = { Text("⚙️") },
-                        label = { Text("Settings") },
-                        selected = currentScreen is Screen.Settings,
-                        onClick = { currentScreen = Screen.Settings },
-                    )
-                }
-            },
-            floatingActionButton = {
-                // Only show transaction FAB on screens where it makes sense
-                val showTransactionFab =
-                    currentScreen is Screen.Accounts ||
-                        currentScreen is Screen.AccountTransactions ||
-                        currentScreen is Screen.Categories
-                if (showTransactionFab) {
-                    FloatingActionButton(
-                        onClick = {
-                            preSelectedAccountId = currentlyViewedAccountId
-                            preSelectedCurrencyId = currentlyViewedCurrencyId
-                            showTransactionDialog = true
-                        },
-                    ) {
-                        Text("+", style = MaterialTheme.typography.headlineLarge)
-                    }
-                }
-            },
-        ) { paddingValues ->
-            Box(modifier = Modifier.padding(paddingValues)) {
-                when (val screen = currentScreen) {
-                    is Screen.Accounts -> {
-                        // Reset currentlyViewedAccountId and currentlyViewedCurrencyId when on other screens
-                        LaunchedEffect(Unit) {
-                            currentlyViewedAccountId = null
-                            currentlyViewedCurrencyId = null
-                        }
-                        AccountsScreen(
-                            accountRepository = repositorySet.accountRepository,
-                            categoryRepository = repositorySet.categoryRepository,
-                            transactionRepository = repositorySet.transactionRepository,
-                            onAccountClick = { account ->
-                                currentScreen = Screen.AccountTransactions(account.id, account.name)
-                            },
-                        )
-                    }
-                    is Screen.Currencies -> {
-                        // Reset currentlyViewedAccountId and currentlyViewedCurrencyId when on other screens
-                        LaunchedEffect(Unit) {
-                            currentlyViewedAccountId = null
-                            currentlyViewedCurrencyId = null
-                        }
-                        CurrenciesScreen(repositorySet.currencyRepository)
-                    }
-                    is Screen.Categories -> {
-                        // Reset currentlyViewedAccountId and currentlyViewedCurrencyId when on other screens
-                        LaunchedEffect(Unit) {
-                            currentlyViewedAccountId = null
-                            currentlyViewedCurrencyId = null
-                        }
-                        CategoriesScreen(
-                            categoryRepository = repositorySet.categoryRepository,
-                            currencyRepository = repositorySet.currencyRepository,
-                        )
-                    }
-                    is Screen.Settings -> {
-                        // Reset currentlyViewedAccountId and currentlyViewedCurrencyId when on other screens
-                        LaunchedEffect(Unit) {
-                            currentlyViewedAccountId = null
-                            currentlyViewedCurrencyId = null
-                        }
-                        SettingsScreen(repositorySet = repositorySet)
-                    }
-                    is Screen.AccountTransactions -> {
-                        // Initialize currentlyViewedAccountId when first entering the screen
-                        LaunchedEffect(screen.accountId) {
-                            currentlyViewedAccountId = screen.accountId
-                        }
-                        AccountTransactionsScreen(
-                            accountId = currentlyViewedAccountId ?: screen.accountId,
-                            transactionRepository = repositorySet.transactionRepository,
-                            transferSourceRepository = repositorySet.transferSourceRepository,
-                            accountRepository = repositorySet.accountRepository,
-                            categoryRepository = repositorySet.categoryRepository,
-                            currencyRepository = repositorySet.currencyRepository,
-                            auditRepository = repositorySet.auditRepository,
-                            attributeTypeRepository = repositorySet.attributeTypeRepository,
-                            transferAttributeRepository = repositorySet.transferAttributeRepository,
-                            maintenanceService = repositorySet.maintenanceService,
-                            currentDeviceId = currentDeviceId,
-                            onAccountIdChange = { accountId ->
-                                currentlyViewedAccountId = accountId
-                            },
-                            onCurrencyIdChange = { currencyId ->
-                                currentlyViewedCurrencyId = currencyId
-                            },
-                            scrollToTransferId = screen.scrollToTransferId,
-                            externalRefreshTrigger = transactionRefreshTrigger,
-                        )
-                    }
-                    is Screen.CsvImports -> {
-                        LaunchedEffect(Unit) {
-                            currentlyViewedAccountId = null
-                            currentlyViewedCurrencyId = null
-                        }
-                        CsvImportsScreen(
-                            csvImportRepository = repositorySet.csvImportRepository,
-                            onImportClick = { importId ->
-                                currentScreen = Screen.CsvImportDetail(importId)
-                            },
-                            onStrategiesClick = {
-                                currentScreen = Screen.CsvStrategies
-                            },
-                        )
-                    }
-                    is Screen.CsvImportDetail -> {
-                        CsvImportDetailScreen(
-                            importId = screen.importId,
-                            csvImportRepository = repositorySet.csvImportRepository,
-                            csvImportStrategyRepository = repositorySet.csvImportStrategyRepository,
-                            accountRepository = repositorySet.accountRepository,
-                            categoryRepository = repositorySet.categoryRepository,
-                            currencyRepository = repositorySet.currencyRepository,
-                            transactionRepository = repositorySet.transactionRepository,
-                            attributeTypeRepository = repositorySet.attributeTypeRepository,
-                            maintenanceService = repositorySet.maintenanceService,
-                            transferSourceQueries = repositorySet.transferSourceQueries,
-                            deviceRepository = repositorySet.deviceRepository,
-                            onBack = { currentScreen = Screen.CsvImports },
-                            onDeleted = { currentScreen = Screen.CsvImports },
-                            onTransferClick = { transferId, isPositiveAmount ->
-                                scope.launch {
-                                    repositorySet.transactionRepository
-                                        .getTransactionById(transferId.id)
-                                        .collect { transfer ->
-                                            transfer?.let {
-                                                // Navigate to target account if positive (money coming in),
-                                                // source account if negative (money going out)
-                                                val accountId =
-                                                    if (isPositiveAmount) {
-                                                        transfer.targetAccountId
-                                                    } else {
-                                                        transfer.sourceAccountId
-                                                    }
-                                                val account = accounts.find { a -> a.id == accountId }
-                                                if (account != null) {
-                                                    currentScreen =
-                                                        Screen.AccountTransactions(
-                                                            accountId = account.id,
-                                                            accountName = account.name,
-                                                            scrollToTransferId = transferId,
-                                                        )
-                                                }
-                                            }
-                                        }
+        MaterialTheme {
+            Scaffold(
+                topBar = {
+                    if (currentScreen !is Screen.AccountTransactions) {
+                        TopAppBar(
+                            title = {
+                                Column {
+                                    Text(currentScreen.title)
+                                    Text(
+                                        text = "v$appVersion",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                                    )
+                                    Text(
+                                        text = "Database: $databaseLocation",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
+                                    )
                                 }
                             },
+                            colors =
+                                TopAppBarDefaults.topAppBarColors(
+                                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                ),
                         )
                     }
-                    is Screen.CsvStrategies -> {
-                        LaunchedEffect(Unit) {
-                            currentlyViewedAccountId = null
-                            currentlyViewedCurrencyId = null
-                        }
-                        CsvStrategiesScreen(
-                            csvImportStrategyRepository = repositorySet.csvImportStrategyRepository,
-                            onBack = { currentScreen = Screen.CsvImports },
+                },
+                bottomBar = {
+                    NavigationBar {
+                        NavigationBarItem(
+                            icon = { Text("\uD83D\uDCB0") },
+                            label = { Text("Accounts") },
+                            selected = currentScreen is Screen.Accounts || currentScreen is Screen.AccountTransactions,
+                            onClick = { currentScreen = Screen.Accounts },
                         )
+                        NavigationBarItem(
+                            icon = { Text("\uD83D\uDCB1") },
+                            label = { Text("Currencies") },
+                            selected = currentScreen is Screen.Currencies,
+                            onClick = { currentScreen = Screen.Currencies },
+                        )
+                        NavigationBarItem(
+                            icon = { Text("\uD83D\uDCC1") },
+                            label = { Text("Categories") },
+                            selected = currentScreen is Screen.Categories,
+                            onClick = { currentScreen = Screen.Categories },
+                        )
+                        NavigationBarItem(
+                            icon = { Text("\uD83D\uDCC4") },
+                            label = { Text("CSV") },
+                            selected = currentScreen is Screen.CsvImports || currentScreen is Screen.CsvImportDetail,
+                            onClick = { currentScreen = Screen.CsvImports },
+                        )
+                        NavigationBarItem(
+                            icon = { Text("\u2699\uFE0F") },
+                            label = { Text("Settings") },
+                            selected = currentScreen is Screen.Settings,
+                            onClick = { currentScreen = Screen.Settings },
+                        )
+                    }
+                },
+                floatingActionButton = {
+                    // Only show transaction FAB on screens where it makes sense
+                    val showTransactionFab =
+                        currentScreen is Screen.Accounts ||
+                            currentScreen is Screen.AccountTransactions ||
+                            currentScreen is Screen.Categories
+                    if (showTransactionFab) {
+                        FloatingActionButton(
+                            onClick = {
+                                preSelectedAccountId = currentlyViewedAccountId
+                                preSelectedCurrencyId = currentlyViewedCurrencyId
+                                showTransactionDialog = true
+                            },
+                        ) {
+                            Text("+", style = MaterialTheme.typography.headlineLarge)
+                        }
+                    }
+                },
+            ) { paddingValues ->
+                Box(modifier = Modifier.padding(paddingValues)) {
+                    when (val screen = currentScreen) {
+                        is Screen.Accounts -> {
+                            // Reset currentlyViewedAccountId and currentlyViewedCurrencyId when on other screens
+                            LaunchedEffect(Unit) {
+                                currentlyViewedAccountId = null
+                                currentlyViewedCurrencyId = null
+                            }
+                            AccountsScreen(
+                                accountRepository = accountRepository,
+                                categoryRepository = categoryRepository,
+                                transactionRepository = transactionRepository,
+                                onAccountClick = { account ->
+                                    currentScreen = Screen.AccountTransactions(account.id, account.name)
+                                },
+                            )
+                        }
+                        is Screen.Currencies -> {
+                            // Reset currentlyViewedAccountId and currentlyViewedCurrencyId when on other screens
+                            LaunchedEffect(Unit) {
+                                currentlyViewedAccountId = null
+                                currentlyViewedCurrencyId = null
+                            }
+                            CurrenciesScreen(currencyRepository)
+                        }
+                        is Screen.Categories -> {
+                            // Reset currentlyViewedAccountId and currentlyViewedCurrencyId when on other screens
+                            LaunchedEffect(Unit) {
+                                currentlyViewedAccountId = null
+                                currentlyViewedCurrencyId = null
+                            }
+                            CategoriesScreen(
+                                categoryRepository = categoryRepository,
+                                currencyRepository = currencyRepository,
+                            )
+                        }
+                        is Screen.Settings -> {
+                            // Reset currentlyViewedAccountId and currentlyViewedCurrencyId when on other screens
+                            LaunchedEffect(Unit) {
+                                currentlyViewedAccountId = null
+                                currentlyViewedCurrencyId = null
+                            }
+                            SettingsScreen(
+                                currencyRepository = currencyRepository,
+                                categoryRepository = categoryRepository,
+                                accountRepository = accountRepository,
+                                attributeTypeRepository = attributeTypeRepository,
+                                transactionRepository = transactionRepository,
+                                maintenanceService = maintenanceService,
+                                transferSourceQueries = transferSourceQueries,
+                                deviceId = deviceId,
+                            )
+                        }
+                        is Screen.AccountTransactions -> {
+                            // Initialize currentlyViewedAccountId when first entering the screen
+                            LaunchedEffect(screen.accountId) {
+                                currentlyViewedAccountId = screen.accountId
+                            }
+                            AccountTransactionsScreen(
+                                accountId = currentlyViewedAccountId ?: screen.accountId,
+                                transactionRepository = transactionRepository,
+                                transferSourceRepository = transferSourceRepository,
+                                accountRepository = accountRepository,
+                                categoryRepository = categoryRepository,
+                                currencyRepository = currencyRepository,
+                                auditRepository = auditRepository,
+                                attributeTypeRepository = attributeTypeRepository,
+                                transferAttributeRepository = transferAttributeRepository,
+                                maintenanceService = maintenanceService,
+                                currentDeviceId = deviceId,
+                                onAccountIdChange = { accountId ->
+                                    currentlyViewedAccountId = accountId
+                                },
+                                onCurrencyIdChange = { currencyId ->
+                                    currentlyViewedCurrencyId = currencyId
+                                },
+                                scrollToTransferId = screen.scrollToTransferId,
+                                externalRefreshTrigger = transactionRefreshTrigger,
+                            )
+                        }
+                        is Screen.CsvImports -> {
+                            LaunchedEffect(Unit) {
+                                currentlyViewedAccountId = null
+                                currentlyViewedCurrencyId = null
+                            }
+                            CsvImportsScreen(
+                                csvImportRepository = csvImportRepository,
+                                onImportClick = { importId ->
+                                    currentScreen = Screen.CsvImportDetail(importId)
+                                },
+                                onStrategiesClick = {
+                                    currentScreen = Screen.CsvStrategies
+                                },
+                            )
+                        }
+                        is Screen.CsvImportDetail -> {
+                            CsvImportDetailScreen(
+                                importId = screen.importId,
+                                csvImportRepository = csvImportRepository,
+                                csvImportStrategyRepository = csvImportStrategyRepository,
+                                accountRepository = accountRepository,
+                                categoryRepository = categoryRepository,
+                                currencyRepository = currencyRepository,
+                                transactionRepository = transactionRepository,
+                                attributeTypeRepository = attributeTypeRepository,
+                                maintenanceService = maintenanceService,
+                                transferSourceQueries = transferSourceQueries,
+                                deviceRepository = deviceRepository,
+                                onBack = { currentScreen = Screen.CsvImports },
+                                onDeleted = { currentScreen = Screen.CsvImports },
+                                onTransferClick = { transferId, isPositiveAmount ->
+                                    scope.launch {
+                                        transactionRepository
+                                            .getTransactionById(transferId.id)
+                                            .collect { transfer ->
+                                                transfer?.let {
+                                                    // Navigate to target account if positive (money coming in),
+                                                    // source account if negative (money going out)
+                                                    val accountId =
+                                                        if (isPositiveAmount) {
+                                                            transfer.targetAccountId
+                                                        } else {
+                                                            transfer.sourceAccountId
+                                                        }
+                                                    val account = accounts.find { a -> a.id == accountId }
+                                                    if (account != null) {
+                                                        currentScreen =
+                                                            Screen.AccountTransactions(
+                                                                accountId = account.id,
+                                                                accountName = account.name,
+                                                                scrollToTransferId = transferId,
+                                                            )
+                                                    }
+                                                }
+                                            }
+                                    }
+                                },
+                            )
+                        }
+                        is Screen.CsvStrategies -> {
+                            LaunchedEffect(Unit) {
+                                currentlyViewedAccountId = null
+                                currentlyViewedCurrencyId = null
+                            }
+                            CsvStrategiesScreen(
+                                csvImportStrategyRepository = csvImportStrategyRepository,
+                                onBack = { currentScreen = Screen.CsvImports },
+                            )
+                        }
                     }
                 }
             }
-        }
 
-        if (showTransactionDialog) {
-            TransactionEntryDialog(
-                transactionRepository = repositorySet.transactionRepository,
-                transferSourceQueries = repositorySet.transferSourceQueries,
-                deviceRepository = repositorySet.deviceRepository,
-                accountRepository = repositorySet.accountRepository,
-                categoryRepository = repositorySet.categoryRepository,
-                currencyRepository = repositorySet.currencyRepository,
-                attributeTypeRepository = repositorySet.attributeTypeRepository,
-                maintenanceService = repositorySet.maintenanceService,
-                preSelectedSourceAccountId = preSelectedAccountId,
-                preSelectedCurrencyId = preSelectedCurrencyId,
-                onDismiss = {
-                    showTransactionDialog = false
-                    preSelectedAccountId = null
-                    preSelectedCurrencyId = null
-                },
-                onTransactionCreated = {
-                    transactionRefreshTrigger++
-                },
-            )
+            if (showTransactionDialog) {
+                TransactionEntryDialog(
+                    transactionRepository = transactionRepository,
+                    transferSourceQueries = transferSourceQueries,
+                    deviceRepository = deviceRepository,
+                    accountRepository = accountRepository,
+                    categoryRepository = categoryRepository,
+                    currencyRepository = currencyRepository,
+                    attributeTypeRepository = attributeTypeRepository,
+                    maintenanceService = maintenanceService,
+                    preSelectedSourceAccountId = preSelectedAccountId,
+                    preSelectedCurrencyId = preSelectedCurrencyId,
+                    onDismiss = {
+                        showTransactionDialog = false
+                        preSelectedAccountId = null
+                        preSelectedCurrencyId = null
+                    },
+                    onTransactionCreated = {
+                        transactionRefreshTrigger++
+                    },
+                )
+            }
         }
     }
 }
