@@ -75,4 +75,19 @@ interface CsvImportRepository {
         id: CsvImportId,
         rowTransferMap: Map<Long, TransferId>,
     )
+
+    /**
+     * Updates the import status for a specific row.
+     *
+     * @param id The import ID
+     * @param rowIndex The row index to update
+     * @param status The import status (IMPORTED, DUPLICATE, UPDATED)
+     * @param transferId Optional transfer ID to link
+     */
+    suspend fun updateRowStatus(
+        id: CsvImportId,
+        rowIndex: Long,
+        status: String,
+        transferId: TransferId? = null,
+    )
 }

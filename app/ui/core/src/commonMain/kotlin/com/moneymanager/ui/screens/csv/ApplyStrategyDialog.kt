@@ -54,6 +54,7 @@ import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvRow
+import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
@@ -221,6 +222,38 @@ fun ApplyStrategyDialog(
                             val currenciesById = currencies.associateBy { it.id }
                             val currenciesByCode = currencies.associateBy { it.code.uppercase() }
 
+                            // Fetch existing transfers for duplicate detection
+                            logger.info { "Fetching existing transfers for duplicate detection" }
+                            val existingTransfers = transactionRepository.getAllTransactions().first()
+                            val existingTransferInfoList =
+                                existingTransfers.map { transfer ->
+                                    // Build attribute map (typeName -> value)
+                                    val attributesList =
+                                        transfer.attributes.map { attr ->
+                                            attr.attributeType.name to attr.value
+                                        }
+
+                                    // Build unique identifier values map based on strategy
+                                    val uniqueIdValues =
+                                        strategy.attributeMappings
+                                            .filter { it.isUniqueIdentifier }
+                                            .associate { mapping ->
+                                                val attributeValue =
+                                                    transfer.attributes
+                                                        .firstOrNull { it.attributeType.name == mapping.attributeTypeName }
+                                                        ?.value.orEmpty()
+                                                mapping.columnName to attributeValue
+                                            }
+
+                                    com.moneymanager.database.csv.ExistingTransferInfo(
+                                        transferId = transfer.id,
+                                        transfer = transfer,
+                                        attributes = attributesList,
+                                        uniqueIdentifierValues = uniqueIdValues,
+                                    )
+                                }
+                            logger.info { "Loaded ${existingTransferInfoList.size} existing transfers for duplicate detection" }
+
                             val mapper =
                                 CsvTransferMapper(
                                     strategy = strategy,
@@ -228,6 +261,7 @@ fun ApplyStrategyDialog(
                                     existingAccounts = accountsByName,
                                     existingCurrencies = currenciesById,
                                     existingCurrenciesByCode = currenciesByCode,
+                                    existingTransfers = existingTransferInfoList,
                                 )
 
                             val finalPrep = mapper.prepareImport(rows)
@@ -255,6 +289,8 @@ fun ApplyStrategyDialog(
 
                             for ((index, transferWithAttrs) in finalPrep.validTransfers.withIndex()) {
                                 val transfer = transferWithAttrs.transfer
+                                val importStatus = transferWithAttrs.importStatus
+                                val existingTransferId = transferWithAttrs.existingTransferId
                                 // Find the original row index for this transfer
                                 val originalRowIndex =
                                     rows.getOrNull(index)?.rowIndex
@@ -268,20 +304,60 @@ fun ApplyStrategyDialog(
                                             if (typeId != null) NewAttribute(typeId, value) else null
                                         }
 
-                                    // Create transfer with attributes and source in one operation
-                                    transactionRepository.createTransfers(
-                                        transfers = listOf(transfer),
-                                        newAttributes = mapOf(transfer.id to attributes),
-                                        sourceRecorder =
-                                            CsvImportSourceRecorder(
-                                                queries = transferSourceQueries,
-                                                deviceId = deviceId,
-                                                csvImportId = csvImport.id,
-                                                rowIndexForTransfer = { originalRowIndex },
-                                            ),
-                                    )
-                                    rowTransferMap[originalRowIndex] = transfer.id
-                                    successCount++
+                                    when (importStatus) {
+                                        ImportStatus.IMPORTED -> {
+                                            // Create new transfer
+                                            transactionRepository.createTransfers(
+                                                transfers = listOf(transfer),
+                                                newAttributes = mapOf(transfer.id to attributes),
+                                                sourceRecorder =
+                                                    CsvImportSourceRecorder(
+                                                        queries = transferSourceQueries,
+                                                        deviceId = deviceId,
+                                                        csvImportId = csvImport.id,
+                                                        rowIndexForTransfer = { originalRowIndex },
+                                                    ),
+                                            )
+                                            // Update row with status and transfer ID
+                                            csvImportRepository.updateRowStatus(
+                                                csvImport.id,
+                                                originalRowIndex,
+                                                ImportStatus.IMPORTED.name,
+                                                transfer.id,
+                                            )
+                                            rowTransferMap[originalRowIndex] = transfer.id
+                                            successCount++
+                                        }
+                                        ImportStatus.DUPLICATE -> {
+                                            // Skip creating transfer, just update CSV row status
+                                            csvImportRepository.updateRowStatus(
+                                                csvImport.id,
+                                                originalRowIndex,
+                                                ImportStatus.DUPLICATE.name,
+                                                existingTransferId,
+                                            )
+                                            logger.info { "Skipped duplicate row $originalRowIndex" }
+                                        }
+                                        ImportStatus.UPDATED -> {
+                                            // Update existing transfer
+                                            if (existingTransferId != null) {
+                                                transactionRepository.updateTransfer(
+                                                    transfer = transfer.copy(id = existingTransferId),
+                                                    deletedAttributeIds = emptySet(),
+                                                    updatedAttributes = emptyMap(),
+                                                    newAttributes = attributes,
+                                                    transactionId = existingTransferId,
+                                                )
+                                                csvImportRepository.updateRowStatus(
+                                                    csvImport.id,
+                                                    originalRowIndex,
+                                                    ImportStatus.UPDATED.name,
+                                                    existingTransferId,
+                                                )
+                                                successCount++
+                                            }
+                                        }
+                                    }
                                 } catch (expected: Exception) {
                                     // Log the error and continue with remaining rows
                                     val errorMsg = expected.message ?: "Unknown error"
@@ -299,14 +375,7 @@ fun ApplyStrategyDialog(
 
                             logger.info { "Transfer creation complete: $successCount successes, ${failedRows.size} failures" }
 
-                            // Update CSV rows with transfer IDs
-                            if (rowTransferMap.isNotEmpty()) {
-                                logger.info { "Updating ${rowTransferMap.size} CSV rows with transfer IDs" }
-                                csvImportRepository.updateRowTransferIdsBatch(
-                                    csvImport.id,
-                                    rowTransferMap,
-                                )
-                            }
+                            // Note: CSV rows are updated with status and transfer IDs during import loop above
 
                             // Refresh materialized views so transfers are visible
                             logger.info { "Refreshing materialized views" }
@@ -449,6 +518,42 @@ private fun ImportPreviewSection(prep: ImportPreparation) {
             style = MaterialTheme.typography.titleSmall,
         )
         Spacer(modifier = Modifier.height(8.dp))
+
+        // Status breakdown if available
+        if (prep.statusCounts.isNotEmpty()) {
+            Text(
+                text = "Status Breakdown:",
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+            ) {
+                prep.statusCounts[ImportStatus.IMPORTED]?.let { count ->
+                    StatCard(
+                        label = "New",
+                        count = count,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                prep.statusCounts[ImportStatus.DUPLICATE]?.let { count ->
+                    StatCard(
+                        label = "Duplicate",
+                        count = count,
+                        color = MaterialTheme.colorScheme.secondary,
+                    )
+                }
+                prep.statusCounts[ImportStatus.UPDATED]?.let { count ->
+                    StatCard(
+                        label = "Updated",
+                        count = count,
+                        color = MaterialTheme.colorScheme.tertiary,
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
 
         Row(
             modifier = Modifier.fillMaxWidth(),

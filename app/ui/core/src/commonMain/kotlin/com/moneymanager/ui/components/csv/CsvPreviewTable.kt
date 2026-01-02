@@ -30,9 +30,11 @@ import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
+import com.moneymanager.domain.model.csv.ImportStatus
 
 private val TRANSFER_COLUMN_WIDTH = 100.dp
 private val ROW_INDEX_COLUMN_WIDTH = 60.dp
+private val STATUS_COLUMN_WIDTH = 90.dp
 
 @Composable
 fun CsvPreviewTable(
@@ -69,6 +71,26 @@ fun CsvPreviewTable(
             ) {
                 Text(
                     text = "Row",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+
+            // Status column header
+            Box(
+                modifier =
+                    Modifier
+                        .width(STATUS_COLUMN_WIDTH)
+                        .border(
+                            width = 1.dp,
+                            color = MaterialTheme.colorScheme.outline,
+                        )
+                        .padding(8.dp),
+            ) {
+                Text(
+                    text = "Status",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
@@ -162,6 +184,36 @@ fun CsvPreviewTable(
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
+                        }
+
+                        // Status cell
+                        Box(
+                            modifier =
+                                Modifier
+                                    .width(STATUS_COLUMN_WIDTH)
+                                    .border(
+                                        width = 1.dp,
+                                        color = MaterialTheme.colorScheme.outlineVariant,
+                                    )
+                                    .padding(8.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            row.importStatus?.let { status ->
+                                val (statusText, statusColor) =
+                                    when (status) {
+                                        ImportStatus.IMPORTED -> "New" to MaterialTheme.colorScheme.primary
+                                        ImportStatus.DUPLICATE -> "Duplicate" to MaterialTheme.colorScheme.secondary
+                                        ImportStatus.UPDATED -> "Updated" to MaterialTheme.colorScheme.tertiary
+                                    }
+                                Text(
+                                    text = statusText,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = statusColor,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
                         }
 
                         // Determine if amount is positive from the amount column

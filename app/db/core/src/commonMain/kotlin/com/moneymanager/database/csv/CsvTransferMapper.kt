@@ -16,6 +16,7 @@ import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
+import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
@@ -46,11 +47,15 @@ sealed interface MappingResult {
      * @property transfer The mapped transfer
      * @property newAccountName Name of new account to create (if any)
      * @property attributes List of (attributeTypeName, value) pairs extracted from CSV
+     * @property importStatus The import status (IMPORTED for new, DUPLICATE if exists with same values, UPDATED if exists with different values)
+     * @property existingTransferId If status is DUPLICATE or UPDATED, the ID of the existing transfer
      */
     data class Success(
         val transfer: Transfer,
         val newAccountName: String?,
         val attributes: List<Pair<String, String>> = emptyList(),
+        val importStatus: ImportStatus = ImportStatus.IMPORTED,
+        val existingTransferId: TransferId? = null,
     ) : MappingResult
 
     data class Error(
@@ -70,20 +75,44 @@ data class NewAccount(
 /**
  * A transfer with its associated attributes extracted from CSV.
  * Uses attribute type names (not IDs) since types may need to be created.
+ *
+ * @property transfer The transfer to import
+ * @property attributes List of (attributeTypeName, value) pairs
+ * @property importStatus The import status (IMPORTED, DUPLICATE, UPDATED)
+ * @property existingTransferId If status is DUPLICATE or UPDATED, the ID of the existing transfer
  */
 data class CsvTransferWithAttributes(
     val transfer: Transfer,
     val attributes: List<Pair<String, String>>,
+    val importStatus: ImportStatus = ImportStatus.IMPORTED,
+    val existingTransferId: TransferId? = null,
 )
 
 /**
  * Result of preparing an import batch.
+ *
+ * @property validTransfers List of transfers to import with their status
+ * @property errorRows Rows that failed to parse
+ * @property newAccounts New accounts that need to be created
+ * @property existingAccountMatches Map of account name to existing account ID
+ * @property statusCounts Count of transfers by import status
  */
 data class ImportPreparation(
     val validTransfers: List<CsvTransferWithAttributes>,
     val errorRows: List<MappingResult.Error>,
     val newAccounts: Set<NewAccount>,
     val existingAccountMatches: Map<String, AccountId>,
+    val statusCounts: Map<ImportStatus, Int> = emptyMap(),
+)
+
+/**
+ * Information about an existing transfer for duplicate detection.
+ */
+data class ExistingTransferInfo(
+    val transferId: TransferId,
+    val transfer: Transfer,
+    val attributes: List<Pair<String, String>>,
+    val uniqueIdentifierValues: Map<String, String>,
 )
 
 /**
@@ -95,9 +124,22 @@ class CsvTransferMapper(
     private val existingAccounts: Map<String, Account>,
     private val existingCurrencies: Map<CurrencyId, Currency>,
     private val existingCurrenciesByCode: Map<String, Currency>,
+    private val existingTransfers: List<ExistingTransferInfo> = emptyList(),
 ) {
     private val columnIndexByName: Map<String, Int> =
         columns.associate { it.originalName to it.columnIndex }
+
+    // Extract unique identifier column names from strategy
+    private val uniqueIdentifierColumns: List<String> =
+        strategy.attributeMappings.filter { it.isUniqueIdentifier }.map { it.columnName }
+
+    // Index existing transfers by their unique identifier values for fast lookup
+    private val existingTransfersByUniqueId: Map<Map<String, String>, ExistingTransferInfo> =
+        if (uniqueIdentifierColumns.isNotEmpty()) {
+            existingTransfers.associateBy { it.uniqueIdentifierValues }
+        } else {
+            emptyMap()
+        }
 
     /**
      * Prepares an import by mapping all rows and collecting new accounts to create.
@@ -107,11 +149,22 @@ class CsvTransferMapper(
         val errorRows = mutableListOf<MappingResult.Error>()
         val newAccounts = mutableSetOf<NewAccount>()
         val existingMatches = mutableMapOf<String, AccountId>()
+        val statusCounts = mutableMapOf<ImportStatus, Int>()
 
         for (row in rows) {
             when (val result = mapRow(row)) {
                 is MappingResult.Success -> {
-                    validTransfers.add(CsvTransferWithAttributes(result.transfer, result.attributes))
+                    validTransfers.add(
+                        CsvTransferWithAttributes(
+                            transfer = result.transfer,
+                            attributes = result.attributes,
+                            importStatus = result.importStatus,
+                            existingTransferId = result.existingTransferId,
+                        ),
+                    )
+                    // Count by status
+                    statusCounts[result.importStatus] = statusCounts.getOrDefault(result.importStatus, 0) + 1
+
                     if (result.newAccountName != null) {
                         val lookupMapping = strategy.fieldMappings[TransferField.TARGET_ACCOUNT]
                         val categoryId =
@@ -142,6 +195,7 @@ class CsvTransferMapper(
             errorRows = errorRows,
             newAccounts = newAccounts,
             existingAccountMatches = existingMatches,
+            statusCounts = statusCounts,
         )
     }
 
@@ -221,6 +275,14 @@ class CsvTransferMapper(
             // Extract attributes from mapped columns
             val attributes = extractAttributes(values)
 
+            // Check for duplicates using unique identifiers if configured, otherwise check by all fields
+            val (importStatus, existingTransferId) =
+                if (uniqueIdentifierColumns.isNotEmpty()) {
+                    checkForDuplicateByUniqueId(values, transfer, attributes)
+                } else {
+                    checkForDuplicateByAllFields(transfer, attributes)
+                }
+
             MappingResult.Success(
                 transfer = transfer,
                 newAccountName =
@@ -231,6 +293,8 @@ class CsvTransferMapper(
                         null
                     },
                 attributes = attributes,
+                importStatus = importStatus,
+                existingTransferId = existingTransferId,
             )
         } catch (expected: Exception) {
             MappingResult.Error(row.rowIndex, expected.message ?: "Unknown error")
@@ -434,5 +498,123 @@ class CsvTransferMapper(
                 .replace("€", "")
                 .replace("£", "")
         return BigDecimal(cleaned)
+    }
+
+    /**
+     * Checks if a transfer is a duplicate or update of an existing transfer using unique identifiers.
+     *
+     * @param values CSV row values
+     * @param transfer The newly mapped transfer
+     * @param attributes The newly mapped attributes
+     * @return Pair of (import status, existing transfer ID if found)
+     */
+    private fun checkForDuplicateByUniqueId(
+        values: List<String>,
+        transfer: Transfer,
+        attributes: List<Pair<String, String>>,
+    ): Pair<ImportStatus, TransferId?> {
+        // Extract unique identifier values from current row
+        val uniqueIdValues =
+            uniqueIdentifierColumns.associateWith { columnName ->
+                getColumnValueOrNull(columnName, values)?.trim().orEmpty()
+            }
+
+        // Look up existing transfer by unique identifiers
+        val existingInfo =
+            existingTransfersByUniqueId[uniqueIdValues]
+                ?: return ImportStatus.IMPORTED to null
+
+        // Found a match - now determine if it's identical (DUPLICATE) or different (UPDATED)
+        val isIdentical = transfersAreIdentical(transfer, attributes, existingInfo.transfer, existingInfo.attributes)
+
+        return if (isIdentical) {
+            ImportStatus.DUPLICATE to existingInfo.transferId
+        } else {
+            ImportStatus.UPDATED to existingInfo.transferId
+        }
+    }
+
+    /**
+     * Checks if a transfer is a duplicate or update by comparing all fields against existing transfers.
+     * Used when no unique identifiers are configured.
+     *
+     * @param transfer The newly mapped transfer
+     * @param attributes The newly mapped attributes
+     * @return Pair of (import status, existing transfer ID if found)
+     */
+    private fun checkForDuplicateByAllFields(
+        transfer: Transfer,
+        attributes: List<Pair<String, String>>,
+    ): Pair<ImportStatus, TransferId?> {
+        // Find an existing transfer that matches all core fields
+        for (existingInfo in existingTransfers) {
+            val coreFieldsMatch =
+                transfer.timestamp == existingInfo.transfer.timestamp &&
+                    transfer.sourceAccountId == existingInfo.transfer.sourceAccountId &&
+                    transfer.targetAccountId == existingInfo.transfer.targetAccountId &&
+                    transfer.amount == existingInfo.transfer.amount &&
+                    transfer.description == existingInfo.transfer.description
+
+            if (coreFieldsMatch) {
+                // Core fields match - check if attributes also match
+                val attributesMatch = attributesAreIdentical(attributes, existingInfo.attributes)
+                return if (attributesMatch) {
+                    ImportStatus.DUPLICATE to existingInfo.transferId
+                } else {
+                    ImportStatus.UPDATED to existingInfo.transferId
+                }
+            }
+        }
+
+        // No match found
+        return ImportStatus.IMPORTED to null
+    }
+
+    /**
+     * Compares two transfers and their attributes to determine if they are identical.
+     *
+     * @param newTransfer The newly mapped transfer
+     * @param newAttributes The newly mapped attributes
+     * @param existingTransfer The existing transfer from database
+     * @param existingAttributes The existing attributes from database
+     * @return true if all fields and attributes match
+     */
+    private fun transfersAreIdentical(
+        newTransfer: Transfer,
+        newAttributes: List<Pair<String, String>>,
+        existingTransfer: Transfer,
+        existingAttributes: List<Pair<String, String>>,
+    ): Boolean {
+        // Compare all transfer fields (excluding ID which will always differ)
+        if (newTransfer.timestamp != existingTransfer.timestamp) return false
+        if (newTransfer.description != existingTransfer.description) return false
+        if (newTransfer.sourceAccountId != existingTransfer.sourceAccountId) return false
+        if (newTransfer.targetAccountId != existingTransfer.targetAccountId) return false
+        if (newTransfer.amount != existingTransfer.amount) return false
+
+        // Compare attributes (order-independent comparison)
+        val newAttrMap = newAttributes.toMap()
+        val existingAttrMap = existingAttributes.toMap()
+
+        if (newAttrMap.size != existingAttrMap.size) return false
+        if (newAttrMap.keys != existingAttrMap.keys) return false
+
+        return newAttrMap.all { (key, value) -> existingAttrMap[key] == value }
+    }
+
+    /**
+     * Compares two attribute lists to determine if they are identical (order-independent).
+     */
+    private fun attributesAreIdentical(
+        newAttributes: List<Pair<String, String>>,
+        existingAttributes: List<Pair<String, String>>,
+    ): Boolean {
+        val newAttrMap = newAttributes.toMap()
+        val existingAttrMap = existingAttributes.toMap()
+
+        if (newAttrMap.size != existingAttrMap.size) return false
+        if (newAttrMap.keys != existingAttrMap.keys) return false
+
+        return newAttrMap.all { (key, value) -> existingAttrMap[key] == value }
     }
 }

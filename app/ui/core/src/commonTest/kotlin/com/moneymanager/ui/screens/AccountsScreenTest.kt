@@ -378,6 +378,8 @@ class AccountsScreenTest {
     private class FakeTransactionRepository : TransactionRepository {
         override fun getTransactionById(id: Uuid): Flow<Transfer?> = flowOf(null)
 
+        override fun getAllTransactions(): Flow<List<Transfer>> = flowOf(emptyList())
+
         override fun getTransactionsByAccount(accountId: AccountId): Flow<List<Transfer>> = flowOf(emptyList())
 
         override fun getTransactionsByDateRange(

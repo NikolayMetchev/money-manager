@@ -216,4 +216,18 @@ class CsvImportRepositoryImpl(
 
             tableManager.updateTransferIdsBatch(import.table_name, rowTransferMap)
         }
+
+    override suspend fun updateRowStatus(
+        id: CsvImportId,
+        rowIndex: Long,
+        status: String,
+        transferId: TransferId?,
+    ): Unit =
+        withContext(coroutineContext) {
+            val import =
+                csvImportQueries.selectImportById(id.id.toString()).executeAsOneOrNull()
+                    ?: return@withContext
+
+            tableManager.updateRowStatus(import.table_name, rowIndex, status, transferId)
+        }
 }

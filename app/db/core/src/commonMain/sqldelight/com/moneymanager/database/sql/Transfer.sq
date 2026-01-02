@@ -325,6 +325,23 @@ WHERE (source_account_id = ? OR target_account_id = ?)
 AND timestamp >= ? AND timestamp <= ?
 ORDER BY timestamp DESC;
 
+selectAll:
+SELECT
+    transfer.id,
+    transfer.revision_id,
+    transfer.timestamp,
+    transfer.description,
+    transfer.source_account_id,
+    transfer.target_account_id,
+    transfer.amount,
+    currency.id AS currency_id,
+    currency.code AS currency_code,
+    currency.name AS currency_name,
+    currency.scale_factor AS currency_scale_factor
+FROM transfer
+JOIN currency ON transfer.currency_id = currency.id
+ORDER BY timestamp DESC;
+
 insert:
 INSERT INTO transfer(id, revision_id, timestamp, description, source_account_id, target_account_id, currency_id, amount)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?);
