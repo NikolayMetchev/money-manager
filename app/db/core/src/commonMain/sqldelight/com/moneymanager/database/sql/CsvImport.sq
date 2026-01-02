@@ -33,18 +33,13 @@ SELECT
     csv_import_metadata.row_count,
     csv_import_metadata.column_count,
     csv_import_metadata.device_id,
-    platform.name AS platform_name,
-    os_name.name AS os_name,
-    machine_name.name AS machine_name,
-    device_make.name AS device_make,
-    device_model.name AS device_model
+    device_view.platform_name,
+    device_view.os_name,
+    device_view.machine_name,
+    device_view.device_make,
+    device_view.device_model
 FROM csv_import_metadata
-JOIN device ON csv_import_metadata.device_id = device.id
-JOIN platform ON device.platform_id = platform.id
-LEFT JOIN os_name ON device.os_id = os_name.id
-LEFT JOIN machine_name ON device.machine_id = machine_name.id
-LEFT JOIN device_make ON device.device_make_id = device_make.id
-LEFT JOIN device_model ON device.device_model_id = device_model.id
+JOIN device_view ON csv_import_metadata.device_id = device_view.id
 ORDER BY csv_import_metadata.import_timestamp DESC;
 
 selectImportById:
@@ -56,18 +51,13 @@ SELECT
     csv_import_metadata.row_count,
     csv_import_metadata.column_count,
     csv_import_metadata.device_id,
-    platform.name AS platform_name,
-    os_name.name AS os_name,
-    machine_name.name AS machine_name,
-    device_make.name AS device_make,
-    device_model.name AS device_model
+    device_view.platform_name,
+    device_view.os_name,
+    device_view.machine_name,
+    device_view.device_make,
+    device_view.device_model
 FROM csv_import_metadata
-JOIN device ON csv_import_metadata.device_id = device.id
-JOIN platform ON device.platform_id = platform.id
-LEFT JOIN os_name ON device.os_id = os_name.id
-LEFT JOIN machine_name ON device.machine_id = machine_name.id
-LEFT JOIN device_make ON device.device_make_id = device_make.id
-LEFT JOIN device_model ON device.device_model_id = device_model.id
+JOIN device_view ON csv_import_metadata.device_id = device_view.id
 WHERE csv_import_metadata.id = ?;
 
 selectImportByTableName:

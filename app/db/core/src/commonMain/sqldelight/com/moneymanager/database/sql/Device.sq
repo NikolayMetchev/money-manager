@@ -1,3 +1,27 @@
+-- os: Lookup table for operating system names
+CREATE TABLE os (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE
+);
+
+-- machine: Lookup table for machine names/hostnames
+CREATE TABLE machine (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE
+);
+
+-- device_make: Lookup table for device manufacturers
+CREATE TABLE device_make (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE
+);
+
+-- device_model: Lookup table for device models
+CREATE TABLE device_model (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE
+);
+
 -- device: Normalized device information table
 -- JVM devices: platform_id, os_id, machine_id are set; device_make_id, device_model_id are NULL
 -- Android devices: platform_id, device_make_id, device_model_id are set; os_id, machine_id are NULL
@@ -9,8 +33,8 @@ CREATE TABLE device (
     device_make_id INTEGER,
     device_model_id INTEGER,
     FOREIGN KEY (platform_id) REFERENCES platform(id),
-    FOREIGN KEY (os_id) REFERENCES os_name(id),
-    FOREIGN KEY (machine_id) REFERENCES machine_name(id),
+    FOREIGN KEY (os_id) REFERENCES os(id),
+    FOREIGN KEY (machine_id) REFERENCES machine(id),
     FOREIGN KEY (device_make_id) REFERENCES device_make(id),
     FOREIGN KEY (device_model_id) REFERENCES device_model(id),
     UNIQUE (platform_id, os_id, machine_id, device_make_id, device_model_id),
@@ -22,31 +46,79 @@ CREATE TABLE device (
 
 CREATE INDEX IF NOT EXISTS idx_device_platform ON device(platform_id);
 
+-- View that joins device with all related lookup tables
+CREATE VIEW device_view AS
+SELECT
+    device.id,
+    platform.name AS platform_name,
+    os.id AS os_id,
+    os.name AS os_name,
+    machine.id AS machine_id,
+    machine.name AS machine_name,
+    device_make.id AS device_make_id,
+    device_make.name AS device_make,
+    device_model.id AS device_model_id,
+    device_model.name AS device_model
+FROM device
+JOIN platform ON device.platform_id = platform.id
+LEFT JOIN os ON device.os_id = os.id
+LEFT JOIN machine ON device.machine_id = machine.id
+LEFT JOIN device_make ON device.device_make_id = device_make.id
+LEFT JOIN device_model ON device.device_model_id = device_model.id;
+
+-- OS queries
+selectOsByName:
+SELECT id FROM os WHERE name = ?;
+
+insertOrIgnoreOs:
+INSERT OR IGNORE INTO os (name) VALUES (?);
+
+-- Machine queries
+selectMachineByName:
+SELECT id FROM machine WHERE name = ?;
+
+insertOrIgnoreMachine:
+INSERT OR IGNORE INTO machine (name) VALUES (?);
+
+-- Device make queries
+selectDeviceMakeByName:
+SELECT id FROM device_make WHERE name = ?;
+
+insertOrIgnoreDeviceMake:
+INSERT OR IGNORE INTO device_make (name) VALUES (?);
+
+-- Device model queries
+selectDeviceModelByName:
+SELECT id FROM device_model WHERE name = ?;
+
+insertOrIgnoreDeviceModel:
+INSERT OR IGNORE INTO device_model (name) VALUES (?);
+
 -- Select device by ID with all related data
 selectById:
 SELECT
-    device.id,
-    platform.name AS platformName,
-    os_name.name AS osName,
-    machine_name.name AS machineName,
-    device_make.name AS deviceMake,
-    device_model.name AS deviceModel
-FROM device
-JOIN platform ON device.platform_id = platform.id
-LEFT JOIN os_name ON device.os_id = os_name.id
-LEFT JOIN machine_name ON device.machine_id = machine_name.id
-LEFT JOIN device_make ON device.device_make_id = device_make.id
-LEFT JOIN device_model ON device.device_model_id = device_model.id
-WHERE device.id = ?;
+    id,
+    platform_name AS platformName,
+    os_name AS osName,
+    machine_name AS machineName,
+    device_make AS deviceMake,
+    device_model AS deviceModel
+FROM device_view
+WHERE id = ?;
 
--- Find existing device by all attributes (for deduplication)
-selectByAttributes:
-SELECT id FROM device
-WHERE platform_id = ?
-  AND (os_id IS ? OR (os_id IS NOT NULL AND os_id = ?))
-  AND (machine_id IS ? OR (machine_id IS NOT NULL AND machine_id = ?))
-  AND (device_make_id IS ? OR (device_make_id IS NOT NULL AND device_make_id = ?))
-  AND (device_model_id IS ? OR (device_model_id IS NOT NULL AND device_model_id = ?));
+-- Find existing JVM device by attributes (for deduplication)
+selectByAttributesJvm:
+SELECT id FROM device_view
+WHERE platform_name = 'JVM'
+  AND os_id = ?
+  AND machine_id = ?;
+
+-- Find existing Android device by attributes (for deduplication)
+selectByAttributesAndroid:
+SELECT id FROM device_view
+WHERE platform_name = 'ANDROID'
+  AND device_make_id = ?
+  AND device_model_id = ?;
 
 -- Insert JVM device
 insertJvm:

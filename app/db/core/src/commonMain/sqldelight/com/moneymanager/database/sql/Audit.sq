@@ -123,11 +123,11 @@ SELECT
     csv_transfer_source.csv_import_id AS source_csv_import_id,
     csv_transfer_source.csv_row_index AS source_csv_row_index,
     csv_import_metadata.original_file_name AS source_csv_file_name,
-    platform.name AS source_platform_name,
-    os_name.name AS source_os_name,
-    machine_name.name AS source_machine_name,
-    device_make.name AS source_device_make,
-    device_model.name AS source_device_model,
+    device_view.platform_name AS source_platform_name,
+    device_view.os_name AS source_os_name,
+    device_view.machine_name AS source_machine_name,
+    device_view.device_make AS source_device_make,
+    device_view.device_model AS source_device_model,
     transfer_source.created_at AS source_created_at
 FROM transfer_audit
 JOIN audit_type ON transfer_audit.audit_type_id = audit_type.id
@@ -137,11 +137,6 @@ LEFT JOIN transfer_source ON transfer_audit.id = transfer_source.transaction_id
 LEFT JOIN source_type ON transfer_source.source_type_id = source_type.id
 LEFT JOIN csv_transfer_source ON transfer_source.id = csv_transfer_source.id
 LEFT JOIN csv_import_metadata ON csv_transfer_source.csv_import_id = csv_import_metadata.id
-LEFT JOIN device ON transfer_source.device_id = device.id
-LEFT JOIN platform ON device.platform_id = platform.id
-LEFT JOIN os_name ON device.os_id = os_name.id
-LEFT JOIN machine_name ON device.machine_id = machine_name.id
-LEFT JOIN device_make ON device.device_make_id = device_make.id
-LEFT JOIN device_model ON device.device_model_id = device_model.id
+LEFT JOIN device_view ON transfer_source.device_id = device_view.id
 WHERE transfer_audit.id = ?
 ORDER BY transfer_audit.audit_timestamp DESC, transfer_audit.audit_id DESC;
