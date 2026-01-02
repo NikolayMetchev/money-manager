@@ -1,0 +1,7 @@
+Transaction ID,Date,Time,Type,Name,Emoji,Category,Amount,Currency,Local amount,Local currency,Notes and #tags,Address,Receipt,Description,Category split,Money Out,Money In
+tx_0000AHtxZqYAfWMjQ83mio,29/03/2022,10:05:11,Faster payment,Nexo AG,,Income,100.00,GBP,100.00,GBP,NXTwY0nExDjfw,,,NXTwY0nExDjfw,,,100.00
+tx_0000AHtxiueemGDNJ8cWLx,29/03/2022,10:06:49,Faster payment,Nexo,,Transfers,-5000.00,GBP,-5000.00,GBP,DKMRNMM95V,,,DKMRNMM95V,,-5000.00,
+tx_0000AHtypT6bhdtlj0uDC5,29/03/2022,10:19:13,Faster payment,Nexo Updated Description,,General,-150.00,GBP,-150.00,GBP,DKMRNMM95V,,,DKMRNMM95V,,-150.00,
+tx_0000AHu1WpKt7u8GzS8XJ3,29/03/2022,10:49:27,Faster payment,Foris DAX MT Limited,,Income,7854.23,GBP,7854.23,GBP,b75c2cc252ab473e88,,,b75c2cc252ab473e88,,,7854.23
+tx_0000ANewTransaction001,30/03/2022,11:00:00,Faster payment,New Payee,,General,-50.00,GBP,-50.00,GBP,New payment,,,New payment,,-50.00,
+tx_0000ANewTransaction002,30/03/2022,12:00:00,Card payment,Coffee Shop,☕,Eating out,-4.50,GBP,-4.50,GBP,,,,Coffee purchase,,-4.50,

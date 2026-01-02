@@ -362,8 +362,8 @@ fun CreateCsvStrategyDialog(
     var targetAccountColumnName by remember { mutableStateOf<String?>(null) }
     var targetAccountFallbackColumns by remember { mutableStateOf<List<String>>(emptyList()) }
     var flipAccountsOnPositive by remember { mutableStateOf(true) }
-    // Map of columnName to attributeTypeName
-    var attributeMappings by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    // List of attribute column mappings with unique identifier flags
+    var attributeMappings by remember { mutableStateOf<List<AttributeColumnMapping>>(emptyList()) }
 
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
@@ -878,13 +878,7 @@ fun CreateCsvStrategyDialog(
                                                             )
                                                     },
                                             ),
-                                        attributeMappings =
-                                            attributeMappings.map { (columnName, attributeTypeName) ->
-                                                AttributeColumnMapping(
-                                                    columnName = columnName,
-                                                    attributeTypeName = attributeTypeName,
-                                                )
-                                            },
+                                        attributeMappings = attributeMappings,
                                         createdAt = now,
                                         updatedAt = now,
                                     )
@@ -1355,8 +1349,8 @@ private fun TimezonePicker(
 @Composable
 private fun AttributeMappingsEditor(
     columns: List<CsvColumn>,
-    mappings: Map<String, String>,
-    onMappingsChanged: (Map<String, String>) -> Unit,
+    mappings: List<AttributeColumnMapping>,
+    onMappingsChanged: (List<AttributeColumnMapping>) -> Unit,
     existingAttributeTypes: List<AttributeType>,
     enabled: Boolean,
     firstRow: CsvRow?,
@@ -1403,8 +1397,10 @@ private fun AttributeMappingsEditor(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 columns.sortedBy { it.columnIndex }.forEach { column ->
                     val columnName = column.originalName
-                    val isEnabled = columnName in mappings
-                    val attributeTypeName = mappings[columnName] ?: columnName
+                    val mapping = mappings.find { it.columnName == columnName }
+                    val isEnabled = mapping != null
+                    val attributeTypeName = mapping?.attributeTypeName ?: columnName
+                    val isUniqueIdentifier = mapping?.isUniqueIdentifier ?: false
                     val sampleValue =
                         firstRow?.values?.getOrNull(column.columnIndex)
                             .orEmpty()
@@ -1414,17 +1410,44 @@ private fun AttributeMappingsEditor(
                         sampleValue = sampleValue,
                         isEnabled = isEnabled,
                         attributeTypeName = attributeTypeName,
+                        isUniqueIdentifier = isUniqueIdentifier,
                         existingAttributeTypes = existingAttributeTypes,
                         enabled = enabled,
                         onEnabledChanged = { checked ->
                             if (checked) {
-                                onMappingsChanged(mappings + (columnName to columnName))
+                                onMappingsChanged(
+                                    mappings +
+                                        AttributeColumnMapping(
+                                            columnName = columnName,
+                                            attributeTypeName = columnName,
+                                            isUniqueIdentifier = false,
+                                        ),
+                                )
                             } else {
-                                onMappingsChanged(mappings - columnName)
+                                onMappingsChanged(mappings.filter { it.columnName != columnName })
                             }
                         },
                         onAttributeTypeChanged = { newTypeName ->
-                            onMappingsChanged(mappings + (columnName to newTypeName))
+                            onMappingsChanged(
+                                mappings.map {
+                                    if (it.columnName == columnName) {
+                                        it.copy(attributeTypeName = newTypeName)
+                                    } else {
+                                        it
+                                    }
+                                },
+                            )
+                        },
+                        onUniqueIdentifierChanged = { isUnique ->
+                            onMappingsChanged(
+                                mappings.map {
+                                    if (it.columnName == columnName) {
+                                        it.copy(isUniqueIdentifier = isUnique)
+                                    } else {
+                                        it
+                                    }
+                                },
+                            )
                         },
                     )
                 }
@@ -1442,10 +1465,12 @@ private fun AttributeColumnMappingRow(
     sampleValue: String,
     isEnabled: Boolean,
     attributeTypeName: String,
+    isUniqueIdentifier: Boolean,
     existingAttributeTypes: List<AttributeType>,
     enabled: Boolean,
     onEnabledChanged: (Boolean) -> Unit,
     onAttributeTypeChanged: (String) -> Unit,
+    onUniqueIdentifierChanged: (Boolean) -> Unit,
 ) {
     Column(
         modifier =
@@ -1481,19 +1506,46 @@ private fun AttributeColumnMappingRow(
             }
         }
 
-        // Show attribute type selector when enabled
+        // Show attribute type selector and unique identifier checkbox when enabled
         AnimatedVisibility(
             visible = isEnabled,
             enter = expandVertically(),
             exit = shrinkVertically(),
         ) {
-            AttributeTypeSelector(
-                selectedTypeName = attributeTypeName,
-                existingAttributeTypes = existingAttributeTypes,
-                onTypeNameChanged = onAttributeTypeChanged,
-                enabled = enabled,
-                modifier = Modifier.padding(start = 40.dp, top = 4.dp, bottom = 4.dp),
-            )
+            Column(modifier = Modifier.padding(start = 40.dp, top = 4.dp, bottom = 4.dp)) {
+                AttributeTypeSelector(
+                    selectedTypeName = attributeTypeName,
+                    existingAttributeTypes = existingAttributeTypes,
+                    onTypeNameChanged = onAttributeTypeChanged,
+                    enabled = enabled,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Unique identifier checkbox
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Checkbox(
+                        checked = isUniqueIdentifier,
+                        onCheckedChange = onUniqueIdentifierChanged,
+                        enabled = enabled,
+                    )
+                    Column {
+                        Text(
+                            text = "Use as unique identifier",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        Text(
+                            text = "Detects duplicates across multiple imports",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
         }
     }
 }

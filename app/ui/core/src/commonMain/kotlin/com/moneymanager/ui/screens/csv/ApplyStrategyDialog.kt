@@ -54,6 +54,7 @@ import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvRow
+import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
@@ -221,6 +222,64 @@ fun ApplyStrategyDialog(
                             val currenciesById = currencies.associateBy { it.id }
                             val currenciesByCode = currencies.associateBy { it.code.uppercase() }
 
+                            // Fetch existing transfers for duplicate detection
+                            // Only fetch transfers that overlap with the CSV's date range and accounts
+                            logger.info { "Determining date range and accounts for duplicate detection" }
+                            val allAccountIds =
+                                prep.validTransfers
+                                    .flatMap { listOf(it.transfer.sourceAccountId, it.transfer.targetAccountId) }
+                                    .toSet()
+                            val minTimestamp =
+                                prep.validTransfers.minOfOrNull { it.transfer.timestamp }
+                                    ?: Clock.System.now()
+                            val maxTimestamp =
+                                prep.validTransfers.maxOfOrNull { it.transfer.timestamp }
+                                    ?: Clock.System.now()
+
+                            logger.info {
+                                "Fetching existing transfers: ${allAccountIds.size} accounts, " +
+                                    "date range $minTimestamp to $maxTimestamp"
+                            }
+
+                            // Fetch existing transfers within the CSV's date range that involve any of the CSV's accounts
+                            val existingTransfers =
+                                allAccountIds.flatMap { accountId ->
+                                    transactionRepository.getTransactionsByAccountAndDateRange(
+                                        accountId = accountId,
+                                        startDate = minTimestamp,
+                                        endDate = maxTimestamp,
+                                    ).first()
+                                }.distinctBy { it.id }
+
+                            val existingTransferInfoList =
+                                existingTransfers.map { transfer ->
+                                    // Build attribute map (typeName -> value)
+                                    val attributesList =
+                                        transfer.attributes.map { attr ->
+                                            attr.attributeType.name to attr.value
+                                        }
+
+                                    // Build unique identifier values map based on strategy
+                                    val uniqueIdValues =
+                                        strategy.attributeMappings
+                                            .filter { it.isUniqueIdentifier }
+                                            .associate { mapping ->
+                                                val attributeValue =
+                                                    transfer.attributes
+                                                        .firstOrNull { it.attributeType.name == mapping.attributeTypeName }
+                                                        ?.value.orEmpty()
+                                                mapping.columnName to attributeValue
+                                            }
+
+                                    com.moneymanager.database.csv.ExistingTransferInfo(
+                                        transferId = transfer.id,
+                                        transfer = transfer,
+                                        attributes = attributesList,
+                                        uniqueIdentifierValues = uniqueIdValues,
+                                    )
+                                }
+                            logger.info { "Loaded ${existingTransferInfoList.size} existing transfers for duplicate detection" }
+
                             val mapper =
                                 CsvTransferMapper(
                                     strategy = strategy,
@@ -228,12 +287,41 @@ fun ApplyStrategyDialog(
                                     existingAccounts = accountsByName,
                                     existingCurrencies = currenciesById,
                                     existingCurrenciesByCode = currenciesByCode,
+                                    existingTransfers = existingTransferInfoList,
                                 )
 
-                            val finalPrep = mapper.prepareImport(rows)
+                            // Only process rows that need processing: ERROR status or no status (never processed)
+                            val rowsToProcess =
+                                rows.filter { row ->
+                                    row.importStatus == null || row.importStatus == ImportStatus.ERROR
+                                }
+
+                            // Handle case when all rows are already processed
+                            if (rowsToProcess.isEmpty()) {
+                                logger.info { "No rows to process - all rows already imported" }
+                                onImportComplete(
+                                    CsvImportResult(
+                                        successCount = 0,
+                                        failedRows = emptyList(),
+                                    ),
+                                )
+                                return@launch
+                            }
+
+                            val finalPrep = mapper.prepareImport(rowsToProcess)
                             val validCount = finalPrep.validTransfers.size
                             val errorCount = finalPrep.errorRows.size
                             logger.info { "Prepared $validCount valid transfers, $errorCount error rows" }
+
+                            // Mark mapping errors as ERROR status in database
+                            for (errorRow in finalPrep.errorRows) {
+                                csvImportRepository.updateRowStatus(
+                                    csvImport.id,
+                                    errorRow.rowIndex,
+                                    ImportStatus.ERROR.name,
+                                    null,
+                                )
+                            }
 
                             // Pre-resolve attribute types
                             val allAttributeTypeNames =
@@ -253,12 +341,11 @@ fun ApplyStrategyDialog(
                             var successCount = 0
                             val deviceId = deviceRepository.getOrCreateDevice(getDeviceInfo())
 
-                            for ((index, transferWithAttrs) in finalPrep.validTransfers.withIndex()) {
+                            for (transferWithAttrs in finalPrep.validTransfers) {
                                 val transfer = transferWithAttrs.transfer
-                                // Find the original row index for this transfer
-                                val originalRowIndex =
-                                    rows.getOrNull(index)?.rowIndex
-                                        ?: continue
+                                val importStatus = transferWithAttrs.importStatus
+                                val existingTransferId = transferWithAttrs.existingTransferId
+                                val originalRowIndex = transferWithAttrs.rowIndex
 
                                 try {
                                     // Convert attributes from (typeName, value) to NewAttribute
@@ -268,21 +355,72 @@ fun ApplyStrategyDialog(
                                             if (typeId != null) NewAttribute(typeId, value) else null
                                         }
 
-                                    // Create transfer with attributes and source in one operation
-                                    transactionRepository.createTransfers(
-                                        transfers = listOf(transfer),
-                                        newAttributes = mapOf(transfer.id to attributes),
-                                        sourceRecorder =
-                                            CsvImportSourceRecorder(
-                                                queries = transferSourceQueries,
-                                                deviceId = deviceId,
-                                                csvImportId = csvImport.id,
-                                                rowIndexForTransfer = { originalRowIndex },
-                                            ),
-                                    )
-                                    rowTransferMap[originalRowIndex] = transfer.id
-                                    successCount++
+                                    when (importStatus) {
+                                        ImportStatus.IMPORTED -> {
+                                            // Create new transfer
+                                            transactionRepository.createTransfers(
+                                                transfers = listOf(transfer),
+                                                newAttributes = mapOf(transfer.id to attributes),
+                                                sourceRecorder =
+                                                    CsvImportSourceRecorder(
+                                                        queries = transferSourceQueries,
+                                                        deviceId = deviceId,
+                                                        csvImportId = csvImport.id,
+                                                        rowIndexForTransfer = { originalRowIndex },
+                                                    ),
+                                            )
+                                            // Update row with status and transfer ID
+                                            csvImportRepository.updateRowStatus(
+                                                csvImport.id,
+                                                originalRowIndex,
+                                                ImportStatus.IMPORTED.name,
+                                                transfer.id,
+                                            )
+                                            rowTransferMap[originalRowIndex] = transfer.id
+                                            successCount++
+                                        }
+                                        ImportStatus.DUPLICATE -> {
+                                            // Skip creating transfer, just update CSV row status
+                                            csvImportRepository.updateRowStatus(
+                                                csvImport.id,
+                                                originalRowIndex,
+                                                ImportStatus.DUPLICATE.name,
+                                                existingTransferId,
+                                            )
+                                            logger.info { "Skipped duplicate row $originalRowIndex" }
+                                        }
+                                        ImportStatus.UPDATED -> {
+                                            // Update existing transfer
+                                            if (existingTransferId != null) {
+                                                transactionRepository.updateTransfer(
+                                                    transfer = transfer.copy(id = existingTransferId),
+                                                    deletedAttributeIds = emptySet(),
+                                                    updatedAttributes = emptyMap(),
+                                                    newAttributes = attributes,
+                                                    transactionId = existingTransferId,
+                                                )
+                                                csvImportRepository.updateRowStatus(
+                                                    csvImport.id,
+                                                    originalRowIndex,
+                                                    ImportStatus.UPDATED.name,
+                                                    existingTransferId,
+                                                )
+                                                successCount++
+                                            }
+                                        }
+                                        ImportStatus.ERROR -> {
+                                            // ERROR status shouldn't come from mapper, but handle gracefully
+                                            logger.warn { "Unexpected ERROR status for row $originalRowIndex" }
+                                        }
+                                    }
                                 } catch (expected: Exception) {
+                                    // Mark row as ERROR in database
+                                    csvImportRepository.updateRowStatus(
+                                        csvImport.id,
+                                        originalRowIndex,
+                                        ImportStatus.ERROR.name,
+                                        null,
+                                    )
                                     // Log the error and continue with remaining rows
                                     val errorMsg = expected.message ?: "Unknown error"
                                     logger.warn(expected) {
@@ -299,14 +437,7 @@ fun ApplyStrategyDialog(
 
                             logger.info { "Transfer creation complete: $successCount successes, ${failedRows.size} failures" }
 
-                            // Update CSV rows with transfer IDs
-                            if (rowTransferMap.isNotEmpty()) {
-                                logger.info { "Updating ${rowTransferMap.size} CSV rows with transfer IDs" }
-                                csvImportRepository.updateRowTransferIdsBatch(
-                                    csvImport.id,
-                                    rowTransferMap,
-                                )
-                            }
+                            // Note: CSV rows are updated with status and transfer IDs during import loop above
 
                             // Refresh materialized views so transfers are visible
                             logger.info { "Refreshing materialized views" }
@@ -449,6 +580,42 @@ private fun ImportPreviewSection(prep: ImportPreparation) {
             style = MaterialTheme.typography.titleSmall,
         )
         Spacer(modifier = Modifier.height(8.dp))
+
+        // Status breakdown if available
+        if (prep.statusCounts.isNotEmpty()) {
+            Text(
+                text = "Status Breakdown:",
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+            ) {
+                prep.statusCounts[ImportStatus.IMPORTED]?.let { count ->
+                    StatCard(
+                        label = "New",
+                        count = count,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                prep.statusCounts[ImportStatus.DUPLICATE]?.let { count ->
+                    StatCard(
+                        label = "Duplicate",
+                        count = count,
+                        color = MaterialTheme.colorScheme.secondary,
+                    )
+                }
+                prep.statusCounts[ImportStatus.UPDATED]?.let { count ->
+                    StatCard(
+                        label = "Updated",
+                        count = count,
+                        color = MaterialTheme.colorScheme.tertiary,
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
 
         Row(
             modifier = Modifier.fillMaxWidth(),
