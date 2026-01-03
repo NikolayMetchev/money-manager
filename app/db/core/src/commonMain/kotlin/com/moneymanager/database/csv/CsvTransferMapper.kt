@@ -9,6 +9,7 @@ package com.moneymanager.database.csv
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.Category.Companion.UNCATEGORIZED_ID
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Money
@@ -28,6 +29,7 @@ import com.moneymanager.domain.model.csvstrategy.FieldMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
+import com.moneymanager.domain.model.csvstrategy.RegexAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import kotlinx.datetime.LocalDate
@@ -171,8 +173,11 @@ class CsvTransferMapper(
                     if (result.newAccountName != null) {
                         val lookupMapping = strategy.fieldMappings[TransferField.TARGET_ACCOUNT]
                         val categoryId =
-                            (lookupMapping as? AccountLookupMapping)?.defaultCategoryId
-                                ?: com.moneymanager.domain.model.Category.UNCATEGORIZED_ID
+                            when (lookupMapping) {
+                                is AccountLookupMapping -> lookupMapping.defaultCategoryId
+                                is RegexAccountMapping -> lookupMapping.defaultCategoryId
+                                else -> UNCATEGORIZED_ID
+                            }
                         newAccounts.add(NewAccount(result.newAccountName, categoryId))
                     }
                 }
@@ -289,11 +294,16 @@ class CsvTransferMapper(
             MappingResult.Success(
                 transfer = transfer,
                 newAccountName =
-                    if (targetMapping is AccountLookupMapping) {
-                        val name = getAccountName(targetMapping, values)
-                        if (name.isNotBlank() && !accountExists(name)) name else null
-                    } else {
-                        null
+                    when (targetMapping) {
+                        is AccountLookupMapping -> {
+                            val name = getAccountName(targetMapping, values)
+                            if (name.isNotBlank() && !accountExists(name)) name else null
+                        }
+                        is RegexAccountMapping -> {
+                            val name = getAccountNameFromRegex(targetMapping, values)
+                            if (name.isNotBlank() && !accountExists(name)) name else null
+                        }
+                        else -> null
                     },
                 attributes = attributes,
                 importStatus = importStatus,
@@ -370,6 +380,11 @@ class CsvTransferMapper(
                 existingAccounts[name]?.id
                     ?: AccountId(-1) // Placeholder for new accounts
             }
+            is RegexAccountMapping -> {
+                val name = getAccountNameFromRegex(mapping, values)
+                existingAccounts[name]?.id
+                    ?: AccountId(-1) // Placeholder for new accounts
+            }
             else -> throw IllegalArgumentException("Invalid account mapping type: ${mapping::class}")
         }
     }
@@ -382,6 +397,35 @@ class CsvTransferMapper(
         mapping: AccountLookupMapping,
         values: List<String>,
     ): String {
+        return mapping.allColumns
+            .map { getColumnValue(it, values) }
+            .firstOrNull { it.isNotBlank() }
+            .orEmpty()
+    }
+
+    /**
+     * Gets the effective account name from a RegexAccountMapping.
+     * If the column value matches any regex rule, returns the configured account name.
+     * Otherwise, uses fallback logic similar to AccountLookupMapping.
+     * All matching is case-insensitive.
+     */
+    private fun getAccountNameFromRegex(
+        mapping: RegexAccountMapping,
+        values: List<String>,
+    ): String {
+        val primaryValue = getColumnValue(mapping.columnName, values)
+
+        // Try each rule in order; first match wins
+        if (primaryValue.isNotBlank()) {
+            for (rule in mapping.rules) {
+                val regex = Regex(rule.pattern, RegexOption.IGNORE_CASE)
+                if (regex.containsMatchIn(primaryValue)) {
+                    return rule.accountName
+                }
+            }
+        }
+
+        // No rules matched - use fallback logic (try columns in order for non-empty value)
         return mapping.allColumns
             .map { getColumnValue(it, values) }
             .firstOrNull { it.isNotBlank() }

@@ -24,6 +24,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.AlertDialog
@@ -37,6 +39,7 @@ import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -71,6 +74,8 @@ import com.moneymanager.domain.model.csvstrategy.FieldMappingId
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
+import com.moneymanager.domain.model.csvstrategy.RegexAccountMapping
+import com.moneymanager.domain.model.csvstrategy.RegexRule
 import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.repository.AccountRepository
@@ -103,6 +108,14 @@ enum class CurrencyMode {
 enum class TimezoneMode {
     HARDCODED,
     FROM_COLUMN,
+}
+
+/**
+ * Target account mapping mode for CSV import.
+ */
+private enum class TargetAccountMode {
+    DIRECT_LOOKUP,
+    REGEX_MATCH,
 }
 
 /**
@@ -359,6 +372,8 @@ private data class StrategyFormState(
     val selectedAccountId: AccountId?,
     val targetAccountColumnName: String?,
     val targetAccountFallbackColumns: List<String>,
+    val targetAccountMode: TargetAccountMode,
+    val regexRules: List<RegexRule>,
     val currencyMode: CurrencyMode,
     val selectedCurrencyId: CurrencyId?,
     val currencyColumnName: String?,
@@ -387,14 +402,26 @@ private fun extractFormStateFromStrategy(
     val targetAccountMapping = strategy.fieldMappings[TransferField.TARGET_ACCOUNT]
     val targetAccountColumnName: String?
     val targetAccountFallbackColumns: List<String>
+    val targetAccountMode: TargetAccountMode
+    val regexRules: List<RegexRule>
     when (targetAccountMapping) {
         is AccountLookupMapping -> {
             targetAccountColumnName = columnIfExists(targetAccountMapping.columnName)
             targetAccountFallbackColumns = targetAccountMapping.fallbackColumns.mapNotNull { columnIfExists(it) }
+            targetAccountMode = TargetAccountMode.DIRECT_LOOKUP
+            regexRules = emptyList()
+        }
+        is RegexAccountMapping -> {
+            targetAccountColumnName = columnIfExists(targetAccountMapping.columnName)
+            targetAccountFallbackColumns = targetAccountMapping.fallbackColumns.mapNotNull { columnIfExists(it) }
+            targetAccountMode = TargetAccountMode.REGEX_MATCH
+            regexRules = targetAccountMapping.rules
         }
         else -> {
             targetAccountColumnName = null
             targetAccountFallbackColumns = emptyList()
+            targetAccountMode = TargetAccountMode.DIRECT_LOOKUP
+            regexRules = emptyList()
         }
     }
 
@@ -512,6 +539,8 @@ private fun extractFormStateFromStrategy(
         selectedAccountId = selectedAccountId,
         targetAccountColumnName = targetAccountColumnName,
         targetAccountFallbackColumns = targetAccountFallbackColumns,
+        targetAccountMode = targetAccountMode,
+        regexRules = regexRules,
         currencyMode = currencyMode,
         selectedCurrencyId = selectedCurrencyId,
         currencyColumnName = currencyColumnName,
@@ -574,6 +603,10 @@ fun CreateCsvStrategyDialog(
     var targetAccountFallbackColumns by remember {
         mutableStateOf(initialState?.targetAccountFallbackColumns.orEmpty())
     }
+    var targetAccountMode by remember {
+        mutableStateOf(initialState?.targetAccountMode ?: TargetAccountMode.DIRECT_LOOKUP)
+    }
+    var regexRules by remember { mutableStateOf(initialState?.regexRules.orEmpty()) }
     var flipAccountsOnPositive by remember { mutableStateOf(initialState?.flipAccountsOnPositive ?: true) }
     // List of attribute column mappings with unique identifier flags
     var attributeMappings by remember {
@@ -748,6 +781,39 @@ fun CreateCsvStrategyDialog(
                     sampleValue = getSampleValue(csvColumns, fallbackSampleRow, targetAccountFallbackColumns.firstOrNull()),
                     enabled = !isSaving,
                 )
+
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "Account Name Mapping",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(
+                        selected = targetAccountMode == TargetAccountMode.DIRECT_LOOKUP,
+                        onClick = { targetAccountMode = TargetAccountMode.DIRECT_LOOKUP },
+                        enabled = !isSaving,
+                    )
+                    Text("Direct Lookup", modifier = Modifier.padding(end = 16.dp))
+                    RadioButton(
+                        selected = targetAccountMode == TargetAccountMode.REGEX_MATCH,
+                        onClick = { targetAccountMode = TargetAccountMode.REGEX_MATCH },
+                        enabled = !isSaving,
+                    )
+                    Text("Regex Match")
+                }
+
+                if (targetAccountMode == TargetAccountMode.REGEX_MATCH) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    RegexRulesEditor(
+                        rules = regexRules,
+                        onRulesChanged = { regexRules = it },
+                        columnName = targetAccountColumnName,
+                        columns = csvColumns,
+                        rows = rows,
+                        enabled = !isSaving,
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(16.dp))
                 Text("Date Column", style = MaterialTheme.typography.titleSmall)
@@ -1033,13 +1099,23 @@ fun CreateCsvStrategyDialog(
                                                         accountId = selectedAccountId!!,
                                                     ),
                                                 TransferField.TARGET_ACCOUNT to
-                                                    AccountLookupMapping(
-                                                        id = FieldMappingId(Uuid.random()),
-                                                        fieldType = TransferField.TARGET_ACCOUNT,
-                                                        columnName = targetAccountColumnName!!,
-                                                        fallbackColumns = targetAccountFallbackColumns,
-                                                        createIfMissing = true,
-                                                    ),
+                                                    when (targetAccountMode) {
+                                                        TargetAccountMode.DIRECT_LOOKUP ->
+                                                            AccountLookupMapping(
+                                                                id = FieldMappingId(Uuid.random()),
+                                                                fieldType = TransferField.TARGET_ACCOUNT,
+                                                                columnName = targetAccountColumnName!!,
+                                                                fallbackColumns = targetAccountFallbackColumns,
+                                                            )
+                                                        TargetAccountMode.REGEX_MATCH ->
+                                                            RegexAccountMapping(
+                                                                id = FieldMappingId(Uuid.random()),
+                                                                fieldType = TransferField.TARGET_ACCOUNT,
+                                                                columnName = targetAccountColumnName!!,
+                                                                rules = regexRules,
+                                                                fallbackColumns = targetAccountFallbackColumns,
+                                                            )
+                                                    },
                                                 TransferField.TIMESTAMP to
                                                     DateTimeParsingMapping(
                                                         id = FieldMappingId(Uuid.random()),
@@ -1951,6 +2027,209 @@ private fun AttributeTypeSelector(
                         },
                     )
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Editor for regex rules that map column values to account names.
+ * Shows a list of rules with pattern and account name inputs, plus a preview of matches.
+ */
+@Composable
+private fun RegexRulesEditor(
+    rules: List<RegexRule>,
+    onRulesChanged: (List<RegexRule>) -> Unit,
+    columnName: String?,
+    columns: List<CsvColumn>,
+    rows: List<CsvRow>,
+    enabled: Boolean,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            "Regex Rules",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Text(
+            "Rules are evaluated in order. First match wins. Case-insensitive.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Get column index for preview
+        val columnIndex =
+            columnName?.let { name ->
+                columns.find { it.originalName == name }?.columnIndex
+            }
+
+        // Show each rule with its matches
+        rules.forEachIndexed { index, rule ->
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                colors =
+                    CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    ),
+            ) {
+                Column(modifier = Modifier.padding(8.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            "Rule ${index + 1}",
+                            style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier.weight(1f),
+                        )
+                        IconButton(
+                            onClick = {
+                                onRulesChanged(rules.filterIndexed { i, _ -> i != index })
+                            },
+                            enabled = enabled,
+                        ) {
+                            Icon(
+                                Icons.Filled.Close,
+                                contentDescription = "Remove rule",
+                            )
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = rule.pattern,
+                        onValueChange = { newPattern ->
+                            onRulesChanged(
+                                rules.mapIndexed { i, r ->
+                                    if (i == index) r.copy(pattern = newPattern) else r
+                                },
+                            )
+                        },
+                        label = { Text("Regex Pattern") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        enabled = enabled,
+                        supportingText = { Text("e.g., .*sample.*") },
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    OutlinedTextField(
+                        value = rule.accountName,
+                        onValueChange = { newName ->
+                            onRulesChanged(
+                                rules.mapIndexed { i, r ->
+                                    if (i == index) r.copy(accountName = newName) else r
+                                },
+                            )
+                        },
+                        label = { Text("Target Account Name") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        enabled = enabled,
+                        supportingText = { Text("Account name when pattern matches") },
+                    )
+
+                    // Show preview of matching values
+                    if (columnIndex != null && rule.pattern.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        val matchingValues =
+                            remember(rule.pattern, rows, columnIndex) {
+                                try {
+                                    val regex = Regex(rule.pattern, RegexOption.IGNORE_CASE)
+                                    rows.mapNotNull { row ->
+                                        row.values.getOrNull(columnIndex)?.takeIf { it.isNotBlank() }
+                                    }.filter { regex.containsMatchIn(it) }.distinct()
+                                } catch (_: Exception) {
+                                    emptyList()
+                                }
+                            }
+                        val matchCount =
+                            remember(rule.pattern, rows, columnIndex) {
+                                try {
+                                    val regex = Regex(rule.pattern, RegexOption.IGNORE_CASE)
+                                    rows.count { row ->
+                                        row.values.getOrNull(columnIndex)?.let { regex.containsMatchIn(it) } == true
+                                    }
+                                } catch (_: Exception) {
+                                    0
+                                }
+                            }
+                        if (matchCount > 0) {
+                            Text(
+                                "Matches $matchCount rows → \"${rule.accountName}\"",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                            Column(
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(max = 100.dp)
+                                        .verticalScroll(rememberScrollState()),
+                            ) {
+                                matchingValues.forEach { value ->
+                                    Text(
+                                        "  • $value",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                            }
+                        } else {
+                            Text(
+                                "No matches",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Add Rule button
+        TextButton(
+            onClick = {
+                onRulesChanged(rules + RegexRule(pattern = "", accountName = ""))
+            },
+            enabled = enabled,
+        ) {
+            Icon(
+                Icons.Filled.Add,
+                contentDescription = null,
+                modifier = Modifier.padding(end = 4.dp),
+            )
+            Text("Add Rule")
+        }
+
+        // Summary of unmatched rows
+        if (rules.isNotEmpty() && columnIndex != null) {
+            Spacer(modifier = Modifier.height(8.dp))
+            val unmatchedCount =
+                remember(rules, rows, columnIndex) {
+                    rows.count { row ->
+                        val value = row.values.getOrNull(columnIndex)
+                        if (value.isNullOrBlank()) return@count false
+                        rules.none { rule ->
+                            if (rule.pattern.isBlank()) return@none false
+                            try {
+                                val regex = Regex(rule.pattern, RegexOption.IGNORE_CASE)
+                                regex.containsMatchIn(value)
+                            } catch (_: Exception) {
+                                false
+                            }
+                        }
+                    }
+                }
+            if (unmatchedCount > 0) {
+                Text(
+                    "Unmatched: $unmatchedCount rows → use column value",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }

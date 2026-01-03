@@ -15,6 +15,8 @@ import com.moneymanager.domain.model.csvstrategy.FieldMappingId
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
+import com.moneymanager.domain.model.csvstrategy.RegexAccountMapping
+import com.moneymanager.domain.model.csvstrategy.RegexRule
 import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import kotlin.test.Test
@@ -51,7 +53,6 @@ class FieldMappingJsonCodecTest {
                 id = FieldMappingId(Uuid.random()),
                 fieldType = TransferField.TARGET_ACCOUNT,
                 columnName = "Payee",
-                createIfMissing = true,
                 defaultCategoryId = Category.UNCATEGORIZED_ID,
             )
         val mappings = mapOf(TransferField.TARGET_ACCOUNT to mapping)
@@ -62,7 +63,37 @@ class FieldMappingJsonCodecTest {
         val decodedMapping = decoded[TransferField.TARGET_ACCOUNT]
         assertIs<AccountLookupMapping>(decodedMapping)
         assertEquals("Payee", decodedMapping.columnName)
-        assertEquals(true, decodedMapping.createIfMissing)
+    }
+
+    @Test
+    fun `encode and decode RegexAccountMapping`() {
+        val mapping =
+            RegexAccountMapping(
+                id = FieldMappingId(Uuid.random()),
+                fieldType = TransferField.TARGET_ACCOUNT,
+                columnName = "Name",
+                rules =
+                    listOf(
+                        RegexRule(pattern = ".*paxos.*", accountName = "Paxos"),
+                        RegexRule(pattern = ".*crypto\\.com.*", accountName = "Crypto.com"),
+                    ),
+                fallbackColumns = listOf("Type"),
+                defaultCategoryId = Category.UNCATEGORIZED_ID,
+            )
+        val mappings = mapOf(TransferField.TARGET_ACCOUNT to mapping)
+
+        val json = FieldMappingJsonCodec.encode(mappings)
+        val decoded = FieldMappingJsonCodec.decode(json)
+
+        val decodedMapping = decoded[TransferField.TARGET_ACCOUNT]
+        assertIs<RegexAccountMapping>(decodedMapping)
+        assertEquals("Name", decodedMapping.columnName)
+        assertEquals(2, decodedMapping.rules.size)
+        assertEquals(".*paxos.*", decodedMapping.rules[0].pattern)
+        assertEquals("Paxos", decodedMapping.rules[0].accountName)
+        assertEquals(".*crypto\\.com.*", decodedMapping.rules[1].pattern)
+        assertEquals("Crypto.com", decodedMapping.rules[1].accountName)
+        assertEquals(listOf("Type"), decodedMapping.fallbackColumns)
     }
 
     @Test
