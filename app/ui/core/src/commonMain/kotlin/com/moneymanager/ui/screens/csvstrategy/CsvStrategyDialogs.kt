@@ -11,12 +11,16 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -24,6 +28,8 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
@@ -50,6 +56,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.csv.CsvColumn
+import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
@@ -69,13 +76,16 @@ import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CategoryRepository
+import com.moneymanager.domain.repository.CsvImportRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.CurrencyPicker
+import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
+import nl.jacobras.humanreadable.HumanReadable
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
@@ -332,6 +342,192 @@ private fun findRowWithBlankColumn(
     }
 }
 
+/**
+ * Data class holding extracted form state from an existing strategy.
+ */
+private data class StrategyFormState(
+    val name: String,
+    val identificationColumns: Set<String>,
+    val dateColumnName: String?,
+    val dateFormat: String,
+    val timeColumnName: String?,
+    val timeFormat: String,
+    val descriptionColumnName: String?,
+    val descriptionFallbackColumns: List<String>,
+    val amountColumnName: String?,
+    val flipAccountsOnPositive: Boolean,
+    val selectedAccountId: AccountId?,
+    val targetAccountColumnName: String?,
+    val targetAccountFallbackColumns: List<String>,
+    val currencyMode: CurrencyMode,
+    val selectedCurrencyId: CurrencyId?,
+    val currencyColumnName: String?,
+    val timezoneMode: TimezoneMode,
+    val selectedTimezone: String,
+    val timezoneColumnName: String?,
+    val attributeMappings: List<AttributeColumnMapping>,
+)
+
+/**
+ * Extracts form state from an existing strategy.
+ * Returns null for columns that don't exist in the current CSV.
+ */
+private fun extractFormStateFromStrategy(
+    strategy: CsvImportStrategy,
+    availableColumnNames: Set<String>,
+): StrategyFormState {
+    // Helper to check if column exists
+    fun columnIfExists(name: String?): String? = name?.takeIf { it in availableColumnNames }
+
+    // Extract source account ID
+    val sourceAccountMapping = strategy.fieldMappings[TransferField.SOURCE_ACCOUNT]
+    val selectedAccountId = (sourceAccountMapping as? HardCodedAccountMapping)?.accountId
+
+    // Extract target account column
+    val targetAccountMapping = strategy.fieldMappings[TransferField.TARGET_ACCOUNT]
+    val targetAccountColumnName: String?
+    val targetAccountFallbackColumns: List<String>
+    when (targetAccountMapping) {
+        is AccountLookupMapping -> {
+            targetAccountColumnName = columnIfExists(targetAccountMapping.columnName)
+            targetAccountFallbackColumns = targetAccountMapping.fallbackColumns.mapNotNull { columnIfExists(it) }
+        }
+        else -> {
+            targetAccountColumnName = null
+            targetAccountFallbackColumns = emptyList()
+        }
+    }
+
+    // Extract timestamp mapping
+    val timestampMapping = strategy.fieldMappings[TransferField.TIMESTAMP]
+    val dateColumnName: String?
+    val dateFormat: String
+    val timeColumnName: String?
+    val timeFormat: String
+    when (timestampMapping) {
+        is DateTimeParsingMapping -> {
+            dateColumnName = columnIfExists(timestampMapping.dateColumnName)
+            dateFormat = timestampMapping.dateFormat
+            timeColumnName = columnIfExists(timestampMapping.timeColumnName)
+            timeFormat = timestampMapping.timeFormat ?: "HH:mm:ss"
+        }
+        else -> {
+            dateColumnName = null
+            dateFormat = "dd/MM/yyyy"
+            timeColumnName = null
+            timeFormat = "HH:mm:ss"
+        }
+    }
+
+    // Extract description column
+    val descriptionMapping = strategy.fieldMappings[TransferField.DESCRIPTION]
+    val descriptionColumnName: String?
+    val descriptionFallbackColumns: List<String>
+    when (descriptionMapping) {
+        is DirectColumnMapping -> {
+            descriptionColumnName = columnIfExists(descriptionMapping.columnName)
+            descriptionFallbackColumns = descriptionMapping.fallbackColumns.mapNotNull { columnIfExists(it) }
+        }
+        else -> {
+            descriptionColumnName = null
+            descriptionFallbackColumns = emptyList()
+        }
+    }
+
+    // Extract amount mapping
+    val amountMapping = strategy.fieldMappings[TransferField.AMOUNT]
+    val amountColumnName: String?
+    val flipAccountsOnPositive: Boolean
+    when (amountMapping) {
+        is AmountParsingMapping -> {
+            amountColumnName = columnIfExists(amountMapping.amountColumnName)
+            flipAccountsOnPositive = amountMapping.flipAccountsOnPositive
+        }
+        else -> {
+            amountColumnName = null
+            flipAccountsOnPositive = true
+        }
+    }
+
+    // Extract currency mapping
+    val currencyMapping = strategy.fieldMappings[TransferField.CURRENCY]
+    val currencyMode: CurrencyMode
+    val selectedCurrencyId: CurrencyId?
+    val currencyColumnName: String?
+    when (currencyMapping) {
+        is HardCodedCurrencyMapping -> {
+            currencyMode = CurrencyMode.HARDCODED
+            selectedCurrencyId = currencyMapping.currencyId
+            currencyColumnName = null
+        }
+        is CurrencyLookupMapping -> {
+            currencyMode = CurrencyMode.FROM_COLUMN
+            selectedCurrencyId = null
+            currencyColumnName = columnIfExists(currencyMapping.columnName)
+        }
+        else -> {
+            currencyMode = CurrencyMode.HARDCODED
+            selectedCurrencyId = null
+            currencyColumnName = null
+        }
+    }
+
+    // Extract timezone mapping
+    val timezoneMapping = strategy.fieldMappings[TransferField.TIMEZONE]
+    val timezoneMode: TimezoneMode
+    val selectedTimezone: String
+    val timezoneColumnName: String?
+    when (timezoneMapping) {
+        is HardCodedTimezoneMapping -> {
+            timezoneMode = TimezoneMode.HARDCODED
+            selectedTimezone = timezoneMapping.timezoneId
+            timezoneColumnName = null
+        }
+        is TimezoneLookupMapping -> {
+            timezoneMode = TimezoneMode.FROM_COLUMN
+            selectedTimezone = TimeZone.currentSystemDefault().id
+            timezoneColumnName = columnIfExists(timezoneMapping.columnName)
+        }
+        else -> {
+            timezoneMode = TimezoneMode.HARDCODED
+            selectedTimezone = TimeZone.currentSystemDefault().id
+            timezoneColumnName = null
+        }
+    }
+
+    // Filter attribute mappings to only include columns that exist
+    val attributeMappings = strategy.attributeMappings.filter { it.columnName in availableColumnNames }
+
+    return StrategyFormState(
+        name = strategy.name,
+        identificationColumns = strategy.identificationColumns.filter { it in availableColumnNames }.toSet(),
+        dateColumnName = dateColumnName,
+        dateFormat = dateFormat,
+        timeColumnName = timeColumnName,
+        timeFormat = timeFormat,
+        descriptionColumnName = descriptionColumnName,
+        descriptionFallbackColumns = descriptionFallbackColumns,
+        amountColumnName = amountColumnName,
+        flipAccountsOnPositive = flipAccountsOnPositive,
+        selectedAccountId = selectedAccountId,
+        targetAccountColumnName = targetAccountColumnName,
+        targetAccountFallbackColumns = targetAccountFallbackColumns,
+        currencyMode = currencyMode,
+        selectedCurrencyId = selectedCurrencyId,
+        currencyColumnName = currencyColumnName,
+        timezoneMode = timezoneMode,
+        selectedTimezone = selectedTimezone,
+        timezoneColumnName = timezoneColumnName,
+        attributeMappings = attributeMappings,
+    )
+}
+
+/**
+ * Dialog for creating or editing a CSV import strategy.
+ *
+ * @param existingStrategy If provided, the dialog operates in edit mode and pre-populates
+ *                         the form with the strategy's values. Otherwise, creates a new strategy.
+ */
 @Composable
 fun CreateCsvStrategyDialog(
     csvImportStrategyRepository: CsvImportStrategyRepository,
@@ -342,28 +538,47 @@ fun CreateCsvStrategyDialog(
     csvColumns: List<CsvColumn>,
     rows: List<CsvRow>,
     onDismiss: () -> Unit,
+    existingStrategy: CsvImportStrategy? = null,
 ) {
-    var name by remember { mutableStateOf("") }
-    var identificationColumns by remember { mutableStateOf(csvColumns.map { it.originalName }.toSet()) }
-    var dateColumnName by remember { mutableStateOf<String?>(null) }
-    var dateFormat by remember { mutableStateOf("dd/MM/yyyy") }
-    var timeColumnName by remember { mutableStateOf<String?>(null) }
-    var timeFormat by remember { mutableStateOf("HH:mm:ss") }
-    var descriptionColumnName by remember { mutableStateOf<String?>(null) }
-    var descriptionFallbackColumns by remember { mutableStateOf<List<String>>(emptyList()) }
-    var amountColumnName by remember { mutableStateOf<String?>(null) }
-    var selectedAccountId by remember { mutableStateOf<AccountId?>(null) }
-    var selectedCurrencyId by remember { mutableStateOf<CurrencyId?>(null) }
-    var currencyMode by remember { mutableStateOf(CurrencyMode.HARDCODED) }
-    var currencyColumnName by remember { mutableStateOf<String?>(null) }
-    var timezoneMode by remember { mutableStateOf(TimezoneMode.HARDCODED) }
-    var selectedTimezone by remember { mutableStateOf(TimeZone.currentSystemDefault().id) }
-    var timezoneColumnName by remember { mutableStateOf<String?>(null) }
-    var targetAccountColumnName by remember { mutableStateOf<String?>(null) }
-    var targetAccountFallbackColumns by remember { mutableStateOf<List<String>>(emptyList()) }
-    var flipAccountsOnPositive by remember { mutableStateOf(true) }
+    val isEditMode = existingStrategy != null
+    val availableColumnNames = csvColumns.map { it.originalName }.toSet()
+
+    // Extract initial state from existing strategy if in edit mode
+    val initialState =
+        existingStrategy?.let {
+            extractFormStateFromStrategy(it, availableColumnNames)
+        }
+    var name by remember { mutableStateOf(initialState?.name.orEmpty()) }
+    var identificationColumns by remember {
+        mutableStateOf(initialState?.identificationColumns ?: csvColumns.map { it.originalName }.toSet())
+    }
+    var dateColumnName by remember { mutableStateOf(initialState?.dateColumnName) }
+    var dateFormat by remember { mutableStateOf(initialState?.dateFormat ?: "dd/MM/yyyy") }
+    var timeColumnName by remember { mutableStateOf(initialState?.timeColumnName) }
+    var timeFormat by remember { mutableStateOf(initialState?.timeFormat ?: "HH:mm:ss") }
+    var descriptionColumnName by remember { mutableStateOf(initialState?.descriptionColumnName) }
+    var descriptionFallbackColumns by remember {
+        mutableStateOf(initialState?.descriptionFallbackColumns.orEmpty())
+    }
+    var amountColumnName by remember { mutableStateOf(initialState?.amountColumnName) }
+    var selectedAccountId by remember { mutableStateOf(initialState?.selectedAccountId) }
+    var selectedCurrencyId by remember { mutableStateOf(initialState?.selectedCurrencyId) }
+    var currencyMode by remember { mutableStateOf(initialState?.currencyMode ?: CurrencyMode.HARDCODED) }
+    var currencyColumnName by remember { mutableStateOf(initialState?.currencyColumnName) }
+    var timezoneMode by remember { mutableStateOf(initialState?.timezoneMode ?: TimezoneMode.HARDCODED) }
+    var selectedTimezone by remember {
+        mutableStateOf(initialState?.selectedTimezone ?: TimeZone.currentSystemDefault().id)
+    }
+    var timezoneColumnName by remember { mutableStateOf(initialState?.timezoneColumnName) }
+    var targetAccountColumnName by remember { mutableStateOf(initialState?.targetAccountColumnName) }
+    var targetAccountFallbackColumns by remember {
+        mutableStateOf(initialState?.targetAccountFallbackColumns.orEmpty())
+    }
+    var flipAccountsOnPositive by remember { mutableStateOf(initialState?.flipAccountsOnPositive ?: true) }
     // List of attribute column mappings with unique identifier flags
-    var attributeMappings by remember { mutableStateOf<List<AttributeColumnMapping>>(emptyList()) }
+    var attributeMappings by remember {
+        mutableStateOf(initialState?.attributeMappings.orEmpty())
+    }
 
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
@@ -404,27 +619,29 @@ fun CreateCsvStrategyDialog(
                 TimezoneMode.FROM_COLUMN -> timezoneColumnName != null
             }
 
-    // Auto-detect columns on first load
+    // Auto-detect columns on first load (only in create mode, not edit mode)
     LaunchedEffect(csvColumns, firstRow) {
-        if (dateColumnName == null) {
-            dateColumnName = ColumnDetector.suggestDateColumn(csvColumns, sampleValues)
-        }
-        if (timeColumnName == null) {
-            timeColumnName = ColumnDetector.suggestTimeColumn(csvColumns, sampleValues)
-        }
-        if (descriptionColumnName == null) {
-            descriptionColumnName = ColumnDetector.suggestDescriptionColumn(csvColumns)
-        }
-        if (amountColumnName == null) {
-            amountColumnName = ColumnDetector.suggestAmountColumn(csvColumns, sampleValues)
-        }
-        if (targetAccountColumnName == null) {
-            targetAccountColumnName = ColumnDetector.suggestPayeeColumn(csvColumns)
-        }
-        if (currencyColumnName == null) {
-            currencyColumnName = ColumnDetector.suggestCurrencyColumn(csvColumns, sampleValues)
-            if (currencyColumnName != null) {
-                currencyMode = CurrencyMode.FROM_COLUMN
+        if (!isEditMode) {
+            if (dateColumnName == null) {
+                dateColumnName = ColumnDetector.suggestDateColumn(csvColumns, sampleValues)
+            }
+            if (timeColumnName == null) {
+                timeColumnName = ColumnDetector.suggestTimeColumn(csvColumns, sampleValues)
+            }
+            if (descriptionColumnName == null) {
+                descriptionColumnName = ColumnDetector.suggestDescriptionColumn(csvColumns)
+            }
+            if (amountColumnName == null) {
+                amountColumnName = ColumnDetector.suggestAmountColumn(csvColumns, sampleValues)
+            }
+            if (targetAccountColumnName == null) {
+                targetAccountColumnName = ColumnDetector.suggestPayeeColumn(csvColumns)
+            }
+            if (currencyColumnName == null) {
+                currencyColumnName = ColumnDetector.suggestCurrencyColumn(csvColumns, sampleValues)
+                if (currencyColumnName != null) {
+                    currencyMode = CurrencyMode.FROM_COLUMN
+                }
             }
         }
     }
@@ -457,7 +674,7 @@ fun CreateCsvStrategyDialog(
 
     AlertDialog(
         onDismissRequest = { if (!isSaving) onDismiss() },
-        title = { Text("Create Import Strategy") },
+        title = { Text(if (isEditMode) "Edit Import Strategy" else "Create Import Strategy") },
         text = {
             Column(
                 modifier =
@@ -804,7 +1021,7 @@ fun CreateCsvStrategyDialog(
                                 val now = Clock.System.now()
                                 val strategy =
                                     CsvImportStrategy(
-                                        id = CsvImportStrategyId(Uuid.random()),
+                                        id = existingStrategy?.id ?: CsvImportStrategyId(Uuid.random()),
                                         name = name,
                                         identificationColumns = identificationColumns,
                                         fieldMappings =
@@ -879,13 +1096,18 @@ fun CreateCsvStrategyDialog(
                                                     },
                                             ),
                                         attributeMappings = attributeMappings,
-                                        createdAt = now,
+                                        createdAt = existingStrategy?.createdAt ?: now,
                                         updatedAt = now,
                                     )
-                                csvImportStrategyRepository.createStrategy(strategy)
+                                if (isEditMode) {
+                                    csvImportStrategyRepository.updateStrategy(strategy)
+                                } else {
+                                    csvImportStrategyRepository.createStrategy(strategy)
+                                }
                                 onDismiss()
                             } catch (expected: Exception) {
-                                errorMessage = "Failed to create strategy: ${expected.message}"
+                                val action = if (isEditMode) "save" else "create"
+                                errorMessage = "Failed to $action strategy: ${expected.message}"
                                 isSaving = false
                             }
                         }
@@ -899,7 +1121,7 @@ fun CreateCsvStrategyDialog(
                         strokeWidth = 2.dp,
                     )
                 }
-                Text("Create")
+                Text(if (isEditMode) "Save" else "Create")
             }
         },
         dismissButton = {
@@ -980,6 +1202,98 @@ fun DeleteCsvStrategyDialog(
                 onClick = onDismiss,
                 enabled = !isDeleting,
             ) {
+                Text("Cancel")
+            }
+        },
+    )
+}
+
+/**
+ * Dialog for selecting a CSV import to use as sample data when editing a strategy.
+ */
+@Composable
+fun SelectCsvImportDialog(
+    csvImportRepository: CsvImportRepository,
+    onCsvSelected: (CsvImport) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val imports by csvImportRepository.getAllImports()
+        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Select CSV File") },
+        text = {
+            if (imports.isEmpty()) {
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 100.dp),
+                    contentAlignment = androidx.compose.ui.Alignment.Center,
+                ) {
+                    Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
+                        Text(
+                            text = "No CSV files available",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Import a CSV file first to use as sample data",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 400.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(imports) { csvImport ->
+                        Card(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onCsvSelected(csvImport) },
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                        ) {
+                            Column(
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                            ) {
+                                Text(
+                                    text = csvImport.originalFileName,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "${csvImport.rowCount} rows, ${csvImport.columnCount} columns",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                Text(
+                                    text = "Imported ${HumanReadable.timeAgo(csvImport.importTimestamp)}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
                 Text("Cancel")
             }
         },

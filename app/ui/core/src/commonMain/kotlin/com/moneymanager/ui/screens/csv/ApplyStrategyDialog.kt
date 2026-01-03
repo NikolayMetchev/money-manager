@@ -123,10 +123,16 @@ fun ApplyStrategyDialog(
         }
     }
 
+    // Filter to only show rows that will be processed: ERROR status or no status (never processed)
+    val rowsToProcess =
+        rows.filter { row ->
+            row.importStatus == null || row.importStatus == ImportStatus.ERROR
+        }
+
     // Prepare import preview when strategy is selected
-    LaunchedEffect(selectedStrategy, rows, accounts, currencies) {
+    LaunchedEffect(selectedStrategy, rowsToProcess, accounts, currencies) {
         selectedStrategy?.let { strategy ->
-            if (accounts.isNotEmpty() && currencies.isNotEmpty() && rows.isNotEmpty()) {
+            if (accounts.isNotEmpty() && currencies.isNotEmpty() && rowsToProcess.isNotEmpty()) {
                 try {
                     val accountsByName = accounts.associateBy { it.name }
                     val currenciesById = currencies.associateBy { it.id }
@@ -139,12 +145,16 @@ fun ApplyStrategyDialog(
                             existingCurrencies = currenciesById,
                             existingCurrenciesByCode = currenciesByCode,
                         )
-                    importPreparation = mapper.prepareImport(rows)
+                    importPreparation = mapper.prepareImport(rowsToProcess)
                     errorMessage = null
                 } catch (expected: Exception) {
                     errorMessage = "Failed to prepare import: ${expected.message}"
                     importPreparation = null
                 }
+            } else if (rowsToProcess.isEmpty() && rows.isNotEmpty()) {
+                // All rows already processed successfully
+                errorMessage = "All rows have already been imported successfully."
+                importPreparation = null
             }
         }
     }
@@ -290,13 +300,8 @@ fun ApplyStrategyDialog(
                                     existingTransfers = existingTransferInfoList,
                                 )
 
-                            // Only process rows that need processing: ERROR status or no status (never processed)
-                            val rowsToProcess =
-                                rows.filter { row ->
-                                    row.importStatus == null || row.importStatus == ImportStatus.ERROR
-                                }
-
                             // Handle case when all rows are already processed
+                            // (rowsToProcess is already filtered at the top of the composable)
                             if (rowsToProcess.isEmpty()) {
                                 logger.info { "No rows to process - all rows already imported" }
                                 onImportComplete(

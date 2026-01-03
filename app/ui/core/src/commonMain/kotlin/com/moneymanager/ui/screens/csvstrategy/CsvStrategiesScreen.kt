@@ -5,7 +5,6 @@
 
 package com.moneymanager.ui.screens.csvstrategy
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,6 +24,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,19 +34,52 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
+import com.moneymanager.domain.model.csv.CsvImport
+import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.repository.AccountRepository
+import com.moneymanager.domain.repository.AttributeTypeRepository
+import com.moneymanager.domain.repository.CategoryRepository
+import com.moneymanager.domain.repository.CsvImportRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
+import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import nl.jacobras.humanreadable.HumanReadable
 
+@Suppress("UnusedParameter") // onStrategyClick retained for future extensibility
 @Composable
 fun CsvStrategiesScreen(
     csvImportStrategyRepository: CsvImportStrategyRepository,
+    csvImportRepository: CsvImportRepository,
+    accountRepository: AccountRepository,
+    categoryRepository: CategoryRepository,
+    currencyRepository: CurrencyRepository,
+    attributeTypeRepository: AttributeTypeRepository,
     onStrategyClick: (CsvImportStrategy) -> Unit = {},
     onBack: () -> Unit = {},
 ) {
     val strategies by csvImportStrategyRepository.getAllStrategies()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+
+    // Edit flow state
+    var strategyToEdit by remember { mutableStateOf<CsvImportStrategy?>(null) }
+    var showSelectCsvDialog by remember { mutableStateOf(false) }
+    var selectedCsvImport by remember { mutableStateOf<CsvImport?>(null) }
+    var csvRows by remember { mutableStateOf<List<CsvRow>>(emptyList()) }
+    var isLoadingRows by remember { mutableStateOf(false) }
+
+    // Load CSV rows when a CSV import is selected
+    LaunchedEffect(selectedCsvImport) {
+        val csvImport = selectedCsvImport
+        if (csvImport != null) {
+            isLoadingRows = true
+            try {
+                csvRows = csvImportRepository.getImportRows(csvImport.id, limit = 100, offset = 0)
+            } finally {
+                isLoadingRows = false
+            }
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -107,7 +140,10 @@ fun CsvStrategiesScreen(
                             CsvStrategyCard(
                                 strategy = strategy,
                                 csvImportStrategyRepository = csvImportStrategyRepository,
-                                onClick = { onStrategyClick(strategy) },
+                                onEditClick = {
+                                    strategyToEdit = strategy
+                                    showSelectCsvDialog = true
+                                },
                             )
                         }
                     }
@@ -119,21 +155,54 @@ fun CsvStrategiesScreen(
             }
         }
     }
+
+    // Show CSV import selector dialog
+    if (showSelectCsvDialog && strategyToEdit != null) {
+        SelectCsvImportDialog(
+            csvImportRepository = csvImportRepository,
+            onCsvSelected = { csvImport ->
+                selectedCsvImport = csvImport
+                showSelectCsvDialog = false
+            },
+            onDismiss = {
+                showSelectCsvDialog = false
+                strategyToEdit = null
+            },
+        )
+    }
+
+    // Show edit strategy dialog when CSV import is selected
+    val currentCsvImport = selectedCsvImport
+    val currentStrategyToEdit = strategyToEdit
+    if (currentCsvImport != null && currentStrategyToEdit != null && !isLoadingRows) {
+        CreateCsvStrategyDialog(
+            csvImportStrategyRepository = csvImportStrategyRepository,
+            accountRepository = accountRepository,
+            categoryRepository = categoryRepository,
+            currencyRepository = currencyRepository,
+            attributeTypeRepository = attributeTypeRepository,
+            csvColumns = currentCsvImport.columns,
+            rows = csvRows,
+            onDismiss = {
+                selectedCsvImport = null
+                strategyToEdit = null
+                csvRows = emptyList()
+            },
+            existingStrategy = currentStrategyToEdit,
+        )
+    }
 }
 
 @Composable
 fun CsvStrategyCard(
     strategy: CsvImportStrategy,
     csvImportStrategyRepository: CsvImportStrategyRepository,
-    onClick: () -> Unit,
+    onEditClick: () -> Unit,
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
 
     Card(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onClick),
+        modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
         Row(
@@ -165,13 +234,23 @@ fun CsvStrategyCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            IconButton(
-                onClick = { showDeleteDialog = true },
-            ) {
-                Text(
-                    text = "🗑️",
-                    style = MaterialTheme.typography.titleMedium,
-                )
+            Row {
+                IconButton(
+                    onClick = onEditClick,
+                ) {
+                    Text(
+                        text = "\u270F\uFE0F",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                }
+                IconButton(
+                    onClick = { showDeleteDialog = true },
+                ) {
+                    Text(
+                        text = "🗑️",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                }
             }
         }
     }
