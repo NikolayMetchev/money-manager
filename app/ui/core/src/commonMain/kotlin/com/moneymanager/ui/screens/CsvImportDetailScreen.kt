@@ -77,6 +77,16 @@ fun CsvImportDetailScreen(
     var importResultMessage by remember { mutableStateOf<String?>(null) }
     var failedRowIndexes by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var rowsRefreshTrigger by remember { mutableStateOf(0) }
+    var hasMatchingStrategy by remember { mutableStateOf(false) }
+
+    // Check if there's a matching strategy for this import's columns
+    LaunchedEffect(import) {
+        import?.let { csvImport ->
+            val columnNames = csvImport.columns.map { it.originalName }.toSet()
+            val matchingStrategy = csvImportStrategyRepository.findMatchingStrategy(columnNames)
+            hasMatchingStrategy = matchingStrategy != null
+        }
+    }
 
     // Determine amount column index by looking for common amount column names
     val amountColumnIndex =
@@ -128,11 +138,16 @@ fun CsvImportDetailScreen(
                 Spacer(modifier = Modifier.width(8.dp))
                 TextButton(
                     onClick = { showApplyStrategyDialog = true },
-                    enabled = !isDeleting && import != null && rows.isNotEmpty(),
+                    enabled = !isDeleting && import != null && rows.isNotEmpty() && hasMatchingStrategy,
                 ) {
                     Text(
                         text = "Apply Strategy",
-                        color = MaterialTheme.colorScheme.primary,
+                        color =
+                            if (hasMatchingStrategy) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                            },
                     )
                 }
                 Spacer(modifier = Modifier.width(8.dp))

@@ -21,6 +21,8 @@ import com.moneymanager.domain.model.csvstrategy.FieldMappingId
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
+import com.moneymanager.domain.model.csvstrategy.RegexAccountMapping
+import com.moneymanager.domain.model.csvstrategy.RegexRule
 import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import kotlinx.datetime.LocalDateTime
@@ -83,7 +85,6 @@ class CsvTransferMapperTest {
                             id = FieldMappingId(Uuid.random()),
                             fieldType = TransferField.TARGET_ACCOUNT,
                             columnName = "Payee",
-                            createIfMissing = true,
                         ),
                     TransferField.TIMESTAMP to
                         DateTimeParsingMapping(
@@ -360,7 +361,6 @@ class CsvTransferMapperTest {
                                 id = FieldMappingId(Uuid.random()),
                                 fieldType = TransferField.TARGET_ACCOUNT,
                                 columnName = "Payee",
-                                createIfMissing = true,
                             ),
                         TransferField.TIMESTAMP to
                             DateTimeParsingMapping(
@@ -442,7 +442,6 @@ class CsvTransferMapperTest {
                                 id = FieldMappingId(Uuid.random()),
                                 fieldType = TransferField.TARGET_ACCOUNT,
                                 columnName = "Payee",
-                                createIfMissing = true,
                             ),
                         TransferField.TIMESTAMP to
                             DateTimeParsingMapping(
@@ -514,7 +513,6 @@ class CsvTransferMapperTest {
                                 id = FieldMappingId(Uuid.random()),
                                 fieldType = TransferField.TARGET_ACCOUNT,
                                 columnName = "Payee",
-                                createIfMissing = true,
                             ),
                         TransferField.TIMESTAMP to
                             DateTimeParsingMapping(
@@ -603,7 +601,6 @@ class CsvTransferMapperTest {
                                 id = FieldMappingId(Uuid.random()),
                                 fieldType = TransferField.TARGET_ACCOUNT,
                                 columnName = "Payee",
-                                createIfMissing = true,
                             ),
                         TransferField.TIMESTAMP to
                             DateTimeParsingMapping(
@@ -688,7 +685,6 @@ class CsvTransferMapperTest {
                                 id = FieldMappingId(Uuid.random()),
                                 fieldType = TransferField.TARGET_ACCOUNT,
                                 columnName = "Payee",
-                                createIfMissing = true,
                             ),
                         TransferField.TIMESTAMP to
                             DateTimeParsingMapping(
@@ -808,7 +804,6 @@ class CsvTransferMapperTest {
                             fieldType = TransferField.TARGET_ACCOUNT,
                             columnName = primaryColumn,
                             fallbackColumns = fallbackColumns,
-                            createIfMissing = true,
                         ),
                     TransferField.TIMESTAMP to
                         DateTimeParsingMapping(
@@ -984,5 +979,268 @@ class CsvTransferMapperTest {
         assertEquals(3, preparation.validTransfers.size)
         assertEquals(0, preparation.errorRows.size)
         assertEquals(0, preparation.newAccounts.size) // All accounts exist
+    }
+
+    // ============= RegexAccountMapping Tests =============
+
+    private val paxosAccount =
+        Account(
+            id = AccountId(4),
+            name = "Paxos",
+            openingDate = Clock.System.now(),
+        )
+
+    private fun createStrategyWithRegex(
+        rules: List<RegexRule> =
+            listOf(
+                RegexRule(pattern = ".*paxos.*", accountName = "Paxos"),
+            ),
+        fallbackColumns: List<String> = listOf("Type"),
+    ): CsvImportStrategy {
+        val now = Clock.System.now()
+        return CsvImportStrategy(
+            id = CsvImportStrategyId(Uuid.random()),
+            name = "Strategy With Regex",
+            identificationColumns = setOf("Date", "Description", "Amount", "Name", "Type"),
+            fieldMappings =
+                mapOf(
+                    TransferField.SOURCE_ACCOUNT to
+                        HardCodedAccountMapping(
+                            id = FieldMappingId(Uuid.random()),
+                            fieldType = TransferField.SOURCE_ACCOUNT,
+                            accountId = testSourceAccountId,
+                        ),
+                    TransferField.TARGET_ACCOUNT to
+                        RegexAccountMapping(
+                            id = FieldMappingId(Uuid.random()),
+                            fieldType = TransferField.TARGET_ACCOUNT,
+                            columnName = "Name",
+                            rules = rules,
+                            fallbackColumns = fallbackColumns,
+                        ),
+                    TransferField.TIMESTAMP to
+                        DateTimeParsingMapping(
+                            id = FieldMappingId(Uuid.random()),
+                            fieldType = TransferField.TIMESTAMP,
+                            dateColumnName = "Date",
+                            dateFormat = "dd/MM/yyyy",
+                        ),
+                    TransferField.DESCRIPTION to
+                        DirectColumnMapping(
+                            id = FieldMappingId(Uuid.random()),
+                            fieldType = TransferField.DESCRIPTION,
+                            columnName = "Description",
+                        ),
+                    TransferField.AMOUNT to
+                        AmountParsingMapping(
+                            id = FieldMappingId(Uuid.random()),
+                            fieldType = TransferField.AMOUNT,
+                            mode = AmountMode.SINGLE_COLUMN,
+                            amountColumnName = "Amount",
+                        ),
+                    TransferField.CURRENCY to
+                        HardCodedCurrencyMapping(
+                            id = FieldMappingId(Uuid.random()),
+                            fieldType = TransferField.CURRENCY,
+                            currencyId = testCurrencyId,
+                        ),
+                ),
+            createdAt = now,
+            updatedAt = now,
+        )
+    }
+
+    @Test
+    fun `mapRow with RegexAccountMapping uses matched account when pattern matches`() {
+        val strategy = createStrategyWithRegex()
+        val mapper =
+            CsvTransferMapper(
+                strategy = strategy,
+                columns = columnsWithType,
+                existingAccounts = mapOf("Paxos" to paxosAccount),
+                existingCurrencies = mapOf(testCurrencyId to testCurrency),
+                existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
+            )
+
+        // Name contains "paxos" - should match and map to Paxos account
+        val row =
+            CsvRow(
+                rowIndex = 1,
+                values = listOf("15/12/2024", "Salary payment", "1500.00", "103611797paxos Te", "Faster payment"),
+            )
+        val result = mapper.mapRow(row)
+
+        assertIs<MappingResult.Success>(result)
+        assertEquals(paxosAccount.id, result.transfer.targetAccountId)
+    }
+
+    @Test
+    fun `mapRow with RegexAccountMapping is case insensitive`() {
+        val strategy = createStrategyWithRegex()
+        val mapper =
+            CsvTransferMapper(
+                strategy = strategy,
+                columns = columnsWithType,
+                existingAccounts = mapOf("Paxos" to paxosAccount),
+                existingCurrencies = mapOf(testCurrencyId to testCurrency),
+                existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
+            )
+
+        // Name contains "PAXOS" (uppercase) - should still match due to case-insensitive matching
+        val row =
+            CsvRow(
+                rowIndex = 1,
+                values = listOf("15/12/2024", "Salary payment", "1500.00", "PAXOS TECHNOLOGY LIMITED", "Faster payment"),
+            )
+        val result = mapper.mapRow(row)
+
+        assertIs<MappingResult.Success>(result)
+        assertEquals(paxosAccount.id, result.transfer.targetAccountId)
+    }
+
+    @Test
+    fun `mapRow with RegexAccountMapping uses column value when no pattern matches`() {
+        val strategy = createStrategyWithRegex()
+        val mapper =
+            CsvTransferMapper(
+                strategy = strategy,
+                columns = columnsWithType,
+                existingAccounts = mapOf("Amazon UK" to testTargetAccount),
+                existingCurrencies = mapOf(testCurrencyId to testCurrency),
+                existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
+            )
+
+        // Name doesn't match regex - should use raw column value
+        val row =
+            CsvRow(
+                rowIndex = 1,
+                values = listOf("15/12/2024", "Purchase", "-50.00", "Amazon UK", "Card payment"),
+            )
+        val result = mapper.mapRow(row)
+
+        assertIs<MappingResult.Success>(result)
+        assertEquals(testTargetAccountId, result.transfer.targetAccountId)
+    }
+
+    @Test
+    fun `mapRow with RegexAccountMapping identifies new account from matched name`() {
+        val strategy = createStrategyWithRegex()
+        // Paxos account doesn't exist yet
+        val mapper =
+            CsvTransferMapper(
+                strategy = strategy,
+                columns = columnsWithType,
+                existingAccounts = emptyMap(),
+                existingCurrencies = mapOf(testCurrencyId to testCurrency),
+                existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
+            )
+
+        val row =
+            CsvRow(
+                rowIndex = 1,
+                values = listOf("15/12/2024", "Salary payment", "1500.00", "103611797paxos Te", "Faster payment"),
+            )
+        val result = mapper.mapRow(row)
+
+        assertIs<MappingResult.Success>(result)
+        assertEquals("Paxos", result.newAccountName)
+    }
+
+    @Test
+    fun `mapRow with RegexAccountMapping identifies new account from fallback when primary empty and no match`() {
+        val strategy = createStrategyWithRegex()
+        val mapper =
+            CsvTransferMapper(
+                strategy = strategy,
+                columns = columnsWithType,
+                existingAccounts = emptyMap(),
+                existingCurrencies = mapOf(testCurrencyId to testCurrency),
+                existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
+            )
+
+        // Name is empty, Type is "Cheque" - should fall back to column value
+        val row =
+            CsvRow(
+                rowIndex = 1,
+                values = listOf("15/12/2024", "Cheque credited", "100.00", "", "Cheque"),
+            )
+        val result = mapper.mapRow(row)
+
+        assertIs<MappingResult.Success>(result)
+        assertEquals("Cheque", result.newAccountName)
+    }
+
+    @Test
+    fun `mapRow with RegexAccountMapping uses first matching rule when multiple rules exist`() {
+        val strategy =
+            createStrategyWithRegex(
+                rules =
+                    listOf(
+                        RegexRule(pattern = ".*paxos.*", accountName = "Paxos"),
+                        RegexRule(pattern = ".*crypto.*", accountName = "Crypto.com"),
+                    ),
+            )
+        val cryptoAccount =
+            Account(
+                id = AccountId(5),
+                name = "Crypto.com",
+                openingDate = Clock.System.now(),
+            )
+        val mapper =
+            CsvTransferMapper(
+                strategy = strategy,
+                columns = columnsWithType,
+                existingAccounts =
+                    mapOf(
+                        "Paxos" to paxosAccount,
+                        "Crypto.com" to cryptoAccount,
+                    ),
+                existingCurrencies = mapOf(testCurrencyId to testCurrency),
+                existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
+            )
+
+        // Should match crypto pattern
+        val row =
+            CsvRow(
+                rowIndex = 1,
+                values = listOf("15/12/2024", "Crypto purchase", "-100.00", "crypto.com app", "Card payment"),
+            )
+        val result = mapper.mapRow(row)
+
+        assertIs<MappingResult.Success>(result)
+        assertEquals(cryptoAccount.id, result.transfer.targetAccountId)
+    }
+
+    @Test
+    fun `prepareImport with RegexAccountMapping handles mix of matched and unmatched values`() {
+        val strategy = createStrategyWithRegex()
+        val mapper =
+            CsvTransferMapper(
+                strategy = strategy,
+                columns = columnsWithType,
+                existingAccounts =
+                    mapOf(
+                        "Paxos" to paxosAccount,
+                        "Amazon UK" to testTargetAccount,
+                    ),
+                existingCurrencies = mapOf(testCurrencyId to testCurrency),
+                existingCurrenciesByCode = mapOf(testCurrency.code.uppercase() to testCurrency),
+            )
+
+        val rows =
+            listOf(
+                // Matches paxos regex
+                CsvRow(rowIndex = 1, values = listOf("15/12/2024", "Salary", "1500.00", "103611797paxos Te", "Faster payment")),
+                // Doesn't match, uses column value
+                CsvRow(rowIndex = 2, values = listOf("16/12/2024", "Purchase", "-50.00", "Amazon UK", "Card payment")),
+                // Matches paxos regex (different prefix)
+                CsvRow(rowIndex = 3, values = listOf("17/12/2024", "Salary", "1500.00", "350709785paxos Te", "Faster payment")),
+            )
+
+        val preparation = mapper.prepareImport(rows)
+
+        assertEquals(3, preparation.validTransfers.size)
+        assertEquals(0, preparation.errorRows.size)
+        assertEquals(0, preparation.newAccounts.size) // All map to existing accounts
     }
 }

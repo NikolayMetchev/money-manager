@@ -40,7 +40,6 @@ data class HardCodedAccountMapping(
 
 /**
  * Looks up an account by name from a CSV column.
- * Can optionally create a new account if not found.
  *
  * When [fallbackColumns] is specified, if the primary [columnName] is empty,
  * each fallback column is tried in order until a non-empty value is found.
@@ -53,7 +52,41 @@ data class AccountLookupMapping(
     override val fieldType: TransferField,
     val columnName: String,
     val fallbackColumns: List<String> = emptyList(),
-    val createIfMissing: Boolean = true,
+    val defaultCategoryId: Long = Category.UNCATEGORIZED_ID,
+) : FieldMapping {
+    /**
+     * Returns all columns to check in priority order (primary first, then fallbacks).
+     */
+    val allColumns: List<String>
+        get() = listOf(columnName) + fallbackColumns
+}
+
+/**
+ * A single regex rule that maps matched values to a specific account name.
+ */
+@Serializable
+data class RegexRule(
+    val pattern: String,
+    val accountName: String,
+)
+
+/**
+ * Maps CSV column values to accounts using regex pattern matching.
+ * Rules are evaluated in order; first match wins.
+ * If no rules match, uses the raw column value for account lookup.
+ * All matching is case-insensitive.
+ *
+ * When [fallbackColumns] is specified and no regex rules match, if the primary
+ * [columnName] is empty, each fallback column is tried in order until a non-empty
+ * value is found.
+ */
+@Serializable
+data class RegexAccountMapping(
+    override val id: FieldMappingId,
+    override val fieldType: TransferField,
+    val columnName: String,
+    val rules: List<RegexRule>,
+    val fallbackColumns: List<String> = emptyList(),
     val defaultCategoryId: Long = Category.UNCATEGORIZED_ID,
 ) : FieldMapping {
     /**

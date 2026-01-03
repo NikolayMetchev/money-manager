@@ -179,7 +179,6 @@ class CsvImportErrorHandlingTest {
                             fieldType = TransferField.TARGET_ACCOUNT,
                             columnName = "Name",
                             fallbackColumns = fallbackColumns,
-                            createIfMissing = true,
                         ),
                     TransferField.TIMESTAMP to
                         DateTimeParsingMapping(
