@@ -315,6 +315,11 @@ fun MoneyManagerApp(
                             }
                             CsvStrategiesScreen(
                                 csvImportStrategyRepository = csvImportStrategyRepository,
+                                csvImportRepository = csvImportRepository,
+                                accountRepository = accountRepository,
+                                categoryRepository = categoryRepository,
+                                currencyRepository = currencyRepository,
+                                attributeTypeRepository = attributeTypeRepository,
                                 onBack = { currentScreen = Screen.CsvImports },
                             )
                         }
