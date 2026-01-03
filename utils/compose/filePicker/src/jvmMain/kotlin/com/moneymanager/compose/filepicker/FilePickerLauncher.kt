@@ -1,5 +1,3 @@
-@file:Suppress("UnusedPrivateProperty") // False positive: mimeTypes and onResult are used
-
 package com.moneymanager.compose.filepicker
 
 import java.awt.FileDialog
