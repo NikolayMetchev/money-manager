@@ -22,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.moneymanager.database.DatabaseMaintenanceService
+import com.moneymanager.database.service.CsvStrategyExportService
 import com.moneymanager.database.sql.TransferSourceQueries
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AppVersion
@@ -65,6 +66,7 @@ fun MoneyManagerApp(
     categoryRepository: CategoryRepository,
     csvImportRepository: CsvImportRepository,
     csvImportStrategyRepository: CsvImportStrategyRepository,
+    csvStrategyExportService: CsvStrategyExportService,
     currencyRepository: CurrencyRepository,
     deviceRepository: DeviceRepository,
     maintenanceService: DatabaseMaintenanceService,
@@ -320,6 +322,8 @@ fun MoneyManagerApp(
                                 categoryRepository = categoryRepository,
                                 currencyRepository = currencyRepository,
                                 attributeTypeRepository = attributeTypeRepository,
+                                csvStrategyExportService = csvStrategyExportService,
+                                appVersion = appVersion,
                                 onBack = { currentScreen = Screen.CsvImports },
                             )
                         }

@@ -10,8 +10,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -74,13 +77,19 @@ fun CsvImportDetailScreen(
     var showApplyStrategyDialog by remember { mutableStateOf(false) }
     var showCreateStrategyDialog by remember { mutableStateOf(false) }
     var isDeleting by remember { mutableStateOf(false) }
-    var importResultMessage by remember { mutableStateOf<String?>(null) }
+    var importSuccessMessage by remember { mutableStateOf<String?>(null) }
+    var importFailedRows by remember { mutableStateOf<List<String>>(emptyList()) }
     var failedRowIndexes by remember { mutableStateOf<Set<Long>>(emptySet()) }
     var rowsRefreshTrigger by remember { mutableStateOf(0) }
     var hasMatchingStrategy by remember { mutableStateOf(false) }
 
+    // Observe strategies to re-check when new ones are added
+    val strategies by csvImportStrategyRepository.getAllStrategies()
+        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+
     // Check if there's a matching strategy for this import's columns
-    LaunchedEffect(import) {
+    // Re-runs when import changes OR when strategies list changes (e.g., after import)
+    LaunchedEffect(import, strategies) {
         import?.let { csvImport ->
             val columnNames = csvImport.columns.map { it.originalName }.toSet()
             val matchingStrategy = csvImportStrategyRepository.findMatchingStrategy(columnNames)
@@ -164,13 +173,39 @@ fun CsvImportDetailScreen(
         }
 
         // Show import result message
-        importResultMessage?.let { message ->
+        importSuccessMessage?.let { message ->
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = message,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.primary,
             )
+        }
+
+        // Show failed rows in scrollable container
+        if (importFailedRows.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Failed rows (${importFailedRows.size}):",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 150.dp)
+                        .verticalScroll(rememberScrollState()),
+            ) {
+                importFailedRows.forEach { errorLine ->
+                    Text(
+                        text = errorLine,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -316,15 +351,10 @@ fun CsvImportDetailScreen(
             onImportComplete = { result ->
                 showApplyStrategyDialog = false
                 failedRowIndexes = result.failedRows.map { it.rowIndex }.toSet()
-                importResultMessage =
-                    buildString {
-                        append("Successfully imported ${result.successCount} transfers")
-                        if (result.failedRows.isNotEmpty()) {
-                            append("\n\nFailed rows (${result.failedRows.size}):")
-                            result.failedRows.forEach { failed ->
-                                append("\n  Row ${failed.rowIndex}: ${failed.errorMessage}")
-                            }
-                        }
+                importSuccessMessage = "Successfully imported ${result.successCount} transfers"
+                importFailedRows =
+                    result.failedRows.map { failed ->
+                        "Row ${failed.rowIndex}: ${failed.errorMessage}"
                     }
                 rowsRefreshTrigger++
             },

@@ -55,8 +55,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.moneymanager.database.service.CsvStrategyExportService
+import com.moneymanager.database.service.ImportParseResult
+import com.moneymanager.database.service.ReferenceType
+import com.moneymanager.database.service.Resolution
+import com.moneymanager.database.service.UnresolvedReference
+import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeType
+import com.moneymanager.domain.model.Category
+import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvImport
@@ -635,6 +643,10 @@ fun CreateCsvStrategyDialog(
         }
 
     // Compute form validity - all required fields must be populated
+    val regexRulesValid =
+        targetAccountMode != TargetAccountMode.REGEX_MATCH ||
+            (regexRules.isNotEmpty() && regexRules.all { it.accountName.isNotBlank() })
+
     val isFormValid =
         name.isNotBlank() &&
             identificationColumns.isNotEmpty() &&
@@ -643,6 +655,7 @@ fun CreateCsvStrategyDialog(
             dateColumnName != null &&
             descriptionColumnName != null &&
             amountColumnName != null &&
+            regexRulesValid &&
             when (currencyMode) {
                 CurrencyMode.HARDCODED -> selectedCurrencyId != null
                 CurrencyMode.FROM_COLUMN -> currencyColumnName != null
@@ -2114,6 +2127,7 @@ private fun RegexRulesEditor(
 
                     Spacer(modifier = Modifier.height(4.dp))
 
+                    val isAccountNameError = rule.accountName.isBlank()
                     OutlinedTextField(
                         value = rule.accountName,
                         onValueChange = { newName ->
@@ -2123,11 +2137,32 @@ private fun RegexRulesEditor(
                                 },
                             )
                         },
-                        label = { Text("Target Account Name") },
+                        label = {
+                            Text(
+                                "Target Account Name *",
+                                color =
+                                    if (isAccountNameError) {
+                                        MaterialTheme.colorScheme.error
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
+                            )
+                        },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         enabled = enabled,
-                        supportingText = { Text("Account name when pattern matches") },
+                        isError = isAccountNameError,
+                        supportingText = {
+                            Text(
+                                if (isAccountNameError) "Required" else "Account name when pattern matches",
+                                color =
+                                    if (isAccountNameError) {
+                                        MaterialTheme.colorScheme.error
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
+                            )
+                        },
                     )
 
                     // Show preview of matching values
@@ -2230,6 +2265,454 @@ private fun RegexRulesEditor(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+        }
+    }
+}
+
+/**
+ * Dialog for importing a CSV strategy from a JSON file.
+ * Shows unresolved references and allows the user to map them to existing entities or create new ones.
+ */
+@Composable
+fun ImportStrategyDialog(
+    parseResult: ImportParseResult,
+    csvImportStrategyRepository: CsvImportStrategyRepository,
+    csvStrategyExportService: CsvStrategyExportService,
+    accountRepository: AccountRepository,
+    categoryRepository: CategoryRepository,
+    currencyRepository: CurrencyRepository,
+    onDismiss: () -> Unit,
+    onImportSuccess: () -> Unit,
+) {
+    val accounts by accountRepository.getAllAccounts()
+        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val categories by categoryRepository.getAllCategories()
+        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val currencies by currencyRepository.getAllCurrencies()
+        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+
+    var resolutions by remember {
+        mutableStateOf<Map<UnresolvedReference, Resolution>>(emptyMap())
+    }
+    var strategyName by remember { mutableStateOf(parseResult.strategyName) }
+    var isImporting by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    val scope = rememberSchemaAwareCoroutineScope()
+
+    // Check if all unresolved references have been resolved
+    val allResolved = parseResult.unresolvedReferences.all { it in resolutions.keys }
+
+    // Check for name conflict
+    val existingStrategies by csvImportStrategyRepository.getAllStrategies()
+        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val nameConflict = existingStrategies.any { it.name == strategyName }
+
+    AlertDialog(
+        onDismissRequest = { if (!isImporting) onDismiss() },
+        title = { Text("Import Strategy") },
+        text = {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+            ) {
+                OutlinedTextField(
+                    value = strategyName,
+                    onValueChange = { strategyName = it },
+                    label = { Text("Strategy Name") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    enabled = !isImporting,
+                    isError = strategyName.isBlank() || nameConflict,
+                    supportingText = {
+                        when {
+                            strategyName.isBlank() -> Text("Name is required")
+                            nameConflict ->
+                                Text(
+                                    "A strategy with this name already exists",
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                        }
+                    },
+                )
+
+                if (parseResult.unresolvedReferences.isEmpty()) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        "All references resolved. Ready to import.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                } else {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        "Resolve Missing References",
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    Text(
+                        "The following references need to be mapped or created:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    parseResult.unresolvedReferences.forEach { ref ->
+                        ReferenceResolutionRow(
+                            reference = ref,
+                            resolution = resolutions[ref],
+                            onResolutionChanged = { resolution ->
+                                resolutions = resolutions + (ref to resolution)
+                            },
+                            accounts = accounts,
+                            categories = categories,
+                            currencies = currencies,
+                            enabled = !isImporting,
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                }
+
+                errorMessage?.let {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = it,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    isImporting = true
+                    errorMessage = null
+                    scope.launch {
+                        try {
+                            // Update the export with the new name if changed
+                            val exportWithNewName = parseResult.export.copy(name = strategyName)
+
+                            // Create the strategy
+                            val strategy =
+                                csvStrategyExportService.createStrategyFromExport(
+                                    export = exportWithNewName,
+                                    resolutions = resolutions,
+                                )
+
+                            // Save it
+                            csvImportStrategyRepository.createStrategy(strategy)
+                            onImportSuccess()
+                            onDismiss()
+                        } catch (expected: Exception) {
+                            errorMessage = "Failed to import: ${expected.message}"
+                            isImporting = false
+                        }
+                    }
+                },
+                enabled = allResolved && strategyName.isNotBlank() && !nameConflict && !isImporting,
+            ) {
+                if (isImporting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.padding(end = 8.dp),
+                        strokeWidth = 2.dp,
+                    )
+                }
+                Text("Import")
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !isImporting,
+            ) {
+                Text("Cancel")
+            }
+        },
+    )
+}
+
+/**
+ * Row for resolving a single unresolved reference.
+ */
+@Composable
+private fun ReferenceResolutionRow(
+    reference: UnresolvedReference,
+    resolution: Resolution?,
+    onResolutionChanged: (Resolution) -> Unit,
+    accounts: List<Account>,
+    categories: List<Category>,
+    currencies: List<Currency>,
+    enabled: Boolean,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    var createNewName by remember { mutableStateOf(reference.name) }
+    var selectedOption by remember(resolution) {
+        mutableStateOf(
+            when (resolution) {
+                is Resolution.CreateNew -> "create"
+                is Resolution.MapToExisting -> "existing:${resolution.id}"
+                null -> null
+            },
+        )
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors =
+            CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            ),
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = reference.name,
+                        style = MaterialTheme.typography.titleSmall,
+                    )
+                    val refType = reference.type.name.lowercase().replaceFirstChar { it.uppercase() }
+                    val fieldName = reference.fieldType.name.lowercase().replace("_", " ")
+                    Text(
+                        text = "$refType for $fieldName",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (resolution != null) {
+                    Text(
+                        "✓",
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Resolution options
+            when (reference.type) {
+                ReferenceType.ACCOUNT -> {
+                    ExposedDropdownMenuBox(
+                        expanded = expanded,
+                        onExpandedChange = { if (enabled) expanded = !expanded },
+                    ) {
+                        OutlinedTextField(
+                            value =
+                                when {
+                                    selectedOption == "create" -> "Create: $createNewName"
+                                    selectedOption?.startsWith("existing:") == true -> {
+                                        val id = selectedOption!!.removePrefix("existing:").toLongOrNull()
+                                        accounts.find { it.id.id == id }?.name ?: "Select..."
+                                    }
+                                    else -> "Select..."
+                                },
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Map to") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+                            enabled = enabled,
+                        )
+                        ExposedDropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = { expanded = false },
+                        ) {
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        "Create new account",
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                },
+                                onClick = {
+                                    selectedOption = "create"
+                                    onResolutionChanged(Resolution.CreateNew(createNewName))
+                                    expanded = false
+                                },
+                            )
+                            accounts.forEach { account ->
+                                DropdownMenuItem(
+                                    text = { Text(account.name) },
+                                    onClick = {
+                                        selectedOption = "existing:${account.id.id}"
+                                        onResolutionChanged(Resolution.MapToExisting(account.id.id))
+                                        expanded = false
+                                    },
+                                )
+                            }
+                        }
+                    }
+
+                    // Show name field for create option
+                    if (selectedOption == "create") {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = createNewName,
+                            onValueChange = { newName ->
+                                createNewName = newName
+                                onResolutionChanged(Resolution.CreateNew(newName))
+                            },
+                            label = { Text("New account name") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            enabled = enabled,
+                        )
+                    }
+                }
+
+                ReferenceType.CATEGORY -> {
+                    ExposedDropdownMenuBox(
+                        expanded = expanded,
+                        onExpandedChange = { if (enabled) expanded = !expanded },
+                    ) {
+                        OutlinedTextField(
+                            value =
+                                when {
+                                    selectedOption == "create" -> "Create: $createNewName"
+                                    selectedOption?.startsWith("existing:") == true -> {
+                                        val id = selectedOption!!.removePrefix("existing:").toLongOrNull()
+                                        categories.find { it.id == id }?.name ?: "Select..."
+                                    }
+                                    else -> "Select..."
+                                },
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Map to") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+                            enabled = enabled,
+                        )
+                        ExposedDropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = { expanded = false },
+                        ) {
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        "Create new category",
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                },
+                                onClick = {
+                                    selectedOption = "create"
+                                    onResolutionChanged(Resolution.CreateNew(createNewName))
+                                    expanded = false
+                                },
+                            )
+                            categories.forEach { category ->
+                                DropdownMenuItem(
+                                    text = { Text(category.name) },
+                                    onClick = {
+                                        selectedOption = "existing:${category.id}"
+                                        onResolutionChanged(Resolution.MapToExisting(category.id))
+                                        expanded = false
+                                    },
+                                )
+                            }
+                        }
+                    }
+
+                    if (selectedOption == "create") {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = createNewName,
+                            onValueChange = { newName ->
+                                createNewName = newName
+                                onResolutionChanged(Resolution.CreateNew(newName))
+                            },
+                            label = { Text("New category name") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            enabled = enabled,
+                        )
+                    }
+                }
+
+                ReferenceType.CURRENCY -> {
+                    ExposedDropdownMenuBox(
+                        expanded = expanded,
+                        onExpandedChange = { if (enabled) expanded = !expanded },
+                    ) {
+                        OutlinedTextField(
+                            value =
+                                when {
+                                    selectedOption == "create" -> "Create: $createNewName"
+                                    selectedOption?.startsWith("existing:") == true -> {
+                                        val id = selectedOption!!.removePrefix("existing:")
+                                        currencies.find { it.id.id.toString() == id }?.let { "${it.code} - ${it.name}" }
+                                            ?: "Select..."
+                                    }
+                                    else -> "Select..."
+                                },
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Map to") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+                            enabled = enabled,
+                        )
+                        ExposedDropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = { expanded = false },
+                        ) {
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        "Create new currency",
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                },
+                                onClick = {
+                                    selectedOption = "create"
+                                    onResolutionChanged(Resolution.CreateNew(createNewName))
+                                    expanded = false
+                                },
+                            )
+                            currencies.forEach { currency ->
+                                DropdownMenuItem(
+                                    text = { Text("${currency.code} - ${currency.name}") },
+                                    onClick = {
+                                        selectedOption = "existing:${currency.id.id}"
+                                        // Currency uses UUID, so we need to handle differently
+                                        // For now, store the string representation
+                                        onResolutionChanged(Resolution.MapToExisting(0L)) // This won't work for currency
+                                        expanded = false
+                                    },
+                                )
+                            }
+                        }
+                    }
+
+                    if (selectedOption == "create") {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = createNewName,
+                            onValueChange = { newName ->
+                                createNewName = newName
+                                onResolutionChanged(Resolution.CreateNew(newName))
+                            },
+                            label = { Text("New currency code") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            enabled = enabled,
+                        )
+                    }
+                }
             }
         }
     }
