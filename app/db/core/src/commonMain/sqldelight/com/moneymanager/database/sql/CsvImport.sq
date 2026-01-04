@@ -80,3 +80,29 @@ VALUES (?, ?, ?, ?);
 
 deleteColumnsByImportId:
 DELETE FROM csv_column_metadata WHERE import_id = ?;
+
+-- Error tracking for CSV imports
+CREATE TABLE csv_import_error (
+    csv_import_id TEXT NOT NULL,
+    row_index INTEGER NOT NULL,
+    error_message TEXT NOT NULL,
+    error_timestamp INTEGER NOT NULL,
+    PRIMARY KEY (csv_import_id, row_index),
+    FOREIGN KEY (csv_import_id) REFERENCES csv_import_metadata(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_csv_import_error_import ON csv_import_error(csv_import_id);
+
+-- csv_import_error queries
+insertOrReplaceError:
+INSERT OR REPLACE INTO csv_import_error (csv_import_id, row_index, error_message, error_timestamp)
+VALUES (?, ?, ?, ?);
+
+deleteError:
+DELETE FROM csv_import_error WHERE csv_import_id = ? AND row_index = ?;
+
+deleteErrorsForImport:
+DELETE FROM csv_import_error WHERE csv_import_id = ?;
+
+getErrorsForImport:
+SELECT * FROM csv_import_error WHERE csv_import_id = ? ORDER BY row_index;

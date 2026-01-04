@@ -71,9 +71,10 @@ class CsvTableManager(private val database: MoneyManagerDatabaseWrapper) {
     }
 
     /**
-     * Queries rows from the CSV table with pagination.
+     * Queries rows from the CSV table with pagination, including any error messages.
      *
      * @param tableName The name of the table
+     * @param csvImportId The CSV import ID for joining with error table
      * @param columnCount The number of columns
      * @param limit Maximum number of rows to return
      * @param offset Number of rows to skip
@@ -81,12 +82,20 @@ class CsvTableManager(private val database: MoneyManagerDatabaseWrapper) {
      */
     fun queryRows(
         tableName: String,
+        csvImportId: String,
         columnCount: Int,
         limit: Int,
         offset: Int,
     ): List<CsvRow> {
-        val columns = (0 until columnCount).joinToString(", ") { "col_$it" }
-        val sql = "SELECT row_index, transaction_id, import_status, $columns FROM $tableName ORDER BY row_index LIMIT $limit OFFSET $offset"
+        val columns = (0 until columnCount).joinToString(", ") { "t.col_$it" }
+        val sql =
+            """
+            SELECT t.row_index, t.transaction_id, t.import_status, e.error_message, $columns
+            FROM $tableName t
+            LEFT JOIN csv_import_error e ON e.csv_import_id = '$csvImportId' AND e.row_index = t.row_index
+            ORDER BY t.row_index
+            LIMIT $limit OFFSET $offset
+            """.trimIndent()
 
         val result = mutableListOf<CsvRow>()
         database.executeQuery(
@@ -99,11 +108,20 @@ class CsvTableManager(private val database: MoneyManagerDatabaseWrapper) {
                     val transferId = transferIdStr?.let { TransferId(Uuid.parse(it)) }
                     val importStatusStr = cursor.getString(2)
                     val importStatus = importStatusStr?.let { ImportStatus.valueOf(it) }
+                    val errorMessage = cursor.getString(3)
                     val values =
                         (0 until columnCount).map { i ->
-                            cursor.getString(i + 3).orEmpty()
+                            cursor.getString(i + 4).orEmpty()
                         }
-                    result.add(CsvRow(rowIndex = rowIndex, values = values, transferId = transferId, importStatus = importStatus))
+                    result.add(
+                        CsvRow(
+                            rowIndex = rowIndex,
+                            values = values,
+                            transferId = transferId,
+                            importStatus = importStatus,
+                            errorMessage = errorMessage,
+                        ),
+                    )
                 }
                 QueryResult.Unit
             },
