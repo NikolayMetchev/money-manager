@@ -77,6 +77,7 @@ fun TestMoneyManagerApp(
                 categoryRepository = dc.categoryRepository,
                 csvImportRepository = dc.csvImportRepository,
                 csvImportStrategyRepository = dc.csvImportStrategyRepository,
+                csvStrategyExportService = dc.csvStrategyExportService,
                 currencyRepository = dc.currencyRepository,
                 deviceRepository = dc.deviceRepository,
                 maintenanceService = dc.maintenanceService,

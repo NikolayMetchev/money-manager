@@ -28,12 +28,19 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.moneymanager.compose.filepicker.rememberFilePicker
+import com.moneymanager.compose.filepicker.rememberFileSaver
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
+import com.moneymanager.database.json.CsvStrategyExportCodec
+import com.moneymanager.database.service.CsvStrategyExportService
+import com.moneymanager.database.service.ImportParseResult
+import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
@@ -44,6 +51,7 @@ import com.moneymanager.domain.repository.CsvImportRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
+import kotlinx.coroutines.launch
 import nl.jacobras.humanreadable.HumanReadable
 
 @Suppress("UnusedParameter") // onStrategyClick retained for future extensibility
@@ -55,6 +63,8 @@ fun CsvStrategiesScreen(
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
     attributeTypeRepository: AttributeTypeRepository,
+    csvStrategyExportService: CsvStrategyExportService,
+    appVersion: AppVersion,
     onStrategyClick: (CsvImportStrategy) -> Unit = {},
     onBack: () -> Unit = {},
 ) {
@@ -67,6 +77,68 @@ fun CsvStrategiesScreen(
     var selectedCsvImport by remember { mutableStateOf<CsvImport?>(null) }
     var csvRows by remember { mutableStateOf<List<CsvRow>>(emptyList()) }
     var isLoadingRows by remember { mutableStateOf(false) }
+
+    // Export state
+    var strategyToExport by remember { mutableStateOf<CsvImportStrategy?>(null) }
+    var exportJson by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
+
+    // Import state
+    var importParseResult by remember { mutableStateOf<ImportParseResult?>(null) }
+    var importError by remember { mutableStateOf<String?>(null) }
+
+    // File saver for export
+    val fileSaver =
+        rememberFileSaver(
+            mimeType = "application/json",
+            onResult = { result ->
+                if (result?.success == true) {
+                    strategyToExport = null
+                    exportJson = null
+                }
+            },
+        )
+
+    // File picker for import
+    val filePicker =
+        rememberFilePicker(
+            mimeTypes = listOf("application/json"),
+            onResult = { result ->
+                if (result != null) {
+                    scope.launch {
+                        @Suppress("TooGenericExceptionCaught")
+                        try {
+                            val jsonContent = result.content
+                            val export = CsvStrategyExportCodec.decode(jsonContent)
+                            val parseResult = csvStrategyExportService.parseExport(export)
+                            importParseResult = parseResult
+                            importError = null
+                        } catch (expected: Exception) {
+                            importError = "Failed to parse file: ${expected.message}"
+                            importParseResult = null
+                        }
+                    }
+                }
+            },
+        )
+
+    // Handle export when strategy is selected
+    LaunchedEffect(strategyToExport) {
+        val strategy = strategyToExport
+        if (strategy != null && exportJson == null) {
+            @Suppress("TooGenericExceptionCaught")
+            try {
+                val export = csvStrategyExportService.toExport(strategy, appVersion)
+                val json = CsvStrategyExportCodec.encode(export)
+                exportJson = json
+                val fileName = "${strategy.name.replace(Regex("[^a-zA-Z0-9-_]"), "_")}.json"
+                fileSaver.launch(fileName, json)
+            } catch (expected: Exception) {
+                strategyToExport = null
+                exportJson = null
+            }
+        }
+    }
 
     // Load CSV rows when a CSV import is selected
     LaunchedEffect(selectedCsvImport) {
@@ -105,6 +177,23 @@ fun CsvStrategiesScreen(
                         style = MaterialTheme.typography.headlineMedium,
                     )
                 }
+                // Import button
+                IconButton(onClick = { filePicker.launch() }) {
+                    Text(
+                        text = "\u2B73",
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                }
+            }
+
+            // Show import error if any
+            importError?.let { error ->
+                Text(
+                    text = error,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
             }
 
             if (strategies.isEmpty()) {
@@ -143,6 +232,9 @@ fun CsvStrategiesScreen(
                                 onEditClick = {
                                     strategyToEdit = strategy
                                     showSelectCsvDialog = true
+                                },
+                                onExportClick = {
+                                    strategyToExport = strategy
                                 },
                             )
                         }
@@ -191,6 +283,27 @@ fun CsvStrategiesScreen(
             existingStrategy = currentStrategyToEdit,
         )
     }
+
+    // Show import dialog when a strategy file has been parsed
+    val currentParseResult = importParseResult
+    if (currentParseResult != null) {
+        ImportStrategyDialog(
+            parseResult = currentParseResult,
+            csvImportStrategyRepository = csvImportStrategyRepository,
+            csvStrategyExportService = csvStrategyExportService,
+            accountRepository = accountRepository,
+            categoryRepository = categoryRepository,
+            currencyRepository = currencyRepository,
+            onDismiss = {
+                importParseResult = null
+                importError = null
+            },
+            onImportSuccess = {
+                importParseResult = null
+                importError = null
+            },
+        )
+    }
 }
 
 @Composable
@@ -198,6 +311,7 @@ fun CsvStrategyCard(
     strategy: CsvImportStrategy,
     csvImportStrategyRepository: CsvImportStrategyRepository,
     onEditClick: () -> Unit,
+    onExportClick: () -> Unit,
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
 
@@ -236,6 +350,14 @@ fun CsvStrategyCard(
             }
             Row {
                 IconButton(
+                    onClick = onExportClick,
+                ) {
+                    Text(
+                        text = "\u2B71",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                }
+                IconButton(
                     onClick = onEditClick,
                 ) {
                     Text(
@@ -247,7 +369,7 @@ fun CsvStrategyCard(
                     onClick = { showDeleteDialog = true },
                 ) {
                     Text(
-                        text = "🗑️",
+                        text = "\uD83D\uDDD1\uFE0F",
                         style = MaterialTheme.typography.titleMedium,
                     )
                 }

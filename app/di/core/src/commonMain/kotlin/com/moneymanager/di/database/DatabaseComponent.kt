@@ -2,6 +2,7 @@ package com.moneymanager.di.database
 
 import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
+import com.moneymanager.database.service.CsvStrategyExportService
 import com.moneymanager.database.sql.TransferSourceQueries
 import com.moneymanager.di.DatabaseScope
 import com.moneymanager.domain.model.DeviceId
@@ -31,6 +32,7 @@ interface DatabaseComponent {
     val categoryRepository: CategoryRepository
     val csvImportRepository: CsvImportRepository
     val csvImportStrategyRepository: CsvImportStrategyRepository
+    val csvStrategyExportService: CsvStrategyExportService
     val currencyRepository: CurrencyRepository
     val deviceRepository: DeviceRepository
     val maintenanceService: DatabaseMaintenanceService

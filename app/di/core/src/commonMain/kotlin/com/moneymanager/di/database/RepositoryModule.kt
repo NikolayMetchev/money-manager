@@ -14,6 +14,7 @@ import com.moneymanager.database.repository.DeviceRepositoryImpl
 import com.moneymanager.database.repository.TransactionRepositoryImpl
 import com.moneymanager.database.repository.TransferAttributeRepositoryImpl
 import com.moneymanager.database.repository.TransferSourceRepositoryImpl
+import com.moneymanager.database.service.CsvStrategyExportService
 import com.moneymanager.database.sql.TransferSourceQueries
 import com.moneymanager.di.DatabaseScope
 import com.moneymanager.domain.model.DeviceId
@@ -82,6 +83,14 @@ interface RepositoryModule {
     @SingleIn(DatabaseScope::class)
     fun provideMaintenanceService(database: MoneyManagerDatabaseWrapper): DatabaseMaintenanceService =
         DatabaseMaintenanceServiceImpl(database)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideCsvStrategyExportService(
+        accountRepository: AccountRepository,
+        currencyRepository: CurrencyRepository,
+        categoryRepository: CategoryRepository,
+    ): CsvStrategyExportService = CsvStrategyExportService(accountRepository, currencyRepository, categoryRepository)
 
     @Provides
     @SingleIn(DatabaseScope::class)
