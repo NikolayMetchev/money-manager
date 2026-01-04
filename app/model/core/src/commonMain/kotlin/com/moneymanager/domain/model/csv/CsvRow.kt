@@ -10,11 +10,13 @@ import com.moneymanager.domain.model.TransferId
  * @property rowIndex The 1-based row index from the original CSV file
  * @property values The column values, indexed by column position (0-based)
  * @property transferId The ID of the transfer created from this row, null if not yet imported
- * @property importStatus The import status of this row (IMPORTED, DUPLICATE, UPDATED), null if not yet processed
+ * @property importStatus The import status of this row (IMPORTED, DUPLICATE, UPDATED, ERROR), null if not yet processed
+ * @property errorMessage The error message if import failed for this row, null if no error
  */
 data class CsvRow(
     val rowIndex: Long,
     val values: List<String>,
     val transferId: TransferId? = null,
     val importStatus: ImportStatus? = null,
+    val errorMessage: String? = null,
 )

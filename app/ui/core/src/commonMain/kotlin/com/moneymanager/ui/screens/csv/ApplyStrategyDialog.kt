@@ -318,13 +318,18 @@ fun ApplyStrategyDialog(
                             val errorCount = finalPrep.errorRows.size
                             logger.info { "Prepared $validCount valid transfers, $errorCount error rows" }
 
-                            // Mark mapping errors as ERROR status in database
+                            // Mark mapping errors as ERROR status in database and save error messages
                             for (errorRow in finalPrep.errorRows) {
                                 csvImportRepository.updateRowStatus(
                                     csvImport.id,
                                     errorRow.rowIndex,
                                     ImportStatus.ERROR.name,
                                     null,
+                                )
+                                csvImportRepository.saveError(
+                                    csvImport.id,
+                                    errorRow.rowIndex,
+                                    errorRow.errorMessage,
                                 )
                             }
 
@@ -381,6 +386,8 @@ fun ApplyStrategyDialog(
                                                 ImportStatus.IMPORTED.name,
                                                 transfer.id,
                                             )
+                                            // Clear any previous error for this row (re-import success)
+                                            csvImportRepository.clearError(csvImport.id, originalRowIndex)
                                             rowTransferMap[originalRowIndex] = transfer.id
                                             successCount++
                                         }
@@ -410,6 +417,8 @@ fun ApplyStrategyDialog(
                                                     ImportStatus.UPDATED.name,
                                                     existingTransferId,
                                                 )
+                                                // Clear any previous error for this row (re-import success)
+                                                csvImportRepository.clearError(csvImport.id, originalRowIndex)
                                                 successCount++
                                             }
                                         }
@@ -428,6 +437,8 @@ fun ApplyStrategyDialog(
                                     )
                                     // Log the error and continue with remaining rows
                                     val errorMsg = expected.message ?: "Unknown error"
+                                    // Persist the error message for later viewing
+                                    csvImportRepository.saveError(csvImport.id, originalRowIndex, errorMsg)
                                     logger.warn(expected) {
                                         "Failed to import row $originalRowIndex: $errorMsg"
                                     }

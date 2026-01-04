@@ -168,6 +168,7 @@ class CsvImportRepositoryImpl(
 
             tableManager.queryRows(
                 tableName = import.table_name,
+                csvImportId = id.id.toString(),
                 columnCount = import.column_count.toInt(),
                 limit = limit,
                 offset = offset,
@@ -229,5 +230,30 @@ class CsvImportRepositoryImpl(
                     ?: return@withContext
 
             tableManager.updateRowStatus(import.table_name, rowIndex, status, transferId)
+        }
+
+    override suspend fun saveError(
+        id: CsvImportId,
+        rowIndex: Long,
+        errorMessage: String,
+    ): Unit =
+        withContext(coroutineContext) {
+            csvImportQueries.insertOrReplaceError(
+                csv_import_id = id.id.toString(),
+                row_index = rowIndex,
+                error_message = errorMessage,
+                error_timestamp = Clock.System.now().toEpochMilliseconds(),
+            )
+        }
+
+    override suspend fun clearError(
+        id: CsvImportId,
+        rowIndex: Long,
+    ): Unit =
+        withContext(coroutineContext) {
+            csvImportQueries.deleteError(
+                csv_import_id = id.id.toString(),
+                row_index = rowIndex,
+            )
         }
 }

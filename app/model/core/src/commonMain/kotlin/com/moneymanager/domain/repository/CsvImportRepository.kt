@@ -90,4 +90,29 @@ interface CsvImportRepository {
         status: String,
         transferId: TransferId? = null,
     )
+
+    /**
+     * Saves an error message for a specific row.
+     * Replaces any existing error for the same row.
+     *
+     * @param id The import ID
+     * @param rowIndex The row index that failed
+     * @param errorMessage The error message to save
+     */
+    suspend fun saveError(
+        id: CsvImportId,
+        rowIndex: Long,
+        errorMessage: String,
+    )
+
+    /**
+     * Clears the error for a specific row (e.g., when re-import succeeds).
+     *
+     * @param id The import ID
+     * @param rowIndex The row index to clear error for
+     */
+    suspend fun clearError(
+        id: CsvImportId,
+        rowIndex: Long,
+    )
 }
