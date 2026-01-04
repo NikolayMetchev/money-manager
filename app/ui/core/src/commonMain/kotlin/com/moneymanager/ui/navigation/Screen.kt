@@ -6,28 +6,28 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImportId
 
-sealed class Screen(val route: String, val title: String) {
-    data object Accounts : Screen("accounts", "Accounts")
+sealed class Screen(val title: String) {
+    data object Accounts : Screen("Accounts")
 
-    data object Currencies : Screen("currencies", "Currencies")
+    data object Currencies : Screen("Currencies")
 
-    data object Categories : Screen("categories", "Categories")
+    data object Categories : Screen("Categories")
 
-    data object CsvImports : Screen("csv-imports", "CSV Imports")
+    data object CsvImports : Screen("CSV Imports")
 
-    data object CsvStrategies : Screen("csv-strategies", "Import Strategies")
+    data object CsvStrategies : Screen("Import Strategies")
 
-    data object Settings : Screen("settings", "Settings")
+    data object Settings : Screen("Settings")
 
     data class AccountTransactions(
         val accountId: AccountId,
         val accountName: String,
         val scrollToTransferId: TransferId? = null,
-    ) : Screen("account-transactions", accountName)
+    ) : Screen(accountName)
 
     data class CsvImportDetail(val importId: CsvImportId) :
-        Screen("csv-import-detail", "CSV Import")
+        Screen("CSV Import")
 
     data class AuditHistory(val transferId: TransferId) :
-        Screen("audit-history", "Audit History")
+        Screen("Audit History")
 }
