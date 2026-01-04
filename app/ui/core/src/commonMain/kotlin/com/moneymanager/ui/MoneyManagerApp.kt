@@ -1,9 +1,13 @@
-@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
+@file:OptIn(
+    kotlin.uuid.ExperimentalUuidApi::class,
+    androidx.compose.ui.ExperimentalComposeUiApi::class,
+)
 
 package com.moneymanager.ui
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -21,6 +25,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.PointerButton
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.onPointerEvent
 import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.database.service.CsvStrategyExportService
 import com.moneymanager.database.sql.TransferSourceQueries
@@ -43,6 +50,7 @@ import com.moneymanager.domain.repository.TransferSourceRepository
 import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.ui.navigation.NavigationHistory
 import com.moneymanager.ui.navigation.Screen
 import com.moneymanager.ui.screens.AccountTransactionsScreen
 import com.moneymanager.ui.screens.AccountsScreen
@@ -51,6 +59,7 @@ import com.moneymanager.ui.screens.CsvImportDetailScreen
 import com.moneymanager.ui.screens.CsvImportsScreen
 import com.moneymanager.ui.screens.CurrenciesScreen
 import com.moneymanager.ui.screens.SettingsScreen
+import com.moneymanager.ui.screens.TransactionAuditScreen
 import com.moneymanager.ui.screens.TransactionEntryDialog
 import com.moneymanager.ui.screens.csvstrategy.CsvStrategiesScreen
 import kotlinx.coroutines.launch
@@ -78,7 +87,8 @@ fun MoneyManagerApp(
 ) {
     ProvideSchemaAwareScope {
         val scope = rememberSchemaAwareCoroutineScope()
-        var currentScreen by remember { mutableStateOf<Screen>(Screen.Accounts) }
+        val navigationHistory = remember { NavigationHistory(Screen.Accounts) }
+        val currentScreen = navigationHistory.currentScreen
         var showTransactionDialog by remember { mutableStateOf(false) }
         var preSelectedAccountId by remember { mutableStateOf<AccountId?>(null) }
         var currentlyViewedAccountId by remember { mutableStateOf<AccountId?>(null) }
@@ -92,6 +102,20 @@ fun MoneyManagerApp(
 
         MaterialTheme {
             Scaffold(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .onPointerEvent(PointerEventType.Press) { event ->
+                            when (event.button) {
+                                PointerButton.Back -> {
+                                    navigationHistory.navigateBack()
+                                }
+                                PointerButton.Forward -> {
+                                    navigationHistory.navigateForward()
+                                }
+                                else -> {}
+                            }
+                        },
                 topBar = {
                     if (currentScreen !is Screen.AccountTransactions) {
                         TopAppBar(
@@ -124,31 +148,31 @@ fun MoneyManagerApp(
                             icon = { Text("\uD83D\uDCB0") },
                             label = { Text("Accounts") },
                             selected = currentScreen is Screen.Accounts || currentScreen is Screen.AccountTransactions,
-                            onClick = { currentScreen = Screen.Accounts },
+                            onClick = { navigationHistory.navigateTo(Screen.Accounts) },
                         )
                         NavigationBarItem(
                             icon = { Text("\uD83D\uDCB1") },
                             label = { Text("Currencies") },
                             selected = currentScreen is Screen.Currencies,
-                            onClick = { currentScreen = Screen.Currencies },
+                            onClick = { navigationHistory.navigateTo(Screen.Currencies) },
                         )
                         NavigationBarItem(
                             icon = { Text("\uD83D\uDCC1") },
                             label = { Text("Categories") },
                             selected = currentScreen is Screen.Categories,
-                            onClick = { currentScreen = Screen.Categories },
+                            onClick = { navigationHistory.navigateTo(Screen.Categories) },
                         )
                         NavigationBarItem(
                             icon = { Text("\uD83D\uDCC4") },
                             label = { Text("CSV") },
                             selected = currentScreen is Screen.CsvImports || currentScreen is Screen.CsvImportDetail,
-                            onClick = { currentScreen = Screen.CsvImports },
+                            onClick = { navigationHistory.navigateTo(Screen.CsvImports) },
                         )
                         NavigationBarItem(
                             icon = { Text("\u2699\uFE0F") },
                             label = { Text("Settings") },
                             selected = currentScreen is Screen.Settings,
-                            onClick = { currentScreen = Screen.Settings },
+                            onClick = { navigationHistory.navigateTo(Screen.Settings) },
                         )
                     }
                 },
@@ -184,7 +208,7 @@ fun MoneyManagerApp(
                                 categoryRepository = categoryRepository,
                                 transactionRepository = transactionRepository,
                                 onAccountClick = { account ->
-                                    currentScreen = Screen.AccountTransactions(account.id, account.name)
+                                    navigationHistory.navigateTo(Screen.AccountTransactions(account.id, account.name))
                                 },
                             )
                         }
@@ -247,6 +271,12 @@ fun MoneyManagerApp(
                                 onCurrencyIdChange = { currencyId ->
                                     currentlyViewedCurrencyId = currencyId
                                 },
+                                onAccountClick = { accountId, accountName ->
+                                    navigationHistory.navigateTo(Screen.AccountTransactions(accountId, accountName))
+                                },
+                                onAuditClick = { transferId ->
+                                    navigationHistory.navigateTo(Screen.AuditHistory(transferId))
+                                },
                                 scrollToTransferId = screen.scrollToTransferId,
                                 externalRefreshTrigger = transactionRefreshTrigger,
                             )
@@ -259,10 +289,10 @@ fun MoneyManagerApp(
                             CsvImportsScreen(
                                 csvImportRepository = csvImportRepository,
                                 onImportClick = { importId ->
-                                    currentScreen = Screen.CsvImportDetail(importId)
+                                    navigationHistory.navigateTo(Screen.CsvImportDetail(importId))
                                 },
                                 onStrategiesClick = {
-                                    currentScreen = Screen.CsvStrategies
+                                    navigationHistory.navigateTo(Screen.CsvStrategies)
                                 },
                             )
                         }
@@ -279,8 +309,8 @@ fun MoneyManagerApp(
                                 maintenanceService = maintenanceService,
                                 transferSourceQueries = transferSourceQueries,
                                 deviceRepository = deviceRepository,
-                                onBack = { currentScreen = Screen.CsvImports },
-                                onDeleted = { currentScreen = Screen.CsvImports },
+                                onBack = { navigationHistory.navigateBack() },
+                                onDeleted = { navigationHistory.navigateTo(Screen.CsvImports) },
                                 onTransferClick = { transferId, isPositiveAmount ->
                                     scope.launch {
                                         transactionRepository
@@ -297,12 +327,13 @@ fun MoneyManagerApp(
                                                         }
                                                     val account = accounts.find { a -> a.id == accountId }
                                                     if (account != null) {
-                                                        currentScreen =
+                                                        navigationHistory.navigateTo(
                                                             Screen.AccountTransactions(
                                                                 accountId = account.id,
                                                                 accountName = account.name,
                                                                 scrollToTransferId = transferId,
-                                                            )
+                                                            ),
+                                                        )
                                                     }
                                                 }
                                             }
@@ -324,7 +355,17 @@ fun MoneyManagerApp(
                                 attributeTypeRepository = attributeTypeRepository,
                                 csvStrategyExportService = csvStrategyExportService,
                                 appVersion = appVersion,
-                                onBack = { currentScreen = Screen.CsvImports },
+                                onBack = { navigationHistory.navigateBack() },
+                            )
+                        }
+                        is Screen.AuditHistory -> {
+                            TransactionAuditScreen(
+                                transferId = screen.transferId,
+                                auditRepository = auditRepository,
+                                accountRepository = accountRepository,
+                                transactionRepository = transactionRepository,
+                                currentDeviceId = deviceId,
+                                onBack = { navigationHistory.navigateBack() },
                             )
                         }
                     }

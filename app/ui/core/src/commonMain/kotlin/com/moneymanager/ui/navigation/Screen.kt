@@ -27,4 +27,7 @@ sealed class Screen(val route: String, val title: String) {
 
     data class CsvImportDetail(val importId: CsvImportId) :
         Screen("csv-import-detail", "CSV Import")
+
+    data class AuditHistory(val transferId: TransferId) :
+        Screen("audit-history", "Audit History")
 }
