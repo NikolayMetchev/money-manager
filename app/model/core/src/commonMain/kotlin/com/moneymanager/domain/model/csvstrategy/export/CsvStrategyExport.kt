@@ -4,7 +4,6 @@ import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AttributeColumnMapping
 import com.moneymanager.domain.model.csvstrategy.RegexRule
 import com.moneymanager.domain.model.csvstrategy.TransferField
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
@@ -41,7 +40,6 @@ sealed interface FieldMappingExport {
  * Uses account name instead of account ID.
  */
 @Serializable
-@SerialName("HardCodedAccount")
 data class HardCodedAccountExport(
     override val fieldType: TransferField,
     val accountName: String,
@@ -52,7 +50,6 @@ data class HardCodedAccountExport(
  * Uses category name instead of category ID.
  */
 @Serializable
-@SerialName("AccountLookup")
 data class AccountLookupExport(
     override val fieldType: TransferField,
     val columnName: String,
@@ -66,7 +63,6 @@ data class AccountLookupExport(
  * RegexRule is already portable (uses account name strings).
  */
 @Serializable
-@SerialName("RegexAccount")
 data class RegexAccountExport(
     override val fieldType: TransferField,
     val columnName: String,
@@ -80,7 +76,6 @@ data class RegexAccountExport(
  * No IDs - fully portable as-is.
  */
 @Serializable
-@SerialName("DateTimeParsing")
 data class DateTimeParsingExport(
     override val fieldType: TransferField,
     val dateColumnName: String,
@@ -95,7 +90,6 @@ data class DateTimeParsingExport(
  * No IDs - fully portable as-is.
  */
 @Serializable
-@SerialName("DirectColumn")
 data class DirectColumnExport(
     override val fieldType: TransferField,
     val columnName: String,
@@ -107,7 +101,6 @@ data class DirectColumnExport(
  * No IDs - fully portable as-is.
  */
 @Serializable
-@SerialName("AmountParsing")
 data class AmountParsingExport(
     override val fieldType: TransferField,
     val mode: AmountMode,
@@ -123,7 +116,6 @@ data class AmountParsingExport(
  * Uses ISO 4217 currency code instead of currency ID.
  */
 @Serializable
-@SerialName("HardCodedCurrency")
 data class HardCodedCurrencyExport(
     override val fieldType: TransferField,
     val currencyCode: String,
@@ -134,7 +126,6 @@ data class HardCodedCurrencyExport(
  * No IDs - fully portable as-is.
  */
 @Serializable
-@SerialName("CurrencyLookup")
 data class CurrencyLookupExport(
     override val fieldType: TransferField,
     val columnName: String,
@@ -145,7 +136,6 @@ data class CurrencyLookupExport(
  * No IDs - fully portable as-is (timezoneId is already a string).
  */
 @Serializable
-@SerialName("HardCodedTimezone")
 data class HardCodedTimezoneExport(
     override val fieldType: TransferField,
     val timezoneId: String,
@@ -156,7 +146,6 @@ data class HardCodedTimezoneExport(
  * No IDs - fully portable as-is.
  */
 @Serializable
-@SerialName("TimezoneLookup")
 data class TimezoneLookupExport(
     override val fieldType: TransferField,
     val columnName: String,
