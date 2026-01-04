@@ -1,7 +1,4 @@
-@file:OptIn(
-    kotlin.uuid.ExperimentalUuidApi::class,
-    androidx.compose.ui.ExperimentalComposeUiApi::class,
-)
+@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
 
 package com.moneymanager.ui
 
@@ -25,9 +22,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.pointer.PointerButton
-import androidx.compose.ui.input.pointer.PointerEventType
-import androidx.compose.ui.input.pointer.onPointerEvent
 import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.database.service.CsvStrategyExportService
 import com.moneymanager.database.sql.TransferSourceQueries
@@ -51,7 +45,9 @@ import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.navigation.NavigationHistory
+import com.moneymanager.ui.navigation.PlatformBackHandler
 import com.moneymanager.ui.navigation.Screen
+import com.moneymanager.ui.navigation.mouseButtonNavigation
 import com.moneymanager.ui.screens.AccountTransactionsScreen
 import com.moneymanager.ui.screens.AccountsScreen
 import com.moneymanager.ui.screens.CategoriesScreen
@@ -101,21 +97,19 @@ fun MoneyManagerApp(
             .collectAsStateWithSchemaErrorHandling(initial = emptyList())
 
         MaterialTheme {
+            // Handle system back button (Android) when there's navigation history
+            PlatformBackHandler(enabled = navigationHistory.canGoBack) {
+                navigationHistory.navigateBack()
+            }
+
             Scaffold(
                 modifier =
                     Modifier
                         .fillMaxSize()
-                        .onPointerEvent(PointerEventType.Press) { event ->
-                            when (event.button) {
-                                PointerButton.Back -> {
-                                    navigationHistory.navigateBack()
-                                }
-                                PointerButton.Forward -> {
-                                    navigationHistory.navigateForward()
-                                }
-                                else -> {}
-                            }
-                        },
+                        .mouseButtonNavigation(
+                            onBack = { navigationHistory.navigateBack() },
+                            onForward = { navigationHistory.navigateForward() },
+                        ),
                 topBar = {
                     if (currentScreen !is Screen.AccountTransactions) {
                         TopAppBar(
@@ -260,11 +254,9 @@ fun MoneyManagerApp(
                                 accountRepository = accountRepository,
                                 categoryRepository = categoryRepository,
                                 currencyRepository = currencyRepository,
-                                auditRepository = auditRepository,
                                 attributeTypeRepository = attributeTypeRepository,
                                 transferAttributeRepository = transferAttributeRepository,
                                 maintenanceService = maintenanceService,
-                                currentDeviceId = deviceId,
                                 onAccountIdChange = { accountId ->
                                     currentlyViewedAccountId = accountId
                                 },
