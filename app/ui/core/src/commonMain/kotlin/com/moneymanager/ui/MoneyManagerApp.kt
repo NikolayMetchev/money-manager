@@ -34,6 +34,7 @@ import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.AuditRepository
 import com.moneymanager.domain.repository.CategoryRepository
+import com.moneymanager.domain.repository.CsvAccountMappingRepository
 import com.moneymanager.domain.repository.CsvImportRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
@@ -69,6 +70,7 @@ fun MoneyManagerApp(
     attributeTypeRepository: AttributeTypeRepository,
     auditRepository: AuditRepository,
     categoryRepository: CategoryRepository,
+    csvAccountMappingRepository: CsvAccountMappingRepository,
     csvImportRepository: CsvImportRepository,
     csvImportStrategyRepository: CsvImportStrategyRepository,
     csvStrategyExportService: CsvStrategyExportService,
@@ -293,6 +295,7 @@ fun MoneyManagerApp(
                                 importId = screen.importId,
                                 csvImportRepository = csvImportRepository,
                                 csvImportStrategyRepository = csvImportStrategyRepository,
+                                csvAccountMappingRepository = csvAccountMappingRepository,
                                 accountRepository = accountRepository,
                                 categoryRepository = categoryRepository,
                                 currencyRepository = currencyRepository,
@@ -341,6 +344,7 @@ fun MoneyManagerApp(
                             CsvStrategiesScreen(
                                 csvImportStrategyRepository = csvImportStrategyRepository,
                                 csvImportRepository = csvImportRepository,
+                                csvAccountMappingRepository = csvAccountMappingRepository,
                                 accountRepository = accountRepository,
                                 categoryRepository = categoryRepository,
                                 currencyRepository = currencyRepository,

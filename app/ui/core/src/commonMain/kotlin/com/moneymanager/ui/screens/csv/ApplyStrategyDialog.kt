@@ -55,9 +55,11 @@ import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
+import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
+import com.moneymanager.domain.repository.CsvAccountMappingRepository
 import com.moneymanager.domain.repository.CsvImportRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
@@ -90,6 +92,7 @@ fun ApplyStrategyDialog(
     csvImport: CsvImport,
     rows: List<CsvRow>,
     csvImportStrategyRepository: CsvImportStrategyRepository,
+    csvAccountMappingRepository: CsvAccountMappingRepository,
     accountRepository: AccountRepository,
     currencyRepository: CurrencyRepository,
     transactionRepository: TransactionRepository,
@@ -111,8 +114,16 @@ fun ApplyStrategyDialog(
 
     var selectedStrategy by remember { mutableStateOf<CsvImportStrategy?>(null) }
     var importPreparation by remember { mutableStateOf<ImportPreparation?>(null) }
+    var accountMappings by remember { mutableStateOf<List<CsvAccountMapping>>(emptyList()) }
     var isImporting by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    // Load account mappings when strategy is selected
+    LaunchedEffect(selectedStrategy) {
+        selectedStrategy?.let { strategy ->
+            accountMappings = csvAccountMappingRepository.getMappingsForStrategy(strategy.id).first()
+        }
+    }
 
     // Auto-select matching strategy when strategies load
     LaunchedEffect(strategies, csvImport.columns) {
@@ -130,7 +141,7 @@ fun ApplyStrategyDialog(
         }
 
     // Prepare import preview when strategy is selected
-    LaunchedEffect(selectedStrategy, rowsToProcess, accounts, currencies) {
+    LaunchedEffect(selectedStrategy, rowsToProcess, accounts, currencies, accountMappings) {
         selectedStrategy?.let { strategy ->
             if (accounts.isNotEmpty() && currencies.isNotEmpty() && rowsToProcess.isNotEmpty()) {
                 try {
@@ -144,6 +155,7 @@ fun ApplyStrategyDialog(
                             existingAccounts = accountsByName,
                             existingCurrencies = currenciesById,
                             existingCurrenciesByCode = currenciesByCode,
+                            accountMappings = accountMappings,
                         )
                     importPreparation = mapper.prepareImport(rowsToProcess)
                     errorMessage = null
@@ -209,6 +221,7 @@ fun ApplyStrategyDialog(
                             logger.info { "Starting CSV import with ${prep.validTransfers.size} valid transfers" }
 
                             // Create new accounts first (skip failures - transfers using them will fail later)
+                            val createdAccountNames = mutableSetOf<String>()
                             for (newAccount in prep.newAccounts) {
                                 try {
                                     val account =
@@ -219,9 +232,73 @@ fun ApplyStrategyDialog(
                                             categoryId = newAccount.categoryId,
                                         )
                                     accountRepository.createAccount(account)
+                                    createdAccountNames.add(newAccount.name)
                                     logger.info { "Created new account: ${newAccount.name}" }
                                 } catch (expected: Exception) {
                                     logger.warn(expected) { "Skipping account '${newAccount.name}': ${expected.message}" }
+                                }
+                            }
+
+                            // Auto-capture mappings for newly created accounts
+                            if (createdAccountNames.isNotEmpty()) {
+                                val updatedAccountsForMapping = accountRepository.getAllAccounts().first()
+                                val accountsByNameForMapping = updatedAccountsForMapping.associateBy { it.name }
+
+                                // Collect discovered mappings, separating regex matches from exact matches
+                                val allDiscoveredMappings =
+                                    prep.validTransfers
+                                        .filter { it.discoveredMapping != null }
+                                        .map { it.discoveredMapping!! }
+
+                                // For regex matches (matchedPattern != null), deduplicate by pattern
+                                // This ensures only ONE mapping is created per regex rule
+                                val regexMappings =
+                                    allDiscoveredMappings
+                                        .filter { it.matchedPattern != null }
+                                        .distinctBy { it.matchedPattern }
+
+                                // For exact matches (matchedPattern == null), deduplicate by csvValue
+                                val exactMappings =
+                                    allDiscoveredMappings
+                                        .filter { it.matchedPattern == null }
+                                        .distinctBy { it.csvValue }
+
+                                for (discoveredMapping in regexMappings + exactMappings) {
+                                    // Look up the account by targetAccountName (the actual account name created)
+                                    val createdAccount =
+                                        accountsByNameForMapping[discoveredMapping.targetAccountName]
+                                            ?.takeIf { it.name in createdAccountNames }
+
+                                    if (createdAccount != null) {
+                                        try {
+                                            // Use the matched regex pattern if available,
+                                            // otherwise create an exact-match pattern for the CSV value
+                                            val matchedPattern = discoveredMapping.matchedPattern
+                                            val pattern =
+                                                if (matchedPattern != null) {
+                                                    Regex(matchedPattern, RegexOption.IGNORE_CASE)
+                                                } else {
+                                                    Regex(
+                                                        "^${Regex.escape(discoveredMapping.csvValue)}$",
+                                                        RegexOption.IGNORE_CASE,
+                                                    )
+                                                }
+                                            csvAccountMappingRepository.createMapping(
+                                                strategyId = strategy.id,
+                                                columnName = discoveredMapping.columnName,
+                                                valuePattern = pattern,
+                                                accountId = createdAccount.id,
+                                            )
+                                            val patternDesc = matchedPattern ?: discoveredMapping.csvValue
+                                            logger.info {
+                                                "Auto-captured mapping: '$patternDesc' -> ${createdAccount.name}"
+                                            }
+                                        } catch (expected: Exception) {
+                                            logger.warn(expected) {
+                                                "Failed to auto-capture mapping for '${discoveredMapping.csvValue}'"
+                                            }
+                                        }
+                                    }
                                 }
                             }
 
@@ -290,6 +367,10 @@ fun ApplyStrategyDialog(
                                 }
                             logger.info { "Loaded ${existingTransferInfoList.size} existing transfers for duplicate detection" }
 
+                            // Load latest account mappings for this strategy
+                            val latestAccountMappings =
+                                csvAccountMappingRepository.getMappingsForStrategy(strategy.id).first()
+
                             val mapper =
                                 CsvTransferMapper(
                                     strategy = strategy,
@@ -298,6 +379,7 @@ fun ApplyStrategyDialog(
                                     existingCurrencies = currenciesById,
                                     existingCurrenciesByCode = currenciesByCode,
                                     existingTransfers = existingTransferInfoList,
+                                    accountMappings = latestAccountMappings,
                                 )
 
                             // Handle case when all rows are already processed

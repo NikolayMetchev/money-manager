@@ -1,0 +1,48 @@
+-- Maps CSV column value patterns to specific account IDs for a given import strategy.
+-- Applied BEFORE name lookup during import to handle renamed accounts or pattern-based routing.
+CREATE TABLE csv_account_mapping (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    strategy_id TEXT NOT NULL,
+    column_name TEXT NOT NULL,
+    value_pattern TEXT NOT NULL,
+    account_id INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    FOREIGN KEY (strategy_id) REFERENCES csv_import_strategy(id) ON DELETE CASCADE,
+    FOREIGN KEY (account_id) REFERENCES account(id) ON DELETE CASCADE,
+    UNIQUE (strategy_id, column_name, value_pattern)
+);
+
+CREATE INDEX idx_csv_account_mapping_strategy ON csv_account_mapping(strategy_id);
+CREATE INDEX idx_csv_account_mapping_account ON csv_account_mapping(account_id);
+
+-- Select all mappings for a strategy ordered by id (first match wins)
+selectByStrategyId:
+SELECT * FROM csv_account_mapping WHERE strategy_id = ? ORDER BY id;
+
+-- Select a mapping by ID
+selectById:
+SELECT * FROM csv_account_mapping WHERE id = ?;
+
+-- Insert a new mapping
+insert:
+INSERT INTO csv_account_mapping (strategy_id, column_name, value_pattern, account_id, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?);
+
+-- Get the last inserted row ID
+lastInsertRowId:
+SELECT last_insert_rowid();
+
+-- Update an existing mapping
+update:
+UPDATE csv_account_mapping
+SET column_name = ?, value_pattern = ?, account_id = ?, updated_at = ?
+WHERE id = ?;
+
+-- Delete a mapping by ID
+deleteById:
+DELETE FROM csv_account_mapping WHERE id = ?;
+
+-- Delete all mappings for a strategy
+deleteByStrategyId:
+DELETE FROM csv_account_mapping WHERE strategy_id = ?;

@@ -26,6 +26,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.AlertDialog
@@ -73,6 +75,7 @@ import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.AttributeColumnMapping
+import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
@@ -89,6 +92,7 @@ import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CategoryRepository
+import com.moneymanager.domain.repository.CsvAccountMappingRepository
 import com.moneymanager.domain.repository.CsvImportRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
@@ -568,6 +572,7 @@ private fun extractFormStateFromStrategy(
 @Composable
 fun CreateCsvStrategyDialog(
     csvImportStrategyRepository: CsvImportStrategyRepository,
+    csvAccountMappingRepository: CsvAccountMappingRepository,
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
@@ -630,6 +635,22 @@ fun CreateCsvStrategyDialog(
     LaunchedEffect(Unit) {
         attributeTypeRepository.getAll().collect { types ->
             existingAttributeTypes = types
+        }
+    }
+
+    // Fetch account mappings for this strategy (edit mode only)
+    var accountMappings by remember { mutableStateOf<List<CsvAccountMapping>>(emptyList()) }
+    var editingAccountMapping by remember { mutableStateOf<CsvAccountMapping?>(null) }
+    var showAddAccountMappingDialog by remember { mutableStateOf(false) }
+
+    // Fetch all accounts for mapping selection
+    val accounts by accountRepository.getAllAccounts().collectAsStateWithSchemaErrorHandling(emptyList())
+
+    LaunchedEffect(existingStrategy?.id) {
+        existingStrategy?.let { strategy ->
+            csvAccountMappingRepository.getMappingsForStrategy(strategy.id).collect { mappings ->
+                accountMappings = mappings
+            }
         }
     }
 
@@ -1078,6 +1099,30 @@ fun CreateCsvStrategyDialog(
                     )
                 }
 
+                // Account Mappings section (edit mode only)
+                if (isEditMode) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Account Mappings", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        "CSV values mapped to existing accounts (auto-created during import)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    AccountMappingsSection(
+                        mappings = accountMappings,
+                        accounts = accounts,
+                        enabled = !isSaving,
+                        onEditMapping = { mapping -> editingAccountMapping = mapping },
+                        onDeleteMapping = { mapping ->
+                            scope.launch {
+                                csvAccountMappingRepository.deleteMapping(mapping.id)
+                            }
+                        },
+                        onAddMapping = { showAddAccountMappingDialog = true },
+                    )
+                }
+
                 errorMessage?.let {
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
@@ -1222,6 +1267,28 @@ fun CreateCsvStrategyDialog(
             }
         },
     )
+
+    // Dialog for editing an existing account mapping
+    editingAccountMapping?.let { mapping ->
+        AccountMappingEditorDialog(
+            existingMapping = mapping,
+            strategyId = existingStrategy!!.id,
+            accounts = accounts,
+            csvAccountMappingRepository = csvAccountMappingRepository,
+            onDismiss = { editingAccountMapping = null },
+        )
+    }
+
+    // Dialog for adding a new account mapping
+    if (showAddAccountMappingDialog && existingStrategy != null) {
+        AccountMappingEditorDialog(
+            existingMapping = null,
+            strategyId = existingStrategy.id,
+            accounts = accounts,
+            csvAccountMappingRepository = csvAccountMappingRepository,
+            onDismiss = { showAddAccountMappingDialog = false },
+        )
+    }
 }
 
 @Composable
@@ -2713,6 +2780,322 @@ private fun ReferenceResolutionRow(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Section showing existing account mappings with edit/delete actions.
+ */
+@Composable
+private fun AccountMappingsSection(
+    mappings: List<CsvAccountMapping>,
+    accounts: List<Account>,
+    enabled: Boolean,
+    onEditMapping: (CsvAccountMapping) -> Unit,
+    onDeleteMapping: (CsvAccountMapping) -> Unit,
+    onAddMapping: () -> Unit,
+) {
+    val accountsById = remember(accounts) { accounts.associateBy { it.id } }
+    var expanded by remember { mutableStateOf(mappings.isNotEmpty()) }
+
+    Column {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable(enabled = enabled) { expanded = !expanded }
+                    .padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text =
+                    if (mappings.isEmpty()) {
+                        "None configured (click to expand)"
+                    } else {
+                        "${mappings.size} mapping(s) configured"
+                    },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Icon(
+                imageVector =
+                    if (expanded) {
+                        Icons.Filled.KeyboardArrowUp
+                    } else {
+                        Icons.Filled.KeyboardArrowDown
+                    },
+                contentDescription = if (expanded) "Collapse" else "Expand",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        AnimatedVisibility(
+            visible = expanded,
+            enter = expandVertically(),
+            exit = shrinkVertically(),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Sort mappings alphabetically by pattern
+                mappings.sortedBy { it.valuePattern.pattern.lowercase() }.forEach { mapping ->
+                    val account = accountsById[mapping.accountId]
+                    AccountMappingRow(
+                        mapping = mapping,
+                        accountName = account?.name ?: "Unknown Account",
+                        enabled = enabled,
+                        onEdit = { onEditMapping(mapping) },
+                        onDelete = { onDeleteMapping(mapping) },
+                    )
+                }
+
+                // Add button
+                TextButton(
+                    onClick = onAddMapping,
+                    enabled = enabled,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Add,
+                        contentDescription = null,
+                        modifier = Modifier.padding(end = 8.dp),
+                    )
+                    Text("Add Account Mapping")
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Single row displaying an account mapping with edit/delete actions.
+ */
+@Composable
+private fun AccountMappingRow(
+    mapping: CsvAccountMapping,
+    accountName: String,
+    enabled: Boolean,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Column: ${mapping.columnName}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = "Pattern: ${mapping.valuePattern.pattern}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = "→ $accountName (ID: ${mapping.accountId.id})",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            IconButton(onClick = onEdit, enabled = enabled) {
+                Icon(
+                    imageVector = Icons.Filled.Edit,
+                    contentDescription = "Edit",
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+            IconButton(onClick = onDelete, enabled = enabled) {
+                Icon(
+                    imageVector = Icons.Filled.Delete,
+                    contentDescription = "Delete",
+                    tint = MaterialTheme.colorScheme.error,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Dialog for editing or creating an account mapping.
+ */
+@Composable
+private fun AccountMappingEditorDialog(
+    existingMapping: CsvAccountMapping?,
+    strategyId: CsvImportStrategyId,
+    accounts: List<Account>,
+    csvAccountMappingRepository: CsvAccountMappingRepository,
+    onDismiss: () -> Unit,
+) {
+    val isEditMode = existingMapping != null
+    var columnName by remember { mutableStateOf(existingMapping?.columnName.orEmpty()) }
+    var patternText by remember { mutableStateOf(existingMapping?.valuePattern?.pattern.orEmpty()) }
+    var selectedAccountId by remember { mutableStateOf(existingMapping?.accountId) }
+    var isSaving by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    val scope = rememberSchemaAwareCoroutineScope()
+
+    val isFormValid =
+        columnName.isNotBlank() &&
+            patternText.isNotBlank() &&
+            selectedAccountId != null
+
+    AlertDialog(
+        onDismissRequest = { if (!isSaving) onDismiss() },
+        title = { Text(if (isEditMode) "Edit Account Mapping" else "Add Account Mapping") },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                OutlinedTextField(
+                    value = columnName,
+                    onValueChange = { columnName = it },
+                    label = { Text("Column Name") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    enabled = !isSaving,
+                    isError = columnName.isBlank(),
+                    supportingText = { Text("CSV column to match against (e.g., Name, Payee)") },
+                )
+
+                OutlinedTextField(
+                    value = patternText,
+                    onValueChange = { patternText = it },
+                    label = { Text("Value Pattern (Regex)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    enabled = !isSaving,
+                    isError = patternText.isBlank(),
+                    supportingText = { Text("Use ^value$ for exact match, or .*keyword.* for contains") },
+                )
+
+                Text("Target Account", style = MaterialTheme.typography.bodyMedium)
+                AccountDropdown(
+                    accounts = accounts,
+                    selectedAccountId = selectedAccountId,
+                    onAccountSelected = { selectedAccountId = it },
+                    enabled = !isSaving,
+                )
+
+                errorMessage?.let {
+                    Text(
+                        text = it,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (isFormValid) {
+                        isSaving = true
+                        errorMessage = null
+                        val accountId = selectedAccountId ?: return@TextButton
+                        scope.launch {
+                            try {
+                                val pattern = Regex(patternText, RegexOption.IGNORE_CASE)
+                                val mapping = existingMapping
+                                if (mapping != null) {
+                                    csvAccountMappingRepository.updateMapping(
+                                        mapping.copy(
+                                            columnName = columnName,
+                                            valuePattern = pattern,
+                                            accountId = accountId,
+                                        ),
+                                    )
+                                } else {
+                                    csvAccountMappingRepository.createMapping(
+                                        strategyId = strategyId,
+                                        columnName = columnName,
+                                        valuePattern = pattern,
+                                        accountId = accountId,
+                                    )
+                                }
+                                onDismiss()
+                            } catch (expected: IllegalArgumentException) {
+                                errorMessage = "Invalid pattern: ${expected.message}"
+                                isSaving = false
+                            }
+                        }
+                    }
+                },
+                enabled = isFormValid && !isSaving,
+            ) {
+                if (isSaving) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.padding(end = 8.dp),
+                        strokeWidth = 2.dp,
+                    )
+                }
+                Text(if (isEditMode) "Save" else "Add")
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !isSaving,
+            ) {
+                Text("Cancel")
+            }
+        },
+    )
+}
+
+/**
+ * Simple dropdown for selecting an account.
+ */
+@Composable
+private fun AccountDropdown(
+    accounts: List<Account>,
+    selectedAccountId: AccountId?,
+    onAccountSelected: (AccountId) -> Unit,
+    enabled: Boolean,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val selectedAccount = accounts.find { it.id == selectedAccountId }
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { if (enabled) expanded = it },
+    ) {
+        OutlinedTextField(
+            value = selectedAccount?.name ?: "Select account...",
+            onValueChange = {},
+            readOnly = true,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
+            enabled = enabled,
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            accounts.sortedBy { it.name }.forEach { account ->
+                DropdownMenuItem(
+                    text = { Text(account.name) },
+                    onClick = {
+                        onAccountSelected(account.id)
+                        expanded = false
+                    },
+                )
             }
         }
     }
