@@ -46,13 +46,11 @@ import com.moneymanager.domain.model.SourceType
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferAttribute
-import com.moneymanager.domain.model.TransferAuditEntry
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.TransferSource
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
-import com.moneymanager.domain.repository.AuditRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CsvImportSourceRecord
 import com.moneymanager.domain.repository.CurrencyRepository
@@ -120,7 +118,6 @@ class AccountTransactionsScreenTest {
             val transferSourceRepository = FakeTransferSourceRepository()
             val currencyRepository = FakeCurrencyRepository(listOf(usdCurrency))
             val categoryRepository = FakeCategoryRepository()
-            val auditRepository = FakeAuditRepository()
             val attributeTypeRepository = FakeAttributeTypeRepository()
             val transferAttributeRepository = FakeTransferAttributeRepository()
             val maintenanceService = FakeDatabaseMaintenanceService()
@@ -137,7 +134,6 @@ class AccountTransactionsScreenTest {
                         accountRepository = accountRepository,
                         categoryRepository = categoryRepository,
                         currencyRepository = currencyRepository,
-                        auditRepository = auditRepository,
                         attributeTypeRepository = attributeTypeRepository,
                         transferAttributeRepository = transferAttributeRepository,
                         maintenanceService = maintenanceService,
@@ -215,7 +211,6 @@ class AccountTransactionsScreenTest {
             val transferSourceRepository = FakeTransferSourceRepository()
             val currencyRepository = FakeCurrencyRepository(listOf(usdCurrency))
             val categoryRepository = FakeCategoryRepository()
-            val auditRepository = FakeAuditRepository()
             val attributeTypeRepository = FakeAttributeTypeRepository()
             val transferAttributeRepository = FakeTransferAttributeRepository()
             val maintenanceService = FakeDatabaseMaintenanceService()
@@ -231,7 +226,6 @@ class AccountTransactionsScreenTest {
                         accountRepository = accountRepository,
                         categoryRepository = categoryRepository,
                         currencyRepository = currencyRepository,
-                        auditRepository = auditRepository,
                         attributeTypeRepository = attributeTypeRepository,
                         transferAttributeRepository = transferAttributeRepository,
                         maintenanceService = maintenanceService,
@@ -331,21 +325,32 @@ class AccountTransactionsScreenTest {
                 setContent {
                     ProvideSchemaAwareScope {
                         var currentAccountId by remember { mutableStateOf(checkingAccountId!!) }
+                        var auditTransferId by remember { mutableStateOf<TransferId?>(null) }
 
-                        AccountTransactionsScreen(
-                            accountId = currentAccountId,
-                            transactionRepository = repositories.transactionRepository,
-                            transferSourceRepository = repositories.transferSourceRepository,
-                            accountRepository = repositories.accountRepository,
-                            categoryRepository = repositories.categoryRepository,
-                            currencyRepository = repositories.currencyRepository,
-                            auditRepository = repositories.auditRepository,
-                            attributeTypeRepository = repositories.attributeTypeRepository,
-                            transferAttributeRepository = repositories.transferAttributeRepository,
-                            maintenanceService = repositories.maintenanceService,
-                            onAccountIdChange = { currentAccountId = it },
-                            onCurrencyIdChange = {},
-                        )
+                        if (auditTransferId != null) {
+                            TransactionAuditScreen(
+                                transferId = auditTransferId!!,
+                                auditRepository = repositories.auditRepository,
+                                accountRepository = repositories.accountRepository,
+                                transactionRepository = repositories.transactionRepository,
+                                onBack = { auditTransferId = null },
+                            )
+                        } else {
+                            AccountTransactionsScreen(
+                                accountId = currentAccountId,
+                                transactionRepository = repositories.transactionRepository,
+                                transferSourceRepository = repositories.transferSourceRepository,
+                                accountRepository = repositories.accountRepository,
+                                categoryRepository = repositories.categoryRepository,
+                                currencyRepository = repositories.currencyRepository,
+                                attributeTypeRepository = repositories.attributeTypeRepository,
+                                transferAttributeRepository = repositories.transferAttributeRepository,
+                                maintenanceService = repositories.maintenanceService,
+                                onAccountIdChange = { currentAccountId = it },
+                                onCurrencyIdChange = {},
+                                onAuditClick = { auditTransferId = it },
+                            )
+                        }
                     }
                 }
 
@@ -530,21 +535,32 @@ class AccountTransactionsScreenTest {
                 setContent {
                     ProvideSchemaAwareScope {
                         var currentAccountId by remember { mutableStateOf(checkingAccountId!!) }
+                        var auditTransferId by remember { mutableStateOf<TransferId?>(null) }
 
-                        AccountTransactionsScreen(
-                            accountId = currentAccountId,
-                            transactionRepository = repositories.transactionRepository,
-                            transferSourceRepository = repositories.transferSourceRepository,
-                            accountRepository = repositories.accountRepository,
-                            categoryRepository = repositories.categoryRepository,
-                            currencyRepository = repositories.currencyRepository,
-                            auditRepository = repositories.auditRepository,
-                            attributeTypeRepository = repositories.attributeTypeRepository,
-                            transferAttributeRepository = repositories.transferAttributeRepository,
-                            maintenanceService = repositories.maintenanceService,
-                            onAccountIdChange = { currentAccountId = it },
-                            onCurrencyIdChange = {},
-                        )
+                        if (auditTransferId != null) {
+                            TransactionAuditScreen(
+                                transferId = auditTransferId!!,
+                                auditRepository = repositories.auditRepository,
+                                accountRepository = repositories.accountRepository,
+                                transactionRepository = repositories.transactionRepository,
+                                onBack = { auditTransferId = null },
+                            )
+                        } else {
+                            AccountTransactionsScreen(
+                                accountId = currentAccountId,
+                                transactionRepository = repositories.transactionRepository,
+                                transferSourceRepository = repositories.transferSourceRepository,
+                                accountRepository = repositories.accountRepository,
+                                categoryRepository = repositories.categoryRepository,
+                                currencyRepository = repositories.currencyRepository,
+                                attributeTypeRepository = repositories.attributeTypeRepository,
+                                transferAttributeRepository = repositories.transferAttributeRepository,
+                                maintenanceService = repositories.maintenanceService,
+                                onAccountIdChange = { currentAccountId = it },
+                                onCurrencyIdChange = {},
+                                onAuditClick = { auditTransferId = it },
+                            )
+                        }
                     }
                 }
 
@@ -697,21 +713,32 @@ class AccountTransactionsScreenTest {
                 setContent {
                     ProvideSchemaAwareScope {
                         var currentAccountId by remember { mutableStateOf(checkingAccountId!!) }
+                        var auditTransferId by remember { mutableStateOf<TransferId?>(null) }
 
-                        AccountTransactionsScreen(
-                            accountId = currentAccountId,
-                            transactionRepository = repositories.transactionRepository,
-                            transferSourceRepository = repositories.transferSourceRepository,
-                            accountRepository = repositories.accountRepository,
-                            categoryRepository = repositories.categoryRepository,
-                            currencyRepository = repositories.currencyRepository,
-                            auditRepository = repositories.auditRepository,
-                            attributeTypeRepository = repositories.attributeTypeRepository,
-                            transferAttributeRepository = repositories.transferAttributeRepository,
-                            maintenanceService = repositories.maintenanceService,
-                            onAccountIdChange = { currentAccountId = it },
-                            onCurrencyIdChange = {},
-                        )
+                        if (auditTransferId != null) {
+                            TransactionAuditScreen(
+                                transferId = auditTransferId!!,
+                                auditRepository = repositories.auditRepository,
+                                accountRepository = repositories.accountRepository,
+                                transactionRepository = repositories.transactionRepository,
+                                onBack = { auditTransferId = null },
+                            )
+                        } else {
+                            AccountTransactionsScreen(
+                                accountId = currentAccountId,
+                                transactionRepository = repositories.transactionRepository,
+                                transferSourceRepository = repositories.transferSourceRepository,
+                                accountRepository = repositories.accountRepository,
+                                categoryRepository = repositories.categoryRepository,
+                                currencyRepository = repositories.currencyRepository,
+                                attributeTypeRepository = repositories.attributeTypeRepository,
+                                transferAttributeRepository = repositories.transferAttributeRepository,
+                                maintenanceService = repositories.maintenanceService,
+                                onAccountIdChange = { currentAccountId = it },
+                                onCurrencyIdChange = {},
+                                onAuditClick = { auditTransferId = it },
+                            )
+                        }
                     }
                 }
 
@@ -1038,12 +1065,6 @@ class AccountTransactionsScreenTest {
         override suspend fun refreshMaterializedViews(): Duration = Duration.ZERO
 
         override suspend fun fullRefreshMaterializedViews(): Duration = Duration.ZERO
-    }
-
-    private class FakeAuditRepository : AuditRepository {
-        override suspend fun getAuditHistoryForTransfer(transferId: TransferId): List<TransferAuditEntry> = emptyList()
-
-        override suspend fun getAuditHistoryForTransferWithSource(transferId: TransferId): List<TransferAuditEntry> = emptyList()
     }
 
     private class FakeTransferSourceRepository : TransferSourceRepository {

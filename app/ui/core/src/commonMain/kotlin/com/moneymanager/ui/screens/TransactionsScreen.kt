@@ -159,32 +159,16 @@ fun AccountTransactionsScreen(
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
-    auditRepository: AuditRepository,
     attributeTypeRepository: AttributeTypeRepository,
     transferAttributeRepository: TransferAttributeRepository,
     maintenanceService: DatabaseMaintenanceService,
-    currentDeviceId: DeviceId? = null,
     onAccountIdChange: (AccountId) -> Unit = {},
     onCurrencyIdChange: (CurrencyId?) -> Unit = {},
+    onAccountClick: (AccountId, String) -> Unit = { _, _ -> },
+    onAuditClick: (TransferId) -> Unit = {},
     scrollToTransferId: TransferId? = null,
     externalRefreshTrigger: Int = 0,
 ) {
-    // Audit transaction state - when set, shows full-screen audit view
-    var transactionIdToAudit by remember { mutableStateOf<TransferId?>(null) }
-
-    // Show full-screen audit view if a transaction is selected for audit
-    transactionIdToAudit?.let { transferId ->
-        TransactionAuditScreen(
-            transferId = transferId,
-            auditRepository = auditRepository,
-            accountRepository = accountRepository,
-            transactionRepository = transactionRepository,
-            currentDeviceId = currentDeviceId,
-            onBack = { transactionIdToAudit = null },
-        )
-        return
-    }
-
     val allAccounts by accountRepository.getAllAccounts()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
     val currencies by currencyRepository.getAllCurrencies()
@@ -421,6 +405,44 @@ fun AccountTransactionsScreen(
         // Capture container dimensions for centering calculations
         val containerWidthDp = maxWidth
         val containerHeightDp = maxHeight
+
+        // Auto-scroll matrix horizontally when account changes (e.g., from back navigation)
+        // Track if this is the initial composition to avoid scrolling on first load
+        val isInitialComposition = remember { mutableStateOf(true) }
+        LaunchedEffect(selectedAccountId) {
+            // Skip scrolling on initial composition
+            if (isInitialComposition.value) {
+                isInitialComposition.value = false
+                return@LaunchedEffect
+            }
+
+            // Scroll horizontally to center the selected account column
+            val accountIndex = allAccounts.indexOfFirst { it.id == selectedAccountId }
+            if (accountIndex >= 0) {
+                with(density) {
+                    val spacingPx = 8.dp.toPx()
+                    val currencyLabelWidthPx = 60.dp.toPx()
+                    val viewportWidthPx = containerWidthDp.toPx() - currencyLabelWidthPx
+
+                    // Calculate column position by summing preceding column widths
+                    var columnStartPx = 0f
+                    for (i in 0 until accountIndex) {
+                        val acc = allAccounts[i]
+                        val colWidth = accountColumnWidths[acc.id] ?: ACCOUNT_COLUMN_MIN_WIDTH
+                        columnStartPx += colWidth.toPx() + spacingPx
+                    }
+                    val targetAccount = allAccounts[accountIndex]
+                    val targetColumnWidth = accountColumnWidths[targetAccount.id] ?: ACCOUNT_COLUMN_MIN_WIDTH
+                    val columnCenterPx = columnStartPx + (targetColumnWidth.toPx() / 2)
+
+                    // Center the column in the viewport
+                    val targetScrollX = (columnCenterPx - (viewportWidthPx / 2)).coerceAtLeast(0f).toInt()
+
+                    // Animate horizontal scroll
+                    horizontalScrollState.animateScrollTo(targetScrollX)
+                }
+            }
+        }
 
         Column(modifier = Modifier.fillMaxSize()) {
             // Account Matrix Section (30% of screen) - with independent loading
@@ -848,9 +870,7 @@ fun AccountTransactionsScreen(
                                 onEditClick = { transfer ->
                                     transactionIdToEdit = transfer.id
                                 },
-                                onAuditClick = { transferId ->
-                                    transactionIdToAudit = transferId
-                                },
+                                onAuditClick = onAuditClick,
                                 onAccountClick = { clickedAccountId ->
                                     highlightedTransactionId = runningBalance.transactionId
                                     selectedCurrencyId = runningBalance.transactionAmount.currency.id
@@ -912,6 +932,12 @@ fun AccountTransactionsScreen(
                                                 }
                                             }
                                         }
+                                    }
+
+                                    // Navigate to the clicked account (adds to navigation history)
+                                    val clickedAccount = allAccounts.find { it.id == clickedAccountId }
+                                    if (clickedAccount != null) {
+                                        onAccountClick(clickedAccountId, clickedAccount.name)
                                     }
                                 },
                             )
