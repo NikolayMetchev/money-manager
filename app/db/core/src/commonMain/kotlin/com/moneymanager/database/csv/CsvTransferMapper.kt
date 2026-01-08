@@ -21,6 +21,7 @@ import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
+import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
@@ -51,6 +52,7 @@ sealed interface MappingResult {
      * @property attributes List of (attributeTypeName, value) pairs extracted from CSV
      * @property importStatus The import status (IMPORTED for new, DUPLICATE if exists with same values, UPDATED if exists with different values)
      * @property existingTransferId If status is DUPLICATE or UPDATED, the ID of the existing transfer
+     * @property discoveredMapping If a new account is being created, the CSV column/value that triggered it (for auto-capture)
      */
     data class Success(
         val transfer: Transfer,
@@ -58,6 +60,7 @@ sealed interface MappingResult {
         val attributes: List<Pair<String, String>> = emptyList(),
         val importStatus: ImportStatus = ImportStatus.IMPORTED,
         val existingTransferId: TransferId? = null,
+        val discoveredMapping: DiscoveredAccountMapping? = null,
     ) : MappingResult
 
     data class Error(
@@ -83,6 +86,7 @@ data class NewAccount(
  * @property importStatus The import status (IMPORTED, DUPLICATE, UPDATED)
  * @property existingTransferId If status is DUPLICATE or UPDATED, the ID of the existing transfer
  * @property rowIndex The original CSV row index for status tracking
+ * @property discoveredMapping If a new account is being created, the CSV column/value that triggered it
  */
 data class CsvTransferWithAttributes(
     val transfer: Transfer,
@@ -90,6 +94,7 @@ data class CsvTransferWithAttributes(
     val importStatus: ImportStatus = ImportStatus.IMPORTED,
     val existingTransferId: TransferId? = null,
     val rowIndex: Long,
+    val discoveredMapping: DiscoveredAccountMapping? = null,
 )
 
 /**
@@ -120,6 +125,27 @@ data class ExistingTransferInfo(
 )
 
 /**
+ * Represents a mapping discovered during import that can be persisted.
+ * Used for auto-capturing mappings when new accounts are created.
+ *
+ * @property columnName The CSV column that was matched
+ * @property csvValue The actual value from the CSV that led to this account
+ * @property targetAccountName The name of the account that will be/was created from this value.
+ *           For AccountLookupMapping, this equals csvValue. For RegexAccountMapping, this is the
+ *           extracted account name which may differ from csvValue.
+ * @property matchedPattern The regex pattern that matched (for RegexAccountMapping with rules),
+ *           or null if this was from AccountLookupMapping or RegexAccountMapping fallback logic.
+ *           When non-null, this pattern should be used for the persisted mapping instead of
+ *           creating an exact-match pattern for csvValue.
+ */
+data class DiscoveredAccountMapping(
+    val columnName: String,
+    val csvValue: String,
+    val targetAccountName: String,
+    val matchedPattern: String? = null,
+)
+
+/**
  * Maps CSV rows to Transfer objects using an import strategy.
  */
 class CsvTransferMapper(
@@ -129,6 +155,7 @@ class CsvTransferMapper(
     private val existingCurrencies: Map<CurrencyId, Currency>,
     private val existingCurrenciesByCode: Map<String, Currency>,
     private val existingTransfers: List<ExistingTransferInfo> = emptyList(),
+    private val accountMappings: List<CsvAccountMapping> = emptyList(),
 ) {
     private val columnIndexByName: Map<String, Int> =
         columns.associate { it.originalName to it.columnIndex }
@@ -144,6 +171,10 @@ class CsvTransferMapper(
         } else {
             emptyMap()
         }
+
+    // Index account mappings by column name for fast lookup
+    private val accountMappingsByColumn: Map<String, List<CsvAccountMapping>> =
+        accountMappings.groupBy { it.columnName }
 
     /**
      * Prepares an import by mapping all rows and collecting new accounts to create.
@@ -165,6 +196,7 @@ class CsvTransferMapper(
                             importStatus = result.importStatus,
                             existingTransferId = result.existingTransferId,
                             rowIndex = row.rowIndex,
+                            discoveredMapping = result.discoveredMapping,
                         ),
                     )
                     // Count by status
@@ -291,23 +323,57 @@ class CsvTransferMapper(
                     checkForDuplicateByAllFields(transfer, attributes)
                 }
 
+            // Determine if a new account needs to be created and capture mapping info
+            // Only create new account if no persisted mapping matched
+            val (newAccountName, discoveredMapping) =
+                when (targetMapping) {
+                    is AccountLookupMapping -> {
+                        val csvValue = getColumnValue(targetMapping.columnName, values)
+                        // If a persisted mapping matched, don't create a new account
+                        if (findPersistedMapping(targetMapping.columnName, csvValue) != null) {
+                            null to null
+                        } else {
+                            val name = getAccountName(targetMapping, values)
+                            if (name.isNotBlank() && !accountExists(name)) {
+                                // For AccountLookupMapping, csvValue == name (account name)
+                                name to DiscoveredAccountMapping(targetMapping.columnName, csvValue, name)
+                            } else {
+                                null to null
+                            }
+                        }
+                    }
+                    is RegexAccountMapping -> {
+                        val result = getAccountNameFromRegexWithPattern(targetMapping, values)
+                        // If a persisted mapping matched, don't create a new account
+                        if (findPersistedMapping(result.sourceColumnName, result.sourceColumnValue) != null) {
+                            null to null
+                        } else {
+                            if (result.accountName.isNotBlank() && !accountExists(result.accountName)) {
+                                // For RegexAccountMapping, accountName differs from sourceColumnValue
+                                // (e.g., sourceColumnValue="Paxos Technology LTD", accountName="Paxos")
+                                // Use the actual source column that produced the value (important for fallback)
+                                result.accountName to
+                                    DiscoveredAccountMapping(
+                                        columnName = result.sourceColumnName,
+                                        csvValue = result.sourceColumnValue,
+                                        targetAccountName = result.accountName,
+                                        matchedPattern = result.matchedPattern,
+                                    )
+                            } else {
+                                null to null
+                            }
+                        }
+                    }
+                    else -> null to null
+                }
+
             MappingResult.Success(
                 transfer = transfer,
-                newAccountName =
-                    when (targetMapping) {
-                        is AccountLookupMapping -> {
-                            val name = getAccountName(targetMapping, values)
-                            if (name.isNotBlank() && !accountExists(name)) name else null
-                        }
-                        is RegexAccountMapping -> {
-                            val name = getAccountNameFromRegex(targetMapping, values)
-                            if (name.isNotBlank() && !accountExists(name)) name else null
-                        }
-                        else -> null
-                    },
+                newAccountName = newAccountName,
                 attributes = attributes,
                 importStatus = importStatus,
                 existingTransferId = existingTransferId,
+                discoveredMapping = discoveredMapping,
             )
         } catch (expected: Exception) {
             MappingResult.Error(row.rowIndex, expected.message ?: "Unknown error")
@@ -373,20 +439,65 @@ class CsvTransferMapper(
         mapping: FieldMapping,
         values: List<String>,
     ): AccountId {
+        // For hardcoded accounts, return immediately
+        if (mapping is HardCodedAccountMapping) {
+            return mapping.accountId
+        }
+
         return when (mapping) {
-            is HardCodedAccountMapping -> mapping.accountId
             is AccountLookupMapping -> {
+                val columnName = mapping.columnName
+                val csvValue = getColumnValue(columnName, values)
+
+                // Check persisted mappings FIRST - this handles renamed accounts
+                val persistedMatch = findPersistedMapping(columnName, csvValue)
+                if (persistedMatch != null) {
+                    return persistedMatch
+                }
+
+                // Fall back to lookup by name
                 val name = getAccountName(mapping, values)
                 existingAccounts[name]?.id
                     ?: AccountId(-1) // Placeholder for new accounts
             }
             is RegexAccountMapping -> {
-                val name = getAccountNameFromRegex(mapping, values)
-                existingAccounts[name]?.id
+                // For RegexAccountMapping, we need to determine which column/value
+                // will actually be used (could be fallback column)
+                val result = getAccountNameFromRegexWithPattern(mapping, values)
+
+                // Check persisted mappings using the ACTUAL column/value that was resolved
+                val persistedMatch = findPersistedMapping(result.sourceColumnName, result.sourceColumnValue)
+                if (persistedMatch != null) {
+                    return persistedMatch
+                }
+
+                // Fall back to lookup by name
+                existingAccounts[result.accountName]?.id
                     ?: AccountId(-1) // Placeholder for new accounts
             }
             else -> throw IllegalArgumentException("Invalid account mapping type: ${mapping::class}")
         }
+    }
+
+    /**
+     * Finds a persisted account mapping that matches the given column and value.
+     * First matching mapping wins (ordered by id).
+     *
+     * @param columnName The CSV column name
+     * @param value The value to match against
+     * @return The mapped AccountId, or null if no match found
+     */
+    private fun findPersistedMapping(
+        columnName: String,
+        value: String,
+    ): AccountId? {
+        val mappings = accountMappingsByColumn[columnName] ?: return null
+        for (mapping in mappings) {
+            if (mapping.valuePattern.containsMatchIn(value)) {
+                return mapping.accountId
+            }
+        }
+        return null
     }
 
     /**
@@ -404,15 +515,24 @@ class CsvTransferMapper(
     }
 
     /**
-     * Gets the effective account name from a RegexAccountMapping.
-     * If the column value matches any regex rule, returns the configured account name.
-     * Otherwise, uses fallback logic similar to AccountLookupMapping.
-     * All matching is case-insensitive.
+     * Result of resolving a RegexAccountMapping to an account name.
      */
-    private fun getAccountNameFromRegex(
+    private data class RegexAccountResult(
+        val accountName: String,
+        val sourceColumnName: String,
+        val sourceColumnValue: String,
+        val matchedPattern: String?,
+    )
+
+    /**
+     * Gets the effective account name and the matched pattern from a RegexAccountMapping.
+     * Returns a pair of (accountName, matchedPattern) where matchedPattern is null if
+     * no regex rule matched (fallback logic was used).
+     */
+    private fun getAccountNameFromRegexWithPattern(
         mapping: RegexAccountMapping,
         values: List<String>,
-    ): String {
+    ): RegexAccountResult {
         val primaryValue = getColumnValue(mapping.columnName, values)
 
         // Try each rule in order; first match wins
@@ -420,16 +540,37 @@ class CsvTransferMapper(
             for (rule in mapping.rules) {
                 val regex = Regex(rule.pattern, RegexOption.IGNORE_CASE)
                 if (regex.containsMatchIn(primaryValue)) {
-                    return rule.accountName
+                    return RegexAccountResult(
+                        accountName = rule.accountName,
+                        sourceColumnName = mapping.columnName,
+                        sourceColumnValue = primaryValue,
+                        matchedPattern = rule.pattern,
+                    )
                 }
             }
         }
 
         // No rules matched - use fallback logic (try columns in order for non-empty value)
-        return mapping.allColumns
-            .map { getColumnValue(it, values) }
-            .firstOrNull { it.isNotBlank() }
-            .orEmpty()
+        // Track which column provided the value
+        for (columnName in mapping.allColumns) {
+            val columnValue = getColumnValue(columnName, values)
+            if (columnValue.isNotBlank()) {
+                return RegexAccountResult(
+                    accountName = columnValue,
+                    sourceColumnName = columnName,
+                    sourceColumnValue = columnValue,
+                    matchedPattern = null,
+                )
+            }
+        }
+
+        // No value found in any column
+        return RegexAccountResult(
+            accountName = "",
+            sourceColumnName = mapping.columnName,
+            sourceColumnValue = "",
+            matchedPattern = null,
+        )
     }
 
     private fun parseTimestamp(
