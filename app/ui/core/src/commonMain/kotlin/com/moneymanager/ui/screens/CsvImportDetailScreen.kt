@@ -37,6 +37,7 @@ import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CategoryRepository
+import com.moneymanager.domain.repository.CsvAccountMappingRepository
 import com.moneymanager.domain.repository.CsvImportRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
@@ -56,6 +57,7 @@ fun CsvImportDetailScreen(
     importId: CsvImportId,
     csvImportRepository: CsvImportRepository,
     csvImportStrategyRepository: CsvImportStrategyRepository,
+    csvAccountMappingRepository: CsvAccountMappingRepository,
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
@@ -339,6 +341,7 @@ fun CsvImportDetailScreen(
             csvImport = import!!,
             rows = rows,
             csvImportStrategyRepository = csvImportStrategyRepository,
+            csvAccountMappingRepository = csvAccountMappingRepository,
             accountRepository = accountRepository,
             currencyRepository = currencyRepository,
             transactionRepository = transactionRepository,
@@ -365,6 +368,7 @@ fun CsvImportDetailScreen(
     if (showCreateStrategyDialog && import != null) {
         CreateCsvStrategyDialog(
             csvImportStrategyRepository = csvImportStrategyRepository,
+            csvAccountMappingRepository = csvAccountMappingRepository,
             accountRepository = accountRepository,
             categoryRepository = categoryRepository,
             currencyRepository = currencyRepository,

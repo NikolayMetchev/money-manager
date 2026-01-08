@@ -10,6 +10,7 @@ import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.AuditRepository
 import com.moneymanager.domain.repository.CategoryRepository
+import com.moneymanager.domain.repository.CsvAccountMappingRepository
 import com.moneymanager.domain.repository.CsvImportRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
@@ -30,6 +31,7 @@ interface DatabaseComponent {
     val attributeTypeRepository: AttributeTypeRepository
     val auditRepository: AuditRepository
     val categoryRepository: CategoryRepository
+    val csvAccountMappingRepository: CsvAccountMappingRepository
     val csvImportRepository: CsvImportRepository
     val csvImportStrategyRepository: CsvImportStrategyRepository
     val csvStrategyExportService: CsvStrategyExportService

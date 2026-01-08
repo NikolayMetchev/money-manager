@@ -47,6 +47,7 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CategoryRepository
+import com.moneymanager.domain.repository.CsvAccountMappingRepository
 import com.moneymanager.domain.repository.CsvImportRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
@@ -59,6 +60,7 @@ import nl.jacobras.humanreadable.HumanReadable
 fun CsvStrategiesScreen(
     csvImportStrategyRepository: CsvImportStrategyRepository,
     csvImportRepository: CsvImportRepository,
+    csvAccountMappingRepository: CsvAccountMappingRepository,
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
@@ -269,6 +271,7 @@ fun CsvStrategiesScreen(
     if (currentCsvImport != null && currentStrategyToEdit != null && !isLoadingRows) {
         CreateCsvStrategyDialog(
             csvImportStrategyRepository = csvImportStrategyRepository,
+            csvAccountMappingRepository = csvAccountMappingRepository,
             accountRepository = accountRepository,
             categoryRepository = categoryRepository,
             currencyRepository = currencyRepository,
