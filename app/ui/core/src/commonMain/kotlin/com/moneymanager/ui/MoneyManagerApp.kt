@@ -49,16 +49,16 @@ import com.moneymanager.ui.navigation.NavigationHistory
 import com.moneymanager.ui.navigation.PlatformBackHandler
 import com.moneymanager.ui.navigation.Screen
 import com.moneymanager.ui.navigation.mouseButtonNavigation
-import com.moneymanager.ui.screens.AccountTransactionsScreen
 import com.moneymanager.ui.screens.AccountsScreen
 import com.moneymanager.ui.screens.CategoriesScreen
 import com.moneymanager.ui.screens.CsvImportDetailScreen
 import com.moneymanager.ui.screens.CsvImportsScreen
 import com.moneymanager.ui.screens.CurrenciesScreen
 import com.moneymanager.ui.screens.SettingsScreen
-import com.moneymanager.ui.screens.TransactionAuditScreen
-import com.moneymanager.ui.screens.TransactionEntryDialog
 import com.moneymanager.ui.screens.csvstrategy.CsvStrategiesScreen
+import com.moneymanager.ui.screens.transactions.AccountTransactionsScreen
+import com.moneymanager.ui.screens.transactions.TransactionAuditScreen
+import com.moneymanager.ui.screens.transactions.TransactionEntryDialog
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)

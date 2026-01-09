@@ -62,6 +62,8 @@ import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
 import com.moneymanager.ui.error.ProvideSchemaAwareScope
+import com.moneymanager.ui.screens.transactions.AccountTransactionsScreen
+import com.moneymanager.ui.screens.transactions.TransactionAuditScreen
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first

@@ -1,0 +1,582 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
+package com.moneymanager.ui.screens.transactions
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberTimePickerState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import com.moneymanager.database.DatabaseMaintenanceService
+import com.moneymanager.domain.getDeviceInfo
+import com.moneymanager.domain.model.AttributeType
+import com.moneymanager.domain.model.Money
+import com.moneymanager.domain.model.NewAttribute
+import com.moneymanager.domain.model.Transfer
+import com.moneymanager.domain.model.TransferAttribute
+import com.moneymanager.domain.repository.AccountRepository
+import com.moneymanager.domain.repository.AttributeTypeRepository
+import com.moneymanager.domain.repository.CategoryRepository
+import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.domain.repository.TransferAttributeRepository
+import com.moneymanager.domain.repository.TransferSourceRepository
+import com.moneymanager.ui.components.AccountPicker
+import com.moneymanager.ui.components.CurrencyPicker
+import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.datetime.LocalTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atTime
+import kotlinx.datetime.toInstant
+import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Instant
+
+@Composable
+fun TransactionEditDialog(
+    transaction: Transfer,
+    transactionRepository: TransactionRepository,
+    transferSourceRepository: TransferSourceRepository,
+    accountRepository: AccountRepository,
+    categoryRepository: CategoryRepository,
+    currencyRepository: CurrencyRepository,
+    attributeTypeRepository: AttributeTypeRepository,
+    transferAttributeRepository: TransferAttributeRepository,
+    maintenanceService: DatabaseMaintenanceService,
+    onDismiss: () -> Unit,
+    onSaved: () -> Unit = {},
+) {
+    var sourceAccountId by remember { mutableStateOf(transaction.sourceAccountId) }
+    var targetAccountId by remember { mutableStateOf(transaction.targetAccountId) }
+    var currencyId by remember { mutableStateOf(transaction.amount.currency.id) }
+    var amount by remember { mutableStateOf(transaction.amount.toDisplayValue().toString()) }
+    var description by remember { mutableStateOf(transaction.description) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var isSaving by remember { mutableStateOf(false) }
+
+    val transactionDateTime = transaction.timestamp.toLocalDateTime(TimeZone.currentSystemDefault())
+    var selectedDate by remember { mutableStateOf(transactionDateTime.date) }
+    var selectedHour by remember { mutableStateOf(transactionDateTime.hour) }
+    var selectedMinute by remember { mutableStateOf(transactionDateTime.minute) }
+    val originalSecond = remember { transactionDateTime.second }
+    val originalNanosecond = remember { transactionDateTime.nanosecond }
+    var showDatePicker by remember { mutableStateOf(false) }
+    var showTimePicker by remember { mutableStateOf(false) }
+
+    val scope = rememberSchemaAwareCoroutineScope()
+
+    // Attribute state
+    var existingAttributeTypes by remember { mutableStateOf<List<AttributeType>>(emptyList()) }
+    var originalAttributes by remember { mutableStateOf<List<TransferAttribute>>(emptyList()) }
+    var isLoadingAttributes by remember { mutableStateOf(true) }
+
+    // EditableAttribute represents the current state of each attribute in the UI
+    // key: a stable identifier (original attribute id or a negative temp id for new ones)
+    // value: Pair(attributeTypeName, value)
+    var editableAttributes by remember { mutableStateOf<Map<Long, Pair<String, String>>>(emptyMap()) }
+    var nextTempId by remember { mutableStateOf(-1L) }
+
+    // Load existing attribute types and attributes for this transaction
+    LaunchedEffect(transaction.id) {
+        attributeTypeRepository.getAll().collect { types ->
+            existingAttributeTypes = types
+        }
+    }
+    LaunchedEffect(transaction.id) {
+        transferAttributeRepository.getByTransaction(transaction.id).first().let { attrs ->
+            originalAttributes = attrs
+            editableAttributes =
+                attrs.associate { attr ->
+                    attr.id to Pair(attr.attributeType.name, attr.value)
+                }
+        }
+        isLoadingAttributes = false
+    }
+
+    // Helper to check if attributes have changed
+    fun hasAttributeChanges(): Boolean {
+        val originalMap = originalAttributes.associate { it.id to Pair(it.attributeType.name, it.value) }
+        // Check if any new attributes were added (negative IDs)
+        if (editableAttributes.keys.any { it < 0 }) return true
+        // Check if any original attributes were removed
+        if (originalMap.keys.any { it !in editableAttributes.keys }) return true
+        // Check if any attribute values changed
+        return editableAttributes.any { (id, pair) ->
+            val original = originalMap[id]
+            original == null || original != pair
+        }
+    }
+
+    // Check if any field has changed from the original transaction
+    val hasChanges =
+        remember(
+            sourceAccountId,
+            targetAccountId,
+            currencyId,
+            amount,
+            description,
+            selectedDate,
+            selectedHour,
+            selectedMinute,
+            editableAttributes,
+            originalAttributes,
+        ) {
+            sourceAccountId != transaction.sourceAccountId ||
+                targetAccountId != transaction.targetAccountId ||
+                currencyId != transaction.amount.currency.id ||
+                amount != transaction.amount.toDisplayValue().toString() ||
+                description != transaction.description ||
+                selectedDate != transactionDateTime.date ||
+                selectedHour != transactionDateTime.hour ||
+                selectedMinute != transactionDateTime.minute ||
+                hasAttributeChanges()
+        }
+
+    AlertDialog(
+        onDismissRequest = { if (!isSaving) onDismiss() },
+        title = { Text("Edit Transaction") },
+        text = {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                // Source Account Picker
+                AccountPicker(
+                    selectedAccountId = sourceAccountId,
+                    onAccountSelected = { sourceAccountId = it },
+                    label = "From Account",
+                    accountRepository = accountRepository,
+                    categoryRepository = categoryRepository,
+                    enabled = !isSaving,
+                    excludeAccountId = targetAccountId,
+                )
+
+                // Target Account Picker
+                AccountPicker(
+                    selectedAccountId = targetAccountId,
+                    onAccountSelected = { targetAccountId = it },
+                    label = "To Account",
+                    accountRepository = accountRepository,
+                    categoryRepository = categoryRepository,
+                    enabled = !isSaving,
+                    excludeAccountId = sourceAccountId,
+                )
+
+                // Currency Picker
+                CurrencyPicker(
+                    selectedCurrencyId = currencyId,
+                    onCurrencySelected = { currencyId = it },
+                    label = "Currency",
+                    currencyRepository = currencyRepository,
+                    enabled = !isSaving,
+                )
+
+                // Date and Time Pickers
+                val dateTimeTextStyle = MaterialTheme.typography.bodySmall
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    OutlinedTextField(
+                        value = selectedDate.toString(),
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Date") },
+                        textStyle = dateTimeTextStyle,
+                        trailingIcon = {
+                            IconButton(
+                                onClick = { showDatePicker = true },
+                                enabled = !isSaving,
+                            ) {
+                                Text(
+                                    text = "\uD83D\uDCC5",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                )
+                            }
+                        },
+                        modifier = Modifier.weight(1.5f),
+                        enabled = false,
+                        singleLine = true,
+                        colors =
+                            OutlinedTextFieldDefaults.colors(
+                                disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                                disabledBorderColor = MaterialTheme.colorScheme.outline,
+                                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            ),
+                    )
+
+                    val time = LocalTime(selectedHour, selectedMinute)
+                    OutlinedTextField(
+                        value = time.toString(),
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Time") },
+                        textStyle = dateTimeTextStyle,
+                        trailingIcon = {
+                            IconButton(
+                                onClick = { showTimePicker = true },
+                                enabled = !isSaving,
+                            ) {
+                                Text(
+                                    text = "\uD83D\uDD54",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                )
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                        enabled = false,
+                        singleLine = true,
+                        colors =
+                            OutlinedTextFieldDefaults.colors(
+                                disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                                disabledBorderColor = MaterialTheme.colorScheme.outline,
+                                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            ),
+                    )
+                }
+
+                // Amount Input
+                OutlinedTextField(
+                    value = amount,
+                    onValueChange = { amount = it },
+                    label = { Text("Amount") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    enabled = !isSaving,
+                )
+
+                // Description Input
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("Description") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    enabled = !isSaving,
+                )
+
+                // Attributes Section
+                if (isLoadingAttributes) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 2.dp,
+                        )
+                    }
+                } else {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            text = "Attributes",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+
+                        // Display editable attributes
+                        editableAttributes.forEach { (id, pair) ->
+                            val (typeName, value) = pair
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                // Attribute type selector
+                                AttributeTypeField(
+                                    value = typeName,
+                                    onValueChange = { newTypeName ->
+                                        editableAttributes = editableAttributes + (id to Pair(newTypeName, value))
+                                    },
+                                    existingTypes = existingAttributeTypes,
+                                    enabled = !isSaving,
+                                    modifier = Modifier.weight(0.4f),
+                                )
+                                // Attribute value field
+                                OutlinedTextField(
+                                    value = value,
+                                    onValueChange = { newValue ->
+                                        editableAttributes = editableAttributes + (id to Pair(typeName, newValue))
+                                    },
+                                    label = { Text("Value") },
+                                    modifier = Modifier.weight(0.5f),
+                                    singleLine = true,
+                                    enabled = !isSaving,
+                                )
+                                // Delete button
+                                IconButton(
+                                    onClick = {
+                                        editableAttributes = editableAttributes - id
+                                    },
+                                    enabled = !isSaving,
+                                ) {
+                                    Text(
+                                        text = "X",
+                                        color = MaterialTheme.colorScheme.error,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                    )
+                                }
+                            }
+                        }
+
+                        // Add new attribute button
+                        TextButton(
+                            onClick = {
+                                editableAttributes = editableAttributes + (nextTempId to Pair("", ""))
+                                nextTempId--
+                            },
+                            enabled = !isSaving,
+                        ) {
+                            Text("+ Add Attribute")
+                        }
+                    }
+                }
+
+                errorMessage?.let { error ->
+                    Text(
+                        text = error,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    when {
+                        sourceAccountId == targetAccountId -> errorMessage = "Source and target accounts must be different"
+                        amount.isBlank() -> errorMessage = "Amount is required"
+                        amount.toDoubleOrNull() == null -> errorMessage = "Invalid amount"
+                        amount.toDouble() <= 0 -> errorMessage = "Amount must be greater than 0"
+                        description.isBlank() -> errorMessage = "Description is required"
+                        else -> {
+                            isSaving = true
+                            errorMessage = null
+                            scope.launch {
+                                try {
+                                    // Get the currency object from repository
+                                    val currency =
+                                        currencyRepository.getCurrencyById(currencyId).first()
+                                            ?: error("Currency not found")
+
+                                    val timestamp =
+                                        selectedDate
+                                            .atTime(selectedHour, selectedMinute, originalSecond, originalNanosecond)
+                                            .toInstant(TimeZone.currentSystemDefault())
+
+                                    // Check if transfer fields actually changed
+                                    val transferFieldsChanged =
+                                        sourceAccountId != transaction.sourceAccountId ||
+                                            targetAccountId != transaction.targetAccountId ||
+                                            currencyId != transaction.amount.currency.id ||
+                                            amount != transaction.amount.toDisplayValue().toString() ||
+                                            description.trim() != transaction.description ||
+                                            timestamp != transaction.timestamp
+
+                                    // Build the transfer object if fields changed
+                                    val updatedTransfer =
+                                        if (transferFieldsChanged) {
+                                            Transfer(
+                                                id = transaction.id,
+                                                timestamp = timestamp,
+                                                description = description.trim(),
+                                                sourceAccountId = sourceAccountId,
+                                                targetAccountId = targetAccountId,
+                                                amount = Money.fromDisplayValue(amount, currency),
+                                            )
+                                        } else {
+                                            null
+                                        }
+
+                                    // Build attribute change data structures
+                                    val originalIds = originalAttributes.map { it.id }.toSet()
+                                    val editableIds = editableAttributes.keys
+                                    val deletedAttributeIds = originalIds - editableIds
+
+                                    // Build updated attributes map (id -> NewAttribute)
+                                    val updatedAttributes = mutableMapOf<Long, NewAttribute>()
+                                    editableAttributes.filter { (id, _) -> id > 0 }.forEach { (id, pair) ->
+                                        val (typeName, value) = pair
+                                        val original = originalAttributes.find { it.id == id }
+                                        if (original != null) {
+                                            val typeChanged = original.attributeType.name != typeName
+                                            val valueChanged = original.value != value
+                                            if (typeChanged || valueChanged) {
+                                                val typeId = attributeTypeRepository.getOrCreate(typeName)
+                                                updatedAttributes[id] = NewAttribute(typeId, value)
+                                            }
+                                        }
+                                    }
+
+                                    // Build new attributes list
+                                    val newAttributes = mutableListOf<NewAttribute>()
+                                    editableAttributes.filter { (id, _) -> id < 0 }.forEach { (_, pair) ->
+                                        val (typeName, value) = pair
+                                        if (typeName.isNotBlank() && value.isNotBlank()) {
+                                            val typeId = attributeTypeRepository.getOrCreate(typeName)
+                                            newAttributes.add(NewAttribute(typeId, value))
+                                        }
+                                    }
+
+                                    // Use the atomic method to update transfer and attributes together
+                                    // This ensures only ONE revision bump even if both change
+                                    transactionRepository.updateTransfer(
+                                        transfer = updatedTransfer,
+                                        deletedAttributeIds = deletedAttributeIds,
+                                        updatedAttributes = updatedAttributes,
+                                        newAttributes = newAttributes,
+                                        transactionId = transaction.id,
+                                    )
+
+                                    // Record manual source for this update
+                                    val updated =
+                                        transactionRepository.getTransactionById(transaction.id.id).first()
+                                    if (updated != null) {
+                                        transferSourceRepository.recordManualSource(
+                                            transactionId = updated.id,
+                                            revisionId = updated.revisionId,
+                                            deviceInfo = getDeviceInfo(),
+                                        )
+                                    }
+
+                                    maintenanceService.refreshMaterializedViews()
+
+                                    onSaved()
+                                    onDismiss()
+                                } catch (expected: Exception) {
+                                    logger.error(expected) { "Failed to update transaction: ${expected.message}" }
+                                    errorMessage = "Failed to update transaction: ${expected.message}"
+                                    isSaving = false
+                                }
+                            }
+                        }
+                    }
+                },
+                enabled = !isSaving && hasChanges,
+            ) {
+                if (isSaving) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Text("Update")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !isSaving,
+            ) {
+                Text("Cancel")
+            }
+        },
+    )
+
+    if (showDatePicker) {
+        val datePickerState =
+            rememberDatePickerState(
+                initialSelectedDateMillis =
+                    selectedDate
+                        .atTime(0, 0)
+                        .toInstant(TimeZone.UTC)
+                        .toEpochMilliseconds(),
+            )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        datePickerState.selectedDateMillis?.let { millis ->
+                            selectedDate =
+                                Instant
+                                    .fromEpochMilliseconds(millis)
+                                    .toLocalDateTime(TimeZone.UTC)
+                                    .date
+                        }
+                        showDatePicker = false
+                    },
+                ) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text("Cancel")
+                }
+            },
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
+    if (showTimePicker) {
+        val timePickerState =
+            rememberTimePickerState(
+                initialHour = selectedHour,
+                initialMinute = selectedMinute,
+                is24Hour = false,
+            )
+        AlertDialog(
+            onDismissRequest = { showTimePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        selectedHour = timePickerState.hour
+                        selectedMinute = timePickerState.minute
+                        showTimePicker = false
+                    },
+                ) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTimePicker = false }) {
+                    Text("Cancel")
+                }
+            },
+            text = {
+                TimePicker(state = timePickerState)
+            },
+        )
+    }
+}
