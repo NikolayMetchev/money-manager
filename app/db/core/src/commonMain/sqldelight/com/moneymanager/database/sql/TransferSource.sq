@@ -3,7 +3,7 @@
 -- Links transfer → transfer_audit → transfer_source via transaction_id + revision_id
 CREATE TABLE transfer_source (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    transaction_id TEXT NOT NULL,
+    transaction_id INTEGER NOT NULL,
     revision_id INTEGER NOT NULL,
     source_type_id INTEGER NOT NULL,
     -- Device that performed the action (always required)

@@ -31,7 +31,6 @@ import kotlinx.coroutines.flow.flowOf
 import kotlin.test.Test
 import kotlin.time.Clock
 import kotlin.time.Instant
-import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalTestApi::class)
 class AccountsScreenTest {
@@ -376,7 +375,7 @@ class AccountsScreenTest {
     }
 
     private class FakeTransactionRepository : TransactionRepository {
-        override fun getTransactionById(id: Uuid): Flow<Transfer?> = flowOf(null)
+        override fun getTransactionById(id: Long): Flow<Transfer?> = flowOf(null)
 
         override fun getTransactionsByAccount(accountId: AccountId): Flow<List<Transfer>> = flowOf(emptyList())
 
@@ -458,7 +457,7 @@ class AccountsScreenTest {
 
         override suspend fun bumpRevisionOnly(id: TransferId): Long = 1L
 
-        override suspend fun deleteTransaction(id: Uuid) {}
+        override suspend fun deleteTransaction(id: Long) {}
     }
 
     private class FakeCategoryRepository : CategoryRepository {

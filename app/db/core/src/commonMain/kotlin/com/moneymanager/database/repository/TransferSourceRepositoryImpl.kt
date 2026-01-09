@@ -36,12 +36,12 @@ class TransferSourceRepositoryImpl(
             val deviceId = deviceRepository.getOrCreateDevice(deviceInfo)
 
             queries.insertManual(
-                transaction_id = transactionId.toString(),
+                transaction_id = transactionId.id,
                 revision_id = revisionId,
                 device_id = deviceId.id,
             )
 
-            queries.selectByTransactionIdAndRevision(transactionId.toString(), revisionId)
+            queries.selectByTransactionIdAndRevision(transactionId.id, revisionId)
                 .executeAsOne()
                 .let(TransferSourceFromRevisionMapper::map)
         }
@@ -62,7 +62,7 @@ class TransferSourceRepositoryImpl(
 
             // Insert base TransferSource record
             queries.insertCsvImportBase(
-                transaction_id = transactionId.toString(),
+                transaction_id = transactionId.id,
                 revision_id = revisionId,
                 device_id = csvImport.device_id,
             )
@@ -74,7 +74,7 @@ class TransferSourceRepositoryImpl(
                 csv_row_index = rowIndex,
             )
 
-            queries.selectByTransactionIdAndRevision(transactionId.toString(), revisionId)
+            queries.selectByTransactionIdAndRevision(transactionId.id, revisionId)
                 .executeAsOne()
                 .let(TransferSourceFromRevisionMapper::map)
         }
@@ -92,7 +92,7 @@ class TransferSourceRepositoryImpl(
                 sources.forEach { source ->
                     // Insert base TransferSource record
                     queries.insertCsvImportBase(
-                        transaction_id = source.transactionId.toString(),
+                        transaction_id = source.transactionId.id,
                         revision_id = source.revisionId,
                         device_id = deviceId,
                     )
@@ -109,7 +109,7 @@ class TransferSourceRepositoryImpl(
 
     override suspend fun getSourcesForTransaction(transactionId: TransferId): List<TransferSource> =
         withContext(Dispatchers.Default) {
-            queries.selectAllByTransactionId(transactionId.toString())
+            queries.selectAllByTransactionId(transactionId.id)
                 .executeAsList()
                 .map(TransferSourceFromTransactionIdMapper::map)
         }
@@ -119,7 +119,7 @@ class TransferSourceRepositoryImpl(
         revisionId: Long,
     ): TransferSource? =
         withContext(Dispatchers.Default) {
-            queries.selectByTransactionIdAndRevision(transactionId.toString(), revisionId)
+            queries.selectByTransactionIdAndRevision(transactionId.id, revisionId)
                 .executeAsOneOrNull()
                 ?.let(TransferSourceFromRevisionMapper::map)
         }
@@ -134,7 +134,7 @@ class TransferSourceRepositoryImpl(
             queries.transaction {
                 sources.forEach { source ->
                     queries.insertSampleGenerator(
-                        transaction_id = source.transactionId.toString(),
+                        transaction_id = source.transactionId.id,
                         revision_id = source.revisionId,
                         device_id = deviceId.id,
                     )

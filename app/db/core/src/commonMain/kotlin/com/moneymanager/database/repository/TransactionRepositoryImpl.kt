@@ -29,7 +29,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlin.time.Instant
-import kotlin.uuid.Uuid
 
 class TransactionRepositoryImpl(
     private val database: MoneyManagerDatabaseWrapper,
@@ -40,16 +39,16 @@ class TransactionRepositoryImpl(
 
     private fun loadAttributesForTransfers(transfers: List<Transfer>): List<Transfer> {
         if (transfers.isEmpty()) return transfers
-        val ids = transfers.map { it.id.id.toString() }
+        val ids = transfers.map { it.id.id }
         val attributesByTransferId =
             transferAttributeQueries.selectByTransactionIds(ids)
                 .executeAsList()
-                .groupBy { TransferId(Uuid.parse(it.transaction_id)) }
+                .groupBy { TransferId(it.transaction_id) }
                 .mapValues { (_, rows) ->
                     rows.map { row ->
                         TransferAttribute(
                             id = row.id,
-                            transactionId = TransferId(Uuid.parse(row.transaction_id)),
+                            transactionId = TransferId(row.transaction_id),
                             attributeType =
                                 AttributeType(
                                     id = AttributeTypeId(row.attribute_type_id),
@@ -67,8 +66,8 @@ class TransactionRepositoryImpl(
         return loadAttributesForTransfers(listOf(transfer)).first()
     }
 
-    override fun getTransactionById(id: Uuid): Flow<Transfer?> =
-        transferQueries.selectById(id.toString(), TransferMapper::mapRaw)
+    override fun getTransactionById(id: Long): Flow<Transfer?> =
+        transferQueries.selectById(id, TransferMapper::mapRaw)
             .asFlow()
             .mapToOneOrNull(Dispatchers.Default)
             .map { loadAttributesForTransfer(it) }
@@ -124,7 +123,7 @@ class TransactionRepositoryImpl(
                 transferQueries.selectRunningBalanceByAccountPaginated(
                     accountId.id,
                     pagingInfo?.lastTimestamp?.toEpochMilliseconds(),
-                    pagingInfo?.lastId?.toString(),
+                    pagingInfo?.lastId?.id,
                     (pageSize + 1).toLong(),
                 ) { id, timestamp, description, account_id, transaction_amount, running_balance,
                     currency_id, currency_code, currency_name, currency_scale_factor, source_account_id, target_account_id,
@@ -182,7 +181,7 @@ class TransactionRepositoryImpl(
                 transferQueries.selectRunningBalanceByAccountPaginatedBackward(
                     accountId.id,
                     firstTimestamp.toEpochMilliseconds(),
-                    firstId.id.toString(),
+                    firstId.id,
                     (pageSize + 1).toLong(),
                 ) { id, timestamp, description, account_id, transaction_amount, running_balance,
                     currency_id, currency_code, currency_name, currency_scale_factor, source_account_id, target_account_id,
@@ -239,7 +238,7 @@ class TransactionRepositoryImpl(
         withContext(Dispatchers.Default) {
             // First, get the transaction to find its timestamp
             val transaction =
-                transferQueries.selectById(transactionId.id.toString(), TransferMapper::mapRaw)
+                transferQueries.selectById(transactionId.id, TransferMapper::mapRaw)
                     .executeAsOneOrNull()
                     ?: throw IllegalArgumentException("Transaction not found: $transactionId")
 
@@ -248,7 +247,7 @@ class TransactionRepositoryImpl(
                 transferQueries.getTransactionRowPosition(
                     accountId = accountId.id,
                     targetTimestamp = transaction.timestamp.toEpochMilliseconds(),
-                    targetId = transactionId.id.toString(),
+                    targetId = transactionId.id,
                 ).executeAsOne()
 
             // Get total count to know if there are more items
@@ -345,10 +344,13 @@ class TransactionRepositoryImpl(
                     database.beginCreationMode()
                     try {
                         batch.forEach { transfer ->
-                            // Create transfer (triggers INSERT audit)
-                            transactionIdQueries.insert(transfer.id.toString())
+                            // Generate new transaction ID (triggers INSERT audit)
+                            transactionIdQueries.insert()
+                            val generatedId = transactionIdQueries.lastInsertedId().executeAsOne()
+
+                            // Create transfer with generated ID
                             transferQueries.insert(
-                                id = transfer.id.toString(),
+                                id = generatedId,
                                 revision_id = transfer.revisionId,
                                 timestamp = transfer.timestamp.toEpochMilliseconds(),
                                 description = transfer.description,
@@ -358,17 +360,20 @@ class TransactionRepositoryImpl(
                                 amount = transfer.amount.amount,
                             )
 
+                            // Create transfer with updated ID for source recording
+                            val transferWithId = transfer.copy(id = TransferId(generatedId))
+
                             // Insert attributes (creation mode records audit at rev 1 without bumping)
                             newAttributes[transfer.id].orEmpty().forEach { attr ->
                                 transferAttributeQueries.insert(
-                                    transaction_id = transfer.id.toString(),
+                                    transaction_id = generatedId,
                                     attribute_type_id = attr.typeId.id,
                                     attribute_value = attr.value,
                                 )
                             }
 
                             // Record source using strategy pattern
-                            sourceRecorder.insert(transfer)
+                            sourceRecorder.insert(transferWithId)
                         }
                     } finally {
                         // Always restore normal trigger behavior
@@ -407,11 +412,11 @@ class TransactionRepositoryImpl(
                         target_account_id = transfer.targetAccountId.id,
                         currency_id = transfer.amount.currency.id.toString(),
                         amount = transfer.amount.amount,
-                        id = transfer.id.toString(),
+                        id = transfer.id.id,
                     )
                 } else if (hasAttributeChanges) {
                     // No transfer change but has attribute changes - need to bump revision first
-                    transferQueries.bumpRevisionOnly(effectiveTransactionId.id.toString())
+                    transferQueries.bumpRevisionOnly(effectiveTransactionId.id)
                 }
 
                 // Step 2: Apply attribute changes in creation mode (record audit but don't bump again)
@@ -431,7 +436,7 @@ class TransactionRepositoryImpl(
                                 // Type changed: delete and recreate
                                 transferAttributeQueries.deleteById(id)
                                 transferAttributeQueries.insert(
-                                    transaction_id = effectiveTransactionId.id.toString(),
+                                    transaction_id = effectiveTransactionId.id,
                                     attribute_type_id = attr.typeId.id,
                                     attribute_value = attr.value,
                                 )
@@ -444,7 +449,7 @@ class TransactionRepositoryImpl(
                         // Insert new attributes
                         newAttributes.forEach { attr ->
                             transferAttributeQueries.insert(
-                                transaction_id = effectiveTransactionId.id.toString(),
+                                transaction_id = effectiveTransactionId.id,
                                 attribute_type_id = attr.typeId.id,
                                 attribute_value = attr.value,
                             )
@@ -459,13 +464,13 @@ class TransactionRepositoryImpl(
     override suspend fun bumpRevisionOnly(id: TransferId): Long =
         withContext(Dispatchers.Default) {
             transferQueries.transactionWithResult {
-                transferQueries.bumpRevisionOnly(id.id.toString())
-                transferQueries.selectById(id.id.toString()).executeAsOne().revision_id
+                transferQueries.bumpRevisionOnly(id.id)
+                transferQueries.selectById(id.id).executeAsOne().revision_id
             }
         }
 
-    override suspend fun deleteTransaction(id: Uuid): Unit =
+    override suspend fun deleteTransaction(id: Long): Unit =
         withContext(Dispatchers.Default) {
-            transferQueries.delete(id.toString())
+            transferQueries.delete(id)
         }
 }

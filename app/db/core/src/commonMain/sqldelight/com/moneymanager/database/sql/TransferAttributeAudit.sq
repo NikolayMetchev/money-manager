@@ -1,6 +1,6 @@
 CREATE TABLE transfer_attribute_audit (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    transaction_id TEXT NOT NULL,
+    transaction_id INTEGER NOT NULL,
     revision_id INTEGER NOT NULL,
     attribute_type_id INTEGER NOT NULL,
     audit_type_id INTEGER NOT NULL,

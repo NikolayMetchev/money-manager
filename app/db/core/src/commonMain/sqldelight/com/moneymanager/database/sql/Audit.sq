@@ -56,7 +56,7 @@ CREATE TABLE transfer_audit (
     audit_id INTEGER PRIMARY KEY AUTOINCREMENT,
     audit_timestamp INTEGER NOT NULL,
     audit_type_id INTEGER NOT NULL,
-    id TEXT NOT NULL,
+    id INTEGER NOT NULL,
     revision_id INTEGER NOT NULL,
     timestamp INTEGER NOT NULL,
     description TEXT NOT NULL,

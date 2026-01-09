@@ -14,7 +14,6 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.AuditRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlin.uuid.Uuid
 
 class AuditRepositoryImpl(
     database: MoneyManagerDatabase,
@@ -25,7 +24,7 @@ class AuditRepositoryImpl(
     override suspend fun getAuditHistoryForTransfer(transferId: TransferId): List<TransferAuditEntry> =
         withContext(Dispatchers.Default) {
             val entries =
-                queries.selectAuditHistoryForTransfer(transferId.toString())
+                queries.selectAuditHistoryForTransfer(transferId.id)
                     .executeAsList()
                     .map(TransferAuditEntryMapper::map)
 
@@ -35,7 +34,7 @@ class AuditRepositoryImpl(
     override suspend fun getAuditHistoryForTransferWithSource(transferId: TransferId): List<TransferAuditEntry> =
         withContext(Dispatchers.Default) {
             val entries =
-                queries.selectAuditHistoryForTransferWithSource(transferId.toString())
+                queries.selectAuditHistoryForTransferWithSource(transferId.id)
                     .executeAsList()
                     .map(TransferAuditEntryWithSourceMapper::map)
 
@@ -48,12 +47,12 @@ class AuditRepositoryImpl(
     ): List<TransferAuditEntry> {
         // Fetch all attribute audit entries for this transfer
         val allAttributeChanges =
-            attributeAuditQueries.selectAllByTransaction(transferId.id.toString())
+            attributeAuditQueries.selectAllByTransaction(transferId.id)
                 .executeAsList()
                 .map { row ->
                     TransferAttributeAuditEntry(
                         id = row.id,
-                        transactionId = TransferId(Uuid.parse(row.transaction_id)),
+                        transactionId = TransferId(row.transaction_id),
                         revisionId = row.revision_id,
                         attributeType =
                             AttributeType(

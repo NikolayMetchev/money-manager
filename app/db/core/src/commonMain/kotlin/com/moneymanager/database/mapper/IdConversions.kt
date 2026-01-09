@@ -12,5 +12,5 @@ interface IdConversions {
 
     fun toCurrencyId(id: String): CurrencyId = CurrencyId(Uuid.parse(id))
 
-    fun toTransferId(id: String): TransferId = TransferId(Uuid.parse(id))
+    fun toTransferId(id: Long): TransferId = TransferId(id)
 }

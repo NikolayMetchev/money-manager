@@ -2,18 +2,13 @@
 -- This table is NEVER deleted from. When a transfer is deleted, the transaction_id remains.
 -- This ensures we always have a valid ID to reference in source tracking and audit history.
 CREATE TABLE transaction_id (
-    id TEXT PRIMARY KEY NOT NULL
-        CHECK (
-            length(id) = 36
-            AND substr(id, 9, 1) = '-'
-            AND substr(id, 14, 1) = '-'
-            AND substr(id, 19, 1) = '-'
-            AND substr(id, 24, 1) = '-'
-            AND substr(id, 15, 1) IN ('1','2','3','4','5','6','7','8')
-            AND lower(substr(id, 20, 1)) IN ('8','9','a','b')
-        )
+    id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL
 );
 
 -- Insert a new transaction ID
 insert:
-INSERT INTO transaction_id (id) VALUES (?);
+INSERT INTO transaction_id DEFAULT VALUES;
+
+-- Get the last inserted transaction ID
+lastInsertedId:
+SELECT last_insert_rowid();

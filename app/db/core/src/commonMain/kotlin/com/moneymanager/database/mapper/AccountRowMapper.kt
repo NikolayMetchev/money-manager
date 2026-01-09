@@ -13,7 +13,7 @@ import kotlin.uuid.Uuid
 
 object AccountRowMapper {
     fun mapRaw(
-        id: String,
+        id: Long,
         timestamp: Long,
         description: String,
         account_id: Long,
@@ -27,7 +27,7 @@ object AccountRowMapper {
         target_account_id: Long,
     ): AccountRow =
         AccountRow(
-            transactionId = TransferId(Uuid.parse(id)),
+            transactionId = TransferId(id),
             timestamp = fromEpochMilliseconds(timestamp),
             description = description,
             accountId = AccountId(account_id),

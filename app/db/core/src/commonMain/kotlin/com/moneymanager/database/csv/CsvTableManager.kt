@@ -7,7 +7,6 @@ import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
-import kotlin.uuid.Uuid
 
 /**
  * Manages dynamic CSV tables in the database.
@@ -104,8 +103,8 @@ class CsvTableManager(private val database: MoneyManagerDatabaseWrapper) {
             { cursor ->
                 while (cursor.next().value) {
                     val rowIndex = cursor.getLong(0) ?: continue
-                    val transferIdStr = cursor.getString(1)
-                    val transferId = transferIdStr?.let { TransferId(Uuid.parse(it)) }
+                    val transferIdLong = cursor.getLong(1)
+                    val transferId = transferIdLong?.let { TransferId(it) }
                     val importStatusStr = cursor.getString(2)
                     val importStatus = importStatusStr?.let { ImportStatus.valueOf(it) }
                     val errorMessage = cursor.getString(3)
