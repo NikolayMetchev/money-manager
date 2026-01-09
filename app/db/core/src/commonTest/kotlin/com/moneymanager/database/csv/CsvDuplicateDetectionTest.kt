@@ -116,7 +116,7 @@ class CsvDuplicateDetectionTest {
         amount: String,
         attributes: List<Pair<String, String>> = emptyList(),
     ): ExistingTransferInfo {
-        val transferId = TransferId(Uuid.random())
+        val transferId = TransferId(1L)
         val localDate = kotlinx.datetime.LocalDate.parse(date)
         val localTime = kotlinx.datetime.LocalTime(12, 0, 0)
         val timestamp = LocalDateTime(localDate, localTime).toInstant(TimeZone.UTC)
@@ -554,7 +554,7 @@ class CsvDuplicateDetectionTest {
                 updatedAt = Clock.System.now(),
             )
 
-        val transferId = TransferId(Uuid.random())
+        val transferId = TransferId(1L)
         val localDate = kotlinx.datetime.LocalDate.parse("2024-01-01")
         val localTime = kotlinx.datetime.LocalTime(12, 0, 0)
         val timestamp = LocalDateTime(localDate, localTime).toInstant(TimeZone.UTC)

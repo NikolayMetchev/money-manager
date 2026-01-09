@@ -1,9 +1,8 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
+@file:OptIn(kotlin.time.ExperimentalTime::class)
 
 package com.moneymanager.domain.model
 
 import kotlin.time.Instant
-import kotlin.uuid.Uuid
 
 data class Transfer(
     val id: TransferId,
@@ -17,6 +16,6 @@ data class Transfer(
 )
 
 @JvmInline
-value class TransferId(override val id: Uuid) : TransactionId {
+value class TransferId(override val id: Long) : TransactionId {
     override fun toString() = id.toString()
 }

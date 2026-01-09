@@ -105,7 +105,7 @@ class AccountTransactionsScreenTest {
 
             val transfer =
                 Transfer(
-                    id = TransferId(Uuid.random()),
+                    id = TransferId(0L),
                     timestamp = now,
                     description = "Transfer to savings",
                     sourceAccountId = checking.id,
@@ -198,7 +198,7 @@ class AccountTransactionsScreenTest {
 
             val transfer =
                 Transfer(
-                    id = TransferId(Uuid.random()),
+                    id = TransferId(0L),
                     timestamp = now,
                     description = "Transfer to savings",
                     sourceAccountId = checking.id,
@@ -299,10 +299,9 @@ class AccountTransactionsScreenTest {
                     )
 
                 // Create a transfer
-                transferId = TransferId(Uuid.random())
                 val transfer =
                     Transfer(
-                        id = transferId,
+                        id = TransferId(0L),
                         timestamp = now,
                         description = "E2E Test Transaction",
                         sourceAccountId = checkingAccountId,
@@ -314,6 +313,10 @@ class AccountTransactionsScreenTest {
                     transfers = listOf(transfer),
                     sourceRecorder = SampleGeneratorSourceRecorder(repositories.transferSourceQueries, deviceId),
                 )
+
+                // Query back the created transfer to get the database-generated ID
+                val createdTransfers = repositories.transactionRepository.getTransactionsByAccount(checkingAccountId).first()
+                transferId = createdTransfers.first().id
 
                 // Refresh materialized views so the transaction appears
                 repositories.maintenanceService.fullRefreshMaterializedViews()
@@ -508,10 +511,9 @@ class AccountTransactionsScreenTest {
                     )
 
                 // Create a transfer (revision 1)
-                transferId = TransferId(Uuid.random())
                 val transfer =
                     Transfer(
-                        id = transferId,
+                        id = TransferId(0L),
                         timestamp = now,
                         description = "Audit Test Transaction",
                         sourceAccountId = checkingAccountId,
@@ -523,6 +525,10 @@ class AccountTransactionsScreenTest {
                     transfers = listOf(transfer),
                     sourceRecorder = ManualSourceRecorder(repositories.transferSourceQueries, deviceId),
                 )
+
+                // Query back the created transfer to get the database-generated ID
+                val createdTransfers = repositories.transactionRepository.getTransactionsByAccount(checkingAccountId).first()
+                transferId = createdTransfers.first().id
 
                 // Verify initial revision is 1
                 val initialTransfer =
@@ -686,10 +692,9 @@ class AccountTransactionsScreenTest {
                     )
 
                 // Create a transfer (revision 1)
-                transferId = TransferId(Uuid.random())
                 val transfer =
                     Transfer(
-                        id = transferId,
+                        id = TransferId(0L),
                         timestamp = now,
                         description = "Original Description",
                         sourceAccountId = checkingAccountId,
@@ -701,6 +706,10 @@ class AccountTransactionsScreenTest {
                     transfers = listOf(transfer),
                     sourceRecorder = ManualSourceRecorder(repositories.transferSourceQueries, deviceId),
                 )
+
+                // Query back the created transfer to get the database-generated ID
+                val createdTransfers = repositories.transactionRepository.getTransactionsByAccount(checkingAccountId).first()
+                transferId = createdTransfers.first().id
 
                 // Verify initial revision is 1
                 val initialTransfer =
@@ -860,7 +869,7 @@ class AccountTransactionsScreenTest {
     private class FakeTransactionRepository(
         private val transfers: List<Transfer>,
     ) : TransactionRepository {
-        override fun getTransactionById(id: Uuid): Flow<Transfer?> = flowOf(transfers.find { it.id.id == id })
+        override fun getTransactionById(id: Long): Flow<Transfer?> = flowOf(transfers.find { it.id.id == id })
 
         override fun getTransactionsByAccount(accountId: AccountId): Flow<List<Transfer>> =
             flowOf(transfers.filter { it.sourceAccountId == accountId || it.targetAccountId == accountId })
@@ -1012,7 +1021,7 @@ class AccountTransactionsScreenTest {
 
         override suspend fun bumpRevisionOnly(id: TransferId): Long = 1L
 
-        override suspend fun deleteTransaction(id: Uuid) {}
+        override suspend fun deleteTransaction(id: Long) {}
     }
 
     private class FakeCurrencyRepository(

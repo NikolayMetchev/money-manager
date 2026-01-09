@@ -24,6 +24,10 @@ exceptions:
     allowedExceptionNameRegex: '_|(expected).*'
 
 naming:
+  ClassNaming:
+    active: false
+  ConstructorParameterNaming:
+    active: false
   FunctionNaming:
     ignoreAnnotated:
       - 'Composable'

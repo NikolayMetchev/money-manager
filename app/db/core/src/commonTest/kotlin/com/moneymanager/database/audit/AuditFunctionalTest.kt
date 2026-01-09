@@ -1,4 +1,4 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
+@file:OptIn(kotlin.time.ExperimentalTime::class)
 
 package com.moneymanager.database.audit
 
@@ -18,7 +18,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
-import kotlin.uuid.Uuid
 
 /**
  * Data class for account audit history records (test-only).
@@ -422,23 +421,23 @@ class AuditFunctionalTest : DbTest() {
         runTest {
             val (sourceAccountId, targetAccountId, currency) = setupTransferPrerequisites()
 
-            val transferId = TransferId(Uuid.random())
             val now = Clock.System.now()
             val description = "Test Transfer"
             val amount = Money.fromDisplayValue(100.0, currency)
 
-            createTransfer(
-                Transfer(
-                    id = transferId,
-                    timestamp = now,
-                    description = description,
-                    sourceAccountId = sourceAccountId,
-                    targetAccountId = targetAccountId,
-                    amount = amount,
-                ),
-            )
+            val transfer =
+                createTransfer(
+                    Transfer(
+                        id = TransferId(0L),
+                        timestamp = now,
+                        description = description,
+                        sourceAccountId = sourceAccountId,
+                        targetAccountId = targetAccountId,
+                        amount = amount,
+                    ),
+                )
 
-            val auditHistory = database.auditQueries.selectAuditHistoryForTransfer(transferId.toString()).executeAsList()
+            val auditHistory = database.auditQueries.selectAuditHistoryForTransfer(transfer.id.id).executeAsList()
 
             assertEquals(1, auditHistory.size)
             assertEquals("INSERT", auditHistory[0].audit_type)
@@ -451,26 +450,26 @@ class AuditFunctionalTest : DbTest() {
         runTest {
             val (sourceAccountId, targetAccountId, currency) = setupTransferPrerequisites()
 
-            val transferId = TransferId(Uuid.random())
             val now = Clock.System.now()
             val originalAmount = Money.fromDisplayValue(100.0, currency)
             val updatedAmount = Money.fromDisplayValue(200.0, currency)
 
-            createTransfer(
-                Transfer(
-                    id = transferId,
-                    timestamp = now,
-                    description = "Original Description",
-                    sourceAccountId = sourceAccountId,
-                    targetAccountId = targetAccountId,
-                    amount = originalAmount,
-                ),
-            )
+            val transfer =
+                createTransfer(
+                    Transfer(
+                        id = TransferId(0L),
+                        timestamp = now,
+                        description = "Original Description",
+                        sourceAccountId = sourceAccountId,
+                        targetAccountId = targetAccountId,
+                        amount = originalAmount,
+                    ),
+                )
 
             repositories.transactionRepository.updateTransfer(
                 transfer =
                     Transfer(
-                        id = transferId,
+                        id = transfer.id,
                         timestamp = now,
                         description = "Updated Description",
                         sourceAccountId = sourceAccountId,
@@ -480,10 +479,10 @@ class AuditFunctionalTest : DbTest() {
                 deletedAttributeIds = emptySet(),
                 updatedAttributes = emptyMap(),
                 newAttributes = emptyList(),
-                transactionId = transferId,
+                transactionId = transfer.id,
             )
 
-            val auditHistory = database.auditQueries.selectAuditHistoryForTransfer(transferId.toString()).executeAsList()
+            val auditHistory = database.auditQueries.selectAuditHistoryForTransfer(transfer.id.id).executeAsList()
 
             assertEquals(2, auditHistory.size)
             val updateAudit = auditHistory[0]
@@ -497,23 +496,23 @@ class AuditFunctionalTest : DbTest() {
         runTest {
             val (sourceAccountId, targetAccountId, currency) = setupTransferPrerequisites()
 
-            val transferId = TransferId(Uuid.random())
             val now = Clock.System.now()
 
-            createTransfer(
-                Transfer(
-                    id = transferId,
-                    timestamp = now,
-                    description = "To Be Deleted",
-                    sourceAccountId = sourceAccountId,
-                    targetAccountId = targetAccountId,
-                    amount = Money.fromDisplayValue(100.0, currency),
-                ),
-            )
+            val transfer =
+                createTransfer(
+                    Transfer(
+                        id = TransferId(0L),
+                        timestamp = now,
+                        description = "To Be Deleted",
+                        sourceAccountId = sourceAccountId,
+                        targetAccountId = targetAccountId,
+                        amount = Money.fromDisplayValue(100.0, currency),
+                    ),
+                )
 
-            repositories.transactionRepository.deleteTransaction(transferId.id)
+            repositories.transactionRepository.deleteTransaction(transfer.id.id)
 
-            val auditHistory = database.auditQueries.selectAuditHistoryForTransfer(transferId.toString()).executeAsList()
+            val auditHistory = database.auditQueries.selectAuditHistoryForTransfer(transfer.id.id).executeAsList()
 
             assertEquals(2, auditHistory.size)
             assertEquals("DELETE", auditHistory[0].audit_type)
@@ -525,26 +524,26 @@ class AuditFunctionalTest : DbTest() {
         runTest {
             val (sourceAccountId, targetAccountId, currency) = setupTransferPrerequisites()
 
-            val transferId = TransferId(Uuid.random())
             val now = Clock.System.now()
 
             // Create transfer (revisionId should be 1)
-            createTransfer(
-                Transfer(
-                    id = transferId,
-                    timestamp = now,
-                    description = "Original Description",
-                    sourceAccountId = sourceAccountId,
-                    targetAccountId = targetAccountId,
-                    amount = Money.fromDisplayValue(100.0, currency),
-                ),
-            )
+            val transfer =
+                createTransfer(
+                    Transfer(
+                        id = TransferId(0L),
+                        timestamp = now,
+                        description = "Original Description",
+                        sourceAccountId = sourceAccountId,
+                        targetAccountId = targetAccountId,
+                        amount = Money.fromDisplayValue(100.0, currency),
+                    ),
+                )
 
             // Update transfer (revisionId should be 2)
             repositories.transactionRepository.updateTransfer(
                 transfer =
                     Transfer(
-                        id = transferId,
+                        id = transfer.id,
                         timestamp = now,
                         description = "Updated Description",
                         sourceAccountId = sourceAccountId,
@@ -554,10 +553,10 @@ class AuditFunctionalTest : DbTest() {
                 deletedAttributeIds = emptySet(),
                 updatedAttributes = emptyMap(),
                 newAttributes = emptyList(),
-                transactionId = transferId,
+                transactionId = transfer.id,
             )
 
-            val auditHistory = database.auditQueries.selectAuditHistoryForTransfer(transferId.toString()).executeAsList()
+            val auditHistory = database.auditQueries.selectAuditHistoryForTransfer(transfer.id.id).executeAsList()
 
             assertEquals(2, auditHistory.size, "Should have 2 audit records (INSERT + UPDATE)")
 
@@ -579,26 +578,26 @@ class AuditFunctionalTest : DbTest() {
         runTest {
             val (sourceAccountId, targetAccountId, currency) = setupTransferPrerequisites()
 
-            val transferId = TransferId(Uuid.random())
             val now = Clock.System.now()
 
             // Create transfer (revisionId = 1)
-            createTransfer(
-                Transfer(
-                    id = transferId,
-                    timestamp = now,
-                    description = "Version 1",
-                    sourceAccountId = sourceAccountId,
-                    targetAccountId = targetAccountId,
-                    amount = Money.fromDisplayValue(100.0, currency),
-                ),
-            )
+            val transfer =
+                createTransfer(
+                    Transfer(
+                        id = TransferId(0L),
+                        timestamp = now,
+                        description = "Version 1",
+                        sourceAccountId = sourceAccountId,
+                        targetAccountId = targetAccountId,
+                        amount = Money.fromDisplayValue(100.0, currency),
+                    ),
+                )
 
             // First update (revisionId = 2)
             repositories.transactionRepository.updateTransfer(
                 transfer =
                     Transfer(
-                        id = transferId,
+                        id = transfer.id,
                         timestamp = now,
                         description = "Version 2",
                         sourceAccountId = sourceAccountId,
@@ -608,14 +607,14 @@ class AuditFunctionalTest : DbTest() {
                 deletedAttributeIds = emptySet(),
                 updatedAttributes = emptyMap(),
                 newAttributes = emptyList(),
-                transactionId = transferId,
+                transactionId = transfer.id,
             )
 
             // Second update (revisionId = 3)
             repositories.transactionRepository.updateTransfer(
                 transfer =
                     Transfer(
-                        id = transferId,
+                        id = transfer.id,
                         timestamp = now,
                         description = "Version 3",
                         sourceAccountId = sourceAccountId,
@@ -625,10 +624,10 @@ class AuditFunctionalTest : DbTest() {
                 deletedAttributeIds = emptySet(),
                 updatedAttributes = emptyMap(),
                 newAttributes = emptyList(),
-                transactionId = transferId,
+                transactionId = transfer.id,
             )
 
-            val auditHistory = database.auditQueries.selectAuditHistoryForTransfer(transferId.toString()).executeAsList()
+            val auditHistory = database.auditQueries.selectAuditHistoryForTransfer(transfer.id.id).executeAsList()
 
             assertEquals(3, auditHistory.size, "Should have 3 audit records (INSERT + 2 UPDATEs)")
 

@@ -15,10 +15,9 @@ import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import kotlinx.coroutines.flow.Flow
 import kotlin.time.Instant
-import kotlin.uuid.Uuid
 
 interface TransactionRepository {
-    fun getTransactionById(id: Uuid): Flow<Transfer?>
+    fun getTransactionById(id: Long): Flow<Transfer?>
 
     fun getTransactionsByAccount(accountId: AccountId): Flow<List<Transfer>>
 
@@ -125,5 +124,5 @@ interface TransactionRepository {
      */
     suspend fun bumpRevisionOnly(id: TransferId): Long
 
-    suspend fun deleteTransaction(id: Uuid)
+    suspend fun deleteTransaction(id: Long)
 }

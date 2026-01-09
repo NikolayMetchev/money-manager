@@ -1,14 +1,5 @@
 CREATE TABLE transfer (
-    id TEXT PRIMARY KEY NOT NULL
-        CHECK (
-            length(id) = 36
-            AND substr(id, 9, 1) = '-'
-            AND substr(id, 14, 1) = '-'
-            AND substr(id, 19, 1) = '-'
-            AND substr(id, 24, 1) = '-'
-            AND substr(id, 15, 1) IN ('1','2','3','4','5','6','7','8')
-            AND lower(substr(id, 20, 1)) IN ('8','9','a','b')
-        ),
+    id INTEGER PRIMARY KEY NOT NULL,
     revision_id INTEGER NOT NULL DEFAULT 1,
     timestamp INTEGER NOT NULL,
     description TEXT NOT NULL,
@@ -51,7 +42,7 @@ CREATE INDEX IF NOT EXISTS idx_account_balance_mv_currency ON account_balance_ma
 
 -- Materialized table for running balances (manually refreshed)
 CREATE TABLE running_balance_materialized_view (
-    id TEXT NOT NULL,
+    id INTEGER NOT NULL,
     timestamp INTEGER NOT NULL,
     description TEXT NOT NULL,
     account_id INTEGER NOT NULL,

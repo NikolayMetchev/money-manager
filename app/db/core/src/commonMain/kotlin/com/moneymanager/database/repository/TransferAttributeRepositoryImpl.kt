@@ -14,7 +14,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
-import kotlin.uuid.Uuid
 
 class TransferAttributeRepositoryImpl(
     private val database: MoneyManagerDatabaseWrapper,
@@ -22,14 +21,14 @@ class TransferAttributeRepositoryImpl(
     private val queries = database.transferAttributeQueries
 
     override fun getByTransaction(transactionId: TransferId): Flow<List<TransferAttribute>> =
-        queries.selectByTransaction(transactionId.id.toString())
+        queries.selectByTransaction(transactionId.id)
             .asFlow()
             .mapToList(Dispatchers.Default)
             .map { list ->
                 list.map { row ->
                     TransferAttribute(
                         id = row.id,
-                        transactionId = TransferId(Uuid.parse(row.transaction_id)),
+                        transactionId = TransferId(row.transaction_id),
                         attributeType =
                             AttributeType(
                                 id = AttributeTypeId(row.attribute_type_id),
@@ -48,7 +47,7 @@ class TransferAttributeRepositoryImpl(
         withContext(Dispatchers.Default) {
             queries.transactionWithResult {
                 queries.insert(
-                    transactionId.id.toString(),
+                    transactionId.id,
                     attributeTypeId.id,
                     value,
                 )

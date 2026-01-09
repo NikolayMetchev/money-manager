@@ -14,7 +14,7 @@ import kotlin.uuid.Uuid
 object TransferMapper {
     @Suppress("LongParameterList")
     fun mapRaw(
-        id: String,
+        id: Long,
         revision_id: Long,
         timestamp: Long,
         description: String,
@@ -34,7 +34,7 @@ object TransferMapper {
                 scaleFactor = currency_scale_factor,
             )
         return Transfer(
-            id = TransferId(Uuid.parse(id)),
+            id = TransferId(id),
             revisionId = revision_id,
             timestamp = fromEpochMilliseconds(timestamp),
             description = description,

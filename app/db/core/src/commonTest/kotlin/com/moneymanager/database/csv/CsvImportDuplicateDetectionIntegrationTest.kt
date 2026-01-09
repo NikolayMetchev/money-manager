@@ -148,14 +148,13 @@ class CsvImportDuplicateDetectionIntegrationTest : DbTest() {
             setupTestData()
 
             // Create an existing transfer with attributes
-            val existingTransferId = TransferId(Uuid.random())
             val localDate = kotlinx.datetime.LocalDate.parse("2024-01-01")
             val localTime = kotlinx.datetime.LocalTime(12, 0, 0)
             val timestamp = LocalDateTime(localDate, localTime).toInstant(TimeZone.UTC)
 
             val existingTransfer =
                 Transfer(
-                    id = existingTransferId,
+                    id = TransferId(0L),
                     timestamp = timestamp,
                     description = "Coffee",
                     sourceAccountId = sourceAccount.id,
@@ -174,13 +173,21 @@ class CsvImportDuplicateDetectionIntegrationTest : DbTest() {
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test", "test"))
             repositories.transactionRepository.createTransfers(
                 transfers = listOf(existingTransfer),
-                newAttributes = mapOf(existingTransferId to attributes),
+                newAttributes = mapOf(TransferId(0L) to attributes),
                 sourceRecorder =
                     com.moneymanager.database.SampleGeneratorSourceRecorder(
                         transferSourceQueries,
                         deviceId,
                     ),
             )
+
+            // Query back the created transfer
+            val createdTransfersList =
+                repositories.transactionRepository.getTransactionsByDateRange(
+                    startDate = timestamp,
+                    endDate = timestamp,
+                ).first()
+            val existingTransferId = createdTransfersList.first { it.description == "Coffee" }.id
 
             // Verify transfer was created
             val allTransfersBeforeImport =
@@ -281,14 +288,13 @@ class CsvImportDuplicateDetectionIntegrationTest : DbTest() {
             setupTestData()
 
             // Create an existing transfer WITHOUT any attributes
-            val existingTransferId = TransferId(Uuid.random())
             val localDate = kotlinx.datetime.LocalDate.parse("2024-01-01")
             val localTime = kotlinx.datetime.LocalTime(12, 0, 0)
             val timestamp = LocalDateTime(localDate, localTime).toInstant(TimeZone.UTC)
 
             val existingTransfer =
                 Transfer(
-                    id = existingTransferId,
+                    id = TransferId(0L),
                     timestamp = timestamp,
                     description = "Coffee",
                     sourceAccountId = sourceAccount.id,
@@ -306,6 +312,14 @@ class CsvImportDuplicateDetectionIntegrationTest : DbTest() {
                         deviceId,
                     ),
             )
+
+            // Query back the created transfer
+            val createdTransfersList =
+                repositories.transactionRepository.getTransactionsByDateRange(
+                    startDate = timestamp,
+                    endDate = timestamp,
+                ).first()
+            val existingTransferId = createdTransfersList.first { it.description == "Coffee" }.id
 
             // Create strategy WITHOUT unique identifier attributes
             val strategyWithoutUniqueId =

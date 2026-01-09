@@ -16,7 +16,7 @@ class ManualSourceRecorder(
 ) : SourceRecorder {
     override fun insert(transfer: Transfer) {
         queries.insertManual(
-            transfer.id.id.toString(),
+            transfer.id.id,
             transfer.revisionId,
             deviceId.id,
         )
@@ -30,7 +30,7 @@ class SampleGeneratorSourceRecorder(
 ) : SourceRecorder {
     override fun insert(transfer: Transfer) {
         queries.insertSampleGenerator(
-            transfer.id.id.toString(),
+            transfer.id.id,
             transfer.revisionId,
             deviceId.id,
         )
@@ -47,7 +47,7 @@ class CsvImportSourceRecorder(
     override fun insert(transfer: Transfer) {
         // Insert base TransferSource record
         queries.insertCsvImportBase(
-            transfer.id.id.toString(),
+            transfer.id.id,
             transfer.revisionId,
             deviceId.id,
         )
