@@ -23,7 +23,7 @@ CREATE TABLE currency_audit (
     audit_id INTEGER PRIMARY KEY AUTOINCREMENT,
     audit_timestamp INTEGER NOT NULL,
     audit_type_id INTEGER NOT NULL,
-    id TEXT NOT NULL,
+    id INTEGER NOT NULL,
     code TEXT NOT NULL,
     name TEXT NOT NULL,
     scale_factor INTEGER NOT NULL,
@@ -62,7 +62,7 @@ CREATE TABLE transfer_audit (
     description TEXT NOT NULL,
     source_account_id INTEGER NOT NULL,
     target_account_id INTEGER NOT NULL,
-    currency_id TEXT NOT NULL,
+    currency_id INTEGER NOT NULL,
     amount INTEGER NOT NULL,
     FOREIGN KEY (audit_type_id) REFERENCES audit_type(id)
 );

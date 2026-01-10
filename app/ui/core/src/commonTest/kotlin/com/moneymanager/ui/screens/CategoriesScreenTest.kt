@@ -23,7 +23,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalTestApi::class)
 class CategoriesScreenTest {
@@ -925,7 +924,7 @@ class CategoriesScreenTest {
             val existing = currenciesFlow.value.find { it.code == code }
             if (existing != null) return existing.id
 
-            val newId = CurrencyId(Uuid.random())
+            val newId = CurrencyId((currenciesFlow.value.maxOfOrNull { it.id.id } ?: 0L) + 1L)
             val newCurrency = Currency(id = newId, code = code, name = name)
             currenciesFlow.value = currenciesFlow.value + newCurrency
             return newId

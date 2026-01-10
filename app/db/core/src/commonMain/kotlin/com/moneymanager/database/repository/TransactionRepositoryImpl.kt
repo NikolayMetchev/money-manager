@@ -1,4 +1,4 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
+@file:OptIn(kotlin.time.ExperimentalTime::class)
 
 package com.moneymanager.database.repository
 
@@ -356,7 +356,7 @@ class TransactionRepositoryImpl(
                                 description = transfer.description,
                                 source_account_id = transfer.sourceAccountId.id,
                                 target_account_id = transfer.targetAccountId.id,
-                                currency_id = transfer.amount.currency.id.toString(),
+                                currency_id = transfer.amount.currency.id.id,
                                 amount = transfer.amount.amount,
                             )
 
@@ -410,7 +410,7 @@ class TransactionRepositoryImpl(
                         description = transfer.description,
                         source_account_id = transfer.sourceAccountId.id,
                         target_account_id = transfer.targetAccountId.id,
-                        currency_id = transfer.amount.currency.id.toString(),
+                        currency_id = transfer.amount.currency.id.id,
                         amount = transfer.amount.amount,
                         id = transfer.id.id,
                     )

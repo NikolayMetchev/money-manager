@@ -188,7 +188,7 @@ class FieldMappingJsonCodecTest {
 
     @Test
     fun `encode and decode HardCodedCurrencyMapping`() {
-        val currencyId = CurrencyId(Uuid.random())
+        val currencyId = CurrencyId(1L)
         val mapping =
             HardCodedCurrencyMapping(
                 id = FieldMappingId(Uuid.random()),
@@ -225,7 +225,7 @@ class FieldMappingJsonCodecTest {
 
     @Test
     fun `encode and decode complete strategy mappings`() {
-        val currencyId = CurrencyId(Uuid.random())
+        val currencyId = CurrencyId(1L)
         val mappings =
             mapOf(
                 TransferField.SOURCE_ACCOUNT to

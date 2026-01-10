@@ -39,7 +39,7 @@ import kotlin.uuid.Uuid
  * 2. Multiple CSV values to be consolidated to a single account
  */
 class CsvAccountMappingTest {
-    private val testCurrencyId = CurrencyId(Uuid.random())
+    private val testCurrencyId = CurrencyId(1L)
     private val testCurrency =
         Currency(
             id = testCurrencyId,

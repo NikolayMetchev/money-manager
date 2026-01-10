@@ -36,7 +36,7 @@ import kotlin.uuid.Uuid
  * - Re-import should only process ERROR rows
  */
 class CsvImportErrorHandlingTest {
-    private val testCurrencyId = CurrencyId(Uuid.random())
+    private val testCurrencyId = CurrencyId(1L)
     private val testCurrency =
         Currency(
             id = testCurrencyId,

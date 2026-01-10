@@ -36,7 +36,7 @@ import kotlin.uuid.Uuid
  * Tests for duplicate detection in CSV imports using unique identifier columns.
  */
 class CsvDuplicateDetectionTest {
-    private val testCurrencyId = CurrencyId(Uuid.random())
+    private val testCurrencyId = CurrencyId(1L)
     private val testCurrency =
         Currency(
             id = testCurrencyId,
