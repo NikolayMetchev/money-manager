@@ -5,16 +5,7 @@ CREATE TABLE transfer (
     description TEXT NOT NULL,
     source_account_id INTEGER NOT NULL,
     target_account_id INTEGER NOT NULL,
-    currency_id TEXT NOT NULL
-        CHECK (
-            length(currency_id) = 36
-            AND substr(currency_id, 9, 1) = '-'
-            AND substr(currency_id, 14, 1) = '-'
-            AND substr(currency_id, 19, 1) = '-'
-            AND substr(currency_id, 24, 1) = '-'
-            AND substr(currency_id, 15, 1) IN ('1','2','3','4','5','6','7','8')
-            AND lower(substr(currency_id, 20, 1)) IN ('8','9','a','b')
-        ),
+    currency_id INTEGER NOT NULL,
     amount INTEGER NOT NULL,
     CHECK (source_account_id != target_account_id),
     FOREIGN KEY (id) REFERENCES transaction_id(id) ON DELETE RESTRICT,
@@ -30,7 +21,7 @@ CREATE INDEX IF NOT EXISTS idx_transfer_currency ON transfer(currency_id);
 -- Materialized table for account balances (manually refreshed)
 CREATE TABLE account_balance_materialized_view (
     account_id INTEGER NOT NULL,
-    currency_id TEXT NOT NULL,
+    currency_id INTEGER NOT NULL,
     balance INTEGER NOT NULL,
     PRIMARY KEY (account_id, currency_id),
     FOREIGN KEY (account_id) REFERENCES account(id) ON DELETE CASCADE,
@@ -46,7 +37,7 @@ CREATE TABLE running_balance_materialized_view (
     timestamp INTEGER NOT NULL,
     description TEXT NOT NULL,
     account_id INTEGER NOT NULL,
-    currency_id TEXT NOT NULL,
+    currency_id INTEGER NOT NULL,
     transaction_amount INTEGER NOT NULL,
     running_balance INTEGER NOT NULL,
     PRIMARY KEY (id, account_id),
@@ -117,7 +108,7 @@ FROM (
 -- Table to track pending changes for incremental refresh
 CREATE TABLE pending_materialized_view_changes (
     account_id INTEGER NOT NULL,
-    currency_id TEXT NOT NULL,
+    currency_id INTEGER NOT NULL,
     min_timestamp INTEGER NOT NULL,
     PRIMARY KEY (account_id, currency_id),
     FOREIGN KEY (account_id) REFERENCES account(id) ON DELETE CASCADE,

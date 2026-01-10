@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
-
 package com.moneymanager.domain.model
 
 import com.moneymanager.bigdecimal.BigDecimal
@@ -8,12 +6,11 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import kotlin.uuid.Uuid
 
 class MoneyTest {
     private val usd =
         Currency(
-            id = CurrencyId(Uuid.random()),
+            id = CurrencyId(1L),
             code = "USD",
             name = "US Dollar",
             scaleFactor = 100,
@@ -21,7 +18,7 @@ class MoneyTest {
 
     private val jpy =
         Currency(
-            id = CurrencyId(Uuid.random()),
+            id = CurrencyId(2L),
             code = "JPY",
             name = "Japanese Yen",
             scaleFactor = 1,
@@ -29,7 +26,7 @@ class MoneyTest {
 
     private val bhd =
         Currency(
-            id = CurrencyId(Uuid.random()),
+            id = CurrencyId(3L),
             code = "BHD",
             name = "Bahraini Dinar",
             scaleFactor = 1000,

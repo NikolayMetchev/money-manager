@@ -14,7 +14,6 @@ import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlin.test.Test
-import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalTestApi::class)
 class CurrenciesScreenTest {
@@ -68,7 +67,7 @@ class CurrenciesScreenTest {
         runComposeUiTest {
             val testCurrency =
                 Currency(
-                    id = CurrencyId(Uuid.random()),
+                    id = CurrencyId(1L),
                     code = "USD",
                     name = "US Dollar",
                 )
@@ -89,9 +88,9 @@ class CurrenciesScreenTest {
         runComposeUiTest {
             val currencies =
                 listOf(
-                    Currency(id = CurrencyId(Uuid.random()), code = "USD", name = "US Dollar"),
-                    Currency(id = CurrencyId(Uuid.random()), code = "EUR", name = "Euro"),
-                    Currency(id = CurrencyId(Uuid.random()), code = "GBP", name = "British Pound"),
+                    Currency(id = CurrencyId(1L), code = "USD", name = "US Dollar"),
+                    Currency(id = CurrencyId(2L), code = "EUR", name = "Euro"),
+                    Currency(id = CurrencyId(3L), code = "GBP", name = "British Pound"),
                 )
             val repository = FakeCurrencyRepository(currencies)
 

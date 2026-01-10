@@ -36,7 +36,7 @@ import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
 class CsvTransferMapperTest {
-    private val testCurrencyId = CurrencyId(Uuid.random())
+    private val testCurrencyId = CurrencyId(1L)
     private val testCurrency =
         Currency(
             id = testCurrencyId,

@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
-
 package com.moneymanager.database.repository
 
 import app.cash.sqldelight.coroutines.asFlow
@@ -17,7 +15,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
-import kotlin.uuid.Uuid
 
 class CategoryRepositoryImpl(
     private val database: MoneyManagerDatabase,
@@ -38,7 +35,7 @@ class CategoryRepositoryImpl(
                 list.map { row ->
                     val currency =
                         Currency(
-                            id = CurrencyId(Uuid.parse(row.currency_id)),
+                            id = CurrencyId(row.currency_id),
                             code = row.currency_code,
                             name = row.currency_name,
                             scaleFactor = row.currency_scale_factor,

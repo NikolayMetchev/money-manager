@@ -75,7 +75,6 @@ import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.Instant
-import kotlin.uuid.Uuid
 
 @OptIn(ExperimentalTestApi::class)
 class AccountTransactionsScreenTest {
@@ -86,7 +85,7 @@ class AccountTransactionsScreenTest {
             val now = Clock.System.now()
             val usdCurrency =
                 Currency(
-                    id = CurrencyId(Uuid.random()),
+                    id = CurrencyId(1L),
                     code = "USD",
                     name = "US Dollar",
                     scaleFactor = 100,
@@ -179,7 +178,7 @@ class AccountTransactionsScreenTest {
             val now = Clock.System.now()
             val usdCurrency =
                 Currency(
-                    id = CurrencyId(Uuid.random()),
+                    id = CurrencyId(1L),
                     code = "USD",
                     name = "US Dollar",
                     scaleFactor = 100,
@@ -1038,7 +1037,7 @@ class AccountTransactionsScreenTest {
         override suspend fun upsertCurrencyByCode(
             code: String,
             name: String,
-        ): CurrencyId = CurrencyId(Uuid.random())
+        ): CurrencyId = CurrencyId(1L)
 
         override suspend fun updateCurrency(currency: Currency) {}
 

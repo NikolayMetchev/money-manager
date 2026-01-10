@@ -37,7 +37,7 @@ private data class CurrencyAuditRecord(
     val auditId: Long,
     val auditTimestamp: Long,
     val auditType: String,
-    val id: String,
+    val id: Long,
     val code: String,
     val name: String,
 )
@@ -99,7 +99,7 @@ class AuditFunctionalTest : DbTest() {
      * Test-only query: selectAuditHistoryForCurrency
      * Retrieves audit history for a specific currency using raw SQL.
      */
-    private fun selectAuditHistoryForCurrency(currencyId: String): List<CurrencyAuditRecord> {
+    private fun selectAuditHistoryForCurrency(currencyId: Long): List<CurrencyAuditRecord> {
         val sql =
             """
             SELECT
@@ -111,7 +111,7 @@ class AuditFunctionalTest : DbTest() {
                 currency_audit.name
             FROM currency_audit
             JOIN audit_type ON currency_audit.audit_type_id = audit_type.id
-            WHERE currency_audit.id = '$currencyId'
+            WHERE currency_audit.id = $currencyId
             ORDER BY currency_audit.audit_timestamp DESC, currency_audit.audit_id DESC
             """.trimIndent()
 
@@ -126,7 +126,7 @@ class AuditFunctionalTest : DbTest() {
                             auditId = cursor.getLong(0)!!,
                             auditTimestamp = cursor.getLong(1)!!,
                             auditType = cursor.getString(2)!!,
-                            id = cursor.getString(3)!!,
+                            id = cursor.getLong(3)!!,
                             code = cursor.getString(4)!!,
                             name = cursor.getString(5)!!,
                         ),
@@ -300,7 +300,7 @@ class AuditFunctionalTest : DbTest() {
             val currencyId = repositories.currencyRepository.upsertCurrencyByCode("TST", "Test Currency")
             assertNotNull(currencyId)
 
-            val auditHistory = selectAuditHistoryForCurrency(currencyId.toString())
+            val auditHistory = selectAuditHistoryForCurrency(currencyId.id)
 
             assertEquals(1, auditHistory.size)
             assertEquals("INSERT", auditHistory[0].auditType)
@@ -318,10 +318,10 @@ class AuditFunctionalTest : DbTest() {
                 code = "TST2",
                 name = "Updated Name",
                 scale_factor = 100,
-                id = currencyId.toString(),
+                id = currencyId.id,
             )
 
-            val auditHistory = selectAuditHistoryForCurrency(currencyId.toString())
+            val auditHistory = selectAuditHistoryForCurrency(currencyId.id)
 
             assertEquals(2, auditHistory.size)
             val updateAudit = auditHistory[0]
@@ -336,9 +336,9 @@ class AuditFunctionalTest : DbTest() {
             val currencyId = repositories.currencyRepository.upsertCurrencyByCode("TST", "Test Currency")
             assertNotNull(currencyId)
 
-            database.currencyQueries.delete(currencyId.toString())
+            database.currencyQueries.delete(currencyId.id)
 
-            val auditHistory = selectAuditHistoryForCurrency(currencyId.toString())
+            val auditHistory = selectAuditHistoryForCurrency(currencyId.id)
 
             assertEquals(2, auditHistory.size)
             assertEquals("DELETE", auditHistory[0].auditType)

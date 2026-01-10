@@ -1,15 +1,11 @@
-@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
-
 package com.moneymanager.domain.model
 
-import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
-import kotlin.uuid.Uuid
 
 /**
  * Represents a currency in the system.
  *
- * @property id Unique identifier for the currency (UUID)
+ * @property id Unique identifier for the currency (auto-incrementing integer)
  * @property code ISO 4217 currency code (e.g., "USD", "EUR", "GBP")
  * @property name Human-readable name of the currency (e.g., "US Dollar")
  * @property scaleFactor The factor used to convert between stored amounts and display amounts.
@@ -28,7 +24,7 @@ data class Currency(
 @Serializable
 @JvmInline
 value class CurrencyId(
-    @Contextual val id: Uuid,
+    val id: Long,
 ) {
     override fun toString() = id.toString()
 }

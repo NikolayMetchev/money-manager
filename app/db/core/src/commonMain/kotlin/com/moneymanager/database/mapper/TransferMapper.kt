@@ -1,4 +1,4 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
+@file:OptIn(kotlin.time.ExperimentalTime::class)
 
 package com.moneymanager.database.mapper
 
@@ -9,7 +9,6 @@ import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import kotlin.time.Instant.Companion.fromEpochMilliseconds
-import kotlin.uuid.Uuid
 
 object TransferMapper {
     @Suppress("LongParameterList")
@@ -21,14 +20,14 @@ object TransferMapper {
         source_account_id: Long,
         target_account_id: Long,
         amount: Long,
-        currency_id: String,
+        currency_id: Long,
         currency_code: String,
         currency_name: String,
         currency_scale_factor: Long,
     ): Transfer {
         val currency =
             Currency(
-                id = CurrencyId(Uuid.parse(currency_id)),
+                id = CurrencyId(currency_id),
                 code = currency_code,
                 name = currency_name,
                 scaleFactor = currency_scale_factor,

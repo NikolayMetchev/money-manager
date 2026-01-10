@@ -21,7 +21,7 @@ import kotlin.time.Clock
  */
 private data class BalanceViewRecord(
     val accountId: Long,
-    val currencyId: String,
+    val currencyId: Long,
     val balance: Long?,
 )
 
@@ -68,7 +68,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
                     results.add(
                         BalanceViewRecord(
                             accountId = cursor.getLong(0)!!,
-                            currencyId = cursor.getString(1)!!,
+                            currencyId = cursor.getLong(1)!!,
                             balance = cursor.getLong(2),
                         ),
                     )
@@ -88,7 +88,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
         val materializedBalances =
             database.transferQueries.selectAllBalances()
                 .executeAsList()
-                .sortedBy { "${it.account_id}-${it.currency_id}" }
+                .sortedWith(compareBy({ it.account_id }, { it.currency_id }))
 
         val viewBalances = selectBalancesFromView()
 
@@ -616,7 +616,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
             // Verify the new currency appears in balances
             val balances = database.transferQueries.selectAllBalances().executeAsList()
             assertTrue(
-                balances.any { it.currency_id == eurId.toString() },
+                balances.any { it.currency_id == eurId.id },
                 "New currency should appear in materialized view",
             )
         }

@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
-
 package com.moneymanager.database.mapper
 
 import com.moneymanager.database.sql.SelectAllBalances
@@ -8,7 +6,6 @@ import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Money
 import tech.mappie.api.ObjectMappie
-import kotlin.uuid.Uuid
 
 object AccountBalanceMapper : ObjectMappie<SelectAllBalances, AccountBalance>(), IdConversions {
     override fun map(from: SelectAllBalances): AccountBalance =
@@ -19,7 +16,7 @@ object AccountBalanceMapper : ObjectMappie<SelectAllBalances, AccountBalance>(),
 
 private fun SelectAllBalances.toCurrency(): Currency =
     Currency(
-        id = CurrencyId(Uuid.parse(currency_id)),
+        id = CurrencyId(currency_id),
         code = currency_code,
         name = currency_name,
         scaleFactor = currency_scale_factor,

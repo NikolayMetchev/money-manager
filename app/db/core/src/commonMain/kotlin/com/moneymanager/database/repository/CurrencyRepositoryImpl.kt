@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
-
 package com.moneymanager.database.repository
 
 import app.cash.sqldelight.coroutines.asFlow
@@ -15,7 +13,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
-import kotlin.uuid.Uuid
 
 class CurrencyRepositoryImpl(
     database: MoneyManagerDatabase,
@@ -29,7 +26,7 @@ class CurrencyRepositoryImpl(
             .map(CurrencyMapper::mapList)
 
     override fun getCurrencyById(id: CurrencyId): Flow<Currency?> =
-        queries.selectById(id.id.toString())
+        queries.selectById(id.id)
             .asFlow()
             .mapToOneOrNull(Dispatchers.Default)
             .map { it?.let(CurrencyMapper::map) }
@@ -47,11 +44,11 @@ class CurrencyRepositoryImpl(
         withContext(Dispatchers.Default) {
             queries.transactionWithResult {
                 val existing = queries.selectByCode(code).executeAsOneOrNull()
-                existing?.let { CurrencyId(Uuid.parse(it.id)) }
+                existing?.let { CurrencyId(it.id) }
                     ?: run {
-                        val newId = Uuid.random()
                         val scaleFactor = CurrencyScaleFactors.getScaleFactor(code)
-                        queries.insert(newId.toString(), code, name, scaleFactor.toLong())
+                        queries.insert(code, name, scaleFactor.toLong())
+                        val newId = queries.lastInsertedId().executeAsOne()
                         CurrencyId(newId)
                     }
             }
@@ -63,12 +60,12 @@ class CurrencyRepositoryImpl(
                 code = currency.code,
                 name = currency.name,
                 scale_factor = currency.scaleFactor,
-                id = currency.id.toString(),
+                id = currency.id.id,
             )
         }
 
     override suspend fun deleteCurrency(id: CurrencyId): Unit =
         withContext(Dispatchers.Default) {
-            queries.delete(id.toString())
+            queries.delete(id.id)
         }
 }

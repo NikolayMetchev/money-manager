@@ -69,7 +69,7 @@ class StrategyMatcherTest {
                         HardCodedCurrencyMapping(
                             id = FieldMappingId(Uuid.random()),
                             fieldType = TransferField.CURRENCY,
-                            currencyId = CurrencyId(Uuid.random()),
+                            currencyId = CurrencyId(1L),
                         ),
                 ),
             createdAt = now,
