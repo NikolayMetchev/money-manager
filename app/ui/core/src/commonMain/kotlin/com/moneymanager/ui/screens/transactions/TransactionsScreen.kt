@@ -409,6 +409,7 @@ fun AccountTransactionsScreen(
                                                 .clickable {
                                                     selectedAccountId = account.id
                                                     selectedCurrencyId = null // Clear currency to show all currencies
+                                                    onAccountClick(account.id, account.name)
                                                 }
                                                 .padding(vertical = 4.dp),
                                         contentAlignment = Alignment.Center,
@@ -512,6 +513,7 @@ fun AccountTransactionsScreen(
                                                             .clickable(enabled = balance != null) {
                                                                 selectedAccountId = account.id
                                                                 selectedCurrencyId = currencyId
+                                                                onAccountClick(account.id, account.name)
                                                             }
                                                             .padding(vertical = 4.dp),
                                                     contentAlignment = Alignment.Center,
