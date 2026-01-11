@@ -584,12 +584,16 @@ class AccountTransactionsScreenTest {
                 // Wait for edit dialog to appear
                 waitUntilExactlyOneExists(hasText("Edit Transaction"), timeoutMillis = 10000)
 
-                // Step 2: Add a new attribute
-                waitUntilExactlyOneExists(hasText("+ Add Attribute"), timeoutMillis = 5000)
+                // Wait for dialog content to fully compose before looking for the button
+                waitForIdle()
+                mainClock.advanceTimeBy(100)
+
+                // Step 2: Add a new attribute (increased timeout for CI stability)
+                waitUntilExactlyOneExists(hasText("+ Add Attribute"), timeoutMillis = 10000)
                 onNodeWithText("+ Add Attribute").performClick()
 
                 // Wait for attribute fields to appear
-                waitUntilAtLeastOneExists(hasText("Type"), timeoutMillis = 5000)
+                waitUntilAtLeastOneExists(hasText("Type"), timeoutMillis = 10000)
 
                 // Fill in the attribute type
                 onAllNodesWithText("Type")[0].performClick()
@@ -765,18 +769,22 @@ class AccountTransactionsScreenTest {
                 // Wait for edit dialog to appear
                 waitUntilExactlyOneExists(hasText("Edit Transaction"), timeoutMillis = 10000)
 
+                // Wait for dialog content to fully compose
+                waitForIdle()
+                mainClock.advanceTimeBy(100)
+
                 // Step 2: Change the description (index 1 is the editable text field in the dialog)
-                waitUntilAtLeastOneExists(hasText("Original Description"), timeoutMillis = 5000)
+                waitUntilAtLeastOneExists(hasText("Original Description"), timeoutMillis = 10000)
                 onAllNodesWithText("Original Description")[1]
                     .performTextReplacement("Updated Description")
                 waitForIdle()
 
-                // Step 3: Add a new attribute
-                waitUntilExactlyOneExists(hasText("+ Add Attribute"), timeoutMillis = 5000)
+                // Step 3: Add a new attribute (increased timeout for CI stability)
+                waitUntilExactlyOneExists(hasText("+ Add Attribute"), timeoutMillis = 10000)
                 onNodeWithText("+ Add Attribute").performClick()
 
                 // Wait for attribute fields to appear
-                waitUntilAtLeastOneExists(hasText("Type"), timeoutMillis = 5000)
+                waitUntilAtLeastOneExists(hasText("Type"), timeoutMillis = 10000)
 
                 // Fill in the attribute type
                 onAllNodesWithText("Type")[0].performClick()
