@@ -40,7 +40,6 @@ import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonAccountOwnership
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
-import com.moneymanager.ui.components.CreatePersonDialog
 import com.moneymanager.ui.components.DeletePersonConfirmationDialog
 import com.moneymanager.ui.components.EditPersonDialog
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
@@ -115,7 +114,8 @@ fun PeopleScreen(
     }
 
     if (showCreateDialog) {
-        CreatePersonDialog(
+        EditPersonDialog(
+            personToEdit = null,
             personRepository = personRepository,
             onDismiss = { showCreateDialog = false },
         )
@@ -124,7 +124,7 @@ fun PeopleScreen(
     val currentPersonToEdit = personToEdit
     if (currentPersonToEdit != null) {
         EditPersonDialog(
-            person = currentPersonToEdit,
+            personToEdit = currentPersonToEdit,
             personRepository = personRepository,
             onDismiss = { personToEdit = null },
         )

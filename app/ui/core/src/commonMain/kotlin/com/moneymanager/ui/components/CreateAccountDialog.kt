@@ -263,7 +263,8 @@ fun CreateAccountDialog(
     }
 
     if (showCreatePersonDialog && personRepository != null) {
-        CreatePersonDialog(
+        EditPersonDialog(
+            personToEdit = null,
             personRepository = personRepository,
             onDismiss = { showCreatePersonDialog = false },
         )

@@ -21,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.Person
+import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.launch
@@ -30,13 +31,13 @@ private val logger = logging()
 
 @Composable
 fun EditPersonDialog(
-    person: Person,
+    personToEdit: Person?,
     personRepository: PersonRepository,
     onDismiss: () -> Unit,
 ) {
-    var firstName by remember { mutableStateOf(person.firstName) }
-    var middleName by remember { mutableStateOf(person.middleName.orEmpty()) }
-    var lastName by remember { mutableStateOf(person.lastName.orEmpty()) }
+    var firstName by remember { mutableStateOf(personToEdit?.firstName.orEmpty()) }
+    var middleName by remember { mutableStateOf(personToEdit?.middleName.orEmpty()) }
+    var lastName by remember { mutableStateOf(personToEdit?.lastName.orEmpty()) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
 
@@ -44,7 +45,7 @@ fun EditPersonDialog(
 
     AlertDialog(
         onDismissRequest = { if (!isSaving) onDismiss() },
-        title = { Text("Edit Person") },
+        title = { Text(if (personToEdit != null) "Edit Person" else "Create New Person") },
         text = {
             Column(
                 modifier =
@@ -99,17 +100,29 @@ fun EditPersonDialog(
                         errorMessage = null
                         scope.launch {
                             try {
-                                val updatedPerson =
-                                    person.copy(
-                                        firstName = firstName.trim(),
-                                        middleName = middleName.trim().ifBlank { null },
-                                        lastName = lastName.trim().ifBlank { null },
-                                    )
-                                personRepository.updatePerson(updatedPerson)
+                                if (personToEdit != null) {
+                                    val updatedPerson =
+                                        personToEdit.copy(
+                                            firstName = firstName.trim(),
+                                            middleName = middleName.trim().ifBlank { null },
+                                            lastName = lastName.trim().ifBlank { null },
+                                        )
+                                    personRepository.updatePerson(updatedPerson)
+                                } else {
+                                    val newPerson =
+                                        Person(
+                                            id = PersonId(0),
+                                            firstName = firstName.trim(),
+                                            middleName = middleName.trim().ifBlank { null },
+                                            lastName = lastName.trim().ifBlank { null },
+                                        )
+                                    personRepository.createPerson(newPerson)
+                                }
                                 onDismiss()
                             } catch (expected: Exception) {
-                                logger.error(expected) { "Failed to update person: ${expected.message}" }
-                                errorMessage = "Failed to update person: ${expected.message}"
+                                val action = if (personToEdit != null) "update" else "create"
+                                logger.error(expected) { "Failed to $action person: ${expected.message}" }
+                                errorMessage = "Failed to $action person: ${expected.message}"
                                 isSaving = false
                             }
                         }
@@ -123,7 +136,7 @@ fun EditPersonDialog(
                         strokeWidth = 2.dp,
                     )
                 } else {
-                    Text("Save")
+                    Text(if (personToEdit != null) "Save" else "Create")
                 }
             }
         },
