@@ -35,6 +35,8 @@ import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
  * @param label The label text displayed on the dropdown
  * @param accountRepository Repository to fetch accounts and create new ones
  * @param categoryRepository Repository needed for account creation (accounts have categories)
+ * @param personRepository Repository needed for account creation (accounts can have owners)
+ * @param personAccountOwnershipRepository Repository needed for account creation (accounts can have owners)
  * @param enabled Whether the picker is enabled
  * @param excludeAccountId Optional account ID to exclude from the list (e.g., the other account in a transfer)
  * @param isError Whether to show error state (red outline)
@@ -46,6 +48,8 @@ fun AccountPicker(
     label: String,
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
+    personRepository: com.moneymanager.domain.repository.PersonRepository? = null,
+    personAccountOwnershipRepository: com.moneymanager.domain.repository.PersonAccountOwnershipRepository? = null,
     enabled: Boolean = true,
     excludeAccountId: AccountId? = null,
     isError: Boolean = false,
@@ -129,11 +133,12 @@ fun AccountPicker(
         CreateAccountDialog(
             accountRepository = accountRepository,
             categoryRepository = categoryRepository,
+            personRepository = personRepository,
+            personAccountOwnershipRepository = personAccountOwnershipRepository,
+            onDismiss = { showCreateAccountDialog = false },
             onAccountCreated = { accountId ->
                 onAccountSelected(accountId)
-                showCreateAccountDialog = false
             },
-            onDismiss = { showCreateAccountDialog = false },
         )
     }
 }

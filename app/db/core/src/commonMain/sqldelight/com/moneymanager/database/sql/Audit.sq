@@ -140,3 +140,36 @@ LEFT JOIN csv_import_metadata ON csv_transfer_source.csv_import_id = csv_import_
 LEFT JOIN device_view ON transfer_source.device_id = device_view.id
 WHERE transfer_audit.id = ?
 ORDER BY transfer_audit.audit_timestamp DESC, transfer_audit.audit_id DESC;
+
+-- person_audit: Audit trail for person table
+CREATE TABLE person_audit (
+    audit_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    audit_timestamp INTEGER NOT NULL,
+    audit_type_id INTEGER NOT NULL,
+    id INTEGER NOT NULL,
+    first_name TEXT NOT NULL,
+    middle_name TEXT,
+    last_name TEXT,
+    FOREIGN KEY (audit_type_id) REFERENCES audit_type(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_person_audit_id ON person_audit(id);
+CREATE INDEX IF NOT EXISTS idx_person_audit_timestamp ON person_audit(audit_timestamp);
+CREATE INDEX IF NOT EXISTS idx_person_audit_type ON person_audit(audit_type_id);
+CREATE INDEX IF NOT EXISTS idx_person_audit_id_timestamp ON person_audit(id, audit_timestamp DESC);
+
+-- person_account_ownership_audit: Audit trail for person_account_ownership table
+CREATE TABLE person_account_ownership_audit (
+    audit_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    audit_timestamp INTEGER NOT NULL,
+    audit_type_id INTEGER NOT NULL,
+    id INTEGER NOT NULL,
+    person_id INTEGER NOT NULL,
+    account_id INTEGER NOT NULL,
+    FOREIGN KEY (audit_type_id) REFERENCES audit_type(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_person_account_ownership_audit_id ON person_account_ownership_audit(id);
+CREATE INDEX IF NOT EXISTS idx_person_account_ownership_audit_timestamp ON person_account_ownership_audit(audit_timestamp);
+CREATE INDEX IF NOT EXISTS idx_person_account_ownership_audit_type ON person_account_ownership_audit(audit_type_id);
+CREATE INDEX IF NOT EXISTS idx_person_account_ownership_audit_id_timestamp ON person_account_ownership_audit(id, audit_timestamp DESC);

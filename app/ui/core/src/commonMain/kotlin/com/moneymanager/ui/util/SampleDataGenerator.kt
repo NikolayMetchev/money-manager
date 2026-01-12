@@ -12,12 +12,16 @@ import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
+import com.moneymanager.domain.model.Person
+import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
+import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -30,6 +34,8 @@ suspend fun generateSampleData(
     currencyRepository: CurrencyRepository,
     categoryRepository: CategoryRepository,
     accountRepository: AccountRepository,
+    personRepository: PersonRepository,
+    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     attributeTypeRepository: AttributeTypeRepository,
     transactionRepository: TransactionRepository,
     maintenanceService: DatabaseMaintenanceService,
@@ -114,6 +120,50 @@ suspend fun generateSampleData(
         }
     }
 
+    // Step 2.5: Generate people
+    progressFlow.emit(
+        GenerationProgress(
+            categoriesCreated = categoriesCreated,
+            totalCategories = totalCategories,
+            currentOperation = "Creating people...",
+        ),
+    )
+
+    val peopleNames =
+        listOf(
+            Triple("John", "Michael", "Doe"),
+            Triple("Jane", "Elizabeth", "Smith"),
+            Triple("Alice", null, "Johnson"),
+            Triple("Bob", "James", "Wilson"),
+            Triple("Charlie", null, "Brown"),
+            Triple("Diana", "Marie", "Prince"),
+            Triple("Eve", "Ann", null),
+            Triple("Frank", null, "Castle"),
+            Triple("Grace", "Lynn", "Harper"),
+            Triple("Henry", "David", "Ford"),
+        )
+
+    val personIds = mutableListOf<PersonId>()
+    for ((firstName, middleName, lastName) in peopleNames) {
+        val person =
+            Person(
+                id = PersonId(0),
+                firstName = firstName,
+                middleName = middleName,
+                lastName = lastName,
+            )
+        val personId = personRepository.createPerson(person)
+        personIds.add(personId)
+    }
+
+    progressFlow.emit(
+        GenerationProgress(
+            categoriesCreated = categoriesCreated,
+            totalCategories = totalCategories,
+            currentOperation = "Created ${personIds.size} people",
+        ),
+    )
+
     // Step 3: Generate account names
     progressFlow.emit(
         GenerationProgress(
@@ -182,6 +232,42 @@ suspend fun generateSampleData(
             totalAccounts = 100,
             totalTransactions = totalExpectedTransactions,
             currentOperation = "Created all 100 accounts",
+        ),
+    )
+
+    // Step 5.5: Assign owners to accounts
+    progressFlow.emit(
+        GenerationProgress(
+            categoriesCreated = categoriesCreated,
+            totalCategories = totalCategories,
+            accountsCreated = 100,
+            totalAccounts = 100,
+            totalTransactions = totalExpectedTransactions,
+            currentOperation = "Assigning owners to accounts...",
+        ),
+    )
+
+    for (accountId in accountIds) {
+        // Most accounts have 1 owner, some have 2 (joint accounts)
+        val ownerCount = if (random.nextDouble() < 0.15) 2 else 1
+        val selectedOwners = personIds.shuffled(random).take(ownerCount)
+
+        for (personId in selectedOwners) {
+            personAccountOwnershipRepository.createOwnership(
+                personId = personId,
+                accountId = accountId,
+            )
+        }
+    }
+
+    progressFlow.emit(
+        GenerationProgress(
+            categoriesCreated = categoriesCreated,
+            totalCategories = totalCategories,
+            accountsCreated = 100,
+            totalAccounts = 100,
+            totalTransactions = totalExpectedTransactions,
+            currentOperation = "Assigned owners to all accounts",
         ),
     )
 

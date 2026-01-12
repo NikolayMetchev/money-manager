@@ -13,6 +13,8 @@ sealed class Screen(val title: String) {
 
     data object Categories : Screen("Categories")
 
+    data object People : Screen("People")
+
     data object CsvImports : Screen("CSV Imports")
 
     data object CsvStrategies : Screen("Import Strategies")

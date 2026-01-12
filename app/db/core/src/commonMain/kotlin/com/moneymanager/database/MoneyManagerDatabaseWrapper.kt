@@ -107,7 +107,10 @@ class MoneyManagerDatabaseWrapper(private val driver: SqlDriver) : MoneyManagerD
     /**
      * Checks if a table should be excluded from audit.
      */
-    fun isExcludedFromAudit(tableName: String): Boolean = tableName in EXCLUDED_FROM_AUDIT || tableName.startsWith(csvTablePrefix)
+    fun isExcludedFromAudit(tableName: String): Boolean =
+        tableName in EXCLUDED_FROM_AUDIT ||
+            tableName.startsWith(csvTablePrefix) ||
+            tableName.endsWith("_audit")
 
     /**
      * Gets all auditable tables from the database.

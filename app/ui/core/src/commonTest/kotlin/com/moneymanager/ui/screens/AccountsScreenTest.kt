@@ -23,6 +23,8 @@ import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.CategoryRepository
+import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
+import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import kotlinx.coroutines.flow.Flow
@@ -47,6 +49,8 @@ class AccountsScreenTest {
                         accountRepository = repository,
                         categoryRepository = FakeCategoryRepository(),
                         transactionRepository = FakeTransactionRepository(),
+                        personRepository = FakePersonRepository(),
+                        personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
                         onAccountClick = {},
                     )
                 }
@@ -84,6 +88,8 @@ class AccountsScreenTest {
                         accountRepository = repository,
                         categoryRepository = FakeCategoryRepository(),
                         transactionRepository = FakeTransactionRepository(),
+                        personRepository = FakePersonRepository(),
+                        personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
                         onAccountClick = {},
                     )
                 }
@@ -107,6 +113,8 @@ class AccountsScreenTest {
                         accountRepository = repository,
                         categoryRepository = FakeCategoryRepository(),
                         transactionRepository = FakeTransactionRepository(),
+                        personRepository = FakePersonRepository(),
+                        personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
                         onAccountClick = {},
                     )
                 }
@@ -129,6 +137,8 @@ class AccountsScreenTest {
                         accountRepository = repository,
                         categoryRepository = FakeCategoryRepository(),
                         transactionRepository = FakeTransactionRepository(),
+                        personRepository = FakePersonRepository(),
+                        personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
                         onAccountClick = {},
                     )
                 }
@@ -161,6 +171,8 @@ class AccountsScreenTest {
                         accountRepository = repository,
                         categoryRepository = FakeCategoryRepository(),
                         transactionRepository = FakeTransactionRepository(),
+                        personRepository = FakePersonRepository(),
+                        personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
                         onAccountClick = {},
                     )
                 }
@@ -190,6 +202,8 @@ class AccountsScreenTest {
                         accountRepository = repository,
                         categoryRepository = FakeCategoryRepository(),
                         transactionRepository = FakeTransactionRepository(),
+                        personRepository = FakePersonRepository(),
+                        personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
                         onAccountClick = {},
                     )
                 }
@@ -216,6 +230,8 @@ class AccountsScreenTest {
                         accountRepository = repository,
                         categoryRepository = FakeCategoryRepository(),
                         transactionRepository = FakeTransactionRepository(),
+                        personRepository = FakePersonRepository(),
+                        personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
                         onAccountClick = {},
                     )
                 }
@@ -244,6 +260,8 @@ class AccountsScreenTest {
                         accountRepository = repository,
                         categoryRepository = FakeCategoryRepository(),
                         transactionRepository = FakeTransactionRepository(),
+                        personRepository = FakePersonRepository(),
+                        personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
                         onAccountClick = {},
                     )
                 }
@@ -280,6 +298,8 @@ class AccountsScreenTest {
                         accountRepository = repository,
                         categoryRepository = FakeCategoryRepository(),
                         transactionRepository = FakeTransactionRepository(),
+                        personRepository = FakePersonRepository(),
+                        personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
                         onAccountClick = {},
                     )
                 }
@@ -328,6 +348,8 @@ class AccountsScreenTest {
                         accountRepository = repository,
                         categoryRepository = FakeCategoryRepository(),
                         transactionRepository = FakeTransactionRepository(),
+                        personRepository = FakePersonRepository(),
+                        personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
                         onAccountClick = {},
                     )
                 }
@@ -483,5 +505,38 @@ class AccountsScreenTest {
         override suspend fun updateCategory(category: Category) {}
 
         override suspend fun deleteCategory(id: Long) {}
+    }
+
+    private class FakePersonRepository : PersonRepository {
+        override fun getAllPeople() = flowOf(emptyList<com.moneymanager.domain.model.Person>())
+
+        override fun getPersonById(id: com.moneymanager.domain.model.PersonId) = flowOf(null as com.moneymanager.domain.model.Person?)
+
+        override suspend fun createPerson(person: com.moneymanager.domain.model.Person) = com.moneymanager.domain.model.PersonId(0)
+
+        override suspend fun updatePerson(person: com.moneymanager.domain.model.Person) {}
+
+        override suspend fun deletePerson(id: com.moneymanager.domain.model.PersonId) {}
+    }
+
+    private class FakePersonAccountOwnershipRepository : PersonAccountOwnershipRepository {
+        override fun getOwnershipsByPerson(personId: com.moneymanager.domain.model.PersonId) =
+            flowOf(emptyList<com.moneymanager.domain.model.PersonAccountOwnership>())
+
+        override fun getOwnershipsByAccount(accountId: AccountId) =
+            flowOf(emptyList<com.moneymanager.domain.model.PersonAccountOwnership>())
+
+        override fun getOwnershipById(id: Long) = flowOf(null as com.moneymanager.domain.model.PersonAccountOwnership?)
+
+        override suspend fun createOwnership(
+            personId: com.moneymanager.domain.model.PersonId,
+            accountId: AccountId,
+        ) = 0L
+
+        override suspend fun deleteOwnership(id: Long) {}
+
+        override suspend fun deleteOwnershipsByPerson(personId: com.moneymanager.domain.model.PersonId) {}
+
+        override suspend fun deleteOwnershipsByAccount(accountId: AccountId) {}
     }
 }

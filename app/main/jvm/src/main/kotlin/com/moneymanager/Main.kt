@@ -125,6 +125,8 @@ private fun MainWindow(onExit: () -> Unit) {
                     currencyRepository = dc.currencyRepository,
                     deviceRepository = dc.deviceRepository,
                     maintenanceService = dc.maintenanceService,
+                    personRepository = dc.personRepository,
+                    personAccountOwnershipRepository = dc.personAccountOwnershipRepository,
                     transactionRepository = dc.transactionRepository,
                     transferAttributeRepository = dc.transferAttributeRepository,
                     transferSourceRepository = dc.transferSourceRepository,

@@ -105,6 +105,7 @@ class DatabaseSchemaErrorDialogE2ETest {
 
             // Wait for operation to complete and dialog to disappear
             waitUntilDoesNotExist(hasText("Database Schema Error"), timeoutMillis = 10000)
+            waitForIdle()
 
             // Then: Dialog should be gone
             onNodeWithText("Database Schema Error").assertDoesNotExist()
@@ -139,6 +140,7 @@ class DatabaseSchemaErrorDialogE2ETest {
 
             // Wait for operation to complete and dialog to disappear
             waitUntilDoesNotExist(hasText("Database Schema Error"), timeoutMillis = 10000)
+            waitForIdle()
 
             // Then: Dialog should be gone
             onNodeWithText("Database Schema Error").assertDoesNotExist()
