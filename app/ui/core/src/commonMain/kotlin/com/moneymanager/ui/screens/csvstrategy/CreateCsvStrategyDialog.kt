@@ -80,6 +80,8 @@ import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CsvAccountMappingRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
+import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.CurrencyPicker
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
@@ -323,6 +325,8 @@ fun CreateCsvStrategyDialog(
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
     attributeTypeRepository: AttributeTypeRepository,
+    personRepository: PersonRepository,
+    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     csvColumns: List<CsvColumn>,
     rows: List<CsvRow>,
     onDismiss: () -> Unit,
@@ -528,6 +532,8 @@ fun CreateCsvStrategyDialog(
                     label = "Select Account",
                     accountRepository = accountRepository,
                     categoryRepository = categoryRepository,
+                    personRepository = personRepository,
+                    personAccountOwnershipRepository = personAccountOwnershipRepository,
                     enabled = !isSaving,
                     isError = selectedAccountId == null,
                 )

@@ -61,7 +61,7 @@ import com.moneymanager.ui.screens.SettingsScreen
 import com.moneymanager.ui.screens.csvstrategy.CsvStrategiesScreen
 import com.moneymanager.ui.screens.transactions.AccountTransactionsScreen
 import com.moneymanager.ui.screens.transactions.TransactionAuditScreen
-import com.moneymanager.ui.screens.transactions.TransactionEntryDialog
+import com.moneymanager.ui.screens.transactions.TransactionEditDialog
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -279,10 +279,14 @@ fun MoneyManagerApp(
                                 accountId = currentlyViewedAccountId ?: screen.accountId,
                                 transactionRepository = transactionRepository,
                                 transferSourceRepository = transferSourceRepository,
+                                transferSourceQueries = transferSourceQueries,
+                                deviceRepository = deviceRepository,
                                 accountRepository = accountRepository,
                                 categoryRepository = categoryRepository,
                                 currencyRepository = currencyRepository,
                                 attributeTypeRepository = attributeTypeRepository,
+                                personRepository = personRepository,
+                                personAccountOwnershipRepository = personAccountOwnershipRepository,
                                 transferAttributeRepository = transferAttributeRepository,
                                 maintenanceService = maintenanceService,
                                 onAccountIdChange = { accountId ->
@@ -327,6 +331,8 @@ fun MoneyManagerApp(
                                 currencyRepository = currencyRepository,
                                 transactionRepository = transactionRepository,
                                 attributeTypeRepository = attributeTypeRepository,
+                                personRepository = personRepository,
+                                personAccountOwnershipRepository = personAccountOwnershipRepository,
                                 maintenanceService = maintenanceService,
                                 transferSourceQueries = transferSourceQueries,
                                 deviceRepository = deviceRepository,
@@ -375,6 +381,8 @@ fun MoneyManagerApp(
                                 categoryRepository = categoryRepository,
                                 currencyRepository = currencyRepository,
                                 attributeTypeRepository = attributeTypeRepository,
+                                personRepository = personRepository,
+                                personAccountOwnershipRepository = personAccountOwnershipRepository,
                                 csvStrategyExportService = csvStrategyExportService,
                                 appVersion = appVersion,
                                 onBack = { navigationHistory.navigateBack() },
@@ -395,14 +403,19 @@ fun MoneyManagerApp(
             }
 
             if (showTransactionDialog) {
-                TransactionEntryDialog(
+                TransactionEditDialog(
+                    transaction = null,
                     transactionRepository = transactionRepository,
+                    transferSourceRepository = transferSourceRepository,
                     transferSourceQueries = transferSourceQueries,
                     deviceRepository = deviceRepository,
                     accountRepository = accountRepository,
                     categoryRepository = categoryRepository,
                     currencyRepository = currencyRepository,
                     attributeTypeRepository = attributeTypeRepository,
+                    personRepository = personRepository,
+                    personAccountOwnershipRepository = personAccountOwnershipRepository,
+                    transferAttributeRepository = transferAttributeRepository,
                     maintenanceService = maintenanceService,
                     preSelectedSourceAccountId = preSelectedAccountId,
                     preSelectedCurrencyId = preSelectedCurrencyId,
@@ -411,7 +424,7 @@ fun MoneyManagerApp(
                         preSelectedAccountId = null
                         preSelectedCurrencyId = null
                     },
-                    onTransactionCreated = {
+                    onSaved = {
                         transactionRefreshTrigger++
                     },
                 )

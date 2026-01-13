@@ -51,6 +51,8 @@ import com.moneymanager.domain.repository.CsvAccountMappingRepository
 import com.moneymanager.domain.repository.CsvImportRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
+import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import kotlinx.coroutines.launch
 import nl.jacobras.humanreadable.HumanReadable
@@ -65,6 +67,8 @@ fun CsvStrategiesScreen(
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
     attributeTypeRepository: AttributeTypeRepository,
+    personRepository: PersonRepository,
+    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     csvStrategyExportService: CsvStrategyExportService,
     appVersion: AppVersion,
     onStrategyClick: (CsvImportStrategy) -> Unit = {},
@@ -276,6 +280,8 @@ fun CsvStrategiesScreen(
             categoryRepository = categoryRepository,
             currencyRepository = currencyRepository,
             attributeTypeRepository = attributeTypeRepository,
+            personRepository = personRepository,
+            personAccountOwnershipRepository = personAccountOwnershipRepository,
             csvColumns = currentCsvImport.columns,
             rows = csvRows,
             onDismiss = {

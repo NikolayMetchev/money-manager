@@ -53,8 +53,8 @@ private val logger = logging()
 fun CreateAccountDialog(
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
-    personRepository: PersonRepository? = null,
-    personAccountOwnershipRepository: PersonAccountOwnershipRepository? = null,
+    personRepository: PersonRepository,
+    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     onDismiss: () -> Unit,
     onAccountCreated: ((AccountId) -> Unit)? = null,
 ) {
@@ -70,7 +70,7 @@ fun CreateAccountDialog(
 
     val categories by categoryRepository.getAllCategories()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val people by (personRepository?.getAllPeople() ?: kotlinx.coroutines.flow.flowOf(emptyList()))
+    val people by personRepository.getAllPeople()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
     val scope = rememberSchemaAwareCoroutineScope()
 
@@ -135,50 +135,48 @@ fun CreateAccountDialog(
                     }
                 }
 
-                if (personRepository != null) {
-                    Column(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = "Owners",
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                    if (people.isEmpty()) {
                         Text(
-                            text = "Owners",
-                            style = MaterialTheme.typography.labelMedium,
-                            modifier = Modifier.padding(bottom = 8.dp),
+                            text = "No people available. Create one first.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        if (people.isEmpty()) {
-                            Text(
-                                text = "No people available. Create one first.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        } else {
-                            people.forEach { person ->
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-                                ) {
-                                    Checkbox(
-                                        checked = selectedOwnerIds.contains(person.id.id),
-                                        onCheckedChange = { checked ->
-                                            selectedOwnerIds =
-                                                if (checked) {
-                                                    selectedOwnerIds + person.id.id
-                                                } else {
-                                                    selectedOwnerIds - person.id.id
-                                                }
-                                        },
-                                        enabled = !isSaving,
-                                    )
-                                    Text(
-                                        text = person.fullName,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                    )
-                                }
+                    } else {
+                        people.forEach { person ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                            ) {
+                                Checkbox(
+                                    checked = selectedOwnerIds.contains(person.id.id),
+                                    onCheckedChange = { checked ->
+                                        selectedOwnerIds =
+                                            if (checked) {
+                                                selectedOwnerIds + person.id.id
+                                            } else {
+                                                selectedOwnerIds - person.id.id
+                                            }
+                                    },
+                                    enabled = !isSaving,
+                                )
+                                Text(
+                                    text = person.fullName,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
                             }
                         }
-                        TextButton(
-                            onClick = { showCreatePersonDialog = true },
-                            enabled = !isSaving,
-                        ) {
-                            Text("+ Add New Person")
-                        }
+                    }
+                    TextButton(
+                        onClick = { showCreatePersonDialog = true },
+                        enabled = !isSaving,
+                    ) {
+                        Text("+ Add New Person")
                     }
                 }
 
@@ -210,13 +208,11 @@ fun CreateAccountDialog(
                                         categoryId = selectedCategoryId,
                                     )
                                 val accountId = accountRepository.createAccount(newAccount)
-                                if (personAccountOwnershipRepository != null) {
-                                    selectedOwnerIds.forEach { personId ->
-                                        personAccountOwnershipRepository.createOwnership(
-                                            personId = com.moneymanager.domain.model.PersonId(personId),
-                                            accountId = accountId,
-                                        )
-                                    }
+                                selectedOwnerIds.forEach { personId ->
+                                    personAccountOwnershipRepository.createOwnership(
+                                        personId = com.moneymanager.domain.model.PersonId(personId),
+                                        accountId = accountId,
+                                    )
                                 }
                                 onAccountCreated?.invoke(accountId)
                                 onDismiss()
@@ -262,7 +258,7 @@ fun CreateAccountDialog(
         )
     }
 
-    if (showCreatePersonDialog && personRepository != null) {
+    if (showCreatePersonDialog) {
         EditPersonDialog(
             personToEdit = null,
             personRepository = personRepository,

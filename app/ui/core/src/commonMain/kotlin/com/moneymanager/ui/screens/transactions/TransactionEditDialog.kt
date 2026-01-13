@@ -36,16 +36,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.moneymanager.database.DatabaseMaintenanceService
+import com.moneymanager.database.ManualSourceRecorder
+import com.moneymanager.database.sql.TransferSourceQueries
 import com.moneymanager.domain.getDeviceInfo
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeType
+import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferAttribute
+import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.domain.repository.DeviceRepository
+import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
+import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.domain.repository.TransferAttributeRepository
 import com.moneymanager.domain.repository.TransferSourceRepository
@@ -59,36 +67,45 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.atTime
 import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Clock
 import kotlin.time.Instant
 
 @Composable
 fun TransactionEditDialog(
-    transaction: Transfer,
+    transaction: Transfer? = null,
     transactionRepository: TransactionRepository,
     transferSourceRepository: TransferSourceRepository,
+    transferSourceQueries: TransferSourceQueries,
+    deviceRepository: DeviceRepository,
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
     attributeTypeRepository: AttributeTypeRepository,
+    personRepository: PersonRepository,
+    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     transferAttributeRepository: TransferAttributeRepository,
     maintenanceService: DatabaseMaintenanceService,
+    preSelectedSourceAccountId: AccountId? = null,
+    preSelectedCurrencyId: CurrencyId? = null,
     onDismiss: () -> Unit,
     onSaved: () -> Unit = {},
 ) {
-    var sourceAccountId by remember { mutableStateOf(transaction.sourceAccountId) }
-    var targetAccountId by remember { mutableStateOf(transaction.targetAccountId) }
-    var currencyId by remember { mutableStateOf(transaction.amount.currency.id) }
-    var amount by remember { mutableStateOf(transaction.amount.toDisplayValue().toString()) }
-    var description by remember { mutableStateOf(transaction.description) }
+    val isEditMode = transaction != null
+    var sourceAccountId by remember { mutableStateOf(transaction?.sourceAccountId ?: preSelectedSourceAccountId) }
+    var targetAccountId by remember { mutableStateOf(transaction?.targetAccountId) }
+    var currencyId by remember { mutableStateOf(transaction?.amount?.currency?.id ?: preSelectedCurrencyId) }
+    var amount by remember { mutableStateOf(transaction?.amount?.toDisplayValue()?.toString() ?: "") }
+    var description by remember { mutableStateOf(transaction?.description ?: "") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
 
-    val transactionDateTime = transaction.timestamp.toLocalDateTime(TimeZone.currentSystemDefault())
-    var selectedDate by remember { mutableStateOf(transactionDateTime.date) }
-    var selectedHour by remember { mutableStateOf(transactionDateTime.hour) }
-    var selectedMinute by remember { mutableStateOf(transactionDateTime.minute) }
-    val originalSecond = remember { transactionDateTime.second }
-    val originalNanosecond = remember { transactionDateTime.nanosecond }
+    val defaultDateTime = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
+    val transactionDateTime = transaction?.timestamp?.toLocalDateTime(TimeZone.currentSystemDefault())
+    var selectedDate by remember { mutableStateOf(transactionDateTime?.date ?: defaultDateTime.date) }
+    var selectedHour by remember { mutableStateOf(transactionDateTime?.hour ?: defaultDateTime.hour) }
+    var selectedMinute by remember { mutableStateOf(transactionDateTime?.minute ?: defaultDateTime.minute) }
+    val originalSecond = remember { transactionDateTime?.second ?: 0 }
+    val originalNanosecond = remember { transactionDateTime?.nanosecond ?: 0 }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
 
@@ -97,7 +114,7 @@ fun TransactionEditDialog(
     // Attribute state
     var existingAttributeTypes by remember { mutableStateOf<List<AttributeType>>(emptyList()) }
     var originalAttributes by remember { mutableStateOf<List<TransferAttribute>>(emptyList()) }
-    var isLoadingAttributes by remember { mutableStateOf(true) }
+    var isLoadingAttributes by remember { mutableStateOf(isEditMode) }
 
     // EditableAttribute represents the current state of each attribute in the UI
     // key: a stable identifier (original attribute id or a negative temp id for new ones)
@@ -106,18 +123,20 @@ fun TransactionEditDialog(
     var nextTempId by remember { mutableStateOf(-1L) }
 
     // Load existing attribute types and attributes for this transaction
-    LaunchedEffect(transaction.id) {
+    LaunchedEffect(Unit) {
         attributeTypeRepository.getAll().collect { types ->
             existingAttributeTypes = types
         }
     }
-    LaunchedEffect(transaction.id) {
-        transferAttributeRepository.getByTransaction(transaction.id).first().let { attrs ->
-            originalAttributes = attrs
-            editableAttributes =
-                attrs.associate { attr ->
-                    attr.id to Pair(attr.attributeType.name, attr.value)
-                }
+    LaunchedEffect(transaction?.id) {
+        if (isEditMode && transaction != null) {
+            transferAttributeRepository.getByTransaction(transaction.id).first().let { attrs ->
+                originalAttributes = attrs
+                editableAttributes =
+                    attrs.associate { attr ->
+                        attr.id to Pair(attr.attributeType.name, attr.value)
+                    }
+            }
         }
         isLoadingAttributes = false
     }
@@ -136,7 +155,7 @@ fun TransactionEditDialog(
         }
     }
 
-    // Check if any field has changed from the original transaction
+    // Check if any field has changed from the original transaction (edit mode only)
     val hasChanges =
         remember(
             sourceAccountId,
@@ -150,20 +169,24 @@ fun TransactionEditDialog(
             editableAttributes,
             originalAttributes,
         ) {
-            sourceAccountId != transaction.sourceAccountId ||
-                targetAccountId != transaction.targetAccountId ||
-                currencyId != transaction.amount.currency.id ||
-                amount != transaction.amount.toDisplayValue().toString() ||
-                description != transaction.description ||
-                selectedDate != transactionDateTime.date ||
-                selectedHour != transactionDateTime.hour ||
-                selectedMinute != transactionDateTime.minute ||
-                hasAttributeChanges()
+            if (!isEditMode || transaction == null) {
+                true // In create mode, always allow save
+            } else {
+                sourceAccountId != transaction.sourceAccountId ||
+                    targetAccountId != transaction.targetAccountId ||
+                    currencyId != transaction.amount.currency.id ||
+                    amount != transaction.amount.toDisplayValue().toString() ||
+                    description != transaction.description ||
+                    selectedDate != transactionDateTime?.date ||
+                    selectedHour != transactionDateTime?.hour ||
+                    selectedMinute != transactionDateTime?.minute ||
+                    hasAttributeChanges()
+            }
         }
 
     AlertDialog(
         onDismissRequest = { if (!isSaving) onDismiss() },
-        title = { Text("Edit Transaction") },
+        title = { Text(if (isEditMode) "Edit Transaction" else "Create New Transaction") },
         text = {
             Column(
                 modifier =
@@ -180,6 +203,8 @@ fun TransactionEditDialog(
                     label = "From Account",
                     accountRepository = accountRepository,
                     categoryRepository = categoryRepository,
+                    personRepository = personRepository,
+                    personAccountOwnershipRepository = personAccountOwnershipRepository,
                     enabled = !isSaving,
                     excludeAccountId = targetAccountId,
                 )
@@ -191,6 +216,8 @@ fun TransactionEditDialog(
                     label = "To Account",
                     accountRepository = accountRepository,
                     categoryRepository = categoryRepository,
+                    personRepository = personRepository,
+                    personAccountOwnershipRepository = personAccountOwnershipRepository,
                     enabled = !isSaving,
                     excludeAccountId = sourceAccountId,
                 )
@@ -382,7 +409,10 @@ fun TransactionEditDialog(
             TextButton(
                 onClick = {
                     when {
+                        sourceAccountId == null -> errorMessage = "Source account is required"
+                        targetAccountId == null -> errorMessage = "Target account is required"
                         sourceAccountId == targetAccountId -> errorMessage = "Source and target accounts must be different"
+                        currencyId == null -> errorMessage = "Currency is required"
                         amount.isBlank() -> errorMessage = "Amount is required"
                         amount.toDoubleOrNull() == null -> errorMessage = "Invalid amount"
                         amount.toDouble() <= 0 -> errorMessage = "Amount must be greater than 0"
@@ -394,7 +424,7 @@ fun TransactionEditDialog(
                                 try {
                                     // Get the currency object from repository
                                     val currency =
-                                        currencyRepository.getCurrencyById(currencyId).first()
+                                        currencyRepository.getCurrencyById(currencyId!!).first()
                                             ?: error("Currency not found")
 
                                     val timestamp =
@@ -402,78 +432,107 @@ fun TransactionEditDialog(
                                             .atTime(selectedHour, selectedMinute, originalSecond, originalNanosecond)
                                             .toInstant(TimeZone.currentSystemDefault())
 
-                                    // Check if transfer fields actually changed
-                                    val transferFieldsChanged =
-                                        sourceAccountId != transaction.sourceAccountId ||
-                                            targetAccountId != transaction.targetAccountId ||
-                                            currencyId != transaction.amount.currency.id ||
-                                            amount != transaction.amount.toDisplayValue().toString() ||
-                                            description.trim() != transaction.description ||
-                                            timestamp != transaction.timestamp
+                                    if (isEditMode && transaction != null) {
+                                        // EDIT MODE: Update existing transaction
+                                        // Check if transfer fields actually changed
+                                        val transferFieldsChanged =
+                                            sourceAccountId != transaction.sourceAccountId ||
+                                                targetAccountId != transaction.targetAccountId ||
+                                                currencyId != transaction.amount.currency.id ||
+                                                amount != transaction.amount.toDisplayValue().toString() ||
+                                                description.trim() != transaction.description ||
+                                                timestamp != transaction.timestamp
 
-                                    // Build the transfer object if fields changed
-                                    val updatedTransfer =
-                                        if (transferFieldsChanged) {
-                                            Transfer(
-                                                id = transaction.id,
-                                                timestamp = timestamp,
-                                                description = description.trim(),
-                                                sourceAccountId = sourceAccountId,
-                                                targetAccountId = targetAccountId,
-                                                amount = Money.fromDisplayValue(amount, currency),
-                                            )
-                                        } else {
-                                            null
-                                        }
+                                        // Build the transfer object if fields changed
+                                        val updatedTransfer =
+                                            if (transferFieldsChanged) {
+                                                Transfer(
+                                                    id = transaction.id,
+                                                    timestamp = timestamp,
+                                                    description = description.trim(),
+                                                    sourceAccountId = sourceAccountId!!,
+                                                    targetAccountId = targetAccountId!!,
+                                                    amount = Money.fromDisplayValue(amount, currency),
+                                                )
+                                            } else {
+                                                null
+                                            }
 
-                                    // Build attribute change data structures
-                                    val originalIds = originalAttributes.map { it.id }.toSet()
-                                    val editableIds = editableAttributes.keys
-                                    val deletedAttributeIds = originalIds - editableIds
+                                        // Build attribute change data structures
+                                        val originalIds = originalAttributes.map { it.id }.toSet()
+                                        val editableIds = editableAttributes.keys
+                                        val deletedAttributeIds = originalIds - editableIds
 
-                                    // Build updated attributes map (id -> NewAttribute)
-                                    val updatedAttributes = mutableMapOf<Long, NewAttribute>()
-                                    editableAttributes.filter { (id, _) -> id > 0 }.forEach { (id, pair) ->
-                                        val (typeName, value) = pair
-                                        val original = originalAttributes.find { it.id == id }
-                                        if (original != null) {
-                                            val typeChanged = original.attributeType.name != typeName
-                                            val valueChanged = original.value != value
-                                            if (typeChanged || valueChanged) {
-                                                val typeId = attributeTypeRepository.getOrCreate(typeName)
-                                                updatedAttributes[id] = NewAttribute(typeId, value)
+                                        // Build updated attributes map (id -> NewAttribute)
+                                        val updatedAttributes = mutableMapOf<Long, NewAttribute>()
+                                        editableAttributes.filter { (id, _) -> id > 0 }.forEach { (id, pair) ->
+                                            val (typeName, value) = pair
+                                            val original = originalAttributes.find { it.id == id }
+                                            if (original != null) {
+                                                val typeChanged = original.attributeType.name != typeName
+                                                val valueChanged = original.value != value
+                                                if (typeChanged || valueChanged) {
+                                                    val typeId = attributeTypeRepository.getOrCreate(typeName)
+                                                    updatedAttributes[id] = NewAttribute(typeId, value)
+                                                }
                                             }
                                         }
-                                    }
 
-                                    // Build new attributes list
-                                    val newAttributes = mutableListOf<NewAttribute>()
-                                    editableAttributes.filter { (id, _) -> id < 0 }.forEach { (_, pair) ->
-                                        val (typeName, value) = pair
-                                        if (typeName.isNotBlank() && value.isNotBlank()) {
-                                            val typeId = attributeTypeRepository.getOrCreate(typeName)
-                                            newAttributes.add(NewAttribute(typeId, value))
+                                        // Build new attributes list
+                                        val newAttributes = mutableListOf<NewAttribute>()
+                                        editableAttributes.filter { (id, _) -> id < 0 }.forEach { (_, pair) ->
+                                            val (typeName, value) = pair
+                                            if (typeName.isNotBlank() && value.isNotBlank()) {
+                                                val typeId = attributeTypeRepository.getOrCreate(typeName)
+                                                newAttributes.add(NewAttribute(typeId, value))
+                                            }
                                         }
-                                    }
 
-                                    // Use the atomic method to update transfer and attributes together
-                                    // This ensures only ONE revision bump even if both change
-                                    transactionRepository.updateTransfer(
-                                        transfer = updatedTransfer,
-                                        deletedAttributeIds = deletedAttributeIds,
-                                        updatedAttributes = updatedAttributes,
-                                        newAttributes = newAttributes,
-                                        transactionId = transaction.id,
-                                    )
+                                        // Use the atomic method to update transfer and attributes together
+                                        transactionRepository.updateTransfer(
+                                            transfer = updatedTransfer,
+                                            deletedAttributeIds = deletedAttributeIds,
+                                            updatedAttributes = updatedAttributes,
+                                            newAttributes = newAttributes,
+                                            transactionId = transaction.id,
+                                        )
 
-                                    // Record manual source for this update
-                                    val updated =
-                                        transactionRepository.getTransactionById(transaction.id.id).first()
-                                    if (updated != null) {
-                                        transferSourceRepository.recordManualSource(
-                                            transactionId = updated.id,
-                                            revisionId = updated.revisionId,
-                                            deviceInfo = getDeviceInfo(),
+                                        // Record manual source for this update
+                                        val updated =
+                                            transactionRepository.getTransactionById(transaction.id.id).first()
+                                        if (updated != null) {
+                                            transferSourceRepository.recordManualSource(
+                                                transactionId = updated.id,
+                                                revisionId = updated.revisionId,
+                                                deviceInfo = getDeviceInfo(),
+                                            )
+                                        }
+                                    } else {
+                                        // CREATE MODE: Create new transaction
+                                        val transfer =
+                                            Transfer(
+                                                id = TransferId(0L),
+                                                timestamp = timestamp,
+                                                description = description.trim(),
+                                                sourceAccountId = sourceAccountId!!,
+                                                targetAccountId = targetAccountId!!,
+                                                amount = Money.fromDisplayValue(amount, currency),
+                                            )
+
+                                        // Build attributes to save (only non-blank ones)
+                                        val attributesToSave =
+                                            editableAttributes
+                                                .filter { (_, pair) -> pair.first.isNotBlank() && pair.second.isNotBlank() }
+                                                .map { (_, pair) ->
+                                                    val typeId = attributeTypeRepository.getOrCreate(pair.first.trim())
+                                                    NewAttribute(typeId, pair.second.trim())
+                                                }
+
+                                        val deviceId = deviceRepository.getOrCreateDevice(getDeviceInfo())
+                                        transactionRepository.createTransfers(
+                                            transfers = listOf(transfer),
+                                            newAttributes = mapOf(transfer.id to attributesToSave),
+                                            sourceRecorder = ManualSourceRecorder(transferSourceQueries, deviceId),
                                         )
                                     }
 
@@ -482,8 +541,11 @@ fun TransactionEditDialog(
                                     onSaved()
                                     onDismiss()
                                 } catch (expected: Exception) {
-                                    logger.error(expected) { "Failed to update transaction: ${expected.message}" }
-                                    errorMessage = "Failed to update transaction: ${expected.message}"
+                                    logger.error(expected) {
+                                        "Failed to ${if (isEditMode) "update" else "create"} transaction: ${expected.message}"
+                                    }
+                                    errorMessage =
+                                        "Failed to ${if (isEditMode) "update" else "create"} transaction: ${expected.message}"
                                     isSaving = false
                                 }
                             }
@@ -498,7 +560,7 @@ fun TransactionEditDialog(
                         strokeWidth = 2.dp,
                     )
                 } else {
-                    Text("Update")
+                    Text(if (isEditMode) "Update" else "Create")
                 }
             }
         },
