@@ -208,23 +208,12 @@ fun CreateAccountDialog(
                                         categoryId = selectedCategoryId,
                                     )
                                 val accountId = accountRepository.createAccount(newAccount)
-
-                                // Try to create ownership records, but don't fail account creation if this fails
-                                // (handles case where database doesn't have People tables yet)
-                                try {
-                                    selectedOwnerIds.forEach { personId ->
-                                        personAccountOwnershipRepository.createOwnership(
-                                            personId = com.moneymanager.domain.model.PersonId(personId),
-                                            accountId = accountId,
-                                        )
-                                    }
-                                } catch (ownershipError: Exception) {
-                                    logger.warn(ownershipError) {
-                                        "Failed to create ownership records (database may not support People feature yet): ${ownershipError.message}"
-                                    }
-                                    // Continue anyway - account was created successfully
+                                selectedOwnerIds.forEach { personId ->
+                                    personAccountOwnershipRepository.createOwnership(
+                                        personId = com.moneymanager.domain.model.PersonId(personId),
+                                        accountId = accountId,
+                                    )
                                 }
-
                                 onAccountCreated?.invoke(accountId)
                                 onDismiss()
                             } catch (expected: Exception) {
