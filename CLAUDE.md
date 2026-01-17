@@ -22,6 +22,7 @@ Money Manager is a Kotlin Multiplatform personal finance app targeting JVM and A
 | `./gradlew build` | Build all, run tests, coverage, dependency health |
 | `./gradlew :app:main:jvm:run` | Run JVM application |
 | `./gradlew :app:main:android:installDebug` | Install Android debug APK |
+| `./gradlew :app:ui:core:pixel6api34AndroidDeviceTest` | Run Android UI tests on managed device |
 | `./gradlew lintFormat` | Format code (ktlint + sort dependencies) |
 | `./gradlew buildHealth` | Check dependency health |
 | `./gradlew detekt` | Static analysis |
@@ -106,6 +107,8 @@ Money Manager is a Kotlin Multiplatform personal finance app targeting JVM and A
 - Use `runComposeUiTest` for UI tests
 - Android tests require manifest with `ComponentActivity` declaration
 - Share test sources via `kotlin.srcDir("src/commonTest/kotlin")`
+- **Android Device Tests**: Use `:app:ui:core:pixel6api34AndroidDeviceTest` for UI tests on managed device emulator
+- **Test Stability**: Always call `waitForIdle()` after `waitUntilDoesNotExist()` to ensure recompositions complete before test ends
 
 ### Platform Support
 
