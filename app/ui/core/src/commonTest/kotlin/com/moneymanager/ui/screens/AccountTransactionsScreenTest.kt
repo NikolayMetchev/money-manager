@@ -117,9 +117,13 @@ class AccountTransactionsScreenTest {
             val accountRepository = FakeAccountRepository(listOf(checking, savings))
             val transactionRepository = FakeTransactionRepository(listOf(transfer))
             val transferSourceRepository = FakeTransferSourceRepository()
+            val transferSourceQueries = createStubTransferSourceQueries()
+            val deviceRepository = FakeDeviceRepository()
             val currencyRepository = FakeCurrencyRepository(listOf(usdCurrency))
             val categoryRepository = FakeCategoryRepository()
             val attributeTypeRepository = FakeAttributeTypeRepository()
+            val personRepository = FakePersonRepository()
+            val personAccountOwnershipRepository = FakePersonAccountOwnershipRepository()
             val transferAttributeRepository = FakeTransferAttributeRepository()
             val maintenanceService = FakeDatabaseMaintenanceService()
 
@@ -132,10 +136,14 @@ class AccountTransactionsScreenTest {
                         accountId = currentAccountId,
                         transactionRepository = transactionRepository,
                         transferSourceRepository = transferSourceRepository,
+                        transferSourceQueries = transferSourceQueries,
+                        deviceRepository = deviceRepository,
                         accountRepository = accountRepository,
                         categoryRepository = categoryRepository,
                         currencyRepository = currencyRepository,
                         attributeTypeRepository = attributeTypeRepository,
+                        personRepository = personRepository,
+                        personAccountOwnershipRepository = personAccountOwnershipRepository,
                         transferAttributeRepository = transferAttributeRepository,
                         maintenanceService = maintenanceService,
                         onAccountIdChange = { currentAccountId = it },
@@ -210,9 +218,13 @@ class AccountTransactionsScreenTest {
             val accountRepository = FakeAccountRepository(listOf(checking, savings))
             val transactionRepository = FakeTransactionRepository(listOf(transfer))
             val transferSourceRepository = FakeTransferSourceRepository()
+            val transferSourceQueries = createStubTransferSourceQueries()
+            val deviceRepository = FakeDeviceRepository()
             val currencyRepository = FakeCurrencyRepository(listOf(usdCurrency))
             val categoryRepository = FakeCategoryRepository()
             val attributeTypeRepository = FakeAttributeTypeRepository()
+            val personRepository = FakePersonRepository()
+            val personAccountOwnershipRepository = FakePersonAccountOwnershipRepository()
             val transferAttributeRepository = FakeTransferAttributeRepository()
             val maintenanceService = FakeDatabaseMaintenanceService()
 
@@ -224,10 +236,14 @@ class AccountTransactionsScreenTest {
                         accountId = currentAccountId,
                         transactionRepository = transactionRepository,
                         transferSourceRepository = transferSourceRepository,
+                        transferSourceQueries = transferSourceQueries,
+                        deviceRepository = deviceRepository,
                         accountRepository = accountRepository,
                         categoryRepository = categoryRepository,
                         currencyRepository = currencyRepository,
                         attributeTypeRepository = attributeTypeRepository,
+                        personRepository = personRepository,
+                        personAccountOwnershipRepository = personAccountOwnershipRepository,
                         transferAttributeRepository = transferAttributeRepository,
                         maintenanceService = maintenanceService,
                         onAccountIdChange = { currentAccountId = it },
@@ -344,10 +360,14 @@ class AccountTransactionsScreenTest {
                                 accountId = currentAccountId,
                                 transactionRepository = repositories.transactionRepository,
                                 transferSourceRepository = repositories.transferSourceRepository,
+                                transferSourceQueries = repositories.transferSourceQueries,
+                                deviceRepository = repositories.deviceRepository,
                                 accountRepository = repositories.accountRepository,
                                 categoryRepository = repositories.categoryRepository,
                                 currencyRepository = repositories.currencyRepository,
                                 attributeTypeRepository = repositories.attributeTypeRepository,
+                                personRepository = repositories.personRepository,
+                                personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                                 transferAttributeRepository = repositories.transferAttributeRepository,
                                 maintenanceService = repositories.maintenanceService,
                                 onAccountIdChange = { currentAccountId = it },
@@ -561,10 +581,14 @@ class AccountTransactionsScreenTest {
                                 accountId = currentAccountId,
                                 transactionRepository = repositories.transactionRepository,
                                 transferSourceRepository = repositories.transferSourceRepository,
+                                transferSourceQueries = repositories.transferSourceQueries,
+                                deviceRepository = repositories.deviceRepository,
                                 accountRepository = repositories.accountRepository,
                                 categoryRepository = repositories.categoryRepository,
                                 currencyRepository = repositories.currencyRepository,
                                 attributeTypeRepository = repositories.attributeTypeRepository,
+                                personRepository = repositories.personRepository,
+                                personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                                 transferAttributeRepository = repositories.transferAttributeRepository,
                                 maintenanceService = repositories.maintenanceService,
                                 onAccountIdChange = { currentAccountId = it },
@@ -746,10 +770,14 @@ class AccountTransactionsScreenTest {
                                 accountId = currentAccountId,
                                 transactionRepository = repositories.transactionRepository,
                                 transferSourceRepository = repositories.transferSourceRepository,
+                                transferSourceQueries = repositories.transferSourceQueries,
+                                deviceRepository = repositories.deviceRepository,
                                 accountRepository = repositories.accountRepository,
                                 categoryRepository = repositories.categoryRepository,
                                 currencyRepository = repositories.currencyRepository,
                                 attributeTypeRepository = repositories.attributeTypeRepository,
+                                personRepository = repositories.personRepository,
+                                personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                                 transferAttributeRepository = repositories.transferAttributeRepository,
                                 maintenanceService = repositories.maintenanceService,
                                 onAccountIdChange = { currentAccountId = it },
@@ -1213,5 +1241,97 @@ class AccountTransactionsScreenTest {
         }
 
         fun getInsertedAttributes(): List<TransferAttribute> = this.attributes.toList()
+    }
+
+    private class FakeDeviceRepository : com.moneymanager.domain.repository.DeviceRepository {
+        override fun getOrCreateDevice(deviceInfo: DeviceInfo): com.moneymanager.domain.model.DeviceId =
+            com.moneymanager.domain.model.DeviceId(1L)
+
+        override suspend fun getDeviceById(id: com.moneymanager.domain.model.DeviceId): DeviceInfo? = null
+    }
+
+    private class FakePersonRepository : com.moneymanager.domain.repository.PersonRepository {
+        override fun getAllPeople(): Flow<List<com.moneymanager.domain.model.Person>> = flowOf(emptyList())
+
+        override fun getPersonById(id: com.moneymanager.domain.model.PersonId): Flow<com.moneymanager.domain.model.Person?> = flowOf(null)
+
+        override suspend fun createPerson(person: com.moneymanager.domain.model.Person): com.moneymanager.domain.model.PersonId =
+            com.moneymanager.domain.model.PersonId(1L)
+
+        override suspend fun updatePerson(person: com.moneymanager.domain.model.Person) = Unit
+
+        override suspend fun deletePerson(id: com.moneymanager.domain.model.PersonId) = Unit
+    }
+
+    private class FakePersonAccountOwnershipRepository : com.moneymanager.domain.repository.PersonAccountOwnershipRepository {
+        override fun getOwnershipsByPerson(
+            personId: com.moneymanager.domain.model.PersonId,
+        ): Flow<List<com.moneymanager.domain.model.PersonAccountOwnership>> = flowOf(emptyList())
+
+        override fun getOwnershipsByAccount(accountId: AccountId): Flow<List<com.moneymanager.domain.model.PersonAccountOwnership>> =
+            flowOf(emptyList())
+
+        override fun getOwnershipById(id: Long): Flow<com.moneymanager.domain.model.PersonAccountOwnership?> = flowOf(null)
+
+        override suspend fun createOwnership(
+            personId: com.moneymanager.domain.model.PersonId,
+            accountId: AccountId,
+        ): Long = 1L
+
+        override suspend fun deleteOwnership(id: Long) = Unit
+
+        override suspend fun deleteOwnershipsByPerson(personId: com.moneymanager.domain.model.PersonId) = Unit
+
+        override suspend fun deleteOwnershipsByAccount(accountId: AccountId) = Unit
+    }
+
+    /**
+     * Creates a stub TransferSourceQueries for tests that don't actually query transfer sources.
+     * Uses a minimal SqlDriver stub that throws NotImplementedError if actually invoked.
+     */
+    private fun createStubTransferSourceQueries(): com.moneymanager.database.sql.TransferSourceQueries {
+        val stubDriver =
+            object : app.cash.sqldelight.db.SqlDriver {
+                override fun close() = Unit
+
+                override fun currentTransaction(): app.cash.sqldelight.Transacter.Transaction? = null
+
+                override fun execute(
+                    identifier: Int?,
+                    sql: String,
+                    parameters: Int,
+                    binders: (app.cash.sqldelight.db.SqlPreparedStatement.() -> Unit)?,
+                ): app.cash.sqldelight.db.QueryResult<Long> {
+                    throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
+                }
+
+                override fun <R> executeQuery(
+                    identifier: Int?,
+                    sql: String,
+                    mapper: (app.cash.sqldelight.db.SqlCursor) -> app.cash.sqldelight.db.QueryResult<R>,
+                    parameters: Int,
+                    binders: (app.cash.sqldelight.db.SqlPreparedStatement.() -> Unit)?,
+                ): app.cash.sqldelight.db.QueryResult<R> {
+                    throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
+                }
+
+                override fun newTransaction(): app.cash.sqldelight.db.QueryResult<app.cash.sqldelight.Transacter.Transaction> {
+                    throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
+                }
+
+                override fun addListener(
+                    vararg queryKeys: String,
+                    listener: app.cash.sqldelight.Query.Listener,
+                ) = Unit
+
+                override fun removeListener(
+                    vararg queryKeys: String,
+                    listener: app.cash.sqldelight.Query.Listener,
+                ) = Unit
+
+                override fun notifyListeners(vararg queryKeys: String) = Unit
+            }
+
+        return com.moneymanager.database.sql.TransferSourceQueries(stubDriver)
     }
 }

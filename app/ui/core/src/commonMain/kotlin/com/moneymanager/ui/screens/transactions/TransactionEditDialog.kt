@@ -94,8 +94,8 @@ fun TransactionEditDialog(
     var sourceAccountId by remember { mutableStateOf(transaction?.sourceAccountId ?: preSelectedSourceAccountId) }
     var targetAccountId by remember { mutableStateOf(transaction?.targetAccountId) }
     var currencyId by remember { mutableStateOf(transaction?.amount?.currency?.id ?: preSelectedCurrencyId) }
-    var amount by remember { mutableStateOf(transaction?.amount?.toDisplayValue()?.toString() ?: "") }
-    var description by remember { mutableStateOf(transaction?.description ?: "") }
+    var amount by remember { mutableStateOf(transaction?.amount?.toDisplayValue()?.toString().orEmpty()) }
+    var description by remember { mutableStateOf(transaction?.description.orEmpty()) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
 
@@ -177,9 +177,9 @@ fun TransactionEditDialog(
                     currencyId != transaction.amount.currency.id ||
                     amount != transaction.amount.toDisplayValue().toString() ||
                     description != transaction.description ||
-                    selectedDate != transactionDateTime?.date ||
-                    selectedHour != transactionDateTime?.hour ||
-                    selectedMinute != transactionDateTime?.minute ||
+                    selectedDate != transactionDateTime!!.date ||
+                    selectedHour != transactionDateTime.hour ||
+                    selectedMinute != transactionDateTime.minute ||
                     hasAttributeChanges()
             }
         }
