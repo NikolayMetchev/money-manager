@@ -170,7 +170,14 @@ fun TransactionEditDialog(
             originalAttributes,
         ) {
             if (!isEditMode || transaction == null) {
-                true // In create mode, always allow save
+                // In create mode, enable save only when all required fields are filled and valid
+                sourceAccountId != null &&
+                    targetAccountId != null &&
+                    currencyId != null &&
+                    amount.isNotBlank() &&
+                    amount.toDoubleOrNull() != null &&
+                    amount.toDouble() > 0 &&
+                    sourceAccountId != targetAccountId
             } else {
                 sourceAccountId != transaction.sourceAccountId ||
                     targetAccountId != transaction.targetAccountId ||
