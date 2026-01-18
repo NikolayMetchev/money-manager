@@ -105,26 +105,30 @@ fun TestMoneyManagerApp(
             databaseLocation = location.toString(),
             error = error,
             onBackupAndCreateNew = {
+                // Immediately clear the error state to hide the dialog
+                databaseState = TestDatabaseState.Loading
+                GlobalSchemaErrorState.clearError()
                 scope.launch {
                     try {
                         databaseManager.backupDatabase(location)
                         val database = databaseManager.openDatabase(location)
                         val component = DatabaseComponent.create(database)
                         databaseState = TestDatabaseState.Loaded(location, component)
-                        GlobalSchemaErrorState.clearError()
                     } catch (expected: Exception) {
                         databaseState = TestDatabaseState.Error(location, expected)
                     }
                 }
             },
             onDeleteAndCreateNew = {
+                // Immediately clear the error state to hide the dialog
+                databaseState = TestDatabaseState.Loading
+                GlobalSchemaErrorState.clearError()
                 scope.launch {
                     try {
                         databaseManager.deleteDatabase(location)
                         val database = databaseManager.openDatabase(location)
                         val component = DatabaseComponent.create(database)
                         databaseState = TestDatabaseState.Loaded(location, component)
-                        GlobalSchemaErrorState.clearError()
                     } catch (expected: Exception) {
                         databaseState = TestDatabaseState.Error(location, expected)
                     }
