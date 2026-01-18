@@ -90,7 +90,7 @@ fun MoneyManagerApp(
 ) {
     ProvideSchemaAwareScope {
         val scope = rememberSchemaAwareCoroutineScope()
-        val navigationHistory = remember { NavigationHistory(Screen.Accounts) }
+        val navigationHistory = remember { NavigationHistory(Screen.Accounts()) }
         val currentScreen = navigationHistory.currentScreen
         var showTransactionDialog by remember { mutableStateOf(false) }
         var preSelectedAccountId by remember { mutableStateOf<AccountId?>(null) }
@@ -149,7 +149,7 @@ fun MoneyManagerApp(
                             icon = { Text("\uD83D\uDCB0") },
                             label = { Text("Accounts") },
                             selected = currentScreen is Screen.Accounts || currentScreen is Screen.AccountTransactions,
-                            onClick = { navigationHistory.navigateTo(Screen.Accounts) },
+                            onClick = { navigationHistory.navigateTo(Screen.Accounts()) },
                         )
                         NavigationBarItem(
                             icon = { Text("\uD83D\uDCB1") },
@@ -216,7 +216,11 @@ fun MoneyManagerApp(
                                 transactionRepository = transactionRepository,
                                 personRepository = personRepository,
                                 personAccountOwnershipRepository = personAccountOwnershipRepository,
+                                scrollToAccountId = screen.scrollToAccountId,
                                 onAccountClick = { account ->
+                                    // Replace current screen with one that remembers the clicked account
+                                    // so that navigating back will scroll to this account
+                                    navigationHistory.replaceCurrentScreen(Screen.Accounts(scrollToAccountId = account.id))
                                     navigationHistory.navigateTo(Screen.AccountTransactions(account.id, account.name))
                                 },
                             )
@@ -295,13 +299,20 @@ fun MoneyManagerApp(
                                 onCurrencyIdChange = { currencyId ->
                                     currentlyViewedCurrencyId = currencyId
                                 },
-                                onAccountClick = { accountId, accountName ->
-                                    navigationHistory.navigateTo(Screen.AccountTransactions(accountId, accountName))
+                                onAccountClick = { accountId, accountName, currencyId ->
+                                    navigationHistory.navigateTo(
+                                        Screen.AccountTransactions(
+                                            accountId = accountId,
+                                            accountName = accountName,
+                                            selectedCurrencyId = currencyId,
+                                        ),
+                                    )
                                 },
                                 onAuditClick = { transferId ->
                                     navigationHistory.navigateTo(Screen.AuditHistory(transferId))
                                 },
                                 scrollToTransferId = screen.scrollToTransferId,
+                                initialCurrencyId = screen.selectedCurrencyId,
                                 externalRefreshTrigger = transactionRefreshTrigger,
                             )
                         }

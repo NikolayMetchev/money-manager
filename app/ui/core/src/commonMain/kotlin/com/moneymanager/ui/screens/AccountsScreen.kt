@@ -44,6 +44,7 @@ fun AccountsScreen(
     transactionRepository: TransactionRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
+    scrollToAccountId: AccountId?,
     onAccountClick: (Account) -> Unit,
 ) {
     // Use schema-error-aware collection for flows that may fail on old databases
@@ -90,12 +91,23 @@ fun AccountsScreen(
             }
         } else {
             val lazyListState = rememberLazyListState()
+
+            // Scroll to the specified account when navigating back
+            LaunchedEffect(scrollToAccountId, accounts) {
+                if (scrollToAccountId != null && accounts.isNotEmpty()) {
+                    val index = accounts.indexOfFirst { it.id == scrollToAccountId }
+                    if (index >= 0) {
+                        lazyListState.animateScrollToItem(index)
+                    }
+                }
+            }
+
             Box(modifier = Modifier.fillMaxSize()) {
                 LazyColumn(
                     state = lazyListState,
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    items(accounts) { account ->
+                    items(accounts, key = { it.id.id }) { account ->
                         val accountBalances = balances.filter { it.accountId == account.id }
                         val category = categories.find { it.id == account.categoryId }
                         AccountCard(

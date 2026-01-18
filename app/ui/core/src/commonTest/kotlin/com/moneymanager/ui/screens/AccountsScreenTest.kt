@@ -51,6 +51,7 @@ class AccountsScreenTest {
                         transactionRepository = FakeTransactionRepository(),
                         personRepository = FakePersonRepository(),
                         personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
+                        scrollToAccountId = null,
                         onAccountClick = {},
                     )
                 }
@@ -90,6 +91,7 @@ class AccountsScreenTest {
                         transactionRepository = FakeTransactionRepository(),
                         personRepository = FakePersonRepository(),
                         personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
+                        scrollToAccountId = null,
                         onAccountClick = {},
                     )
                 }
@@ -115,6 +117,7 @@ class AccountsScreenTest {
                         transactionRepository = FakeTransactionRepository(),
                         personRepository = FakePersonRepository(),
                         personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
+                        scrollToAccountId = null,
                         onAccountClick = {},
                     )
                 }
@@ -139,6 +142,7 @@ class AccountsScreenTest {
                         transactionRepository = FakeTransactionRepository(),
                         personRepository = FakePersonRepository(),
                         personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
+                        scrollToAccountId = null,
                         onAccountClick = {},
                     )
                 }
@@ -173,6 +177,7 @@ class AccountsScreenTest {
                         transactionRepository = FakeTransactionRepository(),
                         personRepository = FakePersonRepository(),
                         personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
+                        scrollToAccountId = null,
                         onAccountClick = {},
                     )
                 }
@@ -204,6 +209,7 @@ class AccountsScreenTest {
                         transactionRepository = FakeTransactionRepository(),
                         personRepository = FakePersonRepository(),
                         personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
+                        scrollToAccountId = null,
                         onAccountClick = {},
                     )
                 }
@@ -232,6 +238,7 @@ class AccountsScreenTest {
                         transactionRepository = FakeTransactionRepository(),
                         personRepository = FakePersonRepository(),
                         personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
+                        scrollToAccountId = null,
                         onAccountClick = {},
                     )
                 }
@@ -262,6 +269,7 @@ class AccountsScreenTest {
                         transactionRepository = FakeTransactionRepository(),
                         personRepository = FakePersonRepository(),
                         personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
+                        scrollToAccountId = null,
                         onAccountClick = {},
                     )
                 }
@@ -300,6 +308,7 @@ class AccountsScreenTest {
                         transactionRepository = FakeTransactionRepository(),
                         personRepository = FakePersonRepository(),
                         personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
+                        scrollToAccountId = null,
                         onAccountClick = {},
                     )
                 }
@@ -350,6 +359,7 @@ class AccountsScreenTest {
                         transactionRepository = FakeTransactionRepository(),
                         personRepository = FakePersonRepository(),
                         personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
+                        scrollToAccountId = null,
                         onAccountClick = {},
                     )
                 }

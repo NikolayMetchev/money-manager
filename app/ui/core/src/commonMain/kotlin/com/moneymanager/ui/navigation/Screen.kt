@@ -3,11 +3,12 @@
 package com.moneymanager.ui.navigation
 
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImportId
 
 sealed class Screen(val title: String) {
-    data object Accounts : Screen("Accounts")
+    data class Accounts(val scrollToAccountId: AccountId? = null) : Screen("Accounts")
 
     data object Currencies : Screen("Currencies")
 
@@ -25,6 +26,7 @@ sealed class Screen(val title: String) {
         val accountId: AccountId,
         val accountName: String,
         val scrollToTransferId: TransferId? = null,
+        val selectedCurrencyId: CurrencyId? = null,
     ) : Screen(accountName)
 
     data class CsvImportDetail(val importId: CsvImportId) :
