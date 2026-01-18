@@ -80,9 +80,10 @@ fun AccountTransactionsScreen(
     maintenanceService: DatabaseMaintenanceService,
     onAccountIdChange: (AccountId) -> Unit = {},
     onCurrencyIdChange: (CurrencyId?) -> Unit = {},
-    onAccountClick: (AccountId, String) -> Unit = { _, _ -> },
+    onAccountClick: (AccountId, String, CurrencyId?) -> Unit = { _, _, _ -> },
     onAuditClick: (TransferId) -> Unit = {},
     scrollToTransferId: TransferId? = null,
+    initialCurrencyId: CurrencyId? = null,
     externalRefreshTrigger: Int = 0,
 ) {
     val allAccounts by accountRepository.getAllAccounts()
@@ -149,15 +150,20 @@ fun AccountTransactionsScreen(
     val accountCurrencyIds = runningBalances.map { it.transactionAmount.currency.id }.distinct()
     val accountCurrencies = currencies.filter { it.id in accountCurrencyIds }
 
-    // Selected currency state - default to first currency if available
-    var selectedCurrencyId by remember { mutableStateOf<CurrencyId?>(null) }
+    // Selected currency state - initialized from parameter
+    var selectedCurrencyId by remember { mutableStateOf(initialCurrencyId) }
+
+    // Sync selectedCurrencyId when parent's initialCurrencyId parameter changes
+    LaunchedEffect(initialCurrencyId) {
+        selectedCurrencyId = initialCurrencyId
+    }
 
     // Notify parent when selected currency changes
     LaunchedEffect(selectedCurrencyId) {
         onCurrencyIdChange(selectedCurrencyId)
     }
 
-    // Update selected currency when account currencies change
+    // Update selected currency when account currencies change (only clear if invalid)
     LaunchedEffect(accountCurrencies) {
         if (accountCurrencies.isNotEmpty()) {
             // If currently selected currency doesn't exist in the new account's currencies, clear it
@@ -165,7 +171,8 @@ fun AccountTransactionsScreen(
             if (selectedCurrencyId != null && accountCurrencies.none { it.id == selectedCurrencyId }) {
                 selectedCurrencyId = null
             }
-        } else {
+        } else if (initialCurrencyId == null) {
+            // Only clear if we didn't receive an initial currency from navigation
             selectedCurrencyId = null
         }
     }
@@ -322,15 +329,10 @@ fun AccountTransactionsScreen(
         val containerWidthDp = maxWidth
         val containerHeightDp = maxHeight
 
-        // Auto-scroll matrix horizontally when account changes (e.g., from back navigation)
-        // Track if this is the initial composition to avoid scrolling on first load
-        val isInitialComposition = remember { mutableStateOf(true) }
-        LaunchedEffect(selectedAccountId) {
-            // Skip scrolling on initial composition
-            if (isInitialComposition.value) {
-                isInitialComposition.value = false
-                return@LaunchedEffect
-            }
+        // Auto-scroll matrix horizontally when account changes (including on initial load)
+        LaunchedEffect(selectedAccountId, allAccounts) {
+            // Wait for accounts to load before attempting to scroll
+            if (allAccounts.isEmpty()) return@LaunchedEffect
 
             // Scroll horizontally to center the selected account column
             val accountIndex = allAccounts.indexOfFirst { it.id == selectedAccountId }
@@ -417,7 +419,7 @@ fun AccountTransactionsScreen(
                                                 .clickable {
                                                     selectedAccountId = account.id
                                                     selectedCurrencyId = null // Clear currency to show all currencies
-                                                    onAccountClick(account.id, account.name)
+                                                    onAccountClick(account.id, account.name, null)
                                                 }
                                                 .padding(vertical = 4.dp),
                                         contentAlignment = Alignment.Center,
@@ -521,7 +523,7 @@ fun AccountTransactionsScreen(
                                                             .clickable(enabled = balance != null) {
                                                                 selectedAccountId = account.id
                                                                 selectedCurrencyId = currencyId
-                                                                onAccountClick(account.id, account.name)
+                                                                onAccountClick(account.id, account.name, currencyId)
                                                             }
                                                             .padding(vertical = 4.dp),
                                                     contentAlignment = Alignment.Center,
@@ -855,7 +857,11 @@ fun AccountTransactionsScreen(
                                     // Navigate to the clicked account (adds to navigation history)
                                     val clickedAccount = allAccounts.find { it.id == clickedAccountId }
                                     if (clickedAccount != null) {
-                                        onAccountClick(clickedAccountId, clickedAccount.name)
+                                        onAccountClick(
+                                            clickedAccountId,
+                                            clickedAccount.name,
+                                            runningBalance.transactionAmount.currency.id,
+                                        )
                                     }
                                 },
                             )
