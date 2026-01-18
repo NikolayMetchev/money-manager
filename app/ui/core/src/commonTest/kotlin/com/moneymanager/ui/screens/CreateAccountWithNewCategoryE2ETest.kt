@@ -66,7 +66,7 @@ class CreateAccountWithNewCategoryE2ETest {
             waitUntilExactlyOneExists(hasText("Your Accounts"), timeoutMillis = 10000)
 
             // Step 1: Click "Add Account" to open the Create Account dialog
-            onNodeWithText("+ Add Account").performClick()
+            onNodeWithText("+ Add Account", useUnmergedTree = true).performClick()
             waitUntilExactlyOneExists(hasText("Create New Account"), timeoutMillis = 5000)
             onNodeWithText("Create New Account").assertIsDisplayed()
 
@@ -115,7 +115,7 @@ class CreateAccountWithNewCategoryE2ETest {
             waitUntilDoesNotExist(hasText("Create New Account"), timeoutMillis = 10000)
 
             // Step 8: Verify the account was created and appears in the list
-            onNodeWithText("Test Checking Account").assertIsDisplayed()
+            onNodeWithText("Test Checking Account", useUnmergedTree = true).assertIsDisplayed()
         }
 }
 

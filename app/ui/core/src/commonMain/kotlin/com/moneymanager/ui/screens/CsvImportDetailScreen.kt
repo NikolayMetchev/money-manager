@@ -42,6 +42,8 @@ import com.moneymanager.domain.repository.CsvImportRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.DeviceRepository
+import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
+import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.ui.components.csv.CsvPreviewTable
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
@@ -63,6 +65,8 @@ fun CsvImportDetailScreen(
     currencyRepository: CurrencyRepository,
     transactionRepository: TransactionRepository,
     attributeTypeRepository: AttributeTypeRepository,
+    personRepository: PersonRepository,
+    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     maintenanceService: DatabaseMaintenanceService,
     transferSourceQueries: TransferSourceQueries,
     deviceRepository: DeviceRepository,
@@ -373,6 +377,8 @@ fun CsvImportDetailScreen(
             categoryRepository = categoryRepository,
             currencyRepository = currencyRepository,
             attributeTypeRepository = attributeTypeRepository,
+            personRepository = personRepository,
+            personAccountOwnershipRepository = personAccountOwnershipRepository,
             csvColumns = import!!.columns,
             rows = rows,
             onDismiss = { showCreateStrategyDialog = false },

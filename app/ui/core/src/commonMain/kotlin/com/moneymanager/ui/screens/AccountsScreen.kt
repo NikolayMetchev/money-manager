@@ -23,7 +23,11 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.CategoryRepository
+import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
+import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.ui.components.CreateAccountDialog
+import com.moneymanager.ui.components.EditAccountDialog
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.util.formatAmount
@@ -38,6 +42,8 @@ fun AccountsScreen(
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
     transactionRepository: TransactionRepository,
+    personRepository: PersonRepository,
+    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     onAccountClick: (Account) -> Unit,
 ) {
     // Use schema-error-aware collection for flows that may fail on old databases
@@ -97,6 +103,8 @@ fun AccountsScreen(
                             category = category,
                             balances = accountBalances,
                             accountRepository = accountRepository,
+                            personRepository = personRepository,
+                            personAccountOwnershipRepository = personAccountOwnershipRepository,
                             onClick = { onAccountClick(account) },
                             onEditClick = { accountToEdit = account },
                         )
@@ -114,6 +122,8 @@ fun AccountsScreen(
         CreateAccountDialog(
             accountRepository = accountRepository,
             categoryRepository = categoryRepository,
+            personRepository = personRepository,
+            personAccountOwnershipRepository = personAccountOwnershipRepository,
             onDismiss = { showCreateDialog = false },
         )
     }
@@ -124,6 +134,8 @@ fun AccountsScreen(
             account = currentAccountToEdit,
             accountRepository = accountRepository,
             categoryRepository = categoryRepository,
+            personRepository = personRepository,
+            personAccountOwnershipRepository = personAccountOwnershipRepository,
             onDismiss = { accountToEdit = null },
         )
     }
@@ -135,10 +147,21 @@ fun AccountCard(
     category: Category?,
     balances: List<AccountBalance>,
     accountRepository: AccountRepository,
+    personRepository: PersonRepository,
+    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     onClick: () -> Unit,
     onEditClick: () -> Unit,
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
+
+    val ownerships by personAccountOwnershipRepository.getOwnershipsByAccount(account.id)
+        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val allPeople by personRepository.getAllPeople()
+        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val owners =
+        ownerships.mapNotNull { ownership ->
+            allPeople.find { it.id == ownership.personId }
+        }
 
     Card(
         modifier =
@@ -166,6 +189,13 @@ fun AccountCard(
                     if (category != null && category.id != -1L) {
                         Text(
                             text = category.name,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (owners.isNotEmpty()) {
+                        Text(
+                            text = "Owners: ${owners.joinToString(", ") { it.fullName }}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

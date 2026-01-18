@@ -41,6 +41,8 @@ import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
+import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.util.GenerationProgress
@@ -106,6 +108,8 @@ fun SettingsScreen(
     currencyRepository: CurrencyRepository,
     categoryRepository: CategoryRepository,
     accountRepository: AccountRepository,
+    personRepository: PersonRepository,
+    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     attributeTypeRepository: AttributeTypeRepository,
     transactionRepository: TransactionRepository,
     maintenanceService: DatabaseMaintenanceService,
@@ -398,6 +402,8 @@ fun SettingsScreen(
                                     currencyRepository = currencyRepository,
                                     categoryRepository = categoryRepository,
                                     accountRepository = accountRepository,
+                                    personRepository = personRepository,
+                                    personAccountOwnershipRepository = personAccountOwnershipRepository,
                                     attributeTypeRepository = attributeTypeRepository,
                                     transactionRepository = transactionRepository,
                                     maintenanceService = maintenanceService,

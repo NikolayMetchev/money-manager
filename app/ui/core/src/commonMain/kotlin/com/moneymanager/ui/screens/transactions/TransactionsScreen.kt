@@ -41,6 +41,7 @@ import com.moneymanager.compose.scrollbar.HorizontalScrollbarForScrollState
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForScrollState
 import com.moneymanager.database.DatabaseMaintenanceService
+import com.moneymanager.database.sql.TransferSourceQueries
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.TransactionId
@@ -50,6 +51,9 @@ import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.domain.repository.DeviceRepository
+import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
+import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.domain.repository.TransferAttributeRepository
 import com.moneymanager.domain.repository.TransferSourceRepository
@@ -64,10 +68,14 @@ fun AccountTransactionsScreen(
     accountId: AccountId,
     transactionRepository: TransactionRepository,
     transferSourceRepository: TransferSourceRepository,
+    transferSourceQueries: TransferSourceQueries,
+    deviceRepository: DeviceRepository,
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
     attributeTypeRepository: AttributeTypeRepository,
+    personRepository: PersonRepository,
+    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     transferAttributeRepository: TransferAttributeRepository,
     maintenanceService: DatabaseMaintenanceService,
     onAccountIdChange: (AccountId) -> Unit = {},
@@ -883,10 +891,14 @@ fun AccountTransactionsScreen(
             transaction = transfer,
             transactionRepository = transactionRepository,
             transferSourceRepository = transferSourceRepository,
+            transferSourceQueries = transferSourceQueries,
+            deviceRepository = deviceRepository,
             accountRepository = accountRepository,
             categoryRepository = categoryRepository,
             currencyRepository = currencyRepository,
             attributeTypeRepository = attributeTypeRepository,
+            personRepository = personRepository,
+            personAccountOwnershipRepository = personAccountOwnershipRepository,
             transferAttributeRepository = transferAttributeRepository,
             maintenanceService = maintenanceService,
             onDismiss = { transactionIdToEdit = null },

@@ -39,6 +39,8 @@ import com.moneymanager.domain.repository.CsvImportRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.DeviceRepository
+import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
+import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.domain.repository.TransferAttributeRepository
 import com.moneymanager.domain.repository.TransferSourceRepository
@@ -54,11 +56,12 @@ import com.moneymanager.ui.screens.CategoriesScreen
 import com.moneymanager.ui.screens.CsvImportDetailScreen
 import com.moneymanager.ui.screens.CsvImportsScreen
 import com.moneymanager.ui.screens.CurrenciesScreen
+import com.moneymanager.ui.screens.PeopleScreen
 import com.moneymanager.ui.screens.SettingsScreen
 import com.moneymanager.ui.screens.csvstrategy.CsvStrategiesScreen
 import com.moneymanager.ui.screens.transactions.AccountTransactionsScreen
 import com.moneymanager.ui.screens.transactions.TransactionAuditScreen
-import com.moneymanager.ui.screens.transactions.TransactionEntryDialog
+import com.moneymanager.ui.screens.transactions.TransactionEditDialog
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -77,6 +80,8 @@ fun MoneyManagerApp(
     currencyRepository: CurrencyRepository,
     deviceRepository: DeviceRepository,
     maintenanceService: DatabaseMaintenanceService,
+    personRepository: PersonRepository,
+    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     transactionRepository: TransactionRepository,
     transferAttributeRepository: TransferAttributeRepository,
     transferSourceRepository: TransferSourceRepository,
@@ -159,6 +164,12 @@ fun MoneyManagerApp(
                             onClick = { navigationHistory.navigateTo(Screen.Categories) },
                         )
                         NavigationBarItem(
+                            icon = { Text("\uD83D\uDC65") },
+                            label = { Text("People") },
+                            selected = currentScreen is Screen.People,
+                            onClick = { navigationHistory.navigateTo(Screen.People) },
+                        )
+                        NavigationBarItem(
                             icon = { Text("\uD83D\uDCC4") },
                             label = { Text("CSV") },
                             selected = currentScreen is Screen.CsvImports || currentScreen is Screen.CsvImportDetail,
@@ -203,6 +214,8 @@ fun MoneyManagerApp(
                                 accountRepository = accountRepository,
                                 categoryRepository = categoryRepository,
                                 transactionRepository = transactionRepository,
+                                personRepository = personRepository,
+                                personAccountOwnershipRepository = personAccountOwnershipRepository,
                                 onAccountClick = { account ->
                                     navigationHistory.navigateTo(Screen.AccountTransactions(account.id, account.name))
                                 },
@@ -227,6 +240,17 @@ fun MoneyManagerApp(
                                 currencyRepository = currencyRepository,
                             )
                         }
+                        is Screen.People -> {
+                            // Reset currentlyViewedAccountId and currentlyViewedCurrencyId when on other screens
+                            LaunchedEffect(Unit) {
+                                currentlyViewedAccountId = null
+                                currentlyViewedCurrencyId = null
+                            }
+                            PeopleScreen(
+                                personRepository = personRepository,
+                                personAccountOwnershipRepository = personAccountOwnershipRepository,
+                            )
+                        }
                         is Screen.Settings -> {
                             // Reset currentlyViewedAccountId and currentlyViewedCurrencyId when on other screens
                             LaunchedEffect(Unit) {
@@ -237,6 +261,8 @@ fun MoneyManagerApp(
                                 currencyRepository = currencyRepository,
                                 categoryRepository = categoryRepository,
                                 accountRepository = accountRepository,
+                                personRepository = personRepository,
+                                personAccountOwnershipRepository = personAccountOwnershipRepository,
                                 attributeTypeRepository = attributeTypeRepository,
                                 transactionRepository = transactionRepository,
                                 maintenanceService = maintenanceService,
@@ -253,10 +279,14 @@ fun MoneyManagerApp(
                                 accountId = currentlyViewedAccountId ?: screen.accountId,
                                 transactionRepository = transactionRepository,
                                 transferSourceRepository = transferSourceRepository,
+                                transferSourceQueries = transferSourceQueries,
+                                deviceRepository = deviceRepository,
                                 accountRepository = accountRepository,
                                 categoryRepository = categoryRepository,
                                 currencyRepository = currencyRepository,
                                 attributeTypeRepository = attributeTypeRepository,
+                                personRepository = personRepository,
+                                personAccountOwnershipRepository = personAccountOwnershipRepository,
                                 transferAttributeRepository = transferAttributeRepository,
                                 maintenanceService = maintenanceService,
                                 onAccountIdChange = { accountId ->
@@ -301,6 +331,8 @@ fun MoneyManagerApp(
                                 currencyRepository = currencyRepository,
                                 transactionRepository = transactionRepository,
                                 attributeTypeRepository = attributeTypeRepository,
+                                personRepository = personRepository,
+                                personAccountOwnershipRepository = personAccountOwnershipRepository,
                                 maintenanceService = maintenanceService,
                                 transferSourceQueries = transferSourceQueries,
                                 deviceRepository = deviceRepository,
@@ -349,6 +381,8 @@ fun MoneyManagerApp(
                                 categoryRepository = categoryRepository,
                                 currencyRepository = currencyRepository,
                                 attributeTypeRepository = attributeTypeRepository,
+                                personRepository = personRepository,
+                                personAccountOwnershipRepository = personAccountOwnershipRepository,
                                 csvStrategyExportService = csvStrategyExportService,
                                 appVersion = appVersion,
                                 onBack = { navigationHistory.navigateBack() },
@@ -369,14 +403,19 @@ fun MoneyManagerApp(
             }
 
             if (showTransactionDialog) {
-                TransactionEntryDialog(
+                TransactionEditDialog(
+                    transaction = null,
                     transactionRepository = transactionRepository,
+                    transferSourceRepository = transferSourceRepository,
                     transferSourceQueries = transferSourceQueries,
                     deviceRepository = deviceRepository,
                     accountRepository = accountRepository,
                     categoryRepository = categoryRepository,
                     currencyRepository = currencyRepository,
                     attributeTypeRepository = attributeTypeRepository,
+                    personRepository = personRepository,
+                    personAccountOwnershipRepository = personAccountOwnershipRepository,
+                    transferAttributeRepository = transferAttributeRepository,
                     maintenanceService = maintenanceService,
                     preSelectedSourceAccountId = preSelectedAccountId,
                     preSelectedCurrencyId = preSelectedCurrencyId,
@@ -385,7 +424,7 @@ fun MoneyManagerApp(
                         preSelectedAccountId = null
                         preSelectedCurrencyId = null
                     },
-                    onTransactionCreated = {
+                    onSaved = {
                         transactionRefreshTrigger++
                     },
                 )

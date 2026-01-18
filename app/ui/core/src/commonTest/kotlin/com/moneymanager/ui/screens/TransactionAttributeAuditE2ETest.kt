@@ -78,10 +78,10 @@ class TransactionAttributeAuditE2ETest {
             waitForIdle()
 
             // Verify source account was created
-            onNodeWithText("Checking Account").assertIsDisplayed()
+            onNodeWithText("Checking Account", useUnmergedTree = true).assertIsDisplayed()
 
             // Step 2: Create target account (Savings)
-            onNodeWithText("+ Add Account").performClick()
+            onNodeWithText("+ Add Account", useUnmergedTree = true).performClick()
             waitUntilExactlyOneExists(hasText("Create New Account"), timeoutMillis = 5000)
             onNodeWithText("Account Name").performTextInput("Savings Account")
             onNodeWithText("Create").performClick()
@@ -89,10 +89,10 @@ class TransactionAttributeAuditE2ETest {
             waitForIdle()
 
             // Verify target account was created
-            onNodeWithText("Savings Account").assertIsDisplayed()
+            onNodeWithText("Savings Account", useUnmergedTree = true).assertIsDisplayed()
 
             // Step 3: Navigate to Checking Account's transactions
-            onNodeWithText("Checking Account").performClick()
+            onNodeWithText("Checking Account", useUnmergedTree = true).performClick()
             waitForIdle()
 
             // Wait for transactions screen to load

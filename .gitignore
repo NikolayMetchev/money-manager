@@ -12,6 +12,7 @@ gradle-9.2.0/
 .idea/shelf
 .idea/discord.xml
 .idea/deploymentTargetSelector.xml
+.idea/csv-editor.xml
 .idea/artifacts/
 .idea/caches/
 *.iws

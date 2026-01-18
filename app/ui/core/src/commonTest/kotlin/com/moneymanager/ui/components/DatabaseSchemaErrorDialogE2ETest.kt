@@ -105,6 +105,7 @@ class DatabaseSchemaErrorDialogE2ETest {
 
             // Wait for operation to complete and dialog to disappear
             waitUntilDoesNotExist(hasText("Database Schema Error"), timeoutMillis = 10000)
+            waitForIdle()
 
             // Ensure all pending recompositions complete before test ends
             waitForIdle()
@@ -142,6 +143,7 @@ class DatabaseSchemaErrorDialogE2ETest {
 
             // Wait for operation to complete and dialog to disappear
             waitUntilDoesNotExist(hasText("Database Schema Error"), timeoutMillis = 10000)
+            waitForIdle()
 
             // Ensure all pending recompositions complete before test ends
             waitForIdle()
