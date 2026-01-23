@@ -26,4 +26,5 @@ data class CurrencyAuditEntry(
     val code: String,
     val name: String,
     val scaleFactor: Long,
+    val source: EntitySource? = null,
 )

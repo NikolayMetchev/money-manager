@@ -1,0 +1,89 @@
+-- Generic source tracking for entity changes (Account, Person, Currency, PersonAccountOwnership)
+-- Similar to transfer_source but for non-transfer entities
+
+-- entity_type values:
+-- 1 = ACCOUNT
+-- 2 = PERSON
+-- 3 = CURRENCY
+-- 4 = PERSON_ACCOUNT_OWNERSHIP
+
+CREATE TABLE entity_type (
+    id INTEGER PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL UNIQUE
+);
+
+INSERT OR IGNORE INTO entity_type (id, name) VALUES (1, 'ACCOUNT');
+INSERT OR IGNORE INTO entity_type (id, name) VALUES (2, 'PERSON');
+INSERT OR IGNORE INTO entity_type (id, name) VALUES (3, 'CURRENCY');
+INSERT OR IGNORE INTO entity_type (id, name) VALUES (4, 'PERSON_ACCOUNT_OWNERSHIP');
+
+CREATE TABLE entity_source (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    entity_type_id INTEGER NOT NULL,
+    entity_id INTEGER NOT NULL,
+    revision_id INTEGER NOT NULL,
+    source_type_id INTEGER NOT NULL,
+    device_id INTEGER NOT NULL,
+    created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now') * 1000),
+    FOREIGN KEY (entity_type_id) REFERENCES entity_type(id),
+    FOREIGN KEY (source_type_id) REFERENCES source_type(id),
+    FOREIGN KEY (device_id) REFERENCES device(id),
+    UNIQUE (entity_type_id, entity_id, revision_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_entity_source_entity ON entity_source(entity_type_id, entity_id);
+CREATE INDEX IF NOT EXISTS idx_entity_source_type ON entity_source(source_type_id);
+CREATE INDEX IF NOT EXISTS idx_entity_source_entity_revision ON entity_source(entity_type_id, entity_id, revision_id);
+CREATE INDEX IF NOT EXISTS idx_entity_source_device ON entity_source(device_id);
+
+-- Insert source for an entity
+insertSource:
+INSERT INTO entity_source (entity_type_id, entity_id, revision_id, source_type_id, device_id)
+VALUES (?, ?, ?, ?, ?);
+
+-- Get source for a specific entity revision
+selectSourceByEntityAndRevision:
+SELECT
+    entity_source.id,
+    entity_source.entity_type_id,
+    entity_type.name AS entity_type_name,
+    entity_source.entity_id,
+    entity_source.revision_id,
+    entity_source.source_type_id,
+    source_type.name AS source_type_name,
+    entity_source.device_id,
+    device_view.platform_name,
+    device_view.os_name,
+    device_view.machine_name,
+    device_view.device_make,
+    device_view.device_model,
+    entity_source.created_at
+FROM entity_source
+JOIN entity_type ON entity_source.entity_type_id = entity_type.id
+JOIN source_type ON entity_source.source_type_id = source_type.id
+LEFT JOIN device_view ON entity_source.device_id = device_view.id
+WHERE entity_source.entity_type_id = ? AND entity_source.entity_id = ? AND entity_source.revision_id = ?;
+
+-- Get all sources for an entity (all revisions)
+selectSourcesByEntity:
+SELECT
+    entity_source.id,
+    entity_source.entity_type_id,
+    entity_type.name AS entity_type_name,
+    entity_source.entity_id,
+    entity_source.revision_id,
+    entity_source.source_type_id,
+    source_type.name AS source_type_name,
+    entity_source.device_id,
+    device_view.platform_name,
+    device_view.os_name,
+    device_view.machine_name,
+    device_view.device_make,
+    device_view.device_model,
+    entity_source.created_at
+FROM entity_source
+JOIN entity_type ON entity_source.entity_type_id = entity_type.id
+JOIN source_type ON entity_source.source_type_id = source_type.id
+LEFT JOIN device_view ON entity_source.device_id = device_view.id
+WHERE entity_source.entity_type_id = ? AND entity_source.entity_id = ?
+ORDER BY entity_source.revision_id DESC;

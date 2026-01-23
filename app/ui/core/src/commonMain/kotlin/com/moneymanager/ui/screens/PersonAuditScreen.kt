@@ -35,9 +35,12 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.domain.model.AuditType
+import com.moneymanager.domain.model.DeviceInfo
+import com.moneymanager.domain.model.EntitySource
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonAuditEntry
 import com.moneymanager.domain.model.PersonId
+import com.moneymanager.domain.model.SourceType
 import com.moneymanager.domain.repository.AuditRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.ui.audit.FieldChange
@@ -65,7 +68,7 @@ fun PersonAuditScreen(
         isLoading = true
         errorMessage = null
         try {
-            auditEntries = auditRepository.getAuditHistoryForPerson(personId)
+            auditEntries = auditRepository.getAuditHistoryForPersonWithSource(personId)
             currentPerson = personRepository.getPersonById(personId).first()
         } catch (expected: Exception) {
             logger.error(expected) { "Failed to load audit history: ${expected.message}" }
@@ -158,6 +161,7 @@ private data class PersonAuditDiff(
     val firstName: FieldChange<String>,
     val middleName: FieldChange<String?>,
     val lastName: FieldChange<String?>,
+    val source: EntitySource?,
 ) {
     val hasChanges: Boolean
         get() = listOf(firstName, middleName, lastName).any { it is FieldChange.Changed }
@@ -193,6 +197,7 @@ private fun computePersonAuditDiffs(
                     firstName = FieldChange.Created(entry.firstName),
                     middleName = FieldChange.Created(entry.middleName),
                     lastName = FieldChange.Created(entry.lastName),
+                    source = entry.source,
                 )
             AuditType.DELETE ->
                 PersonAuditDiff(
@@ -204,6 +209,7 @@ private fun computePersonAuditDiffs(
                     firstName = FieldChange.Deleted(entry.firstName),
                     middleName = FieldChange.Deleted(entry.middleName),
                     lastName = FieldChange.Deleted(entry.lastName),
+                    source = entry.source,
                 )
             AuditType.UPDATE -> {
                 // For UPDATE, entry stores OLD values
@@ -257,6 +263,7 @@ private fun computePersonAuditDiffs(
                         } else {
                             FieldChange.Unchanged(entry.lastName)
                         },
+                    source = entry.source,
                 )
             }
         }
@@ -337,6 +344,7 @@ private fun PersonAuditDiffCard(diff: PersonAuditDiff) {
                     FieldValueRow("First Name", diff.firstName.value())
                     FieldValueRow("Middle Name", diff.middleName.value() ?: "(none)")
                     FieldValueRow("Last Name", diff.lastName.value() ?: "(none)")
+                    SourceInfoSection(diff.source)
                 }
                 AuditType.UPDATE -> {
                     if (!diff.hasChanges) {
@@ -372,6 +380,7 @@ private fun PersonAuditDiffCard(diff: PersonAuditDiff) {
                             )
                         }
                     }
+                    SourceInfoSection(diff.source)
                 }
                 AuditType.DELETE -> {
                     val errorColor = MaterialTheme.colorScheme.error
@@ -383,6 +392,7 @@ private fun PersonAuditDiffCard(diff: PersonAuditDiff) {
                     FieldValueRow("First Name", diff.firstName.value(), errorColor)
                     FieldValueRow("Middle Name", diff.middleName.value() ?: "(none)", errorColor)
                     FieldValueRow("Last Name", diff.lastName.value() ?: "(none)", errorColor)
+                    SourceInfoSection(diff.source, labelColor = errorColor.copy(alpha = 0.8f))
                 }
             }
         }
@@ -448,5 +458,75 @@ private fun FieldChangeRow(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.primary,
         )
+    }
+}
+
+@Composable
+private fun SourceInfoSection(
+    source: EntitySource?,
+    labelColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+) {
+    if (source == null) return
+
+    Column(
+        modifier = Modifier.padding(top = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            text = "Source:",
+            style = MaterialTheme.typography.labelMedium,
+            color = labelColor,
+        )
+
+        when (source.sourceType) {
+            SourceType.MANUAL -> {
+                val deviceInfo = source.deviceInfo
+                when (deviceInfo) {
+                    is DeviceInfo.Jvm -> {
+                        FieldValueRow("Origin", "Manual (Desktop)")
+                        FieldValueRow("Machine", deviceInfo.machineName)
+                        FieldValueRow("OS", deviceInfo.osName)
+                    }
+                    is DeviceInfo.Android -> {
+                        FieldValueRow("Origin", "Manual (Android)")
+                        FieldValueRow("Device", "${deviceInfo.deviceMake} ${deviceInfo.deviceModel}")
+                    }
+                    null -> {
+                        FieldValueRow("Origin", "Manual")
+                    }
+                }
+            }
+            SourceType.CSV_IMPORT -> {
+                val deviceInfo = source.deviceInfo
+                FieldValueRow("Origin", "CSV Import")
+                when (deviceInfo) {
+                    is DeviceInfo.Jvm -> {
+                        FieldValueRow("Machine", deviceInfo.machineName)
+                        FieldValueRow("OS", deviceInfo.osName)
+                    }
+                    is DeviceInfo.Android -> {
+                        FieldValueRow("Device", "${deviceInfo.deviceMake} ${deviceInfo.deviceModel}")
+                    }
+                    null -> {}
+                }
+            }
+            SourceType.SAMPLE_GENERATOR -> {
+                val deviceInfo = source.deviceInfo
+                when (deviceInfo) {
+                    is DeviceInfo.Jvm -> {
+                        FieldValueRow("Origin", "Sample Generator (Desktop)")
+                        FieldValueRow("Machine", deviceInfo.machineName)
+                        FieldValueRow("OS", deviceInfo.osName)
+                    }
+                    is DeviceInfo.Android -> {
+                        FieldValueRow("Origin", "Sample Generator (Android)")
+                        FieldValueRow("Device", "${deviceInfo.deviceMake} ${deviceInfo.deviceModel}")
+                    }
+                    null -> {
+                        FieldValueRow("Origin", "Sample Generator")
+                    }
+                }
+            }
+        }
     }
 }

@@ -248,3 +248,104 @@ FROM currency_audit
 JOIN audit_type ON currency_audit.audit_type_id = audit_type.id
 WHERE currency_audit.id = ?
 ORDER BY currency_audit.audit_timestamp DESC, currency_audit.audit_id DESC;
+
+-- Get audit history for an account with source information
+-- entity_type_id = 1 for ACCOUNT
+selectAuditHistoryForAccountWithSource:
+SELECT
+    account_audit.audit_id,
+    account_audit.audit_timestamp,
+    audit_type.name AS audit_type,
+    account_audit.id,
+    account_audit.revision_id,
+    account_audit.name,
+    account_audit.opening_date,
+    account_audit.category_id,
+    category.name AS category_name,
+    -- Source information
+    entity_source.id AS source_id,
+    entity_source.device_id AS source_device_id,
+    source_type.id AS source_type_id,
+    source_type.name AS source_type_name,
+    device_view.platform_name AS source_platform_name,
+    device_view.os_name AS source_os_name,
+    device_view.machine_name AS source_machine_name,
+    device_view.device_make AS source_device_make,
+    device_view.device_model AS source_device_model,
+    entity_source.created_at AS source_created_at
+FROM account_audit
+JOIN audit_type ON account_audit.audit_type_id = audit_type.id
+LEFT JOIN category ON account_audit.category_id = category.id
+LEFT JOIN entity_source ON account_audit.id = entity_source.entity_id
+    AND account_audit.revision_id = entity_source.revision_id
+    AND entity_source.entity_type_id = 1
+LEFT JOIN source_type ON entity_source.source_type_id = source_type.id
+LEFT JOIN device_view ON entity_source.device_id = device_view.id
+WHERE account_audit.id = ?
+ORDER BY account_audit.audit_timestamp DESC, account_audit.audit_id DESC;
+
+-- Get audit history for a person with source information
+-- entity_type_id = 2 for PERSON
+selectAuditHistoryForPersonWithSource:
+SELECT
+    person_audit.audit_id,
+    person_audit.audit_timestamp,
+    audit_type.name AS audit_type,
+    person_audit.id,
+    person_audit.revision_id,
+    person_audit.first_name,
+    person_audit.middle_name,
+    person_audit.last_name,
+    -- Source information
+    entity_source.id AS source_id,
+    entity_source.device_id AS source_device_id,
+    source_type.id AS source_type_id,
+    source_type.name AS source_type_name,
+    device_view.platform_name AS source_platform_name,
+    device_view.os_name AS source_os_name,
+    device_view.machine_name AS source_machine_name,
+    device_view.device_make AS source_device_make,
+    device_view.device_model AS source_device_model,
+    entity_source.created_at AS source_created_at
+FROM person_audit
+JOIN audit_type ON person_audit.audit_type_id = audit_type.id
+LEFT JOIN entity_source ON person_audit.id = entity_source.entity_id
+    AND person_audit.revision_id = entity_source.revision_id
+    AND entity_source.entity_type_id = 2
+LEFT JOIN source_type ON entity_source.source_type_id = source_type.id
+LEFT JOIN device_view ON entity_source.device_id = device_view.id
+WHERE person_audit.id = ?
+ORDER BY person_audit.audit_timestamp DESC, person_audit.audit_id DESC;
+
+-- Get audit history for a currency with source information
+-- entity_type_id = 3 for CURRENCY
+selectAuditHistoryForCurrencyWithSource:
+SELECT
+    currency_audit.audit_id,
+    currency_audit.audit_timestamp,
+    audit_type.name AS audit_type,
+    currency_audit.id,
+    currency_audit.revision_id,
+    currency_audit.code,
+    currency_audit.name,
+    currency_audit.scale_factor,
+    -- Source information
+    entity_source.id AS source_id,
+    entity_source.device_id AS source_device_id,
+    source_type.id AS source_type_id,
+    source_type.name AS source_type_name,
+    device_view.platform_name AS source_platform_name,
+    device_view.os_name AS source_os_name,
+    device_view.machine_name AS source_machine_name,
+    device_view.device_make AS source_device_make,
+    device_view.device_model AS source_device_model,
+    entity_source.created_at AS source_created_at
+FROM currency_audit
+JOIN audit_type ON currency_audit.audit_type_id = audit_type.id
+LEFT JOIN entity_source ON currency_audit.id = entity_source.entity_id
+    AND currency_audit.revision_id = entity_source.revision_id
+    AND entity_source.entity_type_id = 3
+LEFT JOIN source_type ON entity_source.source_type_id = source_type.id
+LEFT JOIN device_view ON entity_source.device_id = device_view.id
+WHERE currency_audit.id = ?
+ORDER BY currency_audit.audit_timestamp DESC, currency_audit.audit_id DESC;

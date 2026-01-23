@@ -42,6 +42,16 @@ interface AuditRepository {
     suspend fun getAuditHistoryForAccount(accountId: AccountId): List<AccountAuditEntry>
 
     /**
+     * Gets the audit history for a specific account with source information.
+     * Returns entries ordered by audit timestamp descending (most recent first).
+     * Each entry includes its source/provenance if available.
+     *
+     * @param accountId The ID of the account to get audit history for
+     * @return List of audit entries with source information
+     */
+    suspend fun getAuditHistoryForAccountWithSource(accountId: AccountId): List<AccountAuditEntry>
+
+    /**
      * Gets the audit history for a specific person.
      * Returns entries ordered by audit timestamp descending (most recent first).
      *
@@ -49,6 +59,16 @@ interface AuditRepository {
      * @return List of audit entries for the person
      */
     suspend fun getAuditHistoryForPerson(personId: PersonId): List<PersonAuditEntry>
+
+    /**
+     * Gets the audit history for a specific person with source information.
+     * Returns entries ordered by audit timestamp descending (most recent first).
+     * Each entry includes its source/provenance if available.
+     *
+     * @param personId The ID of the person to get audit history for
+     * @return List of audit entries with source information
+     */
+    suspend fun getAuditHistoryForPersonWithSource(personId: PersonId): List<PersonAuditEntry>
 
     /**
      * Gets the audit history for a specific person-account ownership.
@@ -67,4 +87,14 @@ interface AuditRepository {
      * @return List of audit entries for the currency
      */
     suspend fun getAuditHistoryForCurrency(currencyId: CurrencyId): List<CurrencyAuditEntry>
+
+    /**
+     * Gets the audit history for a specific currency with source information.
+     * Returns entries ordered by audit timestamp descending (most recent first).
+     * Each entry includes its source/provenance if available.
+     *
+     * @param currencyId The ID of the currency to get audit history for
+     * @return List of audit entries with source information
+     */
+    suspend fun getAuditHistoryForCurrencyWithSource(currencyId: CurrencyId): List<CurrencyAuditEntry>
 }
