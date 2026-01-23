@@ -24,6 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.database.service.CsvStrategyExportService
+import com.moneymanager.database.sql.EntitySourceQueries
 import com.moneymanager.database.sql.TransferSourceQueries
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AppVersion
@@ -89,6 +90,7 @@ fun MoneyManagerApp(
     transferAttributeRepository: TransferAttributeRepository,
     transferSourceRepository: TransferSourceRepository,
     transferSourceQueries: TransferSourceQueries,
+    entitySourceQueries: EntitySourceQueries,
     deviceId: DeviceId,
 ) {
     ProvideSchemaAwareScope {
@@ -281,6 +283,7 @@ fun MoneyManagerApp(
                                 transactionRepository = transactionRepository,
                                 maintenanceService = maintenanceService,
                                 transferSourceQueries = transferSourceQueries,
+                                entitySourceQueries = entitySourceQueries,
                                 deviceId = deviceId,
                             )
                         }
