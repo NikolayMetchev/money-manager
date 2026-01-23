@@ -22,7 +22,10 @@ import org.lighthousegames.logging.logging
 private val logger = logging()
 
 @Composable
-fun CurrenciesScreen(currencyRepository: CurrencyRepository) {
+fun CurrenciesScreen(
+    currencyRepository: CurrencyRepository,
+    onAuditClick: (Currency) -> Unit = {},
+) {
     val currencies by currencyRepository.getAllCurrencies()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
     var showCreateDialog by remember { mutableStateOf(false) }
@@ -62,6 +65,7 @@ fun CurrenciesScreen(currencyRepository: CurrencyRepository) {
                             CurrencyCard(
                                 currency = currency,
                                 currencyRepository = currencyRepository,
+                                onAuditClick = { onAuditClick(currency) },
                             )
                         }
                     }
@@ -96,6 +100,7 @@ fun CurrenciesScreen(currencyRepository: CurrencyRepository) {
 fun CurrencyCard(
     currency: Currency,
     currencyRepository: CurrencyRepository,
+    onAuditClick: () -> Unit = {},
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
 
@@ -120,6 +125,14 @@ fun CurrencyCard(
                     text = currency.name,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            IconButton(
+                onClick = onAuditClick,
+            ) {
+                Text(
+                    text = "📋",
+                    style = MaterialTheme.typography.titleMedium,
                 )
             }
             IconButton(

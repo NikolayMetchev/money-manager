@@ -45,6 +45,7 @@ fun AccountsScreen(
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     onAccountClick: (Account) -> Unit,
+    onAuditClick: (Account) -> Unit = {},
 ) {
     // Use schema-error-aware collection for flows that may fail on old databases
     val accounts by accountRepository.getAllAccounts()
@@ -107,6 +108,7 @@ fun AccountsScreen(
                             personAccountOwnershipRepository = personAccountOwnershipRepository,
                             onClick = { onAccountClick(account) },
                             onEditClick = { accountToEdit = account },
+                            onAuditClick = { onAuditClick(account) },
                         )
                     }
                 }
@@ -151,6 +153,7 @@ fun AccountCard(
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     onClick: () -> Unit,
     onEditClick: () -> Unit,
+    onAuditClick: () -> Unit = {},
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
 
@@ -206,6 +209,14 @@ fun AccountCard(
                 ) {
                     Text(
                         text = "✏️",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                }
+                IconButton(
+                    onClick = onAuditClick,
+                ) {
+                    Text(
+                        text = "📋",
                         style = MaterialTheme.typography.titleMedium,
                     )
                 }

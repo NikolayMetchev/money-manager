@@ -7,6 +7,7 @@ CREATE TABLE account_audit (
     audit_timestamp INTEGER NOT NULL,
     audit_type_id INTEGER NOT NULL,
     id INTEGER NOT NULL,
+    revision_id INTEGER NOT NULL,
     name TEXT NOT NULL,
     opening_date INTEGER NOT NULL,
     category_id INTEGER NOT NULL,
@@ -24,6 +25,7 @@ CREATE TABLE currency_audit (
     audit_timestamp INTEGER NOT NULL,
     audit_type_id INTEGER NOT NULL,
     id INTEGER NOT NULL,
+    revision_id INTEGER NOT NULL,
     code TEXT NOT NULL,
     name TEXT NOT NULL,
     scale_factor INTEGER NOT NULL,
@@ -147,6 +149,7 @@ CREATE TABLE person_audit (
     audit_timestamp INTEGER NOT NULL,
     audit_type_id INTEGER NOT NULL,
     id INTEGER NOT NULL,
+    revision_id INTEGER NOT NULL,
     first_name TEXT NOT NULL,
     middle_name TEXT,
     last_name TEXT,
@@ -164,6 +167,7 @@ CREATE TABLE person_account_ownership_audit (
     audit_timestamp INTEGER NOT NULL,
     audit_type_id INTEGER NOT NULL,
     id INTEGER NOT NULL,
+    revision_id INTEGER NOT NULL,
     person_id INTEGER NOT NULL,
     account_id INTEGER NOT NULL,
     FOREIGN KEY (audit_type_id) REFERENCES audit_type(id)
@@ -173,3 +177,74 @@ CREATE INDEX IF NOT EXISTS idx_person_account_ownership_audit_id ON person_accou
 CREATE INDEX IF NOT EXISTS idx_person_account_ownership_audit_timestamp ON person_account_ownership_audit(audit_timestamp);
 CREATE INDEX IF NOT EXISTS idx_person_account_ownership_audit_type ON person_account_ownership_audit(audit_type_id);
 CREATE INDEX IF NOT EXISTS idx_person_account_ownership_audit_id_timestamp ON person_account_ownership_audit(id, audit_timestamp DESC);
+
+-- Get audit history for an account
+selectAuditHistoryForAccount:
+SELECT
+    account_audit.audit_id,
+    account_audit.audit_timestamp,
+    audit_type.name AS audit_type,
+    account_audit.id,
+    account_audit.revision_id,
+    account_audit.name,
+    account_audit.opening_date,
+    account_audit.category_id,
+    category.name AS category_name
+FROM account_audit
+JOIN audit_type ON account_audit.audit_type_id = audit_type.id
+LEFT JOIN category ON account_audit.category_id = category.id
+WHERE account_audit.id = ?
+ORDER BY account_audit.audit_timestamp DESC, account_audit.audit_id DESC;
+
+-- Get audit history for a person
+selectAuditHistoryForPerson:
+SELECT
+    person_audit.audit_id,
+    person_audit.audit_timestamp,
+    audit_type.name AS audit_type,
+    person_audit.id,
+    person_audit.revision_id,
+    person_audit.first_name,
+    person_audit.middle_name,
+    person_audit.last_name
+FROM person_audit
+JOIN audit_type ON person_audit.audit_type_id = audit_type.id
+WHERE person_audit.id = ?
+ORDER BY person_audit.audit_timestamp DESC, person_audit.audit_id DESC;
+
+-- Get audit history for a person account ownership
+selectAuditHistoryForPersonAccountOwnership:
+SELECT
+    person_account_ownership_audit.audit_id,
+    person_account_ownership_audit.audit_timestamp,
+    audit_type.name AS audit_type,
+    person_account_ownership_audit.id,
+    person_account_ownership_audit.revision_id,
+    person_account_ownership_audit.person_id,
+    person_account_ownership_audit.account_id,
+    person.first_name AS person_first_name,
+    person.middle_name AS person_middle_name,
+    person.last_name AS person_last_name,
+    account.name AS account_name
+FROM person_account_ownership_audit
+JOIN audit_type ON person_account_ownership_audit.audit_type_id = audit_type.id
+LEFT JOIN person ON person_account_ownership_audit.person_id = person.id
+LEFT JOIN account ON person_account_ownership_audit.account_id = account.id
+WHERE person_account_ownership_audit.id = ?
+ORDER BY person_account_ownership_audit.audit_timestamp DESC, person_account_ownership_audit.audit_id DESC;
+
+-- Get audit history for a currency
+selectAuditHistoryForCurrency:
+SELECT
+    currency_audit.audit_id,
+    currency_audit.audit_timestamp,
+    audit_type.name AS audit_type,
+    currency_audit.id,
+    currency_audit.revision_id,
+    currency_audit.code,
+    currency_audit.name,
+    currency_audit.scale_factor
+FROM currency_audit
+JOIN audit_type ON currency_audit.audit_type_id = audit_type.id
+WHERE currency_audit.id = ?
+ORDER BY currency_audit.audit_timestamp DESC, currency_audit.audit_id DESC;

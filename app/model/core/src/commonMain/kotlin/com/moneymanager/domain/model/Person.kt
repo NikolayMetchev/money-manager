@@ -4,6 +4,7 @@ import kotlinx.serialization.Serializable
 
 data class Person(
     val id: PersonId,
+    val revisionId: Long = 1,
     val firstName: String,
     val middleName: String?,
     val lastName: String?,

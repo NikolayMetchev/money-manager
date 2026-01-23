@@ -51,12 +51,15 @@ import com.moneymanager.ui.navigation.NavigationHistory
 import com.moneymanager.ui.navigation.PlatformBackHandler
 import com.moneymanager.ui.navigation.Screen
 import com.moneymanager.ui.navigation.mouseButtonNavigation
+import com.moneymanager.ui.screens.AccountAuditScreen
 import com.moneymanager.ui.screens.AccountsScreen
 import com.moneymanager.ui.screens.CategoriesScreen
 import com.moneymanager.ui.screens.CsvImportDetailScreen
 import com.moneymanager.ui.screens.CsvImportsScreen
 import com.moneymanager.ui.screens.CurrenciesScreen
+import com.moneymanager.ui.screens.CurrencyAuditScreen
 import com.moneymanager.ui.screens.PeopleScreen
+import com.moneymanager.ui.screens.PersonAuditScreen
 import com.moneymanager.ui.screens.SettingsScreen
 import com.moneymanager.ui.screens.csvstrategy.CsvStrategiesScreen
 import com.moneymanager.ui.screens.transactions.AccountTransactionsScreen
@@ -219,6 +222,9 @@ fun MoneyManagerApp(
                                 onAccountClick = { account ->
                                     navigationHistory.navigateTo(Screen.AccountTransactions(account.id, account.name))
                                 },
+                                onAuditClick = { account ->
+                                    navigationHistory.navigateTo(Screen.AccountAuditHistory(account.id, account.name))
+                                },
                             )
                         }
                         is Screen.Currencies -> {
@@ -227,7 +233,12 @@ fun MoneyManagerApp(
                                 currentlyViewedAccountId = null
                                 currentlyViewedCurrencyId = null
                             }
-                            CurrenciesScreen(currencyRepository)
+                            CurrenciesScreen(
+                                currencyRepository = currencyRepository,
+                                onAuditClick = { currency ->
+                                    navigationHistory.navigateTo(Screen.CurrencyAuditHistory(currency.id, currency.code))
+                                },
+                            )
                         }
                         is Screen.Categories -> {
                             // Reset currentlyViewedAccountId and currentlyViewedCurrencyId when on other screens
@@ -249,6 +260,9 @@ fun MoneyManagerApp(
                             PeopleScreen(
                                 personRepository = personRepository,
                                 personAccountOwnershipRepository = personAccountOwnershipRepository,
+                                onAuditClick = { person ->
+                                    navigationHistory.navigateTo(Screen.PersonAuditHistory(person.id, person.fullName))
+                                },
                             )
                         }
                         is Screen.Settings -> {
@@ -395,6 +409,30 @@ fun MoneyManagerApp(
                                 accountRepository = accountRepository,
                                 transactionRepository = transactionRepository,
                                 currentDeviceId = deviceId,
+                                onBack = { navigationHistory.navigateBack() },
+                            )
+                        }
+                        is Screen.AccountAuditHistory -> {
+                            AccountAuditScreen(
+                                accountId = screen.accountId,
+                                auditRepository = auditRepository,
+                                accountRepository = accountRepository,
+                                onBack = { navigationHistory.navigateBack() },
+                            )
+                        }
+                        is Screen.PersonAuditHistory -> {
+                            PersonAuditScreen(
+                                personId = screen.personId,
+                                auditRepository = auditRepository,
+                                personRepository = personRepository,
+                                onBack = { navigationHistory.navigateBack() },
+                            )
+                        }
+                        is Screen.CurrencyAuditHistory -> {
+                            CurrencyAuditScreen(
+                                currencyId = screen.currencyId,
+                                auditRepository = auditRepository,
+                                currencyRepository = currencyRepository,
                                 onBack = { navigationHistory.navigateBack() },
                             )
                         }

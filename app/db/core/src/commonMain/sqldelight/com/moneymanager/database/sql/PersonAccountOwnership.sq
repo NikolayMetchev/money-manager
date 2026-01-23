@@ -1,5 +1,6 @@
 CREATE TABLE person_account_ownership (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    revision_id INTEGER NOT NULL DEFAULT 1,
     person_id INTEGER NOT NULL,
     account_id INTEGER NOT NULL,
     FOREIGN KEY (person_id) REFERENCES person(id) ON DELETE CASCADE,

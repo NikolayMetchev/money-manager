@@ -3,6 +3,8 @@
 package com.moneymanager.ui.navigation
 
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImportId
 
@@ -32,4 +34,13 @@ sealed class Screen(val title: String) {
 
     data class AuditHistory(val transferId: TransferId) :
         Screen("Audit History")
+
+    data class AccountAuditHistory(val accountId: AccountId, val accountName: String) :
+        Screen("Account Audit: $accountName")
+
+    data class PersonAuditHistory(val personId: PersonId, val personName: String) :
+        Screen("Person Audit: $personName")
+
+    data class CurrencyAuditHistory(val currencyId: CurrencyId, val currencyCode: String) :
+        Screen("Currency Audit: $currencyCode")
 }

@@ -48,6 +48,7 @@ import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 fun PeopleScreen(
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
+    onAuditClick: (Person) -> Unit = {},
 ) {
     val people by personRepository.getAllPeople()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
@@ -101,6 +102,7 @@ fun PeopleScreen(
                             person = person,
                             ownerships = ownerships,
                             onEdit = { personToEdit = person },
+                            onAudit = { onAuditClick(person) },
                             onDelete = { personToDelete = person },
                         )
                     }
@@ -148,6 +150,7 @@ private fun PersonCard(
     person: Person,
     ownerships: List<PersonAccountOwnership>,
     onEdit: () -> Unit,
+    onAudit: () -> Unit,
     onDelete: () -> Unit,
 ) {
     Card(
@@ -182,6 +185,12 @@ private fun PersonCard(
                     Icon(
                         imageVector = Icons.Default.Edit,
                         contentDescription = "Edit ${person.fullName}",
+                    )
+                }
+                IconButton(onClick = onAudit) {
+                    Text(
+                        text = "📋",
+                        style = MaterialTheme.typography.titleMedium,
                     )
                 }
                 IconButton(onClick = onDelete) {

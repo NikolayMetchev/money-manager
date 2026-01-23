@@ -2,12 +2,23 @@
 
 package com.moneymanager.database.repository
 
+import com.moneymanager.database.mapper.AccountAuditEntryMapper
+import com.moneymanager.database.mapper.CurrencyAuditEntryMapper
+import com.moneymanager.database.mapper.PersonAccountOwnershipAuditEntryMapper
+import com.moneymanager.database.mapper.PersonAuditEntryMapper
 import com.moneymanager.database.mapper.TransferAuditEntryMapper
 import com.moneymanager.database.mapper.TransferAuditEntryWithSourceMapper
 import com.moneymanager.database.sql.MoneyManagerDatabase
+import com.moneymanager.domain.model.AccountAuditEntry
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.AuditType
+import com.moneymanager.domain.model.CurrencyAuditEntry
+import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.PersonAccountOwnershipAuditEntry
+import com.moneymanager.domain.model.PersonAuditEntry
+import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.TransferAttributeAuditEntry
 import com.moneymanager.domain.model.TransferAuditEntry
 import com.moneymanager.domain.model.TransferId
@@ -39,6 +50,34 @@ class AuditRepositoryImpl(
                     .map(TransferAuditEntryWithSourceMapper::map)
 
             attachAttributeChanges(transferId, entries)
+        }
+
+    override suspend fun getAuditHistoryForAccount(accountId: AccountId): List<AccountAuditEntry> =
+        withContext(Dispatchers.Default) {
+            queries.selectAuditHistoryForAccount(accountId.id)
+                .executeAsList()
+                .map(AccountAuditEntryMapper::map)
+        }
+
+    override suspend fun getAuditHistoryForPerson(personId: PersonId): List<PersonAuditEntry> =
+        withContext(Dispatchers.Default) {
+            queries.selectAuditHistoryForPerson(personId.id)
+                .executeAsList()
+                .map(PersonAuditEntryMapper::map)
+        }
+
+    override suspend fun getAuditHistoryForPersonAccountOwnership(ownershipId: Long): List<PersonAccountOwnershipAuditEntry> =
+        withContext(Dispatchers.Default) {
+            queries.selectAuditHistoryForPersonAccountOwnership(ownershipId)
+                .executeAsList()
+                .map(PersonAccountOwnershipAuditEntryMapper::map)
+        }
+
+    override suspend fun getAuditHistoryForCurrency(currencyId: CurrencyId): List<CurrencyAuditEntry> =
+        withContext(Dispatchers.Default) {
+            queries.selectAuditHistoryForCurrency(currencyId.id)
+                .executeAsList()
+                .map(CurrencyAuditEntryMapper::map)
         }
 
     private fun attachAttributeChanges(
