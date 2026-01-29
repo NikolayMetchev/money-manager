@@ -18,7 +18,8 @@ object PersonAuditEntryWithSourceMapper :
     AuditTypeConversions {
     override fun map(from: SelectAuditHistoryForPersonWithSource): PersonAuditEntry =
         mapping {
-            PersonAuditEntry::personId fromValue toPersonId(from.id)
+            PersonAuditEntry::auditId fromValue from.id
+            PersonAuditEntry::personId fromValue toPersonId(from.person_id)
             PersonAuditEntry::source fromValue from.toEntitySource()
         }
 }
@@ -48,7 +49,7 @@ private fun SelectAuditHistoryForPersonWithSource.toEntitySource(): EntitySource
     return EntitySource(
         id = sourceId,
         entityType = EntityType.PERSON,
-        entityId = id,
+        entityId = person_id,
         revisionId = revision_id,
         sourceType = SourceType.fromName(sourceTypeName),
         deviceId = deviceId,

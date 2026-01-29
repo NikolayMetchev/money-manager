@@ -13,7 +13,8 @@ object PersonAccountOwnershipAuditEntryMapper :
     AuditTypeConversions {
     override fun map(from: SelectAuditHistoryForPersonAccountOwnership): PersonAccountOwnershipAuditEntry =
         mapping {
-            PersonAccountOwnershipAuditEntry::ownershipId fromValue from.id
+            PersonAccountOwnershipAuditEntry::auditId fromValue from.id
+            PersonAccountOwnershipAuditEntry::ownershipId fromValue from.ownership_id
             PersonAccountOwnershipAuditEntry::personId fromValue toPersonId(from.person_id)
             PersonAccountOwnershipAuditEntry::accountId fromValue toAccountId(from.account_id)
             PersonAccountOwnershipAuditEntry::personFullName fromValue

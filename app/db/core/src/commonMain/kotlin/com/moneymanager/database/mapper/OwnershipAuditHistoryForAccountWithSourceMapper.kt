@@ -17,7 +17,7 @@ object OwnershipAuditHistoryForAccountWithSourceMapper {
                 EntitySource(
                     id = from.source_id,
                     entityType = EntityType.PERSON_ACCOUNT_OWNERSHIP,
-                    entityId = from.id,
+                    entityId = from.ownership_id,
                     revisionId = from.revision_id,
                     sourceType = mapSourceType(from.source_type_name),
                     deviceId = from.source_device_id!!,
@@ -29,10 +29,10 @@ object OwnershipAuditHistoryForAccountWithSourceMapper {
             }
 
         return PersonAccountOwnershipAuditEntry(
-            auditId = from.audit_id,
+            auditId = from.id,
             auditTimestamp = Instant.fromEpochMilliseconds(from.audit_timestamp),
             auditType = mapAuditType(from.audit_type),
-            ownershipId = from.id,
+            ownershipId = from.ownership_id,
             revisionId = from.revision_id,
             personId = toPersonId(from.person_id),
             accountId = toAccountId(from.account_id),

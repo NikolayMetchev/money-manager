@@ -225,8 +225,8 @@ object DatabaseConfig {
                   AND NOT EXISTS (SELECT 1 FROM _creation_mode);
 
                 -- Always record the addition in audit table at current revision
-                INSERT INTO transfer_attribute_audit (transaction_id, revision_id, attribute_type_id, audit_type_id, attribute_value)
-                SELECT NEW.transaction_id, revision_id, NEW.attribute_type_id, 1, NEW.attribute_value
+                INSERT INTO transfer_attribute_audit (audit_timestamp, audit_type_id, transfer_id, revision_id, attribute_type_id, attribute_value)
+                SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, NEW.transaction_id, revision_id, NEW.attribute_type_id, NEW.attribute_value
                 FROM transfer WHERE id = NEW.transaction_id;
             END
             """.trimIndent(),
@@ -250,8 +250,8 @@ object DatabaseConfig {
                   AND NOT EXISTS (SELECT 1 FROM _creation_mode);
 
                 -- Always record the change in audit table (OLD value - what it was before)
-                INSERT INTO transfer_attribute_audit (transaction_id, revision_id, attribute_type_id, audit_type_id, attribute_value)
-                SELECT NEW.transaction_id, revision_id, NEW.attribute_type_id, 2, OLD.attribute_value
+                INSERT INTO transfer_attribute_audit (audit_timestamp, audit_type_id, transfer_id, revision_id, attribute_type_id, attribute_value)
+                SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, NEW.transaction_id, revision_id, NEW.attribute_type_id, OLD.attribute_value
                 FROM transfer WHERE id = NEW.transaction_id;
             END
             """.trimIndent(),
@@ -274,8 +274,8 @@ object DatabaseConfig {
                   AND NOT EXISTS (SELECT 1 FROM _creation_mode);
 
                 -- Always record the deletion in audit table (OLD value - what was deleted)
-                INSERT INTO transfer_attribute_audit (transaction_id, revision_id, attribute_type_id, audit_type_id, attribute_value)
-                SELECT OLD.transaction_id, revision_id, OLD.attribute_type_id, 3, OLD.attribute_value
+                INSERT INTO transfer_attribute_audit (audit_timestamp, audit_type_id, transfer_id, revision_id, attribute_type_id, attribute_value)
+                SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, OLD.transaction_id, revision_id, OLD.attribute_type_id, OLD.attribute_value
                 FROM transfer WHERE id = OLD.transaction_id;
             END
             """.trimIndent(),
@@ -298,11 +298,27 @@ object DatabaseConfig {
     private fun MoneyManagerDatabaseWrapper.createAuditTriggers() {
         val tables = getAuditableTables()
 
+        // Map main table names to their entity ID column name in the audit table
+        val entityIdColumnName =
+            mapOf(
+                "account" to "account_id",
+                "currency" to "currency_id",
+                "category" to "category_id",
+                "transfer" to "transfer_id",
+                "person" to "person_id",
+                "person_account_ownership" to "ownership_id",
+            )
+
         tables.forEach { tableName ->
             val auditTableName = "${tableName}_audit"
             val columns = getTableColumns(tableName)
+            val auditEntityIdCol = entityIdColumnName[tableName] ?: "${tableName}_id"
 
-            val columnList = columns.joinToString(", ")
+            // Map main table column names to audit table column names (id -> entity_id)
+            val auditColumnList =
+                columns.joinToString(", ") { col ->
+                    if (col == "id") auditEntityIdCol else col
+                }
             val newColumnList = columns.joinToString(", ") { "NEW.$it" }
             val oldColumnList = columns.joinToString(", ") { "OLD.$it" }
             // For UPDATE: use OLD values for all columns EXCEPT revision_id, which uses NEW
@@ -321,7 +337,7 @@ object DatabaseConfig {
                 AFTER INSERT ON $tableName
                 FOR EACH ROW
                 BEGIN
-                    INSERT INTO $auditTableName (audit_timestamp, audit_type_id, $columnList)
+                    INSERT INTO $auditTableName (audit_timestamp, audit_type_id, $auditColumnList)
                     VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, $newColumnList);
                 END
                 """.trimIndent(),
@@ -336,7 +352,7 @@ object DatabaseConfig {
                 AFTER UPDATE ON $tableName
                 FOR EACH ROW
                 BEGIN
-                    INSERT INTO $auditTableName (audit_timestamp, audit_type_id, $columnList)
+                    INSERT INTO $auditTableName (audit_timestamp, audit_type_id, $auditColumnList)
                     VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, $updateColumnList);
                 END
                 """.trimIndent(),
@@ -351,7 +367,7 @@ object DatabaseConfig {
                 AFTER DELETE ON $tableName
                 FOR EACH ROW
                 BEGIN
-                    INSERT INTO $auditTableName (audit_timestamp, audit_type_id, $columnList)
+                    INSERT INTO $auditTableName (audit_timestamp, audit_type_id, $auditColumnList)
                     VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, $oldColumnList);
                 END
                 """.trimIndent(),

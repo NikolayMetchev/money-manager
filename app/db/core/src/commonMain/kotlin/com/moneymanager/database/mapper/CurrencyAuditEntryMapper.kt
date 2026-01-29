@@ -13,6 +13,7 @@ object CurrencyAuditEntryMapper :
     AuditTypeConversions {
     override fun map(from: SelectAuditHistoryForCurrency): CurrencyAuditEntry =
         mapping {
-            CurrencyAuditEntry::currencyId fromValue toCurrencyId(from.id)
+            CurrencyAuditEntry::auditId fromValue from.id
+            CurrencyAuditEntry::currencyId fromValue toCurrencyId(from.currency_id)
         }
 }

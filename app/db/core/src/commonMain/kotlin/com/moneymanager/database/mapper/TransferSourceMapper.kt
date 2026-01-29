@@ -66,7 +66,7 @@ object TransferSourceFromAuditMapper :
         val sourceType = toSourceType(from.source_type!!)
         return mapping {
             TransferSource::id fromValue from.source_id!!
-            TransferSource::transactionId fromValue toTransferId(from.id)
+            TransferSource::transactionId fromValue toTransferId(from.transfer_id)
             TransferSource::sourceType fromValue sourceType
             TransferSource::deviceId fromValue from.device_id!!
             TransferSource::deviceInfo fromValue

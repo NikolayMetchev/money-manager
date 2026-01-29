@@ -13,7 +13,8 @@ object AccountAuditEntryMapper :
     AuditTypeConversions {
     override fun map(from: SelectAuditHistoryForAccount): AccountAuditEntry =
         mapping {
-            AccountAuditEntry::accountId fromValue toAccountId(from.id)
+            AccountAuditEntry::auditId fromValue from.id
+            AccountAuditEntry::accountId fromValue toAccountId(from.account_id)
             AccountAuditEntry::openingDate fromValue toInstant(from.opening_date)
             AccountAuditEntry::categoryName fromValue from.category_name
         }

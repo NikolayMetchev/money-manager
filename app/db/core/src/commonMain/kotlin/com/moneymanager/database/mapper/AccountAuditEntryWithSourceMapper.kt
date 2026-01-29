@@ -18,7 +18,8 @@ object AccountAuditEntryWithSourceMapper :
     AuditTypeConversions {
     override fun map(from: SelectAuditHistoryForAccountWithSource): AccountAuditEntry =
         mapping {
-            AccountAuditEntry::accountId fromValue toAccountId(from.id)
+            AccountAuditEntry::auditId fromValue from.id
+            AccountAuditEntry::accountId fromValue toAccountId(from.account_id)
             AccountAuditEntry::source fromValue from.toEntitySource()
         }
 }
@@ -48,7 +49,7 @@ private fun SelectAuditHistoryForAccountWithSource.toEntitySource(): EntitySourc
     return EntitySource(
         id = sourceId,
         entityType = EntityType.ACCOUNT,
-        entityId = id,
+        entityId = account_id,
         revisionId = revision_id,
         sourceType = SourceType.fromName(sourceTypeName),
         deviceId = deviceId,

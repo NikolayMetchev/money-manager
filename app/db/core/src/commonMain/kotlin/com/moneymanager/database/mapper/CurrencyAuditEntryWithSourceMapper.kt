@@ -18,7 +18,8 @@ object CurrencyAuditEntryWithSourceMapper :
     AuditTypeConversions {
     override fun map(from: SelectAuditHistoryForCurrencyWithSource): CurrencyAuditEntry =
         mapping {
-            CurrencyAuditEntry::currencyId fromValue toCurrencyId(from.id)
+            CurrencyAuditEntry::auditId fromValue from.id
+            CurrencyAuditEntry::currencyId fromValue toCurrencyId(from.currency_id)
             CurrencyAuditEntry::source fromValue from.toEntitySource()
         }
 }
@@ -48,7 +49,7 @@ private fun SelectAuditHistoryForCurrencyWithSource.toEntitySource(): EntitySour
     return EntitySource(
         id = sourceId,
         entityType = EntityType.CURRENCY,
-        entityId = id,
+        entityId = currency_id,
         revisionId = revision_id,
         sourceType = SourceType.fromName(sourceTypeName),
         deviceId = deviceId,

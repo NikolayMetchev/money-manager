@@ -13,6 +13,7 @@ object PersonAuditEntryMapper :
     AuditTypeConversions {
     override fun map(from: SelectAuditHistoryForPerson): PersonAuditEntry =
         mapping {
-            PersonAuditEntry::personId fromValue toPersonId(from.id)
+            PersonAuditEntry::auditId fromValue from.id
+            PersonAuditEntry::personId fromValue toPersonId(from.person_id)
         }
 }
