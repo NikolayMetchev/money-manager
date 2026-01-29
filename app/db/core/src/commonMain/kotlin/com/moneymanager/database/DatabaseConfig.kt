@@ -380,8 +380,10 @@ object DatabaseConfig {
             sourceTypeQueries.insert(id = 1, name = "MANUAL")
             sourceTypeQueries.insert(id = 2, name = "CSV_IMPORT")
             sourceTypeQueries.insert(id = 3, name = "SAMPLE_GENERATOR")
+            sourceTypeQueries.insert(id = 4, name = "SYSTEM")
 
             // Seed Platform lookup table
+            platformQueries.insert(id = 0, name = "SYSTEM")
             platformQueries.insert(id = 1, name = "JVM")
             platformQueries.insert(id = 2, name = "ANDROID")
 
@@ -406,9 +408,23 @@ object DatabaseConfig {
                 parent_id = null,
             )
 
-            // Seed currencies
+            // Create system device for system-generated source tracking
+            // Platform 0 = SYSTEM, no os/machine/make/model needed
+            deviceQueries.insertSystemDevice(platform_id = 0)
+            val systemDeviceId =
+                deviceQueries.selectSystemDevice(platform_id = 0).executeAsOneOrNull()
+                    ?: deviceQueries.lastInsertRowId().executeAsOne()
+
+            // Seed currencies with source tracking (entity_type_id=3 CURRENCY, source_type_id=4 SYSTEM)
             allCurrencies.forEach { currency ->
-                currencyRepository.upsertCurrencyByCode(currency.code, currency.displayName)
+                val currencyId = currencyRepository.upsertCurrencyByCode(currency.code, currency.displayName)
+                entitySourceQueries.insertSource(
+                    entity_type_id = 3,
+                    entity_id = currencyId.id,
+                    revision_id = 1,
+                    source_type_id = 4,
+                    device_id = systemDeviceId,
+                )
             }
         }
     }

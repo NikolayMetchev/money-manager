@@ -40,7 +40,9 @@ import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.database.json.CsvStrategyExportCodec
 import com.moneymanager.database.service.CsvStrategyExportService
 import com.moneymanager.database.service.ImportParseResult
+import com.moneymanager.database.sql.EntitySourceQueries
 import com.moneymanager.domain.model.AppVersion
+import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
@@ -69,6 +71,8 @@ fun CsvStrategiesScreen(
     attributeTypeRepository: AttributeTypeRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
+    entitySourceQueries: EntitySourceQueries,
+    deviceId: DeviceId,
     csvStrategyExportService: CsvStrategyExportService,
     appVersion: AppVersion,
     onStrategyClick: (CsvImportStrategy) -> Unit = {},
@@ -282,6 +286,8 @@ fun CsvStrategiesScreen(
             attributeTypeRepository = attributeTypeRepository,
             personRepository = personRepository,
             personAccountOwnershipRepository = personAccountOwnershipRepository,
+            entitySourceQueries = entitySourceQueries,
+            deviceId = deviceId,
             csvColumns = currentCsvImport.columns,
             rows = csvRows,
             onDismiss = {

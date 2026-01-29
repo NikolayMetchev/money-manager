@@ -37,11 +37,13 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.database.ManualSourceRecorder
+import com.moneymanager.database.sql.EntitySourceQueries
 import com.moneymanager.database.sql.TransferSourceQueries
 import com.moneymanager.domain.getDeviceInfo
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Transfer
@@ -76,6 +78,7 @@ fun TransactionEditDialog(
     transactionRepository: TransactionRepository,
     transferSourceRepository: TransferSourceRepository,
     transferSourceQueries: TransferSourceQueries,
+    entitySourceQueries: EntitySourceQueries,
     deviceRepository: DeviceRepository,
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
@@ -85,6 +88,7 @@ fun TransactionEditDialog(
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     transferAttributeRepository: TransferAttributeRepository,
     maintenanceService: DatabaseMaintenanceService,
+    deviceId: DeviceId,
     preSelectedSourceAccountId: AccountId? = null,
     preSelectedCurrencyId: CurrencyId? = null,
     onDismiss: () -> Unit,
@@ -212,6 +216,8 @@ fun TransactionEditDialog(
                     categoryRepository = categoryRepository,
                     personRepository = personRepository,
                     personAccountOwnershipRepository = personAccountOwnershipRepository,
+                    entitySourceQueries = entitySourceQueries,
+                    deviceId = deviceId,
                     enabled = !isSaving,
                     excludeAccountId = targetAccountId,
                 )
@@ -225,6 +231,8 @@ fun TransactionEditDialog(
                     categoryRepository = categoryRepository,
                     personRepository = personRepository,
                     personAccountOwnershipRepository = personAccountOwnershipRepository,
+                    entitySourceQueries = entitySourceQueries,
+                    deviceId = deviceId,
                     enabled = !isSaving,
                     excludeAccountId = sourceAccountId,
                 )
@@ -535,11 +543,11 @@ fun TransactionEditDialog(
                                                     NewAttribute(typeId, pair.second.trim())
                                                 }
 
-                                        val deviceId = deviceRepository.getOrCreateDevice(getDeviceInfo())
+                                        val transferDeviceId = deviceRepository.getOrCreateDevice(getDeviceInfo())
                                         transactionRepository.createTransfers(
                                             transfers = listOf(transfer),
                                             newAttributes = mapOf(transfer.id to attributesToSave),
-                                            sourceRecorder = ManualSourceRecorder(transferSourceQueries, deviceId),
+                                            sourceRecorder = ManualSourceRecorder(transferSourceQueries, transferDeviceId),
                                         )
                                     }
 

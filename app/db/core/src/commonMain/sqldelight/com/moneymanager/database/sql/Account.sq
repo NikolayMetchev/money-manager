@@ -24,6 +24,9 @@ SET revision_id = revision_id + 1,
     category_id = ?
 WHERE id = ?;
 
+selectRevisionById:
+SELECT revision_id FROM account WHERE id = ?;
+
 delete:
 DELETE FROM account WHERE id = ?;
 

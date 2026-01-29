@@ -136,3 +136,15 @@ VALUES (1, ?, ?, NULL, NULL);
 insertAndroid:
 INSERT INTO device (platform_id, os_id, machine_id, device_make_id, device_model_id)
 VALUES (2, NULL, NULL, ?, ?);
+
+-- Insert System device (for system-generated source tracking)
+insertSystemDevice:
+INSERT OR IGNORE INTO device (platform_id, os_id, machine_id, device_make_id, device_model_id)
+VALUES (?, NULL, NULL, NULL, NULL);
+
+-- Select system device by platform_id (for system source tracking)
+selectSystemDevice:
+SELECT id FROM device WHERE platform_id = ? AND os_id IS NULL AND machine_id IS NULL;
+
+lastInsertRowId:
+SELECT last_insert_rowid();

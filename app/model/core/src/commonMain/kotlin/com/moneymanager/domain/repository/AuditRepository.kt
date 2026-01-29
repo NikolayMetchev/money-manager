@@ -80,6 +80,17 @@ interface AuditRepository {
     suspend fun getAuditHistoryForPersonAccountOwnership(ownershipId: Long): List<PersonAccountOwnershipAuditEntry>
 
     /**
+     * Gets all ownership audit history for a specific account with source information.
+     * This returns all ownership changes (owners added/removed) for the given account.
+     * Returns entries ordered by audit timestamp descending (most recent first).
+     * Each entry includes its source/provenance if available.
+     *
+     * @param accountId The ID of the account to get ownership audit history for
+     * @return List of ownership audit entries with source information
+     */
+    suspend fun getOwnershipAuditHistoryForAccountWithSource(accountId: AccountId): List<PersonAccountOwnershipAuditEntry>
+
+    /**
      * Gets the audit history for a specific currency.
      * Returns entries ordered by audit timestamp descending (most recent first).
      *

@@ -28,4 +28,5 @@ data class PersonAccountOwnershipAuditEntry(
     val accountId: AccountId,
     val personFullName: String?,
     val accountName: String?,
+    val source: EntitySource? = null,
 )

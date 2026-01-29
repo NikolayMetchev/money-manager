@@ -40,6 +40,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.EntitySource
+import com.moneymanager.domain.model.PersonAccountOwnershipAuditEntry
 import com.moneymanager.domain.model.SourceType
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AuditRepository
@@ -59,6 +60,7 @@ fun AccountAuditScreen(
     onBack: () -> Unit,
 ) {
     var auditEntries by remember { mutableStateOf<List<AccountAuditEntry>>(emptyList()) }
+    var ownershipAuditEntries by remember { mutableStateOf<List<PersonAccountOwnershipAuditEntry>>(emptyList()) }
     var currentAccount by remember { mutableStateOf<Account?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -68,6 +70,7 @@ fun AccountAuditScreen(
         errorMessage = null
         try {
             auditEntries = auditRepository.getAuditHistoryForAccountWithSource(accountId)
+            ownershipAuditEntries = auditRepository.getOwnershipAuditHistoryForAccountWithSource(accountId)
             currentAccount = accountRepository.getAccountById(accountId).first()
         } catch (expected: Exception) {
             logger.error(expected) { "Failed to load audit history: ${expected.message}" }
@@ -128,8 +131,8 @@ fun AccountAuditScreen(
             }
         } else {
             val auditDiffs =
-                remember(auditEntries, currentAccount) {
-                    computeAccountAuditDiffs(auditEntries, currentAccount)
+                remember(auditEntries, ownershipAuditEntries, currentAccount) {
+                    computeAccountAuditDiffs(auditEntries, ownershipAuditEntries, currentAccount)
                 }
 
             val auditListState = rememberLazyListState()
@@ -153,24 +156,71 @@ fun AccountAuditScreen(
 
 private data class AccountAuditDiff(
     val auditId: Long,
-    val auditTimestamp: kotlinx.datetime.Instant,
+    val auditTimestamp: kotlin.time.Instant,
     val auditType: AuditType,
     val accountId: AccountId,
     val revisionId: Long,
     val name: FieldChange<String>,
-    val openingDate: FieldChange<kotlinx.datetime.Instant>,
+    val openingDate: FieldChange<kotlin.time.Instant>,
     val categoryName: FieldChange<String?>,
+    val ownersAdded: List<String>,
+    val ownersRemoved: List<String>,
     val source: EntitySource?,
 ) {
-    val hasChanges: Boolean
+    val hasFieldChanges: Boolean
         get() = listOf(name, openingDate, categoryName).any { it is FieldChange.Changed }
+
+    val hasOwnershipChanges: Boolean
+        get() = ownersAdded.isNotEmpty() || ownersRemoved.isNotEmpty()
+
+    val hasChanges: Boolean
+        get() = hasFieldChanges || hasOwnershipChanges
 }
 
 private fun computeAccountAuditDiffs(
     entries: List<AccountAuditEntry>,
+    ownershipEntries: List<PersonAccountOwnershipAuditEntry>,
     currentAccount: Account?,
 ): List<AccountAuditDiff> {
+    // Group ownership entries by timestamp proximity to account entries
+    // Use a 2-second window to match ownership changes with account changes
+    val timestampWindowMs = 2000L
+
+    data class OwnershipChanges(
+        val ownersAdded: List<String>,
+        val ownersRemoved: List<String>,
+        val source: EntitySource?,
+    )
+
+    fun findOwnershipChangesForEntry(entry: AccountAuditEntry): OwnershipChanges {
+        val entryTimestampMs = entry.auditTimestamp.toEpochMilliseconds()
+        val matchingOwnershipChanges =
+            ownershipEntries.filter { ownership ->
+                val ownershipTimestampMs = ownership.auditTimestamp.toEpochMilliseconds()
+                kotlin.math.abs(ownershipTimestampMs - entryTimestampMs) <= timestampWindowMs
+            }
+
+        val ownersAdded =
+            matchingOwnershipChanges
+                .filter { it.auditType == AuditType.INSERT }
+                .map { it.personFullName ?: "Unknown (ID: ${it.personId.id})" }
+
+        val ownersRemoved =
+            matchingOwnershipChanges
+                .filter { it.auditType == AuditType.DELETE }
+                .map { it.personFullName ?: "Unknown (ID: ${it.personId.id})" }
+
+        // Get source from the first ownership change that has one
+        val ownershipSource = matchingOwnershipChanges.firstNotNullOfOrNull { it.source }
+
+        return OwnershipChanges(ownersAdded, ownersRemoved, ownershipSource)
+    }
+
     return entries.mapIndexed { index, entry ->
+        val ownershipChanges = findOwnershipChangesForEntry(entry)
+        // Use ownership source if account entry doesn't have its own source
+        val effectiveSource = entry.source ?: ownershipChanges.source
+
         when (entry.auditType) {
             AuditType.INSERT ->
                 AccountAuditDiff(
@@ -182,7 +232,9 @@ private fun computeAccountAuditDiffs(
                     name = FieldChange.Created(entry.name),
                     openingDate = FieldChange.Created(entry.openingDate),
                     categoryName = FieldChange.Created(entry.categoryName),
-                    source = entry.source,
+                    ownersAdded = ownershipChanges.ownersAdded,
+                    ownersRemoved = ownershipChanges.ownersRemoved,
+                    source = effectiveSource,
                 )
             AuditType.DELETE ->
                 AccountAuditDiff(
@@ -194,7 +246,9 @@ private fun computeAccountAuditDiffs(
                     name = FieldChange.Deleted(entry.name),
                     openingDate = FieldChange.Deleted(entry.openingDate),
                     categoryName = FieldChange.Deleted(entry.categoryName),
-                    source = entry.source,
+                    ownersAdded = ownershipChanges.ownersAdded,
+                    ownersRemoved = ownershipChanges.ownersRemoved,
+                    source = effectiveSource,
                 )
             AuditType.UPDATE -> {
                 // For UPDATE, entry stores OLD values
@@ -236,7 +290,9 @@ private fun computeAccountAuditDiffs(
                         } else {
                             FieldChange.Unchanged(entry.categoryName)
                         },
-                    source = entry.source,
+                    ownersAdded = ownershipChanges.ownersAdded,
+                    ownersRemoved = ownershipChanges.ownersRemoved,
+                    source = effectiveSource,
                 )
             }
         }
@@ -318,6 +374,7 @@ private fun AccountAuditDiffCard(diff: AccountAuditDiff) {
                     val openingDate = diff.openingDate.value().toLocalDateTime(TimeZone.currentSystemDefault())
                     FieldValueRow("Opening Date", "${openingDate.date}")
                     FieldValueRow("Category", diff.categoryName.value() ?: "Uncategorized")
+                    OwnershipChangesSection(diff.ownersAdded, diff.ownersRemoved)
                     SourceInfoSection(diff.source)
                 }
                 AuditType.UPDATE -> {
@@ -345,6 +402,7 @@ private fun AccountAuditDiffCard(diff: AccountAuditDiff) {
                                 categoryChange.newValue ?: "Uncategorized",
                             )
                         }
+                        OwnershipChangesSection(diff.ownersAdded, diff.ownersRemoved)
                     }
                     SourceInfoSection(diff.source)
                 }
@@ -359,8 +417,59 @@ private fun AccountAuditDiffCard(diff: AccountAuditDiff) {
                     val openingDate = diff.openingDate.value().toLocalDateTime(TimeZone.currentSystemDefault())
                     FieldValueRow("Opening Date", "${openingDate.date}", errorColor)
                     FieldValueRow("Category", diff.categoryName.value() ?: "Uncategorized", errorColor)
+                    OwnershipChangesSection(diff.ownersAdded, diff.ownersRemoved)
                     SourceInfoSection(diff.source, labelColor = errorColor.copy(alpha = 0.8f))
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OwnershipChangesSection(
+    ownersAdded: List<String>,
+    ownersRemoved: List<String>,
+) {
+    if (ownersAdded.isEmpty() && ownersRemoved.isEmpty()) return
+
+    Column(
+        modifier = Modifier.padding(top = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        if (ownersAdded.isNotEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = "Owners added:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.width(100.dp),
+                )
+                Text(
+                    text = ownersAdded.joinToString(", "),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+        if (ownersRemoved.isNotEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = "Owners removed:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.width(100.dp),
+                )
+                Text(
+                    text = ownersRemoved.joinToString(", "),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                )
             }
         }
     }
@@ -493,6 +602,9 @@ private fun SourceInfoSection(
                         FieldValueRow("Origin", "Sample Generator")
                     }
                 }
+            }
+            SourceType.SYSTEM -> {
+                FieldValueRow("Origin", "System")
             }
         }
     }

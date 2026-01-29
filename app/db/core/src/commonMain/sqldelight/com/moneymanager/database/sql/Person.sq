@@ -1,3 +1,4 @@
+-- Person table
 CREATE TABLE person (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     revision_id INTEGER NOT NULL DEFAULT 1,
@@ -9,6 +10,7 @@ CREATE TABLE person (
 CREATE INDEX IF NOT EXISTS idx_person_first_name ON person(first_name);
 CREATE INDEX IF NOT EXISTS idx_person_last_name ON person(last_name);
 
+-- Person queries
 selectAll:
 SELECT * FROM person ORDER BY first_name, last_name;
 
@@ -29,4 +31,47 @@ delete:
 DELETE FROM person WHERE id = ?;
 
 lastInsertRowId:
+SELECT last_insert_rowid();
+
+selectRevisionById:
+SELECT revision_id FROM person WHERE id = ?;
+
+-- Person-Account Ownership table (many-to-many relationship)
+CREATE TABLE person_account_ownership (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    revision_id INTEGER NOT NULL DEFAULT 1,
+    person_id INTEGER NOT NULL,
+    account_id INTEGER NOT NULL,
+    FOREIGN KEY (person_id) REFERENCES person(id) ON DELETE CASCADE,
+    FOREIGN KEY (account_id) REFERENCES account(id) ON DELETE CASCADE,
+    UNIQUE (person_id, account_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_person_account_ownership_person ON person_account_ownership(person_id);
+CREATE INDEX IF NOT EXISTS idx_person_account_ownership_account ON person_account_ownership(account_id);
+
+-- Ownership queries
+ownershipSelectByPerson:
+SELECT * FROM person_account_ownership WHERE person_id = ?;
+
+ownershipSelectByAccount:
+SELECT * FROM person_account_ownership WHERE account_id = ?;
+
+ownershipSelectById:
+SELECT * FROM person_account_ownership WHERE id = ?;
+
+ownershipInsert:
+INSERT INTO person_account_ownership(person_id, account_id)
+VALUES (?, ?);
+
+ownershipDelete:
+DELETE FROM person_account_ownership WHERE id = ?;
+
+ownershipDeleteByPerson:
+DELETE FROM person_account_ownership WHERE person_id = ?;
+
+ownershipDeleteByAccount:
+DELETE FROM person_account_ownership WHERE account_id = ?;
+
+ownershipLastInsertRowId:
 SELECT last_insert_rowid();

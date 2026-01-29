@@ -17,10 +17,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
+import com.moneymanager.database.sql.EntitySourceQueries
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Category
+import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
@@ -44,6 +46,8 @@ fun AccountsScreen(
     transactionRepository: TransactionRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
+    entitySourceQueries: EntitySourceQueries,
+    deviceId: DeviceId,
     onAccountClick: (Account) -> Unit,
     onAuditClick: (Account) -> Unit = {},
 ) {
@@ -126,6 +130,8 @@ fun AccountsScreen(
             categoryRepository = categoryRepository,
             personRepository = personRepository,
             personAccountOwnershipRepository = personAccountOwnershipRepository,
+            entitySourceQueries = entitySourceQueries,
+            deviceId = deviceId,
             onDismiss = { showCreateDialog = false },
         )
     }
@@ -138,6 +144,8 @@ fun AccountsScreen(
             categoryRepository = categoryRepository,
             personRepository = personRepository,
             personAccountOwnershipRepository = personAccountOwnershipRepository,
+            entitySourceQueries = entitySourceQueries,
+            deviceId = deviceId,
             onDismiss = { accountToEdit = null },
         )
     }
@@ -404,155 +412,6 @@ fun CreateAccountDialog(
                     )
                 } else {
                     Text("Create")
-                }
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                enabled = !isSaving,
-            ) {
-                Text("Cancel")
-            }
-        },
-    )
-
-    if (showCreateCategoryDialog) {
-        CreateCategoryDialog(
-            categoryRepository = categoryRepository,
-            onCategoryCreated = { categoryId, categoryName ->
-                selectedCategoryId = categoryId
-                selectedCategoryName = categoryName
-                showCreateCategoryDialog = false
-            },
-            onDismiss = { showCreateCategoryDialog = false },
-        )
-    }
-}
-
-@Composable
-fun EditAccountDialog(
-    account: Account,
-    accountRepository: AccountRepository,
-    categoryRepository: CategoryRepository,
-    onDismiss: () -> Unit,
-) {
-    var name by remember { mutableStateOf(account.name) }
-    var selectedCategoryId by remember { mutableStateOf(account.categoryId) }
-    var selectedCategoryName by remember { mutableStateOf<String?>(null) }
-    var expanded by remember { mutableStateOf(false) }
-    var showCreateCategoryDialog by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    var isSaving by remember { mutableStateOf(false) }
-
-    val categories by categoryRepository.getAllCategories()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val scope = rememberSchemaAwareCoroutineScope()
-
-    AlertDialog(
-        onDismissRequest = { if (!isSaving) onDismiss() },
-        title = { Text("Edit Account") },
-        text = {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Account Name") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    enabled = !isSaving,
-                )
-
-                ExposedDropdownMenuBox(
-                    expanded = expanded,
-                    onExpandedChange = { expanded = !expanded && !isSaving },
-                ) {
-                    OutlinedTextField(
-                        value =
-                            selectedCategoryName
-                                ?: categories.find { it.id == selectedCategoryId }?.name
-                                ?: "Uncategorized",
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Category") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                        modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
-                        enabled = !isSaving,
-                    )
-                    ExposedDropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { expanded = false },
-                    ) {
-                        categories.forEach { category ->
-                            DropdownMenuItem(
-                                text = { Text(category.name) },
-                                onClick = {
-                                    selectedCategoryId = category.id
-                                    selectedCategoryName = null
-                                    expanded = false
-                                },
-                            )
-                        }
-                        HorizontalDivider()
-                        DropdownMenuItem(
-                            text = { Text("+ Create New Category") },
-                            onClick = {
-                                expanded = false
-                                showCreateCategoryDialog = true
-                            },
-                        )
-                    }
-                }
-
-                errorMessage?.let { error ->
-                    Text(
-                        text = error,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    if (name.isBlank()) {
-                        errorMessage = "Account name is required"
-                    } else {
-                        isSaving = true
-                        errorMessage = null
-                        scope.launch {
-                            try {
-                                val updatedAccount =
-                                    account.copy(
-                                        name = name.trim(),
-                                        categoryId = selectedCategoryId,
-                                    )
-                                accountRepository.updateAccount(updatedAccount)
-                                onDismiss()
-                            } catch (expected: Exception) {
-                                logger.error(expected) { "Failed to update account: ${expected.message}" }
-                                errorMessage = "Failed to update account: ${expected.message}"
-                                isSaving = false
-                            }
-                        }
-                    }
-                },
-                enabled = !isSaving,
-            ) {
-                if (isSaving) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp,
-                    )
-                } else {
-                    Text("Save")
                 }
             }
         },

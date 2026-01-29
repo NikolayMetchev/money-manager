@@ -233,6 +233,44 @@ LEFT JOIN account ON person_account_ownership_audit.account_id = account.id
 WHERE person_account_ownership_audit.id = ?
 ORDER BY person_account_ownership_audit.audit_timestamp DESC, person_account_ownership_audit.audit_id DESC;
 
+-- Get ownership audit history for a specific account with source information
+-- entity_type_id = 4 for PERSON_ACCOUNT_OWNERSHIP
+selectOwnershipAuditHistoryForAccountWithSource:
+SELECT
+    person_account_ownership_audit.audit_id,
+    person_account_ownership_audit.audit_timestamp,
+    audit_type.name AS audit_type,
+    person_account_ownership_audit.id,
+    person_account_ownership_audit.revision_id,
+    person_account_ownership_audit.person_id,
+    person_account_ownership_audit.account_id,
+    person.first_name AS person_first_name,
+    person.middle_name AS person_middle_name,
+    person.last_name AS person_last_name,
+    account.name AS account_name,
+    -- Source information
+    entity_source.id AS source_id,
+    entity_source.device_id AS source_device_id,
+    source_type.id AS source_type_id,
+    source_type.name AS source_type_name,
+    device_view.platform_name AS source_platform_name,
+    device_view.os_name AS source_os_name,
+    device_view.machine_name AS source_machine_name,
+    device_view.device_make AS source_device_make,
+    device_view.device_model AS source_device_model,
+    entity_source.created_at AS source_created_at
+FROM person_account_ownership_audit
+JOIN audit_type ON person_account_ownership_audit.audit_type_id = audit_type.id
+LEFT JOIN person ON person_account_ownership_audit.person_id = person.id
+LEFT JOIN account ON person_account_ownership_audit.account_id = account.id
+LEFT JOIN entity_source ON person_account_ownership_audit.id = entity_source.entity_id
+    AND person_account_ownership_audit.revision_id = entity_source.revision_id
+    AND entity_source.entity_type_id = 4
+LEFT JOIN source_type ON entity_source.source_type_id = source_type.id
+LEFT JOIN device_view ON entity_source.device_id = device_view.id
+WHERE person_account_ownership_audit.account_id = ?
+ORDER BY person_account_ownership_audit.audit_timestamp DESC, person_account_ownership_audit.audit_id DESC;
+
 -- Get audit history for a currency
 selectAuditHistoryForCurrency:
 SELECT

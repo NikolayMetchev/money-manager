@@ -221,6 +221,8 @@ fun MoneyManagerApp(
                                 transactionRepository = transactionRepository,
                                 personRepository = personRepository,
                                 personAccountOwnershipRepository = personAccountOwnershipRepository,
+                                entitySourceQueries = entitySourceQueries,
+                                deviceId = deviceId,
                                 onAccountClick = { account ->
                                     navigationHistory.navigateTo(Screen.AccountTransactions(account.id, account.name))
                                 },
@@ -237,6 +239,8 @@ fun MoneyManagerApp(
                             }
                             CurrenciesScreen(
                                 currencyRepository = currencyRepository,
+                                entitySourceQueries = entitySourceQueries,
+                                deviceId = deviceId,
                                 onAuditClick = { currency ->
                                     navigationHistory.navigateTo(Screen.CurrencyAuditHistory(currency.id, currency.code))
                                 },
@@ -262,6 +266,8 @@ fun MoneyManagerApp(
                             PeopleScreen(
                                 personRepository = personRepository,
                                 personAccountOwnershipRepository = personAccountOwnershipRepository,
+                                entitySourceQueries = entitySourceQueries,
+                                deviceId = deviceId,
                                 onAuditClick = { person ->
                                     navigationHistory.navigateTo(Screen.PersonAuditHistory(person.id, person.fullName))
                                 },
@@ -297,6 +303,7 @@ fun MoneyManagerApp(
                                 transactionRepository = transactionRepository,
                                 transferSourceRepository = transferSourceRepository,
                                 transferSourceQueries = transferSourceQueries,
+                                entitySourceQueries = entitySourceQueries,
                                 deviceRepository = deviceRepository,
                                 accountRepository = accountRepository,
                                 categoryRepository = categoryRepository,
@@ -306,6 +313,7 @@ fun MoneyManagerApp(
                                 personAccountOwnershipRepository = personAccountOwnershipRepository,
                                 transferAttributeRepository = transferAttributeRepository,
                                 maintenanceService = maintenanceService,
+                                deviceId = deviceId,
                                 onAccountIdChange = { accountId ->
                                     currentlyViewedAccountId = accountId
                                 },
@@ -352,7 +360,9 @@ fun MoneyManagerApp(
                                 personAccountOwnershipRepository = personAccountOwnershipRepository,
                                 maintenanceService = maintenanceService,
                                 transferSourceQueries = transferSourceQueries,
+                                entitySourceQueries = entitySourceQueries,
                                 deviceRepository = deviceRepository,
+                                deviceId = deviceId,
                                 onBack = { navigationHistory.navigateBack() },
                                 onDeleted = { navigationHistory.navigateTo(Screen.CsvImports) },
                                 onTransferClick = { transferId, isPositiveAmount ->
@@ -400,6 +410,8 @@ fun MoneyManagerApp(
                                 attributeTypeRepository = attributeTypeRepository,
                                 personRepository = personRepository,
                                 personAccountOwnershipRepository = personAccountOwnershipRepository,
+                                entitySourceQueries = entitySourceQueries,
+                                deviceId = deviceId,
                                 csvStrategyExportService = csvStrategyExportService,
                                 appVersion = appVersion,
                                 onBack = { navigationHistory.navigateBack() },
@@ -449,6 +461,7 @@ fun MoneyManagerApp(
                     transactionRepository = transactionRepository,
                     transferSourceRepository = transferSourceRepository,
                     transferSourceQueries = transferSourceQueries,
+                    entitySourceQueries = entitySourceQueries,
                     deviceRepository = deviceRepository,
                     accountRepository = accountRepository,
                     categoryRepository = categoryRepository,
@@ -458,6 +471,7 @@ fun MoneyManagerApp(
                     personAccountOwnershipRepository = personAccountOwnershipRepository,
                     transferAttributeRepository = transferAttributeRepository,
                     maintenanceService = maintenanceService,
+                    deviceId = deviceId,
                     preSelectedSourceAccountId = preSelectedAccountId,
                     preSelectedCurrencyId = preSelectedCurrencyId,
                     onDismiss = {

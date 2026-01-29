@@ -36,6 +36,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
+import com.moneymanager.database.sql.EntitySourceQueries
+import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonAccountOwnership
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
@@ -48,6 +50,8 @@ import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 fun PeopleScreen(
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
+    entitySourceQueries: EntitySourceQueries,
+    deviceId: DeviceId,
     onAuditClick: (Person) -> Unit = {},
 ) {
     val people by personRepository.getAllPeople()
@@ -119,6 +123,8 @@ fun PeopleScreen(
         EditPersonDialog(
             personToEdit = null,
             personRepository = personRepository,
+            entitySourceQueries = entitySourceQueries,
+            deviceId = deviceId,
             onDismiss = { showCreateDialog = false },
         )
     }
@@ -128,6 +134,8 @@ fun PeopleScreen(
         EditPersonDialog(
             personToEdit = currentPersonToEdit,
             personRepository = personRepository,
+            entitySourceQueries = entitySourceQueries,
+            deviceId = deviceId,
             onDismiss = { personToEdit = null },
         )
     }

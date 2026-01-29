@@ -509,6 +509,9 @@ private fun SourceInfoSection(
                     }
                 }
             }
+            SourceType.SYSTEM -> {
+                FieldValueRow("Origin", "System")
+            }
         }
     }
 }

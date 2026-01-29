@@ -13,6 +13,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CategoryBalance
+import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.PageWithTargetIndex
 import com.moneymanager.domain.model.PagingInfo
@@ -36,6 +37,9 @@ import kotlin.time.Instant
 
 @OptIn(ExperimentalTestApi::class)
 class AccountsScreenTest {
+    private val testDeviceId = DeviceId(1L)
+    private val stubEntitySourceQueries = createStubEntitySourceQueries()
+
     @Test
     fun accountsScreen_displaysEmptyState_whenNoAccounts() =
         runComposeUiTest {
@@ -51,6 +55,8 @@ class AccountsScreenTest {
                         transactionRepository = FakeTransactionRepository(),
                         personRepository = FakePersonRepository(),
                         personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
+                        entitySourceQueries = stubEntitySourceQueries,
+                        deviceId = testDeviceId,
                         onAccountClick = {},
                     )
                 }
@@ -90,6 +96,8 @@ class AccountsScreenTest {
                         transactionRepository = FakeTransactionRepository(),
                         personRepository = FakePersonRepository(),
                         personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
+                        entitySourceQueries = stubEntitySourceQueries,
+                        deviceId = testDeviceId,
                         onAccountClick = {},
                     )
                 }
@@ -115,6 +123,8 @@ class AccountsScreenTest {
                         transactionRepository = FakeTransactionRepository(),
                         personRepository = FakePersonRepository(),
                         personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
+                        entitySourceQueries = stubEntitySourceQueries,
+                        deviceId = testDeviceId,
                         onAccountClick = {},
                     )
                 }
@@ -139,6 +149,8 @@ class AccountsScreenTest {
                         transactionRepository = FakeTransactionRepository(),
                         personRepository = FakePersonRepository(),
                         personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
+                        entitySourceQueries = stubEntitySourceQueries,
+                        deviceId = testDeviceId,
                         onAccountClick = {},
                     )
                 }
@@ -173,6 +185,8 @@ class AccountsScreenTest {
                         transactionRepository = FakeTransactionRepository(),
                         personRepository = FakePersonRepository(),
                         personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
+                        entitySourceQueries = stubEntitySourceQueries,
+                        deviceId = testDeviceId,
                         onAccountClick = {},
                     )
                 }
@@ -204,6 +218,8 @@ class AccountsScreenTest {
                         transactionRepository = FakeTransactionRepository(),
                         personRepository = FakePersonRepository(),
                         personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
+                        entitySourceQueries = stubEntitySourceQueries,
+                        deviceId = testDeviceId,
                         onAccountClick = {},
                     )
                 }
@@ -232,6 +248,8 @@ class AccountsScreenTest {
                         transactionRepository = FakeTransactionRepository(),
                         personRepository = FakePersonRepository(),
                         personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
+                        entitySourceQueries = stubEntitySourceQueries,
+                        deviceId = testDeviceId,
                         onAccountClick = {},
                     )
                 }
@@ -262,6 +280,8 @@ class AccountsScreenTest {
                         transactionRepository = FakeTransactionRepository(),
                         personRepository = FakePersonRepository(),
                         personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
+                        entitySourceQueries = stubEntitySourceQueries,
+                        deviceId = testDeviceId,
                         onAccountClick = {},
                     )
                 }
@@ -300,6 +320,8 @@ class AccountsScreenTest {
                         transactionRepository = FakeTransactionRepository(),
                         personRepository = FakePersonRepository(),
                         personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
+                        entitySourceQueries = stubEntitySourceQueries,
+                        deviceId = testDeviceId,
                         onAccountClick = {},
                     )
                 }
@@ -350,6 +372,8 @@ class AccountsScreenTest {
                         transactionRepository = FakeTransactionRepository(),
                         personRepository = FakePersonRepository(),
                         personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
+                        entitySourceQueries = stubEntitySourceQueries,
+                        deviceId = testDeviceId,
                         onAccountClick = {},
                     )
                 }
@@ -383,11 +407,12 @@ class AccountsScreenTest {
             return accounts.map { createAccount(it) }
         }
 
-        override suspend fun updateAccount(account: Account) {
+        override suspend fun updateAccount(account: Account): Long {
             accountsFlow.value =
                 accountsFlow.value.map {
-                    if (it.id == account.id) account else it
+                    if (it.id == account.id) account.copy(revisionId = account.revisionId + 1) else it
                 }
+            return account.revisionId + 1
         }
 
         override suspend fun deleteAccount(id: AccountId) {
@@ -538,5 +563,57 @@ class AccountsScreenTest {
         override suspend fun deleteOwnershipsByPerson(personId: com.moneymanager.domain.model.PersonId) {}
 
         override suspend fun deleteOwnershipsByAccount(accountId: AccountId) {}
+    }
+
+    /**
+     * Creates a stub EntitySourceQueries for tests that don't actually query entity sources.
+     * Uses a minimal SqlDriver stub that throws NotImplementedError if actually invoked.
+     */
+    private companion object {
+        fun createStubEntitySourceQueries(): com.moneymanager.database.sql.EntitySourceQueries {
+            val stubDriver =
+                object : app.cash.sqldelight.db.SqlDriver {
+                    override fun close() = Unit
+
+                    override fun currentTransaction(): app.cash.sqldelight.Transacter.Transaction? = null
+
+                    override fun execute(
+                        identifier: Int?,
+                        sql: String,
+                        parameters: Int,
+                        binders: (app.cash.sqldelight.db.SqlPreparedStatement.() -> Unit)?,
+                    ): app.cash.sqldelight.db.QueryResult<Long> {
+                        throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
+                    }
+
+                    override fun <R> executeQuery(
+                        identifier: Int?,
+                        sql: String,
+                        mapper: (app.cash.sqldelight.db.SqlCursor) -> app.cash.sqldelight.db.QueryResult<R>,
+                        parameters: Int,
+                        binders: (app.cash.sqldelight.db.SqlPreparedStatement.() -> Unit)?,
+                    ): app.cash.sqldelight.db.QueryResult<R> {
+                        throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
+                    }
+
+                    override fun newTransaction(): app.cash.sqldelight.db.QueryResult<app.cash.sqldelight.Transacter.Transaction> {
+                        throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
+                    }
+
+                    override fun addListener(
+                        vararg queryKeys: String,
+                        listener: app.cash.sqldelight.Query.Listener,
+                    ) = Unit
+
+                    override fun removeListener(
+                        vararg queryKeys: String,
+                        listener: app.cash.sqldelight.Query.Listener,
+                    ) = Unit
+
+                    override fun notifyListeners(vararg queryKeys: String) = Unit
+                }
+
+            return com.moneymanager.database.sql.EntitySourceQueries(stubDriver)
+        }
     }
 }

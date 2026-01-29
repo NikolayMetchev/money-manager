@@ -20,6 +20,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.moneymanager.database.ManualEntitySourceRecorder
+import com.moneymanager.database.sql.EntitySourceQueries
+import com.moneymanager.domain.model.DeviceId
+import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.repository.PersonRepository
@@ -33,6 +37,8 @@ private val logger = logging()
 fun EditPersonDialog(
     personToEdit: Person?,
     personRepository: PersonRepository,
+    entitySourceQueries: EntitySourceQueries,
+    deviceId: DeviceId,
     onDismiss: () -> Unit,
 ) {
     var firstName by remember { mutableStateOf(personToEdit?.firstName.orEmpty()) }
@@ -116,7 +122,13 @@ fun EditPersonDialog(
                                             middleName = middleName.trim().ifBlank { null },
                                             lastName = lastName.trim().ifBlank { null },
                                         )
-                                    personRepository.createPerson(newPerson)
+                                    val personId = personRepository.createPerson(newPerson)
+                                    // Record source for audit trail
+                                    ManualEntitySourceRecorder(entitySourceQueries, deviceId).insert(
+                                        EntityType.PERSON,
+                                        personId.id,
+                                        1L,
+                                    )
                                 }
                                 onDismiss()
                             } catch (expected: Exception) {

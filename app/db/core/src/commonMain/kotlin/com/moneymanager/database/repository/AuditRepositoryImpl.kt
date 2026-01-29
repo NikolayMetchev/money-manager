@@ -6,6 +6,7 @@ import com.moneymanager.database.mapper.AccountAuditEntryMapper
 import com.moneymanager.database.mapper.AccountAuditEntryWithSourceMapper
 import com.moneymanager.database.mapper.CurrencyAuditEntryMapper
 import com.moneymanager.database.mapper.CurrencyAuditEntryWithSourceMapper
+import com.moneymanager.database.mapper.OwnershipAuditHistoryForAccountWithSourceMapper
 import com.moneymanager.database.mapper.PersonAccountOwnershipAuditEntryMapper
 import com.moneymanager.database.mapper.PersonAuditEntryMapper
 import com.moneymanager.database.mapper.PersonAuditEntryWithSourceMapper
@@ -88,6 +89,13 @@ class AuditRepositoryImpl(
             queries.selectAuditHistoryForPersonAccountOwnership(ownershipId)
                 .executeAsList()
                 .map(PersonAccountOwnershipAuditEntryMapper::map)
+        }
+
+    override suspend fun getOwnershipAuditHistoryForAccountWithSource(accountId: AccountId): List<PersonAccountOwnershipAuditEntry> =
+        withContext(Dispatchers.Default) {
+            queries.selectOwnershipAuditHistoryForAccountWithSource(accountId.id)
+                .executeAsList()
+                .map(OwnershipAuditHistoryForAccountWithSourceMapper::map)
         }
 
     override suspend fun getAuditHistoryForCurrency(currencyId: CurrencyId): List<CurrencyAuditEntry> =
