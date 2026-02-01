@@ -8,7 +8,7 @@ import kotlin.time.Instant
  * Represents an audit entry for a currency (asset).
  * Captures the state of a currency at a specific point in time during an INSERT, UPDATE, or DELETE operation.
  *
- * @property auditId Unique identifier for this audit entry
+ * @property id Unique identifier for this audit entry
  * @property auditTimestamp When this audit entry was created
  * @property auditType The type of operation that triggered this audit (INSERT, UPDATE, DELETE)
  * @property currencyId The ID of the currency that was audited
@@ -18,7 +18,7 @@ import kotlin.time.Instant
  * @property scaleFactor The scale factor at the time of the audit
  */
 data class CurrencyAuditEntry(
-    val auditId: Long,
+    val id: Long,
     val auditTimestamp: Instant,
     val auditType: AuditType,
     val currencyId: CurrencyId,

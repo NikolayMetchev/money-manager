@@ -76,7 +76,7 @@ fun TransactionAuditScreen(
         isLoading = true
         errorMessage = null
         try {
-            auditEntries = auditRepository.getAuditHistoryForTransferWithSource(transferId)
+            auditEntries = auditRepository.getAuditHistoryForTransfer(transferId)
             val transfer = transactionRepository.getTransactionById(transferId.id).first()
             currentTransfer = transfer
         } catch (expected: Exception) {
@@ -166,7 +166,7 @@ fun TransactionAuditScreen(
                     state = auditListState,
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    items(auditDiffs, key = { it.auditId }) { diff ->
+                    items(auditDiffs, key = { it.id }) { diff ->
                         AuditDiffCard(
                             diff = diff,
                             accounts = accounts,

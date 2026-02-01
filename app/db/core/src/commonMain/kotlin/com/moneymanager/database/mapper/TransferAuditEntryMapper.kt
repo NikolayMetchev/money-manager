@@ -16,9 +16,11 @@ object TransferAuditEntryMapper :
     AuditTypeConversions {
     override fun map(from: SelectAuditHistoryForTransfer): TransferAuditEntry =
         mapping {
-            TransferAuditEntry::auditId fromValue from.id
-            TransferAuditEntry::transferId fromValue toTransferId(from.transfer_id)
             TransferAuditEntry::amount fromValue Money(from.amount, from.toCurrency())
+            TransferAuditEntry::source fromValue
+                from.source_id?.let {
+                    TransferSourceFromAuditMapper.map(from)
+                }
         }
 }
 

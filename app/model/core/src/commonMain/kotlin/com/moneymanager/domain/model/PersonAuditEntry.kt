@@ -8,7 +8,7 @@ import kotlin.time.Instant
  * Represents an audit entry for a person.
  * Captures the state of a person at a specific point in time during an INSERT, UPDATE, or DELETE operation.
  *
- * @property auditId Unique identifier for this audit entry
+ * @property id Unique identifier for this audit entry
  * @property auditTimestamp When this audit entry was created
  * @property auditType The type of operation that triggered this audit (INSERT, UPDATE, DELETE)
  * @property personId The ID of the person that was audited
@@ -18,7 +18,7 @@ import kotlin.time.Instant
  * @property lastName The last name at the time of the audit
  */
 data class PersonAuditEntry(
-    val auditId: Long,
+    val id: Long,
     val auditTimestamp: Instant,
     val auditType: AuditType,
     val personId: PersonId,

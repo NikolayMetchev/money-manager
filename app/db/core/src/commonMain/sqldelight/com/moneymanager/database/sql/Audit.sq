@@ -108,30 +108,6 @@ SELECT
     currency.id AS currency_id,
     currency.code AS currency_code,
     currency.name AS currency_name,
-    currency.scale_factor AS currency_scale_factor
-FROM transfer_audit
-JOIN audit_type ON transfer_audit.audit_type_id = audit_type.id
-JOIN currency ON transfer_audit.currency_id = currency.id
-WHERE transfer_audit.transfer_id = ?
-ORDER BY transfer_audit.audit_timestamp DESC, transfer_audit.id DESC;
-
--- Get audit history for a transfer with source information
-selectAuditHistoryForTransferWithSource:
-SELECT
-    transfer_audit.id,
-    transfer_audit.audit_timestamp,
-    audit_type.name AS audit_type,
-    transfer_audit.transfer_id,
-    transfer_audit.revision_id,
-    transfer_audit.timestamp,
-    transfer_audit.description,
-    transfer_audit.source_account_id,
-    transfer_audit.target_account_id,
-    transfer_audit.currency_id,
-    transfer_audit.amount,
-    currency.id AS currency_id,
-    currency.code AS currency_code,
-    currency.name AS currency_name,
     currency.scale_factor AS currency_scale_factor,
     -- Source information
     transfer_source.id AS source_id,
@@ -199,51 +175,17 @@ CREATE TABLE person_account_ownership_audit (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     audit_timestamp INTEGER NOT NULL,
     audit_type_id INTEGER NOT NULL,
-    ownership_id INTEGER NOT NULL,
+    person_account_ownership_id INTEGER NOT NULL,
     revision_id INTEGER NOT NULL,
     person_id INTEGER NOT NULL,
     account_id INTEGER NOT NULL,
     FOREIGN KEY (audit_type_id) REFERENCES audit_type(id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_person_account_ownership_audit_ownership_id ON person_account_ownership_audit(ownership_id);
+CREATE INDEX IF NOT EXISTS idx_person_account_ownership_audit_person_account_ownership_id ON person_account_ownership_audit(person_account_ownership_id);
 CREATE INDEX IF NOT EXISTS idx_person_account_ownership_audit_timestamp ON person_account_ownership_audit(audit_timestamp);
 CREATE INDEX IF NOT EXISTS idx_person_account_ownership_audit_type ON person_account_ownership_audit(audit_type_id);
-CREATE INDEX IF NOT EXISTS idx_person_account_ownership_audit_ownership_id_timestamp ON person_account_ownership_audit(ownership_id, audit_timestamp DESC);
-
--- Get audit history for an account
-selectAuditHistoryForAccount:
-SELECT
-    account_audit.id,
-    account_audit.audit_timestamp,
-    audit_type.name AS audit_type,
-    account_audit.account_id,
-    account_audit.revision_id,
-    account_audit.name,
-    account_audit.opening_date,
-    account_audit.category_id,
-    category.name AS category_name
-FROM account_audit
-JOIN audit_type ON account_audit.audit_type_id = audit_type.id
-LEFT JOIN category ON account_audit.category_id = category.id
-WHERE account_audit.account_id = ?
-ORDER BY account_audit.audit_timestamp DESC, account_audit.id DESC;
-
--- Get audit history for a person
-selectAuditHistoryForPerson:
-SELECT
-    person_audit.id,
-    person_audit.audit_timestamp,
-    audit_type.name AS audit_type,
-    person_audit.person_id,
-    person_audit.revision_id,
-    person_audit.first_name,
-    person_audit.middle_name,
-    person_audit.last_name
-FROM person_audit
-JOIN audit_type ON person_audit.audit_type_id = audit_type.id
-WHERE person_audit.person_id = ?
-ORDER BY person_audit.audit_timestamp DESC, person_audit.id DESC;
+CREATE INDEX IF NOT EXISTS idx_person_account_ownership_audit_person_account_ownership_id_timestamp ON person_account_ownership_audit(person_account_ownership_id, audit_timestamp DESC);
 
 -- Get audit history for a person account ownership
 selectAuditHistoryForPersonAccountOwnership:
@@ -251,7 +193,7 @@ SELECT
     person_account_ownership_audit.id,
     person_account_ownership_audit.audit_timestamp,
     audit_type.name AS audit_type,
-    person_account_ownership_audit.ownership_id,
+    person_account_ownership_audit.person_account_ownership_id,
     person_account_ownership_audit.revision_id,
     person_account_ownership_audit.person_id,
     person_account_ownership_audit.account_id,
@@ -263,17 +205,17 @@ FROM person_account_ownership_audit
 JOIN audit_type ON person_account_ownership_audit.audit_type_id = audit_type.id
 LEFT JOIN person ON person_account_ownership_audit.person_id = person.id
 LEFT JOIN account ON person_account_ownership_audit.account_id = account.id
-WHERE person_account_ownership_audit.ownership_id = ?
+WHERE person_account_ownership_audit.person_account_ownership_id = ?
 ORDER BY person_account_ownership_audit.audit_timestamp DESC, person_account_ownership_audit.id DESC;
 
--- Get ownership audit history for a specific account with source information
+-- Get ownership audit history for a specific account
 -- entity_type_id = 4 for PERSON_ACCOUNT_OWNERSHIP
-selectOwnershipAuditHistoryForAccountWithSource:
+selectOwnershipAuditHistoryForAccount:
 SELECT
     person_account_ownership_audit.id,
     person_account_ownership_audit.audit_timestamp,
     audit_type.name AS audit_type,
-    person_account_ownership_audit.ownership_id,
+    person_account_ownership_audit.person_account_ownership_id,
     person_account_ownership_audit.revision_id,
     person_account_ownership_audit.person_id,
     person_account_ownership_audit.account_id,
@@ -296,7 +238,7 @@ FROM person_account_ownership_audit
 JOIN audit_type ON person_account_ownership_audit.audit_type_id = audit_type.id
 LEFT JOIN person ON person_account_ownership_audit.person_id = person.id
 LEFT JOIN account ON person_account_ownership_audit.account_id = account.id
-LEFT JOIN entity_source ON person_account_ownership_audit.ownership_id = entity_source.entity_id
+LEFT JOIN entity_source ON person_account_ownership_audit.person_account_ownership_id = entity_source.entity_id
     AND person_account_ownership_audit.revision_id = entity_source.revision_id
     AND entity_source.entity_type_id = 4
 LEFT JOIN source_type ON entity_source.source_type_id = source_type.id
@@ -304,25 +246,9 @@ LEFT JOIN device_view ON entity_source.device_id = device_view.id
 WHERE person_account_ownership_audit.account_id = ?
 ORDER BY person_account_ownership_audit.audit_timestamp DESC, person_account_ownership_audit.id DESC;
 
--- Get audit history for a currency
-selectAuditHistoryForCurrency:
-SELECT
-    currency_audit.id,
-    currency_audit.audit_timestamp,
-    audit_type.name AS audit_type,
-    currency_audit.currency_id,
-    currency_audit.revision_id,
-    currency_audit.code,
-    currency_audit.name,
-    currency_audit.scale_factor
-FROM currency_audit
-JOIN audit_type ON currency_audit.audit_type_id = audit_type.id
-WHERE currency_audit.currency_id = ?
-ORDER BY currency_audit.audit_timestamp DESC, currency_audit.id DESC;
-
--- Get audit history for an account with source information
+-- Get audit history for an account
 -- entity_type_id = 1 for ACCOUNT
-selectAuditHistoryForAccountWithSource:
+selectAuditHistoryForAccount:
 SELECT
     account_audit.id,
     account_audit.audit_timestamp,
@@ -355,9 +281,9 @@ LEFT JOIN device_view ON entity_source.device_id = device_view.id
 WHERE account_audit.account_id = ?
 ORDER BY account_audit.audit_timestamp DESC, account_audit.id DESC;
 
--- Get audit history for a person with source information
+-- Get audit history for a person
 -- entity_type_id = 2 for PERSON
-selectAuditHistoryForPersonWithSource:
+selectAuditHistoryForPerson:
 SELECT
     person_audit.id,
     person_audit.audit_timestamp,
@@ -388,9 +314,9 @@ LEFT JOIN device_view ON entity_source.device_id = device_view.id
 WHERE person_audit.person_id = ?
 ORDER BY person_audit.audit_timestamp DESC, person_audit.id DESC;
 
--- Get audit history for a currency with source information
+-- Get audit history for a currency
 -- entity_type_id = 3 for CURRENCY
-selectAuditHistoryForCurrencyWithSource:
+selectAuditHistoryForCurrency:
 SELECT
     currency_audit.id,
     currency_audit.audit_timestamp,

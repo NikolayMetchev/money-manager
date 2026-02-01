@@ -68,7 +68,7 @@ fun CurrencyAuditScreen(
         isLoading = true
         errorMessage = null
         try {
-            auditEntries = auditRepository.getAuditHistoryForCurrencyWithSource(currencyId)
+            auditEntries = auditRepository.getAuditHistoryForCurrency(currencyId)
             currentCurrency = currencyRepository.getCurrencyById(currencyId).first()
         } catch (expected: Exception) {
             logger.error(expected) { "Failed to load audit history: ${expected.message}" }
@@ -139,7 +139,7 @@ fun CurrencyAuditScreen(
                     state = auditListState,
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    items(auditDiffs, key = { it.auditId }) { diff ->
+                    items(auditDiffs, key = { it.id }) { diff ->
                         CurrencyAuditDiffCard(diff = diff)
                     }
                 }
@@ -153,7 +153,7 @@ fun CurrencyAuditScreen(
 }
 
 private data class CurrencyAuditDiff(
-    val auditId: Long,
+    val id: Long,
     val auditTimestamp: Instant,
     val auditType: AuditType,
     val currencyId: CurrencyId,
@@ -175,7 +175,7 @@ private fun computeCurrencyAuditDiffs(
         when (entry.auditType) {
             AuditType.INSERT ->
                 CurrencyAuditDiff(
-                    auditId = entry.auditId,
+                    id = entry.id,
                     auditTimestamp = entry.auditTimestamp,
                     auditType = entry.auditType,
                     currencyId = entry.currencyId,
@@ -187,7 +187,7 @@ private fun computeCurrencyAuditDiffs(
                 )
             AuditType.DELETE ->
                 CurrencyAuditDiff(
-                    auditId = entry.auditId,
+                    id = entry.id,
                     auditTimestamp = entry.auditTimestamp,
                     auditType = entry.auditType,
                     currencyId = entry.currencyId,
@@ -226,7 +226,7 @@ private fun computeCurrencyAuditDiffs(
                     }
 
                 CurrencyAuditDiff(
-                    auditId = entry.auditId,
+                    id = entry.id,
                     auditTimestamp = entry.auditTimestamp,
                     auditType = entry.auditType,
                     currencyId = entry.currencyId,

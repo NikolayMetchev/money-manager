@@ -298,21 +298,10 @@ object DatabaseConfig {
     private fun MoneyManagerDatabaseWrapper.createAuditTriggers() {
         val tables = getAuditableTables()
 
-        // Map main table names to their entity ID column name in the audit table
-        val entityIdColumnName =
-            mapOf(
-                "account" to "account_id",
-                "currency" to "currency_id",
-                "category" to "category_id",
-                "transfer" to "transfer_id",
-                "person" to "person_id",
-                "person_account_ownership" to "ownership_id",
-            )
-
         tables.forEach { tableName ->
             val auditTableName = "${tableName}_audit"
             val columns = getTableColumns(tableName)
-            val auditEntityIdCol = entityIdColumnName[tableName] ?: "${tableName}_id"
+            val auditEntityIdCol = "${tableName}_id"
 
             // Map main table column names to audit table column names (id -> entity_id)
             val auditColumnList =

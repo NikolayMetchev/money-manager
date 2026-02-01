@@ -68,7 +68,7 @@ fun PersonAuditScreen(
         isLoading = true
         errorMessage = null
         try {
-            auditEntries = auditRepository.getAuditHistoryForPersonWithSource(personId)
+            auditEntries = auditRepository.getAuditHistoryForPerson(personId)
             currentPerson = personRepository.getPersonById(personId).first()
         } catch (expected: Exception) {
             logger.error(expected) { "Failed to load audit history: ${expected.message}" }
@@ -139,7 +139,7 @@ fun PersonAuditScreen(
                     state = auditListState,
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    items(auditDiffs, key = { it.auditId }) { diff ->
+                    items(auditDiffs, key = { it.id }) { diff ->
                         PersonAuditDiffCard(diff = diff)
                     }
                 }
@@ -153,7 +153,7 @@ fun PersonAuditScreen(
 }
 
 private data class PersonAuditDiff(
-    val auditId: Long,
+    val id: Long,
     val auditTimestamp: Instant,
     val auditType: AuditType,
     val personId: PersonId,
@@ -189,7 +189,7 @@ private fun computePersonAuditDiffs(
         when (entry.auditType) {
             AuditType.INSERT ->
                 PersonAuditDiff(
-                    auditId = entry.auditId,
+                    id = entry.id,
                     auditTimestamp = entry.auditTimestamp,
                     auditType = entry.auditType,
                     personId = entry.personId,
@@ -201,7 +201,7 @@ private fun computePersonAuditDiffs(
                 )
             AuditType.DELETE ->
                 PersonAuditDiff(
-                    auditId = entry.auditId,
+                    id = entry.id,
                     auditTimestamp = entry.auditTimestamp,
                     auditType = entry.auditType,
                     personId = entry.personId,
@@ -240,7 +240,7 @@ private fun computePersonAuditDiffs(
                     }
 
                 PersonAuditDiff(
-                    auditId = entry.auditId,
+                    id = entry.id,
                     auditTimestamp = entry.auditTimestamp,
                     auditType = entry.auditType,
                     personId = entry.personId,

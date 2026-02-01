@@ -69,8 +69,8 @@ fun AccountAuditScreen(
         isLoading = true
         errorMessage = null
         try {
-            auditEntries = auditRepository.getAuditHistoryForAccountWithSource(accountId)
-            ownershipAuditEntries = auditRepository.getOwnershipAuditHistoryForAccountWithSource(accountId)
+            auditEntries = auditRepository.getAuditHistoryForAccount(accountId)
+            ownershipAuditEntries = auditRepository.getOwnershipAuditHistoryForAccount(accountId)
             currentAccount = accountRepository.getAccountById(accountId).first()
         } catch (expected: Exception) {
             logger.error(expected) { "Failed to load audit history: ${expected.message}" }
@@ -141,7 +141,7 @@ fun AccountAuditScreen(
                     state = auditListState,
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    items(auditDiffs, key = { it.auditId }) { diff ->
+                    items(auditDiffs, key = { it.id }) { diff ->
                         AccountAuditDiffCard(diff = diff)
                     }
                 }
@@ -155,7 +155,7 @@ fun AccountAuditScreen(
 }
 
 private data class AccountAuditDiff(
-    val auditId: Long,
+    val id: Long,
     val auditTimestamp: kotlin.time.Instant,
     val auditType: AuditType,
     val accountId: AccountId,
@@ -224,7 +224,7 @@ private fun computeAccountAuditDiffs(
         when (entry.auditType) {
             AuditType.INSERT ->
                 AccountAuditDiff(
-                    auditId = entry.auditId,
+                    id = entry.id,
                     auditTimestamp = entry.auditTimestamp,
                     auditType = entry.auditType,
                     accountId = entry.accountId,
@@ -238,7 +238,7 @@ private fun computeAccountAuditDiffs(
                 )
             AuditType.DELETE ->
                 AccountAuditDiff(
-                    auditId = entry.auditId,
+                    id = entry.id,
                     auditTimestamp = entry.auditTimestamp,
                     auditType = entry.auditType,
                     accountId = entry.accountId,
@@ -272,7 +272,7 @@ private fun computeAccountAuditDiffs(
                     }
 
                 AccountAuditDiff(
-                    auditId = entry.auditId,
+                    id = entry.id,
                     auditTimestamp = entry.auditTimestamp,
                     auditType = entry.auditType,
                     accountId = entry.accountId,

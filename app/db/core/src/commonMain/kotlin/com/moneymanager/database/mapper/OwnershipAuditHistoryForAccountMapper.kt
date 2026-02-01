@@ -2,29 +2,52 @@
 
 package com.moneymanager.database.mapper
 
-import com.moneymanager.database.sql.SelectAuditHistoryForAccountWithSource
-import com.moneymanager.domain.model.AccountAuditEntry
+import com.moneymanager.database.sql.SelectOwnershipAuditHistoryForAccount
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.EntitySource
 import com.moneymanager.domain.model.EntityType
+import com.moneymanager.domain.model.PersonAccountOwnershipAuditEntry
 import com.moneymanager.domain.model.SourceType
 import tech.mappie.api.ObjectMappie
 import kotlin.time.Instant
 
-object AccountAuditEntryWithSourceMapper :
-    ObjectMappie<SelectAuditHistoryForAccountWithSource, AccountAuditEntry>(),
+object OwnershipAuditHistoryForAccountMapper :
+    ObjectMappie<SelectOwnershipAuditHistoryForAccount, PersonAccountOwnershipAuditEntry>(),
     IdConversions,
     InstantConversions,
     AuditTypeConversions {
-    override fun map(from: SelectAuditHistoryForAccountWithSource): AccountAuditEntry =
+    override fun map(from: SelectOwnershipAuditHistoryForAccount): PersonAccountOwnershipAuditEntry =
         mapping {
-            AccountAuditEntry::auditId fromValue from.id
-            AccountAuditEntry::accountId fromValue toAccountId(from.account_id)
-            AccountAuditEntry::source fromValue from.toEntitySource()
+            PersonAccountOwnershipAuditEntry::personFullName fromValue
+                buildPersonFullName(
+                    from.person_first_name,
+                    from.person_middle_name,
+                    from.person_last_name,
+                )
+            PersonAccountOwnershipAuditEntry::source fromValue from.toEntitySource()
         }
 }
 
-private fun SelectAuditHistoryForAccountWithSource.toEntitySource(): EntitySource? {
+private fun buildPersonFullName(
+    firstName: String?,
+    middleName: String?,
+    lastName: String?,
+): String? {
+    if (firstName == null) return null
+    return buildString {
+        append(firstName)
+        if (!middleName.isNullOrBlank()) {
+            append(" ")
+            append(middleName)
+        }
+        if (!lastName.isNullOrBlank()) {
+            append(" ")
+            append(lastName)
+        }
+    }
+}
+
+private fun SelectOwnershipAuditHistoryForAccount.toEntitySource(): EntitySource? {
     val sourceId = source_id ?: return null
     source_type_id ?: return null
     val sourceTypeName = source_type_name ?: return null
@@ -48,8 +71,8 @@ private fun SelectAuditHistoryForAccountWithSource.toEntitySource(): EntitySourc
 
     return EntitySource(
         id = sourceId,
-        entityType = EntityType.ACCOUNT,
-        entityId = account_id,
+        entityType = EntityType.PERSON_ACCOUNT_OWNERSHIP,
+        entityId = person_account_ownership_id,
         revisionId = revision_id,
         sourceType = SourceType.fromName(sourceTypeName),
         deviceId = deviceId,

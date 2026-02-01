@@ -45,7 +45,7 @@ fun computeAuditDiff(
     return when (entry.auditType) {
         AuditType.INSERT ->
             AuditEntryDiff(
-                auditId = entry.auditId,
+                id = entry.id,
                 auditTimestamp = entry.auditTimestamp,
                 auditType = entry.auditType,
                 transferId = entry.transferId,
@@ -60,7 +60,7 @@ fun computeAuditDiff(
             )
         AuditType.DELETE ->
             AuditEntryDiff(
-                auditId = entry.auditId,
+                id = entry.id,
                 auditTimestamp = entry.auditTimestamp,
                 auditType = entry.auditType,
                 transferId = entry.transferId,
@@ -76,7 +76,7 @@ fun computeAuditDiff(
         AuditType.UPDATE -> {
             requireNotNull(newValuesForUpdate) { "UPDATE entry must have new values to compare against" }
             AuditEntryDiff(
-                auditId = entry.auditId,
+                id = entry.id,
                 auditTimestamp = entry.auditTimestamp,
                 auditType = entry.auditType,
                 transferId = entry.transferId,

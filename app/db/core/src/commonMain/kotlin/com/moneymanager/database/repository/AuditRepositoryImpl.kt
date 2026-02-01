@@ -3,15 +3,11 @@
 package com.moneymanager.database.repository
 
 import com.moneymanager.database.mapper.AccountAuditEntryMapper
-import com.moneymanager.database.mapper.AccountAuditEntryWithSourceMapper
 import com.moneymanager.database.mapper.CurrencyAuditEntryMapper
-import com.moneymanager.database.mapper.CurrencyAuditEntryWithSourceMapper
-import com.moneymanager.database.mapper.OwnershipAuditHistoryForAccountWithSourceMapper
+import com.moneymanager.database.mapper.OwnershipAuditHistoryForAccountMapper
 import com.moneymanager.database.mapper.PersonAccountOwnershipAuditEntryMapper
 import com.moneymanager.database.mapper.PersonAuditEntryMapper
-import com.moneymanager.database.mapper.PersonAuditEntryWithSourceMapper
 import com.moneymanager.database.mapper.TransferAuditEntryMapper
-import com.moneymanager.database.mapper.TransferAuditEntryWithSourceMapper
 import com.moneymanager.database.sql.MoneyManagerDatabase
 import com.moneymanager.domain.model.AccountAuditEntry
 import com.moneymanager.domain.model.AccountId
@@ -45,28 +41,11 @@ class AuditRepositoryImpl(
             attachAttributeChanges(transferId, entries)
         }
 
-    override suspend fun getAuditHistoryForTransferWithSource(transferId: TransferId): List<TransferAuditEntry> =
-        withContext(Dispatchers.Default) {
-            val entries =
-                queries.selectAuditHistoryForTransferWithSource(transferId.id)
-                    .executeAsList()
-                    .map(TransferAuditEntryWithSourceMapper::map)
-
-            attachAttributeChanges(transferId, entries)
-        }
-
     override suspend fun getAuditHistoryForAccount(accountId: AccountId): List<AccountAuditEntry> =
         withContext(Dispatchers.Default) {
             queries.selectAuditHistoryForAccount(accountId.id)
                 .executeAsList()
                 .map(AccountAuditEntryMapper::map)
-        }
-
-    override suspend fun getAuditHistoryForAccountWithSource(accountId: AccountId): List<AccountAuditEntry> =
-        withContext(Dispatchers.Default) {
-            queries.selectAuditHistoryForAccountWithSource(accountId.id)
-                .executeAsList()
-                .map(AccountAuditEntryWithSourceMapper::map)
         }
 
     override suspend fun getAuditHistoryForPerson(personId: PersonId): List<PersonAuditEntry> =
@@ -76,13 +55,6 @@ class AuditRepositoryImpl(
                 .map(PersonAuditEntryMapper::map)
         }
 
-    override suspend fun getAuditHistoryForPersonWithSource(personId: PersonId): List<PersonAuditEntry> =
-        withContext(Dispatchers.Default) {
-            queries.selectAuditHistoryForPersonWithSource(personId.id)
-                .executeAsList()
-                .map(PersonAuditEntryWithSourceMapper::map)
-        }
-
     override suspend fun getAuditHistoryForPersonAccountOwnership(ownershipId: Long): List<PersonAccountOwnershipAuditEntry> =
         withContext(Dispatchers.Default) {
             queries.selectAuditHistoryForPersonAccountOwnership(ownershipId)
@@ -90,11 +62,11 @@ class AuditRepositoryImpl(
                 .map(PersonAccountOwnershipAuditEntryMapper::map)
         }
 
-    override suspend fun getOwnershipAuditHistoryForAccountWithSource(accountId: AccountId): List<PersonAccountOwnershipAuditEntry> =
+    override suspend fun getOwnershipAuditHistoryForAccount(accountId: AccountId): List<PersonAccountOwnershipAuditEntry> =
         withContext(Dispatchers.Default) {
-            queries.selectOwnershipAuditHistoryForAccountWithSource(accountId.id)
+            queries.selectOwnershipAuditHistoryForAccount(accountId.id)
                 .executeAsList()
-                .map(OwnershipAuditHistoryForAccountWithSourceMapper::map)
+                .map(OwnershipAuditHistoryForAccountMapper::map)
         }
 
     override suspend fun getAuditHistoryForCurrency(currencyId: CurrencyId): List<CurrencyAuditEntry> =
@@ -102,13 +74,6 @@ class AuditRepositoryImpl(
             queries.selectAuditHistoryForCurrency(currencyId.id)
                 .executeAsList()
                 .map(CurrencyAuditEntryMapper::map)
-        }
-
-    override suspend fun getAuditHistoryForCurrencyWithSource(currencyId: CurrencyId): List<CurrencyAuditEntry> =
-        withContext(Dispatchers.Default) {
-            queries.selectAuditHistoryForCurrencyWithSource(currencyId.id)
-                .executeAsList()
-                .map(CurrencyAuditEntryWithSourceMapper::map)
         }
 
     private fun attachAttributeChanges(
