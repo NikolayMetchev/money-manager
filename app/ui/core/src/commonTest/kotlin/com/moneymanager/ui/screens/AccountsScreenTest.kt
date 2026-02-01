@@ -57,6 +57,7 @@ class AccountsScreenTest {
                         personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
                         entitySourceQueries = stubEntitySourceQueries,
                         deviceId = testDeviceId,
+                        scrollToAccountId = null,
                         onAccountClick = {},
                     )
                 }
@@ -98,6 +99,7 @@ class AccountsScreenTest {
                         personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
                         entitySourceQueries = stubEntitySourceQueries,
                         deviceId = testDeviceId,
+                        scrollToAccountId = null,
                         onAccountClick = {},
                     )
                 }
@@ -125,6 +127,7 @@ class AccountsScreenTest {
                         personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
                         entitySourceQueries = stubEntitySourceQueries,
                         deviceId = testDeviceId,
+                        scrollToAccountId = null,
                         onAccountClick = {},
                     )
                 }
@@ -151,6 +154,7 @@ class AccountsScreenTest {
                         personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
                         entitySourceQueries = stubEntitySourceQueries,
                         deviceId = testDeviceId,
+                        scrollToAccountId = null,
                         onAccountClick = {},
                     )
                 }
@@ -187,6 +191,7 @@ class AccountsScreenTest {
                         personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
                         entitySourceQueries = stubEntitySourceQueries,
                         deviceId = testDeviceId,
+                        scrollToAccountId = null,
                         onAccountClick = {},
                     )
                 }
@@ -220,6 +225,7 @@ class AccountsScreenTest {
                         personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
                         entitySourceQueries = stubEntitySourceQueries,
                         deviceId = testDeviceId,
+                        scrollToAccountId = null,
                         onAccountClick = {},
                     )
                 }
@@ -250,6 +256,7 @@ class AccountsScreenTest {
                         personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
                         entitySourceQueries = stubEntitySourceQueries,
                         deviceId = testDeviceId,
+                        scrollToAccountId = null,
                         onAccountClick = {},
                     )
                 }
@@ -282,6 +289,7 @@ class AccountsScreenTest {
                         personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
                         entitySourceQueries = stubEntitySourceQueries,
                         deviceId = testDeviceId,
+                        scrollToAccountId = null,
                         onAccountClick = {},
                     )
                 }
@@ -322,6 +330,7 @@ class AccountsScreenTest {
                         personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
                         entitySourceQueries = stubEntitySourceQueries,
                         deviceId = testDeviceId,
+                        scrollToAccountId = null,
                         onAccountClick = {},
                     )
                 }
@@ -374,6 +383,7 @@ class AccountsScreenTest {
                         personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
                         entitySourceQueries = stubEntitySourceQueries,
                         deviceId = testDeviceId,
+                        scrollToAccountId = null,
                         onAccountClick = {},
                     )
                 }
