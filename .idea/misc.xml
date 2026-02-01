@@ -4,22 +4,6 @@
   <component name="FrameworkDetectionExcludesConfiguration">
     <file type="web" url="file://$PROJECT_DIR$" />
   </component>
-  <component name="ManuallyLinkedServices">
-    <option name="services">
-      <set>
-        <option value="auth" />
-        <option value="pes" />
-        <option value="pes-admin-service" />
-        <option value="pes-blocking-service" />
-        <option value="pes-email-sending-events-connector" />
-        <option value="pes-event-router" />
-        <option value="pes-event-storer" />
-        <option value="pes-metric-service" />
-        <option value="pes-recon-service" />
-        <option value="pes-service" />
-      </set>
-    </option>
-  </component>
   <component name="ProjectRootManager" version="2" languageLevel="JDK_25" default="true" project-jdk-name="temurin-25" project-jdk-type="JavaSDK">
     <output url="file://$PROJECT_DIR$/out" />
   </component>
