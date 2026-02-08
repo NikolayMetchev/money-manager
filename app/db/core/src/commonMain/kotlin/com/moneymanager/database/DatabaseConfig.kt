@@ -191,6 +191,85 @@ object DatabaseConfig {
         )
 
     /**
+     * Creates custom audit triggers for the category table.
+     * Unlike the auto-generated triggers, these include a subquery to capture the
+     * parent category name at audit time (denormalized into the audit row).
+     *
+     * Must be called BEFORE createAuditTriggers() so the generic IF NOT EXISTS triggers
+     * are skipped for category.
+     */
+    private fun MoneyManagerDatabaseWrapper.createCategoryAuditTriggers() {
+        // INSERT trigger - stores NEW values, looks up parent name
+        execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_category_insert_audit
+            AFTER INSERT ON category
+            FOR EACH ROW
+            BEGIN
+                INSERT INTO category_audit (audit_timestamp, audit_type_id, category_id, revision_id, name, parent_id, parent_name)
+                VALUES (
+                    CAST(strftime('%s', 'now') AS INTEGER) * 1000,
+                    1,
+                    NEW.id,
+                    NEW.revision_id,
+                    NEW.name,
+                    NEW.parent_id,
+                    (SELECT name FROM category WHERE id = NEW.parent_id)
+                );
+            END
+            """.trimIndent(),
+            0,
+        )
+
+        // UPDATE trigger - stores OLD values (except revision_id uses NEW), looks up old parent name
+        execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_category_update_audit
+            AFTER UPDATE ON category
+            FOR EACH ROW
+            BEGIN
+                INSERT INTO category_audit (audit_timestamp, audit_type_id, category_id, revision_id, name, parent_id, parent_name)
+                VALUES (
+                    CAST(strftime('%s', 'now') AS INTEGER) * 1000,
+                    2,
+                    OLD.id,
+                    NEW.revision_id,
+                    OLD.name,
+                    OLD.parent_id,
+                    (SELECT name FROM category WHERE id = OLD.parent_id)
+                );
+            END
+            """.trimIndent(),
+            0,
+        )
+
+        // DELETE trigger - stores OLD values, looks up old parent name
+        execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_category_delete_audit
+            AFTER DELETE ON category
+            FOR EACH ROW
+            BEGIN
+                INSERT INTO category_audit (audit_timestamp, audit_type_id, category_id, revision_id, name, parent_id, parent_name)
+                VALUES (
+                    CAST(strftime('%s', 'now') AS INTEGER) * 1000,
+                    3,
+                    OLD.id,
+                    OLD.revision_id,
+                    OLD.name,
+                    OLD.parent_id,
+                    (SELECT name FROM category WHERE id = OLD.parent_id)
+                );
+            END
+            """.trimIndent(),
+            0,
+        )
+    }
+
+    /**
      * Creates triggers for transfer attribute auditing.
      *
      * Each attribute change (INSERT/UPDATE/DELETE) bumps the transfer revision
@@ -403,7 +482,12 @@ object DatabaseConfig {
             createCreationModeTable()
             createAttributeTriggers()
 
+            // Create custom category audit triggers (must be before generic ones)
+            // These include parent_name denormalization via subquery
+            createCategoryAuditTriggers()
+
             // Create audit triggers for all main tables
+            // Category triggers are skipped because custom ones already exist (IF NOT EXISTS)
             createAuditTriggers()
 
             // Seed default "Uncategorized" category

@@ -4,6 +4,7 @@ package com.moneymanager.domain.repository
 
 import com.moneymanager.domain.model.AccountAuditEntry
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.CategoryAuditEntry
 import com.moneymanager.domain.model.CurrencyAuditEntry
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.PersonAccountOwnershipAuditEntry
@@ -72,4 +73,14 @@ interface AuditRepository {
      * @return List of audit entries for the currency
      */
     suspend fun getAuditHistoryForCurrency(currencyId: CurrencyId): List<CurrencyAuditEntry>
+
+    /**
+     * Gets the audit history for a specific category.
+     * Returns entries ordered by audit timestamp descending (most recent first).
+     * Each entry includes its source/provenance if available.
+     *
+     * @param categoryId The ID of the category to get audit history for
+     * @return List of audit entries for the category
+     */
+    suspend fun getAuditHistoryForCategory(categoryId: Long): List<CategoryAuditEntry>
 }

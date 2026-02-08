@@ -12,6 +12,7 @@ enum class EntityType(val id: Long) {
     PERSON(2),
     CURRENCY(3),
     PERSON_ACCOUNT_OWNERSHIP(4),
+    CATEGORY(5),
     ;
 
     companion object {

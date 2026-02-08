@@ -3,6 +3,7 @@
 package com.moneymanager.database.repository
 
 import com.moneymanager.database.mapper.AccountAuditEntryMapper
+import com.moneymanager.database.mapper.CategoryAuditEntryMapper
 import com.moneymanager.database.mapper.CurrencyAuditEntryMapper
 import com.moneymanager.database.mapper.OwnershipAuditHistoryForAccountMapper
 import com.moneymanager.database.mapper.PersonAccountOwnershipAuditEntryMapper
@@ -14,6 +15,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.AuditType
+import com.moneymanager.domain.model.CategoryAuditEntry
 import com.moneymanager.domain.model.CurrencyAuditEntry
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.PersonAccountOwnershipAuditEntry
@@ -74,6 +76,13 @@ class AuditRepositoryImpl(
             queries.selectAuditHistoryForCurrency(currencyId.id)
                 .executeAsList()
                 .map(CurrencyAuditEntryMapper::map)
+        }
+
+    override suspend fun getAuditHistoryForCategory(categoryId: Long): List<CategoryAuditEntry> =
+        withContext(Dispatchers.Default) {
+            queries.selectAuditHistoryForCategory(categoryId)
+                .executeAsList()
+                .map(CategoryAuditEntryMapper::map)
         }
 
     private fun attachAttributeChanges(

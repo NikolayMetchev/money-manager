@@ -44,4 +44,7 @@ sealed class Screen(val title: String) {
 
     data class CurrencyAuditHistory(val currencyId: CurrencyId, val currencyCode: String) :
         Screen("Currency Audit: $currencyCode")
+
+    data class CategoryAuditHistory(val categoryId: Long, val categoryName: String) :
+        Screen("Category Audit: $categoryName")
 }

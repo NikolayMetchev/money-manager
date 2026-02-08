@@ -1,4 +1,4 @@
--- Generic source tracking for entity changes (Account, Person, Currency, PersonAccountOwnership)
+-- Generic source tracking for entity changes (Account, Person, Currency, PersonAccountOwnership, Category)
 -- Similar to transfer_source but for non-transfer entities
 
 -- entity_type values:
@@ -6,6 +6,7 @@
 -- 2 = PERSON
 -- 3 = CURRENCY
 -- 4 = PERSON_ACCOUNT_OWNERSHIP
+-- 5 = CATEGORY
 
 CREATE TABLE entity_type (
     id INTEGER PRIMARY KEY NOT NULL,
@@ -16,6 +17,7 @@ INSERT OR IGNORE INTO entity_type (id, name) VALUES (1, 'ACCOUNT');
 INSERT OR IGNORE INTO entity_type (id, name) VALUES (2, 'PERSON');
 INSERT OR IGNORE INTO entity_type (id, name) VALUES (3, 'CURRENCY');
 INSERT OR IGNORE INTO entity_type (id, name) VALUES (4, 'PERSON_ACCOUNT_OWNERSHIP');
+INSERT OR IGNORE INTO entity_type (id, name) VALUES (5, 'CATEGORY');
 
 CREATE TABLE entity_source (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

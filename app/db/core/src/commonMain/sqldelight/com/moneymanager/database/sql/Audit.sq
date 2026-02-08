@@ -43,8 +43,10 @@ CREATE TABLE category_audit (
     audit_timestamp INTEGER NOT NULL,
     audit_type_id INTEGER NOT NULL,
     category_id INTEGER NOT NULL,
+    revision_id INTEGER NOT NULL,
     name TEXT NOT NULL,
     parent_id INTEGER,
+    parent_name TEXT,
     FOREIGN KEY (audit_type_id) REFERENCES audit_type(id)
 );
 
@@ -346,3 +348,36 @@ LEFT JOIN source_type ON entity_source.source_type_id = source_type.id
 LEFT JOIN device_view ON entity_source.device_id = device_view.id
 WHERE currency_audit.currency_id = ?
 ORDER BY currency_audit.audit_timestamp DESC, currency_audit.id DESC;
+
+-- Get audit history for a category
+-- entity_type_id = 5 for CATEGORY
+selectAuditHistoryForCategory:
+SELECT
+    category_audit.id,
+    category_audit.audit_timestamp,
+    audit_type.name AS audit_type,
+    category_audit.category_id,
+    category_audit.revision_id,
+    category_audit.name,
+    category_audit.parent_id,
+    category_audit.parent_name,
+    -- Source information
+    entity_source.id AS source_id,
+    entity_source.device_id AS source_device_id,
+    source_type.id AS source_type_id,
+    source_type.name AS source_type_name,
+    device_view.platform_name AS source_platform_name,
+    device_view.os_name AS source_os_name,
+    device_view.machine_name AS source_machine_name,
+    device_view.device_make AS source_device_make,
+    device_view.device_model AS source_device_model,
+    entity_source.created_at AS source_created_at
+FROM category_audit
+JOIN audit_type ON category_audit.audit_type_id = audit_type.id
+LEFT JOIN entity_source ON category_audit.category_id = entity_source.entity_id
+    AND category_audit.revision_id = entity_source.revision_id
+    AND entity_source.entity_type_id = 5
+LEFT JOIN source_type ON entity_source.source_type_id = source_type.id
+LEFT JOIN device_view ON entity_source.device_id = device_view.id
+WHERE category_audit.category_id = ?
+ORDER BY category_audit.audit_timestamp DESC, category_audit.id DESC;

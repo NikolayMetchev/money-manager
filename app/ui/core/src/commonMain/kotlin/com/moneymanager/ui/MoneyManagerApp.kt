@@ -55,6 +55,7 @@ import com.moneymanager.ui.navigation.mouseButtonNavigation
 import com.moneymanager.ui.screens.AccountAuditScreen
 import com.moneymanager.ui.screens.AccountsScreen
 import com.moneymanager.ui.screens.CategoriesScreen
+import com.moneymanager.ui.screens.CategoryAuditScreen
 import com.moneymanager.ui.screens.CsvImportDetailScreen
 import com.moneymanager.ui.screens.CsvImportsScreen
 import com.moneymanager.ui.screens.CurrenciesScreen
@@ -259,6 +260,9 @@ fun MoneyManagerApp(
                             CategoriesScreen(
                                 categoryRepository = categoryRepository,
                                 currencyRepository = currencyRepository,
+                                onAuditClick = { category ->
+                                    navigationHistory.navigateTo(Screen.CategoryAuditHistory(category.id, category.name))
+                                },
                             )
                         }
                         is Screen.People -> {
@@ -459,6 +463,14 @@ fun MoneyManagerApp(
                                 currencyId = screen.currencyId,
                                 auditRepository = auditRepository,
                                 currencyRepository = currencyRepository,
+                                onBack = { navigationHistory.navigateBack() },
+                            )
+                        }
+                        is Screen.CategoryAuditHistory -> {
+                            CategoryAuditScreen(
+                                categoryId = screen.categoryId,
+                                auditRepository = auditRepository,
+                                categoryRepository = categoryRepository,
                                 onBack = { navigationHistory.navigateBack() },
                             )
                         }
