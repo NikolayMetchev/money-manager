@@ -4,12 +4,12 @@ develocity = "4.3"
 android-gradle-plugin = "8.13.2"
 android-minSdk = "30"
 android-targetSdk = "35"
-androidx-activity-compose = "1.12.2"
-androidx-compose = "1.10.0"
+androidx-activity-compose = "1.12.3"
+androidx-compose = "1.10.2"
 androidx-test-core = "1.7.0"
 androidx-test-runner = "1.7.0"
 compose = "1.7.5"
-compose-plugin = "1.9.3"
+compose-plugin = "1.10.0"
 compose-ui-test = "1.9.3"
 dependency-analysis = "3.5.1"
 detekt = "2.0.0-alpha.1"
@@ -21,8 +21,8 @@ kmlogging = "2.0.3"
 kotlin = "2.3.0"
 kotlinx-coroutines = "1.10.2"
 kotlinx-datetime = "0.7.1"
-kotlinx-serialization = "1.9.0"
-kover = "0.9.4"
+kotlinx-serialization = "1.10.0"
+kover = "0.9.5"
 ktlint = "12.1.2"
 log4j = "2.25.3"
 mappie = "2.3.0-2.3.0"
@@ -38,7 +38,7 @@ turbine = "1.2.1"
 android-gradle-plugin = { module = "com.android.tools.build:gradle", version.ref = "android-gradle-plugin" }
 androidx-activity = { module = "androidx.activity:activity", version.ref = "androidx-activity-compose" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity-compose" }
-androidx-compose-runtime = { module = "androidx.compose.runtime:runtime", version = "1.10.0" }
+androidx-compose-runtime = { module = "androidx.compose.runtime:runtime", version.ref = "androidx-compose" }
 androidx-compose-runtime-desktop = { module = "androidx.compose.runtime:runtime-desktop", version.ref = "androidx-compose" }
 androidx-test-core = { module = "androidx.test:core", version.ref = "androidx-test-core" }
 androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidx-test-runner" }
