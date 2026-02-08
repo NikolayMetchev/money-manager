@@ -33,11 +33,19 @@ fun computeAuditDiff(
     newValuesForUpdate: UpdateNewValues?,
 ): AuditEntryDiff {
     // Convert attribute audit entries to AttributeChange display model
+    val newAttributesByType = newValuesForUpdate?.attributeValues.orEmpty()
     val attributeChanges =
         entry.attributeChanges.map { attrAudit ->
             when (attrAudit.auditType) {
                 AuditType.INSERT -> AttributeChange.Added(attrAudit.attributeType.name, attrAudit.value)
-                AuditType.UPDATE -> AttributeChange.ModifiedFrom(attrAudit.attributeType.name, attrAudit.value)
+                AuditType.UPDATE -> {
+                    val newValue = newAttributesByType[attrAudit.attributeType.name]
+                    if (newValue != null) {
+                        AttributeChange.Changed(attrAudit.attributeType.name, attrAudit.value, newValue)
+                    } else {
+                        AttributeChange.ModifiedFrom(attrAudit.attributeType.name, attrAudit.value)
+                    }
+                }
                 AuditType.DELETE -> AttributeChange.Removed(attrAudit.attributeType.name, attrAudit.value)
             }
         }
@@ -103,6 +111,7 @@ data class UpdateNewValues(
     val sourceAccountId: AccountId,
     val targetAccountId: AccountId,
     val amount: Money,
+    val attributeValues: Map<String, String> = emptyMap(),
 ) {
     companion object {
         fun fromTransfer(transfer: Transfer): UpdateNewValues =
@@ -112,17 +121,48 @@ data class UpdateNewValues(
                 sourceAccountId = transfer.sourceAccountId,
                 targetAccountId = transfer.targetAccountId,
                 amount = transfer.amount,
+                attributeValues = transfer.attributes.associate { it.attributeType.name to it.value },
             )
 
-        fun fromAuditEntry(entry: TransferAuditEntry): UpdateNewValues =
+        fun fromAuditEntry(
+            entry: TransferAuditEntry,
+            attributeValues: Map<String, String>,
+        ): UpdateNewValues =
             UpdateNewValues(
                 timestamp = entry.timestamp,
                 description = entry.description,
                 sourceAccountId = entry.sourceAccountId,
                 targetAccountId = entry.targetAccountId,
                 amount = entry.amount,
+                attributeValues = attributeValues,
             )
     }
+}
+
+/**
+ * Reconstructs attribute state by reversing the changes in an audit entry.
+ *
+ * Given the attribute state AFTER this entry's changes were applied,
+ * returns the attribute state BEFORE this entry's changes.
+ *
+ * - INSERT change: attribute was added -> remove it from prior state
+ * - UPDATE change: attribute value was changed -> restore old value
+ * - DELETE change: attribute was removed -> re-add with old value
+ */
+fun reverseAttributeChanges(
+    stateAfter: Map<String, String>,
+    entry: TransferAuditEntry,
+): Map<String, String> {
+    val result = stateAfter.toMutableMap()
+    for (attrChange in entry.attributeChanges) {
+        val typeName = attrChange.attributeType.name
+        when (attrChange.auditType) {
+            AuditType.INSERT -> result.remove(typeName)
+            AuditType.UPDATE -> result[typeName] = attrChange.value
+            AuditType.DELETE -> result[typeName] = attrChange.value
+        }
+    }
+    return result
 }
 
 private fun <T> computeFieldChange(
