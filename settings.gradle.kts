@@ -15,7 +15,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath("com.android.tools.build:gradle:8.13.2")
+        classpath("com.android.tools.build:gradle:9.0.0")
     }
 }
 
@@ -25,8 +25,8 @@ plugins {
     id("com.autonomousapps.build-health") version "3.5.1"
 
     // Kotlin plugins declared here for classloader compatibility with DAGP
-    id("org.jetbrains.kotlin.multiplatform") version "2.3.0" apply false
-    id("org.jetbrains.kotlin.jvm") version "2.3.0" apply false
+    id("org.jetbrains.kotlin.multiplatform") version "2.3.10" apply false
+    id("org.jetbrains.kotlin.jvm") version "2.3.10" apply false
 }
 
 develocity {

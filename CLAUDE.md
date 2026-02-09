@@ -8,10 +8,10 @@ Money Manager is a Kotlin Multiplatform personal finance app targeting JVM and A
 
 ## Technology Stack
 
-- **Language**: Kotlin 2.2.21 | **Build**: Gradle 9.2.0 | **Java**: 25 (Target: 24)
-- **Database**: SQLite via SQLDelight 2.2.1 | **DI**: Metro 0.7.7
-- **UI**: Compose Multiplatform 1.9.3 with Material 3
-- **Object Mapping**: Mappie 2.2.21-1.6.1 | **Code Quality**: Detekt, ktlint
+- **Language**: Kotlin | **Build**: Gradle | **JVM**: 25
+- **Database**: SQLite via SQLDelight | **DI**: Metro 
+- **UI**: Compose Multiplatform with Material 3
+- **Object Mapping**: Mappie | **Code Quality**: Detekt, ktlint
 
 ## Build Commands
 
