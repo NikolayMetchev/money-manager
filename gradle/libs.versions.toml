@@ -1,7 +1,7 @@
 [versions]
 android-compileSdk = "36"
 develocity = "4.3"
-android-gradle-plugin = "8.13.2"
+android-gradle-plugin = "9.0.0"
 android-minSdk = "30"
 android-targetSdk = "35"
 androidx-activity-compose = "1.12.3"
