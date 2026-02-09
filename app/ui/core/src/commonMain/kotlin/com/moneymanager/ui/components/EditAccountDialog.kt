@@ -30,7 +30,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.moneymanager.database.ManualEntitySourceRecorder
+import com.moneymanager.database.sql.EntitySourceQueries
 import com.moneymanager.domain.model.Account
+import com.moneymanager.domain.model.DeviceId
+import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.CategoryRepository
@@ -54,6 +58,8 @@ fun EditAccountDialog(
     categoryRepository: CategoryRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
+    entitySourceQueries: EntitySourceQueries,
+    deviceId: DeviceId,
     onDismiss: () -> Unit,
 ) {
     var name by remember { mutableStateOf(account.name) }
@@ -208,7 +214,14 @@ fun EditAccountDialog(
                                         name = name.trim(),
                                         categoryId = selectedCategoryId,
                                     )
-                                accountRepository.updateAccount(updatedAccount)
+                                val newRevisionId = accountRepository.updateAccount(updatedAccount)
+
+                                // Record source for account update audit trail
+                                ManualEntitySourceRecorder(entitySourceQueries, deviceId).insert(
+                                    EntityType.ACCOUNT,
+                                    account.id.id,
+                                    newRevisionId,
+                                )
 
                                 val existingOwnerIds = existingOwnerships.map { it.personId.id }.toSet()
                                 val ownersToAdd = selectedOwnerIds - existingOwnerIds
@@ -222,9 +235,16 @@ fun EditAccountDialog(
                                 }
 
                                 ownersToAdd.forEach { personId ->
-                                    personAccountOwnershipRepository.createOwnership(
-                                        personId = PersonId(personId),
-                                        accountId = account.id,
+                                    val ownershipId =
+                                        personAccountOwnershipRepository.createOwnership(
+                                            personId = PersonId(personId),
+                                            accountId = account.id,
+                                        )
+                                    // Record source for new ownership audit trail
+                                    ManualEntitySourceRecorder(entitySourceQueries, deviceId).insert(
+                                        EntityType.PERSON_ACCOUNT_OWNERSHIP,
+                                        ownershipId,
+                                        1L,
                                     )
                                 }
 
@@ -275,6 +295,8 @@ fun EditAccountDialog(
         EditPersonDialog(
             personToEdit = null,
             personRepository = personRepository,
+            entitySourceQueries = entitySourceQueries,
+            deviceId = deviceId,
             onDismiss = { showCreatePersonDialog = false },
         )
     }

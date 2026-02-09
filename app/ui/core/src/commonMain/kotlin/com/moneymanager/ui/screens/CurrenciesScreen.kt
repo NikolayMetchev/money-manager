@@ -12,7 +12,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
+import com.moneymanager.database.ManualEntitySourceRecorder
+import com.moneymanager.database.sql.EntitySourceQueries
 import com.moneymanager.domain.model.Currency
+import com.moneymanager.domain.model.DeviceId
+import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -22,7 +26,12 @@ import org.lighthousegames.logging.logging
 private val logger = logging()
 
 @Composable
-fun CurrenciesScreen(currencyRepository: CurrencyRepository) {
+fun CurrenciesScreen(
+    currencyRepository: CurrencyRepository,
+    entitySourceQueries: EntitySourceQueries,
+    deviceId: DeviceId,
+    onAuditClick: (Currency) -> Unit = {},
+) {
     val currencies by currencyRepository.getAllCurrencies()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
     var showCreateDialog by remember { mutableStateOf(false) }
@@ -62,6 +71,7 @@ fun CurrenciesScreen(currencyRepository: CurrencyRepository) {
                             CurrencyCard(
                                 currency = currency,
                                 currencyRepository = currencyRepository,
+                                onAuditClick = { onAuditClick(currency) },
                             )
                         }
                     }
@@ -86,6 +96,8 @@ fun CurrenciesScreen(currencyRepository: CurrencyRepository) {
         if (showCreateDialog) {
             CreateCurrencyDialog(
                 currencyRepository = currencyRepository,
+                entitySourceQueries = entitySourceQueries,
+                deviceId = deviceId,
                 onDismiss = { showCreateDialog = false },
             )
         }
@@ -96,6 +108,7 @@ fun CurrenciesScreen(currencyRepository: CurrencyRepository) {
 fun CurrencyCard(
     currency: Currency,
     currencyRepository: CurrencyRepository,
+    onAuditClick: () -> Unit = {},
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
 
@@ -123,6 +136,14 @@ fun CurrencyCard(
                 )
             }
             IconButton(
+                onClick = onAuditClick,
+            ) {
+                Text(
+                    text = "📋",
+                    style = MaterialTheme.typography.titleMedium,
+                )
+            }
+            IconButton(
                 onClick = { showDeleteDialog = true },
             ) {
                 Text(
@@ -145,6 +166,8 @@ fun CurrencyCard(
 @Composable
 fun CreateCurrencyDialog(
     currencyRepository: CurrencyRepository,
+    entitySourceQueries: EntitySourceQueries,
+    deviceId: DeviceId,
     onDismiss: () -> Unit,
 ) {
     var code by remember { mutableStateOf("") }
@@ -204,7 +227,13 @@ fun CreateCurrencyDialog(
                             errorMessage = null
                             scope.launch {
                                 try {
-                                    currencyRepository.upsertCurrencyByCode(code.trim(), name.trim())
+                                    val currencyId = currencyRepository.upsertCurrencyByCode(code.trim(), name.trim())
+                                    // Record source for audit trail
+                                    ManualEntitySourceRecorder(entitySourceQueries, deviceId).insert(
+                                        EntityType.CURRENCY,
+                                        currencyId.id,
+                                        1L,
+                                    )
                                     onDismiss()
                                 } catch (expected: Exception) {
                                     logger.error(expected) { "Failed to create currency: ${expected.message}" }

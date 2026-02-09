@@ -13,7 +13,10 @@ interface AccountRepository {
 
     suspend fun createAccountsBatch(accounts: List<Account>): List<AccountId>
 
-    suspend fun updateAccount(account: Account)
+    /**
+     * Updates the account and returns the new revision ID.
+     */
+    suspend fun updateAccount(account: Account): Long
 
     suspend fun deleteAccount(id: AccountId)
 }

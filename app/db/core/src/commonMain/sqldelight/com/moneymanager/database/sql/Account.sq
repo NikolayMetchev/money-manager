@@ -1,5 +1,6 @@
 CREATE TABLE account (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    revision_id INTEGER NOT NULL DEFAULT 1,
     name TEXT NOT NULL CHECK(length(trim(name)) > 0),
     opening_date INTEGER NOT NULL,
     category_id INTEGER NOT NULL DEFAULT -1,
@@ -18,9 +19,13 @@ VALUES (?, ?, ?);
 
 update:
 UPDATE account
-SET name = ?,
+SET revision_id = revision_id + 1,
+    name = ?,
     category_id = ?
 WHERE id = ?;
+
+selectRevisionById:
+SELECT revision_id FROM account WHERE id = ?;
 
 delete:
 DELETE FROM account WHERE id = ?;
