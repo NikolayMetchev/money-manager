@@ -3,60 +3,64 @@
 
 -- account_audit: Audit trail for account table
 CREATE TABLE account_audit (
-    audit_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     audit_timestamp INTEGER NOT NULL,
     audit_type_id INTEGER NOT NULL,
-    id INTEGER NOT NULL,
+    account_id INTEGER NOT NULL,
+    revision_id INTEGER NOT NULL,
     name TEXT NOT NULL,
     opening_date INTEGER NOT NULL,
     category_id INTEGER NOT NULL,
     FOREIGN KEY (audit_type_id) REFERENCES audit_type(id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_account_audit_id ON account_audit(id);
+CREATE INDEX IF NOT EXISTS idx_account_audit_account_id ON account_audit(account_id);
 CREATE INDEX IF NOT EXISTS idx_account_audit_timestamp ON account_audit(audit_timestamp);
 CREATE INDEX IF NOT EXISTS idx_account_audit_type ON account_audit(audit_type_id);
-CREATE INDEX IF NOT EXISTS idx_account_audit_id_timestamp ON account_audit(id, audit_timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_account_audit_account_id_timestamp ON account_audit(account_id, audit_timestamp DESC);
 
 -- currency_audit: Audit trail for currency table
 CREATE TABLE currency_audit (
-    audit_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     audit_timestamp INTEGER NOT NULL,
     audit_type_id INTEGER NOT NULL,
-    id INTEGER NOT NULL,
+    currency_id INTEGER NOT NULL,
+    revision_id INTEGER NOT NULL,
     code TEXT NOT NULL,
     name TEXT NOT NULL,
     scale_factor INTEGER NOT NULL,
     FOREIGN KEY (audit_type_id) REFERENCES audit_type(id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_currency_audit_id ON currency_audit(id);
+CREATE INDEX IF NOT EXISTS idx_currency_audit_currency_id ON currency_audit(currency_id);
 CREATE INDEX IF NOT EXISTS idx_currency_audit_timestamp ON currency_audit(audit_timestamp);
 CREATE INDEX IF NOT EXISTS idx_currency_audit_type ON currency_audit(audit_type_id);
-CREATE INDEX IF NOT EXISTS idx_currency_audit_id_timestamp ON currency_audit(id, audit_timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_currency_audit_currency_id_timestamp ON currency_audit(currency_id, audit_timestamp DESC);
 
 -- category_audit: Audit trail for category table
 CREATE TABLE category_audit (
-    audit_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     audit_timestamp INTEGER NOT NULL,
     audit_type_id INTEGER NOT NULL,
-    id INTEGER NOT NULL,
+    category_id INTEGER NOT NULL,
+    revision_id INTEGER NOT NULL,
     name TEXT NOT NULL,
     parent_id INTEGER,
+    parent_name TEXT,
     FOREIGN KEY (audit_type_id) REFERENCES audit_type(id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_category_audit_id ON category_audit(id);
+CREATE INDEX IF NOT EXISTS idx_category_audit_category_id ON category_audit(category_id);
 CREATE INDEX IF NOT EXISTS idx_category_audit_timestamp ON category_audit(audit_timestamp);
 CREATE INDEX IF NOT EXISTS idx_category_audit_type ON category_audit(audit_type_id);
-CREATE INDEX IF NOT EXISTS idx_category_audit_id_timestamp ON category_audit(id, audit_timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_category_audit_category_id_timestamp ON category_audit(category_id, audit_timestamp DESC);
 
 -- transfer_audit: Audit trail for transfer table
 CREATE TABLE transfer_audit (
-    audit_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     audit_timestamp INTEGER NOT NULL,
     audit_type_id INTEGER NOT NULL,
-    id INTEGER NOT NULL,
+    transfer_id INTEGER NOT NULL,
     revision_id INTEGER NOT NULL,
     timestamp INTEGER NOT NULL,
     description TEXT NOT NULL,
@@ -67,43 +71,35 @@ CREATE TABLE transfer_audit (
     FOREIGN KEY (audit_type_id) REFERENCES audit_type(id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_transfer_audit_id ON transfer_audit(id);
+CREATE INDEX IF NOT EXISTS idx_transfer_audit_transfer_id ON transfer_audit(transfer_id);
 CREATE INDEX IF NOT EXISTS idx_transfer_audit_timestamp ON transfer_audit(audit_timestamp);
 CREATE INDEX IF NOT EXISTS idx_transfer_audit_type ON transfer_audit(audit_type_id);
-CREATE INDEX IF NOT EXISTS idx_transfer_audit_id_timestamp ON transfer_audit(id, audit_timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_transfer_audit_transfer_id_timestamp ON transfer_audit(transfer_id, audit_timestamp DESC);
+
+-- transfer_attribute_audit: Audit trail for transfer attributes
+CREATE TABLE transfer_attribute_audit (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    audit_timestamp INTEGER NOT NULL,
+    audit_type_id INTEGER NOT NULL,
+    transfer_id INTEGER NOT NULL,
+    revision_id INTEGER NOT NULL,
+    attribute_type_id INTEGER NOT NULL,
+    attribute_value TEXT NOT NULL,
+    FOREIGN KEY (audit_type_id) REFERENCES audit_type(id),
+    FOREIGN KEY (attribute_type_id) REFERENCES attribute_type(id) ON DELETE RESTRICT
+);
+
+CREATE INDEX IF NOT EXISTS idx_transfer_attribute_audit_transfer_id ON transfer_attribute_audit(transfer_id);
+CREATE INDEX IF NOT EXISTS idx_transfer_attribute_audit_revision ON transfer_attribute_audit(transfer_id, revision_id);
 
 -- Queries to retrieve audit history for each table
 
 selectAuditHistoryForTransfer:
 SELECT
-    transfer_audit.audit_id,
+    transfer_audit.id,
     transfer_audit.audit_timestamp,
     audit_type.name AS audit_type,
-    transfer_audit.id,
-    transfer_audit.revision_id,
-    transfer_audit.timestamp,
-    transfer_audit.description,
-    transfer_audit.source_account_id,
-    transfer_audit.target_account_id,
-    transfer_audit.currency_id,
-    transfer_audit.amount,
-    currency.id AS currency_id,
-    currency.code AS currency_code,
-    currency.name AS currency_name,
-    currency.scale_factor AS currency_scale_factor
-FROM transfer_audit
-JOIN audit_type ON transfer_audit.audit_type_id = audit_type.id
-JOIN currency ON transfer_audit.currency_id = currency.id
-WHERE transfer_audit.id = ?
-ORDER BY transfer_audit.audit_timestamp DESC, transfer_audit.audit_id DESC;
-
--- Get audit history for a transfer with source information
-selectAuditHistoryForTransferWithSource:
-SELECT
-    transfer_audit.audit_id,
-    transfer_audit.audit_timestamp,
-    audit_type.name AS audit_type,
-    transfer_audit.id,
+    transfer_audit.transfer_id,
     transfer_audit.revision_id,
     transfer_audit.timestamp,
     transfer_audit.description,
@@ -132,44 +128,256 @@ SELECT
 FROM transfer_audit
 JOIN audit_type ON transfer_audit.audit_type_id = audit_type.id
 JOIN currency ON transfer_audit.currency_id = currency.id
-LEFT JOIN transfer_source ON transfer_audit.id = transfer_source.transaction_id
+LEFT JOIN transfer_source ON transfer_audit.transfer_id = transfer_source.transaction_id
     AND transfer_audit.revision_id = transfer_source.revision_id
 LEFT JOIN source_type ON transfer_source.source_type_id = source_type.id
 LEFT JOIN csv_transfer_source ON transfer_source.id = csv_transfer_source.id
 LEFT JOIN csv_import_metadata ON csv_transfer_source.csv_import_id = csv_import_metadata.id
 LEFT JOIN device_view ON transfer_source.device_id = device_view.id
-WHERE transfer_audit.id = ?
-ORDER BY transfer_audit.audit_timestamp DESC, transfer_audit.audit_id DESC;
+WHERE transfer_audit.transfer_id = ?
+ORDER BY transfer_audit.audit_timestamp DESC, transfer_audit.id DESC;
+
+-- Get all attribute audit records for a transfer
+selectAttributeAuditByTransfer:
+SELECT
+    transfer_attribute_audit.id,
+    transfer_attribute_audit.audit_timestamp,
+    audit_type.name AS audit_type,
+    transfer_attribute_audit.transfer_id,
+    transfer_attribute_audit.revision_id,
+    transfer_attribute_audit.attribute_type_id,
+    transfer_attribute_audit.attribute_value,
+    attribute_type.name AS attribute_type_name
+FROM transfer_attribute_audit
+JOIN audit_type ON transfer_attribute_audit.audit_type_id = audit_type.id
+JOIN attribute_type ON transfer_attribute_audit.attribute_type_id = attribute_type.id
+WHERE transfer_attribute_audit.transfer_id = ?
+ORDER BY transfer_attribute_audit.revision_id DESC, attribute_type.name;
 
 -- person_audit: Audit trail for person table
 CREATE TABLE person_audit (
-    audit_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     audit_timestamp INTEGER NOT NULL,
     audit_type_id INTEGER NOT NULL,
-    id INTEGER NOT NULL,
+    person_id INTEGER NOT NULL,
+    revision_id INTEGER NOT NULL,
     first_name TEXT NOT NULL,
     middle_name TEXT,
     last_name TEXT,
     FOREIGN KEY (audit_type_id) REFERENCES audit_type(id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_person_audit_id ON person_audit(id);
+CREATE INDEX IF NOT EXISTS idx_person_audit_person_id ON person_audit(person_id);
 CREATE INDEX IF NOT EXISTS idx_person_audit_timestamp ON person_audit(audit_timestamp);
 CREATE INDEX IF NOT EXISTS idx_person_audit_type ON person_audit(audit_type_id);
-CREATE INDEX IF NOT EXISTS idx_person_audit_id_timestamp ON person_audit(id, audit_timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_person_audit_person_id_timestamp ON person_audit(person_id, audit_timestamp DESC);
 
 -- person_account_ownership_audit: Audit trail for person_account_ownership table
 CREATE TABLE person_account_ownership_audit (
-    audit_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     audit_timestamp INTEGER NOT NULL,
     audit_type_id INTEGER NOT NULL,
-    id INTEGER NOT NULL,
+    person_account_ownership_id INTEGER NOT NULL,
+    revision_id INTEGER NOT NULL,
     person_id INTEGER NOT NULL,
     account_id INTEGER NOT NULL,
     FOREIGN KEY (audit_type_id) REFERENCES audit_type(id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_person_account_ownership_audit_id ON person_account_ownership_audit(id);
+CREATE INDEX IF NOT EXISTS idx_person_account_ownership_audit_person_account_ownership_id ON person_account_ownership_audit(person_account_ownership_id);
 CREATE INDEX IF NOT EXISTS idx_person_account_ownership_audit_timestamp ON person_account_ownership_audit(audit_timestamp);
 CREATE INDEX IF NOT EXISTS idx_person_account_ownership_audit_type ON person_account_ownership_audit(audit_type_id);
-CREATE INDEX IF NOT EXISTS idx_person_account_ownership_audit_id_timestamp ON person_account_ownership_audit(id, audit_timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_person_account_ownership_audit_person_account_ownership_id_timestamp ON person_account_ownership_audit(person_account_ownership_id, audit_timestamp DESC);
+
+-- Get audit history for a person account ownership
+selectAuditHistoryForPersonAccountOwnership:
+SELECT
+    person_account_ownership_audit.id,
+    person_account_ownership_audit.audit_timestamp,
+    audit_type.name AS audit_type,
+    person_account_ownership_audit.person_account_ownership_id,
+    person_account_ownership_audit.revision_id,
+    person_account_ownership_audit.person_id,
+    person_account_ownership_audit.account_id,
+    person.first_name AS person_first_name,
+    person.middle_name AS person_middle_name,
+    person.last_name AS person_last_name,
+    account.name AS account_name
+FROM person_account_ownership_audit
+JOIN audit_type ON person_account_ownership_audit.audit_type_id = audit_type.id
+LEFT JOIN person ON person_account_ownership_audit.person_id = person.id
+LEFT JOIN account ON person_account_ownership_audit.account_id = account.id
+WHERE person_account_ownership_audit.person_account_ownership_id = ?
+ORDER BY person_account_ownership_audit.audit_timestamp DESC, person_account_ownership_audit.id DESC;
+
+-- Get ownership audit history for a specific account
+-- entity_type_id = 4 for PERSON_ACCOUNT_OWNERSHIP
+selectOwnershipAuditHistoryForAccount:
+SELECT
+    person_account_ownership_audit.id,
+    person_account_ownership_audit.audit_timestamp,
+    audit_type.name AS audit_type,
+    person_account_ownership_audit.person_account_ownership_id,
+    person_account_ownership_audit.revision_id,
+    person_account_ownership_audit.person_id,
+    person_account_ownership_audit.account_id,
+    person.first_name AS person_first_name,
+    person.middle_name AS person_middle_name,
+    person.last_name AS person_last_name,
+    account.name AS account_name,
+    -- Source information
+    entity_source.id AS source_id,
+    entity_source.device_id AS source_device_id,
+    source_type.id AS source_type_id,
+    source_type.name AS source_type_name,
+    device_view.platform_name AS source_platform_name,
+    device_view.os_name AS source_os_name,
+    device_view.machine_name AS source_machine_name,
+    device_view.device_make AS source_device_make,
+    device_view.device_model AS source_device_model,
+    entity_source.created_at AS source_created_at
+FROM person_account_ownership_audit
+JOIN audit_type ON person_account_ownership_audit.audit_type_id = audit_type.id
+LEFT JOIN person ON person_account_ownership_audit.person_id = person.id
+LEFT JOIN account ON person_account_ownership_audit.account_id = account.id
+LEFT JOIN entity_source ON person_account_ownership_audit.person_account_ownership_id = entity_source.entity_id
+    AND person_account_ownership_audit.revision_id = entity_source.revision_id
+    AND entity_source.entity_type_id = 4
+LEFT JOIN source_type ON entity_source.source_type_id = source_type.id
+LEFT JOIN device_view ON entity_source.device_id = device_view.id
+WHERE person_account_ownership_audit.account_id = ?
+ORDER BY person_account_ownership_audit.audit_timestamp DESC, person_account_ownership_audit.id DESC;
+
+-- Get audit history for an account
+-- entity_type_id = 1 for ACCOUNT
+selectAuditHistoryForAccount:
+SELECT
+    account_audit.id,
+    account_audit.audit_timestamp,
+    audit_type.name AS audit_type,
+    account_audit.account_id,
+    account_audit.revision_id,
+    account_audit.name,
+    account_audit.opening_date,
+    account_audit.category_id,
+    category.name AS category_name,
+    -- Source information
+    entity_source.id AS source_id,
+    entity_source.device_id AS source_device_id,
+    source_type.id AS source_type_id,
+    source_type.name AS source_type_name,
+    device_view.platform_name AS source_platform_name,
+    device_view.os_name AS source_os_name,
+    device_view.machine_name AS source_machine_name,
+    device_view.device_make AS source_device_make,
+    device_view.device_model AS source_device_model,
+    entity_source.created_at AS source_created_at
+FROM account_audit
+JOIN audit_type ON account_audit.audit_type_id = audit_type.id
+LEFT JOIN category ON account_audit.category_id = category.id
+LEFT JOIN entity_source ON account_audit.account_id = entity_source.entity_id
+    AND account_audit.revision_id = entity_source.revision_id
+    AND entity_source.entity_type_id = 1
+LEFT JOIN source_type ON entity_source.source_type_id = source_type.id
+LEFT JOIN device_view ON entity_source.device_id = device_view.id
+WHERE account_audit.account_id = ?
+ORDER BY account_audit.audit_timestamp DESC, account_audit.id DESC;
+
+-- Get audit history for a person
+-- entity_type_id = 2 for PERSON
+selectAuditHistoryForPerson:
+SELECT
+    person_audit.id,
+    person_audit.audit_timestamp,
+    audit_type.name AS audit_type,
+    person_audit.person_id,
+    person_audit.revision_id,
+    person_audit.first_name,
+    person_audit.middle_name,
+    person_audit.last_name,
+    -- Source information
+    entity_source.id AS source_id,
+    entity_source.device_id AS source_device_id,
+    source_type.id AS source_type_id,
+    source_type.name AS source_type_name,
+    device_view.platform_name AS source_platform_name,
+    device_view.os_name AS source_os_name,
+    device_view.machine_name AS source_machine_name,
+    device_view.device_make AS source_device_make,
+    device_view.device_model AS source_device_model,
+    entity_source.created_at AS source_created_at
+FROM person_audit
+JOIN audit_type ON person_audit.audit_type_id = audit_type.id
+LEFT JOIN entity_source ON person_audit.person_id = entity_source.entity_id
+    AND person_audit.revision_id = entity_source.revision_id
+    AND entity_source.entity_type_id = 2
+LEFT JOIN source_type ON entity_source.source_type_id = source_type.id
+LEFT JOIN device_view ON entity_source.device_id = device_view.id
+WHERE person_audit.person_id = ?
+ORDER BY person_audit.audit_timestamp DESC, person_audit.id DESC;
+
+-- Get audit history for a currency
+-- entity_type_id = 3 for CURRENCY
+selectAuditHistoryForCurrency:
+SELECT
+    currency_audit.id,
+    currency_audit.audit_timestamp,
+    audit_type.name AS audit_type,
+    currency_audit.currency_id,
+    currency_audit.revision_id,
+    currency_audit.code,
+    currency_audit.name,
+    currency_audit.scale_factor,
+    -- Source information
+    entity_source.id AS source_id,
+    entity_source.device_id AS source_device_id,
+    source_type.id AS source_type_id,
+    source_type.name AS source_type_name,
+    device_view.platform_name AS source_platform_name,
+    device_view.os_name AS source_os_name,
+    device_view.machine_name AS source_machine_name,
+    device_view.device_make AS source_device_make,
+    device_view.device_model AS source_device_model,
+    entity_source.created_at AS source_created_at
+FROM currency_audit
+JOIN audit_type ON currency_audit.audit_type_id = audit_type.id
+LEFT JOIN entity_source ON currency_audit.currency_id = entity_source.entity_id
+    AND currency_audit.revision_id = entity_source.revision_id
+    AND entity_source.entity_type_id = 3
+LEFT JOIN source_type ON entity_source.source_type_id = source_type.id
+LEFT JOIN device_view ON entity_source.device_id = device_view.id
+WHERE currency_audit.currency_id = ?
+ORDER BY currency_audit.audit_timestamp DESC, currency_audit.id DESC;
+
+-- Get audit history for a category
+-- entity_type_id = 5 for CATEGORY
+selectAuditHistoryForCategory:
+SELECT
+    category_audit.id,
+    category_audit.audit_timestamp,
+    audit_type.name AS audit_type,
+    category_audit.category_id,
+    category_audit.revision_id,
+    category_audit.name,
+    category_audit.parent_id,
+    category_audit.parent_name,
+    -- Source information
+    entity_source.id AS source_id,
+    entity_source.device_id AS source_device_id,
+    source_type.id AS source_type_id,
+    source_type.name AS source_type_name,
+    device_view.platform_name AS source_platform_name,
+    device_view.os_name AS source_os_name,
+    device_view.machine_name AS source_machine_name,
+    device_view.device_make AS source_device_make,
+    device_view.device_model AS source_device_model,
+    entity_source.created_at AS source_created_at
+FROM category_audit
+JOIN audit_type ON category_audit.audit_type_id = audit_type.id
+LEFT JOIN entity_source ON category_audit.category_id = entity_source.entity_id
+    AND category_audit.revision_id = entity_source.revision_id
+    AND entity_source.entity_type_id = 5
+LEFT JOIN source_type ON entity_source.source_type_id = source_type.id
+LEFT JOIN device_view ON entity_source.device_id = device_view.id
+WHERE category_audit.category_id = ?
+ORDER BY category_audit.audit_timestamp DESC, category_audit.id DESC;

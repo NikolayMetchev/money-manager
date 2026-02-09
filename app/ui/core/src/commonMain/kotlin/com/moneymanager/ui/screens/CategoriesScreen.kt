@@ -91,6 +91,7 @@ private val HIERARCHY_COLUMN_WIDTH = 250.dp
 fun CategoriesScreen(
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
+    onAuditClick: (Category) -> Unit = {},
 ) {
     val categories by categoryRepository.getAllCategories()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
@@ -262,6 +263,7 @@ fun CategoriesScreen(
                                     }
                             },
                             onEditClick = { editingCategory = node.category },
+                            onAuditClick = { onAuditClick(node.category) },
                             isDraggable = !isUncategorized,
                             isDragging = isDragging,
                             isDropTarget = isDropTarget && !isUncategorized,
@@ -405,6 +407,7 @@ fun CategoryTreeItem(
     isExpanded: Boolean,
     onToggleExpand: () -> Unit,
     onEditClick: () -> Unit,
+    onAuditClick: () -> Unit,
     isDraggable: Boolean,
     isDragging: Boolean,
     isDropTarget: Boolean,
@@ -544,6 +547,17 @@ fun CategoryTreeItem(
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
+                    }
+
+                    // Audit button
+                    IconButton(
+                        onClick = onAuditClick,
+                        modifier = Modifier.size(20.dp),
+                    ) {
+                        Text(
+                            text = "\uD83D\uDCCB",
+                            style = MaterialTheme.typography.labelSmall,
+                        )
                     }
                 }
             }

@@ -191,6 +191,85 @@ object DatabaseConfig {
         )
 
     /**
+     * Creates custom audit triggers for the category table.
+     * Unlike the auto-generated triggers, these include a subquery to capture the
+     * parent category name at audit time (denormalized into the audit row).
+     *
+     * Must be called BEFORE createAuditTriggers() so the generic IF NOT EXISTS triggers
+     * are skipped for category.
+     */
+    private fun MoneyManagerDatabaseWrapper.createCategoryAuditTriggers() {
+        // INSERT trigger - stores NEW values, looks up parent name
+        execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_category_insert_audit
+            AFTER INSERT ON category
+            FOR EACH ROW
+            BEGIN
+                INSERT INTO category_audit (audit_timestamp, audit_type_id, category_id, revision_id, name, parent_id, parent_name)
+                VALUES (
+                    CAST(strftime('%s', 'now') AS INTEGER) * 1000,
+                    1,
+                    NEW.id,
+                    NEW.revision_id,
+                    NEW.name,
+                    NEW.parent_id,
+                    (SELECT name FROM category WHERE id = NEW.parent_id)
+                );
+            END
+            """.trimIndent(),
+            0,
+        )
+
+        // UPDATE trigger - stores OLD values (except revision_id uses NEW), looks up old parent name
+        execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_category_update_audit
+            AFTER UPDATE ON category
+            FOR EACH ROW
+            BEGIN
+                INSERT INTO category_audit (audit_timestamp, audit_type_id, category_id, revision_id, name, parent_id, parent_name)
+                VALUES (
+                    CAST(strftime('%s', 'now') AS INTEGER) * 1000,
+                    2,
+                    OLD.id,
+                    NEW.revision_id,
+                    OLD.name,
+                    OLD.parent_id,
+                    (SELECT name FROM category WHERE id = OLD.parent_id)
+                );
+            END
+            """.trimIndent(),
+            0,
+        )
+
+        // DELETE trigger - stores OLD values, looks up old parent name
+        execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_category_delete_audit
+            AFTER DELETE ON category
+            FOR EACH ROW
+            BEGIN
+                INSERT INTO category_audit (audit_timestamp, audit_type_id, category_id, revision_id, name, parent_id, parent_name)
+                VALUES (
+                    CAST(strftime('%s', 'now') AS INTEGER) * 1000,
+                    3,
+                    OLD.id,
+                    OLD.revision_id,
+                    OLD.name,
+                    OLD.parent_id,
+                    (SELECT name FROM category WHERE id = OLD.parent_id)
+                );
+            END
+            """.trimIndent(),
+            0,
+        )
+    }
+
+    /**
      * Creates triggers for transfer attribute auditing.
      *
      * Each attribute change (INSERT/UPDATE/DELETE) bumps the transfer revision
@@ -225,8 +304,8 @@ object DatabaseConfig {
                   AND NOT EXISTS (SELECT 1 FROM _creation_mode);
 
                 -- Always record the addition in audit table at current revision
-                INSERT INTO transfer_attribute_audit (transaction_id, revision_id, attribute_type_id, audit_type_id, attribute_value)
-                SELECT NEW.transaction_id, revision_id, NEW.attribute_type_id, 1, NEW.attribute_value
+                INSERT INTO transfer_attribute_audit (audit_timestamp, audit_type_id, transfer_id, revision_id, attribute_type_id, attribute_value)
+                SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, NEW.transaction_id, revision_id, NEW.attribute_type_id, NEW.attribute_value
                 FROM transfer WHERE id = NEW.transaction_id;
             END
             """.trimIndent(),
@@ -250,8 +329,8 @@ object DatabaseConfig {
                   AND NOT EXISTS (SELECT 1 FROM _creation_mode);
 
                 -- Always record the change in audit table (OLD value - what it was before)
-                INSERT INTO transfer_attribute_audit (transaction_id, revision_id, attribute_type_id, audit_type_id, attribute_value)
-                SELECT NEW.transaction_id, revision_id, NEW.attribute_type_id, 2, OLD.attribute_value
+                INSERT INTO transfer_attribute_audit (audit_timestamp, audit_type_id, transfer_id, revision_id, attribute_type_id, attribute_value)
+                SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, NEW.transaction_id, revision_id, NEW.attribute_type_id, OLD.attribute_value
                 FROM transfer WHERE id = NEW.transaction_id;
             END
             """.trimIndent(),
@@ -274,8 +353,8 @@ object DatabaseConfig {
                   AND NOT EXISTS (SELECT 1 FROM _creation_mode);
 
                 -- Always record the deletion in audit table (OLD value - what was deleted)
-                INSERT INTO transfer_attribute_audit (transaction_id, revision_id, attribute_type_id, audit_type_id, attribute_value)
-                SELECT OLD.transaction_id, revision_id, OLD.attribute_type_id, 3, OLD.attribute_value
+                INSERT INTO transfer_attribute_audit (audit_timestamp, audit_type_id, transfer_id, revision_id, attribute_type_id, attribute_value)
+                SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, OLD.transaction_id, revision_id, OLD.attribute_type_id, OLD.attribute_value
                 FROM transfer WHERE id = OLD.transaction_id;
             END
             """.trimIndent(),
@@ -301,8 +380,13 @@ object DatabaseConfig {
         tables.forEach { tableName ->
             val auditTableName = "${tableName}_audit"
             val columns = getTableColumns(tableName)
+            val auditEntityIdCol = "${tableName}_id"
 
-            val columnList = columns.joinToString(", ")
+            // Map main table column names to audit table column names (id -> entity_id)
+            val auditColumnList =
+                columns.joinToString(", ") { col ->
+                    if (col == "id") auditEntityIdCol else col
+                }
             val newColumnList = columns.joinToString(", ") { "NEW.$it" }
             val oldColumnList = columns.joinToString(", ") { "OLD.$it" }
             // For UPDATE: use OLD values for all columns EXCEPT revision_id, which uses NEW
@@ -321,7 +405,7 @@ object DatabaseConfig {
                 AFTER INSERT ON $tableName
                 FOR EACH ROW
                 BEGIN
-                    INSERT INTO $auditTableName (audit_timestamp, audit_type_id, $columnList)
+                    INSERT INTO $auditTableName (audit_timestamp, audit_type_id, $auditColumnList)
                     VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, $newColumnList);
                 END
                 """.trimIndent(),
@@ -336,7 +420,7 @@ object DatabaseConfig {
                 AFTER UPDATE ON $tableName
                 FOR EACH ROW
                 BEGIN
-                    INSERT INTO $auditTableName (audit_timestamp, audit_type_id, $columnList)
+                    INSERT INTO $auditTableName (audit_timestamp, audit_type_id, $auditColumnList)
                     VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, $updateColumnList);
                 END
                 """.trimIndent(),
@@ -351,7 +435,7 @@ object DatabaseConfig {
                 AFTER DELETE ON $tableName
                 FOR EACH ROW
                 BEGIN
-                    INSERT INTO $auditTableName (audit_timestamp, audit_type_id, $columnList)
+                    INSERT INTO $auditTableName (audit_timestamp, audit_type_id, $auditColumnList)
                     VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, $oldColumnList);
                 END
                 """.trimIndent(),
@@ -380,8 +464,10 @@ object DatabaseConfig {
             sourceTypeQueries.insert(id = 1, name = "MANUAL")
             sourceTypeQueries.insert(id = 2, name = "CSV_IMPORT")
             sourceTypeQueries.insert(id = 3, name = "SAMPLE_GENERATOR")
+            sourceTypeQueries.insert(id = 4, name = "SYSTEM")
 
             // Seed Platform lookup table
+            platformQueries.insert(id = 0, name = "SYSTEM")
             platformQueries.insert(id = 1, name = "JVM")
             platformQueries.insert(id = 2, name = "ANDROID")
 
@@ -396,7 +482,12 @@ object DatabaseConfig {
             createCreationModeTable()
             createAttributeTriggers()
 
+            // Create custom category audit triggers (must be before generic ones)
+            // These include parent_name denormalization via subquery
+            createCategoryAuditTriggers()
+
             // Create audit triggers for all main tables
+            // Category triggers are skipped because custom ones already exist (IF NOT EXISTS)
             createAuditTriggers()
 
             // Seed default "Uncategorized" category
@@ -406,9 +497,23 @@ object DatabaseConfig {
                 parent_id = null,
             )
 
-            // Seed currencies
+            // Create system device for system-generated source tracking
+            // Platform 0 = SYSTEM, no os/machine/make/model needed
+            deviceQueries.insertSystemDevice(platform_id = 0)
+            val systemDeviceId =
+                deviceQueries.selectSystemDevice(platform_id = 0).executeAsOneOrNull()
+                    ?: deviceQueries.lastInsertRowId().executeAsOne()
+
+            // Seed currencies with source tracking (entity_type_id=3 CURRENCY, source_type_id=4 SYSTEM)
             allCurrencies.forEach { currency ->
-                currencyRepository.upsertCurrencyByCode(currency.code, currency.displayName)
+                val currencyId = currencyRepository.upsertCurrencyByCode(currency.code, currency.displayName)
+                entitySourceQueries.insertSource(
+                    entity_type_id = 3,
+                    entity_id = currencyId.id,
+                    revision_id = 1,
+                    source_type_id = 4,
+                    device_id = systemDeviceId,
+                )
             }
         }
     }

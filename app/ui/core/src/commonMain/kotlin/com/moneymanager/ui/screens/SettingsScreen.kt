@@ -35,6 +35,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moneymanager.database.DatabaseMaintenanceService
+import com.moneymanager.database.sql.EntitySourceQueries
 import com.moneymanager.database.sql.TransferSourceQueries
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.repository.AccountRepository
@@ -114,6 +115,7 @@ fun SettingsScreen(
     transactionRepository: TransactionRepository,
     maintenanceService: DatabaseMaintenanceService,
     transferSourceQueries: TransferSourceQueries,
+    entitySourceQueries: EntitySourceQueries,
     deviceId: DeviceId,
 ) {
     var showWarningDialog by remember { mutableStateOf(false) }
@@ -408,6 +410,7 @@ fun SettingsScreen(
                                     transactionRepository = transactionRepository,
                                     maintenanceService = maintenanceService,
                                     transferSourceQueries = transferSourceQueries,
+                                    entitySourceQueries = entitySourceQueries,
                                     deviceId = deviceId,
                                     progressFlow = progressFlow,
                                 )

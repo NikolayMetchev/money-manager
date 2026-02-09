@@ -17,22 +17,22 @@ import kotlinx.coroutines.withContext
 class PersonAccountOwnershipRepositoryImpl(
     database: MoneyManagerDatabase,
 ) : PersonAccountOwnershipRepository {
-    private val queries = database.personAccountOwnershipQueries
+    private val queries = database.personQueries
 
     override fun getOwnershipsByPerson(personId: PersonId): Flow<List<PersonAccountOwnership>> =
-        queries.selectByPerson(personId.id)
+        queries.ownershipSelectByPerson(personId.id)
             .asFlow()
             .mapToList(Dispatchers.Default)
             .map(PersonAccountOwnershipMapper::mapList)
 
     override fun getOwnershipsByAccount(accountId: AccountId): Flow<List<PersonAccountOwnership>> =
-        queries.selectByAccount(accountId.id)
+        queries.ownershipSelectByAccount(accountId.id)
             .asFlow()
             .mapToList(Dispatchers.Default)
             .map(PersonAccountOwnershipMapper::mapList)
 
     override fun getOwnershipById(id: Long): Flow<PersonAccountOwnership?> =
-        queries.selectById(id)
+        queries.ownershipSelectById(id)
             .asFlow()
             .mapToOneOrNull(Dispatchers.Default)
             .map { it?.let(PersonAccountOwnershipMapper::map) }
@@ -43,26 +43,26 @@ class PersonAccountOwnershipRepositoryImpl(
     ): Long =
         withContext(Dispatchers.Default) {
             queries.transactionWithResult {
-                queries.insert(
+                queries.ownershipInsert(
                     person_id = personId.id,
                     account_id = accountId.id,
                 )
-                queries.lastInsertRowId().executeAsOne()
+                queries.ownershipLastInsertRowId().executeAsOne()
             }
         }
 
     override suspend fun deleteOwnership(id: Long): Unit =
         withContext(Dispatchers.Default) {
-            queries.delete(id)
+            queries.ownershipDelete(id)
         }
 
     override suspend fun deleteOwnershipsByPerson(personId: PersonId): Unit =
         withContext(Dispatchers.Default) {
-            queries.deleteByPerson(personId.id)
+            queries.ownershipDeleteByPerson(personId.id)
         }
 
     override suspend fun deleteOwnershipsByAccount(accountId: AccountId): Unit =
         withContext(Dispatchers.Default) {
-            queries.deleteByAccount(accountId.id)
+            queries.ownershipDeleteByAccount(accountId.id)
         }
 }

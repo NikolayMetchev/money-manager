@@ -135,6 +135,7 @@ private fun MainContent(
                 transferAttributeRepository = dc.transferAttributeRepository,
                 transferSourceRepository = dc.transferSourceRepository,
                 transferSourceQueries = dc.transferSourceQueries,
+                entitySourceQueries = dc.entitySourceQueries,
                 deviceId = dc.deviceId,
             )
         }
