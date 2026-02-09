@@ -1,19 +1,23 @@
 import com.android.build.api.dsl.ApplicationExtension
 import org.jetbrains.kotlin.compose.compiler.gradle.ComposeCompilerGradlePluginExtension
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.dsl.KotlinAndroidProjectExtension
 
 plugins {
     id("moneymanager.kotlin-convention")
-    id("com.android.application")
     id("org.jetbrains.compose")
-    id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+
+// Apply Android and Kotlin Android plugins outside the plugins block to avoid
+// AGP 9.0 KotlinBaseApiPlugin conflict during precompiled script plugin accessor generation
+apply(plugin = "com.android.application")
+apply(plugin = "org.jetbrains.kotlin.android")
 
 val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
 val jvmTargetVersion = libs.findVersion("jvm-target").get().toString()
 
-kotlin {
+configure<KotlinAndroidProjectExtension> {
     jvmToolchain(libs.findVersion("jvm-toolchain").get().toString().toInt())
 
     compilerOptions {
