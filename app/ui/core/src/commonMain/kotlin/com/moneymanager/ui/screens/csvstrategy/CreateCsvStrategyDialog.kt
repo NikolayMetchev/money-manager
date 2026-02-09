@@ -467,10 +467,15 @@ fun CreateCsvStrategyDialog(
         }
     }
 
+    // Track initial column names to avoid overwriting saved fallback columns on edit mode load.
+    // Auto-detection should only trigger when the user changes the primary column, not on initial load.
+    val initialTargetAccountColumnName = remember { initialState?.targetAccountColumnName }
+    val initialDescriptionColumnName = remember { initialState?.descriptionColumnName }
+
     // Auto-detect fallback columns when target column is selected
     LaunchedEffect(targetAccountColumnName, rows) {
         val primaryColumn = targetAccountColumnName
-        if (primaryColumn != null && rows.isNotEmpty()) {
+        if (primaryColumn != null && primaryColumn != initialTargetAccountColumnName && rows.isNotEmpty()) {
             targetAccountFallbackColumns =
                 ColumnDetector.suggestFallbackColumns(
                     primaryColumn = primaryColumn,
@@ -483,7 +488,7 @@ fun CreateCsvStrategyDialog(
     // Auto-detect fallback columns when description column is selected
     LaunchedEffect(descriptionColumnName, rows) {
         val primaryColumn = descriptionColumnName
-        if (primaryColumn != null && rows.isNotEmpty()) {
+        if (primaryColumn != null && primaryColumn != initialDescriptionColumnName && rows.isNotEmpty()) {
             descriptionFallbackColumns =
                 ColumnDetector.suggestFallbackColumns(
                     primaryColumn = primaryColumn,
