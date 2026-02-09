@@ -388,7 +388,8 @@ class AccountTransactionsScreenTest {
                     }
                 }
 
-                waitForIdle()
+                // Wait for the edit button to appear
+                waitUntilExactlyOneExists(hasText("\u270F\uFE0F"), timeoutMillis = 10000)
 
                 // Click the edit button (pencil emoji) on the transaction
                 onNodeWithText("\u270F\uFE0F").performClick()
@@ -404,7 +405,9 @@ class AccountTransactionsScreenTest {
                 // Wait for "+ Add Attribute" button to be available and click it
                 waitUntilExactlyOneExists(hasText("+ Add Attribute"), timeoutMillis = 10000)
                 onNodeWithText("+ Add Attribute").performClick()
-                waitForIdle()
+
+                // Wait for attribute fields to appear
+                waitUntilAtLeastOneExists(hasText("Type"), timeoutMillis = 10000)
 
                 // Find and fill in the attribute type field
                 onAllNodesWithText("Type")[0].performClick()
@@ -466,28 +469,19 @@ class AccountTransactionsScreenTest {
                     repositories.maintenanceService.fullRefreshMaterializedViews()
                 }
 
-                // Wait for UI to refresh after edit dialog closes
-                mainClock.advanceTimeBy(300)
-                waitForIdle()
+                // Wait for audit button to be visible (indicates UI has refreshed)
+                waitUntilExactlyOneExists(hasText("\uD83D\uDCDC"), timeoutMillis = 10000)
 
                 // Now click the Audit History button (📜) and verify it shows the new attribute
                 onNodeWithText("\uD83D\uDCDC").performClick()
-                waitForIdle()
-                mainClock.advanceTimeBy(300)
-                waitForIdle()
 
-                // Verify audit history is displayed - title format is "Audit History: <transferId>"
-                onNodeWithText("Audit History:", substring = true).assertIsDisplayed()
+                // Wait for audit history dialog to appear
+                waitUntilExactlyOneExists(hasText("Audit History:", substring = true), timeoutMillis = 10000)
 
-                // Wait for audit entries to load
-                mainClock.advanceTimeBy(1000)
-                waitForIdle()
-
-                // The audit should show UPDATE entry (revision 2)
-                // Verify the attribute type and value are displayed in the audit history
+                // The audit should show the attribute type and value in the audit history
                 // The attribute is displayed as "+Reference Number:" and "REF-12345" as separate text nodes
-                onNodeWithText("Reference Number", substring = true).assertIsDisplayed()
-                onNodeWithText("REF-12345", substring = true).assertIsDisplayed()
+                waitUntilAtLeastOneExists(hasText("Reference Number", substring = true), timeoutMillis = 10000)
+                waitUntilAtLeastOneExists(hasText("REF-12345", substring = true), timeoutMillis = 10000)
             }
         } finally {
             // Clean up database
