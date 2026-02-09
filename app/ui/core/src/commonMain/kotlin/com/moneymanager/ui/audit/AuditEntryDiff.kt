@@ -16,7 +16,7 @@ import kotlin.time.Instant
  * to indicate whether it was created, changed, unchanged, or deleted.
  */
 data class AuditEntryDiff(
-    val auditId: Long,
+    val id: Long,
     val auditTimestamp: Instant,
     val auditType: AuditType,
     val transferId: TransferId,

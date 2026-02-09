@@ -2,8 +2,10 @@
 
 package com.moneymanager.database
 
+import com.moneymanager.database.sql.EntitySourceQueries
 import com.moneymanager.database.sql.TransferSourceQueries
 import com.moneymanager.domain.model.DeviceId
+import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.SourceRecorder
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
@@ -57,6 +59,52 @@ class CsvImportSourceRecorder(
             transferSourceId,
             csvImportId.id.toString(),
             rowIndexForTransfer(transfer.id),
+        )
+    }
+}
+
+// ============================================================================
+// Entity Source Recorders (for Account, Person, Currency, PersonAccountOwnership)
+// ============================================================================
+
+/** Records source for entity operations (manual entry). */
+class ManualEntitySourceRecorder(
+    private val queries: EntitySourceQueries,
+    private val deviceId: DeviceId,
+) {
+    fun insert(
+        entityType: EntityType,
+        entityId: Long,
+        revisionId: Long,
+    ) {
+        // source_type_id 1 = MANUAL
+        queries.insertSource(
+            entity_type_id = entityType.id,
+            entity_id = entityId,
+            revision_id = revisionId,
+            source_type_id = 1L,
+            device_id = deviceId.id,
+        )
+    }
+}
+
+/** Records source for entity operations (sample data generator). */
+class SampleGeneratorEntitySourceRecorder(
+    private val queries: EntitySourceQueries,
+    private val deviceId: DeviceId,
+) {
+    fun insert(
+        entityType: EntityType,
+        entityId: Long,
+        revisionId: Long,
+    ) {
+        // source_type_id 3 = SAMPLE_GENERATOR
+        queries.insertSource(
+            entity_type_id = entityType.id,
+            entity_id = entityId,
+            revision_id = revisionId,
+            source_type_id = 3L,
+            device_id = deviceId.id,
         )
     }
 }

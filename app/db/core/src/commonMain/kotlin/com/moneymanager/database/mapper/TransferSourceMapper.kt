@@ -4,7 +4,7 @@ package com.moneymanager.database.mapper
 
 import com.moneymanager.database.repository.DeviceRepositoryImpl
 import com.moneymanager.database.sql.SelectAllByTransactionId
-import com.moneymanager.database.sql.SelectAuditHistoryForTransferWithSource
+import com.moneymanager.database.sql.SelectAuditHistoryForTransfer
 import com.moneymanager.database.sql.SelectByTransactionIdAndRevision
 import com.moneymanager.domain.model.CsvSourceDetails
 import com.moneymanager.domain.model.SourceType
@@ -20,7 +20,6 @@ object TransferSourceFromRevisionMapper :
     SourceTypeConversions {
     override fun map(from: SelectByTransactionIdAndRevision): TransferSource {
         return mapping {
-            TransferSource::transactionId fromValue toTransferId(from.transaction_id)
             TransferSource::deviceInfo fromValue
                 DeviceRepositoryImpl.createDeviceInfo(
                     platformName = from.platform_name,
@@ -42,7 +41,6 @@ object TransferSourceFromTransactionIdMapper :
     SourceTypeConversions {
     override fun map(from: SelectAllByTransactionId): TransferSource {
         return mapping {
-            TransferSource::transactionId fromValue toTransferId(from.transaction_id)
             TransferSource::deviceInfo fromValue
                 DeviceRepositoryImpl.createDeviceInfo(
                     platformName = from.platform_name,
@@ -58,15 +56,15 @@ object TransferSourceFromTransactionIdMapper :
 }
 
 object TransferSourceFromAuditMapper :
-    ObjectMappie<SelectAuditHistoryForTransferWithSource, TransferSource>(),
+    ObjectMappie<SelectAuditHistoryForTransfer, TransferSource>(),
     IdConversions,
     InstantConversions,
     SourceTypeConversions {
-    override fun map(from: SelectAuditHistoryForTransferWithSource): TransferSource {
+    override fun map(from: SelectAuditHistoryForTransfer): TransferSource {
         val sourceType = toSourceType(from.source_type!!)
         return mapping {
             TransferSource::id fromValue from.source_id!!
-            TransferSource::transactionId fromValue toTransferId(from.id)
+            TransferSource::transactionId fromValue toTransferId(from.transfer_id)
             TransferSource::sourceType fromValue sourceType
             TransferSource::deviceId fromValue from.device_id!!
             TransferSource::deviceInfo fromValue

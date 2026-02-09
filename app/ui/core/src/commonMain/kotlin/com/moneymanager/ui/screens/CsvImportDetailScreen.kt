@@ -30,7 +30,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.database.DatabaseMaintenanceService
+import com.moneymanager.database.sql.EntitySourceQueries
 import com.moneymanager.database.sql.TransferSourceQueries
+import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csv.CsvRow
@@ -69,7 +71,9 @@ fun CsvImportDetailScreen(
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     maintenanceService: DatabaseMaintenanceService,
     transferSourceQueries: TransferSourceQueries,
+    entitySourceQueries: EntitySourceQueries,
     deviceRepository: DeviceRepository,
+    deviceId: DeviceId,
     onBack: () -> Unit,
     onDeleted: () -> Unit,
     onTransferClick: ((TransferId, Boolean) -> Unit)? = null,
@@ -379,6 +383,8 @@ fun CsvImportDetailScreen(
             attributeTypeRepository = attributeTypeRepository,
             personRepository = personRepository,
             personAccountOwnershipRepository = personAccountOwnershipRepository,
+            entitySourceQueries = entitySourceQueries,
+            deviceId = deviceId,
             csvColumns = import!!.columns,
             rows = rows,
             onDismiss = { showCreateStrategyDialog = false },

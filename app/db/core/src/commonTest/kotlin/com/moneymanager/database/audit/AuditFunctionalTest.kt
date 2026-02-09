@@ -62,15 +62,15 @@ class AuditFunctionalTest : DbTest() {
         val sql =
             """
             SELECT
-                account_audit.audit_id,
+                account_audit.id,
                 account_audit.audit_timestamp,
                 audit_type.name AS auditType,
-                account_audit.id,
+                account_audit.account_id,
                 account_audit.name
             FROM account_audit
             JOIN audit_type ON account_audit.audit_type_id = audit_type.id
-            WHERE account_audit.id = $accountId
-            ORDER BY account_audit.audit_timestamp DESC, account_audit.audit_id DESC
+            WHERE account_audit.account_id = $accountId
+            ORDER BY account_audit.audit_timestamp DESC, account_audit.id DESC
             """.trimIndent()
 
         return database.executeQuery(
@@ -103,16 +103,16 @@ class AuditFunctionalTest : DbTest() {
         val sql =
             """
             SELECT
-                currency_audit.audit_id,
+                currency_audit.id,
                 currency_audit.audit_timestamp,
                 audit_type.name AS auditType,
-                currency_audit.id,
+                currency_audit.currency_id,
                 currency_audit.code,
                 currency_audit.name
             FROM currency_audit
             JOIN audit_type ON currency_audit.audit_type_id = audit_type.id
-            WHERE currency_audit.id = $currencyId
-            ORDER BY currency_audit.audit_timestamp DESC, currency_audit.audit_id DESC
+            WHERE currency_audit.currency_id = $currencyId
+            ORDER BY currency_audit.audit_timestamp DESC, currency_audit.id DESC
             """.trimIndent()
 
         return database.executeQuery(
@@ -146,15 +146,15 @@ class AuditFunctionalTest : DbTest() {
         val sql =
             """
             SELECT
-                category_audit.audit_id,
+                category_audit.id,
                 category_audit.audit_timestamp,
                 audit_type.name AS auditType,
-                category_audit.id,
+                category_audit.category_id,
                 category_audit.name
             FROM category_audit
             JOIN audit_type ON category_audit.audit_type_id = audit_type.id
-            WHERE category_audit.id = $categoryId
-            ORDER BY category_audit.audit_timestamp DESC, category_audit.audit_id DESC
+            WHERE category_audit.category_id = $categoryId
+            ORDER BY category_audit.audit_timestamp DESC, category_audit.id DESC
             """.trimIndent()
 
         return database.executeQuery(
