@@ -9,6 +9,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import kotlinx.coroutines.flow.Flow
@@ -17,6 +18,9 @@ import kotlin.test.Test
 
 @OptIn(ExperimentalTestApi::class)
 class CurrenciesScreenTest {
+    private val testDeviceId = DeviceId(1L)
+    private val stubEntitySourceQueries = createStubEntitySourceQueries()
+
     private class FakeCurrencyRepository(
         private val currencies: List<Currency>,
     ) : CurrencyRepository {
@@ -55,7 +59,11 @@ class CurrenciesScreenTest {
 
             setContent {
                 ProvideSchemaAwareScope {
-                    CurrenciesScreen(currencyRepository = repository)
+                    CurrenciesScreen(
+                        currencyRepository = repository,
+                        entitySourceQueries = stubEntitySourceQueries,
+                        deviceId = testDeviceId,
+                    )
                 }
             }
 
@@ -75,7 +83,11 @@ class CurrenciesScreenTest {
 
             setContent {
                 ProvideSchemaAwareScope {
-                    CurrenciesScreen(currencyRepository = repository)
+                    CurrenciesScreen(
+                        currencyRepository = repository,
+                        entitySourceQueries = stubEntitySourceQueries,
+                        deviceId = testDeviceId,
+                    )
                 }
             }
 
@@ -96,7 +108,11 @@ class CurrenciesScreenTest {
 
             setContent {
                 ProvideSchemaAwareScope {
-                    CurrenciesScreen(currencyRepository = repository)
+                    CurrenciesScreen(
+                        currencyRepository = repository,
+                        entitySourceQueries = stubEntitySourceQueries,
+                        deviceId = testDeviceId,
+                    )
                 }
             }
 
@@ -115,7 +131,11 @@ class CurrenciesScreenTest {
 
             setContent {
                 ProvideSchemaAwareScope {
-                    CurrenciesScreen(currencyRepository = repository)
+                    CurrenciesScreen(
+                        currencyRepository = repository,
+                        entitySourceQueries = stubEntitySourceQueries,
+                        deviceId = testDeviceId,
+                    )
                 }
             }
 
@@ -131,7 +151,11 @@ class CurrenciesScreenTest {
 
             setContent {
                 ProvideSchemaAwareScope {
-                    CurrenciesScreen(currencyRepository = repository)
+                    CurrenciesScreen(
+                        currencyRepository = repository,
+                        entitySourceQueries = stubEntitySourceQueries,
+                        deviceId = testDeviceId,
+                    )
                 }
             }
 
@@ -140,4 +164,56 @@ class CurrenciesScreenTest {
 
             onNodeWithText("Currency code is required").assertIsDisplayed()
         }
+
+    /**
+     * Creates a stub EntitySourceQueries for tests that don't actually query entity sources.
+     * Uses a minimal SqlDriver stub that throws NotImplementedError if actually invoked.
+     */
+    private companion object {
+        fun createStubEntitySourceQueries(): com.moneymanager.database.sql.EntitySourceQueries {
+            val stubDriver =
+                object : app.cash.sqldelight.db.SqlDriver {
+                    override fun close() = Unit
+
+                    override fun currentTransaction(): app.cash.sqldelight.Transacter.Transaction? = null
+
+                    override fun execute(
+                        identifier: Int?,
+                        sql: String,
+                        parameters: Int,
+                        binders: (app.cash.sqldelight.db.SqlPreparedStatement.() -> Unit)?,
+                    ): app.cash.sqldelight.db.QueryResult<Long> {
+                        throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
+                    }
+
+                    override fun <R> executeQuery(
+                        identifier: Int?,
+                        sql: String,
+                        mapper: (app.cash.sqldelight.db.SqlCursor) -> app.cash.sqldelight.db.QueryResult<R>,
+                        parameters: Int,
+                        binders: (app.cash.sqldelight.db.SqlPreparedStatement.() -> Unit)?,
+                    ): app.cash.sqldelight.db.QueryResult<R> {
+                        throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
+                    }
+
+                    override fun newTransaction(): app.cash.sqldelight.db.QueryResult<app.cash.sqldelight.Transacter.Transaction> {
+                        throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
+                    }
+
+                    override fun addListener(
+                        vararg queryKeys: String,
+                        listener: app.cash.sqldelight.Query.Listener,
+                    ) = Unit
+
+                    override fun removeListener(
+                        vararg queryKeys: String,
+                        listener: app.cash.sqldelight.Query.Listener,
+                    ) = Unit
+
+                    override fun notifyListeners(vararg queryKeys: String) = Unit
+                }
+
+            return com.moneymanager.database.sql.EntitySourceQueries(stubDriver)
+        }
+    }
 }

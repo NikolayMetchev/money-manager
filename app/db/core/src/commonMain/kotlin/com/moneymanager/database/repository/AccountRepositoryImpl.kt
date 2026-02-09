@@ -61,13 +61,16 @@ class AccountRepositoryImpl(
             }
         }
 
-    override suspend fun updateAccount(account: Account): Unit =
+    override suspend fun updateAccount(account: Account): Long =
         withContext(Dispatchers.Default) {
-            queries.update(
-                name = account.name,
-                category_id = account.categoryId,
-                id = account.id.id,
-            )
+            queries.transactionWithResult {
+                queries.update(
+                    name = account.name,
+                    category_id = account.categoryId,
+                    id = account.id.id,
+                )
+                queries.selectRevisionById(account.id.id).executeAsOne()
+            }
         }
 
     override suspend fun deleteAccount(id: AccountId): Unit =

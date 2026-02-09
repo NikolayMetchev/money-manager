@@ -7,6 +7,7 @@ import kotlin.time.Instant
 
 data class Account(
     val id: AccountId,
+    val revisionId: Long = 1,
     val name: String,
     val openingDate: Instant,
     val categoryId: Long = Category.UNCATEGORIZED_ID,

@@ -87,6 +87,8 @@ class MoneyManagerDatabaseWrapper(private val driver: SqlDriver) : MoneyManagerD
             "csv_import_strategy",
             "transaction_id",
             "source_type",
+            "entity_source",
+            "entity_type",
             "transfer_source",
             "csv_transfer_source",
             "platform",

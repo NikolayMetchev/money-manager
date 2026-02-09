@@ -8,7 +8,7 @@ import kotlin.time.Instant
  * Represents an audit entry for a transfer/transaction.
  * Captures the state of a transfer at a specific point in time during an INSERT, UPDATE, or DELETE operation.
  *
- * @property auditId Unique identifier for this audit entry
+ * @property id Unique identifier for this audit entry
  * @property auditTimestamp When this audit entry was created
  * @property auditType The type of operation that triggered this audit (INSERT, UPDATE, DELETE)
  * @property transferId The ID of the transfer that was audited
@@ -21,7 +21,7 @@ import kotlin.time.Instant
  * @property source The source/provenance of this audit entry (null if not tracked)
  */
 data class TransferAuditEntry(
-    val auditId: Long,
+    val id: Long,
     val auditTimestamp: Instant,
     val auditType: AuditType,
     val transferId: TransferId,

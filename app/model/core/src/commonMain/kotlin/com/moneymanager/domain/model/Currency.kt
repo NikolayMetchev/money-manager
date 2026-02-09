@@ -16,6 +16,7 @@ import kotlinx.serialization.Serializable
  */
 data class Currency(
     val id: CurrencyId,
+    val revisionId: Long = 1,
     val code: String,
     val name: String,
     val scaleFactor: Long = 100,

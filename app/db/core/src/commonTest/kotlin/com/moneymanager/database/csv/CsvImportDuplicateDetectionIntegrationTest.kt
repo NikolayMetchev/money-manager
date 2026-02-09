@@ -24,6 +24,7 @@ import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.FieldMappingId
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
+import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
@@ -118,6 +119,12 @@ class CsvImportDuplicateDetectionIntegrationTest : DbTest() {
                             id = FieldMappingId(Uuid.random()),
                             fieldType = TransferField.CURRENCY,
                             currencyId = testCurrency.id,
+                        ),
+                    TransferField.TIMEZONE to
+                        HardCodedTimezoneMapping(
+                            id = FieldMappingId(Uuid.random()),
+                            fieldType = TransferField.TIMEZONE,
+                            timezoneId = "UTC",
                         ),
                 ),
             attributeMappings =

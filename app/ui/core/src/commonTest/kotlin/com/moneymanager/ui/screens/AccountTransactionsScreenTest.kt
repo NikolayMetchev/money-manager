@@ -35,6 +35,7 @@ import com.moneymanager.domain.model.CsvSourceDetails
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DbLocation
+import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
@@ -78,6 +79,9 @@ import kotlin.time.Instant
 
 @OptIn(ExperimentalTestApi::class)
 class AccountTransactionsScreenTest {
+    private val testDeviceId = DeviceId(1L)
+    private val stubEntitySourceQueries = createStubEntitySourceQueries()
+
     @Test
     fun accountTransactionCard_flipsAccountDisplay_whenPerspectiveChanges() =
         runComposeUiTest {
@@ -137,6 +141,7 @@ class AccountTransactionsScreenTest {
                         transactionRepository = transactionRepository,
                         transferSourceRepository = transferSourceRepository,
                         transferSourceQueries = transferSourceQueries,
+                        entitySourceQueries = stubEntitySourceQueries,
                         deviceRepository = deviceRepository,
                         accountRepository = accountRepository,
                         categoryRepository = categoryRepository,
@@ -146,6 +151,7 @@ class AccountTransactionsScreenTest {
                         personAccountOwnershipRepository = personAccountOwnershipRepository,
                         transferAttributeRepository = transferAttributeRepository,
                         maintenanceService = maintenanceService,
+                        deviceId = testDeviceId,
                         onAccountIdChange = { currentAccountId = it },
                         onCurrencyIdChange = {},
                     )
@@ -237,6 +243,7 @@ class AccountTransactionsScreenTest {
                         transactionRepository = transactionRepository,
                         transferSourceRepository = transferSourceRepository,
                         transferSourceQueries = transferSourceQueries,
+                        entitySourceQueries = stubEntitySourceQueries,
                         deviceRepository = deviceRepository,
                         accountRepository = accountRepository,
                         categoryRepository = categoryRepository,
@@ -246,6 +253,7 @@ class AccountTransactionsScreenTest {
                         personAccountOwnershipRepository = personAccountOwnershipRepository,
                         transferAttributeRepository = transferAttributeRepository,
                         maintenanceService = maintenanceService,
+                        deviceId = testDeviceId,
                         onAccountIdChange = { currentAccountId = it },
                         onCurrencyIdChange = {},
                     )
@@ -361,6 +369,7 @@ class AccountTransactionsScreenTest {
                                 transactionRepository = repositories.transactionRepository,
                                 transferSourceRepository = repositories.transferSourceRepository,
                                 transferSourceQueries = repositories.transferSourceQueries,
+                                entitySourceQueries = repositories.entitySourceQueries,
                                 deviceRepository = repositories.deviceRepository,
                                 accountRepository = repositories.accountRepository,
                                 categoryRepository = repositories.categoryRepository,
@@ -370,6 +379,7 @@ class AccountTransactionsScreenTest {
                                 personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                                 transferAttributeRepository = repositories.transferAttributeRepository,
                                 maintenanceService = repositories.maintenanceService,
+                                deviceId = repositories.deviceId,
                                 onAccountIdChange = { currentAccountId = it },
                                 onCurrencyIdChange = {},
                                 onAuditClick = { auditTransferId = it },
@@ -582,6 +592,7 @@ class AccountTransactionsScreenTest {
                                 transactionRepository = repositories.transactionRepository,
                                 transferSourceRepository = repositories.transferSourceRepository,
                                 transferSourceQueries = repositories.transferSourceQueries,
+                                entitySourceQueries = repositories.entitySourceQueries,
                                 deviceRepository = repositories.deviceRepository,
                                 accountRepository = repositories.accountRepository,
                                 categoryRepository = repositories.categoryRepository,
@@ -591,6 +602,7 @@ class AccountTransactionsScreenTest {
                                 personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                                 transferAttributeRepository = repositories.transferAttributeRepository,
                                 maintenanceService = repositories.maintenanceService,
+                                deviceId = repositories.deviceId,
                                 onAccountIdChange = { currentAccountId = it },
                                 onCurrencyIdChange = {},
                                 onAuditClick = { auditTransferId = it },
@@ -771,6 +783,7 @@ class AccountTransactionsScreenTest {
                                 transactionRepository = repositories.transactionRepository,
                                 transferSourceRepository = repositories.transferSourceRepository,
                                 transferSourceQueries = repositories.transferSourceQueries,
+                                entitySourceQueries = repositories.entitySourceQueries,
                                 deviceRepository = repositories.deviceRepository,
                                 accountRepository = repositories.accountRepository,
                                 categoryRepository = repositories.categoryRepository,
@@ -780,6 +793,7 @@ class AccountTransactionsScreenTest {
                                 personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                                 transferAttributeRepository = repositories.transferAttributeRepository,
                                 maintenanceService = repositories.maintenanceService,
+                                deviceId = repositories.deviceId,
                                 onAccountIdChange = { currentAccountId = it },
                                 onCurrencyIdChange = {},
                                 onAuditClick = { auditTransferId = it },
@@ -894,8 +908,12 @@ class AccountTransactionsScreenTest {
             return accounts.map { createAccount(it) }
         }
 
-        override suspend fun updateAccount(account: Account) {
-            accountsFlow.value = accountsFlow.value.map { if (it.id == account.id) account else it }
+        override suspend fun updateAccount(account: Account): Long {
+            accountsFlow.value =
+                accountsFlow.value.map {
+                    if (it.id == account.id) account.copy(revisionId = account.revisionId + 1) else it
+                }
+            return account.revisionId + 1
         }
 
         override suspend fun deleteAccount(id: AccountId) {
@@ -1333,5 +1351,57 @@ class AccountTransactionsScreenTest {
             }
 
         return com.moneymanager.database.sql.TransferSourceQueries(stubDriver)
+    }
+
+    /**
+     * Creates a stub EntitySourceQueries for tests that don't actually query entity sources.
+     * Uses a minimal SqlDriver stub that throws NotImplementedError if actually invoked.
+     */
+    private companion object {
+        fun createStubEntitySourceQueries(): com.moneymanager.database.sql.EntitySourceQueries {
+            val stubDriver =
+                object : app.cash.sqldelight.db.SqlDriver {
+                    override fun close() = Unit
+
+                    override fun currentTransaction(): app.cash.sqldelight.Transacter.Transaction? = null
+
+                    override fun execute(
+                        identifier: Int?,
+                        sql: String,
+                        parameters: Int,
+                        binders: (app.cash.sqldelight.db.SqlPreparedStatement.() -> Unit)?,
+                    ): app.cash.sqldelight.db.QueryResult<Long> {
+                        throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
+                    }
+
+                    override fun <R> executeQuery(
+                        identifier: Int?,
+                        sql: String,
+                        mapper: (app.cash.sqldelight.db.SqlCursor) -> app.cash.sqldelight.db.QueryResult<R>,
+                        parameters: Int,
+                        binders: (app.cash.sqldelight.db.SqlPreparedStatement.() -> Unit)?,
+                    ): app.cash.sqldelight.db.QueryResult<R> {
+                        throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
+                    }
+
+                    override fun newTransaction(): app.cash.sqldelight.db.QueryResult<app.cash.sqldelight.Transacter.Transaction> {
+                        throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
+                    }
+
+                    override fun addListener(
+                        vararg queryKeys: String,
+                        listener: app.cash.sqldelight.Query.Listener,
+                    ) = Unit
+
+                    override fun removeListener(
+                        vararg queryKeys: String,
+                        listener: app.cash.sqldelight.Query.Listener,
+                    ) = Unit
+
+                    override fun notifyListeners(vararg queryKeys: String) = Unit
+                }
+
+            return com.moneymanager.database.sql.EntitySourceQueries(stubDriver)
+        }
     }
 }
