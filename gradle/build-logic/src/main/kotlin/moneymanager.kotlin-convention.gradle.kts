@@ -25,8 +25,6 @@ tasks {
     }
 
     withType<Detekt>().configureEach {
-        // Detekt only supports up to JVM target 24
-        jvmTarget = minOf(jvmTargetVersion.toInt(), 24).toString()
         // Exclude generated code from analysis
         exclude { it.file.absolutePath.contains("/build/generated/") }
     }
