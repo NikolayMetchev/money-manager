@@ -16,6 +16,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
+import androidx.compose.ui.test.waitUntilDoesNotExist
 import androidx.compose.ui.test.waitUntilExactlyOneExists
 import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.database.ManualSourceRecorder
@@ -394,15 +395,10 @@ class AccountTransactionsScreenTest {
                 onNodeWithText("\u270F\uFE0F").performClick()
                 waitForIdle()
 
-                // Wait for edit dialog to appear (longer timeout for CI)
+                // Wait for edit dialog to appear and attributes to finish loading
+                // (dialog shows spinner while loading attributes from DB via Dispatchers.Default)
                 waitUntilExactlyOneExists(hasText("Edit Transaction"), timeoutMillis = 10000)
-
-                // Wait for dialog content to fully compose before looking for the button
-                waitForIdle()
-                mainClock.advanceTimeBy(100)
-
-                // Wait for "+ Add Attribute" button to be available and click it
-                waitUntilExactlyOneExists(hasText("+ Add Attribute"), timeoutMillis = 10000)
+                waitUntilExactlyOneExists(hasText("+ Add Attribute"), timeoutMillis = 30000)
                 onNodeWithText("+ Add Attribute").performClick()
 
                 // Wait for attribute fields to appear
@@ -422,12 +418,9 @@ class AccountTransactionsScreenTest {
                 onAllNodesWithText("Value")[0].performTextInput("REF-12345")
                 waitForIdle()
 
-                // Click Update to save
+                // Click Update to save and wait for dialog to close
                 onNodeWithText("Update").performClick()
-                waitForIdle()
-
-                // Wait for save operation to complete
-                mainClock.advanceTimeBy(500)
+                waitUntilDoesNotExist(hasText("Edit Transaction"), timeoutMillis = 30000)
                 waitForIdle()
 
                 // Verify from database: the attribute was saved
@@ -610,15 +603,9 @@ class AccountTransactionsScreenTest {
                 // Step 1: Open edit dialog
                 onNodeWithText("\u270F\uFE0F").performClick()
 
-                // Wait for edit dialog to appear
+                // Wait for edit dialog to appear and attributes to finish loading
                 waitUntilExactlyOneExists(hasText("Edit Transaction"), timeoutMillis = 10000)
-
-                // Wait for dialog content to fully compose before looking for the button
-                waitForIdle()
-                mainClock.advanceTimeBy(100)
-
-                // Step 2: Add a new attribute (increased timeout for CI stability)
-                waitUntilExactlyOneExists(hasText("+ Add Attribute"), timeoutMillis = 10000)
+                waitUntilExactlyOneExists(hasText("+ Add Attribute"), timeoutMillis = 30000)
                 onNodeWithText("+ Add Attribute").performClick()
 
                 // Wait for attribute fields to appear
@@ -636,12 +623,9 @@ class AccountTransactionsScreenTest {
                 onAllNodesWithText("Value")[0].performTextInput("Test Value 123")
                 waitForIdle()
 
-                // Step 3: Click Update to save
+                // Step 3: Click Update to save and wait for dialog to close
                 onNodeWithText("Update").performClick()
-                waitForIdle()
-
-                // Wait for save operation to complete
-                mainClock.advanceTimeBy(500)
+                waitUntilDoesNotExist(hasText("Edit Transaction"), timeoutMillis = 30000)
                 waitForIdle()
 
                 // Refresh materialized views
@@ -801,12 +785,9 @@ class AccountTransactionsScreenTest {
                 // Step 1: Open edit dialog
                 onNodeWithText("\u270F\uFE0F").performClick()
 
-                // Wait for edit dialog to appear
+                // Wait for edit dialog to appear and attributes to finish loading
                 waitUntilExactlyOneExists(hasText("Edit Transaction"), timeoutMillis = 10000)
-
-                // Wait for dialog content to fully compose
-                waitForIdle()
-                mainClock.advanceTimeBy(100)
+                waitUntilExactlyOneExists(hasText("+ Add Attribute"), timeoutMillis = 30000)
 
                 // Step 2: Change the description (index 1 is the editable text field in the dialog)
                 waitUntilAtLeastOneExists(hasText("Original Description"), timeoutMillis = 10000)
@@ -835,10 +816,7 @@ class AccountTransactionsScreenTest {
 
                 // Step 4: Click Update to save (both changes should be atomic)
                 onNodeWithText("Update").performClick()
-                waitForIdle()
-
-                // Wait for save operation to complete
-                mainClock.advanceTimeBy(500)
+                waitUntilDoesNotExist(hasText("Edit Transaction"), timeoutMillis = 30000)
                 waitForIdle()
 
                 // Refresh materialized views
