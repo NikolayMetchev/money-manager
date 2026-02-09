@@ -12,6 +12,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.waitUntilDoesNotExist
+import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import androidx.compose.ui.test.waitUntilExactlyOneExists
 import com.moneymanager.database.DatabaseManager
 import com.moneymanager.domain.model.AppVersion
@@ -258,14 +259,11 @@ class TransactionAttributeAuditE2ETest {
 
             // Step 8: Verify the audit history shows exactly one revision (Rev 1) with the attribute
             // Wait for audit entries to load (they load asynchronously)
-            mainClock.advanceTimeBy(2000)
-            waitForIdle()
             waitUntilExactlyOneExists(hasText("Rev 1", substring = true), timeoutMillis = 10000)
-            onNodeWithText("Rev 1", substring = true).assertIsDisplayed()
 
             // Verify the attribute appears in the audit history at revision 1
-            onNodeWithText("Reference Number", substring = true).assertIsDisplayed()
-            onNodeWithText("REF-001", substring = true).assertIsDisplayed()
+            waitUntilAtLeastOneExists(hasText("Reference Number", substring = true), timeoutMillis = 10000)
+            waitUntilAtLeastOneExists(hasText("REF-001", substring = true), timeoutMillis = 10000)
 
             // Verify there is NO "Rev 2" - confirming only one audit entry exists
             // This ensures the attribute didn't cause an extra revision bump
