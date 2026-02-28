@@ -43,7 +43,6 @@ import com.moneymanager.domain.repository.DeviceRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
-import com.moneymanager.domain.repository.TransferAttributeRepository
 import com.moneymanager.domain.repository.TransferSourceRepository
 import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
@@ -88,7 +87,6 @@ fun MoneyManagerApp(
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     transactionRepository: TransactionRepository,
-    transferAttributeRepository: TransferAttributeRepository,
     transferSourceRepository: TransferSourceRepository,
     transferSourceQueries: TransferSourceQueries,
     entitySourceQueries: EntitySourceQueries,
@@ -319,7 +317,6 @@ fun MoneyManagerApp(
                                 attributeTypeRepository = attributeTypeRepository,
                                 personRepository = personRepository,
                                 personAccountOwnershipRepository = personAccountOwnershipRepository,
-                                transferAttributeRepository = transferAttributeRepository,
                                 maintenanceService = maintenanceService,
                                 deviceId = deviceId,
                                 onAccountIdChange = { accountId ->
@@ -492,7 +489,6 @@ fun MoneyManagerApp(
                     attributeTypeRepository = attributeTypeRepository,
                     personRepository = personRepository,
                     personAccountOwnershipRepository = personAccountOwnershipRepository,
-                    transferAttributeRepository = transferAttributeRepository,
                     maintenanceService = maintenanceService,
                     deviceId = deviceId,
                     preSelectedSourceAccountId = preSelectedAccountId,
