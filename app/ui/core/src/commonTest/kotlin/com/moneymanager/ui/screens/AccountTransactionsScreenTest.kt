@@ -603,9 +603,9 @@ class AccountTransactionsScreenTest {
                 // Step 1: Open edit dialog
                 onNodeWithText("\u270F\uFE0F").performClick()
 
-                // Wait for edit dialog to appear and attributes to finish loading
+                // Wait for edit dialog to appear (attributes are initialized synchronously from Transfer)
                 waitUntilExactlyOneExists(hasText("Edit Transaction"), timeoutMillis = 10000)
-                waitUntilExactlyOneExists(hasText("+ Add Attribute"), timeoutMillis = 30000)
+                waitUntilExactlyOneExists(hasText("+ Add Attribute"), timeoutMillis = 10000)
                 onNodeWithText("+ Add Attribute").performClick()
 
                 // Wait for attribute fields to appear
@@ -785,9 +785,9 @@ class AccountTransactionsScreenTest {
                 // Step 1: Open edit dialog
                 onNodeWithText("\u270F\uFE0F").performClick()
 
-                // Wait for edit dialog to appear and attributes to finish loading
+                // Wait for edit dialog to appear (attributes are initialized synchronously from Transfer)
                 waitUntilExactlyOneExists(hasText("Edit Transaction"), timeoutMillis = 10000)
-                waitUntilExactlyOneExists(hasText("+ Add Attribute"), timeoutMillis = 30000)
+                waitUntilExactlyOneExists(hasText("+ Add Attribute"), timeoutMillis = 10000)
 
                 // Step 2: Change the description (index 1 is the editable text field in the dialog)
                 waitUntilAtLeastOneExists(hasText("Original Description"), timeoutMillis = 10000)
