@@ -155,7 +155,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
                     description = "Transfer 1",
                     sourceAccountId = account1Id,
                     targetAccountId = account2Id,
-                    amount = Money.fromDisplayValue(100.0, currency),
+                    amount = Money.fromDisplayValue("100", currency),
                 ),
             )
 
@@ -170,7 +170,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
                     description = "Transfer 2 (after)",
                     sourceAccountId = account1Id,
                     targetAccountId = account2Id,
-                    amount = Money.fromDisplayValue(50.0, currency),
+                    amount = Money.fromDisplayValue("50", currency),
                 ),
             )
 
@@ -208,7 +208,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
                     description = "Transfer 1",
                     sourceAccountId = account1Id,
                     targetAccountId = account2Id,
-                    amount = Money.fromDisplayValue(100.0, currency),
+                    amount = Money.fromDisplayValue("100", currency),
                 ),
             )
 
@@ -220,7 +220,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
                     description = "Transfer 3",
                     sourceAccountId = account1Id,
                     targetAccountId = account2Id,
-                    amount = Money.fromDisplayValue(75.0, currency),
+                    amount = Money.fromDisplayValue("75", currency),
                 ),
             )
 
@@ -235,7 +235,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
                     description = "Transfer 2 (middle)",
                     sourceAccountId = account1Id,
                     targetAccountId = account2Id,
-                    amount = Money.fromDisplayValue(50.0, currency),
+                    amount = Money.fromDisplayValue("50", currency),
                 ),
             )
 
@@ -260,7 +260,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
                     description = "Transfer 1",
                     sourceAccountId = account1Id,
                     targetAccountId = account2Id,
-                    amount = Money.fromDisplayValue(100.0, currency),
+                    amount = Money.fromDisplayValue("100", currency),
                 ),
             )
 
@@ -275,7 +275,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
                     description = "Transfer 0 (before)",
                     sourceAccountId = account1Id,
                     targetAccountId = account2Id,
-                    amount = Money.fromDisplayValue(50.0, currency),
+                    amount = Money.fromDisplayValue("50", currency),
                 ),
             )
 
@@ -303,7 +303,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
                         description = "Transfer 1",
                         sourceAccountId = account1Id,
                         targetAccountId = account2Id,
-                        amount = Money.fromDisplayValue(100.0, currency),
+                        amount = Money.fromDisplayValue("100", currency),
                     ),
                 )
 
@@ -314,7 +314,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
                     description = "Transfer 2",
                     sourceAccountId = account1Id,
                     targetAccountId = account2Id,
-                    amount = Money.fromDisplayValue(50.0, currency),
+                    amount = Money.fromDisplayValue("50", currency),
                 ),
             )
 
@@ -330,7 +330,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
                         description = "Transfer 1 (updated)",
                         sourceAccountId = account1Id,
                         targetAccountId = account2Id,
-                        amount = Money.fromDisplayValue(100.0, currency),
+                        amount = Money.fromDisplayValue("100", currency),
                     ),
                 deletedAttributeIds = emptySet(),
                 updatedAttributes = emptyMap(),
@@ -377,7 +377,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
                         description = "Original transfer",
                         sourceAccountId = account1Id,
                         targetAccountId = account2Id,
-                        amount = Money.fromDisplayValue(100.0, currency),
+                        amount = Money.fromDisplayValue("100", currency),
                     ),
                 )
 
@@ -393,7 +393,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
                         description = "Updated transfer",
                         sourceAccountId = account3Id,
                         targetAccountId = account4Id,
-                        amount = Money.fromDisplayValue(100.0, currency),
+                        amount = Money.fromDisplayValue("100", currency),
                     ),
                 deletedAttributeIds = emptySet(),
                 updatedAttributes = emptyMap(),
@@ -434,7 +434,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
                         description = "Transfer 1",
                         sourceAccountId = account1Id,
                         targetAccountId = account2Id,
-                        amount = Money.fromDisplayValue(100.0, currency),
+                        amount = Money.fromDisplayValue("100", currency),
                     ),
                 )
 
@@ -445,7 +445,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
                     description = "Transfer 2",
                     sourceAccountId = account1Id,
                     targetAccountId = account2Id,
-                    amount = Money.fromDisplayValue(50.0, currency),
+                    amount = Money.fromDisplayValue("50", currency),
                 ),
             )
 
@@ -483,7 +483,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
                         description = "Only transfer",
                         sourceAccountId = account1Id,
                         targetAccountId = account2Id,
-                        amount = Money.fromDisplayValue(100.0, currency),
+                        amount = Money.fromDisplayValue("100", currency),
                     ),
                 )
 
@@ -538,7 +538,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
                     description = "First transfer",
                     sourceAccountId = account1Id,
                     targetAccountId = account2Id,
-                    amount = Money.fromDisplayValue(100.0, currency),
+                    amount = Money.fromDisplayValue("100", currency),
                 ),
             )
 
@@ -558,7 +558,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
                     description = "Transfer with new account",
                     sourceAccountId = account3Id,
                     targetAccountId = account1Id,
-                    amount = Money.fromDisplayValue(50.0, currency),
+                    amount = Money.fromDisplayValue("50", currency),
                 ),
             )
 
@@ -589,7 +589,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
                     description = "USD transfer",
                     sourceAccountId = account1Id,
                     targetAccountId = account2Id,
-                    amount = Money.fromDisplayValue(100.0, usdCurrency),
+                    amount = Money.fromDisplayValue("100", usdCurrency),
                 ),
             )
 
@@ -606,7 +606,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
                     description = "EUR transfer",
                     sourceAccountId = account1Id,
                     targetAccountId = account2Id,
-                    amount = Money.fromDisplayValue(50.0, eurCurrency),
+                    amount = Money.fromDisplayValue("50", eurCurrency),
                 ),
             )
 
@@ -640,7 +640,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
                     description = "Initial transfer",
                     sourceAccountId = account1Id,
                     targetAccountId = account2Id,
-                    amount = Money.fromDisplayValue(100.0, currency),
+                    amount = Money.fromDisplayValue("100", currency),
                 ),
             )
 
@@ -655,7 +655,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
                     description = "Transfer 2",
                     sourceAccountId = account1Id,
                     targetAccountId = account2Id,
-                    amount = Money.fromDisplayValue(50.0, currency),
+                    amount = Money.fromDisplayValue("50", currency),
                 ),
             )
 
@@ -666,7 +666,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
                     description = "Transfer 3",
                     sourceAccountId = account2Id,
                     targetAccountId = account1Id,
-                    amount = Money.fromDisplayValue(25.0, currency),
+                    amount = Money.fromDisplayValue("25", currency),
                 ),
             )
 
@@ -677,7 +677,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
                     description = "Transfer 4",
                     sourceAccountId = account1Id,
                     targetAccountId = account2Id,
-                    amount = Money.fromDisplayValue(75.0, currency),
+                    amount = Money.fromDisplayValue("75", currency),
                 ),
             )
 
@@ -719,7 +719,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
                         description = "Transfer $i",
                         sourceAccountId = if (i % 2 == 0) account1Id else account2Id,
                         targetAccountId = if (i % 2 == 0) account2Id else account1Id,
-                        amount = Money.fromDisplayValue((i + 1) * 10.0, currency),
+                        amount = Money.fromDisplayValue("${(i + 1) * 10}", currency),
                     ),
                 )
             }

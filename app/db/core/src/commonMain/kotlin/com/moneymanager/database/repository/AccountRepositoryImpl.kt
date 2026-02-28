@@ -6,9 +6,11 @@ import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
 import com.moneymanager.database.mapper.AccountMapper
+import com.moneymanager.database.mapper.TransferMapper
 import com.moneymanager.database.sql.MoneyManagerDatabase
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.repository.AccountRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -16,9 +18,10 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
 class AccountRepositoryImpl(
-    database: MoneyManagerDatabase,
+    private val database: MoneyManagerDatabase,
 ) : AccountRepository {
     private val queries = database.accountQueries
+    private val transferQueries = database.transferQueries
 
     override fun getAllAccounts(): Flow<List<Account>> =
         queries.selectAll()
@@ -76,5 +79,40 @@ class AccountRepositoryImpl(
     override suspend fun deleteAccount(id: AccountId): Unit =
         withContext(Dispatchers.Default) {
             queries.delete(id.id)
+        }
+
+    override suspend fun countTransfersByAccount(accountId: AccountId): Long =
+        withContext(Dispatchers.Default) {
+            transferQueries.countTransfersByAccount(accountId.id).executeAsOne()
+        }
+
+    override suspend fun getTransfersBetweenAccounts(
+        accountA: AccountId,
+        accountB: AccountId,
+    ): List<Transfer> =
+        withContext(Dispatchers.Default) {
+            transferQueries.selectTransfersBetweenAccounts(
+                accountA = accountA.id,
+                accountB = accountB.id,
+                TransferMapper::mapRaw,
+            ).executeAsList()
+        }
+
+    override suspend fun deleteAccountAndMoveTransactions(
+        accountToDelete: AccountId,
+        targetAccount: AccountId,
+    ): Unit =
+        withContext(Dispatchers.Default) {
+            database.transaction {
+                transferQueries.moveTransfersSourceAccount(
+                    targetAccount = targetAccount.id,
+                    accountToDelete = accountToDelete.id,
+                )
+                transferQueries.moveTransfersTargetAccount(
+                    targetAccount = targetAccount.id,
+                    accountToDelete = accountToDelete.id,
+                )
+                queries.delete(accountToDelete.id)
+            }
         }
 }

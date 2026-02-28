@@ -113,7 +113,7 @@ class AccountTransactionsScreenTest {
                     description = "Transfer to savings",
                     sourceAccountId = checking.id,
                     targetAccountId = savings.id,
-                    amount = Money.fromDisplayValue(100.0, usdCurrency),
+                    amount = Money.fromDisplayValue("100", usdCurrency),
                 )
 
             val accountRepository = FakeAccountRepository(listOf(checking, savings))
@@ -214,7 +214,7 @@ class AccountTransactionsScreenTest {
                     description = "Transfer to savings",
                     sourceAccountId = checking.id,
                     targetAccountId = savings.id,
-                    amount = Money.fromDisplayValue(100.0, usdCurrency),
+                    amount = Money.fromDisplayValue("100", usdCurrency),
                 )
 
             val accountRepository = FakeAccountRepository(listOf(checking, savings))
@@ -325,7 +325,7 @@ class AccountTransactionsScreenTest {
                         description = "E2E Test Transaction",
                         sourceAccountId = checkingAccountId,
                         targetAccountId = savingsAccountId,
-                        amount = Money.fromDisplayValue(50.0, usdCurrency),
+                        amount = Money.fromDisplayValue("50", usdCurrency),
                     )
                 val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
                 repositories.transactionRepository.createTransfers(
@@ -528,7 +528,7 @@ class AccountTransactionsScreenTest {
                         description = "Audit Test Transaction",
                         sourceAccountId = checkingAccountId,
                         targetAccountId = savingsAccountId,
-                        amount = Money.fromDisplayValue(100.0, usdCurrency),
+                        amount = Money.fromDisplayValue("100", usdCurrency),
                     )
                 val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
                 repositories.transactionRepository.createTransfers(
@@ -709,7 +709,7 @@ class AccountTransactionsScreenTest {
                         description = "Original Description",
                         sourceAccountId = checkingAccountId,
                         targetAccountId = savingsAccountId,
-                        amount = Money.fromDisplayValue(100.0, usdCurrency),
+                        amount = Money.fromDisplayValue("100", usdCurrency),
                     )
                 val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
                 repositories.transactionRepository.createTransfers(
@@ -880,6 +880,20 @@ class AccountTransactionsScreenTest {
 
         override suspend fun deleteAccount(id: AccountId) {
             accountsFlow.value = accountsFlow.value.filter { it.id != id }
+        }
+
+        override suspend fun countTransfersByAccount(accountId: AccountId): Long = 0L
+
+        override suspend fun getTransfersBetweenAccounts(
+            accountA: AccountId,
+            accountB: AccountId,
+        ): List<Transfer> = emptyList()
+
+        override suspend fun deleteAccountAndMoveTransactions(
+            accountToDelete: AccountId,
+            targetAccount: AccountId,
+        ) {
+            accountsFlow.value = accountsFlow.value.filter { it.id != accountToDelete }
         }
     }
 

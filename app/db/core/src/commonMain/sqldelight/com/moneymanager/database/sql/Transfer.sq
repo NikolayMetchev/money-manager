@@ -425,3 +425,37 @@ bumpRevisionOnly:
 UPDATE transfer
 SET revision_id = revision_id + 1
 WHERE id = ?;
+
+countTransfersByAccount:
+SELECT COUNT(*) AS count
+FROM transfer
+WHERE source_account_id = :accountId OR target_account_id = :accountId;
+
+selectTransfersBetweenAccounts:
+SELECT
+    transfer.id,
+    transfer.revision_id,
+    transfer.timestamp,
+    transfer.description,
+    transfer.source_account_id,
+    transfer.target_account_id,
+    transfer.amount,
+    currency.id AS currency_id,
+    currency.code AS currency_code,
+    currency.name AS currency_name,
+    currency.scale_factor AS currency_scale_factor
+FROM transfer
+JOIN currency ON transfer.currency_id = currency.id
+WHERE (source_account_id = :accountA AND target_account_id = :accountB)
+   OR (source_account_id = :accountB AND target_account_id = :accountA)
+ORDER BY timestamp DESC;
+
+moveTransfersSourceAccount:
+UPDATE transfer
+SET revision_id = revision_id + 1, source_account_id = :targetAccount
+WHERE source_account_id = :accountToDelete;
+
+moveTransfersTargetAccount:
+UPDATE transfer
+SET revision_id = revision_id + 1, target_account_id = :targetAccount
+WHERE target_account_id = :accountToDelete;

@@ -17,12 +17,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
+import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.database.sql.EntitySourceQueries
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.DeviceId
+import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
@@ -46,6 +48,7 @@ fun AccountsScreen(
     transactionRepository: TransactionRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
+    maintenanceService: DatabaseMaintenanceService,
     entitySourceQueries: EntitySourceQueries,
     deviceId: DeviceId,
     scrollToAccountId: AccountId?,
@@ -122,6 +125,7 @@ fun AccountsScreen(
                             accountRepository = accountRepository,
                             personRepository = personRepository,
                             personAccountOwnershipRepository = personAccountOwnershipRepository,
+                            maintenanceService = maintenanceService,
                             onClick = { onAccountClick(account) },
                             onEditClick = { accountToEdit = account },
                             onAuditClick = { onAuditClick(account) },
@@ -171,6 +175,7 @@ fun AccountCard(
     accountRepository: AccountRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
+    maintenanceService: DatabaseMaintenanceService,
     onClick: () -> Unit,
     onEditClick: () -> Unit,
     onAuditClick: () -> Unit = {},
@@ -293,6 +298,7 @@ fun AccountCard(
         DeleteAccountDialog(
             account = account,
             accountRepository = accountRepository,
+            maintenanceService = maintenanceService,
             onDismiss = { showDeleteDialog = false },
         )
     }
@@ -454,11 +460,39 @@ fun CreateAccountDialog(
 fun DeleteAccountDialog(
     account: Account,
     accountRepository: AccountRepository,
+    maintenanceService: DatabaseMaintenanceService,
     onDismiss: () -> Unit,
 ) {
     var isDeleting by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var transferCount by remember { mutableStateOf<Long?>(null) }
+    var conflictingTransfers by remember { mutableStateOf(emptyList<Transfer>()) }
+    var selectedTargetAccount by remember { mutableStateOf<Account?>(null) }
+    var dropdownExpanded by remember { mutableStateOf(false) }
     val scope = rememberSchemaAwareCoroutineScope()
+
+    val allAccounts by accountRepository.getAllAccounts()
+        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val otherAccounts = allAccounts.filter { it.id != account.id }
+
+    LaunchedEffect(Unit) {
+        transferCount = accountRepository.countTransfersByAccount(account.id)
+    }
+
+    LaunchedEffect(selectedTargetAccount) {
+        val target = selectedTargetAccount
+        conflictingTransfers =
+            if (target != null) {
+                accountRepository.getTransfersBetweenAccounts(account.id, target.id)
+            } else {
+                emptyList()
+            }
+    }
+
+    val hasTransactions = (transferCount ?: 0) > 0
+    val hasConflicts = conflictingTransfers.isNotEmpty()
+    val canDelete = !hasTransactions || (selectedTargetAccount != null && !hasConflicts)
+    val noOtherAccounts = hasTransactions && otherAccounts.isEmpty()
 
     AlertDialog(
         onDismissRequest = { if (!isDeleting) onDismiss() },
@@ -477,11 +511,77 @@ fun DeleteAccountDialog(
                     text = "Are you sure you want to delete \"${account.name}\"?",
                     style = MaterialTheme.typography.bodyLarge,
                 )
-                Text(
-                    text = "This action cannot be undone. All transactions associated with this account will become orphaned.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                if (transferCount == null) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp).align(Alignment.CenterHorizontally),
+                        strokeWidth = 2.dp,
+                    )
+                } else if (hasTransactions) {
+                    Text(
+                        text = "This account has $transferCount transaction(s). Choose an account to move them to:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (noOtherAccounts) {
+                        Text(
+                            text = "No other accounts available. Create another account first.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    } else {
+                        ExposedDropdownMenuBox(
+                            expanded = dropdownExpanded,
+                            onExpandedChange = { dropdownExpanded = !dropdownExpanded && !isDeleting },
+                        ) {
+                            OutlinedTextField(
+                                value = selectedTargetAccount?.name ?: "Select account",
+                                onValueChange = {},
+                                readOnly = true,
+                                label = { Text("Move transactions to") },
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = dropdownExpanded) },
+                                modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+                                enabled = !isDeleting,
+                            )
+                            ExposedDropdownMenu(
+                                expanded = dropdownExpanded,
+                                onDismissRequest = { dropdownExpanded = false },
+                            ) {
+                                otherAccounts.forEach { targetAccount ->
+                                    DropdownMenuItem(
+                                        text = { Text(targetAccount.name) },
+                                        onClick = {
+                                            selectedTargetAccount = targetAccount
+                                            dropdownExpanded = false
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                        if (hasConflicts) {
+                            Text(
+                                text =
+                                    "Cannot move to \"${selectedTargetAccount?.name}\": " +
+                                        "${conflictingTransfers.size} transaction(s) between these accounts " +
+                                        "would be deleted. Choose a different account.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                            conflictingTransfers.forEach { transfer ->
+                                Text(
+                                    text = "${transfer.description} - ${formatAmount(transfer.amount)}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    Text(
+                        text = "This action cannot be undone.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 errorMessage?.let { error ->
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
@@ -499,7 +599,15 @@ fun DeleteAccountDialog(
                     errorMessage = null
                     scope.launch {
                         try {
-                            accountRepository.deleteAccount(account.id)
+                            if (hasTransactions) {
+                                accountRepository.deleteAccountAndMoveTransactions(
+                                    accountToDelete = account.id,
+                                    targetAccount = selectedTargetAccount!!.id,
+                                )
+                                maintenanceService.fullRefreshMaterializedViews()
+                            } else {
+                                accountRepository.deleteAccount(account.id)
+                            }
                             onDismiss()
                         } catch (expected: Exception) {
                             logger.error(expected) { "Failed to delete account: ${expected.message}" }
@@ -508,7 +616,7 @@ fun DeleteAccountDialog(
                         }
                     }
                 },
-                enabled = !isDeleting,
+                enabled = !isDeleting && canDelete && !noOtherAccounts && transferCount != null,
                 colors =
                     ButtonDefaults.textButtonColors(
                         contentColor = MaterialTheme.colorScheme.error,

@@ -423,7 +423,7 @@ class AuditFunctionalTest : DbTest() {
 
             val now = Clock.System.now()
             val description = "Test Transfer"
-            val amount = Money.fromDisplayValue(100.0, currency)
+            val amount = Money.fromDisplayValue("100", currency)
 
             val transfer =
                 createTransfer(
@@ -451,8 +451,8 @@ class AuditFunctionalTest : DbTest() {
             val (sourceAccountId, targetAccountId, currency) = setupTransferPrerequisites()
 
             val now = Clock.System.now()
-            val originalAmount = Money.fromDisplayValue(100.0, currency)
-            val updatedAmount = Money.fromDisplayValue(200.0, currency)
+            val originalAmount = Money.fromDisplayValue("100", currency)
+            val updatedAmount = Money.fromDisplayValue("200", currency)
 
             val transfer =
                 createTransfer(
@@ -506,7 +506,7 @@ class AuditFunctionalTest : DbTest() {
                         description = "To Be Deleted",
                         sourceAccountId = sourceAccountId,
                         targetAccountId = targetAccountId,
-                        amount = Money.fromDisplayValue(100.0, currency),
+                        amount = Money.fromDisplayValue("100", currency),
                     ),
                 )
 
@@ -535,7 +535,7 @@ class AuditFunctionalTest : DbTest() {
                         description = "Original Description",
                         sourceAccountId = sourceAccountId,
                         targetAccountId = targetAccountId,
-                        amount = Money.fromDisplayValue(100.0, currency),
+                        amount = Money.fromDisplayValue("100", currency),
                     ),
                 )
 
@@ -548,7 +548,7 @@ class AuditFunctionalTest : DbTest() {
                         description = "Updated Description",
                         sourceAccountId = sourceAccountId,
                         targetAccountId = targetAccountId,
-                        amount = Money.fromDisplayValue(200.0, currency),
+                        amount = Money.fromDisplayValue("200", currency),
                     ),
                 deletedAttributeIds = emptySet(),
                 updatedAttributes = emptyMap(),
@@ -589,7 +589,7 @@ class AuditFunctionalTest : DbTest() {
                         description = "Version 1",
                         sourceAccountId = sourceAccountId,
                         targetAccountId = targetAccountId,
-                        amount = Money.fromDisplayValue(100.0, currency),
+                        amount = Money.fromDisplayValue("100", currency),
                     ),
                 )
 
@@ -602,7 +602,7 @@ class AuditFunctionalTest : DbTest() {
                         description = "Version 2",
                         sourceAccountId = sourceAccountId,
                         targetAccountId = targetAccountId,
-                        amount = Money.fromDisplayValue(200.0, currency),
+                        amount = Money.fromDisplayValue("200", currency),
                     ),
                 deletedAttributeIds = emptySet(),
                 updatedAttributes = emptyMap(),
@@ -619,7 +619,7 @@ class AuditFunctionalTest : DbTest() {
                         description = "Version 3",
                         sourceAccountId = sourceAccountId,
                         targetAccountId = targetAccountId,
-                        amount = Money.fromDisplayValue(300.0, currency),
+                        amount = Money.fromDisplayValue("300", currency),
                     ),
                 deletedAttributeIds = emptySet(),
                 updatedAttributes = emptyMap(),

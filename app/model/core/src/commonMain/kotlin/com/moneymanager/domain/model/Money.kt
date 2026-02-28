@@ -171,20 +171,6 @@ data class Money(
         }
 
         /**
-         * Creates a Money instance from a display value (e.g., 123.45).
-         *
-         * @param displayValue The display value as Double
-         * @param currency The currency of the amount
-         * @return A new Money instance with the amount converted to the smallest currency unit
-         */
-        fun fromDisplayValue(
-            displayValue: Double,
-            currency: Currency,
-        ): Money {
-            return fromDisplayValue(BigDecimal(displayValue), currency)
-        }
-
-        /**
          * Creates a Money instance from a display value (e.g., "123.45").
          *
          * @param displayValue The display value as String
