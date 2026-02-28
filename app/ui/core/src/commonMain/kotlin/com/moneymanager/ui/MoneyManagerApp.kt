@@ -220,6 +220,7 @@ fun MoneyManagerApp(
                                 transactionRepository = transactionRepository,
                                 personRepository = personRepository,
                                 personAccountOwnershipRepository = personAccountOwnershipRepository,
+                                maintenanceService = maintenanceService,
                                 entitySourceQueries = entitySourceQueries,
                                 deviceId = deviceId,
                                 scrollToAccountId = screen.scrollToAccountId,

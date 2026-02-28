@@ -7,6 +7,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
+import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
@@ -33,6 +34,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlin.test.Test
 import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.time.Instant
 
 @OptIn(ExperimentalTestApi::class)
@@ -55,6 +57,7 @@ class AccountsScreenTest {
                         transactionRepository = FakeTransactionRepository(),
                         personRepository = FakePersonRepository(),
                         personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
+                        maintenanceService = FakeDatabaseMaintenanceService(),
                         entitySourceQueries = stubEntitySourceQueries,
                         deviceId = testDeviceId,
                         scrollToAccountId = null,
@@ -97,6 +100,7 @@ class AccountsScreenTest {
                         transactionRepository = FakeTransactionRepository(),
                         personRepository = FakePersonRepository(),
                         personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
+                        maintenanceService = FakeDatabaseMaintenanceService(),
                         entitySourceQueries = stubEntitySourceQueries,
                         deviceId = testDeviceId,
                         scrollToAccountId = null,
@@ -125,6 +129,7 @@ class AccountsScreenTest {
                         transactionRepository = FakeTransactionRepository(),
                         personRepository = FakePersonRepository(),
                         personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
+                        maintenanceService = FakeDatabaseMaintenanceService(),
                         entitySourceQueries = stubEntitySourceQueries,
                         deviceId = testDeviceId,
                         scrollToAccountId = null,
@@ -152,6 +157,7 @@ class AccountsScreenTest {
                         transactionRepository = FakeTransactionRepository(),
                         personRepository = FakePersonRepository(),
                         personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
+                        maintenanceService = FakeDatabaseMaintenanceService(),
                         entitySourceQueries = stubEntitySourceQueries,
                         deviceId = testDeviceId,
                         scrollToAccountId = null,
@@ -189,6 +195,7 @@ class AccountsScreenTest {
                         transactionRepository = FakeTransactionRepository(),
                         personRepository = FakePersonRepository(),
                         personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
+                        maintenanceService = FakeDatabaseMaintenanceService(),
                         entitySourceQueries = stubEntitySourceQueries,
                         deviceId = testDeviceId,
                         scrollToAccountId = null,
@@ -223,6 +230,7 @@ class AccountsScreenTest {
                         transactionRepository = FakeTransactionRepository(),
                         personRepository = FakePersonRepository(),
                         personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
+                        maintenanceService = FakeDatabaseMaintenanceService(),
                         entitySourceQueries = stubEntitySourceQueries,
                         deviceId = testDeviceId,
                         scrollToAccountId = null,
@@ -254,6 +262,7 @@ class AccountsScreenTest {
                         transactionRepository = FakeTransactionRepository(),
                         personRepository = FakePersonRepository(),
                         personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
+                        maintenanceService = FakeDatabaseMaintenanceService(),
                         entitySourceQueries = stubEntitySourceQueries,
                         deviceId = testDeviceId,
                         scrollToAccountId = null,
@@ -287,6 +296,7 @@ class AccountsScreenTest {
                         transactionRepository = FakeTransactionRepository(),
                         personRepository = FakePersonRepository(),
                         personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
+                        maintenanceService = FakeDatabaseMaintenanceService(),
                         entitySourceQueries = stubEntitySourceQueries,
                         deviceId = testDeviceId,
                         scrollToAccountId = null,
@@ -328,6 +338,7 @@ class AccountsScreenTest {
                         transactionRepository = FakeTransactionRepository(),
                         personRepository = FakePersonRepository(),
                         personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
+                        maintenanceService = FakeDatabaseMaintenanceService(),
                         entitySourceQueries = stubEntitySourceQueries,
                         deviceId = testDeviceId,
                         scrollToAccountId = null,
@@ -381,6 +392,7 @@ class AccountsScreenTest {
                         transactionRepository = FakeTransactionRepository(),
                         personRepository = FakePersonRepository(),
                         personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
+                        maintenanceService = FakeDatabaseMaintenanceService(),
                         entitySourceQueries = stubEntitySourceQueries,
                         deviceId = testDeviceId,
                         scrollToAccountId = null,
@@ -428,6 +440,21 @@ class AccountsScreenTest {
         override suspend fun deleteAccount(id: AccountId) {
             deletedAccounts.add(id)
             accountsFlow.value = accountsFlow.value.filter { it.id != id }
+        }
+
+        override suspend fun countTransfersByAccount(accountId: AccountId): Long = 0L
+
+        override suspend fun getTransfersBetweenAccounts(
+            accountA: AccountId,
+            accountB: AccountId,
+        ): List<Transfer> = emptyList()
+
+        override suspend fun deleteAccountAndMoveTransactions(
+            accountToDelete: AccountId,
+            targetAccount: AccountId,
+        ) {
+            deletedAccounts.add(accountToDelete)
+            accountsFlow.value = accountsFlow.value.filter { it.id != accountToDelete }
         }
     }
 
@@ -573,6 +600,18 @@ class AccountsScreenTest {
         override suspend fun deleteOwnershipsByPerson(personId: com.moneymanager.domain.model.PersonId) {}
 
         override suspend fun deleteOwnershipsByAccount(accountId: AccountId) {}
+    }
+
+    private class FakeDatabaseMaintenanceService : DatabaseMaintenanceService {
+        override suspend fun reindex(): Duration = Duration.ZERO
+
+        override suspend fun vacuum(): Duration = Duration.ZERO
+
+        override suspend fun analyze(): Duration = Duration.ZERO
+
+        override suspend fun refreshMaterializedViews(): Duration = Duration.ZERO
+
+        override suspend fun fullRefreshMaterializedViews(): Duration = Duration.ZERO
     }
 
     /**

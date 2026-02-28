@@ -2,6 +2,7 @@ package com.moneymanager.domain.repository
 
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.Transfer
 import kotlinx.coroutines.flow.Flow
 
 interface AccountRepository {
@@ -19,4 +20,16 @@ interface AccountRepository {
     suspend fun updateAccount(account: Account): Long
 
     suspend fun deleteAccount(id: AccountId)
+
+    suspend fun countTransfersByAccount(accountId: AccountId): Long
+
+    suspend fun getTransfersBetweenAccounts(
+        accountA: AccountId,
+        accountB: AccountId,
+    ): List<Transfer>
+
+    suspend fun deleteAccountAndMoveTransactions(
+        accountToDelete: AccountId,
+        targetAccount: AccountId,
+    )
 }

@@ -351,7 +351,8 @@ suspend fun generateSampleData(
             val currency = selectedCurrencies.random(random)
 
             // Random amount (1-10000 with 2 decimal places)
-            val amount = (random.nextInt(100, 1000001) / 100.0)
+            val amountCents = random.nextInt(100, 1000001)
+            val amount = "${amountCents / 100}.${(amountCents % 100).toString().padStart(2, '0')}"
 
             // Random description
             val description = generateTransactionDescription(random)

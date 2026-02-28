@@ -58,12 +58,6 @@ class MoneyTest {
     }
 
     @Test
-    fun fromDisplayValue_double_convertsCorrectly() {
-        val money = Money.fromDisplayValue(123.45, usd)
-        assertEquals(12345L, money.amount)
-    }
-
-    @Test
     fun fromDisplayValue_string_convertsCorrectly() {
         val money = Money.fromDisplayValue("123.45", usd)
         assertEquals(12345L, money.amount)

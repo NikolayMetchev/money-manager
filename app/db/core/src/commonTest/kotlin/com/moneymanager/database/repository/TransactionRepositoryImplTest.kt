@@ -45,7 +45,7 @@ class TransactionRepositoryImplTest : DbTest() {
                     description = "Test transaction",
                     sourceAccountId = sourceAccountId,
                     targetAccountId = targetAccountId,
-                    amount = Money.fromDisplayValue(100.0, currency),
+                    amount = Money.fromDisplayValue("100", currency),
                 )
             val createdTransfer = createTransfer(transfer)
 
@@ -54,7 +54,7 @@ class TransactionRepositoryImplTest : DbTest() {
             assertEquals(sourceAccountId, retrieved.sourceAccountId)
             assertEquals(targetAccountId, retrieved.targetAccountId)
             assertEquals(currencyId, retrieved.amount.currency.id)
-            assertEquals(Money.fromDisplayValue(100.0, currency), retrieved.amount)
+            assertEquals(Money.fromDisplayValue("100", currency), retrieved.amount)
         }
 
     @Test
@@ -82,7 +82,7 @@ class TransactionRepositoryImplTest : DbTest() {
                         description = "Invalid transaction",
                         sourceAccountId = accountId,
                         targetAccountId = accountId,
-                        amount = Money.fromDisplayValue(100.0, currency),
+                        amount = Money.fromDisplayValue("100", currency),
                     )
                 createTransfer(transfer)
             }
@@ -116,7 +116,7 @@ class TransactionRepositoryImplTest : DbTest() {
                     description = "Test transaction",
                     sourceAccountId = sourceAccountId,
                     targetAccountId = targetAccountId,
-                    amount = Money.fromDisplayValue(100.0, currency),
+                    amount = Money.fromDisplayValue("100", currency),
                 )
             val createdTransfer = createTransfer(transfer)
 
@@ -134,7 +134,7 @@ class TransactionRepositoryImplTest : DbTest() {
                         description = "Test transaction",
                         sourceAccountId = sourceAccountId,
                         targetAccountId = sourceAccountId,
-                        amount = Money.fromDisplayValue(100.0, currency),
+                        amount = Money.fromDisplayValue("100", currency),
                     )
                 repositories.transactionRepository.updateTransfer(
                     transfer = invalidTransfer,
@@ -175,7 +175,7 @@ class TransactionRepositoryImplTest : DbTest() {
                     description = "Transfer to savings",
                     sourceAccountId = checkingAccountId,
                     targetAccountId = savingsAccountId,
-                    amount = Money.fromDisplayValue(100.0, usd),
+                    amount = Money.fromDisplayValue("100", usd),
                 )
             createTransfer(transfer)
 
@@ -192,8 +192,8 @@ class TransactionRepositoryImplTest : DbTest() {
             // Verify balances
             assertNotNull(checkingBalance, "Checking account should have a balance")
             assertNotNull(savingsBalance, "Savings account should have a balance")
-            assertEquals(Money.fromDisplayValue(-100.0, usd), checkingBalance.balance, "Checking should have -100 (outgoing)")
-            assertEquals(Money.fromDisplayValue(100.0, usd), savingsBalance.balance, "Savings should have +100 (incoming)")
+            assertEquals(Money.fromDisplayValue("-100", usd), checkingBalance.balance, "Checking should have -100 (outgoing)")
+            assertEquals(Money.fromDisplayValue("100", usd), savingsBalance.balance, "Savings should have +100 (incoming)")
         }
 
     @Test
@@ -228,7 +228,7 @@ class TransactionRepositoryImplTest : DbTest() {
                     description = "Transfer to savings",
                     sourceAccountId = checkingAccountId,
                     targetAccountId = savingsAccountId,
-                    amount = Money.fromDisplayValue(100.0, usd),
+                    amount = Money.fromDisplayValue("100", usd),
                 ),
             )
 
@@ -240,7 +240,7 @@ class TransactionRepositoryImplTest : DbTest() {
                     description = "Credit card payment",
                     sourceAccountId = checkingAccountId,
                     targetAccountId = creditCardAccountId,
-                    amount = Money.fromDisplayValue(50.0, usd),
+                    amount = Money.fromDisplayValue("50", usd),
                 ),
             )
 
@@ -252,7 +252,7 @@ class TransactionRepositoryImplTest : DbTest() {
                     description = "Transfer from savings",
                     sourceAccountId = savingsAccountId,
                     targetAccountId = checkingAccountId,
-                    amount = Money.fromDisplayValue(30.0, usd),
+                    amount = Money.fromDisplayValue("30", usd),
                 ),
             )
 
@@ -273,13 +273,13 @@ class TransactionRepositoryImplTest : DbTest() {
             assertNotNull(creditCardBalance)
 
             // Checking: -100 (out) - 50 (out) + 30 (in) = -120
-            assertEquals(Money.fromDisplayValue(-120.0, usd), checkingBalance.balance, "Checking balance should be -120")
+            assertEquals(Money.fromDisplayValue("-120", usd), checkingBalance.balance, "Checking balance should be -120")
 
             // Savings: +100 (in) - 30 (out) = +70
-            assertEquals(Money.fromDisplayValue(70.0, usd), savingsBalance.balance, "Savings balance should be +70")
+            assertEquals(Money.fromDisplayValue("70", usd), savingsBalance.balance, "Savings balance should be +70")
 
             // Credit Card: +50 (in) = +50
-            assertEquals(Money.fromDisplayValue(50.0, usd), creditCardBalance.balance, "Credit Card balance should be +50")
+            assertEquals(Money.fromDisplayValue("50", usd), creditCardBalance.balance, "Credit Card balance should be +50")
         }
 
     @Test
@@ -312,7 +312,7 @@ class TransactionRepositoryImplTest : DbTest() {
                     description = "Transfer USD to savings",
                     sourceAccountId = checkingAccountId,
                     targetAccountId = savingsAccountId,
-                    amount = Money.fromDisplayValue(100.0, usd),
+                    amount = Money.fromDisplayValue("100", usd),
                 ),
             )
 
@@ -324,7 +324,7 @@ class TransactionRepositoryImplTest : DbTest() {
                     description = "Transfer EUR to savings",
                     sourceAccountId = checkingAccountId,
                     targetAccountId = savingsAccountId,
-                    amount = Money.fromDisplayValue(50.0, eur),
+                    amount = Money.fromDisplayValue("50", eur),
                 ),
             )
 
@@ -348,10 +348,10 @@ class TransactionRepositoryImplTest : DbTest() {
             assertNotNull(savingsUsdBalance)
             assertNotNull(savingsEurBalance)
 
-            assertEquals(Money.fromDisplayValue(-100.0, usd), checkingUsdBalance.balance, "Checking USD balance should be -100")
-            assertEquals(Money.fromDisplayValue(-50.0, eur), checkingEurBalance.balance, "Checking EUR balance should be -50")
-            assertEquals(Money.fromDisplayValue(100.0, usd), savingsUsdBalance.balance, "Savings USD balance should be +100")
-            assertEquals(Money.fromDisplayValue(50.0, eur), savingsEurBalance.balance, "Savings EUR balance should be +50")
+            assertEquals(Money.fromDisplayValue("-100", usd), checkingUsdBalance.balance, "Checking USD balance should be -100")
+            assertEquals(Money.fromDisplayValue("-50", eur), checkingEurBalance.balance, "Checking EUR balance should be -50")
+            assertEquals(Money.fromDisplayValue("100", usd), savingsUsdBalance.balance, "Savings USD balance should be +100")
+            assertEquals(Money.fromDisplayValue("50", eur), savingsEurBalance.balance, "Savings EUR balance should be +50")
         }
 
     @Test
@@ -397,7 +397,7 @@ class TransactionRepositoryImplTest : DbTest() {
                     description = "Test transaction to delete",
                     sourceAccountId = sourceAccountId,
                     targetAccountId = targetAccountId,
-                    amount = Money.fromDisplayValue(100.0, currency),
+                    amount = Money.fromDisplayValue("100", currency),
                 )
             val createdTransfer = createTransfer(transfer)
 
