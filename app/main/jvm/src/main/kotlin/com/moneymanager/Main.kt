@@ -128,7 +128,6 @@ private fun MainWindow(onExit: () -> Unit) {
                     personRepository = dc.personRepository,
                     personAccountOwnershipRepository = dc.personAccountOwnershipRepository,
                     transactionRepository = dc.transactionRepository,
-                    transferAttributeRepository = dc.transferAttributeRepository,
                     transferSourceRepository = dc.transferSourceRepository,
                     transferSourceQueries = dc.transferSourceQueries,
                     entitySourceQueries = dc.entitySourceQueries,
