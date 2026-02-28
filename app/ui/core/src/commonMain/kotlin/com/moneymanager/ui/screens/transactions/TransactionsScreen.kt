@@ -57,7 +57,6 @@ import com.moneymanager.domain.repository.DeviceRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
-import com.moneymanager.domain.repository.TransferAttributeRepository
 import com.moneymanager.domain.repository.TransferSourceRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -79,7 +78,6 @@ fun AccountTransactionsScreen(
     attributeTypeRepository: AttributeTypeRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    transferAttributeRepository: TransferAttributeRepository,
     maintenanceService: DatabaseMaintenanceService,
     deviceId: DeviceId,
     onAccountIdChange: (AccountId) -> Unit = {},
@@ -910,7 +908,6 @@ fun AccountTransactionsScreen(
             attributeTypeRepository = attributeTypeRepository,
             personRepository = personRepository,
             personAccountOwnershipRepository = personAccountOwnershipRepository,
-            transferAttributeRepository = transferAttributeRepository,
             maintenanceService = maintenanceService,
             deviceId = deviceId,
             onDismiss = { transactionIdToEdit = null },

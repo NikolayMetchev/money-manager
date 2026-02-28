@@ -56,7 +56,6 @@ import com.moneymanager.domain.repository.DeviceRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
-import com.moneymanager.domain.repository.TransferAttributeRepository
 import com.moneymanager.domain.repository.TransferSourceRepository
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.CurrencyPicker
@@ -85,7 +84,6 @@ fun TransactionEditDialog(
     attributeTypeRepository: AttributeTypeRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    transferAttributeRepository: TransferAttributeRepository,
     maintenanceService: DatabaseMaintenanceService,
     deviceId: DeviceId,
     preSelectedSourceAccountId: AccountId? = null,
@@ -117,7 +115,7 @@ fun TransactionEditDialog(
     // Attribute state - in edit mode, initialize from transaction's embedded attributes
     // (already loaded by TransactionsScreen via getTransactionById which calls loadAttributesForTransfer)
     var existingAttributeTypes by remember { mutableStateOf<List<AttributeType>>(emptyList()) }
-    var originalAttributes by remember {
+    val originalAttributes by remember {
         mutableStateOf(transaction?.attributes.orEmpty())
     }
 
