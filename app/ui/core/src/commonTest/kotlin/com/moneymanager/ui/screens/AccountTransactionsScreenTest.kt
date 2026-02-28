@@ -46,7 +46,6 @@ import com.moneymanager.domain.model.SourceRecorder
 import com.moneymanager.domain.model.SourceType
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
-import com.moneymanager.domain.model.TransferAttribute
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.TransferSource
 import com.moneymanager.domain.model.csv.CsvImportId
@@ -57,7 +56,6 @@ import com.moneymanager.domain.repository.CsvImportSourceRecord
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.SampleGeneratorSourceRecord
 import com.moneymanager.domain.repository.TransactionRepository
-import com.moneymanager.domain.repository.TransferAttributeRepository
 import com.moneymanager.domain.repository.TransferSourceRepository
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
@@ -128,7 +126,6 @@ class AccountTransactionsScreenTest {
             val attributeTypeRepository = FakeAttributeTypeRepository()
             val personRepository = FakePersonRepository()
             val personAccountOwnershipRepository = FakePersonAccountOwnershipRepository()
-            val transferAttributeRepository = FakeTransferAttributeRepository()
             val maintenanceService = FakeDatabaseMaintenanceService()
 
             // When: Viewing from Checking account's perspective
@@ -149,7 +146,6 @@ class AccountTransactionsScreenTest {
                         attributeTypeRepository = attributeTypeRepository,
                         personRepository = personRepository,
                         personAccountOwnershipRepository = personAccountOwnershipRepository,
-                        transferAttributeRepository = transferAttributeRepository,
                         maintenanceService = maintenanceService,
                         deviceId = testDeviceId,
                         onAccountIdChange = { currentAccountId = it },
@@ -231,7 +227,6 @@ class AccountTransactionsScreenTest {
             val attributeTypeRepository = FakeAttributeTypeRepository()
             val personRepository = FakePersonRepository()
             val personAccountOwnershipRepository = FakePersonAccountOwnershipRepository()
-            val transferAttributeRepository = FakeTransferAttributeRepository()
             val maintenanceService = FakeDatabaseMaintenanceService()
 
             setContent {
@@ -251,7 +246,6 @@ class AccountTransactionsScreenTest {
                         attributeTypeRepository = attributeTypeRepository,
                         personRepository = personRepository,
                         personAccountOwnershipRepository = personAccountOwnershipRepository,
-                        transferAttributeRepository = transferAttributeRepository,
                         maintenanceService = maintenanceService,
                         deviceId = testDeviceId,
                         onAccountIdChange = { currentAccountId = it },
@@ -377,7 +371,6 @@ class AccountTransactionsScreenTest {
                                 attributeTypeRepository = repositories.attributeTypeRepository,
                                 personRepository = repositories.personRepository,
                                 personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                                transferAttributeRepository = repositories.transferAttributeRepository,
                                 maintenanceService = repositories.maintenanceService,
                                 deviceId = repositories.deviceId,
                                 onAccountIdChange = { currentAccountId = it },
@@ -586,7 +579,6 @@ class AccountTransactionsScreenTest {
                                 attributeTypeRepository = repositories.attributeTypeRepository,
                                 personRepository = repositories.personRepository,
                                 personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                                transferAttributeRepository = repositories.transferAttributeRepository,
                                 maintenanceService = repositories.maintenanceService,
                                 deviceId = repositories.deviceId,
                                 onAccountIdChange = { currentAccountId = it },
@@ -603,9 +595,9 @@ class AccountTransactionsScreenTest {
                 // Step 1: Open edit dialog
                 onNodeWithText("\u270F\uFE0F").performClick()
 
-                // Wait for edit dialog to appear and attributes to finish loading
+                // Wait for edit dialog to appear (attributes are initialized synchronously from Transfer)
                 waitUntilExactlyOneExists(hasText("Edit Transaction"), timeoutMillis = 10000)
-                waitUntilExactlyOneExists(hasText("+ Add Attribute"), timeoutMillis = 30000)
+                waitUntilExactlyOneExists(hasText("+ Add Attribute"), timeoutMillis = 10000)
                 onNodeWithText("+ Add Attribute").performClick()
 
                 // Wait for attribute fields to appear
@@ -768,7 +760,6 @@ class AccountTransactionsScreenTest {
                                 attributeTypeRepository = repositories.attributeTypeRepository,
                                 personRepository = repositories.personRepository,
                                 personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                                transferAttributeRepository = repositories.transferAttributeRepository,
                                 maintenanceService = repositories.maintenanceService,
                                 deviceId = repositories.deviceId,
                                 onAccountIdChange = { currentAccountId = it },
@@ -785,9 +776,9 @@ class AccountTransactionsScreenTest {
                 // Step 1: Open edit dialog
                 onNodeWithText("\u270F\uFE0F").performClick()
 
-                // Wait for edit dialog to appear and attributes to finish loading
+                // Wait for edit dialog to appear (attributes are initialized synchronously from Transfer)
                 waitUntilExactlyOneExists(hasText("Edit Transaction"), timeoutMillis = 10000)
-                waitUntilExactlyOneExists(hasText("+ Add Attribute"), timeoutMillis = 30000)
+                waitUntilExactlyOneExists(hasText("+ Add Attribute"), timeoutMillis = 10000)
 
                 // Step 2: Change the description (index 1 is the editable text field in the dialog)
                 waitUntilAtLeastOneExists(hasText("Original Description"), timeoutMillis = 10000)
@@ -1189,47 +1180,6 @@ class AccountTransactionsScreenTest {
         }
 
         fun getCreatedTypes(): List<AttributeType> = types.toList()
-    }
-
-    private class FakeTransferAttributeRepository : TransferAttributeRepository {
-        private val attributes = mutableListOf<TransferAttribute>()
-        private var nextId = 1L
-
-        override fun getByTransaction(transactionId: TransferId): Flow<List<TransferAttribute>> =
-            flowOf(attributes.filter { it.transactionId == transactionId })
-
-        override suspend fun insert(
-            transactionId: TransferId,
-            attributeTypeId: AttributeTypeId,
-            value: String,
-        ): Long {
-            val id = nextId++
-            attributes.add(
-                TransferAttribute(
-                    id = id,
-                    transactionId = transactionId,
-                    attributeType = AttributeType(id = attributeTypeId, name = "Type${attributeTypeId.id}"),
-                    value = value,
-                ),
-            )
-            return id
-        }
-
-        override suspend fun updateValue(
-            id: Long,
-            newValue: String,
-        ) {
-            val index = attributes.indexOfFirst { it.id == id }
-            if (index >= 0) {
-                attributes[index] = attributes[index].copy(value = newValue)
-            }
-        }
-
-        override suspend fun delete(id: Long) {
-            attributes.removeAll { it.id == id }
-        }
-
-        fun getInsertedAttributes(): List<TransferAttribute> = this.attributes.toList()
     }
 
     private class FakeDeviceRepository : com.moneymanager.domain.repository.DeviceRepository {

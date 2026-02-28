@@ -47,7 +47,6 @@ import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Transfer
-import com.moneymanager.domain.model.TransferAttribute
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
@@ -57,7 +56,6 @@ import com.moneymanager.domain.repository.DeviceRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
-import com.moneymanager.domain.repository.TransferAttributeRepository
 import com.moneymanager.domain.repository.TransferSourceRepository
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.CurrencyPicker
@@ -86,7 +84,6 @@ fun TransactionEditDialog(
     attributeTypeRepository: AttributeTypeRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    transferAttributeRepository: TransferAttributeRepository,
     maintenanceService: DatabaseMaintenanceService,
     deviceId: DeviceId,
     preSelectedSourceAccountId: AccountId? = null,
@@ -115,34 +112,30 @@ fun TransactionEditDialog(
 
     val scope = rememberSchemaAwareCoroutineScope()
 
-    // Attribute state
+    // Attribute state - in edit mode, initialize from transaction's embedded attributes
+    // (already loaded by TransactionsScreen via getTransactionById which calls loadAttributesForTransfer)
     var existingAttributeTypes by remember { mutableStateOf<List<AttributeType>>(emptyList()) }
-    var originalAttributes by remember { mutableStateOf<List<TransferAttribute>>(emptyList()) }
-    var isLoadingAttributes by remember { mutableStateOf(isEditMode) }
+    val originalAttributes by remember {
+        mutableStateOf(transaction?.attributes.orEmpty())
+    }
 
     // EditableAttribute represents the current state of each attribute in the UI
     // key: a stable identifier (original attribute id or a negative temp id for new ones)
     // value: Pair(attributeTypeName, value)
-    var editableAttributes by remember { mutableStateOf<Map<Long, Pair<String, String>>>(emptyMap()) }
+    var editableAttributes by remember {
+        mutableStateOf(
+            transaction?.attributes.orEmpty().associate { attr ->
+                attr.id to Pair(attr.attributeType.name, attr.value)
+            },
+        )
+    }
     var nextTempId by remember { mutableStateOf(-1L) }
 
-    // Load existing attribute types and attributes for this transaction
+    // Load existing attribute types for autocomplete
     LaunchedEffect(Unit) {
         attributeTypeRepository.getAll().collect { types ->
             existingAttributeTypes = types
         }
-    }
-    LaunchedEffect(transaction?.id) {
-        if (isEditMode && transaction != null) {
-            transferAttributeRepository.getByTransaction(transaction.id).first().let { attrs ->
-                originalAttributes = attrs
-                editableAttributes =
-                    attrs.associate { attr ->
-                        attr.id to Pair(attr.attributeType.name, attr.value)
-                    }
-            }
-        }
-        isLoadingAttributes = false
     }
 
     // Helper to check if attributes have changed
@@ -332,82 +325,70 @@ fun TransactionEditDialog(
                 )
 
                 // Attributes Section
-                if (isLoadingAttributes) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center,
-                    ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
-                            strokeWidth = 2.dp,
-                        )
-                    }
-                } else {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Text(
-                            text = "Attributes",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = "Attributes",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
 
-                        // Display editable attributes
-                        editableAttributes.forEach { (id, pair) ->
-                            val (typeName, value) = pair
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
+                    // Display editable attributes
+                    editableAttributes.forEach { (id, pair) ->
+                        val (typeName, value) = pair
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            // Attribute type selector
+                            AttributeTypeField(
+                                value = typeName,
+                                onValueChange = { newTypeName ->
+                                    editableAttributes = editableAttributes + (id to Pair(newTypeName, value))
+                                },
+                                existingTypes = existingAttributeTypes,
+                                enabled = !isSaving,
+                                modifier = Modifier.weight(0.4f),
+                            )
+                            // Attribute value field
+                            OutlinedTextField(
+                                value = value,
+                                onValueChange = { newValue ->
+                                    editableAttributes = editableAttributes + (id to Pair(typeName, newValue))
+                                },
+                                label = { Text("Value") },
+                                modifier = Modifier.weight(0.5f),
+                                singleLine = true,
+                                enabled = !isSaving,
+                            )
+                            // Delete button
+                            IconButton(
+                                onClick = {
+                                    editableAttributes = editableAttributes - id
+                                },
+                                enabled = !isSaving,
                             ) {
-                                // Attribute type selector
-                                AttributeTypeField(
-                                    value = typeName,
-                                    onValueChange = { newTypeName ->
-                                        editableAttributes = editableAttributes + (id to Pair(newTypeName, value))
-                                    },
-                                    existingTypes = existingAttributeTypes,
-                                    enabled = !isSaving,
-                                    modifier = Modifier.weight(0.4f),
+                                Text(
+                                    text = "X",
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodyLarge,
                                 )
-                                // Attribute value field
-                                OutlinedTextField(
-                                    value = value,
-                                    onValueChange = { newValue ->
-                                        editableAttributes = editableAttributes + (id to Pair(typeName, newValue))
-                                    },
-                                    label = { Text("Value") },
-                                    modifier = Modifier.weight(0.5f),
-                                    singleLine = true,
-                                    enabled = !isSaving,
-                                )
-                                // Delete button
-                                IconButton(
-                                    onClick = {
-                                        editableAttributes = editableAttributes - id
-                                    },
-                                    enabled = !isSaving,
-                                ) {
-                                    Text(
-                                        text = "X",
-                                        color = MaterialTheme.colorScheme.error,
-                                        style = MaterialTheme.typography.bodyLarge,
-                                    )
-                                }
                             }
                         }
+                    }
 
-                        // Add new attribute button
-                        TextButton(
-                            onClick = {
-                                editableAttributes = editableAttributes + (nextTempId to Pair("", ""))
-                                nextTempId--
-                            },
-                            enabled = !isSaving,
-                        ) {
-                            Text("+ Add Attribute")
-                        }
+                    // Add new attribute button
+                    TextButton(
+                        onClick = {
+                            editableAttributes = editableAttributes + (nextTempId to Pair("", ""))
+                            nextTempId--
+                        },
+                        enabled = !isSaving,
+                    ) {
+                        Text("+ Add Attribute")
                     }
                 }
 

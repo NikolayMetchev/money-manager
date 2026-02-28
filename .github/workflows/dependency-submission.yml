@@ -1,0 +1,27 @@
+name: Gradle Dependency Submission
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write  # Required to submit dependency graph
+
+jobs:
+  dependency-submission:
+    name: Submit Dependency Graph
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Gradle environment
+        uses: ./.github/actions/gradle-setup
+
+      - name: Generate and submit dependency graph
+        uses: gradle/actions/dependency-submission@v4
