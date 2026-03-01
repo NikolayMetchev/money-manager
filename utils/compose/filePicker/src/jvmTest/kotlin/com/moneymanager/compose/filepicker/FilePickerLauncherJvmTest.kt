@@ -1,3 +1,5 @@
+@file:OptIn(kotlin.time.ExperimentalTime::class)
+
 package com.moneymanager.compose.filepicker
 
 import java.io.File
@@ -167,5 +169,16 @@ class FilePickerLauncherJvmTest {
 
         assertNotNull(result)
         assertEquals(content, result.content)
+    }
+
+    @Test
+    fun `readFileAsResult populates lastModified`() {
+        val file = createTempFile("timestamped", "content")
+
+        val result = readFileAsResult(file)
+
+        assertNotNull(result)
+        val lastModified = assertNotNull(result.lastModified)
+        assertTrue(lastModified.toEpochMilliseconds() > 0)
     }
 }

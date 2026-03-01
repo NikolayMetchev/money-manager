@@ -1,3 +1,5 @@
+@file:OptIn(kotlin.time.ExperimentalTime::class)
+
 package com.moneymanager.domain.repository
 
 import com.moneymanager.domain.model.TransferId
@@ -5,6 +7,7 @@ import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csv.CsvRow
 import kotlinx.coroutines.flow.Flow
+import kotlin.time.Instant
 
 interface CsvImportRepository {
     /**
@@ -20,6 +23,8 @@ interface CsvImportRepository {
         fileName: String,
         headers: List<String>,
         rows: List<List<String>>,
+        fileChecksum: String? = null,
+        fileLastModified: Instant? = null,
     ): CsvImportId
 
     /**
@@ -115,4 +120,12 @@ interface CsvImportRepository {
         id: CsvImportId,
         rowIndex: Long,
     )
+
+    /**
+     * Finds imports that match the given file checksum.
+     *
+     * @param checksum The SHA-256 checksum to search for
+     * @return List of matching imports, ordered by timestamp descending
+     */
+    suspend fun findImportsByChecksum(checksum: String): List<CsvImport>
 }
