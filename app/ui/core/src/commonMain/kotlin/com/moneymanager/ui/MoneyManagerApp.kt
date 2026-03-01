@@ -68,6 +68,7 @@ import com.moneymanager.ui.screens.csvstrategy.CsvStrategiesScreen
 import com.moneymanager.ui.screens.transactions.AccountTransactionsScreen
 import com.moneymanager.ui.screens.transactions.TransactionAuditScreen
 import com.moneymanager.ui.screens.transactions.TransactionEditDialog
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -106,7 +107,9 @@ fun MoneyManagerApp(
         var currentlyViewedCurrencyId by remember { mutableStateOf<CurrencyId?>(null) }
         var transactionRefreshTrigger by remember { mutableStateOf(0) }
 
+        var defaultCurrencyLoaded by remember { mutableStateOf(false) }
         val defaultCurrencyId by settingsRepository.getDefaultCurrencyId()
+            .onEach { defaultCurrencyLoaded = true }
             .collectAsStateWithSchemaErrorHandling(initial = null)
 
         // Use schema-error-aware collection for flows that may fail on old databases
@@ -483,7 +486,7 @@ fun MoneyManagerApp(
                 }
             }
 
-            if (defaultCurrencyId == null) {
+            if (defaultCurrencyLoaded && defaultCurrencyId == null) {
                 DefaultCurrencyInitDialog(
                     currencyRepository = currencyRepository,
                     settingsRepository = settingsRepository,
