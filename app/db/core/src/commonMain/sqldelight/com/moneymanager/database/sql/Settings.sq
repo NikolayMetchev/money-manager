@@ -1,0 +1,10 @@
+CREATE TABLE settings (
+    default_currency_id INTEGER NOT NULL REFERENCES currency(id)
+);
+
+selectDefaultCurrencyId:
+SELECT default_currency_id FROM settings LIMIT 1;
+
+upsertDefaultCurrency:
+INSERT OR REPLACE INTO settings(rowid, default_currency_id) VALUES (1, ?);
+

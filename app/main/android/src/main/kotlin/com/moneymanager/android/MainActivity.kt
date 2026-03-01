@@ -131,6 +131,7 @@ private fun MainContent(
                 maintenanceService = dc.maintenanceService,
                 personRepository = dc.personRepository,
                 personAccountOwnershipRepository = dc.personAccountOwnershipRepository,
+                settingsRepository = dc.settingsRepository,
                 transactionRepository = dc.transactionRepository,
                 transferSourceRepository = dc.transferSourceRepository,
                 transferSourceQueries = dc.transferSourceQueries,

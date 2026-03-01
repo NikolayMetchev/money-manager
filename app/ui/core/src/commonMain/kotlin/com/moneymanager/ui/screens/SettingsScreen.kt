@@ -44,7 +44,10 @@ import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
+import com.moneymanager.domain.repository.SettingsRepository
 import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.ui.components.CurrencyPicker
+import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.util.GenerationProgress
 import com.moneymanager.ui.util.generateSampleData
@@ -113,6 +116,7 @@ fun SettingsScreen(
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     attributeTypeRepository: AttributeTypeRepository,
     transactionRepository: TransactionRepository,
+    settingsRepository: SettingsRepository,
     maintenanceService: DatabaseMaintenanceService,
     transferSourceQueries: TransferSourceQueries,
     entitySourceQueries: EntitySourceQueries,
@@ -141,6 +145,39 @@ fun SettingsScreen(
             text = "Settings",
             style = MaterialTheme.typography.headlineMedium,
         )
+
+        // Preferences Section
+        val defaultCurrencyId by settingsRepository.getDefaultCurrencyId()
+            .collectAsStateWithSchemaErrorHandling(initial = null)
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = "Preferences",
+                    style = MaterialTheme.typography.titleMedium,
+                )
+
+                CurrencyPicker(
+                    selectedCurrencyId = defaultCurrencyId,
+                    onCurrencySelected = { currencyId ->
+                        scope.launch {
+                            settingsRepository.setDefaultCurrencyId(currencyId)
+                        }
+                    },
+                    label = "Default Currency",
+                    currencyRepository = currencyRepository,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
 
         // Maintenance Section
         Card(
