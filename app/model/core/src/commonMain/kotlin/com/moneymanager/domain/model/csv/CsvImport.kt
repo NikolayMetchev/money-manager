@@ -25,4 +25,6 @@ data class CsvImport(
     val columnCount: Int,
     val columns: List<CsvColumn>,
     val deviceInfo: DeviceInfo,
+    val fileChecksum: String? = null,
+    val fileLastModified: Instant? = null,
 )

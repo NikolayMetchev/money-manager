@@ -37,6 +37,8 @@ class CsvImportRepositoryImpl(
         fileName: String,
         headers: List<String>,
         rows: List<List<String>>,
+        fileChecksum: String?,
+        fileLastModified: Instant?,
     ): CsvImportId =
         withContext(coroutineContext) {
             val importId = CsvImportId(Uuid.random())
@@ -59,6 +61,8 @@ class CsvImportRepositoryImpl(
                 row_count = rows.size.toLong(),
                 column_count = columnCount.toLong(),
                 device_id = deviceId.id,
+                file_checksum = fileChecksum,
+                file_last_modified = fileLastModified?.toEpochMilliseconds(),
             )
 
             // Insert column metadata
@@ -108,6 +112,8 @@ class CsvImportRepositoryImpl(
                                 deviceMake = import.device_make,
                                 deviceModel = import.device_model,
                             ),
+                        fileChecksum = import.file_checksum,
+                        fileLastModified = import.file_last_modified?.let { Instant.fromEpochMilliseconds(it) },
                     )
                 }
             }
@@ -151,6 +157,8 @@ class CsvImportRepositoryImpl(
                             deviceMake = it.device_make,
                             deviceModel = it.device_model,
                         ),
+                    fileChecksum = it.file_checksum,
+                    fileLastModified = it.file_last_modified?.let { ms -> Instant.fromEpochMilliseconds(ms) },
                 )
             }
         }
@@ -255,5 +263,41 @@ class CsvImportRepositoryImpl(
                 csv_import_id = id.id.toString(),
                 row_index = rowIndex,
             )
+        }
+
+    override suspend fun findImportsByChecksum(checksum: String): List<CsvImport> =
+        withContext(coroutineContext) {
+            csvImportQueries.selectImportsByChecksum(checksum).executeAsList().map { import ->
+                val columns =
+                    csvImportQueries.selectColumnsByImportId(import.id)
+                        .executeAsList()
+                        .map { col ->
+                            CsvColumn(
+                                id = CsvColumnId(Uuid.parse(col.id)),
+                                columnIndex = col.column_index.toInt(),
+                                originalName = col.original_name,
+                            )
+                        }
+
+                CsvImport(
+                    id = CsvImportId(Uuid.parse(import.id)),
+                    tableName = import.table_name,
+                    originalFileName = import.original_file_name,
+                    importTimestamp = Instant.fromEpochMilliseconds(import.import_timestamp),
+                    rowCount = import.row_count.toInt(),
+                    columnCount = import.column_count.toInt(),
+                    columns = columns,
+                    deviceInfo =
+                        DeviceRepositoryImpl.createDeviceInfo(
+                            platformName = import.platform_name,
+                            osName = import.os_name,
+                            machineName = import.machine_name,
+                            deviceMake = import.device_make,
+                            deviceModel = import.device_model,
+                        ),
+                    fileChecksum = import.file_checksum,
+                    fileLastModified = import.file_last_modified?.let { Instant.fromEpochMilliseconds(it) },
+                )
+            }
         }
 }
