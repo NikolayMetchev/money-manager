@@ -7,10 +7,13 @@ CREATE TABLE csv_import_metadata (
     row_count INTEGER NOT NULL,
     column_count INTEGER NOT NULL,
     device_id INTEGER NOT NULL,
+    file_checksum TEXT,
+    file_last_modified INTEGER,
     FOREIGN KEY (device_id) REFERENCES device(id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_csv_import_device ON csv_import_metadata(device_id);
+CREATE INDEX IF NOT EXISTS idx_csv_import_checksum ON csv_import_metadata(file_checksum);
 
 -- Column definitions for each imported CSV
 CREATE TABLE csv_column_metadata (
@@ -33,6 +36,8 @@ SELECT
     csv_import_metadata.row_count,
     csv_import_metadata.column_count,
     csv_import_metadata.device_id,
+    csv_import_metadata.file_checksum,
+    csv_import_metadata.file_last_modified,
     device_view.platform_name,
     device_view.os_name,
     device_view.machine_name,
@@ -51,6 +56,8 @@ SELECT
     csv_import_metadata.row_count,
     csv_import_metadata.column_count,
     csv_import_metadata.device_id,
+    csv_import_metadata.file_checksum,
+    csv_import_metadata.file_last_modified,
     device_view.platform_name,
     device_view.os_name,
     device_view.machine_name,
@@ -63,9 +70,30 @@ WHERE csv_import_metadata.id = ?;
 selectImportByTableName:
 SELECT * FROM csv_import_metadata WHERE table_name = ?;
 
+selectImportsByChecksum:
+SELECT
+    csv_import_metadata.id,
+    csv_import_metadata.table_name,
+    csv_import_metadata.original_file_name,
+    csv_import_metadata.import_timestamp,
+    csv_import_metadata.row_count,
+    csv_import_metadata.column_count,
+    csv_import_metadata.device_id,
+    csv_import_metadata.file_checksum,
+    csv_import_metadata.file_last_modified,
+    device_view.platform_name,
+    device_view.os_name,
+    device_view.machine_name,
+    device_view.device_make,
+    device_view.device_model
+FROM csv_import_metadata
+JOIN device_view ON csv_import_metadata.device_id = device_view.id
+WHERE csv_import_metadata.file_checksum = ?
+ORDER BY csv_import_metadata.import_timestamp DESC;
+
 insertImport:
-INSERT INTO csv_import_metadata (id, table_name, original_file_name, import_timestamp, row_count, column_count, device_id)
-VALUES (?, ?, ?, ?, ?, ?, ?);
+INSERT INTO csv_import_metadata (id, table_name, original_file_name, import_timestamp, row_count, column_count, device_id, file_checksum, file_last_modified)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 deleteImport:
 DELETE FROM csv_import_metadata WHERE id = ?;
