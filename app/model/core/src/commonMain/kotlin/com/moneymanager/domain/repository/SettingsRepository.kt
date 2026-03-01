@@ -7,6 +7,4 @@ interface SettingsRepository {
     fun getDefaultCurrencyId(): Flow<CurrencyId?>
 
     suspend fun setDefaultCurrencyId(currencyId: CurrencyId)
-
-    suspend fun clearDefaultCurrencyId()
 }

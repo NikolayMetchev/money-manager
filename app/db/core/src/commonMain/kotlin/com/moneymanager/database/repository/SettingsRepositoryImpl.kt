@@ -25,9 +25,4 @@ class SettingsRepositoryImpl(
         withContext(Dispatchers.Default) {
             queries.upsertDefaultCurrency(currencyId.id)
         }
-
-    override suspend fun clearDefaultCurrencyId(): Unit =
-        withContext(Dispatchers.Default) {
-            queries.clearDefaultCurrency()
-        }
 }

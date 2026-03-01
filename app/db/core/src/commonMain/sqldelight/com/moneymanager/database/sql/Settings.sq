@@ -8,5 +8,3 @@ SELECT default_currency_id FROM settings LIMIT 1;
 upsertDefaultCurrency:
 INSERT OR REPLACE INTO settings(rowid, default_currency_id) VALUES (1, ?);
 
-clearDefaultCurrency:
-DELETE FROM settings;

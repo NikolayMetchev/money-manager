@@ -42,17 +42,4 @@ class SettingsRepositoryImplTest : DbTest() {
             repositories.settingsRepository.setDefaultCurrencyId(usdCurrency.id)
             assertEquals(usdCurrency.id, repositories.settingsRepository.getDefaultCurrencyId().first())
         }
-
-    @Test
-    fun `clear default currency returns null`() =
-        runTest {
-            val currencies = repositories.currencyRepository.getAllCurrencies().first()
-            val eurCurrency = currencies.first { it.code == "EUR" }
-
-            repositories.settingsRepository.setDefaultCurrencyId(eurCurrency.id)
-            assertNotNull(repositories.settingsRepository.getDefaultCurrencyId().first())
-
-            repositories.settingsRepository.clearDefaultCurrencyId()
-            assertNull(repositories.settingsRepository.getDefaultCurrencyId().first())
-        }
 }

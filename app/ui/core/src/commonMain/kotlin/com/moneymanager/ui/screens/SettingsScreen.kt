@@ -176,19 +176,6 @@ fun SettingsScreen(
                     currencyRepository = currencyRepository,
                     modifier = Modifier.fillMaxWidth(),
                 )
-
-                if (defaultCurrencyId != null) {
-                    OutlinedButton(
-                        onClick = {
-                            scope.launch {
-                                settingsRepository.clearDefaultCurrencyId()
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text("Clear Default Currency")
-                    }
-                }
             }
         }
 
