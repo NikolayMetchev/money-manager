@@ -21,5 +21,12 @@ actual class Currency actual constructor(actual val code: String) {
             java.util.Currency.getAvailableCurrencies()
                 .map { Currency(it.currencyCode) }
                 .sortedBy { it.code }
+
+        actual fun getDefaultCurrencyCode(): String? =
+            try {
+                java.util.Currency.getInstance(java.util.Locale.getDefault())?.currencyCode
+            } catch (_: IllegalArgumentException) {
+                null
+            }
     }
 }

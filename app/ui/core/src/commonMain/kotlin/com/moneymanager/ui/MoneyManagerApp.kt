@@ -42,8 +42,10 @@ import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.DeviceRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
+import com.moneymanager.domain.repository.SettingsRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.domain.repository.TransferSourceRepository
+import com.moneymanager.ui.components.DefaultCurrencyInitDialog
 import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -86,6 +88,7 @@ fun MoneyManagerApp(
     maintenanceService: DatabaseMaintenanceService,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
+    settingsRepository: SettingsRepository,
     transactionRepository: TransactionRepository,
     transferSourceRepository: TransferSourceRepository,
     transferSourceQueries: TransferSourceQueries,
@@ -102,6 +105,9 @@ fun MoneyManagerApp(
         var preSelectedCurrencyId by remember { mutableStateOf<CurrencyId?>(null) }
         var currentlyViewedCurrencyId by remember { mutableStateOf<CurrencyId?>(null) }
         var transactionRefreshTrigger by remember { mutableStateOf(0) }
+
+        val defaultCurrencyId by settingsRepository.getDefaultCurrencyId()
+            .collectAsStateWithSchemaErrorHandling(initial = null)
 
         // Use schema-error-aware collection for flows that may fail on old databases
         val accounts by accountRepository.getAllAccounts()
@@ -197,7 +203,7 @@ fun MoneyManagerApp(
                         FloatingActionButton(
                             onClick = {
                                 preSelectedAccountId = currentlyViewedAccountId
-                                preSelectedCurrencyId = currentlyViewedCurrencyId
+                                preSelectedCurrencyId = currentlyViewedCurrencyId ?: defaultCurrencyId
                                 showTransactionDialog = true
                             },
                         ) {
@@ -294,6 +300,7 @@ fun MoneyManagerApp(
                                 personAccountOwnershipRepository = personAccountOwnershipRepository,
                                 attributeTypeRepository = attributeTypeRepository,
                                 transactionRepository = transactionRepository,
+                                settingsRepository = settingsRepository,
                                 maintenanceService = maintenanceService,
                                 transferSourceQueries = transferSourceQueries,
                                 entitySourceQueries = entitySourceQueries,
@@ -474,6 +481,13 @@ fun MoneyManagerApp(
                         }
                     }
                 }
+            }
+
+            if (defaultCurrencyId == null) {
+                DefaultCurrencyInitDialog(
+                    currencyRepository = currencyRepository,
+                    settingsRepository = settingsRepository,
+                )
             }
 
             if (showTransactionDialog) {

@@ -18,6 +18,7 @@ import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.DeviceRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
+import com.moneymanager.domain.repository.SettingsRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.domain.repository.TransferAttributeRepository
 import com.moneymanager.domain.repository.TransferSourceRepository
@@ -43,6 +44,7 @@ interface DatabaseComponent {
     val maintenanceService: DatabaseMaintenanceService
     val personAccountOwnershipRepository: PersonAccountOwnershipRepository
     val personRepository: PersonRepository
+    val settingsRepository: SettingsRepository
     val transactionRepository: TransactionRepository
     val transferAttributeRepository: TransferAttributeRepository
     val transferSourceRepository: TransferSourceRepository

@@ -101,6 +101,7 @@ class MoneyManagerDatabaseWrapper(private val driver: SqlDriver) : MoneyManagerD
             "transfer_attribute",
             "_import_batch",
             "_creation_mode",
+            "settings",
         )
 
     /**

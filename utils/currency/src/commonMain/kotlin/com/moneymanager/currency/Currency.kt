@@ -31,5 +31,11 @@ expect class Currency(code: String) {
          * @return List of all available currencies sorted by code
          */
         fun getAllCurrencies(): List<Currency>
+
+        /**
+         * Returns the ISO 4217 currency code for the device's default locale,
+         * or null if unavailable.
+         */
+        fun getDefaultCurrencyCode(): String?
     }
 }

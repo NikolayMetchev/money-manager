@@ -15,6 +15,7 @@ import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.ui.MoneyManagerApp
 import com.moneymanager.ui.components.DatabaseSchemaErrorDialog
 import com.moneymanager.ui.error.GlobalSchemaErrorState
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 private sealed class TestDatabaseState {
@@ -47,6 +48,11 @@ fun TestMoneyManagerApp(
             val component = DatabaseComponent.create(database)
             // Force initialization of all lazy properties to detect schema errors early
             component.deviceId
+            // Set a default currency to avoid the init dialog blocking E2E tests
+            val currencies = component.currencyRepository.getAllCurrencies().first()
+            if (currencies.isNotEmpty()) {
+                component.settingsRepository.setDefaultCurrencyId(currencies.first().id)
+            }
             databaseState = TestDatabaseState.Loaded(location, component)
         } catch (expected: Exception) {
             databaseState = TestDatabaseState.Error(location, expected)
@@ -84,6 +90,7 @@ fun TestMoneyManagerApp(
                 maintenanceService = dc.maintenanceService,
                 personRepository = dc.personRepository,
                 personAccountOwnershipRepository = dc.personAccountOwnershipRepository,
+                settingsRepository = dc.settingsRepository,
                 transactionRepository = dc.transactionRepository,
                 transferSourceRepository = dc.transferSourceRepository,
                 transferSourceQueries = dc.transferSourceQueries,
