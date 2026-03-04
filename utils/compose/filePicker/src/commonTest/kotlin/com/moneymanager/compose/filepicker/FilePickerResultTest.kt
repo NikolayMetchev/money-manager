@@ -1,8 +1,12 @@
+@file:OptIn(kotlin.time.ExperimentalTime::class)
+
 package com.moneymanager.compose.filepicker
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
+import kotlin.test.assertNull
+import kotlin.time.Instant
 
 class FilePickerResultTest {
     @Test
@@ -66,5 +70,31 @@ class FilePickerResultTest {
 
         assertEquals("test.csv", fileName)
         assertEquals("data", content)
+    }
+
+    @Test
+    fun `FilePickerResult lastModified defaults to null`() {
+        val result = FilePickerResult(fileName = "test.csv", content = "data")
+
+        assertNull(result.lastModified)
+    }
+
+    @Test
+    fun `FilePickerResult stores lastModified when provided`() {
+        val timestamp = Instant.fromEpochMilliseconds(1700000000000L)
+        val result = FilePickerResult(fileName = "test.csv", content = "data", lastModified = timestamp)
+
+        assertEquals(timestamp, result.lastModified)
+    }
+
+    @Test
+    fun `FilePickerResult equality considers lastModified`() {
+        val timestamp = Instant.fromEpochMilliseconds(1700000000000L)
+        val result1 = FilePickerResult(fileName = "test.csv", content = "data", lastModified = timestamp)
+        val result2 = FilePickerResult(fileName = "test.csv", content = "data", lastModified = timestamp)
+        val result3 = FilePickerResult(fileName = "test.csv", content = "data", lastModified = null)
+
+        assertEquals(result1, result2)
+        assertNotEquals(result1, result3)
     }
 }
