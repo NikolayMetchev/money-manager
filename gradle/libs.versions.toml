@@ -31,7 +31,7 @@ metro = "0.11.2"
 schemaspy = "7.0.2"
 slf4j = "2.0.17"
 sort-dependencies = "0.16"
-sqldelight = "2.2.1"
+sqldelight = "2.3.2"
 turbine = "1.2.1"
 
 [libraries]
