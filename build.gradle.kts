@@ -49,13 +49,33 @@ tasks.register("lintFormat") {
 dependencyAnalysis {
     issues {
         all {
-            onUnusedDependencies {
-                exclude("org.jetbrains.kotlin:kotlin-test")
-                exclude("org.jetbrains.compose.desktop:desktop-jvm-windows-x64")
-                exclude("org.jetbrains.compose.hot-reload:hot-reload-runtime-api")
-            }
             onAny {
                 severity("fail")
+            }
+        }
+
+        project(":app:di:core") {
+            ignoreSourceSet("commonTest")
+        }
+
+        project(":test:app:db") {
+            ignoreSourceSet("commonTest")
+        }
+
+        project(":utils:compose:scrollbar") {
+            ignoreSourceSet("commonTest", "jvmDev")
+        }
+
+        project(":utils:compose:filePicker") {
+            ignoreSourceSet("jvmDev")
+        }
+
+        project(":app:ui:core") {
+            ignoreSourceSet("jvmDev")
+            sourceSet("commonTest") {
+                onUnusedDependencies {
+                    exclude("org.jetbrains.kotlin:kotlin-test")
+                }
             }
         }
     }

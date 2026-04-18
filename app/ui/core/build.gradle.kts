@@ -59,9 +59,6 @@ kotlin {
                 api(projects.app.db.core)
                 api(projects.app.model.core)
 
-                // Material (v2) for jvm-specific dialogs
-                implementation(compose.material)
-                implementation(compose.uiTooling)
                 implementation(libs.compose.animation.core.desktop)
                 implementation(libs.compose.animation.desktop)
                 implementation(libs.compose.components.resources.desktop)
