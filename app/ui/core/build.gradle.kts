@@ -72,6 +72,8 @@ kotlin {
         }
         val jvmTest by getting {
             dependencies {
+                // Skiko native libraries for desktop UI tests
+                implementation(compose.desktop.currentOs)
                 implementation(kotlin("test"))
                 implementation(libs.androidx.compose.runtime.desktop)
                 implementation(libs.compose.ui.test.desktop)
