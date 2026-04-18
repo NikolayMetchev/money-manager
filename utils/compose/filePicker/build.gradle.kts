@@ -7,27 +7,28 @@ kotlin {
     sourceSets {
         commonMain {
             dependencies {
-                implementation(compose.runtime)
             }
         }
 
         jvmMain {
             dependencies {
-                implementation(compose.desktop.currentOs)
+                api(libs.androidx.compose.runtime.desktop)
+                implementation(libs.kotlinx.coroutines.core)
             }
         }
 
         androidMain {
             dependencies {
-                implementation(libs.androidx.activity.compose)
+                api(libs.androidx.compose.runtime)
+
+                implementation(libs.androidx.activity)
+                implementation(libs.androidx.compose.ui)
             }
         }
 
         val androidDeviceTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation(libs.androidx.test.core)
-                implementation(libs.androidx.test.runner)
             }
         }
     }

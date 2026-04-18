@@ -7,8 +7,6 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                api(kotlin("test-annotations-common"))
-                api(kotlin("test-common"))
                 api(projects.app.db.core)
                 api(projects.app.di.core)
                 api(projects.app.model.core)
@@ -19,16 +17,20 @@ kotlin {
         val jvmMain by getting {
             dependencies {
                 api(kotlin("test-junit"))
+                api(projects.app.db.core)
+                api(projects.app.di.core)
+                api(projects.app.model.core)
 
-                implementation(libs.sqldelight.sqlite.driver)
+                implementation(libs.kotlinx.coroutines.core)
             }
         }
         val androidMain by getting {
             dependencies {
-                api(kotlin("test-junit"))
-                api(libs.androidx.test.core)
+                implementation(libs.androidx.test.core)
+                implementation(libs.androidx.test.monitor)
+                implementation(libs.kotlinx.coroutines.core)
 
-                implementation(libs.sqldelight.android.driver)
+                api(kotlin("test-junit"))
             }
         }
     }

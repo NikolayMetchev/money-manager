@@ -10,14 +10,14 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 api(projects.app.model.core)
+                api(libs.kotlinx.coroutines.core)
+                api(libs.mappie.api)
+                api(projects.utils.currency)
 
-                implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.datetime)
                 implementation(libs.kotlinx.serialization.json)
                 implementation(libs.sqldelight.coroutines.extensions)
-                implementation(projects.app.model.core)
                 implementation(projects.utils.bigdecimal)
-                implementation(projects.utils.currency)
             }
         }
 
@@ -31,12 +31,23 @@ kotlin {
 
         val jvmMain by getting {
             dependencies {
+                api(projects.utils.currency)
+
+                implementation(libs.kotlinx.serialization.core)
                 implementation(libs.sqldelight.sqlite.driver)
+            }
+        }
+
+        val jvmTest by getting {
+            dependencies {
+                implementation(projects.app.di.core)
             }
         }
 
         val androidMain by getting {
             dependencies {
+                implementation(libs.androidx.sqlite)
+                implementation(libs.kotlinx.serialization.core)
                 implementation(libs.sqldelight.android.driver)
             }
         }
@@ -47,9 +58,8 @@ kotlin {
             // file since androidDeviceTest provides its own implementation
             dependencies {
                 implementation(kotlin("test"))
-                implementation(libs.androidx.test.core)
-                implementation(libs.androidx.test.runner)
                 implementation(libs.kotlinx.coroutines.test)
+                implementation(projects.app.di.core)
                 implementation(projects.test.app.db)
             }
             // Include repository tests from commonTest (not the expect declarations file)

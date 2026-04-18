@@ -8,15 +8,22 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation(libs.metro.runtime)
-                implementation(projects.app.db.core)
-                implementation(projects.app.model.core)
+                api(projects.app.db.core)
+                api(projects.app.model.core)
+            }
+        }
+
+        val jvmMain by getting {
+            dependencies {
+                api(libs.metro.runtime)
+                api(projects.app.db.core)
+                api(projects.app.model.core)
             }
         }
 
         val androidMain by getting {
             dependencies {
-                implementation(libs.androidx.test.core)
+                api(libs.metro.runtime)
             }
         }
     }
