@@ -6,7 +6,8 @@ plugins {
 kotlin {
     sourceSets {
         commonMain {
-            dependencies {}
+            dependencies {
+            }
         }
 
         commonTest {
@@ -35,9 +36,9 @@ kotlin {
 
         val androidDeviceTest by getting {
             dependencies {
-                runtimeOnly(libs.kotlinx.coroutines.android)
-                runtimeOnly(libs.androidx.test.runner)
-            }
+            runtimeOnly(libs.androidx.test.runner)
+            runtimeOnly(libs.kotlinx.coroutines.android)
+        }
         }
     }
 }
