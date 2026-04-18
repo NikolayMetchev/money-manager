@@ -64,6 +64,7 @@ kotlin {
                 implementation(libs.kotlinx.coroutines.test)
                 implementation(projects.app.di.core)
                 implementation(projects.test.app.db)
+                runtimeOnly(libs.androidx.test.runner)
             }
             // Include repository tests from commonTest (not the expect declarations file)
             kotlin.srcDir("src/commonTest/kotlin/com/moneymanager/database/repository")
