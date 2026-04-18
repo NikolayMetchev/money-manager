@@ -1,4 +1,5 @@
 @file:Suppress("UnusedPrivateProperty") // False positive: mimeTypes and onResult are used
+@file:OptIn(kotlin.time.ExperimentalTime::class)
 
 package com.moneymanager.compose.filepicker
 
@@ -6,6 +7,7 @@ import java.awt.FileDialog
 import java.awt.Frame
 import java.io.File
 import java.io.FilenameFilter
+import kotlin.time.Instant
 
 actual class FilePickerLauncher(
     private val mimeTypes: List<String>,
@@ -79,7 +81,8 @@ internal fun matchesExtensions(
 internal fun readFileAsResult(file: File): FilePickerResult? =
     try {
         val content = file.readText(Charsets.UTF_8)
-        FilePickerResult(fileName = file.name, content = content)
+        val lastModified = file.lastModified().takeIf { it > 0 }?.let { Instant.fromEpochMilliseconds(it) }
+        FilePickerResult(fileName = file.name, content = content, lastModified = lastModified)
     } catch (_: Exception) {
         null
     }

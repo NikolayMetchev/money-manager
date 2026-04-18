@@ -1,9 +1,10 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
+@file:OptIn(ExperimentalTime::class)
 
 package com.moneymanager.domain.model.csv
 
 import com.moneymanager.domain.model.DeviceInfo
 import kotlin.jvm.JvmInline
+import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -25,4 +26,6 @@ data class CsvImport(
     val columnCount: Int,
     val columns: List<CsvColumn>,
     val deviceInfo: DeviceInfo,
+    val fileChecksum: String,
+    val fileLastModified: Instant,
 )

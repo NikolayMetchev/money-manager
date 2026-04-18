@@ -1,4 +1,4 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
+@file:OptIn(ExperimentalTime::class, ExperimentalUuidApi::class)
 
 package com.moneymanager.database.repository
 
@@ -22,11 +22,13 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
 import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
+import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 class CsvImportRepositoryImpl(
-    database: MoneyManagerDatabaseWrapper,
+    private val database: MoneyManagerDatabaseWrapper,
     private val deviceId: DeviceId,
     private val coroutineContext: CoroutineContext = Dispatchers.Default,
 ) : CsvImportRepository {
@@ -37,42 +39,43 @@ class CsvImportRepositoryImpl(
         fileName: String,
         headers: List<String>,
         rows: List<List<String>>,
+        fileChecksum: String,
+        fileLastModified: Instant,
     ): CsvImportId =
         withContext(coroutineContext) {
-            val importId = CsvImportId(Uuid.random())
-            val tableName = "csv_import_${importId.id.toHexString().take(8)}"
-            val columnCount = headers.size
-            val timestamp = Clock.System.now()
+            database.transactionWithResult {
+                val importId = CsvImportId(Uuid.random())
+                val tableName = "csv_import_${importId.id.toHexString().take(8)}"
+                val columnCount = headers.size
+                val timestamp = Clock.System.now()
 
-            // Create the dynamic table
-            tableManager.createCsvTable(tableName, columnCount)
+                tableManager.createCsvTable(tableName, columnCount)
+                tableManager.insertRowsBatch(tableName, rows, columnCount)
 
-            // Insert the data
-            tableManager.insertRowsBatch(tableName, rows, columnCount)
-
-            // Insert metadata
-            csvImportQueries.insertImport(
-                id = importId.id.toString(),
-                table_name = tableName,
-                original_file_name = fileName,
-                import_timestamp = timestamp.toEpochMilliseconds(),
-                row_count = rows.size.toLong(),
-                column_count = columnCount.toLong(),
-                device_id = deviceId.id,
-            )
-
-            // Insert column metadata
-            headers.forEachIndexed { index, header ->
-                val columnId = Uuid.random()
-                csvImportQueries.insertColumn(
-                    id = columnId.toString(),
-                    import_id = importId.id.toString(),
-                    column_index = index.toLong(),
-                    original_name = header,
+                csvImportQueries.insertImport(
+                    id = importId.id.toString(),
+                    table_name = tableName,
+                    original_file_name = fileName,
+                    import_timestamp = timestamp.toEpochMilliseconds(),
+                    row_count = rows.size.toLong(),
+                    column_count = columnCount.toLong(),
+                    device_id = deviceId.id,
+                    file_checksum = fileChecksum,
+                    file_last_modified = fileLastModified.toEpochMilliseconds(),
                 )
-            }
 
-            importId
+                headers.forEachIndexed { index, header ->
+                    val columnId = Uuid.random()
+                    csvImportQueries.insertColumn(
+                        id = columnId.toString(),
+                        import_id = importId.id.toString(),
+                        column_index = index.toLong(),
+                        original_name = header,
+                    )
+                }
+
+                importId
+            }
         }
 
     override fun getAllImports(): Flow<List<CsvImport>> {
@@ -108,6 +111,8 @@ class CsvImportRepositoryImpl(
                                 deviceMake = import.device_make,
                                 deviceModel = import.device_model,
                             ),
+                        fileChecksum = import.file_checksum,
+                        fileLastModified = Instant.fromEpochMilliseconds(import.file_last_modified),
                     )
                 }
             }
@@ -151,6 +156,8 @@ class CsvImportRepositoryImpl(
                             deviceMake = it.device_make,
                             deviceModel = it.device_model,
                         ),
+                    fileChecksum = it.file_checksum,
+                    fileLastModified = Instant.fromEpochMilliseconds(it.file_last_modified),
                 )
             }
         }
@@ -255,5 +262,41 @@ class CsvImportRepositoryImpl(
                 csv_import_id = id.id.toString(),
                 row_index = rowIndex,
             )
+        }
+
+    override suspend fun findImportsByChecksum(checksum: String): List<CsvImport> =
+        withContext(coroutineContext) {
+            csvImportQueries.selectImportsByChecksum(checksum).executeAsList().map { import ->
+                val columns =
+                    csvImportQueries.selectColumnsByImportId(import.id)
+                        .executeAsList()
+                        .map { col ->
+                            CsvColumn(
+                                id = CsvColumnId(Uuid.parse(col.id)),
+                                columnIndex = col.column_index.toInt(),
+                                originalName = col.original_name,
+                            )
+                        }
+
+                CsvImport(
+                    id = CsvImportId(Uuid.parse(import.id)),
+                    tableName = import.table_name,
+                    originalFileName = import.original_file_name,
+                    importTimestamp = Instant.fromEpochMilliseconds(import.import_timestamp),
+                    rowCount = import.row_count.toInt(),
+                    columnCount = import.column_count.toInt(),
+                    columns = columns,
+                    deviceInfo =
+                        DeviceRepositoryImpl.createDeviceInfo(
+                            platformName = import.platform_name,
+                            osName = import.os_name,
+                            machineName = import.machine_name,
+                            deviceMake = import.device_make,
+                            deviceModel = import.device_model,
+                        ),
+                    fileChecksum = import.file_checksum,
+                    fileLastModified = Instant.fromEpochMilliseconds(import.file_last_modified),
+                )
+            }
         }
 }

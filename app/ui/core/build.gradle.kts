@@ -22,6 +22,9 @@ kotlin {
                 implementation(projects.utils.parsers.csv)
             }
         }
+        val jvmAndroidMain by creating {
+            dependsOn(commonMain)
+        }
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
@@ -30,6 +33,7 @@ kotlin {
             }
         }
         val androidMain by getting {
+            dependsOn(jvmAndroidMain)
             dependencies {
                 api(libs.androidx.compose.foundation)
                 api(libs.androidx.compose.foundation.layout)
@@ -49,6 +53,7 @@ kotlin {
             }
         }
         val jvmMain by getting {
+            dependsOn(jvmAndroidMain)
             dependencies {
                 api(libs.androidx.compose.runtime.desktop)
                 api(libs.compose.foundation.desktop)

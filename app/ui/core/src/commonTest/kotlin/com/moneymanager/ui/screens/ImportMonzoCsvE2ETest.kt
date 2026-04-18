@@ -1,4 +1,4 @@
-@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
+@file:OptIn(ExperimentalTime::class, ExperimentalUuidApi::class)
 
 package com.moneymanager.ui.screens
 
@@ -26,6 +26,9 @@ import com.moneymanager.test.database.deleteTestDatabase
 import com.moneymanager.ui.test.TestMoneyManagerApp
 import kotlin.test.AfterTest
 import kotlin.test.Test
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
+import kotlin.uuid.ExperimentalUuidApi
 
 /**
  * End-to-end test for importing a Monzo CSV file and creating an import strategy.
@@ -104,6 +107,8 @@ class ImportMonzoCsvE2ETest {
                     fileName = "monzo_test_export.csv",
                     headers = headers,
                     rows = rows,
+                    fileChecksum = "monzo_test_export_checksum",
+                    fileLastModified = Instant.fromEpochMilliseconds(1700000000000L),
                 )
             }
 

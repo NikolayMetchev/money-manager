@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -36,9 +37,11 @@ import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.repository.CsvImportRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.ui.util.sha256Hex
 import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Clock
 
 @Composable
 fun CsvImportsScreen(
@@ -51,6 +54,7 @@ fun CsvImportsScreen(
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
     var isImporting by remember { mutableStateOf(false) }
     var importError by remember { mutableStateOf<String?>(null) }
+    var duplicateImport by remember { mutableStateOf<CsvImport?>(null) }
 
     val filePicker =
         rememberFilePicker(
@@ -61,6 +65,13 @@ fun CsvImportsScreen(
                 importError = null
                 scope.launch {
                     try {
+                        val checksum = sha256Hex(result.content)
+                        val existing = csvImportRepository.findImportsByChecksum(checksum)
+                        if (existing.isNotEmpty()) {
+                            duplicateImport = existing.first()
+                            isImporting = false
+                            return@launch
+                        }
                         val parser = CsvParser()
                         val delimiter = parser.detectDelimiter(result.content)
                         val parseResult =
@@ -72,6 +83,8 @@ fun CsvImportsScreen(
                             fileName = result.fileName,
                             headers = parseResult.headers,
                             rows = parseResult.rows,
+                            fileChecksum = checksum,
+                            fileLastModified = result.lastModified ?: Clock.System.now(),
                         )
                     } catch (expected: Exception) {
                         importError = "Failed to import CSV: ${expected.message}"
@@ -81,6 +94,17 @@ fun CsvImportsScreen(
                 }
             }
         }
+
+    duplicateImport?.let { existing ->
+        DuplicateImportDialog(
+            existingImport = existing,
+            onDismiss = { duplicateImport = null },
+            onViewExisting = {
+                duplicateImport = null
+                onImportClick(existing.id)
+            },
+        )
+    }
 
     Column(
         modifier =
@@ -196,6 +220,42 @@ private fun CsvImportCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "SHA-256: ${import.fileChecksum.take(16)}...",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
+}
+
+@Composable
+private fun DuplicateImportDialog(
+    existingImport: CsvImport,
+    onDismiss: () -> Unit,
+    onViewExisting: () -> Unit,
+) {
+    val localDateTime = existingImport.importTimestamp.toLocalDateTime(TimeZone.currentSystemDefault())
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("File Already Imported") },
+        text = {
+            Text(
+                "This file has already been imported as \"${existingImport.originalFileName}\" " +
+                    "on ${localDateTime.date} at ${localDateTime.hour}:" +
+                    "${localDateTime.minute.toString().padStart(2, '0')}.",
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onViewExisting) {
+                Text("View Existing")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Dismiss")
+            }
+        },
+    )
 }
