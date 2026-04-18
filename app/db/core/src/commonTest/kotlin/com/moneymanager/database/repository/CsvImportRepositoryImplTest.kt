@@ -1,4 +1,4 @@
-@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class, kotlin.time.ExperimentalTime::class)
+@file:OptIn(ExperimentalUuidApi::class, ExperimentalTime::class)
 
 package com.moneymanager.database.repository
 
@@ -9,12 +9,14 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
+import kotlin.uuid.ExperimentalUuidApi
 
 class CsvImportRepositoryImplTest : DbTest() {
     private val headers = listOf("Date", "Amount", "Description")
+    private val lastModified = Instant.fromEpochMilliseconds(1700000000000L)
     private val rows =
         listOf(
             listOf("2024-01-01", "100.00", "Test transaction 1"),
@@ -29,6 +31,8 @@ class CsvImportRepositoryImplTest : DbTest() {
                     fileName = "test.csv",
                     headers = headers,
                     rows = rows,
+                    fileChecksum = "test_checksum",
+                    fileLastModified = lastModified,
                 )
 
             assertNotNull(importId)
@@ -46,7 +50,6 @@ class CsvImportRepositoryImplTest : DbTest() {
     fun `createImport should persist checksum and lastModified`() =
         runTest {
             val checksum = "abc123def456"
-            val lastModified = Instant.fromEpochMilliseconds(1700000000000L)
 
             val importId =
                 repositories.csvImportRepository.createImport(
@@ -64,26 +67,29 @@ class CsvImportRepositoryImplTest : DbTest() {
         }
 
     @Test
-    fun `createImport without checksum stores nulls`() =
+    fun `createImport requires checksum and lastModified`() =
         runTest {
+            val checksum = "required_checksum"
+
             val importId =
                 repositories.csvImportRepository.createImport(
                     fileName = "test.csv",
                     headers = headers,
                     rows = rows,
+                    fileChecksum = checksum,
+                    fileLastModified = lastModified,
                 )
 
             val import = repositories.csvImportRepository.getImport(importId).first()
             assertNotNull(import)
-            assertNull(import.fileChecksum)
-            assertNull(import.fileLastModified)
+            assertEquals(checksum, import.fileChecksum)
+            assertEquals(lastModified, import.fileLastModified)
         }
 
     @Test
     fun `getAllImports should include checksum and lastModified`() =
         runTest {
             val checksum = "sha256hash"
-            val lastModified = Instant.fromEpochMilliseconds(1700000000000L)
 
             repositories.csvImportRepository.createImport(
                 fileName = "test.csv",
@@ -109,12 +115,14 @@ class CsvImportRepositoryImplTest : DbTest() {
                 headers = headers,
                 rows = rows,
                 fileChecksum = checksum,
+                fileLastModified = lastModified,
             )
             repositories.csvImportRepository.createImport(
                 fileName = "file3.csv",
                 headers = headers,
                 rows = rows,
                 fileChecksum = "different_checksum",
+                fileLastModified = lastModified,
             )
 
             val matches = repositories.csvImportRepository.findImportsByChecksum(checksum)
@@ -132,6 +140,7 @@ class CsvImportRepositoryImplTest : DbTest() {
                 headers = headers,
                 rows = rows,
                 fileChecksum = checksum,
+                fileLastModified = lastModified,
             )
 
             assertFailsWith<Exception> {
@@ -140,6 +149,7 @@ class CsvImportRepositoryImplTest : DbTest() {
                     headers = headers,
                     rows = rows,
                     fileChecksum = checksum,
+                    fileLastModified = lastModified,
                 )
             }
 
@@ -156,6 +166,7 @@ class CsvImportRepositoryImplTest : DbTest() {
                 headers = headers,
                 rows = rows,
                 fileChecksum = "some_checksum",
+                fileLastModified = lastModified,
             )
 
             val matches = repositories.csvImportRepository.findImportsByChecksum("nonexistent")

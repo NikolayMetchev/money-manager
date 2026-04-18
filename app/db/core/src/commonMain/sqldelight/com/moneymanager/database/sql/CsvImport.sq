@@ -7,15 +7,14 @@ CREATE TABLE csv_import_metadata (
     row_count INTEGER NOT NULL,
     column_count INTEGER NOT NULL,
     device_id INTEGER NOT NULL,
-    file_checksum TEXT,
-    file_last_modified INTEGER,
+    file_checksum TEXT NOT NULL,
+    file_last_modified INTEGER NOT NULL,
     FOREIGN KEY (device_id) REFERENCES device(id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_csv_import_device ON csv_import_metadata(device_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_csv_import_checksum
-ON csv_import_metadata(file_checksum)
-WHERE file_checksum IS NOT NULL;
+ON csv_import_metadata(file_checksum);
 
 -- Column definitions for each imported CSV
 CREATE TABLE csv_column_metadata (

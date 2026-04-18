@@ -1,4 +1,4 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
+@file:OptIn(ExperimentalTime::class, ExperimentalUuidApi::class)
 
 package com.moneymanager.database.repository
 
@@ -22,7 +22,9 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
 import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
+import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 class CsvImportRepositoryImpl(
@@ -37,8 +39,8 @@ class CsvImportRepositoryImpl(
         fileName: String,
         headers: List<String>,
         rows: List<List<String>>,
-        fileChecksum: String?,
-        fileLastModified: Instant?,
+        fileChecksum: String,
+        fileLastModified: Instant,
     ): CsvImportId =
         withContext(coroutineContext) {
             database.transactionWithResult {
@@ -59,7 +61,7 @@ class CsvImportRepositoryImpl(
                     column_count = columnCount.toLong(),
                     device_id = deviceId.id,
                     file_checksum = fileChecksum,
-                    file_last_modified = fileLastModified?.toEpochMilliseconds(),
+                    file_last_modified = fileLastModified.toEpochMilliseconds(),
                 )
 
                 headers.forEachIndexed { index, header ->
@@ -110,7 +112,7 @@ class CsvImportRepositoryImpl(
                                 deviceModel = import.device_model,
                             ),
                         fileChecksum = import.file_checksum,
-                        fileLastModified = import.file_last_modified?.let { Instant.fromEpochMilliseconds(it) },
+                        fileLastModified = Instant.fromEpochMilliseconds(import.file_last_modified),
                     )
                 }
             }
@@ -155,7 +157,7 @@ class CsvImportRepositoryImpl(
                             deviceModel = it.device_model,
                         ),
                     fileChecksum = it.file_checksum,
-                    fileLastModified = it.file_last_modified?.let { ms -> Instant.fromEpochMilliseconds(ms) },
+                    fileLastModified = Instant.fromEpochMilliseconds(it.file_last_modified),
                 )
             }
         }
@@ -293,7 +295,7 @@ class CsvImportRepositoryImpl(
                             deviceModel = import.device_model,
                         ),
                     fileChecksum = import.file_checksum,
-                    fileLastModified = import.file_last_modified?.let { Instant.fromEpochMilliseconds(it) },
+                    fileLastModified = Instant.fromEpochMilliseconds(import.file_last_modified),
                 )
             }
         }

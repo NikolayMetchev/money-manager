@@ -41,6 +41,7 @@ import com.moneymanager.ui.util.sha256Hex
 import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Clock
 
 @Composable
 fun CsvImportsScreen(
@@ -83,7 +84,7 @@ fun CsvImportsScreen(
                             headers = parseResult.headers,
                             rows = parseResult.rows,
                             fileChecksum = checksum,
-                            fileLastModified = result.lastModified,
+                            fileLastModified = result.lastModified ?: Clock.System.now(),
                         )
                     } catch (expected: Exception) {
                         importError = "Failed to import CSV: ${expected.message}"
@@ -219,14 +220,12 @@ private fun CsvImportCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            import.fileChecksum?.let { checksum ->
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "SHA-256: ${checksum.take(16)}...",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "SHA-256: ${import.fileChecksum.take(16)}...",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

@@ -1,4 +1,4 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
+@file:OptIn(ExperimentalTime::class)
 
 package com.moneymanager.domain.repository
 
@@ -7,6 +7,7 @@ import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csv.CsvRow
 import kotlinx.coroutines.flow.Flow
+import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 interface CsvImportRepository {
@@ -23,8 +24,8 @@ interface CsvImportRepository {
         fileName: String,
         headers: List<String>,
         rows: List<List<String>>,
-        fileChecksum: String? = null,
-        fileLastModified: Instant? = null,
+        fileChecksum: String,
+        fileLastModified: Instant,
     ): CsvImportId
 
     /**
