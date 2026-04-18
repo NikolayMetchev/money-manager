@@ -7,27 +7,36 @@ kotlin {
     sourceSets {
         commonMain {
             dependencies {
-                implementation(compose.runtime)
+            }
+        }
+
+        commonTest {
+            dependencies {
+                implementation(kotlin("test"))
             }
         }
 
         jvmMain {
             dependencies {
-                implementation(compose.desktop.currentOs)
+                api(libs.androidx.compose.runtime.desktop)
+                implementation(libs.kotlinx.coroutines.core)
             }
         }
 
         androidMain {
             dependencies {
+                api(libs.androidx.compose.runtime)
+
+                implementation(libs.androidx.activity)
                 implementation(libs.androidx.activity.compose)
+                implementation(libs.androidx.compose.ui)
             }
         }
 
         val androidDeviceTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation(libs.androidx.test.core)
-                implementation(libs.androidx.test.runner)
+                runtimeOnly(libs.androidx.test.runner)
             }
         }
     }

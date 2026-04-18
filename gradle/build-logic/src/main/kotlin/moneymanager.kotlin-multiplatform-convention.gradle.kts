@@ -15,12 +15,4 @@ configure<KotlinMultiplatformExtension> {
     compilerOptions {
         freeCompilerArgs.add("-Xexpect-actual-classes")
     }
-
-    sourceSets {
-        val commonTest by getting {
-            dependencies {
-                implementation(kotlin("test"))
-            }
-        }
-    }
 }

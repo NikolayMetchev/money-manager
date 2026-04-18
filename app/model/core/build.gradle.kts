@@ -8,11 +8,27 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation(libs.kmlogging)
-                implementation(libs.kotlinx.coroutines.core)
-                implementation(libs.kotlinx.datetime)
-                implementation(libs.kotlinx.serialization.json)
-                implementation(projects.utils.bigdecimal)
+                api(libs.kotlinx.coroutines.core)
+                api(projects.utils.bigdecimal)
+            }
+        }
+
+        val jvmMain by getting {
+            dependencies {
+                api(libs.kotlinx.serialization.core)
+                api(projects.utils.bigdecimal)
+            }
+        }
+
+        val androidMain by getting {
+            dependencies {
+                api(libs.kotlinx.serialization.core)
+            }
+        }
+
+        val commonTest by getting {
+            dependencies {
+                implementation(kotlin("test"))
             }
         }
     }

@@ -53,6 +53,41 @@ dependencyAnalysis {
                 severity("fail")
             }
         }
+
+        project(":app:di:core") {
+            ignoreSourceSet("commonTest")
+        }
+
+        project(":test:app:db") {
+            ignoreSourceSet("commonTest")
+        }
+
+        project(":utils:compose:scrollbar") {
+            ignoreSourceSet("commonTest", "jvmDev")
+        }
+
+        project(":utils:compose:filePicker") {
+            ignoreSourceSet("jvmDev")
+        }
+
+        project(":app:ui:core") {
+            ignoreSourceSet("jvmDev")
+            sourceSet("commonTest") {
+                onUnusedDependencies {
+                    exclude("org.jetbrains.kotlin:kotlin-test")
+                }
+            }
+            sourceSet("jvmTest") {
+                onUnusedDependencies {
+                    // Compose desktop UI tests need the current OS Skiko native runtime in CI.
+                    exclude("org.jetbrains.compose.desktop:desktop-jvm-linux-arm64")
+                    exclude("org.jetbrains.compose.desktop:desktop-jvm-linux-x64")
+                    exclude("org.jetbrains.compose.desktop:desktop-jvm-macos-arm64")
+                    exclude("org.jetbrains.compose.desktop:desktop-jvm-macos-x64")
+                    exclude("org.jetbrains.compose.desktop:desktop-jvm-windows-x64")
+                }
+            }
+        }
     }
 }
 
