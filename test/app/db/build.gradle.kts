@@ -7,31 +7,31 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                api(projects.app.db.core)
-                api(projects.app.di.core)
-                api(projects.app.model.core)
+            api(projects.app.db.core)
+            api(projects.app.di.core)
+            api(projects.app.model.core)
 
-                implementation(libs.kotlinx.coroutines.test)
-            }
+            implementation(libs.kotlinx.coroutines.test)
+        }
         }
         val jvmMain by getting {
             dependencies {
-                api(kotlin("test-junit"))
-                api(projects.app.db.core)
-                api(projects.app.di.core)
-                api(projects.app.model.core)
+            api(kotlin("test-junit"))
+            api(projects.app.db.core)
+            api(projects.app.di.core)
+            api(projects.app.model.core)
 
-                implementation(libs.kotlinx.coroutines.core)
-            }
+            implementation(libs.kotlinx.coroutines.core)
+        }
         }
         val androidMain by getting {
             dependencies {
-                implementation(libs.androidx.test.core)
-                implementation(libs.androidx.test.monitor)
-                implementation(libs.kotlinx.coroutines.core)
+            api(kotlin("test-junit"))
 
-                api(kotlin("test-junit"))
-            }
+            implementation(libs.androidx.test.core)
+            implementation(libs.androidx.test.monitor)
+            implementation(libs.kotlinx.coroutines.core)
+        }
         }
     }
 }
