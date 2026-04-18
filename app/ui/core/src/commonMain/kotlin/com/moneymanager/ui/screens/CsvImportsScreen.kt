@@ -37,10 +37,10 @@ import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.repository.CsvImportRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.ui.util.sha256Hex
 import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-import java.security.MessageDigest
 
 @Composable
 fun CsvImportsScreen(
@@ -64,7 +64,7 @@ fun CsvImportsScreen(
                 importError = null
                 scope.launch {
                     try {
-                        val checksum = computeSha256(result.content)
+                        val checksum = sha256Hex(result.content)
                         val existing = csvImportRepository.findImportsByChecksum(checksum)
                         if (existing.isNotEmpty()) {
                             duplicateImport = existing.first()
@@ -259,10 +259,4 @@ private fun DuplicateImportDialog(
             }
         },
     )
-}
-
-private fun computeSha256(content: String): String {
-    val digest = MessageDigest.getInstance("SHA-256")
-    val hashBytes = digest.digest(content.toByteArray(Charsets.UTF_8))
-    return hashBytes.joinToString("") { "%02x".format(it) }
 }

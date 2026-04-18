@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -99,18 +100,12 @@ class CsvImportRepositoryImplTest : DbTest() {
         }
 
     @Test
-    fun `findImportsByChecksum should return matching imports`() =
+    fun `findImportsByChecksum should return matching import`() =
         runTest {
             val checksum = "matching_checksum"
 
             repositories.csvImportRepository.createImport(
                 fileName = "file1.csv",
-                headers = headers,
-                rows = rows,
-                fileChecksum = checksum,
-            )
-            repositories.csvImportRepository.createImport(
-                fileName = "file2.csv",
                 headers = headers,
                 rows = rows,
                 fileChecksum = checksum,
@@ -123,8 +118,34 @@ class CsvImportRepositoryImplTest : DbTest() {
             )
 
             val matches = repositories.csvImportRepository.findImportsByChecksum(checksum)
-            assertEquals(2, matches.size)
+            assertEquals(1, matches.size)
             assertTrue(matches.all { it.fileChecksum == checksum })
+        }
+
+    @Test
+    fun `createImport should reject duplicate checksum`() =
+        runTest {
+            val checksum = "duplicate_checksum"
+
+            repositories.csvImportRepository.createImport(
+                fileName = "file1.csv",
+                headers = headers,
+                rows = rows,
+                fileChecksum = checksum,
+            )
+
+            assertFailsWith<Exception> {
+                repositories.csvImportRepository.createImport(
+                    fileName = "file2.csv",
+                    headers = headers,
+                    rows = rows,
+                    fileChecksum = checksum,
+                )
+            }
+
+            val matches = repositories.csvImportRepository.findImportsByChecksum(checksum)
+            assertEquals(1, matches.size)
+            assertEquals("file1.csv", matches.first().originalFileName)
         }
 
     @Test

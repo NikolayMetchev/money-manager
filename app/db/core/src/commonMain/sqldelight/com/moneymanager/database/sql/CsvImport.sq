@@ -13,7 +13,9 @@ CREATE TABLE csv_import_metadata (
 );
 
 CREATE INDEX IF NOT EXISTS idx_csv_import_device ON csv_import_metadata(device_id);
-CREATE INDEX IF NOT EXISTS idx_csv_import_checksum ON csv_import_metadata(file_checksum);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_csv_import_checksum
+ON csv_import_metadata(file_checksum)
+WHERE file_checksum IS NOT NULL;
 
 -- Column definitions for each imported CSV
 CREATE TABLE csv_column_metadata (

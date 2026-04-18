@@ -26,7 +26,7 @@ import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 class CsvImportRepositoryImpl(
-    database: MoneyManagerDatabaseWrapper,
+    private val database: MoneyManagerDatabaseWrapper,
     private val deviceId: DeviceId,
     private val coroutineContext: CoroutineContext = Dispatchers.Default,
 ) : CsvImportRepository {
@@ -41,42 +41,39 @@ class CsvImportRepositoryImpl(
         fileLastModified: Instant?,
     ): CsvImportId =
         withContext(coroutineContext) {
-            val importId = CsvImportId(Uuid.random())
-            val tableName = "csv_import_${importId.id.toHexString().take(8)}"
-            val columnCount = headers.size
-            val timestamp = Clock.System.now()
+            database.transactionWithResult {
+                val importId = CsvImportId(Uuid.random())
+                val tableName = "csv_import_${importId.id.toHexString().take(8)}"
+                val columnCount = headers.size
+                val timestamp = Clock.System.now()
 
-            // Create the dynamic table
-            tableManager.createCsvTable(tableName, columnCount)
+                tableManager.createCsvTable(tableName, columnCount)
+                tableManager.insertRowsBatch(tableName, rows, columnCount)
 
-            // Insert the data
-            tableManager.insertRowsBatch(tableName, rows, columnCount)
-
-            // Insert metadata
-            csvImportQueries.insertImport(
-                id = importId.id.toString(),
-                table_name = tableName,
-                original_file_name = fileName,
-                import_timestamp = timestamp.toEpochMilliseconds(),
-                row_count = rows.size.toLong(),
-                column_count = columnCount.toLong(),
-                device_id = deviceId.id,
-                file_checksum = fileChecksum,
-                file_last_modified = fileLastModified?.toEpochMilliseconds(),
-            )
-
-            // Insert column metadata
-            headers.forEachIndexed { index, header ->
-                val columnId = Uuid.random()
-                csvImportQueries.insertColumn(
-                    id = columnId.toString(),
-                    import_id = importId.id.toString(),
-                    column_index = index.toLong(),
-                    original_name = header,
+                csvImportQueries.insertImport(
+                    id = importId.id.toString(),
+                    table_name = tableName,
+                    original_file_name = fileName,
+                    import_timestamp = timestamp.toEpochMilliseconds(),
+                    row_count = rows.size.toLong(),
+                    column_count = columnCount.toLong(),
+                    device_id = deviceId.id,
+                    file_checksum = fileChecksum,
+                    file_last_modified = fileLastModified?.toEpochMilliseconds(),
                 )
-            }
 
-            importId
+                headers.forEachIndexed { index, header ->
+                    val columnId = Uuid.random()
+                    csvImportQueries.insertColumn(
+                        id = columnId.toString(),
+                        import_id = importId.id.toString(),
+                        column_index = index.toLong(),
+                        original_name = header,
+                    )
+                }
+
+                importId
+            }
         }
 
     override fun getAllImports(): Flow<List<CsvImport>> {
