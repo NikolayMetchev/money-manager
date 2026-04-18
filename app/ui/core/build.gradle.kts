@@ -24,6 +24,7 @@ kotlin {
         }
         val commonTest by getting {
             dependencies {
+                implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)
                 implementation(projects.test.app.db)
             }
@@ -53,6 +54,7 @@ kotlin {
                 api(libs.compose.foundation.desktop)
                 api(libs.compose.foundation.layout.desktop)
                 api(libs.compose.ui.desktop)
+                api(libs.compose.ui.geometry.desktop)
                 api(libs.compose.ui.unit.desktop)
                 api(projects.app.db.core)
                 api(projects.app.model.core)
@@ -73,8 +75,7 @@ kotlin {
         }
         val jvmTest by getting {
             dependencies {
-                // Skiko native libraries for desktop UI tests
-                implementation(compose.desktop.currentOs)
+                implementation(kotlin("test"))
                 implementation(libs.androidx.compose.runtime.desktop)
                 implementation(libs.compose.ui.test.desktop)
                 implementation(libs.sqldelight.runtime)

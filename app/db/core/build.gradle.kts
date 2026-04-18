@@ -23,8 +23,9 @@ kotlin {
 
         val commonTest by getting {
             dependencies {
+                implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)
-                implementation(projects.app.model.core)
+                api(projects.app.model.core)
                 implementation(projects.test.app.db)
             }
         }
@@ -40,6 +41,7 @@ kotlin {
 
         val jvmTest by getting {
             dependencies {
+                implementation(projects.app.db.core)
                 implementation(projects.app.di.core)
             }
         }

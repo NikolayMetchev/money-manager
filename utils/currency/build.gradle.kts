@@ -17,5 +17,11 @@ kotlin {
         androidMain {
             dependsOn(jvmAndroidMain)
         }
+
+        commonTest {
+            dependencies {
+                implementation(kotlin("test"))
+            }
+        }
     }
 }

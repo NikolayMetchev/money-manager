@@ -9,6 +9,12 @@ kotlin {
             dependencies {}
         }
 
+        commonTest {
+            dependencies {
+                implementation(kotlin("test"))
+            }
+        }
+
         jvmMain {
             dependencies {
                 api(libs.androidx.compose.runtime.desktop)

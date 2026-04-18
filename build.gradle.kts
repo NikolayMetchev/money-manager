@@ -49,6 +49,11 @@ tasks.register("lintFormat") {
 dependencyAnalysis {
     issues {
         all {
+            onUnusedDependencies {
+                exclude("org.jetbrains.kotlin:kotlin-test")
+                exclude("org.jetbrains.compose.desktop:desktop-jvm-windows-x64")
+                exclude("org.jetbrains.compose.hot-reload:hot-reload-runtime-api")
+            }
             onAny {
                 severity("fail")
             }

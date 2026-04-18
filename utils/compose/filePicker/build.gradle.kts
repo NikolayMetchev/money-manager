@@ -10,6 +10,12 @@ kotlin {
             }
         }
 
+        commonTest {
+            dependencies {
+                implementation(kotlin("test"))
+            }
+        }
+
         jvmMain {
             dependencies {
                 api(libs.androidx.compose.runtime.desktop)
@@ -22,6 +28,7 @@ kotlin {
                 api(libs.androidx.compose.runtime)
 
                 implementation(libs.androidx.activity)
+                implementation(libs.androidx.activity.compose)
                 implementation(libs.androidx.compose.ui)
             }
         }

@@ -25,5 +25,11 @@ kotlin {
                 api(libs.kotlinx.serialization.core)
             }
         }
+
+        val commonTest by getting {
+            dependencies {
+                implementation(kotlin("test"))
+            }
+        }
     }
 }

@@ -14,6 +14,8 @@ androidx-test-monitor = "1.8.0"
 androidx-test-runner = "1.7.0"
 compose = "1.7.5"
 compose-plugin = "1.10.3"
+compose-material-icons-desktop = "1.7.3"
+compose-material3-desktop = "1.9.0"
 compose-ui-test = "1.9.3"
 dependency-analysis = "3.7.0"
 detekt = "2.0.0-alpha.2"
@@ -71,11 +73,12 @@ compose-components-resources-desktop = { module = "org.jetbrains.compose.compone
 compose-foundation-desktop = { module = "org.jetbrains.compose.foundation:foundation-desktop", version.ref = "compose-plugin" }
 compose-foundation-layout-desktop = { module = "org.jetbrains.compose.foundation:foundation-layout-desktop", version.ref = "compose-plugin" }
 compose-gradle-plugin = { module = "org.jetbrains.compose:compose-gradle-plugin", version.ref = "compose-plugin" }
+compose-material-icons-core-desktop = { module = "org.jetbrains.compose.material:material-icons-core-desktop", version.ref = "compose-material-icons-desktop" }
+compose-material3-desktop = { module = "org.jetbrains.compose.material3:material3-desktop", version.ref = "compose-material3-desktop" }
 compose-material-desktop = { module = "org.jetbrains.compose.material:material-desktop", version.ref = "compose-plugin" }
-compose-material-icons-core-desktop = { module = "org.jetbrains.compose.material:material-icons-core-desktop", version.ref = "compose" }
-compose-material3-desktop = { module = "org.jetbrains.compose.material3:material3-desktop", version.ref = "compose" }
 compose-runtime-desktop = { module = "org.jetbrains.compose.runtime:runtime-desktop", version.ref = "compose-plugin" }
 compose-ui-desktop = { module = "org.jetbrains.compose.ui:ui-desktop", version.ref = "compose-plugin" }
+compose-ui-geometry-desktop = { module = "org.jetbrains.compose.ui:ui-geometry-desktop", version.ref = "compose-plugin" }
 compose-ui-graphics-desktop = { module = "org.jetbrains.compose.ui:ui-graphics-desktop", version.ref = "compose-plugin" }
 compose-ui-text-desktop = { module = "org.jetbrains.compose.ui:ui-text-desktop", version.ref = "compose-plugin" }
 compose-ui-test-desktop = { module = "org.jetbrains.compose.ui:ui-test-desktop", version.ref = "compose-plugin" }
