@@ -62,6 +62,7 @@ import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
@@ -72,6 +73,7 @@ import kotlinx.coroutines.launch
 fun ImportStrategyDialog(
     parseResult: ImportParseResult,
     csvImportStrategyRepository: CsvImportStrategyRepository,
+    csvAccountMappingRepository: CsvAccountMappingRepository,
     csvStrategyExportService: CsvStrategyExportService,
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
@@ -197,6 +199,19 @@ fun ImportStrategyDialog(
 
                             // Save it
                             csvImportStrategyRepository.createStrategy(strategy)
+
+                            val accountsByName = accountRepository.getAllAccounts().first().associateBy { it.name }
+                            exportWithNewName.accountMappings.forEach { mapping ->
+                                val accountId =
+                                    accountsByName[mapping.accountName]?.id
+                                        ?: error("Account not found: ${mapping.accountName}")
+                                csvAccountMappingRepository.createMapping(
+                                    strategyId = strategy.id,
+                                    columnName = mapping.columnName,
+                                    valuePattern = Regex(mapping.valuePattern),
+                                    accountId = accountId,
+                                )
+                            }
                             onImportSuccess()
                             onDismiss()
                         } catch (expected: Exception) {

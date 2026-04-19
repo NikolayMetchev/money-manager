@@ -10,6 +10,7 @@ import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
+import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
@@ -25,6 +26,7 @@ import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.csvstrategy.export.AccountLookupExport
 import com.moneymanager.domain.model.csvstrategy.export.AmountParsingExport
+import com.moneymanager.domain.model.csvstrategy.export.CsvAccountMappingExport
 import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExport
 import com.moneymanager.domain.model.csvstrategy.export.CurrencyLookupExport
 import com.moneymanager.domain.model.csvstrategy.export.DateTimeParsingExport
@@ -107,6 +109,8 @@ class CsvStrategyExportService(
     suspend fun toExport(
         strategy: CsvImportStrategy,
         appVersion: AppVersion,
+        includeAccountMappings: Boolean = false,
+        accountMappings: List<CsvAccountMapping> = emptyList(),
     ): CsvStrategyExport {
         val accounts = accountRepository.getAllAccounts().first()
         val currencies = currencyRepository.getAllCurrencies().first()
@@ -125,6 +129,18 @@ class CsvStrategyExportService(
                     mapping.toExport(accountsById, currenciesById, categoriesById)
                 },
             attributeMappings = strategy.attributeMappings,
+            accountMappings =
+                if (includeAccountMappings) {
+                    accountMappings.map { mapping ->
+                        CsvAccountMappingExport(
+                            columnName = mapping.columnName,
+                            valuePattern = mapping.valuePattern.pattern,
+                            accountName = accountsById[mapping.accountId]?.name ?: "Unknown Account",
+                        )
+                    }
+                } else {
+                    emptyList()
+                },
         )
     }
 
@@ -201,6 +217,18 @@ class CsvStrategyExportService(
                 is HardCodedTimezoneExport,
                 is TimezoneLookupExport,
                 -> Unit
+            }
+        }
+
+        for (mapping in export.accountMappings) {
+            if (accountsByName[mapping.accountName] == null) {
+                unresolvedReferences.add(
+                    UnresolvedReference(
+                        type = ReferenceType.ACCOUNT,
+                        name = mapping.accountName,
+                        fieldType = TransferField.SOURCE_ACCOUNT,
+                    ),
+                )
             }
         }
 

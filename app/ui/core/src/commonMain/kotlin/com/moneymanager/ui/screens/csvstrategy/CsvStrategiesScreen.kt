@@ -59,6 +59,7 @@ import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import nl.jacobras.humanreadable.HumanReadable
 
@@ -141,7 +142,14 @@ fun CsvStrategiesScreen(
         if (strategy != null && exportJson == null) {
             @Suppress("TooGenericExceptionCaught")
             try {
-                val export = csvStrategyExportService.toExport(strategy, appVersion)
+                val persistedAccountMappings = csvAccountMappingRepository.getMappingsForStrategy(strategy.id).first()
+                val export =
+                    csvStrategyExportService.toExport(
+                        strategy = strategy,
+                        appVersion = appVersion,
+                        includeAccountMappings = true,
+                        accountMappings = persistedAccountMappings,
+                    )
                 val json = CsvStrategyExportCodec.encode(export)
                 exportJson = json
                 val fileName = "${strategy.name.replace(Regex("[^a-zA-Z0-9-_]"), "_")}.json"
@@ -308,6 +316,7 @@ fun CsvStrategiesScreen(
         ImportStrategyDialog(
             parseResult = currentParseResult,
             csvImportStrategyRepository = csvImportStrategyRepository,
+            csvAccountMappingRepository = csvAccountMappingRepository,
             csvStrategyExportService = csvStrategyExportService,
             accountRepository = accountRepository,
             categoryRepository = categoryRepository,
