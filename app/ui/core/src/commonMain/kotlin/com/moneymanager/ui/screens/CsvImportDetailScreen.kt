@@ -308,7 +308,7 @@ fun CsvImportDetailScreen(
                         amountColumnIndex = amountColumnIndex,
                         failedRowIndexes = failedRowIndexes,
                         scrollToRowIndex = scrollToRowIndex,
-                        onDuplicateSourceClick = { transferId ->
+                        onDuplicateSourceClick = { transferId, isPositiveAmount ->
                             scope.launch {
                                 val source =
                                     transferSourceRepository.getSourcesForTransaction(transferId)
@@ -319,7 +319,7 @@ fun CsvImportDetailScreen(
                                 if (sourceImportId != null) {
                                     onCsvSourceClick(sourceImportId, csvSource.rowIndex)
                                 } else {
-                                    onTransferClick?.invoke(transferId, true)
+                                    onTransferClick?.invoke(transferId, isPositiveAmount)
                                 }
                             }
                         },

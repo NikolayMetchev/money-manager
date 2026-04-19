@@ -15,12 +15,17 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -46,16 +51,20 @@ fun CsvPreviewTable(
     amountColumnIndex: Int? = null,
     failedRowIndexes: Set<Long> = emptySet(),
     scrollToRowIndex: Long? = null,
-    onDuplicateSourceClick: ((TransferId) -> Unit)? = null,
+    onDuplicateSourceClick: ((TransferId, Boolean) -> Unit)? = null,
     onTransferClick: ((TransferId, Boolean) -> Unit)? = null,
 ) {
     val horizontalScrollState = rememberScrollState()
     val lazyListState = rememberLazyListState()
 
-    LaunchedEffect(scrollToRowIndex, rows) {
-        val targetIndex = rows.indexOfFirst { it.rowIndex == scrollToRowIndex }
+    val scrolledToRowIndex = remember { mutableStateOf<Long?>(null) }
+    LaunchedEffect(scrollToRowIndex, rows.size) {
+        val targetRowIndex = scrollToRowIndex ?: return@LaunchedEffect
+        if (scrolledToRowIndex.value == targetRowIndex) return@LaunchedEffect
+        val targetIndex = rows.indexOfFirst { it.rowIndex == targetRowIndex }
         if (targetIndex >= 0) {
             lazyListState.animateScrollToItem(targetIndex)
+            scrolledToRowIndex.value = targetRowIndex
         }
     }
 
@@ -79,7 +88,7 @@ fun CsvPreviewTable(
                         )
                         .padding(8.dp),
             ) {
-                Text(
+                SelectableText(
                     text = "Row",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
@@ -99,7 +108,7 @@ fun CsvPreviewTable(
                         )
                         .padding(8.dp),
             ) {
-                Text(
+                SelectableText(
                     text = "Status",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
@@ -119,7 +128,7 @@ fun CsvPreviewTable(
                         )
                         .padding(8.dp),
             ) {
-                Text(
+                SelectableText(
                     text = "Transaction",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
@@ -140,7 +149,7 @@ fun CsvPreviewTable(
                             )
                             .padding(8.dp),
                 ) {
-                    Text(
+                    SelectableText(
                         text = column.originalName,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
@@ -159,8 +168,8 @@ fun CsvPreviewTable(
                     val hasError = row.errorMessage != null
                     val rowBackground =
                         when {
-                            row.rowIndex == scrollToRowIndex -> MaterialTheme.colorScheme.primaryContainer
                             isFailed || hasError -> MaterialTheme.colorScheme.errorContainer
+                            row.rowIndex == scrollToRowIndex -> MaterialTheme.colorScheme.primaryContainer
                             else -> MaterialTheme.colorScheme.surface
                         }
 
@@ -183,7 +192,7 @@ fun CsvPreviewTable(
                                         )
                                         .padding(8.dp),
                             ) {
-                                Text(
+                                SelectableText(
                                     text = row.rowIndex.toString(),
                                     style = MaterialTheme.typography.bodySmall,
                                     fontWeight = if (isFailed) FontWeight.Bold else FontWeight.Normal,
@@ -218,7 +227,7 @@ fun CsvPreviewTable(
                                             ImportStatus.UPDATED -> "Updated" to MaterialTheme.colorScheme.tertiary
                                             ImportStatus.ERROR -> "Error" to MaterialTheme.colorScheme.error
                                         }
-                                    Text(
+                                    SelectableText(
                                         text = statusText,
                                         style = MaterialTheme.typography.bodySmall,
                                         color = statusColor,
@@ -229,18 +238,11 @@ fun CsvPreviewTable(
                                 }
                             }
 
-                            // Determine if amount is positive from the amount column
                             val isPositiveAmount =
-                                amountColumnIndex?.let { idx ->
-                                    if (idx in row.values.indices) {
-                                        val amountStr = row.values[idx].trim()
-                                        // Parse the amount string - positive if it doesn't start with '-'
-                                        // Also handle parentheses notation (123) as negative
-                                        !amountStr.startsWith("-") && !amountStr.startsWith("(")
-                                    } else {
-                                        true
-                                    }
-                                } ?: true
+                                isRowAmountPositive(
+                                    row = row,
+                                    amountColumnIndex = amountColumnIndex,
+                                )
 
                             // Transfer ID cell
                             TransferIdCell(
@@ -264,7 +266,7 @@ fun CsvPreviewTable(
                                                 )
                                                 .padding(8.dp),
                                     ) {
-                                        Text(
+                                        SelectableText(
                                             text = value,
                                             style = MaterialTheme.typography.bodySmall,
                                             color =
@@ -290,7 +292,7 @@ fun CsvPreviewTable(
                                         .background(MaterialTheme.colorScheme.errorContainer)
                                         .padding(horizontal = 16.dp, vertical = 8.dp),
                             ) {
-                                Text(
+                                SelectableText(
                                     text = error,
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.error,
@@ -321,14 +323,19 @@ private fun TransferIdCell(
     importStatus: ImportStatus?,
     transferId: TransferId?,
     isPositiveAmount: Boolean,
-    onDuplicateSourceClick: ((TransferId) -> Unit)?,
+    onDuplicateSourceClick: ((TransferId, Boolean) -> Unit)?,
     onClick: ((TransferId, Boolean) -> Unit)?,
 ) {
     val isDuplicate = importStatus == ImportStatus.DUPLICATE
     val clickAction =
         when {
             transferId == null -> null
-            isDuplicate && onDuplicateSourceClick != null -> ({ onDuplicateSourceClick(transferId) })
+            isDuplicate && onDuplicateSourceClick != null -> (
+                {
+                    onDuplicateSourceClick(transferId, isPositiveAmount)
+                }
+            )
+            isDuplicate -> null
             onClick != null -> ({ onClick(transferId, isPositiveAmount) })
             else -> null
         }
@@ -360,5 +367,39 @@ private fun TransferIdCell(
                 overflow = TextOverflow.Ellipsis,
             )
         }
+    }
+}
+
+private fun isRowAmountPositive(
+    row: CsvRow,
+    amountColumnIndex: Int?,
+): Boolean =
+    amountColumnIndex?.let { index ->
+        val amount = row.values.getOrNull(index)?.trim()
+        amount == null || (!amount.startsWith("-") && !amount.startsWith("("))
+    } ?: true
+
+@Composable
+private fun SelectableText(
+    text: String,
+    modifier: Modifier = Modifier,
+    color: Color = Color.Unspecified,
+    style: TextStyle = TextStyle.Default,
+    fontWeight: FontWeight? = null,
+    textDecoration: TextDecoration? = null,
+    maxLines: Int = Int.MAX_VALUE,
+    overflow: TextOverflow = TextOverflow.Clip,
+) {
+    SelectionContainer {
+        Text(
+            text = text,
+            modifier = modifier,
+            color = color,
+            style = style,
+            fontWeight = fontWeight,
+            textDecoration = textDecoration,
+            maxLines = maxLines,
+            overflow = overflow,
+        )
     }
 }

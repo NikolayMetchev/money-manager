@@ -104,6 +104,7 @@ class CsvTableManager(private val database: MoneyManagerDatabaseWrapper) {
                     MIN(transfer_source.transaction_id) AS transaction_id
                 FROM csv_transfer_source
                 JOIN transfer_source ON transfer_source.id = csv_transfer_source.id
+                WHERE csv_transfer_source.csv_import_id = '$csvImportId'
                 GROUP BY csv_transfer_source.csv_import_id, csv_transfer_source.csv_row_index
             ) source_rows ON source_rows.csv_import_id = '$csvImportId'
                 AND source_rows.csv_row_index = t.row_index
