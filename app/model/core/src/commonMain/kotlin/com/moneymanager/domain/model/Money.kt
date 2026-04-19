@@ -62,9 +62,7 @@ data class Money(
      * @param multiplier The value to multiply by
      * @return A new Money instance with the product
      */
-    operator fun times(multiplier: Long): Money {
-        return Money(amount * multiplier, currency)
-    }
+    operator fun times(multiplier: Long): Money = Money(amount * multiplier, currency)
 
     /**
      * Multiplies this Money amount by a scalar value.
@@ -72,9 +70,7 @@ data class Money(
      * @param multiplier The value to multiply by
      * @return A new Money instance with the product
      */
-    operator fun times(multiplier: Int): Money {
-        return Money(amount * multiplier, currency)
-    }
+    operator fun times(multiplier: Int): Money = Money(amount * multiplier, currency)
 
     /**
      * Divides this Money amount by a scalar value.
@@ -82,9 +78,7 @@ data class Money(
      * @param divisor The value to divide by
      * @return A new Money instance with the quotient
      */
-    operator fun div(divisor: Long): Money {
-        return Money(amount / divisor, currency)
-    }
+    operator fun div(divisor: Long): Money = Money(amount / divisor, currency)
 
     /**
      * Divides this Money amount by a scalar value.
@@ -92,18 +86,14 @@ data class Money(
      * @param divisor The value to divide by
      * @return A new Money instance with the quotient
      */
-    operator fun div(divisor: Int): Money {
-        return Money(amount / divisor, currency)
-    }
+    operator fun div(divisor: Int): Money = Money(amount / divisor, currency)
 
     /**
      * Negates this Money amount.
      *
      * @return A new Money instance with the negated amount
      */
-    operator fun unaryMinus(): Money {
-        return Money(-amount, currency)
-    }
+    operator fun unaryMinus(): Money = Money(-amount, currency)
 
     /**
      * Compares this Money amount with another.
@@ -143,9 +133,7 @@ data class Money(
      *
      * @return A new Money instance with the absolute amount
      */
-    fun abs(): Money {
-        return if (amount < 0) Money(-amount, currency) else this
-    }
+    fun abs(): Money = if (amount < 0) Money(-amount, currency) else this
 
     private fun requireSameCurrency(other: Money) {
         require(currency.id == other.currency.id) {
@@ -180,9 +168,7 @@ data class Money(
         fun fromDisplayValue(
             displayValue: String,
             currency: Currency,
-        ): Money {
-            return fromDisplayValue(BigDecimal(displayValue), currency)
-        }
+        ): Money = fromDisplayValue(BigDecimal(displayValue), currency)
 
         /**
          * Creates a zero Money instance for a given currency.
@@ -190,8 +176,6 @@ data class Money(
          * @param currency The currency of the amount
          * @return A new Money instance with zero amount
          */
-        fun zero(currency: Currency): Money {
-            return Money(0L, currency)
-        }
+        fun zero(currency: Currency): Money = Money(0L, currency)
     }
 }

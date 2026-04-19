@@ -50,10 +50,11 @@ open class DbTest {
         )
         // Query back the created transfer by its details (timestamp + description should be unique enough for tests)
         val allTransfers =
-            repositories.transactionRepository.getTransactionsByDateRange(
-                startDate = transfer.timestamp,
-                endDate = transfer.timestamp,
-            ).first()
+            repositories.transactionRepository
+                .getTransactionsByDateRange(
+                    startDate = transfer.timestamp,
+                    endDate = transfer.timestamp,
+                ).first()
         return allTransfers.first { it.description == transfer.description }
     }
 }

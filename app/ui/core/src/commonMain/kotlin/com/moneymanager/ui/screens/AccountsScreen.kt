@@ -56,11 +56,14 @@ fun AccountsScreen(
     onAuditClick: (Account) -> Unit = {},
 ) {
     // Use schema-error-aware collection for flows that may fail on old databases
-    val accounts by accountRepository.getAllAccounts()
+    val accounts by accountRepository
+        .getAllAccounts()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val balances by transactionRepository.getAccountBalances()
+    val balances by transactionRepository
+        .getAccountBalances()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val categories by categoryRepository.getAllCategories()
+    val categories by categoryRepository
+        .getAllCategories()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
     var showCreateDialog by remember { mutableStateOf(false) }
     var accountToEdit by remember { mutableStateOf<Account?>(null) }
@@ -182,9 +185,11 @@ fun AccountCard(
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
 
-    val ownerships by personAccountOwnershipRepository.getOwnershipsByAccount(account.id)
+    val ownerships by personAccountOwnershipRepository
+        .getOwnershipsByAccount(account.id)
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val allPeople by personRepository.getAllPeople()
+    val allPeople by personRepository
+        .getAllPeople()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
     val owners =
         ownerships.mapNotNull { ownership ->
@@ -318,7 +323,8 @@ fun CreateAccountDialog(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
 
-    val categories by categoryRepository.getAllCategories()
+    val categories by categoryRepository
+        .getAllCategories()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
     val scope = rememberSchemaAwareCoroutineScope()
 
@@ -471,7 +477,8 @@ fun DeleteAccountDialog(
     var dropdownExpanded by remember { mutableStateOf(false) }
     val scope = rememberSchemaAwareCoroutineScope()
 
-    val allAccounts by accountRepository.getAllAccounts()
+    val allAccounts by accountRepository
+        .getAllAccounts()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
     val otherAccounts = allAccounts.filter { it.id != account.id }
 
@@ -655,7 +662,8 @@ fun CreateCategoryDialog(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
 
-    val categories by categoryRepository.getAllCategories()
+    val categories by categoryRepository
+        .getAllCategories()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
     val scope = rememberSchemaAwareCoroutineScope()
 

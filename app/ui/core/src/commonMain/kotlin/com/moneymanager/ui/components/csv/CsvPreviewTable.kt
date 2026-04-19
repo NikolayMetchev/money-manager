@@ -85,8 +85,7 @@ fun CsvPreviewTable(
                         .border(
                             width = 1.dp,
                             color = MaterialTheme.colorScheme.outline,
-                        )
-                        .padding(8.dp),
+                        ).padding(8.dp),
             ) {
                 SelectableText(
                     text = "Row",
@@ -105,8 +104,7 @@ fun CsvPreviewTable(
                         .border(
                             width = 1.dp,
                             color = MaterialTheme.colorScheme.outline,
-                        )
-                        .padding(8.dp),
+                        ).padding(8.dp),
             ) {
                 SelectableText(
                     text = "Status",
@@ -125,8 +123,7 @@ fun CsvPreviewTable(
                         .border(
                             width = 1.dp,
                             color = MaterialTheme.colorScheme.outline,
-                        )
-                        .padding(8.dp),
+                        ).padding(8.dp),
             ) {
                 SelectableText(
                     text = "Transaction",
@@ -146,8 +143,7 @@ fun CsvPreviewTable(
                             .border(
                                 width = 1.dp,
                                 color = MaterialTheme.colorScheme.outline,
-                            )
-                            .padding(8.dp),
+                            ).padding(8.dp),
                 ) {
                     SelectableText(
                         text = column.originalName,
@@ -189,8 +185,7 @@ fun CsvPreviewTable(
                                         .border(
                                             width = 1.dp,
                                             color = MaterialTheme.colorScheme.outlineVariant,
-                                        )
-                                        .padding(8.dp),
+                                        ).padding(8.dp),
                             ) {
                                 SelectableText(
                                     text = row.rowIndex.toString(),
@@ -215,8 +210,7 @@ fun CsvPreviewTable(
                                         .border(
                                             width = 1.dp,
                                             color = MaterialTheme.colorScheme.outlineVariant,
-                                        )
-                                        .padding(8.dp),
+                                        ).padding(8.dp),
                                 contentAlignment = Alignment.Center,
                             ) {
                                 row.importStatus?.let { status ->
@@ -263,8 +257,7 @@ fun CsvPreviewTable(
                                                 .border(
                                                     width = 1.dp,
                                                     color = MaterialTheme.colorScheme.outlineVariant,
-                                                )
-                                                .padding(8.dp),
+                                                ).padding(8.dp),
                                     ) {
                                         SelectableText(
                                             text = value,
@@ -350,12 +343,10 @@ private fun TransferIdCell(
                     } else {
                         Modifier
                     },
-                )
-                .border(
+                ).border(
                     width = 1.dp,
                     color = MaterialTheme.colorScheme.outlineVariant,
-                )
-                .padding(8.dp),
+                ).padding(8.dp),
     ) {
         if (transferId != null) {
             Text(

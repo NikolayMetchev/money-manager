@@ -96,7 +96,11 @@ class CurrencyRepositoryImplTest : DbTest() {
     fun `upsertCurrencyByCode should be case sensitive`() =
         runTest {
             // Given - USD is already seeded
-            val initialCount = repositories.currencyRepository.getAllCurrencies().first().size
+            val initialCount =
+                repositories.currencyRepository
+                    .getAllCurrencies()
+                    .first()
+                    .size
 
             // When
             val lowercaseId = repositories.currencyRepository.upsertCurrencyByCode("usd", "US Dollar Lowercase")
@@ -116,7 +120,11 @@ class CurrencyRepositoryImplTest : DbTest() {
     fun `upsertCurrencyByCode should handle rapid consecutive calls for same code`() =
         runTest {
             // Given
-            val initialCount = repositories.currencyRepository.getAllCurrencies().first().size
+            val initialCount =
+                repositories.currencyRepository
+                    .getAllCurrencies()
+                    .first()
+                    .size
 
             // When - simulate rapid upserts for a new currency
             val id1 = repositories.currencyRepository.upsertCurrencyByCode("BTC", "Bitcoin")

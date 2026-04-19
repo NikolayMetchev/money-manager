@@ -73,26 +73,27 @@ class AuditFunctionalTest : DbTest() {
             ORDER BY account_audit.audit_timestamp DESC, account_audit.id DESC
             """.trimIndent()
 
-        return database.executeQuery(
-            identifier = null,
-            sql = sql,
-            mapper = { cursor ->
-                val results = mutableListOf<AccountAuditRecord>()
-                while (cursor.next().value) {
-                    results.add(
-                        AccountAuditRecord(
-                            auditId = cursor.getLong(0)!!,
-                            auditTimestamp = cursor.getLong(1)!!,
-                            auditType = cursor.getString(2)!!,
-                            id = cursor.getLong(3)!!,
-                            name = cursor.getString(4)!!,
-                        ),
-                    )
-                }
-                QueryResult.Value(results)
-            },
-            parameters = 0,
-        ).value
+        return database
+            .executeQuery(
+                identifier = null,
+                sql = sql,
+                mapper = { cursor ->
+                    val results = mutableListOf<AccountAuditRecord>()
+                    while (cursor.next().value) {
+                        results.add(
+                            AccountAuditRecord(
+                                auditId = cursor.getLong(0)!!,
+                                auditTimestamp = cursor.getLong(1)!!,
+                                auditType = cursor.getString(2)!!,
+                                id = cursor.getLong(3)!!,
+                                name = cursor.getString(4)!!,
+                            ),
+                        )
+                    }
+                    QueryResult.Value(results)
+                },
+                parameters = 0,
+            ).value
     }
 
     /**
@@ -115,27 +116,28 @@ class AuditFunctionalTest : DbTest() {
             ORDER BY currency_audit.audit_timestamp DESC, currency_audit.id DESC
             """.trimIndent()
 
-        return database.executeQuery(
-            identifier = null,
-            sql = sql,
-            mapper = { cursor ->
-                val results = mutableListOf<CurrencyAuditRecord>()
-                while (cursor.next().value) {
-                    results.add(
-                        CurrencyAuditRecord(
-                            auditId = cursor.getLong(0)!!,
-                            auditTimestamp = cursor.getLong(1)!!,
-                            auditType = cursor.getString(2)!!,
-                            id = cursor.getLong(3)!!,
-                            code = cursor.getString(4)!!,
-                            name = cursor.getString(5)!!,
-                        ),
-                    )
-                }
-                QueryResult.Value(results)
-            },
-            parameters = 0,
-        ).value
+        return database
+            .executeQuery(
+                identifier = null,
+                sql = sql,
+                mapper = { cursor ->
+                    val results = mutableListOf<CurrencyAuditRecord>()
+                    while (cursor.next().value) {
+                        results.add(
+                            CurrencyAuditRecord(
+                                auditId = cursor.getLong(0)!!,
+                                auditTimestamp = cursor.getLong(1)!!,
+                                auditType = cursor.getString(2)!!,
+                                id = cursor.getLong(3)!!,
+                                code = cursor.getString(4)!!,
+                                name = cursor.getString(5)!!,
+                            ),
+                        )
+                    }
+                    QueryResult.Value(results)
+                },
+                parameters = 0,
+            ).value
     }
 
     /**
@@ -157,26 +159,27 @@ class AuditFunctionalTest : DbTest() {
             ORDER BY category_audit.audit_timestamp DESC, category_audit.id DESC
             """.trimIndent()
 
-        return database.executeQuery(
-            identifier = null,
-            sql = sql,
-            mapper = { cursor ->
-                val results = mutableListOf<CategoryAuditRecord>()
-                while (cursor.next().value) {
-                    results.add(
-                        CategoryAuditRecord(
-                            auditId = cursor.getLong(0)!!,
-                            auditTimestamp = cursor.getLong(1)!!,
-                            auditType = cursor.getString(2)!!,
-                            id = cursor.getLong(3)!!,
-                            name = cursor.getString(4)!!,
-                        ),
-                    )
-                }
-                QueryResult.Value(results)
-            },
-            parameters = 0,
-        ).value
+        return database
+            .executeQuery(
+                identifier = null,
+                sql = sql,
+                mapper = { cursor ->
+                    val results = mutableListOf<CategoryAuditRecord>()
+                    while (cursor.next().value) {
+                        results.add(
+                            CategoryAuditRecord(
+                                auditId = cursor.getLong(0)!!,
+                                auditTimestamp = cursor.getLong(1)!!,
+                                auditType = cursor.getString(2)!!,
+                                id = cursor.getLong(3)!!,
+                                name = cursor.getString(4)!!,
+                            ),
+                        )
+                    }
+                    QueryResult.Value(results)
+                },
+                parameters = 0,
+            ).value
     }
 
     @Test

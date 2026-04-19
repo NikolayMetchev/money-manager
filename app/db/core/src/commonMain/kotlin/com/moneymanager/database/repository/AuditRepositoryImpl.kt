@@ -36,7 +36,8 @@ class AuditRepositoryImpl(
     override suspend fun getAuditHistoryForTransfer(transferId: TransferId): List<TransferAuditEntry> =
         withContext(Dispatchers.Default) {
             val entries =
-                queries.selectAuditHistoryForTransfer(transferId.id)
+                queries
+                    .selectAuditHistoryForTransfer(transferId.id)
                     .executeAsList()
                     .map(TransferAuditEntryMapper::map)
 
@@ -45,42 +46,48 @@ class AuditRepositoryImpl(
 
     override suspend fun getAuditHistoryForAccount(accountId: AccountId): List<AccountAuditEntry> =
         withContext(Dispatchers.Default) {
-            queries.selectAuditHistoryForAccount(accountId.id)
+            queries
+                .selectAuditHistoryForAccount(accountId.id)
                 .executeAsList()
                 .map(AccountAuditEntryMapper::map)
         }
 
     override suspend fun getAuditHistoryForPerson(personId: PersonId): List<PersonAuditEntry> =
         withContext(Dispatchers.Default) {
-            queries.selectAuditHistoryForPerson(personId.id)
+            queries
+                .selectAuditHistoryForPerson(personId.id)
                 .executeAsList()
                 .map(PersonAuditEntryMapper::map)
         }
 
     override suspend fun getAuditHistoryForPersonAccountOwnership(ownershipId: Long): List<PersonAccountOwnershipAuditEntry> =
         withContext(Dispatchers.Default) {
-            queries.selectAuditHistoryForPersonAccountOwnership(ownershipId)
+            queries
+                .selectAuditHistoryForPersonAccountOwnership(ownershipId)
                 .executeAsList()
                 .map(PersonAccountOwnershipAuditEntryMapper::map)
         }
 
     override suspend fun getOwnershipAuditHistoryForAccount(accountId: AccountId): List<PersonAccountOwnershipAuditEntry> =
         withContext(Dispatchers.Default) {
-            queries.selectOwnershipAuditHistoryForAccount(accountId.id)
+            queries
+                .selectOwnershipAuditHistoryForAccount(accountId.id)
                 .executeAsList()
                 .map(OwnershipAuditHistoryForAccountMapper::map)
         }
 
     override suspend fun getAuditHistoryForCurrency(currencyId: CurrencyId): List<CurrencyAuditEntry> =
         withContext(Dispatchers.Default) {
-            queries.selectAuditHistoryForCurrency(currencyId.id)
+            queries
+                .selectAuditHistoryForCurrency(currencyId.id)
                 .executeAsList()
                 .map(CurrencyAuditEntryMapper::map)
         }
 
     override suspend fun getAuditHistoryForCategory(categoryId: Long): List<CategoryAuditEntry> =
         withContext(Dispatchers.Default) {
-            queries.selectAuditHistoryForCategory(categoryId)
+            queries
+                .selectAuditHistoryForCategory(categoryId)
                 .executeAsList()
                 .map(CategoryAuditEntryMapper::map)
         }
@@ -91,7 +98,8 @@ class AuditRepositoryImpl(
     ): List<TransferAuditEntry> {
         // Fetch all attribute audit entries for this transfer
         val allAttributeChanges =
-            queries.selectAttributeAuditByTransfer(transferId.id)
+            queries
+                .selectAttributeAuditByTransfer(transferId.id)
                 .executeAsList()
                 .map { row ->
                     TransferAttributeAuditEntry(

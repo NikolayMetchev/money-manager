@@ -1,6 +1,8 @@
 package com.moneymanager.domain.model
 
-actual data class DbLocation(val name: String) {
+actual data class DbLocation(
+    val name: String,
+) {
     /**
      * On Android, checking file existence requires Context.
      * Use [com.moneymanager.database.DatabaseManager.databaseExists] for actual file existence checks.

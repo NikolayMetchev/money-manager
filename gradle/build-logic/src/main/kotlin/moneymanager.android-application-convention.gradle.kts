@@ -43,6 +43,11 @@ configure<ApplicationExtension> {
         sourceCompatibility = JavaVersion.toVersion(jvmTargetVersion)
         targetCompatibility = JavaVersion.toVersion(jvmTargetVersion)
     }
+
+    lint {
+        warningsAsErrors = true
+        abortOnError = true
+    }
 }
 
 // Disable Compose mapping file generation to work around Java 25 compatibility issue

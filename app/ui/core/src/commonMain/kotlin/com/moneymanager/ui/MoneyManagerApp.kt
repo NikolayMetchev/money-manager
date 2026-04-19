@@ -109,12 +109,14 @@ fun MoneyManagerApp(
         var transactionRefreshTrigger by remember { mutableStateOf(0) }
 
         var defaultCurrencyLoaded by remember { mutableStateOf(false) }
-        val defaultCurrencyId by settingsRepository.getDefaultCurrencyId()
+        val defaultCurrencyId by settingsRepository
+            .getDefaultCurrencyId()
             .onEach { defaultCurrencyLoaded = true }
             .collectAsStateWithSchemaErrorHandling(initial = null)
 
         // Use schema-error-aware collection for flows that may fail on old databases
-        val accounts by accountRepository.getAllAccounts()
+        val accounts by accountRepository
+            .getAllAccounts()
             .collectAsStateWithSchemaErrorHandling(initial = emptyList())
 
         MaterialTheme {

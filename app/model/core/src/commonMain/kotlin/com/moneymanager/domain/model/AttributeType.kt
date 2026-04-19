@@ -9,6 +9,8 @@ data class AttributeType(
 
 @Serializable
 @JvmInline
-value class AttributeTypeId(val id: Long) {
+value class AttributeTypeId(
+    val id: Long,
+) {
     override fun toString() = id.toString()
 }

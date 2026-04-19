@@ -71,7 +71,10 @@ private sealed class AppDatabaseState {
         val databaseComponent: DatabaseComponent,
     ) : AppDatabaseState()
 
-    data class Error(val location: DbLocation, val error: Throwable) : AppDatabaseState()
+    data class Error(
+        val location: DbLocation,
+        val error: Throwable,
+    ) : AppDatabaseState()
 }
 
 @Suppress("FunctionName")

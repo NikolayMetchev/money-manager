@@ -4,7 +4,9 @@ package com.moneymanager.domain.model
  * Represents the source/origin of a transfer audit entry.
  * Tracks how each change (INSERT, UPDATE, DELETE) was initiated.
  */
-enum class SourceType(val id: Int) {
+enum class SourceType(
+    val id: Int,
+) {
     /** Manual entry by user */
     MANUAL(1),
 

@@ -82,7 +82,8 @@ fun CsvStrategiesScreen(
     onStrategyClick: (CsvImportStrategy) -> Unit = {},
     onBack: () -> Unit = {},
 ) {
-    val strategies by csvImportStrategyRepository.getAllStrategies()
+    val strategies by csvImportStrategyRepository
+        .getAllStrategies()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
 
     // Edit flow state

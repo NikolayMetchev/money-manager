@@ -22,13 +22,15 @@ class CategoryRepositoryImpl(
     private val queries = database.categoryQueries
 
     override fun getAllCategories(): Flow<List<Category>> =
-        queries.selectAll()
+        queries
+            .selectAll()
             .asFlow()
             .mapToList(Dispatchers.Default)
             .map(CategoryMapper::mapList)
 
     override fun getCategoryBalances(): Flow<List<CategoryBalance>> =
-        queries.selectAllCategoryBalances()
+        queries
+            .selectAllCategoryBalances()
             .asFlow()
             .mapToList(Dispatchers.Default)
             .map { list ->
@@ -48,19 +50,22 @@ class CategoryRepositoryImpl(
             }
 
     override fun getCategoryById(id: Long): Flow<Category?> =
-        queries.selectById(id)
+        queries
+            .selectById(id)
             .asFlow()
             .mapToOneOrNull(Dispatchers.Default)
             .map { it?.let(CategoryMapper::map) }
 
     override fun getTopLevelCategories(): Flow<List<Category>> =
-        queries.selectTopLevel()
+        queries
+            .selectTopLevel()
             .asFlow()
             .mapToList(Dispatchers.Default)
             .map(CategoryMapper::mapList)
 
     override fun getCategoriesByParent(parentId: Long): Flow<List<Category>> =
-        queries.selectByParent(parentId)
+        queries
+            .selectByParent(parentId)
             .asFlow()
             .mapToList(Dispatchers.Default)
             .map(CategoryMapper::mapList)

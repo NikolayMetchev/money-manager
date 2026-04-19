@@ -26,13 +26,15 @@ class CsvAccountMappingRepositoryImpl(
     private val queries = database.csvAccountMappingQueries
 
     override fun getMappingsForStrategy(strategyId: CsvImportStrategyId): Flow<List<CsvAccountMapping>> =
-        queries.selectByStrategyId(strategyId.id.toString())
+        queries
+            .selectByStrategyId(strategyId.id.toString())
             .asFlow()
             .mapToList(coroutineContext)
             .map { mappings -> mappings.map(::toDomain) }
 
     override fun getMappingById(id: Long): Flow<CsvAccountMapping?> =
-        queries.selectById(id)
+        queries
+            .selectById(id)
             .asFlow()
             .mapToOneOrNull(coroutineContext)
             .map { it?.let(::toDomain) }

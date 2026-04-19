@@ -5,7 +5,9 @@ package com.moneymanager.currency
  *
  * @param code ISO 4217 currency code (e.g., "USD", "GBP", "EUR")
  */
-expect class Currency(code: String) {
+expect class Currency(
+    code: String,
+) {
     /**
      * The ISO 4217 currency code.
      */

@@ -32,7 +32,10 @@ import org.lighthousegames.logging.logging
 
 private val logger = logging()
 
-data class AuditScreenData<D>(val title: String, val diffs: List<D>)
+data class AuditScreenData<D>(
+    val title: String,
+    val diffs: List<D>,
+)
 
 @Composable
 fun <D : Any> AuditScreen(

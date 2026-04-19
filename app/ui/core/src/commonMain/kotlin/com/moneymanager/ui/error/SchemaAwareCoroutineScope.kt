@@ -69,6 +69,4 @@ fun ProvideSchemaAwareScope(content: @Composable () -> Unit) {
  * Use this instead of rememberCoroutineScope() when you need schema-aware error handling.
  */
 @Composable
-fun rememberSchemaAwareCoroutineScope(): CoroutineScope {
-    return LocalSchemaAwareScope.current
-}
+fun rememberSchemaAwareCoroutineScope(): CoroutineScope = LocalSchemaAwareScope.current

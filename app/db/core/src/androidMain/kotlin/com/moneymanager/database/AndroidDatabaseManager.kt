@@ -17,7 +17,9 @@ private val DEFAULT_DB_LOCATION = DbLocation(DEFAULT_DATABASE_NAME)
  * Manages SQLite databases using Android's built-in database support.
  * Stateless - does not track open databases.
  */
-class AndroidDatabaseManager(private val context: Context) : DatabaseManager {
+class AndroidDatabaseManager(
+    private val context: Context,
+) : DatabaseManager {
     override suspend fun openDatabase(location: DbLocation): MoneyManagerDatabaseWrapper =
         withContext(Dispatchers.IO) {
             // Check if this is a new database before opening

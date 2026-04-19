@@ -48,7 +48,8 @@ fun CurrencyPicker(
     placeholder: String = "Type to search...",
     isError: Boolean = false,
 ) {
-    val currencies by currencyRepository.getAllCurrencies()
+    val currencies by currencyRepository
+        .getAllCurrencies()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
 
     var expanded by remember { mutableStateOf(false) }

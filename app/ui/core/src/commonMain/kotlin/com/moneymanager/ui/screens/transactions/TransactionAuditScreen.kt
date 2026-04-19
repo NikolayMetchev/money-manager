@@ -57,7 +57,8 @@ fun TransactionAuditScreen(
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
     onBack: () -> Unit,
 ) {
-    val accounts by accountRepository.getAllAccounts()
+    val accounts by accountRepository
+        .getAllAccounts()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
 
     AuditScreen(

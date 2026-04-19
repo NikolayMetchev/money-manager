@@ -63,14 +63,34 @@ suspend fun generateSampleData(
     // Pick 10-20 popular currencies (or all if less than 20)
     val popularCurrencyCodes =
         listOf(
-            "USD", "EUR", "GBP", "JPY", "CAD", "AUD", "CHF", "CNY", "INR", "MXN",
-            "BRL", "KRW", "SGD", "NZD", "SEK", "NOK", "DKK", "PLN", "THB", "ZAR",
+            "USD",
+            "EUR",
+            "GBP",
+            "JPY",
+            "CAD",
+            "AUD",
+            "CHF",
+            "CNY",
+            "INR",
+            "MXN",
+            "BRL",
+            "KRW",
+            "SGD",
+            "NZD",
+            "SEK",
+            "NOK",
+            "DKK",
+            "PLN",
+            "THB",
+            "ZAR",
         )
 
     val selectedCurrencies =
-        allCurrencies.filter { currency ->
-            popularCurrencyCodes.contains(currency.code)
-        }.take(20).ifEmpty { allCurrencies.take(20) }
+        allCurrencies
+            .filter { currency ->
+                popularCurrencyCodes.contains(currency.code)
+            }.take(20)
+            .ifEmpty { allCurrencies.take(20) }
 
     check(selectedCurrencies.isNotEmpty()) { "No currencies available for sample data generation." }
 
@@ -440,16 +460,46 @@ suspend fun generateSampleData(
 private fun generateAccountNames(count: Int): List<String> {
     val prefixes =
         listOf(
-            "Personal", "Business", "Savings", "Emergency", "Investment", "Retirement",
-            "Travel", "Education", "Health", "Entertainment", "Shopping", "Food",
-            "Transport", "Utilities", "Mortgage", "Rent", "Vacation", "Hobby",
-            "Charity", "Gift", "Project", "Revenue", "Expense", "Cash",
+            "Personal",
+            "Business",
+            "Savings",
+            "Emergency",
+            "Investment",
+            "Retirement",
+            "Travel",
+            "Education",
+            "Health",
+            "Entertainment",
+            "Shopping",
+            "Food",
+            "Transport",
+            "Utilities",
+            "Mortgage",
+            "Rent",
+            "Vacation",
+            "Hobby",
+            "Charity",
+            "Gift",
+            "Project",
+            "Revenue",
+            "Expense",
+            "Cash",
         )
 
     val suffixes =
         listOf(
-            "Checking", "Savings", "Account", "Fund", "Wallet", "Reserve",
-            "Portfolio", "Budget", "Stash", "Pool", "Treasury", "Vault",
+            "Checking",
+            "Savings",
+            "Account",
+            "Fund",
+            "Wallet",
+            "Reserve",
+            "Portfolio",
+            "Budget",
+            "Stash",
+            "Pool",
+            "Treasury",
+            "Vault",
         )
 
     val names = mutableListOf<String>()
@@ -546,8 +596,8 @@ private data class CategoryWithChildren(
     val children: List<Category>,
 )
 
-private fun generateCategoryHierarchy(): List<CategoryWithChildren> {
-    return listOf(
+private fun generateCategoryHierarchy(): List<CategoryWithChildren> =
+    listOf(
         CategoryWithChildren(
             category = Category(name = "Income"),
             children =
@@ -728,7 +778,6 @@ private fun generateCategoryHierarchy(): List<CategoryWithChildren> {
                 ),
         ),
     )
-}
 
 data class GenerationProgress(
     val accountsCreated: Int = 0,

@@ -19,13 +19,15 @@ class PersonRepositoryImpl(
     private val queries = database.personQueries
 
     override fun getAllPeople(): Flow<List<Person>> =
-        queries.selectAll()
+        queries
+            .selectAll()
             .asFlow()
             .mapToList(Dispatchers.Default)
             .map(PersonMapper::mapList)
 
     override fun getPersonById(id: PersonId): Flow<Person?> =
-        queries.selectById(id.id)
+        queries
+            .selectById(id.id)
             .asFlow()
             .mapToOneOrNull(Dispatchers.Default)
             .map { it?.let(PersonMapper::map) }

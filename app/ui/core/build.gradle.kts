@@ -11,7 +11,7 @@ kotlin {
                 api(projects.app.db.core)
                 api(projects.app.model.core)
 
-                implementation(compose.components.resources)
+                implementation(libs.compose.components.resources)
                 implementation(libs.human.readable)
                 implementation(libs.kmlogging)
                 implementation(libs.kotlinx.datetime)

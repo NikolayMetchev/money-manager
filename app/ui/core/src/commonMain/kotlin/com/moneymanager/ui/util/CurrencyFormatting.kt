@@ -14,14 +14,13 @@ import com.moneymanager.currency.Currency as CurrencyFormatter
 fun formatAmount(
     amount: Number,
     currency: Currency,
-): String {
-    return try {
+): String =
+    try {
         CurrencyFormatter(currency.code).format(amount)
     } catch (e: IllegalArgumentException) {
         // Fallback for unknown currency codes - just format as number with currency code
         String.format("%.2f %s", amount.toDouble(), currency.code)
     }
-}
 
 /**
  * Formats a Money value using the embedded currency.
@@ -29,6 +28,4 @@ fun formatAmount(
  * @param money The Money value to format
  * @return Formatted currency string (e.g., "$1,234.56" for USD)
  */
-fun formatAmount(money: Money): String {
-    return formatAmount(money.toDisplayValue().toDouble(), money.currency)
-}
+fun formatAmount(money: Money): String = formatAmount(money.toDisplayValue().toDouble(), money.currency)

@@ -25,23 +25,24 @@ class DeviceRepositoryImplTest : DbTest() {
      */
     private fun selectAllPlatforms(): List<PlatformRecord> {
         val sql = "SELECT id, name FROM platform"
-        return database.executeQuery(
-            identifier = null,
-            sql = sql,
-            mapper = { cursor ->
-                val results = mutableListOf<PlatformRecord>()
-                while (cursor.next().value) {
-                    results.add(
-                        PlatformRecord(
-                            id = cursor.getLong(0)!!,
-                            name = cursor.getString(1)!!,
-                        ),
-                    )
-                }
-                QueryResult.Value(results)
-            },
-            parameters = 0,
-        ).value
+        return database
+            .executeQuery(
+                identifier = null,
+                sql = sql,
+                mapper = { cursor ->
+                    val results = mutableListOf<PlatformRecord>()
+                    while (cursor.next().value) {
+                        results.add(
+                            PlatformRecord(
+                                id = cursor.getLong(0)!!,
+                                name = cursor.getString(1)!!,
+                            ),
+                        )
+                    }
+                    QueryResult.Value(results)
+                },
+                parameters = 0,
+            ).value
     }
 
     @Test

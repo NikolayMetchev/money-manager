@@ -20,19 +20,22 @@ class CurrencyRepositoryImpl(
     private val queries = database.currencyQueries
 
     override fun getAllCurrencies(): Flow<List<Currency>> =
-        queries.selectAll()
+        queries
+            .selectAll()
             .asFlow()
             .mapToList(Dispatchers.Default)
             .map(CurrencyMapper::mapList)
 
     override fun getCurrencyById(id: CurrencyId): Flow<Currency?> =
-        queries.selectById(id.id)
+        queries
+            .selectById(id.id)
             .asFlow()
             .mapToOneOrNull(Dispatchers.Default)
             .map { it?.let(CurrencyMapper::map) }
 
     override fun getCurrencyByCode(code: String): Flow<Currency?> =
-        queries.selectByCode(code)
+        queries
+            .selectByCode(code)
             .asFlow()
             .mapToOneOrNull(Dispatchers.Default)
             .map { it?.let(CurrencyMapper::map) }

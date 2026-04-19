@@ -21,8 +21,8 @@ private val logger = logging()
 fun <T> Flow<T>.collectAsStateWithSchemaErrorHandling(
     initial: T,
     databaseLocation: String = "default",
-): State<T> {
-    return produceState(initial, this) {
+): State<T> =
+    produceState(initial, this) {
         catch { e ->
             if (SchemaErrorDetector.isSchemaError(e)) {
                 logger.error(e) { "Schema error in Flow collection: ${e.message}" }
@@ -32,4 +32,3 @@ fun <T> Flow<T>.collectAsStateWithSchemaErrorHandling(
             }
         }.collect { value = it }
     }
-}

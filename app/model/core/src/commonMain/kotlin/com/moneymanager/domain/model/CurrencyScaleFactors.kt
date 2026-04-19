@@ -86,9 +86,7 @@ object CurrencyScaleFactors {
      * @param currencyCode The ISO 4217 currency code (e.g., "USD", "JPY", "BHD")
      * @return The scale factor for the currency (e.g., 100 for USD, 1 for JPY, 1000 for BHD)
      */
-    fun getScaleFactor(currencyCode: String): Int {
-        return scaleFactors[currencyCode.uppercase()] ?: DEFAULT_SCALE_FACTOR
-    }
+    fun getScaleFactor(currencyCode: String): Int = scaleFactors[currencyCode.uppercase()] ?: DEFAULT_SCALE_FACTOR
 
     /**
      * Gets the number of decimal places for a given ISO 4217 currency code.

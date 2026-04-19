@@ -147,7 +147,8 @@ fun SettingsScreen(
         )
 
         // Preferences Section
-        val defaultCurrencyId by settingsRepository.getDefaultCurrencyId()
+        val defaultCurrencyId by settingsRepository
+            .getDefaultCurrencyId()
             .collectAsStateWithSchemaErrorHandling(initial = null)
 
         Card(

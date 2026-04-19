@@ -384,8 +384,8 @@ class CsvTransferMapper(
      * Extracts attribute values from CSV row based on strategy.attributeMappings.
      * Skips attributes with blank values.
      */
-    private fun extractAttributes(values: List<String>): List<Pair<String, String>> {
-        return strategy.attributeMappings.mapNotNull { mapping ->
+    private fun extractAttributes(values: List<String>): List<Pair<String, String>> =
+        strategy.attributeMappings.mapNotNull { mapping ->
             val value = getColumnValueOrNull(mapping.columnName, values)?.trim()
             if (value.isNullOrBlank()) {
                 null
@@ -393,7 +393,6 @@ class CsvTransferMapper(
                 mapping.attributeTypeName to value
             }
         }
-    }
 
     /**
      * Gets a column value by name, returning null if the column doesn't exist.
@@ -507,12 +506,11 @@ class CsvTransferMapper(
     private fun getAccountName(
         mapping: AccountLookupMapping,
         values: List<String>,
-    ): String {
-        return mapping.allColumns
+    ): String =
+        mapping.allColumns
             .map { getColumnValue(it, values) }
             .firstOrNull { it.isNotBlank() }
             .orEmpty()
-    }
 
     /**
      * Result of resolving a RegexAccountMapping to an account name.
@@ -616,8 +614,8 @@ class CsvTransferMapper(
     private fun parseTimezone(
         mapping: FieldMapping?,
         values: List<String>,
-    ): TimeZone {
-        return when (mapping) {
+    ): TimeZone =
+        when (mapping) {
             is HardCodedTimezoneMapping -> TimeZone.of(mapping.timezoneId)
             is TimezoneLookupMapping -> {
                 val tzId = getColumnValue(mapping.columnName, values).trim()
@@ -625,17 +623,15 @@ class CsvTransferMapper(
             }
             else -> TimeZone.currentSystemDefault()
         }
-    }
 
     private fun parseDescription(
         mapping: FieldMapping,
         values: List<String>,
-    ): String {
-        return when (mapping) {
+    ): String =
+        when (mapping) {
             is DirectColumnMapping -> getDirectColumnValue(mapping, values)
             else -> throw IllegalArgumentException("Invalid description mapping type: ${mapping::class}")
         }
-    }
 
     /**
      * Gets the effective value from a DirectColumnMapping,
@@ -644,18 +640,17 @@ class CsvTransferMapper(
     private fun getDirectColumnValue(
         mapping: DirectColumnMapping,
         values: List<String>,
-    ): String {
-        return mapping.allColumns
+    ): String =
+        mapping.allColumns
             .map { getColumnValue(it, values) }
             .firstOrNull { it.isNotBlank() }
             .orEmpty()
-    }
 
     private fun parseCurrency(
         mapping: FieldMapping,
         values: List<String>,
-    ): Currency? {
-        return when (mapping) {
+    ): Currency? =
+        when (mapping) {
             is HardCodedCurrencyMapping -> existingCurrencies[mapping.currencyId]
             is CurrencyLookupMapping -> {
                 val code = getColumnValue(mapping.columnName, values).trim().uppercase()
@@ -663,7 +658,6 @@ class CsvTransferMapper(
             }
             else -> throw IllegalArgumentException("Invalid currency mapping type: ${mapping::class}")
         }
-    }
 
     private fun getColumnValue(
         columnName: String,
@@ -679,7 +673,8 @@ class CsvTransferMapper(
 
     private fun parseBigDecimal(value: String): BigDecimal {
         val cleaned =
-            value.trim()
+            value
+                .trim()
                 .replace(",", "") // Remove thousand separators
                 .replace(" ", "")
                 .replace("$", "")

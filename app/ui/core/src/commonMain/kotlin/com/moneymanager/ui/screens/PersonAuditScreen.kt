@@ -65,8 +65,8 @@ private data class PersonAuditDiff(
 private fun computePersonAuditDiffs(
     entries: List<PersonAuditEntry>,
     currentPerson: Person?,
-): List<PersonAuditDiff> {
-    return entries.mapIndexed { index, entry ->
+): List<PersonAuditDiff> =
+    entries.mapIndexed { index, entry ->
         when (entry.auditType) {
             AuditType.INSERT ->
                 PersonAuditDiff(
@@ -144,7 +144,6 @@ private fun computePersonAuditDiffs(
             }
         }
     }
-}
 
 @Composable
 private fun PersonAuditDiffCard(diff: PersonAuditDiff) {

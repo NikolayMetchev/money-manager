@@ -84,7 +84,8 @@ fun CsvImportDetailScreen(
     onTransferClick: ((TransferId, Boolean) -> Unit)? = null,
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
-    val import by csvImportRepository.getImport(importId)
+    val import by csvImportRepository
+        .getImport(importId)
         .collectAsStateWithSchemaErrorHandling(initial = null)
     var rows by remember { mutableStateOf<List<CsvRow>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
@@ -99,7 +100,8 @@ fun CsvImportDetailScreen(
     var hasMatchingStrategy by remember { mutableStateOf(false) }
 
     // Observe strategies to re-check when new ones are added
-    val strategies by csvImportStrategyRepository.getAllStrategies()
+    val strategies by csvImportStrategyRepository
+        .getAllStrategies()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
 
     // Check if there's a matching strategy for this import's columns
@@ -115,23 +117,30 @@ fun CsvImportDetailScreen(
     // Determine amount column index by looking for common amount column names
     val amountColumnIndex =
         remember(import) {
-            import?.columns?.indexOfFirst { column ->
-                val name = column.originalName.lowercase()
-                name == "amount" || name == "value" || name == "total" ||
-                    name == "debit" || name == "credit" || name.contains("amount")
-            }?.takeIf { it >= 0 }
+            import
+                ?.columns
+                ?.indexOfFirst { column ->
+                    val name = column.originalName.lowercase()
+                    name == "amount" ||
+                        name == "value" ||
+                        name == "total" ||
+                        name == "debit" ||
+                        name == "credit" ||
+                        name.contains("amount")
+                }?.takeIf { it >= 0 }
         }
 
     // Load rows when import is available or after import completes
     LaunchedEffect(import, rowsRefreshTrigger) {
-        scope.launch {
-            import?.let {
-                isLoading = true
-                // Load all rows - the actual row count is stored in the import metadata
-                rows = csvImportRepository.getImportRows(importId, limit = it.rowCount, offset = 0)
-                isLoading = false
-            }
-        }.join()
+        scope
+            .launch {
+                import?.let {
+                    isLoading = true
+                    // Load all rows - the actual row count is stored in the import metadata
+                    rows = csvImportRepository.getImportRows(importId, limit = it.rowCount, offset = 0)
+                    isLoading = false
+                }
+            }.join()
     }
 
     Column(
@@ -311,7 +320,8 @@ fun CsvImportDetailScreen(
                         onDuplicateSourceClick = { transferId, isPositiveAmount ->
                             scope.launch {
                                 val source =
-                                    transferSourceRepository.getSourcesForTransaction(transferId)
+                                    transferSourceRepository
+                                        .getSourcesForTransaction(transferId)
                                         .filter { it.sourceType == SourceType.CSV_IMPORT }
                                         .minByOrNull { it.revisionId }
                                 val csvSource = source?.csvSource

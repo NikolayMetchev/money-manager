@@ -425,9 +425,7 @@ class AccountsScreenTest {
             return newId
         }
 
-        override suspend fun createAccountsBatch(accounts: List<Account>): List<AccountId> {
-            return accounts.map { createAccount(it) }
-        }
+        override suspend fun createAccountsBatch(accounts: List<Account>): List<AccountId> = accounts.map { createAccount(it) }
 
         override suspend fun updateAccount(account: Account): Long {
             accountsFlow.value =
@@ -574,7 +572,9 @@ class AccountsScreenTest {
 
         override fun getPersonById(id: com.moneymanager.domain.model.PersonId) = flowOf(null as com.moneymanager.domain.model.Person?)
 
-        override suspend fun createPerson(person: com.moneymanager.domain.model.Person) = com.moneymanager.domain.model.PersonId(0)
+        override suspend fun createPerson(person: com.moneymanager.domain.model.Person) =
+            com.moneymanager.domain.model
+                .PersonId(0)
 
         override suspend fun updatePerson(person: com.moneymanager.domain.model.Person) {}
 
@@ -631,9 +631,8 @@ class AccountsScreenTest {
                         sql: String,
                         parameters: Int,
                         binders: (app.cash.sqldelight.db.SqlPreparedStatement.() -> Unit)?,
-                    ): app.cash.sqldelight.db.QueryResult<Long> {
+                    ): app.cash.sqldelight.db.QueryResult<Long> =
                         throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
-                    }
 
                     override fun <R> executeQuery(
                         identifier: Int?,
@@ -641,13 +640,11 @@ class AccountsScreenTest {
                         mapper: (app.cash.sqldelight.db.SqlCursor) -> app.cash.sqldelight.db.QueryResult<R>,
                         parameters: Int,
                         binders: (app.cash.sqldelight.db.SqlPreparedStatement.() -> Unit)?,
-                    ): app.cash.sqldelight.db.QueryResult<R> {
+                    ): app.cash.sqldelight.db.QueryResult<R> =
                         throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
-                    }
 
-                    override fun newTransaction(): app.cash.sqldelight.db.QueryResult<app.cash.sqldelight.Transacter.Transaction> {
+                    override fun newTransaction(): app.cash.sqldelight.db.QueryResult<app.cash.sqldelight.Transacter.Transaction> =
                         throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
-                    }
 
                     override fun addListener(
                         vararg queryKeys: String,
@@ -662,7 +659,8 @@ class AccountsScreenTest {
                     override fun notifyListeners(vararg queryKeys: String) = Unit
                 }
 
-            return com.moneymanager.database.sql.EntitySourceQueries(stubDriver)
+            return com.moneymanager.database.sql
+                .EntitySourceQueries(stubDriver)
         }
     }
 }

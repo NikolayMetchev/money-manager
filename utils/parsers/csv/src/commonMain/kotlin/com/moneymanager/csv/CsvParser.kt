@@ -139,15 +139,14 @@ class CsvParser {
     private fun normalizeRows(
         rows: List<List<String>>,
         columnCount: Int,
-    ): List<List<String>> {
-        return rows.map { row ->
+    ): List<List<String>> =
+        rows.map { row ->
             when {
                 row.size < columnCount -> row + List(columnCount - row.size) { "" }
                 row.size > columnCount -> row.take(columnCount)
                 else -> row
             }
         }
-    }
 
     private fun calculateDelimiterScore(
         lines: List<String>,

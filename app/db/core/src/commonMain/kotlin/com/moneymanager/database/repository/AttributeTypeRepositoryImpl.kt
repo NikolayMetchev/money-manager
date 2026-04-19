@@ -18,7 +18,8 @@ class AttributeTypeRepositoryImpl(
     private val queries = database.attributeTypeQueries
 
     override fun getAll(): Flow<List<AttributeType>> =
-        queries.selectAll()
+        queries
+            .selectAll()
             .asFlow()
             .mapToList(Dispatchers.Default)
             .map { list ->
@@ -31,7 +32,8 @@ class AttributeTypeRepositoryImpl(
             }
 
     override fun getById(id: AttributeTypeId): Flow<AttributeType?> =
-        queries.selectById(id.id)
+        queries
+            .selectById(id.id)
             .asFlow()
             .mapToOneOrNull(Dispatchers.Default)
             .map { row ->
@@ -44,7 +46,8 @@ class AttributeTypeRepositoryImpl(
             }
 
     override fun getByName(name: String): Flow<AttributeType?> =
-        queries.selectByName(name)
+        queries
+            .selectByName(name)
             .asFlow()
             .mapToOneOrNull(Dispatchers.Default)
             .map { row ->

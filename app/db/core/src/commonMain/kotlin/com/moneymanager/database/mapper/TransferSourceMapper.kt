@@ -18,8 +18,8 @@ object TransferSourceFromRevisionMapper :
     IdConversions,
     InstantConversions,
     SourceTypeConversions {
-    override fun map(from: SelectByTransactionIdAndRevision): TransferSource {
-        return mapping {
+    override fun map(from: SelectByTransactionIdAndRevision): TransferSource =
+        mapping {
             TransferSource::deviceInfo fromValue
                 DeviceRepositoryImpl.createDeviceInfo(
                     platformName = from.platform_name,
@@ -31,7 +31,6 @@ object TransferSourceFromRevisionMapper :
             TransferSource::csvSource fromValue
                 mapCsvSource(toSourceType(from.source_type), from.csv_import_id, from.csv_row_index, from.csv_file_name)
         }
-    }
 }
 
 object TransferSourceFromTransactionIdMapper :
@@ -39,8 +38,8 @@ object TransferSourceFromTransactionIdMapper :
     IdConversions,
     InstantConversions,
     SourceTypeConversions {
-    override fun map(from: SelectAllByTransactionId): TransferSource {
-        return mapping {
+    override fun map(from: SelectAllByTransactionId): TransferSource =
+        mapping {
             TransferSource::deviceInfo fromValue
                 DeviceRepositoryImpl.createDeviceInfo(
                     platformName = from.platform_name,
@@ -52,7 +51,6 @@ object TransferSourceFromTransactionIdMapper :
             TransferSource::csvSource fromValue
                 mapCsvSource(toSourceType(from.source_type), from.csv_import_id, from.csv_row_index, from.csv_file_name)
         }
-    }
 }
 
 object TransferSourceFromAuditMapper :

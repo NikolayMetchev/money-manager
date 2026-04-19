@@ -16,7 +16,8 @@ class SettingsRepositoryImpl(
     private val queries = database.settingsQueries
 
     override fun getDefaultCurrencyId(): Flow<CurrencyId?> =
-        queries.selectDefaultCurrencyId()
+        queries
+            .selectDefaultCurrencyId()
             .asFlow()
             .mapToOneOrNull(Dispatchers.Default)
             .map { it?.let(::CurrencyId) }

@@ -61,8 +61,8 @@ private fun readFileContent(
 private fun getFileName(
     context: Context,
     uri: Uri,
-): String? {
-    return context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+): String? =
+    context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
         if (cursor.moveToFirst()) {
             val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
             if (nameIndex >= 0) {
@@ -74,7 +74,6 @@ private fun getFileName(
             null
         }
     }
-}
 
 private fun getLastModified(
     context: Context,

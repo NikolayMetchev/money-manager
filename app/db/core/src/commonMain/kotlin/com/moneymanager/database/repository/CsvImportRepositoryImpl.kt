@@ -78,14 +78,16 @@ class CsvImportRepositoryImpl(
             }
         }
 
-    override fun getAllImports(): Flow<List<CsvImport>> {
-        return csvImportQueries.selectAllImports()
+    override fun getAllImports(): Flow<List<CsvImport>> =
+        csvImportQueries
+            .selectAllImports()
             .asFlow()
             .mapToList(coroutineContext)
             .map { imports ->
                 imports.map { import ->
                     val columns =
-                        csvImportQueries.selectColumnsByImportId(import.id)
+                        csvImportQueries
+                            .selectColumnsByImportId(import.id)
                             .executeAsList()
                             .map { col ->
                                 CsvColumn(
@@ -116,16 +118,17 @@ class CsvImportRepositoryImpl(
                     )
                 }
             }
-    }
 
     override fun getImport(id: CsvImportId): Flow<CsvImport?> {
         val importFlow =
-            csvImportQueries.selectImportById(id.id.toString())
+            csvImportQueries
+                .selectImportById(id.id.toString())
                 .asFlow()
                 .mapToOneOrNull(coroutineContext)
 
         val columnsFlow =
-            csvImportQueries.selectColumnsByImportId(id.id.toString())
+            csvImportQueries
+                .selectColumnsByImportId(id.id.toString())
                 .asFlow()
                 .mapToList(coroutineContext)
 
@@ -268,7 +271,8 @@ class CsvImportRepositoryImpl(
         withContext(coroutineContext) {
             csvImportQueries.selectImportsByChecksum(checksum).executeAsList().map { import ->
                 val columns =
-                    csvImportQueries.selectColumnsByImportId(import.id)
+                    csvImportQueries
+                        .selectColumnsByImportId(import.id)
                         .executeAsList()
                         .map { col ->
                             CsvColumn(

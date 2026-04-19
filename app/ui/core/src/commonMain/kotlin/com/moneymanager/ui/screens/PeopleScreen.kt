@@ -54,7 +54,8 @@ fun PeopleScreen(
     deviceId: DeviceId,
     onAuditClick: (Person) -> Unit = {},
 ) {
-    val people by personRepository.getAllPeople()
+    val people by personRepository
+        .getAllPeople()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
     var showCreateDialog by remember { mutableStateOf(false) }
     var personToEdit by remember { mutableStateOf<Person?>(null) }
@@ -100,7 +101,8 @@ fun PeopleScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(people) { person ->
-                        val ownerships by personAccountOwnershipRepository.getOwnershipsByPerson(person.id)
+                        val ownerships by personAccountOwnershipRepository
+                            .getOwnershipsByPerson(person.id)
                             .collectAsStateWithSchemaErrorHandling(initial = emptyList())
                         PersonCard(
                             person = person,
@@ -142,7 +144,8 @@ fun PeopleScreen(
 
     val currentPersonToDelete = personToDelete
     if (currentPersonToDelete != null) {
-        val ownerships by personAccountOwnershipRepository.getOwnershipsByPerson(currentPersonToDelete.id)
+        val ownerships by personAccountOwnershipRepository
+            .getOwnershipsByPerson(currentPersonToDelete.id)
             .collectAsStateWithSchemaErrorHandling(initial = emptyList())
         DeletePersonConfirmationDialog(
             person = currentPersonToDelete,

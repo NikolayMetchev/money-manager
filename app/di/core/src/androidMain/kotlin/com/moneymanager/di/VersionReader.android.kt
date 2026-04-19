@@ -21,14 +21,14 @@ fun initializeVersionReader(context: Context) {
  * Android implementation of version reader.
  * Reads the VERSION file from the assets folder.
  */
-actual fun readAppVersion(): AppVersion {
-    return try {
+actual fun readAppVersion(): AppVersion =
+    try {
         val versionString =
-            androidContext.assets.open("VERSION")
+            androidContext.assets
+                .open("VERSION")
                 .bufferedReader()
                 .use { it.readText().trim() }
         AppVersion(versionString)
     } catch (_: Exception) {
         AppVersion("Unknown")
     }
-}

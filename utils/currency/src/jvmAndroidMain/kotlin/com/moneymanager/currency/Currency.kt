@@ -6,7 +6,9 @@ import java.text.NumberFormat
 import java.util.Locale
 import java.util.Currency as JavaCurrency
 
-actual class Currency actual constructor(actual val code: String) {
+actual class Currency actual constructor(
+    actual val code: String,
+) {
     private val javaCurrency: JavaCurrency = JavaCurrency.getInstance(code)
     private val formatter: NumberFormat =
         NumberFormat.getCurrencyInstance().apply {
@@ -20,7 +22,8 @@ actual class Currency actual constructor(actual val code: String) {
 
     actual companion object {
         actual fun getAllCurrencies(): List<Currency> =
-            JavaCurrency.getAvailableCurrencies()
+            JavaCurrency
+                .getAvailableCurrencies()
                 .map { Currency(it.currencyCode) }
                 .sortedBy { it.code }
 

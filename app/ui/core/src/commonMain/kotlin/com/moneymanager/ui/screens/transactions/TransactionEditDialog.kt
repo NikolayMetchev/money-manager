@@ -95,7 +95,15 @@ fun TransactionEditDialog(
     var sourceAccountId by remember { mutableStateOf(transaction?.sourceAccountId ?: preSelectedSourceAccountId) }
     var targetAccountId by remember { mutableStateOf(transaction?.targetAccountId) }
     var currencyId by remember { mutableStateOf(transaction?.amount?.currency?.id ?: preSelectedCurrencyId) }
-    var amount by remember { mutableStateOf(transaction?.amount?.toDisplayValue()?.toString().orEmpty()) }
+    var amount by remember {
+        mutableStateOf(
+            transaction
+                ?.amount
+                ?.toDisplayValue()
+                ?.toString()
+                .orEmpty(),
+        )
+    }
     var description by remember { mutableStateOf(transaction?.description.orEmpty()) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
@@ -166,7 +174,7 @@ fun TransactionEditDialog(
             editableAttributes,
             originalAttributes,
         ) {
-            if (!isEditMode || transaction == null) {
+            if (transaction == null) {
                 // In create mode, enable save only when all required fields are filled and valid
                 sourceAccountId != null &&
                     targetAccountId != null &&
@@ -428,7 +436,7 @@ fun TransactionEditDialog(
                                             .atTime(selectedHour, selectedMinute, originalSecond, originalNanosecond)
                                             .toInstant(TimeZone.currentSystemDefault())
 
-                                    if (isEditMode && transaction != null) {
+                                    if (transaction != null) {
                                         // EDIT MODE: Update existing transaction
                                         // Check if transfer fields actually changed
                                         val transferFieldsChanged =

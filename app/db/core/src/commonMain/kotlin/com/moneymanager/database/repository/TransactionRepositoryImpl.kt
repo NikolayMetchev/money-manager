@@ -41,7 +41,8 @@ class TransactionRepositoryImpl(
         if (transfers.isEmpty()) return transfers
         val ids = transfers.map { it.id.id }
         val attributesByTransferId =
-            transferAttributeQueries.selectByTransactionIds(ids)
+            transferAttributeQueries
+                .selectByTransactionIds(ids)
                 .executeAsList()
                 .groupBy { TransferId(it.transaction_id) }
                 .mapValues { (_, rows) ->
@@ -67,13 +68,15 @@ class TransactionRepositoryImpl(
     }
 
     override fun getTransactionById(id: Long): Flow<Transfer?> =
-        transferQueries.selectById(id, TransferMapper::mapRaw)
+        transferQueries
+            .selectById(id, TransferMapper::mapRaw)
             .asFlow()
             .mapToOneOrNull(Dispatchers.Default)
             .map { loadAttributesForTransfer(it) }
 
     override fun getTransactionsByAccount(accountId: AccountId): Flow<List<Transfer>> =
-        transferQueries.selectByAccount(accountId.id, accountId.id, TransferMapper::mapRaw)
+        transferQueries
+            .selectByAccount(accountId.id, accountId.id, TransferMapper::mapRaw)
             .asFlow()
             .mapToList(Dispatchers.Default)
             .map { loadAttributesForTransfers(it) }
@@ -82,12 +85,12 @@ class TransactionRepositoryImpl(
         startDate: Instant,
         endDate: Instant,
     ): Flow<List<Transfer>> =
-        transferQueries.selectByDateRange(
-            startDate.toEpochMilliseconds(),
-            endDate.toEpochMilliseconds(),
-            TransferMapper::mapRaw,
-        )
-            .asFlow()
+        transferQueries
+            .selectByDateRange(
+                startDate.toEpochMilliseconds(),
+                endDate.toEpochMilliseconds(),
+                TransferMapper::mapRaw,
+            ).asFlow()
             .mapToList(Dispatchers.Default)
             .map { loadAttributesForTransfers(it) }
 
@@ -96,19 +99,20 @@ class TransactionRepositoryImpl(
         startDate: Instant,
         endDate: Instant,
     ): Flow<List<Transfer>> =
-        transferQueries.selectByAccountAndDateRange(
-            accountId.id,
-            accountId.id,
-            startDate.toEpochMilliseconds(),
-            endDate.toEpochMilliseconds(),
-            TransferMapper::mapRaw,
-        )
-            .asFlow()
+        transferQueries
+            .selectByAccountAndDateRange(
+                accountId.id,
+                accountId.id,
+                startDate.toEpochMilliseconds(),
+                endDate.toEpochMilliseconds(),
+                TransferMapper::mapRaw,
+            ).asFlow()
             .mapToList(Dispatchers.Default)
             .map { loadAttributesForTransfers(it) }
 
     override fun getAccountBalances(): Flow<List<AccountBalance>> =
-        transferQueries.selectAllBalances()
+        transferQueries
+            .selectAllBalances()
             .asFlow()
             .mapToList(Dispatchers.Default)
             .map(AccountBalanceMapper::mapList)
@@ -120,15 +124,13 @@ class TransactionRepositoryImpl(
     ): PagingResult<AccountRow> =
         withContext(Dispatchers.Default) {
             val items =
-                transferQueries.selectRunningBalanceByAccountPaginated(
-                    accountId.id,
-                    pagingInfo?.lastTimestamp?.toEpochMilliseconds(),
-                    pagingInfo?.lastId?.id,
-                    (pageSize + 1).toLong(),
-                ) { id, timestamp, description, account_id, transaction_amount, running_balance,
-                    currency_id, currency_code, currency_name, currency_scale_factor, source_account_id, target_account_id,
-                    ->
-                    AccountRowMapper.mapRaw(
+                transferQueries
+                    .selectRunningBalanceByAccountPaginated(
+                        accountId.id,
+                        pagingInfo?.lastTimestamp?.toEpochMilliseconds(),
+                        pagingInfo?.lastId?.id,
+                        (pageSize + 1).toLong(),
+                    ) {
                         id,
                         timestamp,
                         description,
@@ -141,9 +143,22 @@ class TransactionRepositoryImpl(
                         currency_scale_factor,
                         source_account_id,
                         target_account_id,
-                    )
-                }
-                    .executeAsList()
+                        ->
+                        AccountRowMapper.mapRaw(
+                            id,
+                            timestamp,
+                            description,
+                            account_id,
+                            transaction_amount,
+                            running_balance,
+                            currency_id,
+                            currency_code,
+                            currency_name,
+                            currency_scale_factor,
+                            source_account_id,
+                            target_account_id,
+                        )
+                    }.executeAsList()
 
             val hasMore = items.size > pageSize
             val pageItems = if (hasMore) items.take(pageSize) else items
@@ -178,15 +193,13 @@ class TransactionRepositoryImpl(
     ): PagingResult<AccountRow> =
         withContext(Dispatchers.Default) {
             val items =
-                transferQueries.selectRunningBalanceByAccountPaginatedBackward(
-                    accountId.id,
-                    firstTimestamp.toEpochMilliseconds(),
-                    firstId.id,
-                    (pageSize + 1).toLong(),
-                ) { id, timestamp, description, account_id, transaction_amount, running_balance,
-                    currency_id, currency_code, currency_name, currency_scale_factor, source_account_id, target_account_id,
-                    ->
-                    AccountRowMapper.mapRaw(
+                transferQueries
+                    .selectRunningBalanceByAccountPaginatedBackward(
+                        accountId.id,
+                        firstTimestamp.toEpochMilliseconds(),
+                        firstId.id,
+                        (pageSize + 1).toLong(),
+                    ) {
                         id,
                         timestamp,
                         description,
@@ -199,9 +212,22 @@ class TransactionRepositoryImpl(
                         currency_scale_factor,
                         source_account_id,
                         target_account_id,
-                    )
-                }
-                    .executeAsList()
+                        ->
+                        AccountRowMapper.mapRaw(
+                            id,
+                            timestamp,
+                            description,
+                            account_id,
+                            transaction_amount,
+                            running_balance,
+                            currency_id,
+                            currency_code,
+                            currency_name,
+                            currency_scale_factor,
+                            source_account_id,
+                            target_account_id,
+                        )
+                    }.executeAsList()
                     // Reverse to get correct display order (newest first)
                     .reversed()
 
@@ -238,21 +264,24 @@ class TransactionRepositoryImpl(
         withContext(Dispatchers.Default) {
             // First, get the transaction to find its timestamp
             val transaction =
-                transferQueries.selectById(transactionId.id, TransferMapper::mapRaw)
+                transferQueries
+                    .selectById(transactionId.id, TransferMapper::mapRaw)
                     .executeAsOneOrNull()
                     ?: throw IllegalArgumentException("Transaction not found: $transactionId")
 
             // Get the row position of the transaction (0-indexed, sorted by timestamp DESC)
             val rowPosition =
-                transferQueries.getTransactionRowPosition(
-                    accountId = accountId.id,
-                    targetTimestamp = transaction.timestamp.toEpochMilliseconds(),
-                    targetId = transactionId.id,
-                ).executeAsOne()
+                transferQueries
+                    .getTransactionRowPosition(
+                        accountId = accountId.id,
+                        targetTimestamp = transaction.timestamp.toEpochMilliseconds(),
+                        targetId = transactionId.id,
+                    ).executeAsOne()
 
             // Get total count to know if there are more items
             val totalCount =
-                transferQueries.countTransactionsByAccount(accountId.id)
+                transferQueries
+                    .countTransactionsByAccount(accountId.id)
                     .executeAsOne()
 
             // Calculate offset to center the transaction in the page
@@ -266,14 +295,12 @@ class TransactionRepositoryImpl(
 
             // Load the page
             val items =
-                transferQueries.selectRunningBalanceByAccountOffset(
-                    accountId = accountId.id,
-                    limit = pageSize.toLong(),
-                    offset = offset,
-                ) { id, timestamp, description, account_id, transaction_amount, running_balance,
-                    currency_id, currency_code, currency_name, currency_scale_factor, source_account_id, target_account_id,
-                    ->
-                    AccountRowMapper.mapRaw(
+                transferQueries
+                    .selectRunningBalanceByAccountOffset(
+                        accountId = accountId.id,
+                        limit = pageSize.toLong(),
+                        offset = offset,
+                    ) {
                         id,
                         timestamp,
                         description,
@@ -286,9 +313,22 @@ class TransactionRepositoryImpl(
                         currency_scale_factor,
                         source_account_id,
                         target_account_id,
-                    )
-                }
-                    .executeAsList()
+                        ->
+                        AccountRowMapper.mapRaw(
+                            id,
+                            timestamp,
+                            description,
+                            account_id,
+                            transaction_amount,
+                            running_balance,
+                            currency_id,
+                            currency_code,
+                            currency_name,
+                            currency_scale_factor,
+                            source_account_id,
+                            target_account_id,
+                        )
+                    }.executeAsList()
 
             // Find the target transaction's index within the loaded page
             val targetIndex =

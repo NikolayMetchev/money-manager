@@ -60,7 +60,8 @@ fun AccountPicker(
     excludeAccountId: AccountId? = null,
     isError: Boolean = false,
 ) {
-    val accounts by accountRepository.getAllAccounts()
+    val accounts by accountRepository
+        .getAllAccounts()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
 
     var expanded by remember { mutableStateOf(false) }

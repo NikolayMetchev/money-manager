@@ -75,9 +75,11 @@ fun CreateAccountDialog(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
 
-    val categories by categoryRepository.getAllCategories()
+    val categories by categoryRepository
+        .getAllCategories()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val people by personRepository.getAllPeople()
+    val people by personRepository
+        .getAllPeople()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
     val scope = rememberSchemaAwareCoroutineScope()
 
@@ -224,7 +226,9 @@ fun CreateAccountDialog(
                                 selectedOwnerIds.forEach { personId ->
                                     val ownershipId =
                                         personAccountOwnershipRepository.createOwnership(
-                                            personId = com.moneymanager.domain.model.PersonId(personId),
+                                            personId =
+                                                com.moneymanager.domain.model
+                                                    .PersonId(personId),
                                             accountId = accountId,
                                         )
                                     // Record source for ownership audit trail
