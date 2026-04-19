@@ -93,7 +93,9 @@ fun CsvStrategiesScreen(
     var isLoadingRows by remember { mutableStateOf(false) }
 
     // Export state
+    var strategyPendingExportPrompt by remember { mutableStateOf<CsvImportStrategy?>(null) }
     var strategyToExport by remember { mutableStateOf<CsvImportStrategy?>(null) }
+    var includeAccountMappingsInExport by remember { mutableStateOf<Boolean?>(null) }
     var exportJson by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
@@ -105,11 +107,10 @@ fun CsvStrategiesScreen(
     val fileSaver =
         rememberFileSaver(
             mimeType = "application/json",
-            onResult = { result ->
-                if (result?.success == true) {
-                    strategyToExport = null
-                    exportJson = null
-                }
+            onResult = {
+                strategyToExport = null
+                includeAccountMappingsInExport = null
+                exportJson = null
             },
         )
 
@@ -137,17 +138,23 @@ fun CsvStrategiesScreen(
         )
 
     // Handle export when strategy is selected
-    LaunchedEffect(strategyToExport) {
+    LaunchedEffect(strategyToExport, includeAccountMappingsInExport) {
         val strategy = strategyToExport
-        if (strategy != null && exportJson == null) {
+        val includeAccountMappings = includeAccountMappingsInExport
+        if (strategy != null && includeAccountMappings != null && exportJson == null) {
             @Suppress("TooGenericExceptionCaught")
             try {
-                val persistedAccountMappings = csvAccountMappingRepository.getMappingsForStrategy(strategy.id).first()
+                val persistedAccountMappings =
+                    if (includeAccountMappings) {
+                        csvAccountMappingRepository.getMappingsForStrategy(strategy.id).first()
+                    } else {
+                        emptyList()
+                    }
                 val export =
                     csvStrategyExportService.toExport(
                         strategy = strategy,
                         appVersion = appVersion,
-                        includeAccountMappings = true,
+                        includeAccountMappings = includeAccountMappings,
                         accountMappings = persistedAccountMappings,
                     )
                 val json = CsvStrategyExportCodec.encode(export)
@@ -156,6 +163,7 @@ fun CsvStrategiesScreen(
                 fileSaver.launch(fileName, json)
             } catch (expected: Exception) {
                 strategyToExport = null
+                includeAccountMappingsInExport = null
                 exportJson = null
             }
         }
@@ -255,7 +263,7 @@ fun CsvStrategiesScreen(
                                     showSelectCsvDialog = true
                                 },
                                 onExportClick = {
-                                    strategyToExport = strategy
+                                    strategyPendingExportPrompt = strategy
                                 },
                             )
                         }
@@ -267,6 +275,22 @@ fun CsvStrategiesScreen(
                 }
             }
         }
+    }
+
+    val currentStrategyPendingExportPrompt = strategyPendingExportPrompt
+    if (currentStrategyPendingExportPrompt != null) {
+        ExportAccountMappingsDialog(
+            strategy = currentStrategyPendingExportPrompt,
+            onExport = { includeAccountMappings ->
+                strategyPendingExportPrompt = null
+                exportJson = null
+                strategyToExport = currentStrategyPendingExportPrompt
+                includeAccountMappingsInExport = includeAccountMappings
+            },
+            onDismiss = {
+                strategyPendingExportPrompt = null
+            },
+        )
     }
 
     // Show CSV import selector dialog

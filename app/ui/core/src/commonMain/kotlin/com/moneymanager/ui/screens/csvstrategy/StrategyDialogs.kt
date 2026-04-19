@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -17,6 +18,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -26,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -108,6 +111,60 @@ fun DeleteCsvStrategyDialog(
                 onClick = onDismiss,
                 enabled = !isDeleting,
             ) {
+                Text("Cancel")
+            }
+        },
+    )
+}
+
+/**
+ * Dialog for choosing whether persisted CSV account mappings should be included in an export.
+ */
+@Composable
+fun ExportAccountMappingsDialog(
+    strategy: CsvImportStrategy,
+    onExport: (includeAccountMappings: Boolean) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var includeAccountMappings by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Export Strategy") },
+        text = {
+            Column {
+                Text("Export \"${strategy.name}\" as a JSON file.")
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { includeAccountMappings = !includeAccountMappings },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Checkbox(
+                        checked = includeAccountMappings,
+                        onCheckedChange = { includeAccountMappings = it },
+                    )
+                    Text(
+                        text = "Include account mappings",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+                Text(
+                    text = "Account mappings can contain account names from this database.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onExport(includeAccountMappings) }) {
+                Text("Export")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
                 Text("Cancel")
             }
         },
