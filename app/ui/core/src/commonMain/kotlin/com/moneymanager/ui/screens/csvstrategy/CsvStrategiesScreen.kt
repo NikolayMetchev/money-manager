@@ -97,6 +97,7 @@ fun CsvStrategiesScreen(
     var strategyToExport by remember { mutableStateOf<CsvImportStrategy?>(null) }
     var includeAccountMappingsInExport by remember { mutableStateOf<Boolean?>(null) }
     var exportJson by remember { mutableStateOf<String?>(null) }
+    var exportError by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
     // Import state
@@ -128,6 +129,7 @@ fun CsvStrategiesScreen(
                             val parseResult = csvStrategyExportService.parseExport(export)
                             importParseResult = parseResult
                             importError = null
+                            exportError = null
                         } catch (expected: Exception) {
                             importError = "Failed to parse file: ${expected.message}"
                             importParseResult = null
@@ -144,6 +146,7 @@ fun CsvStrategiesScreen(
         if (strategy != null && includeAccountMappings != null && exportJson == null) {
             @Suppress("TooGenericExceptionCaught")
             try {
+                exportError = null
                 val persistedAccountMappings =
                     if (includeAccountMappings) {
                         csvAccountMappingRepository.getMappingsForStrategy(strategy.id).first()
@@ -154,8 +157,7 @@ fun CsvStrategiesScreen(
                     csvStrategyExportService.toExport(
                         strategy = strategy,
                         appVersion = appVersion,
-                        includeAccountMappings = includeAccountMappings,
-                        accountMappings = persistedAccountMappings,
+                        accountMappings = persistedAccountMappings.takeIf { includeAccountMappings },
                     )
                 val json = CsvStrategyExportCodec.encode(export)
                 exportJson = json
@@ -165,6 +167,7 @@ fun CsvStrategiesScreen(
                 strategyToExport = null
                 includeAccountMappingsInExport = null
                 exportJson = null
+                exportError = "Failed to export: ${expected.message}"
             }
         }
     }
@@ -217,6 +220,14 @@ fun CsvStrategiesScreen(
 
             // Show import error if any
             importError?.let { error ->
+                Text(
+                    text = error,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
+            }
+            exportError?.let { error ->
                 Text(
                     text = error,
                     color = MaterialTheme.colorScheme.error,
@@ -284,6 +295,7 @@ fun CsvStrategiesScreen(
             onExport = { includeAccountMappings ->
                 strategyPendingExportPrompt = null
                 exportJson = null
+                exportError = null
                 strategyToExport = currentStrategyPendingExportPrompt
                 includeAccountMappingsInExport = includeAccountMappings
             },

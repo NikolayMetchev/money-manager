@@ -27,6 +27,13 @@ data class CsvStrategyExport(
     val accountMappings: List<CsvAccountMappingExport> = emptyList(),
 )
 
+/**
+ * Portable export format for a persisted account mapping.
+ *
+ * @property valuePattern Regex pattern string from CsvAccountMapping.valuePattern.
+ * Consumers compile this with Regex(...), so it must be a valid regex with any
+ * literal characters escaped as needed.
+ */
 @Serializable
 data class CsvAccountMappingExport(
     val columnName: String,

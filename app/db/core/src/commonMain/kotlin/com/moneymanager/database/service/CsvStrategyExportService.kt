@@ -109,8 +109,7 @@ class CsvStrategyExportService(
     suspend fun toExport(
         strategy: CsvImportStrategy,
         appVersion: AppVersion,
-        includeAccountMappings: Boolean = false,
-        accountMappings: List<CsvAccountMapping> = emptyList(),
+        accountMappings: List<CsvAccountMapping>? = null,
     ): CsvStrategyExport {
         val accounts = accountRepository.getAllAccounts().first()
         val currencies = currencyRepository.getAllCurrencies().first()
@@ -130,12 +129,15 @@ class CsvStrategyExportService(
                 },
             attributeMappings = strategy.attributeMappings,
             accountMappings =
-                if (includeAccountMappings) {
+                if (accountMappings != null) {
                     accountMappings.map { mapping ->
+                        val account =
+                            accountsById[mapping.accountId]
+                                ?: error("Missing account for id ${mapping.accountId.id} in CsvAccountMapping")
                         CsvAccountMappingExport(
                             columnName = mapping.columnName,
                             valuePattern = mapping.valuePattern.pattern,
-                            accountName = accountsById[mapping.accountId]?.name ?: "Unknown Account",
+                            accountName = account.name,
                         )
                     }
                 } else {

@@ -55,6 +55,8 @@ import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
+import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.csvstrategy.export.CsvAccountMappingExport
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CsvAccountMappingRepository
@@ -186,6 +188,7 @@ fun ImportStrategyDialog(
                     isImporting = true
                     errorMessage = null
                     scope.launch {
+                        var createdStrategyId: CsvImportStrategyId? = null
                         try {
                             // Update the export with the new name if changed
                             val exportWithNewName = parseResult.export.copy(name = strategyName)
@@ -197,24 +200,30 @@ fun ImportStrategyDialog(
                                     resolutions = resolutions,
                                 )
 
-                            // Save it
-                            csvImportStrategyRepository.createStrategy(strategy)
+                            val resolvedAccountMappings =
+                                resolveAccountMappings(
+                                    accountMappings = exportWithNewName.accountMappings,
+                                    resolutions = resolutions,
+                                    accounts = accountRepository.getAllAccounts().first(),
+                                )
 
-                            val accountsByName = accountRepository.getAllAccounts().first().associateBy { it.name }
-                            exportWithNewName.accountMappings.forEach { mapping ->
-                                val accountId =
-                                    accountsByName[mapping.accountName]?.id
-                                        ?: error("Account not found: ${mapping.accountName}")
+                            createdStrategyId = csvImportStrategyRepository.createStrategy(strategy)
+                            resolvedAccountMappings.forEach { mapping ->
                                 csvAccountMappingRepository.createMapping(
                                     strategyId = strategy.id,
                                     columnName = mapping.columnName,
-                                    valuePattern = Regex(mapping.valuePattern),
-                                    accountId = accountId,
+                                    valuePattern = mapping.valuePattern,
+                                    accountId = mapping.accountId,
                                 )
                             }
                             onImportSuccess()
                             onDismiss()
                         } catch (expected: Exception) {
+                            createdStrategyId?.let { strategyId ->
+                                runCatching {
+                                    csvImportStrategyRepository.deleteStrategy(strategyId)
+                                }
+                            }
                             errorMessage = "Failed to import: ${expected.message}"
                             isImporting = false
                         }
@@ -241,6 +250,56 @@ fun ImportStrategyDialog(
         },
     )
 }
+
+private data class ResolvedAccountMapping(
+    val columnName: String,
+    val valuePattern: Regex,
+    val accountId: AccountId,
+)
+
+private fun resolveAccountMappings(
+    accountMappings: List<CsvAccountMappingExport>,
+    resolutions: Map<UnresolvedReference, Resolution>,
+    accounts: List<Account>,
+): List<ResolvedAccountMapping> {
+    val accountsByName = accounts.associateBy { it.name }
+    val accountsById = accounts.associateBy { it.id.id }
+
+    return accountMappings.map { mapping ->
+        val resolution =
+            resolutions[accountMappingReference(mapping.accountName)]
+                ?: resolutions.entries
+                    .firstOrNull { (reference) ->
+                        reference.type == ReferenceType.ACCOUNT && reference.name == mapping.accountName
+                    }
+                    ?.value
+        val account =
+            when (resolution) {
+                is Resolution.CreateNew ->
+                    accountsByName[resolution.name]
+                        ?: error("Created account not found: ${resolution.name}")
+                is Resolution.MapToExisting ->
+                    accountsById[resolution.id]
+                        ?: error("Resolved account not found: ${mapping.accountName}")
+                null ->
+                    accountsByName[mapping.accountName]
+                        ?: error("Account not found: ${mapping.accountName}")
+            }
+
+        ResolvedAccountMapping(
+            columnName = mapping.columnName,
+            valuePattern = Regex(mapping.valuePattern),
+            accountId = account.id,
+        )
+    }
+}
+
+private fun accountMappingReference(accountName: String): UnresolvedReference =
+    UnresolvedReference(
+        type = ReferenceType.ACCOUNT,
+        name = accountName,
+        fieldType = TransferField.SOURCE_ACCOUNT,
+    )
 
 /**
  * Row for resolving a single unresolved reference.
