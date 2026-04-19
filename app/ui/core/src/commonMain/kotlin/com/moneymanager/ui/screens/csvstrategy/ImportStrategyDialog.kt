@@ -171,9 +171,9 @@ fun ImportStrategyDialog(
                             onClick = {
                                 resolutions =
                                     resolutions +
-                                        unresolvedAccountReferences.associateWith { reference ->
-                                            Resolution.CreateNew(reference.name)
-                                        }
+                                    unresolvedAccountReferences.associateWith { reference ->
+                                        Resolution.CreateNew(reference.name)
+                                    }
                             },
                             enabled = !isImporting,
                         ) {
