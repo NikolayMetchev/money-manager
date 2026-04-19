@@ -152,7 +152,9 @@ fun ExportAccountMappingsDialog(
                     )
                 }
                 Text(
-                    text = "Account mappings can contain account names from this database.",
+                    text =
+                        "Use this only when importing into a database with matching accounts. " +
+                            "Leave it unchecked for a more portable strategy.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
