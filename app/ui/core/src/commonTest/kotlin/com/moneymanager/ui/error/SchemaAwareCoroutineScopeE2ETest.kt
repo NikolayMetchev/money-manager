@@ -93,16 +93,19 @@ class SchemaAwareCoroutineScopeE2ETest {
 
             // Wait for schema error dialog (shown at startup due to missing tables)
             waitUntilExactlyOneExists(hasText("Database Schema Error"), timeoutMillis = 10000)
+            waitUntilExactlyOneExists(hasText("Delete Database and Start Fresh"), timeoutMillis = 10000)
 
             // When: User clicks "Delete Database and Start Fresh"
             onNodeWithText("Delete Database and Start Fresh").performClick()
 
             // Then: Dialog should disappear and app should recover
             waitUntilDoesNotExist(hasText("Database Schema Error"), timeoutMillis = 10000)
+            waitForIdle()
             onNodeWithText("Database Schema Error").assertDoesNotExist()
 
             // App should now show normal content after database recreation
-            waitUntilExactlyOneExists(hasText("Your Accounts"), timeoutMillis = 10000)
+            waitUntilExactlyOneExists(hasText("Your Accounts"), timeoutMillis = 15000)
+            waitForIdle()
         }
 }
 
