@@ -68,6 +68,7 @@ import com.moneymanager.ui.screens.csvstrategy.CsvStrategiesScreen
 import com.moneymanager.ui.screens.transactions.AccountTransactionsScreen
 import com.moneymanager.ui.screens.transactions.TransactionAuditScreen
 import com.moneymanager.ui.screens.transactions.TransactionEditDialog
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 
@@ -371,6 +372,7 @@ fun MoneyManagerApp(
                         is Screen.CsvImportDetail -> {
                             CsvImportDetailScreen(
                                 importId = screen.importId,
+                                scrollToRowIndex = screen.scrollToRowIndex,
                                 csvImportRepository = csvImportRepository,
                                 csvImportStrategyRepository = csvImportStrategyRepository,
                                 csvAccountMappingRepository = csvAccountMappingRepository,
@@ -382,38 +384,39 @@ fun MoneyManagerApp(
                                 personRepository = personRepository,
                                 personAccountOwnershipRepository = personAccountOwnershipRepository,
                                 maintenanceService = maintenanceService,
+                                transferSourceRepository = transferSourceRepository,
                                 transferSourceQueries = transferSourceQueries,
                                 entitySourceQueries = entitySourceQueries,
                                 deviceRepository = deviceRepository,
                                 deviceId = deviceId,
                                 onBack = { navigationHistory.navigateBack() },
                                 onDeleted = { navigationHistory.navigateTo(Screen.CsvImports) },
+                                onCsvSourceClick = { importId, rowIndex ->
+                                    navigationHistory.navigateTo(Screen.CsvImportDetail(importId, rowIndex))
+                                },
                                 onTransferClick = { transferId, isPositiveAmount ->
                                     scope.launch {
-                                        transactionRepository
-                                            .getTransactionById(transferId.id)
-                                            .collect { transfer ->
-                                                transfer?.let {
-                                                    // Navigate to target account if positive (money coming in),
-                                                    // source account if negative (money going out)
-                                                    val accountId =
-                                                        if (isPositiveAmount) {
-                                                            transfer.targetAccountId
-                                                        } else {
-                                                            transfer.sourceAccountId
-                                                        }
-                                                    val account = accounts.find { a -> a.id == accountId }
-                                                    if (account != null) {
-                                                        navigationHistory.navigateTo(
-                                                            Screen.AccountTransactions(
-                                                                accountId = account.id,
-                                                                accountName = account.name,
-                                                                scrollToTransferId = transferId,
-                                                            ),
-                                                        )
-                                                    }
-                                                }
+                                        val transfer =
+                                            transactionRepository
+                                                .getTransactionById(transferId.id)
+                                                .first()
+                                                ?: return@launch
+                                        // Navigate to target account if positive (money coming in),
+                                        // source account if negative (money going out)
+                                        val accountId =
+                                            if (isPositiveAmount) {
+                                                transfer.targetAccountId
+                                            } else {
+                                                transfer.sourceAccountId
                                             }
+                                        val account = accounts.find { a -> a.id == accountId }
+                                        navigationHistory.navigateTo(
+                                            Screen.AccountTransactions(
+                                                accountId = accountId,
+                                                accountName = account?.name ?: accountId.toString(),
+                                                scrollToTransferId = transferId,
+                                            ),
+                                        )
                                     }
                                 },
                             )
@@ -447,6 +450,9 @@ fun MoneyManagerApp(
                                 accountRepository = accountRepository,
                                 transactionRepository = transactionRepository,
                                 currentDeviceId = deviceId,
+                                onCsvSourceClick = { importId, rowIndex ->
+                                    navigationHistory.navigateTo(Screen.CsvImportDetail(importId, rowIndex))
+                                },
                                 onBack = { navigationHistory.navigateBack() },
                             )
                         }

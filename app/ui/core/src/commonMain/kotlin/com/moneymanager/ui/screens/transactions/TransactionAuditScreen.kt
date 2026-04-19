@@ -2,10 +2,14 @@ package com.moneymanager.ui.screens.transactions
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -20,6 +24,7 @@ import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.SourceType
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.TransferSource
+import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AuditRepository
 import com.moneymanager.domain.repository.TransactionRepository
@@ -49,6 +54,7 @@ fun TransactionAuditScreen(
     accountRepository: AccountRepository,
     transactionRepository: TransactionRepository,
     currentDeviceId: DeviceId? = null,
+    onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
     onBack: () -> Unit,
 ) {
     val accounts by accountRepository.getAllAccounts()
@@ -100,6 +106,7 @@ fun TransactionAuditScreen(
                 diff = diff,
                 accounts = accounts,
                 currentDeviceId = currentDeviceId,
+                onCsvSourceClick = onCsvSourceClick,
             )
         },
     )
@@ -110,6 +117,7 @@ private fun TransactionAuditDiffCard(
     diff: AuditEntryDiff,
     accounts: List<Account>,
     currentDeviceId: DeviceId? = null,
+    onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
 ) {
     AuditDiffCard(
         auditType = diff.auditType,
@@ -117,9 +125,9 @@ private fun TransactionAuditDiffCard(
         revisionId = diff.revisionId,
     ) {
         when (diff.auditType) {
-            AuditType.INSERT -> InsertDiffContent(diff, accounts, currentDeviceId)
-            AuditType.UPDATE -> UpdateDiffContent(diff, accounts, currentDeviceId)
-            AuditType.DELETE -> DeleteDiffContent(diff, accounts, currentDeviceId)
+            AuditType.INSERT -> InsertDiffContent(diff, accounts, currentDeviceId, onCsvSourceClick)
+            AuditType.UPDATE -> UpdateDiffContent(diff, accounts, currentDeviceId, onCsvSourceClick)
+            AuditType.DELETE -> DeleteDiffContent(diff, accounts, currentDeviceId, onCsvSourceClick)
         }
     }
 }
@@ -129,6 +137,7 @@ private fun InsertDiffContent(
     diff: AuditEntryDiff,
     accounts: List<Account>,
     currentDeviceId: DeviceId? = null,
+    onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
 ) {
     val transactionDateTime = diff.timestamp.value().toLocalDateTime(TimeZone.currentSystemDefault())
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -143,7 +152,7 @@ private fun InsertDiffContent(
         FieldValueRow("Amount", formatAmount(diff.amount.value()), labelWidth = LABEL_WIDTH)
         FieldValueRow("Description", diff.description.value().ifBlank { "(none)" }, labelWidth = LABEL_WIDTH)
         AttributesSection(diff.attributeChanges)
-        SourceInfoSection(diff.source, currentDeviceId = currentDeviceId)
+        SourceInfoSection(diff.source, currentDeviceId = currentDeviceId, onCsvSourceClick = onCsvSourceClick)
     }
 }
 
@@ -152,6 +161,7 @@ private fun UpdateDiffContent(
     diff: AuditEntryDiff,
     accounts: List<Account>,
     currentDeviceId: DeviceId? = null,
+    onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
 ) {
     val hasAnyChanges = diff.hasChanges
 
@@ -225,7 +235,7 @@ private fun UpdateDiffContent(
                 AttributeChangesSection(significantAttrChanges)
             }
         }
-        SourceInfoSection(diff.source, currentDeviceId = currentDeviceId)
+        SourceInfoSection(diff.source, currentDeviceId = currentDeviceId, onCsvSourceClick = onCsvSourceClick)
     }
 }
 
@@ -234,6 +244,7 @@ private fun DeleteDiffContent(
     diff: AuditEntryDiff,
     accounts: List<Account>,
     currentDeviceId: DeviceId? = null,
+    onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
 ) {
     val errorColor = MaterialTheme.colorScheme.error
     val transactionDateTime = diff.timestamp.value().toLocalDateTime(TimeZone.currentSystemDefault())
@@ -249,7 +260,12 @@ private fun DeleteDiffContent(
         FieldValueRow("Amount", formatAmount(diff.amount.value()), errorColor, labelWidth = LABEL_WIDTH)
         FieldValueRow("Description", diff.description.value().ifBlank { "(none)" }, errorColor, labelWidth = LABEL_WIDTH)
         AttributesSection(diff.attributeChanges, errorColor)
-        SourceInfoSection(diff.source, currentDeviceId = currentDeviceId, labelColor = errorColor.copy(alpha = 0.8f))
+        SourceInfoSection(
+            diff.source,
+            currentDeviceId = currentDeviceId,
+            labelColor = errorColor.copy(alpha = 0.8f),
+            onCsvSourceClick = onCsvSourceClick,
+        )
     }
 }
 
@@ -411,6 +427,7 @@ private fun SourceInfoSection(
     source: TransferSource?,
     currentDeviceId: DeviceId? = null,
     labelColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
 ) {
     if (source == null) return
 
@@ -449,8 +466,26 @@ private fun SourceInfoSection(
                 if (csvSource != null) {
                     val fileName = csvSource.fileName ?: "Unknown file"
                     FieldValueRow("Origin", "CSV Import$thisDeviceSuffix", labelWidth = LABEL_WIDTH)
-                    FieldValueRow("File", fileName, labelWidth = LABEL_WIDTH)
-                    FieldValueRow("Row", (csvSource.rowIndex + 1).toString(), labelWidth = LABEL_WIDTH)
+                    val csvImportId = csvSource.importId
+                    if (csvImportId != null) {
+                        CsvSourceLinkRow(
+                            label = "File",
+                            value = fileName,
+                            csvImportId = csvImportId,
+                            rowIndex = csvSource.rowIndex,
+                            onCsvSourceClick = onCsvSourceClick,
+                        )
+                        CsvSourceLinkRow(
+                            label = "Row",
+                            value = csvSource.rowIndex.toString(),
+                            csvImportId = csvImportId,
+                            rowIndex = csvSource.rowIndex,
+                            onCsvSourceClick = onCsvSourceClick,
+                        )
+                    } else {
+                        FieldValueRow("File", fileName, labelWidth = LABEL_WIDTH)
+                        FieldValueRow("Row", csvSource.rowIndex.toString(), labelWidth = LABEL_WIDTH)
+                    }
                 } else {
                     FieldValueRow("Origin", "CSV Import$thisDeviceSuffix", labelWidth = LABEL_WIDTH)
                 }
@@ -482,6 +517,34 @@ private fun SourceInfoSection(
             SourceType.SYSTEM -> {
                 FieldValueRow("Origin", "System", labelWidth = LABEL_WIDTH)
             }
+        }
+    }
+}
+
+@Composable
+private fun CsvSourceLinkRow(
+    label: String,
+    value: String,
+    csvImportId: CsvImportId,
+    rowIndex: Long,
+    onCsvSourceClick: (CsvImportId, Long) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "$label:",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.width(LABEL_WIDTH),
+        )
+        TextButton(
+            onClick = { onCsvSourceClick(csvImportId, rowIndex) },
+            contentPadding = PaddingValues(0.dp),
+        ) {
+            Text(value)
         }
     }
 }

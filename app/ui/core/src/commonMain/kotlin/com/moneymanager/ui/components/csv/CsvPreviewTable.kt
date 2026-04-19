@@ -15,10 +15,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -33,7 +33,7 @@ import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
 
-private val TRANSFER_COLUMN_WIDTH = 100.dp
+private val TRANSFER_COLUMN_WIDTH = 120.dp
 private val ROW_INDEX_COLUMN_WIDTH = 60.dp
 private val STATUS_COLUMN_WIDTH = 90.dp
 
@@ -45,297 +45,317 @@ fun CsvPreviewTable(
     columnWidth: Dp = 150.dp,
     amountColumnIndex: Int? = null,
     failedRowIndexes: Set<Long> = emptySet(),
+    scrollToRowIndex: Long? = null,
+    onDuplicateSourceClick: ((TransferId) -> Unit)? = null,
     onTransferClick: ((TransferId, Boolean) -> Unit)? = null,
 ) {
     val horizontalScrollState = rememberScrollState()
     val lazyListState = rememberLazyListState()
 
-    SelectionContainer {
-        Column(modifier = modifier) {
-            // Header row
-            Row(
+    LaunchedEffect(scrollToRowIndex, rows) {
+        val targetIndex = rows.indexOfFirst { it.rowIndex == scrollToRowIndex }
+        if (targetIndex >= 0) {
+            lazyListState.animateScrollToItem(targetIndex)
+        }
+    }
+
+    Column(modifier = modifier) {
+        // Header row
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(horizontalScrollState)
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+        ) {
+            // Row index column header
+            Box(
                 modifier =
                     Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(horizontalScrollState)
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
-            ) {
-                // Row index column header
-                Box(
-                    modifier =
-                        Modifier
-                            .width(ROW_INDEX_COLUMN_WIDTH)
-                            .border(
-                                width = 1.dp,
-                                color = MaterialTheme.colorScheme.outline,
-                            )
-                            .padding(8.dp),
-                ) {
-                    Text(
-                        text = "Row",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-
-                // Status column header
-                Box(
-                    modifier =
-                        Modifier
-                            .width(STATUS_COLUMN_WIDTH)
-                            .border(
-                                width = 1.dp,
-                                color = MaterialTheme.colorScheme.outline,
-                            )
-                            .padding(8.dp),
-                ) {
-                    Text(
-                        text = "Status",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-
-                // Transfer ID column header
-                Box(
-                    modifier =
-                        Modifier
-                            .width(TRANSFER_COLUMN_WIDTH)
-                            .border(
-                                width = 1.dp,
-                                color = MaterialTheme.colorScheme.outline,
-                            )
-                            .padding(8.dp),
-                ) {
-                    Text(
-                        text = "Transaction Id",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-
-                // CSV columns
-                columns.sortedBy { it.columnIndex }.forEach { column ->
-                    Box(
-                        modifier =
-                            Modifier
-                                .width(columnWidth)
-                                .border(
-                                    width = 1.dp,
-                                    color = MaterialTheme.colorScheme.outline,
-                                )
-                                .padding(8.dp),
-                    ) {
-                        Text(
-                            text = column.originalName,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
+                        .width(ROW_INDEX_COLUMN_WIDTH)
+                        .border(
+                            width = 1.dp,
+                            color = MaterialTheme.colorScheme.outline,
                         )
-                    }
-                }
+                        .padding(8.dp),
+            ) {
+                Text(
+                    text = "Row",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
 
-            // Data rows with vertical scrollbar
-            Box(modifier = Modifier.weight(1f)) {
-                LazyColumn(state = lazyListState) {
-                    itemsIndexed(rows) { _, row ->
-                        val isFailed = row.rowIndex in failedRowIndexes
-                        val hasError = row.errorMessage != null
-                        val rowBackground =
-                            if (isFailed || hasError) {
-                                MaterialTheme.colorScheme.errorContainer
-                            } else {
-                                MaterialTheme.colorScheme.surface
-                            }
+            // Status column header
+            Box(
+                modifier =
+                    Modifier
+                        .width(STATUS_COLUMN_WIDTH)
+                        .border(
+                            width = 1.dp,
+                            color = MaterialTheme.colorScheme.outline,
+                        )
+                        .padding(8.dp),
+            ) {
+                Text(
+                    text = "Status",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
 
-                        Column {
-                            Row(
+            // Transaction navigation column header
+            Box(
+                modifier =
+                    Modifier
+                        .width(TRANSFER_COLUMN_WIDTH)
+                        .border(
+                            width = 1.dp,
+                            color = MaterialTheme.colorScheme.outline,
+                        )
+                        .padding(8.dp),
+            ) {
+                Text(
+                    text = "Transaction",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+
+            // CSV columns
+            columns.sortedBy { it.columnIndex }.forEach { column ->
+                Box(
+                    modifier =
+                        Modifier
+                            .width(columnWidth)
+                            .border(
+                                width = 1.dp,
+                                color = MaterialTheme.colorScheme.outline,
+                            )
+                            .padding(8.dp),
+                ) {
+                    Text(
+                        text = column.originalName,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+
+        // Data rows with vertical scrollbar
+        Box(modifier = Modifier.weight(1f)) {
+            LazyColumn(state = lazyListState) {
+                itemsIndexed(rows) { _, row ->
+                    val isFailed = row.rowIndex in failedRowIndexes
+                    val hasError = row.errorMessage != null
+                    val rowBackground =
+                        when {
+                            row.rowIndex == scrollToRowIndex -> MaterialTheme.colorScheme.primaryContainer
+                            isFailed || hasError -> MaterialTheme.colorScheme.errorContainer
+                            else -> MaterialTheme.colorScheme.surface
+                        }
+
+                    Column {
+                        Row(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(horizontalScrollState)
+                                    .background(rowBackground),
+                        ) {
+                            // Row index cell
+                            Box(
                                 modifier =
                                     Modifier
-                                        .fillMaxWidth()
-                                        .horizontalScroll(horizontalScrollState)
-                                        .background(rowBackground),
+                                        .width(ROW_INDEX_COLUMN_WIDTH)
+                                        .border(
+                                            width = 1.dp,
+                                            color = MaterialTheme.colorScheme.outlineVariant,
+                                        )
+                                        .padding(8.dp),
                             ) {
-                                // Row index cell
-                                Box(
-                                    modifier =
-                                        Modifier
-                                            .width(ROW_INDEX_COLUMN_WIDTH)
-                                            .border(
-                                                width = 1.dp,
-                                                color = MaterialTheme.colorScheme.outlineVariant,
-                                            )
-                                            .padding(8.dp),
-                                ) {
+                                Text(
+                                    text = row.rowIndex.toString(),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = if (isFailed) FontWeight.Bold else FontWeight.Normal,
+                                    color =
+                                        if (isFailed) {
+                                            MaterialTheme.colorScheme.onErrorContainer
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurface
+                                        },
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+
+                            // Status cell
+                            Box(
+                                modifier =
+                                    Modifier
+                                        .width(STATUS_COLUMN_WIDTH)
+                                        .border(
+                                            width = 1.dp,
+                                            color = MaterialTheme.colorScheme.outlineVariant,
+                                        )
+                                        .padding(8.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                row.importStatus?.let { status ->
+                                    val (statusText, statusColor) =
+                                        when (status) {
+                                            ImportStatus.IMPORTED -> "New" to MaterialTheme.colorScheme.primary
+                                            ImportStatus.DUPLICATE -> "Duplicate" to MaterialTheme.colorScheme.secondary
+                                            ImportStatus.UPDATED -> "Updated" to MaterialTheme.colorScheme.tertiary
+                                            ImportStatus.ERROR -> "Error" to MaterialTheme.colorScheme.error
+                                        }
                                     Text(
-                                        text = row.rowIndex.toString(),
+                                        text = statusText,
                                         style = MaterialTheme.typography.bodySmall,
-                                        fontWeight = if (isFailed) FontWeight.Bold else FontWeight.Normal,
-                                        color =
-                                            if (isFailed) {
-                                                MaterialTheme.colorScheme.onErrorContainer
-                                            } else {
-                                                MaterialTheme.colorScheme.onSurface
-                                            },
+                                        color = statusColor,
+                                        fontWeight = FontWeight.Bold,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                     )
                                 }
+                            }
 
-                                // Status cell
-                                Box(
-                                    modifier =
-                                        Modifier
-                                            .width(STATUS_COLUMN_WIDTH)
-                                            .border(
-                                                width = 1.dp,
-                                                color = MaterialTheme.colorScheme.outlineVariant,
-                                            )
-                                            .padding(8.dp),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    row.importStatus?.let { status ->
-                                        val (statusText, statusColor) =
-                                            when (status) {
-                                                ImportStatus.IMPORTED -> "New" to MaterialTheme.colorScheme.primary
-                                                ImportStatus.DUPLICATE -> "Duplicate" to MaterialTheme.colorScheme.secondary
-                                                ImportStatus.UPDATED -> "Updated" to MaterialTheme.colorScheme.tertiary
-                                                ImportStatus.ERROR -> "Error" to MaterialTheme.colorScheme.error
-                                            }
+                            // Determine if amount is positive from the amount column
+                            val isPositiveAmount =
+                                amountColumnIndex?.let { idx ->
+                                    if (idx in row.values.indices) {
+                                        val amountStr = row.values[idx].trim()
+                                        // Parse the amount string - positive if it doesn't start with '-'
+                                        // Also handle parentheses notation (123) as negative
+                                        !amountStr.startsWith("-") && !amountStr.startsWith("(")
+                                    } else {
+                                        true
+                                    }
+                                } ?: true
+
+                            // Transfer ID cell
+                            TransferIdCell(
+                                importStatus = row.importStatus,
+                                transferId = row.transferId,
+                                isPositiveAmount = isPositiveAmount,
+                                onDuplicateSourceClick = onDuplicateSourceClick,
+                                onClick = onTransferClick,
+                            )
+
+                            // CSV data cells
+                            row.values.forEachIndexed { index, value ->
+                                if (index < columns.size) {
+                                    Box(
+                                        modifier =
+                                            Modifier
+                                                .width(columnWidth)
+                                                .border(
+                                                    width = 1.dp,
+                                                    color = MaterialTheme.colorScheme.outlineVariant,
+                                                )
+                                                .padding(8.dp),
+                                    ) {
                                         Text(
-                                            text = statusText,
+                                            text = value,
                                             style = MaterialTheme.typography.bodySmall,
-                                            color = statusColor,
-                                            fontWeight = FontWeight.Bold,
+                                            color =
+                                                if (isFailed) {
+                                                    MaterialTheme.colorScheme.onErrorContainer
+                                                } else {
+                                                    MaterialTheme.colorScheme.onSurface
+                                                },
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
                                         )
                                     }
                                 }
-
-                                // Determine if amount is positive from the amount column
-                                val isPositiveAmount =
-                                    amountColumnIndex?.let { idx ->
-                                        if (idx in row.values.indices) {
-                                            val amountStr = row.values[idx].trim()
-                                            // Parse the amount string - positive if it doesn't start with '-'
-                                            // Also handle parentheses notation (123) as negative
-                                            !amountStr.startsWith("-") && !amountStr.startsWith("(")
-                                        } else {
-                                            true
-                                        }
-                                    } ?: true
-
-                                // Transfer ID cell
-                                TransferIdCell(
-                                    transferId = row.transferId,
-                                    isPositiveAmount = isPositiveAmount,
-                                    onClick = onTransferClick,
-                                )
-
-                                // CSV data cells
-                                row.values.forEachIndexed { index, value ->
-                                    if (index < columns.size) {
-                                        Box(
-                                            modifier =
-                                                Modifier
-                                                    .width(columnWidth)
-                                                    .border(
-                                                        width = 1.dp,
-                                                        color = MaterialTheme.colorScheme.outlineVariant,
-                                                    )
-                                                    .padding(8.dp),
-                                        ) {
-                                            Text(
-                                                text = value,
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color =
-                                                    if (isFailed) {
-                                                        MaterialTheme.colorScheme.onErrorContainer
-                                                    } else {
-                                                        MaterialTheme.colorScheme.onSurface
-                                                    },
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis,
-                                            )
-                                        }
-                                    }
-                                }
                             }
+                        }
 
-                            // Error message row (shown below data row when there's an error)
-                            row.errorMessage?.let { error ->
-                                Row(
-                                    modifier =
-                                        Modifier
-                                            .fillMaxWidth()
-                                            .background(MaterialTheme.colorScheme.errorContainer)
-                                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                                ) {
-                                    Text(
-                                        text = error,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.error,
-                                        fontWeight = FontWeight.Medium,
-                                    )
-                                }
+                        // Error message row (shown below data row when there's an error)
+                        row.errorMessage?.let { error ->
+                            Row(
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .background(MaterialTheme.colorScheme.errorContainer)
+                                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                            ) {
+                                Text(
+                                    text = error,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error,
+                                    fontWeight = FontWeight.Medium,
+                                )
                             }
                         }
                     }
                 }
-
-                VerticalScrollbarForLazyList(
-                    lazyListState = lazyListState,
-                    modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
-                )
             }
 
-            // Horizontal scrollbar at the bottom
-            HorizontalScrollbarForScrollState(
-                scrollState = horizontalScrollState,
-                modifier = Modifier.fillMaxWidth(),
+            VerticalScrollbarForLazyList(
+                lazyListState = lazyListState,
+                modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
             )
         }
+
+        // Horizontal scrollbar at the bottom
+        HorizontalScrollbarForScrollState(
+            scrollState = horizontalScrollState,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 
 @Composable
 private fun TransferIdCell(
+    importStatus: ImportStatus?,
     transferId: TransferId?,
     isPositiveAmount: Boolean,
+    onDuplicateSourceClick: ((TransferId) -> Unit)?,
     onClick: ((TransferId, Boolean) -> Unit)?,
 ) {
+    val isDuplicate = importStatus == ImportStatus.DUPLICATE
+    val clickAction =
+        when {
+            transferId == null -> null
+            isDuplicate && onDuplicateSourceClick != null -> ({ onDuplicateSourceClick(transferId) })
+            onClick != null -> ({ onClick(transferId, isPositiveAmount) })
+            else -> null
+        }
+
     Box(
         modifier =
             Modifier
                 .width(TRANSFER_COLUMN_WIDTH)
-                .border(
-                    width = 1.dp,
-                    color = MaterialTheme.colorScheme.outlineVariant,
-                )
                 .then(
-                    if (transferId != null && onClick != null) {
-                        Modifier.clickable { onClick(transferId, isPositiveAmount) }
+                    if (clickAction != null) {
+                        Modifier.clickable { clickAction() }
                     } else {
                         Modifier
                     },
+                )
+                .border(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.outlineVariant,
                 )
                 .padding(8.dp),
     ) {
         if (transferId != null) {
             Text(
-                text = "View →",
+                text = if (isDuplicate && onDuplicateSourceClick != null) "Source ->" else "View ->",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.primary,
-                textDecoration = if (onClick != null) TextDecoration.Underline else TextDecoration.None,
+                textDecoration = if (clickAction != null) TextDecoration.Underline else TextDecoration.None,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
