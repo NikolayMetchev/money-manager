@@ -49,10 +49,12 @@ import com.moneymanager.database.service.ImportParseResult
 import com.moneymanager.database.service.ReferenceType
 import com.moneymanager.database.service.Resolution
 import com.moneymanager.database.service.UnresolvedReference
+import com.moneymanager.database.sql.EntitySourceQueries
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Currency
+import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.model.csvstrategy.export.CsvAccountMappingExport
@@ -61,6 +63,9 @@ import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CsvAccountMappingRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
+import com.moneymanager.domain.repository.PersonRepository
+import com.moneymanager.ui.components.CreateAccountDialog
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.flow.first
@@ -79,6 +84,10 @@ fun ImportStrategyDialog(
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
+    personRepository: PersonRepository,
+    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
+    entitySourceQueries: EntitySourceQueries,
+    deviceId: DeviceId,
     onDismiss: () -> Unit,
     onImportSuccess: () -> Unit,
 ) {
@@ -99,6 +108,10 @@ fun ImportStrategyDialog(
 
     // Check if all unresolved references have been resolved
     val allResolved = parseResult.unresolvedReferences.all { it in resolutions.keys }
+    val unresolvedAccountReferences =
+        parseResult.unresolvedReferences.filter { reference ->
+            reference.type == ReferenceType.ACCOUNT && reference !in resolutions.keys
+        }
 
     // Check for name conflict
     val existingStrategies by csvImportStrategyRepository.getAllStrategies()
@@ -153,6 +166,20 @@ fun ImportStrategyDialog(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    if (unresolvedAccountReferences.isNotEmpty()) {
+                        TextButton(
+                            onClick = {
+                                resolutions =
+                                    resolutions +
+                                        unresolvedAccountReferences.associateWith { reference ->
+                                            Resolution.CreateNew(reference.name)
+                                        }
+                            },
+                            enabled = !isImporting,
+                        ) {
+                            Text("Create New for All Unresolved Accounts")
+                        }
+                    }
                     Spacer(modifier = Modifier.height(8.dp))
 
                     parseResult.unresolvedReferences.forEach { ref ->
@@ -165,6 +192,12 @@ fun ImportStrategyDialog(
                             accounts = accounts,
                             categories = categories,
                             currencies = currencies,
+                            accountRepository = accountRepository,
+                            categoryRepository = categoryRepository,
+                            personRepository = personRepository,
+                            personAccountOwnershipRepository = personAccountOwnershipRepository,
+                            entitySourceQueries = entitySourceQueries,
+                            deviceId = deviceId,
                             enabled = !isImporting,
                         )
                         Spacer(modifier = Modifier.height(8.dp))
@@ -312,10 +345,17 @@ private fun ReferenceResolutionRow(
     accounts: List<Account>,
     categories: List<Category>,
     currencies: List<Currency>,
+    accountRepository: AccountRepository,
+    categoryRepository: CategoryRepository,
+    personRepository: PersonRepository,
+    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
+    entitySourceQueries: EntitySourceQueries,
+    deviceId: DeviceId,
     enabled: Boolean,
 ) {
     var expanded by remember { mutableStateOf(false) }
     var createNewName by remember { mutableStateOf(reference.name) }
+    var showCreateAccountDialog by remember { mutableStateOf(false) }
     var selectedOption by remember(resolution) {
         mutableStateOf(
             when (resolution) {
@@ -371,61 +411,73 @@ private fun ReferenceResolutionRow(
             // Resolution options
             when (reference.type) {
                 ReferenceType.ACCOUNT -> {
-                    ExposedDropdownMenuBox(
-                        expanded = expanded,
-                        onExpandedChange = { if (enabled) expanded = !expanded },
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        OutlinedTextField(
-                            value =
-                                when {
-                                    selectedOption == "create" -> "Create: $createNewName"
-                                    selectedOption?.startsWith("existing:") == true -> {
-                                        val id = selectedOption!!.removePrefix("existing:").toLongOrNull()
-                                        accounts.find { it.id.id == id }?.name ?: "Select..."
-                                    }
-                                    else -> "Select..."
-                                },
-                            onValueChange = {},
-                            readOnly = true,
-                            label = { Text("Map to") },
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
-                            enabled = enabled,
-                        )
-                        ExposedDropdownMenu(
+                        ExposedDropdownMenuBox(
                             expanded = expanded,
-                            onDismissRequest = { expanded = false },
+                            onExpandedChange = { if (enabled) expanded = !expanded },
+                            modifier = Modifier.weight(1f),
                         ) {
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        "Create new account",
-                                        color = MaterialTheme.colorScheme.primary,
-                                    )
-                                },
-                                onClick = {
-                                    selectedOption = "create"
-                                    onResolutionChanged(Resolution.CreateNew(createNewName))
-                                    expanded = false
-                                },
+                            OutlinedTextField(
+                                value =
+                                    when {
+                                        selectedOption?.startsWith("existing:") == true -> {
+                                            val id = selectedOption!!.removePrefix("existing:").toLongOrNull()
+                                            accounts.find { it.id.id == id }?.name ?: "Select..."
+                                        }
+                                        selectedOption == "create" -> "Create on import: $createNewName"
+                                        else -> "Select..."
+                                    },
+                                onValueChange = {},
+                                readOnly = true,
+                                label = { Text("Map to") },
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+                                enabled = enabled,
                             )
-                            accounts.forEach { account ->
+                            ExposedDropdownMenu(
+                                expanded = expanded,
+                                onDismissRequest = { expanded = false },
+                            ) {
+                                accounts.forEach { account ->
+                                    DropdownMenuItem(
+                                        text = { Text(account.name) },
+                                        onClick = {
+                                            selectedOption = "existing:${account.id.id}"
+                                            onResolutionChanged(Resolution.MapToExisting(account.id.id))
+                                            expanded = false
+                                        },
+                                    )
+                                }
                                 DropdownMenuItem(
-                                    text = { Text(account.name) },
+                                    text = {
+                                        Text(
+                                            "Create on import",
+                                            color = MaterialTheme.colorScheme.primary,
+                                        )
+                                    },
                                     onClick = {
-                                        selectedOption = "existing:${account.id.id}"
-                                        onResolutionChanged(Resolution.MapToExisting(account.id.id))
+                                        selectedOption = "create"
+                                        onResolutionChanged(Resolution.CreateNew(createNewName))
                                         expanded = false
                                     },
                                 )
                             }
                         }
+                        TextButton(
+                            onClick = { showCreateAccountDialog = true },
+                            enabled = enabled,
+                        ) {
+                            Text("Create Account")
+                        }
                     }
 
-                    // Show name field for create option
                     if (selectedOption == "create") {
                         Spacer(modifier = Modifier.height(8.dp))
                         OutlinedTextField(
@@ -438,6 +490,23 @@ private fun ReferenceResolutionRow(
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
                             enabled = enabled,
+                        )
+                    }
+
+                    if (showCreateAccountDialog) {
+                        CreateAccountDialog(
+                            accountRepository = accountRepository,
+                            categoryRepository = categoryRepository,
+                            personRepository = personRepository,
+                            personAccountOwnershipRepository = personAccountOwnershipRepository,
+                            entitySourceQueries = entitySourceQueries,
+                            deviceId = deviceId,
+                            initialName = reference.name,
+                            onDismiss = { showCreateAccountDialog = false },
+                            onAccountCreated = { accountId ->
+                                selectedOption = "existing:${accountId.id}"
+                                onResolutionChanged(Resolution.MapToExisting(accountId.id))
+                            },
                         )
                     }
                 }

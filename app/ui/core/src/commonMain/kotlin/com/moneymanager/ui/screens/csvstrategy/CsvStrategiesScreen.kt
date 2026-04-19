@@ -357,6 +357,10 @@ fun CsvStrategiesScreen(
             accountRepository = accountRepository,
             categoryRepository = categoryRepository,
             currencyRepository = currencyRepository,
+            personRepository = personRepository,
+            personAccountOwnershipRepository = personAccountOwnershipRepository,
+            entitySourceQueries = entitySourceQueries,
+            deviceId = deviceId,
             onDismiss = {
                 importParseResult = null
                 importError = null
