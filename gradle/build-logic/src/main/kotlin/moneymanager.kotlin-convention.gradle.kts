@@ -33,9 +33,17 @@ tasks {
         targetCompatibility = jvmTargetVersion
     }
 
-    // Make detekt aggregate task include type-resolution tasks for KMP modules
+    // Make detekt aggregate task include KMP source-set tasks without invoking
+    // compilation-based type resolution, which currently reports false
+    // expect/actual compiler errors for shared JVM/Android source sets.
     named("detekt") {
-        dependsOn(matching { it.name.startsWith("detektMain") || it.name.startsWith("detektTest") })
+        dependsOn(
+            matching {
+                it.name.startsWith("detekt") &&
+                    it.name.endsWith("SourceSet") &&
+                    !it.name.startsWith("detektBaseline")
+            },
+        )
     }
 }
 
