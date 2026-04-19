@@ -129,20 +129,16 @@ class CsvStrategyExportService(
                 },
             attributeMappings = strategy.attributeMappings,
             accountMappings =
-                if (accountMappings != null) {
-                    accountMappings.map { mapping ->
-                        val account =
-                            accountsById[mapping.accountId]
-                                ?: error("Missing account for id ${mapping.accountId.id} in CsvAccountMapping")
-                        CsvAccountMappingExport(
-                            columnName = mapping.columnName,
-                            valuePattern = mapping.valuePattern.pattern,
-                            accountName = account.name,
-                        )
-                    }
-                } else {
-                    emptyList()
-                },
+                accountMappings?.map { mapping ->
+                    val account =
+                        accountsById[mapping.accountId]
+                            ?: error("Missing account for id ${mapping.accountId.id} in CsvAccountMapping")
+                    CsvAccountMappingExport(
+                        columnName = mapping.columnName,
+                        valuePattern = mapping.valuePattern.pattern,
+                        accountName = account.name,
+                    )
+                }.orEmpty(),
         )
     }
 
@@ -237,7 +233,7 @@ class CsvStrategyExportService(
         return ImportParseResult(
             strategyName = export.name,
             export = export,
-            unresolvedReferences = unresolvedReferences.distinctBy { it.name to it.type },
+            unresolvedReferences = unresolvedReferences.distinct(),
         )
     }
 
