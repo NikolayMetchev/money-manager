@@ -14,7 +14,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
-import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import androidx.compose.ui.test.waitUntilDoesNotExist
 import androidx.compose.ui.test.waitUntilExactlyOneExists
@@ -63,6 +62,7 @@ import com.moneymanager.test.database.deleteTestDatabase
 import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import com.moneymanager.ui.screens.transactions.AccountTransactionsScreen
 import com.moneymanager.ui.screens.transactions.TransactionAuditScreen
+import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
@@ -82,7 +82,7 @@ class AccountTransactionsScreenTest {
 
     @Test
     fun accountTransactionCard_flipsAccountDisplay_whenPerspectiveChanges() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given: Two accounts and a transfer between them
             val now = Clock.System.now()
             val usdCurrency =
@@ -183,7 +183,7 @@ class AccountTransactionsScreenTest {
 
     @Test
     fun clickingAccountInTransaction_switchesPerspective() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given: Two accounts with a transfer between them
             val now = Clock.System.now()
             val usdCurrency =
@@ -342,7 +342,7 @@ class AccountTransactionsScreenTest {
             }
 
             // Run the UI test
-            runComposeUiTest {
+            runMoneyManagerComposeUiTest {
                 // When: Viewing the account transactions screen
                 setContent {
                     ProvideSchemaAwareScope {
@@ -550,7 +550,7 @@ class AccountTransactionsScreenTest {
             }
 
             // Run the UI test
-            runComposeUiTest {
+            runMoneyManagerComposeUiTest {
                 // When: Viewing the account transactions screen
                 setContent {
                     ProvideSchemaAwareScope {
@@ -731,7 +731,7 @@ class AccountTransactionsScreenTest {
             }
 
             // Run the UI test
-            runComposeUiTest {
+            runMoneyManagerComposeUiTest {
                 // When: Viewing the account transactions screen
                 setContent {
                     ProvideSchemaAwareScope {
