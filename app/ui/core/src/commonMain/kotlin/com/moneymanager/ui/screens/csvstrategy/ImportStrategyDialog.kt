@@ -207,10 +207,11 @@ fun ImportStrategyDialog(
                                     accounts = accountRepository.getAllAccounts().first(),
                                 )
 
-                            createdStrategyId = csvImportStrategyRepository.createStrategy(strategy)
+                            val persistedStrategyId = csvImportStrategyRepository.createStrategy(strategy)
+                            createdStrategyId = persistedStrategyId
                             resolvedAccountMappings.forEach { mapping ->
                                 csvAccountMappingRepository.createMapping(
-                                    strategyId = strategy.id,
+                                    strategyId = persistedStrategyId,
                                     columnName = mapping.columnName,
                                     valuePattern = mapping.valuePattern,
                                     accountId = mapping.accountId,
@@ -288,7 +289,7 @@ private fun resolveAccountMappings(
 
         ResolvedAccountMapping(
             columnName = mapping.columnName,
-            valuePattern = Regex(mapping.valuePattern),
+            valuePattern = Regex(mapping.valuePattern, RegexOption.IGNORE_CASE),
             accountId = account.id,
         )
     }
