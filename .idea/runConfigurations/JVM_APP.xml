@@ -1,10 +1,11 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="JVM APP" type="JetRunConfigurationType">
-    <option name="ALTERNATIVE_JRE_PATH" value="temurin-25" />
+    <option name="ALTERNATIVE_JRE_PATH" value="$PROJECT_DIR$/../../../../Program Files/Amazon Corretto/jdk25.0.2_10" />
     <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true" />
     <option name="MAIN_CLASS_NAME" value="com.moneymanager.MainKt" />
     <module name="money-manager.app.main.jvm.main" />
     <shortenClasspath name="NONE" />
+    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
     <method v="2">
       <option name="Make" enabled="true" />
     </method>
