@@ -62,6 +62,14 @@ dependencyAnalysis {
             ignoreSourceSet("commonTest")
         }
 
+        project(":app:db:core") {
+            sourceSet("commonTest") {
+                onIncorrectConfiguration {
+                    exclude(":app:model:core")
+                }
+            }
+        }
+
         project(":utils:compose:scrollbar") {
             ignoreSourceSet("commonTest", "jvmDev")
         }
