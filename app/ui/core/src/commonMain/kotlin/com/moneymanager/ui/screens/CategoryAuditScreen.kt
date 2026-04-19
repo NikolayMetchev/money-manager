@@ -19,7 +19,7 @@ import com.moneymanager.ui.audit.FieldChangeRow
 import com.moneymanager.ui.audit.FieldValueRow
 import com.moneymanager.ui.audit.SourceInfoSection
 import kotlinx.coroutines.flow.first
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 @Composable
 fun CategoryAuditScreen(
