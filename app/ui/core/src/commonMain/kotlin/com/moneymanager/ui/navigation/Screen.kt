@@ -30,7 +30,10 @@ sealed class Screen(val title: String) {
         val selectedCurrencyId: CurrencyId? = null,
     ) : Screen(accountName)
 
-    data class CsvImportDetail(val importId: CsvImportId) :
+    data class CsvImportDetail(
+        val importId: CsvImportId,
+        val scrollToRowIndex: Long? = null,
+    ) :
         Screen("CSV Import")
 
     data class AuditHistory(val transferId: TransferId) :

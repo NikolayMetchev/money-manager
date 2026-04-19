@@ -51,6 +51,7 @@ import com.moneymanager.domain.getDeviceInfo
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Transfer
+import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvRow
@@ -65,6 +66,7 @@ import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.DeviceRepository
 import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.domain.repository.TransferSourceRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.flow.first
@@ -100,6 +102,7 @@ fun ApplyStrategyDialog(
     attributeTypeRepository: AttributeTypeRepository,
     maintenanceService: DatabaseMaintenanceService,
     transferSourceQueries: TransferSourceQueries,
+    transferSourceRepository: TransferSourceRepository,
     deviceRepository: DeviceRepository,
     onDismiss: () -> Unit,
     onImportComplete: (CsvImportResult) -> Unit,
@@ -428,7 +431,6 @@ fun ApplyStrategyDialog(
 
                             // Create transfers and track which rows they came from
                             logger.info { "Starting to create $validCount transfers" }
-                            val rowTransferMap = mutableMapOf<Long, com.moneymanager.domain.model.TransferId>()
                             val failedRows = mutableListOf<CsvImportResult.FailedRow>()
                             var successCount = 0
                             val deviceId = deviceRepository.getOrCreateDevice(getDeviceInfo())
@@ -449,6 +451,7 @@ fun ApplyStrategyDialog(
 
                                     when (importStatus) {
                                         ImportStatus.IMPORTED -> {
+                                            var createdTransferId: TransferId? = null
                                             // Create new transfer
                                             transactionRepository.createTransfers(
                                                 transfers = listOf(transfer),
@@ -458,19 +461,22 @@ fun ApplyStrategyDialog(
                                                         queries = transferSourceQueries,
                                                         deviceId = deviceId,
                                                         csvImportId = csvImport.id,
-                                                        rowIndexForTransfer = { originalRowIndex },
+                                                        rowIndexForTransfer = { generatedTransferId ->
+                                                            createdTransferId = generatedTransferId
+                                                            originalRowIndex
+                                                        },
                                                     ),
                                             )
+                                            val rowTransferId = createdTransferId ?: transfer.id
                                             // Update row with status and transfer ID
                                             csvImportRepository.updateRowStatus(
                                                 csvImport.id,
                                                 originalRowIndex,
                                                 ImportStatus.IMPORTED.name,
-                                                transfer.id,
+                                                rowTransferId,
                                             )
                                             // Clear any previous error for this row (re-import success)
                                             csvImportRepository.clearError(csvImport.id, originalRowIndex)
-                                            rowTransferMap[originalRowIndex] = transfer.id
                                             successCount++
                                         }
                                         ImportStatus.DUPLICATE -> {
@@ -493,6 +499,16 @@ fun ApplyStrategyDialog(
                                                     newAttributes = attributes,
                                                     transactionId = existingTransferId,
                                                 )
+                                                val updatedTransfer =
+                                                    transactionRepository.getTransactionById(existingTransferId.id).first()
+                                                if (updatedTransfer != null) {
+                                                    transferSourceRepository.recordCsvImportSource(
+                                                        transactionId = existingTransferId,
+                                                        revisionId = updatedTransfer.revisionId,
+                                                        csvImportId = csvImport.id,
+                                                        rowIndex = originalRowIndex,
+                                                    )
+                                                }
                                                 csvImportRepository.updateRowStatus(
                                                     csvImport.id,
                                                     originalRowIndex,

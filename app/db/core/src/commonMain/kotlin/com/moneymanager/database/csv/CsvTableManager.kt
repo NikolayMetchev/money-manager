@@ -89,9 +89,25 @@ class CsvTableManager(private val database: MoneyManagerDatabaseWrapper) {
         val columns = (0 until columnCount).joinToString(", ") { "t.col_$it" }
         val sql =
             """
-            SELECT t.row_index, t.transaction_id, t.import_status, e.error_message, $columns
+            SELECT
+                t.row_index,
+                COALESCE(NULLIF(t.transaction_id, '0'), source_rows.transaction_id) AS transaction_id,
+                t.import_status,
+                e.error_message,
+                $columns
             FROM $tableName t
             LEFT JOIN csv_import_error e ON e.csv_import_id = '$csvImportId' AND e.row_index = t.row_index
+            LEFT JOIN (
+                SELECT
+                    csv_transfer_source.csv_import_id,
+                    csv_transfer_source.csv_row_index,
+                    MIN(transfer_source.transaction_id) AS transaction_id
+                FROM csv_transfer_source
+                JOIN transfer_source ON transfer_source.id = csv_transfer_source.id
+                WHERE csv_transfer_source.csv_import_id = '$csvImportId'
+                GROUP BY csv_transfer_source.csv_import_id, csv_transfer_source.csv_row_index
+            ) source_rows ON source_rows.csv_import_id = '$csvImportId'
+                AND source_rows.csv_row_index = t.row_index
             ORDER BY t.row_index
             LIMIT $limit OFFSET $offset
             """.trimIndent()

@@ -33,6 +33,7 @@ import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.database.sql.EntitySourceQueries
 import com.moneymanager.database.sql.TransferSourceQueries
 import com.moneymanager.domain.model.DeviceId
+import com.moneymanager.domain.model.SourceType
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csv.CsvRow
@@ -47,6 +48,7 @@ import com.moneymanager.domain.repository.DeviceRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.domain.repository.TransferSourceRepository
 import com.moneymanager.ui.components.csv.CsvPreviewTable
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -59,6 +61,7 @@ import kotlinx.datetime.toLocalDateTime
 @Composable
 fun CsvImportDetailScreen(
     importId: CsvImportId,
+    scrollToRowIndex: Long? = null,
     csvImportRepository: CsvImportRepository,
     csvImportStrategyRepository: CsvImportStrategyRepository,
     csvAccountMappingRepository: CsvAccountMappingRepository,
@@ -70,12 +73,14 @@ fun CsvImportDetailScreen(
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     maintenanceService: DatabaseMaintenanceService,
+    transferSourceRepository: TransferSourceRepository,
     transferSourceQueries: TransferSourceQueries,
     entitySourceQueries: EntitySourceQueries,
     deviceRepository: DeviceRepository,
     deviceId: DeviceId,
     onBack: () -> Unit,
     onDeleted: () -> Unit,
+    onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
     onTransferClick: ((TransferId, Boolean) -> Unit)? = null,
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
@@ -302,6 +307,22 @@ fun CsvImportDetailScreen(
                         modifier = Modifier.fillMaxSize(),
                         amountColumnIndex = amountColumnIndex,
                         failedRowIndexes = failedRowIndexes,
+                        scrollToRowIndex = scrollToRowIndex,
+                        onDuplicateSourceClick = { transferId, isPositiveAmount ->
+                            scope.launch {
+                                val source =
+                                    transferSourceRepository.getSourcesForTransaction(transferId)
+                                        .filter { it.sourceType == SourceType.CSV_IMPORT }
+                                        .minByOrNull { it.revisionId }
+                                val csvSource = source?.csvSource
+                                val sourceImportId = csvSource?.importId
+                                if (sourceImportId != null) {
+                                    onCsvSourceClick(sourceImportId, csvSource.rowIndex)
+                                } else {
+                                    onTransferClick?.invoke(transferId, isPositiveAmount)
+                                }
+                            }
+                        },
                         onTransferClick = onTransferClick,
                     )
                 }
@@ -357,6 +378,7 @@ fun CsvImportDetailScreen(
             attributeTypeRepository = attributeTypeRepository,
             maintenanceService = maintenanceService,
             transferSourceQueries = transferSourceQueries,
+            transferSourceRepository = transferSourceRepository,
             deviceRepository = deviceRepository,
             onDismiss = { showApplyStrategyDialog = false },
             onImportComplete = { result ->
