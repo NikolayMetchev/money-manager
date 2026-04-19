@@ -59,6 +59,7 @@ import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import nl.jacobras.humanreadable.HumanReadable
 
@@ -92,8 +93,11 @@ fun CsvStrategiesScreen(
     var isLoadingRows by remember { mutableStateOf(false) }
 
     // Export state
+    var strategyPendingExportPrompt by remember { mutableStateOf<CsvImportStrategy?>(null) }
     var strategyToExport by remember { mutableStateOf<CsvImportStrategy?>(null) }
+    var includeAccountMappingsInExport by remember { mutableStateOf<Boolean?>(null) }
     var exportJson by remember { mutableStateOf<String?>(null) }
+    var exportError by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
     // Import state
@@ -104,11 +108,10 @@ fun CsvStrategiesScreen(
     val fileSaver =
         rememberFileSaver(
             mimeType = "application/json",
-            onResult = { result ->
-                if (result?.success == true) {
-                    strategyToExport = null
-                    exportJson = null
-                }
+            onResult = {
+                strategyToExport = null
+                includeAccountMappingsInExport = null
+                exportJson = null
             },
         )
 
@@ -126,6 +129,7 @@ fun CsvStrategiesScreen(
                             val parseResult = csvStrategyExportService.parseExport(export)
                             importParseResult = parseResult
                             importError = null
+                            exportError = null
                         } catch (expected: Exception) {
                             importError = "Failed to parse file: ${expected.message}"
                             importParseResult = null
@@ -136,19 +140,34 @@ fun CsvStrategiesScreen(
         )
 
     // Handle export when strategy is selected
-    LaunchedEffect(strategyToExport) {
+    LaunchedEffect(strategyToExport, includeAccountMappingsInExport) {
         val strategy = strategyToExport
-        if (strategy != null && exportJson == null) {
+        val includeAccountMappings = includeAccountMappingsInExport
+        if (strategy != null && includeAccountMappings != null && exportJson == null) {
             @Suppress("TooGenericExceptionCaught")
             try {
-                val export = csvStrategyExportService.toExport(strategy, appVersion)
+                exportError = null
+                val persistedAccountMappings =
+                    if (includeAccountMappings) {
+                        csvAccountMappingRepository.getMappingsForStrategy(strategy.id).first()
+                    } else {
+                        emptyList()
+                    }
+                val export =
+                    csvStrategyExportService.toExport(
+                        strategy = strategy,
+                        appVersion = appVersion,
+                        accountMappings = persistedAccountMappings.takeIf { includeAccountMappings },
+                    )
                 val json = CsvStrategyExportCodec.encode(export)
                 exportJson = json
                 val fileName = "${strategy.name.replace(Regex("[^a-zA-Z0-9-_]"), "_")}.json"
                 fileSaver.launch(fileName, json)
             } catch (expected: Exception) {
                 strategyToExport = null
+                includeAccountMappingsInExport = null
                 exportJson = null
+                exportError = "Failed to export: ${expected.message}"
             }
         }
     }
@@ -208,6 +227,14 @@ fun CsvStrategiesScreen(
                     modifier = Modifier.padding(bottom = 8.dp),
                 )
             }
+            exportError?.let { error ->
+                Text(
+                    text = error,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
+            }
 
             if (strategies.isEmpty()) {
                 Box(
@@ -247,7 +274,7 @@ fun CsvStrategiesScreen(
                                     showSelectCsvDialog = true
                                 },
                                 onExportClick = {
-                                    strategyToExport = strategy
+                                    strategyPendingExportPrompt = strategy
                                 },
                             )
                         }
@@ -259,6 +286,23 @@ fun CsvStrategiesScreen(
                 }
             }
         }
+    }
+
+    val currentStrategyPendingExportPrompt = strategyPendingExportPrompt
+    if (currentStrategyPendingExportPrompt != null) {
+        ExportAccountMappingsDialog(
+            strategy = currentStrategyPendingExportPrompt,
+            onExport = { includeAccountMappings ->
+                strategyPendingExportPrompt = null
+                exportJson = null
+                exportError = null
+                strategyToExport = currentStrategyPendingExportPrompt
+                includeAccountMappingsInExport = includeAccountMappings
+            },
+            onDismiss = {
+                strategyPendingExportPrompt = null
+            },
+        )
     }
 
     // Show CSV import selector dialog
@@ -308,10 +352,15 @@ fun CsvStrategiesScreen(
         ImportStrategyDialog(
             parseResult = currentParseResult,
             csvImportStrategyRepository = csvImportStrategyRepository,
+            csvAccountMappingRepository = csvAccountMappingRepository,
             csvStrategyExportService = csvStrategyExportService,
             accountRepository = accountRepository,
             categoryRepository = categoryRepository,
             currencyRepository = currencyRepository,
+            personRepository = personRepository,
+            personAccountOwnershipRepository = personAccountOwnershipRepository,
+            entitySourceQueries = entitySourceQueries,
+            deviceId = deviceId,
             onDismiss = {
                 importParseResult = null
                 importError = null

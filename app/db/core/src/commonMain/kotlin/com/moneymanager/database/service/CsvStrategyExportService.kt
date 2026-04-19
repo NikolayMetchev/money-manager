@@ -10,6 +10,7 @@ import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
+import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
@@ -25,6 +26,7 @@ import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.csvstrategy.export.AccountLookupExport
 import com.moneymanager.domain.model.csvstrategy.export.AmountParsingExport
+import com.moneymanager.domain.model.csvstrategy.export.CsvAccountMappingExport
 import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExport
 import com.moneymanager.domain.model.csvstrategy.export.CurrencyLookupExport
 import com.moneymanager.domain.model.csvstrategy.export.DateTimeParsingExport
@@ -56,12 +58,12 @@ enum class ReferenceType {
  *
  * @property type The type of reference (account, currency, category)
  * @property name The name/code from the export that couldn't be resolved
- * @property fieldType Which transfer field this reference belongs to
+ * @property fieldType Which transfer field this reference belongs to, or null for references that are not field-scoped
  */
 data class UnresolvedReference(
     val type: ReferenceType,
     val name: String,
-    val fieldType: TransferField,
+    val fieldType: TransferField?,
 )
 
 /**
@@ -107,6 +109,7 @@ class CsvStrategyExportService(
     suspend fun toExport(
         strategy: CsvImportStrategy,
         appVersion: AppVersion,
+        accountMappings: List<CsvAccountMapping>? = null,
     ): CsvStrategyExport {
         val accounts = accountRepository.getAllAccounts().first()
         val currencies = currencyRepository.getAllCurrencies().first()
@@ -125,6 +128,17 @@ class CsvStrategyExportService(
                     mapping.toExport(accountsById, currenciesById, categoriesById)
                 },
             attributeMappings = strategy.attributeMappings,
+            accountMappings =
+                accountMappings?.map { mapping ->
+                    val account =
+                        accountsById[mapping.accountId]
+                            ?: error("Missing account for id ${mapping.accountId.id} in CsvAccountMapping")
+                    CsvAccountMappingExport(
+                        columnName = mapping.columnName,
+                        valuePattern = mapping.valuePattern.pattern,
+                        accountName = account.name,
+                    )
+                }.orEmpty(),
         )
     }
 
@@ -204,10 +218,22 @@ class CsvStrategyExportService(
             }
         }
 
+        for (mapping in export.accountMappings) {
+            if (accountsByName[mapping.accountName] == null) {
+                unresolvedReferences.add(
+                    UnresolvedReference(
+                        type = ReferenceType.ACCOUNT,
+                        name = mapping.accountName,
+                        fieldType = null,
+                    ),
+                )
+            }
+        }
+
         return ImportParseResult(
             strategyName = export.name,
             export = export,
-            unresolvedReferences = unresolvedReferences.distinctBy { it.name to it.type },
+            unresolvedReferences = unresolvedReferences.distinct(),
         )
     }
 

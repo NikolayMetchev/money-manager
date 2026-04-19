@@ -63,8 +63,9 @@ fun CreateAccountDialog(
     deviceId: DeviceId,
     onDismiss: () -> Unit,
     onAccountCreated: ((AccountId) -> Unit)? = null,
+    initialName: String = "",
 ) {
-    var name by remember { mutableStateOf("") }
+    var name by remember(initialName) { mutableStateOf(initialName) }
     var selectedCategoryId by remember { mutableStateOf(-1L) }
     var selectedCategoryName by remember { mutableStateOf<String?>(null) }
     var expanded by remember { mutableStateOf(false) }

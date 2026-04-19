@@ -49,19 +49,26 @@ import com.moneymanager.database.service.ImportParseResult
 import com.moneymanager.database.service.ReferenceType
 import com.moneymanager.database.service.Resolution
 import com.moneymanager.database.service.UnresolvedReference
+import com.moneymanager.database.sql.EntitySourceQueries
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Currency
+import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
+import com.moneymanager.domain.model.csvstrategy.export.CsvAccountMappingExport
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CsvAccountMappingRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
+import com.moneymanager.domain.repository.PersonRepository
+import com.moneymanager.ui.components.CreateAccountDialog
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
@@ -72,10 +79,15 @@ import kotlinx.coroutines.launch
 fun ImportStrategyDialog(
     parseResult: ImportParseResult,
     csvImportStrategyRepository: CsvImportStrategyRepository,
+    csvAccountMappingRepository: CsvAccountMappingRepository,
     csvStrategyExportService: CsvStrategyExportService,
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
+    personRepository: PersonRepository,
+    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
+    entitySourceQueries: EntitySourceQueries,
+    deviceId: DeviceId,
     onDismiss: () -> Unit,
     onImportSuccess: () -> Unit,
 ) {
@@ -96,6 +108,10 @@ fun ImportStrategyDialog(
 
     // Check if all unresolved references have been resolved
     val allResolved = parseResult.unresolvedReferences.all { it in resolutions.keys }
+    val unresolvedAccountReferences =
+        parseResult.unresolvedReferences.filter { reference ->
+            reference.type == ReferenceType.ACCOUNT && reference !in resolutions.keys
+        }
 
     // Check for name conflict
     val existingStrategies by csvImportStrategyRepository.getAllStrategies()
@@ -150,6 +166,20 @@ fun ImportStrategyDialog(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    if (unresolvedAccountReferences.isNotEmpty()) {
+                        TextButton(
+                            onClick = {
+                                resolutions =
+                                    resolutions +
+                                    unresolvedAccountReferences.associateWith { reference ->
+                                        Resolution.CreateNew(reference.name)
+                                    }
+                            },
+                            enabled = !isImporting,
+                        ) {
+                            Text("Create New for All Unresolved Accounts")
+                        }
+                    }
                     Spacer(modifier = Modifier.height(8.dp))
 
                     parseResult.unresolvedReferences.forEach { ref ->
@@ -162,6 +192,12 @@ fun ImportStrategyDialog(
                             accounts = accounts,
                             categories = categories,
                             currencies = currencies,
+                            accountRepository = accountRepository,
+                            categoryRepository = categoryRepository,
+                            personRepository = personRepository,
+                            personAccountOwnershipRepository = personAccountOwnershipRepository,
+                            entitySourceQueries = entitySourceQueries,
+                            deviceId = deviceId,
                             enabled = !isImporting,
                         )
                         Spacer(modifier = Modifier.height(8.dp))
@@ -184,6 +220,7 @@ fun ImportStrategyDialog(
                     isImporting = true
                     errorMessage = null
                     scope.launch {
+                        var createdStrategyId: CsvImportStrategyId? = null
                         try {
                             // Update the export with the new name if changed
                             val exportWithNewName = parseResult.export.copy(name = strategyName)
@@ -195,11 +232,31 @@ fun ImportStrategyDialog(
                                     resolutions = resolutions,
                                 )
 
-                            // Save it
-                            csvImportStrategyRepository.createStrategy(strategy)
+                            val resolvedAccountMappings =
+                                resolveAccountMappings(
+                                    accountMappings = exportWithNewName.accountMappings,
+                                    resolutions = resolutions,
+                                    accounts = accountRepository.getAllAccounts().first(),
+                                )
+
+                            val persistedStrategyId = csvImportStrategyRepository.createStrategy(strategy)
+                            createdStrategyId = persistedStrategyId
+                            resolvedAccountMappings.forEach { mapping ->
+                                csvAccountMappingRepository.createMapping(
+                                    strategyId = persistedStrategyId,
+                                    columnName = mapping.columnName,
+                                    valuePattern = mapping.valuePattern,
+                                    accountId = mapping.accountId,
+                                )
+                            }
                             onImportSuccess()
                             onDismiss()
                         } catch (expected: Exception) {
+                            createdStrategyId?.let { strategyId ->
+                                runCatching {
+                                    csvImportStrategyRepository.deleteStrategy(strategyId)
+                                }
+                            }
                             errorMessage = "Failed to import: ${expected.message}"
                             isImporting = false
                         }
@@ -227,6 +284,56 @@ fun ImportStrategyDialog(
     )
 }
 
+private data class ResolvedAccountMapping(
+    val columnName: String,
+    val valuePattern: Regex,
+    val accountId: AccountId,
+)
+
+private fun resolveAccountMappings(
+    accountMappings: List<CsvAccountMappingExport>,
+    resolutions: Map<UnresolvedReference, Resolution>,
+    accounts: List<Account>,
+): List<ResolvedAccountMapping> {
+    val accountsByName = accounts.associateBy { it.name }
+    val accountsById = accounts.associateBy { it.id.id }
+
+    return accountMappings.map { mapping ->
+        val resolution =
+            resolutions[accountMappingReference(mapping.accountName)]
+                ?: resolutions.entries
+                    .firstOrNull { (reference) ->
+                        reference.type == ReferenceType.ACCOUNT && reference.name == mapping.accountName
+                    }
+                    ?.value
+        val account =
+            when (resolution) {
+                is Resolution.CreateNew ->
+                    accountsByName[resolution.name]
+                        ?: error("Created account not found: ${resolution.name}")
+                is Resolution.MapToExisting ->
+                    accountsById[resolution.id]
+                        ?: error("Resolved account not found: ${mapping.accountName}")
+                null ->
+                    accountsByName[mapping.accountName]
+                        ?: error("Account not found: ${mapping.accountName}")
+            }
+
+        ResolvedAccountMapping(
+            columnName = mapping.columnName,
+            valuePattern = Regex(mapping.valuePattern, RegexOption.IGNORE_CASE),
+            accountId = account.id,
+        )
+    }
+}
+
+private fun accountMappingReference(accountName: String): UnresolvedReference =
+    UnresolvedReference(
+        type = ReferenceType.ACCOUNT,
+        name = accountName,
+        fieldType = null,
+    )
+
 /**
  * Row for resolving a single unresolved reference.
  */
@@ -238,10 +345,17 @@ private fun ReferenceResolutionRow(
     accounts: List<Account>,
     categories: List<Category>,
     currencies: List<Currency>,
+    accountRepository: AccountRepository,
+    categoryRepository: CategoryRepository,
+    personRepository: PersonRepository,
+    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
+    entitySourceQueries: EntitySourceQueries,
+    deviceId: DeviceId,
     enabled: Boolean,
 ) {
     var expanded by remember { mutableStateOf(false) }
     var createNewName by remember { mutableStateOf(reference.name) }
+    var showCreateAccountDialog by remember { mutableStateOf(false) }
     var selectedOption by remember(resolution) {
         mutableStateOf(
             when (resolution) {
@@ -271,7 +385,12 @@ private fun ReferenceResolutionRow(
                         style = MaterialTheme.typography.titleSmall,
                     )
                     val refType = reference.type.name.lowercase().replaceFirstChar { it.uppercase() }
-                    val fieldName = reference.fieldType.name.lowercase().replace("_", " ")
+                    val fieldName =
+                        reference.fieldType
+                            ?.name
+                            ?.lowercase()
+                            ?.replace("_", " ")
+                            ?: "account mapping"
                     Text(
                         text = "$refType for $fieldName",
                         style = MaterialTheme.typography.bodySmall,
@@ -292,61 +411,73 @@ private fun ReferenceResolutionRow(
             // Resolution options
             when (reference.type) {
                 ReferenceType.ACCOUNT -> {
-                    ExposedDropdownMenuBox(
-                        expanded = expanded,
-                        onExpandedChange = { if (enabled) expanded = !expanded },
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        OutlinedTextField(
-                            value =
-                                when {
-                                    selectedOption == "create" -> "Create: $createNewName"
-                                    selectedOption?.startsWith("existing:") == true -> {
-                                        val id = selectedOption!!.removePrefix("existing:").toLongOrNull()
-                                        accounts.find { it.id.id == id }?.name ?: "Select..."
-                                    }
-                                    else -> "Select..."
-                                },
-                            onValueChange = {},
-                            readOnly = true,
-                            label = { Text("Map to") },
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
-                            enabled = enabled,
-                        )
-                        ExposedDropdownMenu(
+                        ExposedDropdownMenuBox(
                             expanded = expanded,
-                            onDismissRequest = { expanded = false },
+                            onExpandedChange = { if (enabled) expanded = !expanded },
+                            modifier = Modifier.weight(1f),
                         ) {
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        "Create new account",
-                                        color = MaterialTheme.colorScheme.primary,
-                                    )
-                                },
-                                onClick = {
-                                    selectedOption = "create"
-                                    onResolutionChanged(Resolution.CreateNew(createNewName))
-                                    expanded = false
-                                },
+                            OutlinedTextField(
+                                value =
+                                    when {
+                                        selectedOption?.startsWith("existing:") == true -> {
+                                            val id = selectedOption!!.removePrefix("existing:").toLongOrNull()
+                                            accounts.find { it.id.id == id }?.name ?: "Select..."
+                                        }
+                                        selectedOption == "create" -> "Create on import: $createNewName"
+                                        else -> "Select..."
+                                    },
+                                onValueChange = {},
+                                readOnly = true,
+                                label = { Text("Map to") },
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+                                enabled = enabled,
                             )
-                            accounts.forEach { account ->
+                            ExposedDropdownMenu(
+                                expanded = expanded,
+                                onDismissRequest = { expanded = false },
+                            ) {
+                                accounts.forEach { account ->
+                                    DropdownMenuItem(
+                                        text = { Text(account.name) },
+                                        onClick = {
+                                            selectedOption = "existing:${account.id.id}"
+                                            onResolutionChanged(Resolution.MapToExisting(account.id.id))
+                                            expanded = false
+                                        },
+                                    )
+                                }
                                 DropdownMenuItem(
-                                    text = { Text(account.name) },
+                                    text = {
+                                        Text(
+                                            "Create on import",
+                                            color = MaterialTheme.colorScheme.primary,
+                                        )
+                                    },
                                     onClick = {
-                                        selectedOption = "existing:${account.id.id}"
-                                        onResolutionChanged(Resolution.MapToExisting(account.id.id))
+                                        selectedOption = "create"
+                                        onResolutionChanged(Resolution.CreateNew(createNewName))
                                         expanded = false
                                     },
                                 )
                             }
                         }
+                        TextButton(
+                            onClick = { showCreateAccountDialog = true },
+                            enabled = enabled,
+                        ) {
+                            Text("Create Account")
+                        }
                     }
 
-                    // Show name field for create option
                     if (selectedOption == "create") {
                         Spacer(modifier = Modifier.height(8.dp))
                         OutlinedTextField(
@@ -359,6 +490,23 @@ private fun ReferenceResolutionRow(
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
                             enabled = enabled,
+                        )
+                    }
+
+                    if (showCreateAccountDialog) {
+                        CreateAccountDialog(
+                            accountRepository = accountRepository,
+                            categoryRepository = categoryRepository,
+                            personRepository = personRepository,
+                            personAccountOwnershipRepository = personAccountOwnershipRepository,
+                            entitySourceQueries = entitySourceQueries,
+                            deviceId = deviceId,
+                            initialName = reference.name,
+                            onDismiss = { showCreateAccountDialog = false },
+                            onAccountCreated = { accountId ->
+                                selectedOption = "existing:${accountId.id}"
+                                onResolutionChanged(Resolution.MapToExisting(accountId.id))
+                            },
                         )
                     }
                 }
