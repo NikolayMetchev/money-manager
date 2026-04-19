@@ -58,12 +58,12 @@ enum class ReferenceType {
  *
  * @property type The type of reference (account, currency, category)
  * @property name The name/code from the export that couldn't be resolved
- * @property fieldType Which transfer field this reference belongs to
+ * @property fieldType Which transfer field this reference belongs to, or null for references that are not field-scoped
  */
 data class UnresolvedReference(
     val type: ReferenceType,
     val name: String,
-    val fieldType: TransferField,
+    val fieldType: TransferField?,
 )
 
 /**
@@ -228,7 +228,7 @@ class CsvStrategyExportService(
                     UnresolvedReference(
                         type = ReferenceType.ACCOUNT,
                         name = mapping.accountName,
-                        fieldType = TransferField.SOURCE_ACCOUNT,
+                        fieldType = null,
                     ),
                 )
             }

@@ -55,7 +55,6 @@ import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
-import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.csvstrategy.export.CsvAccountMappingExport
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.CategoryRepository
@@ -299,7 +298,7 @@ private fun accountMappingReference(accountName: String): UnresolvedReference =
     UnresolvedReference(
         type = ReferenceType.ACCOUNT,
         name = accountName,
-        fieldType = TransferField.SOURCE_ACCOUNT,
+        fieldType = null,
     )
 
 /**
@@ -346,7 +345,12 @@ private fun ReferenceResolutionRow(
                         style = MaterialTheme.typography.titleSmall,
                     )
                     val refType = reference.type.name.lowercase().replaceFirstChar { it.uppercase() }
-                    val fieldName = reference.fieldType.name.lowercase().replace("_", " ")
+                    val fieldName =
+                        reference.fieldType
+                            ?.name
+                            ?.lowercase()
+                            ?.replace("_", " ")
+                            ?: "account mapping"
                     Text(
                         text = "$refType for $fieldName",
                         style = MaterialTheme.typography.bodySmall,
