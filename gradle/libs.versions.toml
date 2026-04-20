@@ -1,11 +1,11 @@
 [versions]
-# App Android API level sync: keep compile and target SDK aligned.
-# Emulator API level sync lives with the Gradle managed device and CI because SDK 37 emulator packages are not available on GitHub's stable SDK channel yet.
-android-compileSdk = "37"
+# Android API level sync: keep compile SDK, target SDK, the Gradle managed device, CI emulator,
+# and IntelliJ Android Tests run configuration aligned. API 37 is beta.
+android-compileSdk = "36"
 develocity = "4.4.0"
 android-gradle-plugin = "9.1.1"
 android-minSdk = "30"
-android-targetSdk = "37"
+android-targetSdk = "36"
 androidx-activity-compose = "1.13.0"
 androidx-compose = "1.10.6"
 androidx-compose-material-icons = "1.7.8"
