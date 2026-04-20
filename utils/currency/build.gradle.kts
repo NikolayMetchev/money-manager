@@ -18,6 +18,9 @@ kotlin {
 
         jvmMain {
             dependsOn(jvmAndroidMain)
+            dependencies {
+                api(projects.utils.bigdecimal)
+            }
         }
 
         androidMain {
