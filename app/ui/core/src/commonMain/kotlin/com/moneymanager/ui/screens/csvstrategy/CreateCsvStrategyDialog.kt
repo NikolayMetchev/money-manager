@@ -109,6 +109,14 @@ enum class TimezoneMode {
     FROM_COLUMN,
 }
 
+internal fun attributeCandidateColumns(
+    csvColumns: List<CsvColumn>,
+    primaryFieldColumnNames: Set<String?>,
+): List<CsvColumn> {
+    val usedPrimaryFieldColumns = primaryFieldColumnNames.filterNotNull().toSet()
+    return csvColumns.filter { it.originalName !in usedPrimaryFieldColumns }
+}
+
 /**
  * Target account mapping mode for CSV import.
  */
@@ -828,32 +836,30 @@ fun CreateCsvStrategyDialog(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
 
-                // Calculate used columns
-                val usedColumns =
-                    setOfNotNull(
-                        dateColumnName,
-                        timeColumnName,
-                        descriptionColumnName,
-                        amountColumnName,
-                        targetAccountColumnName,
-                        currencyColumnName,
-                        timezoneColumnName,
-                    ) +
-                        targetAccountFallbackColumns +
-                        descriptionFallbackColumns
+                val attributeColumns =
+                    attributeCandidateColumns(
+                        csvColumns = csvColumns,
+                        primaryFieldColumnNames =
+                            setOf(
+                                dateColumnName,
+                                timeColumnName,
+                                descriptionColumnName,
+                                amountColumnName,
+                                targetAccountColumnName,
+                                currencyColumnName,
+                                timezoneColumnName,
+                            ),
+                    )
 
-                // Show unused columns for attribute selection
-                val unusedColumns = csvColumns.filter { it.originalName !in usedColumns }
-
-                if (unusedColumns.isEmpty()) {
+                if (attributeColumns.isEmpty()) {
                     Text(
-                        "All columns are used by field mappings",
+                        "No columns available for attributes",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 } else {
                     AttributeMappingsEditor(
-                        columns = unusedColumns,
+                        columns = attributeColumns,
                         mappings = attributeMappings,
                         onMappingsChanged = { attributeMappings = it },
                         existingAttributeTypes = existingAttributeTypes,
