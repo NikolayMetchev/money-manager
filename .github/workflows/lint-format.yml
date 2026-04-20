@@ -34,7 +34,9 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
         with:
-          gradle-version: 9.2.0
+          # Gradle version sync: keep this aligned with gradle/wrapper/gradle-wrapper.properties
+          # and .github/actions/gradle-setup/action.yml.
+          gradle-version: 9.4.1
 
       - name: Run lintFormat
         run: ./gradlew lintFormat --no-daemon -Dktlint.ignoreFailures=true --continue
