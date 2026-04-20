@@ -24,6 +24,8 @@ detekt = "2.0.0-alpha.2"
 diamondedge-logging = "2.1.1"
 gradle-doctor = "0.12.1"
 human-readable = "1.12.3"
+# JVM version sync: keep jvm-target and jvm-toolchain aligned with .github/actions/gradle-setup/action.yml,
+# .github/workflows/lint-format.yml, and AGENTS.md.
 jvm-target = "25"
 jvm-toolchain = "25"
 kmlogging = "2.0.3"

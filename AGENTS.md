@@ -8,7 +8,7 @@ Money Manager is a Kotlin Multiplatform personal finance app targeting JVM and A
 
 ## Technology Stack
 
-- **Language**: Kotlin | **Build**: Gradle | **JVM**: 25
+- **Language**: Kotlin | **Build**: Gradle | **JVM**: 25. JVM version sync: keep this aligned with `gradle/libs.versions.toml`, `.github/actions/gradle-setup/action.yml`, and `.github/workflows/lint-format.yml`.
 - **Database**: SQLite via SQLDelight | **DI**: Metro 
 - **UI**: Compose Multiplatform with Material 3
 - **Object Mapping**: Mappie | **Code Quality**: Detekt, ktlint
@@ -116,7 +116,7 @@ Money Manager is a Kotlin Multiplatform personal finance app targeting JVM and A
 
 ### Common Issues
 
-1. **Java**: Requires JDK 25 toolchain
+1. **Java**: Requires JDK 25 toolchain. JVM version sync: update this with `gradle/libs.versions.toml`, `.github/actions/gradle-setup/action.yml`, and `.github/workflows/lint-format.yml`.
 2. **Metro**: Keep Kotlin version aligned (2.2.21). Components/modules must be `interface`
 3. **SQLDelight**: `execute()`/`update()`/`delete()` return `Long`, not `Unit`
 4. **Configuration Cache**: Enabled for faster builds; invalidates on build file changes
