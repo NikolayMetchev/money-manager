@@ -49,6 +49,7 @@ import com.moneymanager.database.csv.StrategyMatcher
 import com.moneymanager.database.sql.TransferSourceQueries
 import com.moneymanager.domain.getDeviceInfo
 import com.moneymanager.domain.model.Account
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
@@ -232,9 +233,7 @@ fun ApplyStrategyDialog(
                                 try {
                                     val account =
                                         Account(
-                                            id =
-                                                com.moneymanager.domain.model
-                                                    .AccountId(0),
+                                            id = AccountId(0),
                                             name = newAccount.name,
                                             openingDate = Clock.System.now(),
                                             categoryId = newAccount.categoryId,

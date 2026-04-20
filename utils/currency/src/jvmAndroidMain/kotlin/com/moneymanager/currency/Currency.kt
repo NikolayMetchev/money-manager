@@ -2,6 +2,7 @@
 
 package com.moneymanager.currency
 
+import com.moneymanager.bigdecimal.BigDecimal
 import java.text.NumberFormat
 import java.util.Locale
 import java.util.Currency as JavaCurrency
@@ -19,6 +20,8 @@ actual class Currency actual constructor(
         get() = javaCurrency.displayName
 
     actual fun format(amount: Number): String = formatter.format(amount)
+
+    actual fun format(amount: BigDecimal): String = formatter.format(java.math.BigDecimal(amount.toString()))
 
     actual companion object {
         actual fun getAllCurrencies(): List<Currency> =

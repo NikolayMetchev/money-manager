@@ -65,6 +65,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CategoryBalance
@@ -138,7 +139,7 @@ fun CategoriesScreen(
                         .filter { it.balance.currency.id == currency.id }
                         .maxByOrNull { kotlin.math.abs(it.balance.amount) }
                         ?.balance
-                val formattedMax = maxMoney?.let { formatAmount(it) } ?: formatAmount(0.0, currency)
+                val formattedMax = maxMoney?.let { formatAmount(it) } ?: formatAmount(BigDecimal.ZERO, currency)
                 // Estimate width: ~8dp per character + 16dp padding
                 val balanceWidth = (formattedMax.length * 8 + 16).dp
                 // Also consider header text width (currency code)

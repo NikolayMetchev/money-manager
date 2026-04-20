@@ -1,4 +1,5 @@
 [versions]
+# Android API level sync: update this with the Gradle managed device, CI emulator, and IntelliJ Android Tests run configuration.
 android-compileSdk = "37"
 develocity = "4.4.0"
 android-gradle-plugin = "9.1.1"

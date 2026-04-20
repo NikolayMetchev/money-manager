@@ -1,5 +1,6 @@
 package com.moneymanager.ui.util
 
+import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.Money
 import com.moneymanager.currency.Currency as CurrencyFormatter
@@ -12,14 +13,14 @@ import com.moneymanager.currency.Currency as CurrencyFormatter
  * @return Formatted currency string (e.g., "$1,234.56" for USD)
  */
 fun formatAmount(
-    amount: Number,
+    amount: BigDecimal,
     currency: Currency,
 ): String =
     try {
         CurrencyFormatter(currency.code).format(amount)
-    } catch (e: IllegalArgumentException) {
+    } catch (_: IllegalArgumentException) {
         // Fallback for unknown currency codes - just format as number with currency code
-        String.format("%.2f %s", amount.toDouble(), currency.code)
+        "$amount ${currency.code}"
     }
 
 /**
@@ -28,4 +29,4 @@ fun formatAmount(
  * @param money The Money value to format
  * @return Formatted currency string (e.g., "$1,234.56" for USD)
  */
-fun formatAmount(money: Money): String = formatAmount(money.toDisplayValue().toDouble(), money.currency)
+fun formatAmount(money: Money): String = formatAmount(money.toDisplayValue(), money.currency)

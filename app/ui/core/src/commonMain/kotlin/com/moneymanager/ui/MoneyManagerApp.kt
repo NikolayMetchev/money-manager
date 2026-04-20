@@ -5,7 +5,9 @@ package com.moneymanager.ui
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.MaterialTheme
@@ -129,6 +131,8 @@ fun MoneyManagerApp(
                 modifier =
                     Modifier
                         .fillMaxSize()
+                        .systemBarsPadding()
+                        .imePadding()
                         .mouseButtonNavigation(
                             onBack = { navigationHistory.navigateBack() },
                             onForward = { navigationHistory.navigateForward() },

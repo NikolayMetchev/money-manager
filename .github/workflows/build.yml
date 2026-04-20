@@ -59,13 +59,17 @@ jobs:
           path: |
             ~/.android/avd/*
             ~/.android/adb*
-          key: avd-pixel6-api34-${{ runner.os }}
+          # Android API level sync: update with gradle/libs.versions.toml, the Gradle managed device,
+          # .idea/runConfigurations/Android_Tests.xml, and AGENTS.md.
+          key: avd-pixel6-api37-${{ runner.os }}
 
       - name: Create AVD and generate snapshot for caching
         if: steps.avd-cache.outputs.cache-hit != 'true'
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 34
+          # Android API level sync: update with gradle/libs.versions.toml, the Gradle managed device,
+          # .idea/runConfigurations/Android_Tests.xml, and AGENTS.md.
+          api-level: 37
           arch: x86_64
           profile: pixel_6
           target: google_apis
@@ -78,14 +82,16 @@ jobs:
         timeout-minutes: 20
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 34
+          # Android API level sync: update with gradle/libs.versions.toml, the Gradle managed device,
+          # .idea/runConfigurations/Android_Tests.xml, and AGENTS.md.
+          api-level: 37
           arch: x86_64
           profile: pixel_6
           target: google_apis
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
           disable-animations: true
-          script: ./gradlew connectedAndroidDeviceTest createAndroidDeviceTestCoverageReport --stacktrace
+          script: ./gradlew connectedAndroidDeviceTest createAndroidDeviceTestCoverageReport --stacktrace --console=plain
 
       - name: Upload coverage and test results to Codecov
         if: always()

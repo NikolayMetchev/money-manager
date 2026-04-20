@@ -7,7 +7,14 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
+import app.cash.sqldelight.Query
+import app.cash.sqldelight.Transacter
+import app.cash.sqldelight.db.QueryResult
+import app.cash.sqldelight.db.SqlCursor
+import app.cash.sqldelight.db.SqlDriver
+import app.cash.sqldelight.db.SqlPreparedStatement
 import com.moneymanager.database.DatabaseMaintenanceService
+import com.moneymanager.database.sql.EntitySourceQueries
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
@@ -19,6 +26,9 @@ import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.PageWithTargetIndex
 import com.moneymanager.domain.model.PagingInfo
 import com.moneymanager.domain.model.PagingResult
+import com.moneymanager.domain.model.Person
+import com.moneymanager.domain.model.PersonAccountOwnership
+import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.SourceRecorder
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
@@ -568,36 +578,32 @@ class AccountsScreenTest {
     }
 
     private class FakePersonRepository : PersonRepository {
-        override fun getAllPeople() = flowOf(emptyList<com.moneymanager.domain.model.Person>())
+        override fun getAllPeople() = flowOf(emptyList<Person>())
 
-        override fun getPersonById(id: com.moneymanager.domain.model.PersonId) = flowOf(null as com.moneymanager.domain.model.Person?)
+        override fun getPersonById(id: PersonId) = flowOf(null as Person?)
 
-        override suspend fun createPerson(person: com.moneymanager.domain.model.Person) =
-            com.moneymanager.domain.model
-                .PersonId(0)
+        override suspend fun createPerson(person: Person) = PersonId(0)
 
-        override suspend fun updatePerson(person: com.moneymanager.domain.model.Person) {}
+        override suspend fun updatePerson(person: Person) {}
 
-        override suspend fun deletePerson(id: com.moneymanager.domain.model.PersonId) {}
+        override suspend fun deletePerson(id: PersonId) {}
     }
 
     private class FakePersonAccountOwnershipRepository : PersonAccountOwnershipRepository {
-        override fun getOwnershipsByPerson(personId: com.moneymanager.domain.model.PersonId) =
-            flowOf(emptyList<com.moneymanager.domain.model.PersonAccountOwnership>())
+        override fun getOwnershipsByPerson(personId: PersonId) = flowOf(emptyList<PersonAccountOwnership>())
 
-        override fun getOwnershipsByAccount(accountId: AccountId) =
-            flowOf(emptyList<com.moneymanager.domain.model.PersonAccountOwnership>())
+        override fun getOwnershipsByAccount(accountId: AccountId) = flowOf(emptyList<PersonAccountOwnership>())
 
-        override fun getOwnershipById(id: Long) = flowOf(null as com.moneymanager.domain.model.PersonAccountOwnership?)
+        override fun getOwnershipById(id: Long) = flowOf(null as PersonAccountOwnership?)
 
         override suspend fun createOwnership(
-            personId: com.moneymanager.domain.model.PersonId,
+            personId: PersonId,
             accountId: AccountId,
         ) = 0L
 
         override suspend fun deleteOwnership(id: Long) {}
 
-        override suspend fun deleteOwnershipsByPerson(personId: com.moneymanager.domain.model.PersonId) {}
+        override suspend fun deleteOwnershipsByPerson(personId: PersonId) {}
 
         override suspend fun deleteOwnershipsByAccount(accountId: AccountId) {}
     }
@@ -619,48 +625,45 @@ class AccountsScreenTest {
      * Uses a minimal SqlDriver stub that throws NotImplementedError if actually invoked.
      */
     private companion object {
-        fun createStubEntitySourceQueries(): com.moneymanager.database.sql.EntitySourceQueries {
+        fun createStubEntitySourceQueries(): EntitySourceQueries {
             val stubDriver =
-                object : app.cash.sqldelight.db.SqlDriver {
+                object : SqlDriver {
                     override fun close() = Unit
 
-                    override fun currentTransaction(): app.cash.sqldelight.Transacter.Transaction? = null
+                    override fun currentTransaction(): Transacter.Transaction? = null
 
                     override fun execute(
                         identifier: Int?,
                         sql: String,
                         parameters: Int,
-                        binders: (app.cash.sqldelight.db.SqlPreparedStatement.() -> Unit)?,
-                    ): app.cash.sqldelight.db.QueryResult<Long> =
-                        throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
+                        binders: (SqlPreparedStatement.() -> Unit)?,
+                    ): QueryResult<Long> = throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
 
                     override fun <R> executeQuery(
                         identifier: Int?,
                         sql: String,
-                        mapper: (app.cash.sqldelight.db.SqlCursor) -> app.cash.sqldelight.db.QueryResult<R>,
+                        mapper: (SqlCursor) -> QueryResult<R>,
                         parameters: Int,
-                        binders: (app.cash.sqldelight.db.SqlPreparedStatement.() -> Unit)?,
-                    ): app.cash.sqldelight.db.QueryResult<R> =
-                        throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
+                        binders: (SqlPreparedStatement.() -> Unit)?,
+                    ): QueryResult<R> = throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
 
-                    override fun newTransaction(): app.cash.sqldelight.db.QueryResult<app.cash.sqldelight.Transacter.Transaction> =
+                    override fun newTransaction(): QueryResult<Transacter.Transaction> =
                         throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
 
                     override fun addListener(
                         vararg queryKeys: String,
-                        listener: app.cash.sqldelight.Query.Listener,
+                        listener: Query.Listener,
                     ) = Unit
 
                     override fun removeListener(
                         vararg queryKeys: String,
-                        listener: app.cash.sqldelight.Query.Listener,
+                        listener: Query.Listener,
                     ) = Unit
 
                     override fun notifyListeners(vararg queryKeys: String) = Unit
                 }
 
-            return com.moneymanager.database.sql
-                .EntitySourceQueries(stubDriver)
+            return EntitySourceQueries(stubDriver)
         }
     }
 }

@@ -36,6 +36,7 @@ import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.EntityType
+import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
@@ -226,9 +227,7 @@ fun CreateAccountDialog(
                                 selectedOwnerIds.forEach { personId ->
                                     val ownershipId =
                                         personAccountOwnershipRepository.createOwnership(
-                                            personId =
-                                                com.moneymanager.domain.model
-                                                    .PersonId(personId),
+                                            personId = PersonId(personId),
                                             accountId = accountId,
                                         )
                                     // Record source for ownership audit trail

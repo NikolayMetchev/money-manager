@@ -57,12 +57,8 @@ class TransferSourceRepositoryImpl(
             // Get device_id from the CSV import metadata
             val csvImport =
                 csvImportQueries
-                    .selectImportByTableName(
-                        csvImportQueries
-                            .selectImportById(csvImportId.toString())
-                            .executeAsOne()
-                            .table_name,
-                    ).executeAsOne()
+                    .selectImportById(csvImportId.toString())
+                    .executeAsOne()
 
             // Insert base TransferSource record
             queries.insertCsvImportBase(

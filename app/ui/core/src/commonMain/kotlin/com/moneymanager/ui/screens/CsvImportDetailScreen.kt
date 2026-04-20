@@ -134,10 +134,18 @@ fun CsvImportDetailScreen(
     LaunchedEffect(import, rowsRefreshTrigger) {
         scope
             .launch {
-                import?.let {
+                val currentImport = import
+                if (currentImport == null) {
+                    rows = emptyList()
+                    isLoading = false
+                    return@launch
+                }
+
+                try {
                     isLoading = true
                     // Load all rows - the actual row count is stored in the import metadata
-                    rows = csvImportRepository.getImportRows(importId, limit = it.rowCount, offset = 0)
+                    rows = csvImportRepository.getImportRows(importId, limit = currentImport.rowCount, offset = 0)
+                } finally {
                     isLoading = false
                 }
             }.join()

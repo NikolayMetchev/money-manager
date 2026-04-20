@@ -10,7 +10,8 @@
       </option>
       <option name="taskNames">
         <list>
-          <option value="pixel6api34AndroidDeviceTest" />
+          <!-- Android API level sync: update with gradle/libs.versions.toml, the Gradle managed device, CI emulator, and AGENTS.md. -->
+          <option value="pixel6api37AndroidDeviceTest" />
         </list>
       </option>
       <option name="vmOptions" />
