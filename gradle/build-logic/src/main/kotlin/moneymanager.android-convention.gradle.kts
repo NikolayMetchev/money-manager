@@ -1,4 +1,3 @@
-import com.android.build.api.dsl.ManagedVirtualDevice.PageAlignment.FORCE_16KB_PAGES
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 
@@ -9,9 +8,9 @@ plugins {
 }
 
 val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
-// Android API level sync: update with gradle/libs.versions.toml, .github/workflows/build.yml,
+// Android emulator API level sync: update with .github/workflows/build.yml,
 // .idea/runConfigurations/Android_Tests.xml, and AGENTS.md.
-val androidTestManagedDeviceNames = listOf("pixel6api37")
+val androidTestManagedDeviceNames = listOf("pixel6api36")
 
 fun KotlinMultiplatformExtension.configureAndroidTarget() {
     android {
@@ -32,10 +31,9 @@ fun KotlinMultiplatformExtension.configureAndroidTarget() {
 
             managedDevices {
                 localDevices {
-                    create("pixel6api37") {
+                    create("pixel6api36") {
                         device = "Pixel 6"
-                        apiLevel = 37
-                        pageAlignment = FORCE_16KB_PAGES
+                        apiLevel = 36
                         systemImageSource = "aosp-atd"
                     }
                 }
