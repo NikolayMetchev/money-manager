@@ -24,6 +24,11 @@ fun KotlinMultiplatformExtension.configureAndroidTarget() {
             jvmTarget.set(JvmTarget.fromTarget(libs.findVersion("jvm-target").get().toString()))
         }
 
+        lint {
+            warningsAsErrors = true
+            abortOnError = true
+        }
+
         // Enable instrumented tests with Gradle Managed Device
         withDeviceTest {
             // Enable code coverage for instrumented tests

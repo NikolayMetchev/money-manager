@@ -19,6 +19,10 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
     }
 }
 
+tasks.withType<JavaCompile>().configureEach {
+    options.compilerArgs.addAll(listOf("-Xlint:all", "-Werror"))
+}
+
 dependencies {
     compileOnly(libs.develocity.gradle.plugin)
     implementation(libs.android.gradle.plugin)
