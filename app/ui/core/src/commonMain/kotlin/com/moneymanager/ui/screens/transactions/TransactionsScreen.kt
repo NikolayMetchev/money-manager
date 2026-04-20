@@ -88,11 +88,14 @@ fun AccountTransactionsScreen(
     initialCurrencyId: CurrencyId? = null,
     externalRefreshTrigger: Int = 0,
 ) {
-    val allAccounts by accountRepository.getAllAccounts()
+    val allAccounts by accountRepository
+        .getAllAccounts()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val currencies by currencyRepository.getAllCurrencies()
+    val currencies by currencyRepository
+        .getAllCurrencies()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val accountBalances by transactionRepository.getAccountBalances()
+    val accountBalances by transactionRepository
+        .getAccountBalances()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
 
     // Selected account state - synced with parent's accountId parameter
@@ -417,13 +420,11 @@ fun AccountTransactionsScreen(
                                                         isCellSelected -> MaterialTheme.colorScheme.secondaryContainer
                                                         else -> MaterialTheme.colorScheme.surface
                                                     },
-                                                )
-                                                .clickable {
+                                                ).clickable {
                                                     selectedAccountId = account.id
                                                     selectedCurrencyId = null // Clear currency to show all currencies
                                                     onAccountClick(account.id, account.name, null)
-                                                }
-                                                .padding(vertical = 4.dp),
+                                                }.padding(vertical = 4.dp),
                                         contentAlignment = Alignment.Center,
                                     ) {
                                         Text(
@@ -468,8 +469,7 @@ fun AccountTransactionsScreen(
                                                         } else {
                                                             MaterialTheme.colorScheme.surface
                                                         },
-                                                    )
-                                                    .padding(vertical = 4.dp),
+                                                    ).padding(vertical = 4.dp),
                                         ) {
                                             Text(
                                                 text = "${currency?.code ?: "?"}:",
@@ -526,8 +526,7 @@ fun AccountTransactionsScreen(
                                                                 selectedAccountId = account.id
                                                                 selectedCurrencyId = currencyId
                                                                 onAccountClick(account.id, account.name, currencyId)
-                                                            }
-                                                            .padding(vertical = 4.dp),
+                                                            }.padding(vertical = 4.dp),
                                                     contentAlignment = Alignment.Center,
                                                 ) {
                                                     if (balance != null) {
@@ -690,9 +689,10 @@ fun AccountTransactionsScreen(
 
                         // Now find the index in the filtered list (which now includes this currency)
                         val index =
-                            runningBalances.filter {
-                                it.transactionAmount.currency.id == transaction.transactionAmount.currency.id
-                            }.indexOfFirst { it.transactionId.id == targetTransferId.id }
+                            runningBalances
+                                .filter {
+                                    it.transactionAmount.currency.id == transaction.transactionAmount.currency.id
+                                }.indexOfFirst { it.transactionId.id == targetTransferId.id }
 
                         if (index >= 0) {
                             // Scroll to the transaction

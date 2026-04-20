@@ -15,6 +15,8 @@ data class Account(
 
 @Serializable
 @JvmInline
-value class AccountId(val id: Long) {
+value class AccountId(
+    val id: Long,
+) {
     override fun toString() = id.toString()
 }

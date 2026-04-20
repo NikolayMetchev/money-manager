@@ -8,7 +8,7 @@ Money Manager is a Kotlin Multiplatform personal finance app targeting JVM and A
 
 ## Technology Stack
 
-- **Language**: Kotlin | **Build**: Gradle | **JVM**: 25
+- **Language**: Kotlin | **Build**: Gradle | **JVM**: 25. JVM version sync: keep this aligned with `gradle/libs.versions.toml`, `.github/actions/gradle-setup/action.yml`, and `.github/workflows/lint-format.yml`.
 - **Database**: SQLite via SQLDelight | **DI**: Metro 
 - **UI**: Compose Multiplatform with Material 3
 - **Object Mapping**: Mappie | **Code Quality**: Detekt, ktlint
@@ -22,7 +22,7 @@ Money Manager is a Kotlin Multiplatform personal finance app targeting JVM and A
 | `./gradlew build` | Build all, run tests, coverage, dependency health |
 | `./gradlew :app:main:jvm:run` | Run JVM application |
 | `./gradlew :app:main:android:installDebug` | Install Android debug APK |
-| `./gradlew :app:ui:core:pixel6api34AndroidDeviceTest` | Run Android UI tests on managed device |
+| `./gradlew :app:ui:core:pixel6api36AndroidDeviceTest` | Run Android UI tests on managed device |
 | `./gradlew lintFormat` | Format code (ktlint + sort dependencies) |
 | `./gradlew buildHealth` | Check dependency health |
 | `./gradlew detekt` | Static analysis |
@@ -107,7 +107,7 @@ Money Manager is a Kotlin Multiplatform personal finance app targeting JVM and A
 - Use `runComposeUiTest` for UI tests
 - Android tests require manifest with `ComponentActivity` declaration
 - Share test sources via `kotlin.srcDir("src/commonTest/kotlin")`
-- **Android Device Tests**: Use `:app:ui:core:pixel6api34AndroidDeviceTest` for UI tests on managed device emulator
+- **Android Device Tests**: Use `:app:ui:core:pixel6api36AndroidDeviceTest` for UI tests on managed device emulator. Android emulator API level sync: update this with the Gradle managed device, CI emulator, and IntelliJ Android Tests run configuration.
 - **Test Stability**: Always call `waitForIdle()` after `waitUntilDoesNotExist()` to ensure recompositions complete before test ends
 
 ### Platform Support
@@ -116,7 +116,7 @@ Money Manager is a Kotlin Multiplatform personal finance app targeting JVM and A
 
 ### Common Issues
 
-1. **Java**: Requires JDK 25 toolchain
+1. **Java**: Requires JDK 25 toolchain. JVM version sync: update this with `gradle/libs.versions.toml`, `.github/actions/gradle-setup/action.yml`, and `.github/workflows/lint-format.yml`.
 2. **Metro**: Keep Kotlin version aligned (2.2.21). Components/modules must be `interface`
 3. **SQLDelight**: `execute()`/`update()`/`delete()` return `Long`, not `Unit`
 4. **Configuration Cache**: Enabled for faster builds; invalidates on build file changes

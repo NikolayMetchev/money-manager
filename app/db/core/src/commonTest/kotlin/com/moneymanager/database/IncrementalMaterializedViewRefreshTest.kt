@@ -42,15 +42,16 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
      */
     private fun countPendingChanges(): Long {
         val sql = "SELECT COUNT(*) FROM pending_materialized_view_changes"
-        return database.executeQuery(
-            identifier = null,
-            sql = sql,
-            mapper = { cursor ->
-                cursor.next()
-                QueryResult.Value(cursor.getLong(0)!!)
-            },
-            parameters = 0,
-        ).value
+        return database
+            .executeQuery(
+                identifier = null,
+                sql = sql,
+                mapper = { cursor ->
+                    cursor.next()
+                    QueryResult.Value(cursor.getLong(0)!!)
+                },
+                parameters = 0,
+            ).value
     }
 
     /**
@@ -59,24 +60,25 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
      */
     private fun selectBalancesFromView(): List<BalanceViewRecord> {
         val sql = "SELECT account_id, currency_id, balance FROM account_balance_view ORDER BY account_id, currency_id"
-        return database.executeQuery(
-            identifier = null,
-            sql = sql,
-            mapper = { cursor ->
-                val results = mutableListOf<BalanceViewRecord>()
-                while (cursor.next().value) {
-                    results.add(
-                        BalanceViewRecord(
-                            accountId = cursor.getLong(0)!!,
-                            currencyId = cursor.getLong(1)!!,
-                            balance = cursor.getLong(2),
-                        ),
-                    )
-                }
-                QueryResult.Value(results)
-            },
-            parameters = 0,
-        ).value
+        return database
+            .executeQuery(
+                identifier = null,
+                sql = sql,
+                mapper = { cursor ->
+                    val results = mutableListOf<BalanceViewRecord>()
+                    while (cursor.next().value) {
+                        results.add(
+                            BalanceViewRecord(
+                                accountId = cursor.getLong(0)!!,
+                                currencyId = cursor.getLong(1)!!,
+                                balance = cursor.getLong(2),
+                            ),
+                        )
+                    }
+                    QueryResult.Value(results)
+                },
+                parameters = 0,
+            ).value
     }
 
     // Helper to verify materialized views match the source views
@@ -86,7 +88,8 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
 
         // Query both materialized views and views
         val materializedBalances =
-            database.transferQueries.selectAllBalances()
+            database.transferQueries
+                .selectAllBalances()
                 .executeAsList()
                 .sortedWith(compareBy({ it.account_id }, { it.currency_id }))
 
@@ -727,14 +730,16 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
             // Do incremental refresh
             repositories.maintenanceService.refreshMaterializedViews()
             val incrementalBalances =
-                database.transferQueries.selectAllBalances()
+                database.transferQueries
+                    .selectAllBalances()
                     .executeAsList()
                     .sortedBy { "${it.account_id}-${it.currency_id}" }
 
             // Do full refresh
             repositories.maintenanceService.fullRefreshMaterializedViews()
             val fullBalances =
-                database.transferQueries.selectAllBalances()
+                database.transferQueries
+                    .selectAllBalances()
                     .executeAsList()
                     .sortedBy { "${it.account_id}-${it.currency_id}" }
 

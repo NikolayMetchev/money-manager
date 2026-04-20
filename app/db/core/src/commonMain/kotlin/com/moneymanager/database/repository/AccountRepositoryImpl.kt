@@ -24,13 +24,15 @@ class AccountRepositoryImpl(
     private val transferQueries = database.transferQueries
 
     override fun getAllAccounts(): Flow<List<Account>> =
-        queries.selectAll()
+        queries
+            .selectAll()
             .asFlow()
             .mapToList(Dispatchers.Default)
             .map(AccountMapper::mapList)
 
     override fun getAccountById(id: AccountId): Flow<Account?> =
-        queries.selectById(id.id)
+        queries
+            .selectById(id.id)
             .asFlow()
             .mapToOneOrNull(Dispatchers.Default)
             .map { it?.let(AccountMapper::map) }
@@ -91,11 +93,12 @@ class AccountRepositoryImpl(
         accountB: AccountId,
     ): List<Transfer> =
         withContext(Dispatchers.Default) {
-            transferQueries.selectTransfersBetweenAccounts(
-                accountA = accountA.id,
-                accountB = accountB.id,
-                TransferMapper::mapRaw,
-            ).executeAsList()
+            transferQueries
+                .selectTransfersBetweenAccounts(
+                    accountA = accountA.id,
+                    accountB = accountB.id,
+                    TransferMapper::mapRaw,
+                ).executeAsList()
         }
 
     override suspend fun deleteAccountAndMoveTransactions(

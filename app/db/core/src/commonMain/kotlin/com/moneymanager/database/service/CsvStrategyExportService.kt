@@ -73,12 +73,16 @@ sealed interface Resolution {
     /**
      * Map to an existing entity by ID.
      */
-    data class MapToExisting(val id: Long) : Resolution
+    data class MapToExisting(
+        val id: Long,
+    ) : Resolution
 
     /**
      * Create a new entity with the given name.
      */
-    data class CreateNew(val name: String) : Resolution
+    data class CreateNew(
+        val name: String,
+    ) : Resolution
 }
 
 /**
@@ -129,16 +133,17 @@ class CsvStrategyExportService(
                 },
             attributeMappings = strategy.attributeMappings,
             accountMappings =
-                accountMappings?.map { mapping ->
-                    val account =
-                        accountsById[mapping.accountId]
-                            ?: error("Missing account for id ${mapping.accountId.id} in CsvAccountMapping")
-                    CsvAccountMappingExport(
-                        columnName = mapping.columnName,
-                        valuePattern = mapping.valuePattern.pattern,
-                        accountName = account.name,
-                    )
-                }.orEmpty(),
+                accountMappings
+                    ?.map { mapping ->
+                        val account =
+                            accountsById[mapping.accountId]
+                                ?: error("Missing account for id ${mapping.accountId.id} in CsvAccountMapping")
+                        CsvAccountMappingExport(
+                            columnName = mapping.columnName,
+                            valuePattern = mapping.valuePattern.pattern,
+                            accountName = account.name,
+                        )
+                    }.orEmpty(),
         )
     }
 

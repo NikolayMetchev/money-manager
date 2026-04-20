@@ -1470,7 +1470,9 @@ private fun AttributeMappingsEditor(
                     val attributeTypeName = mapping?.attributeTypeName ?: columnName
                     val isUniqueIdentifier = mapping?.isUniqueIdentifier ?: false
                     val sampleValue =
-                        firstRow?.values?.getOrNull(column.columnIndex)
+                        firstRow
+                            ?.values
+                            ?.getOrNull(column.columnIndex)
                             .orEmpty()
 
                     AttributeColumnMappingRow(
@@ -1837,9 +1839,11 @@ private fun RegexRulesEditor(
                             remember(rule.pattern, rows, columnIndex) {
                                 try {
                                     val regex = Regex(rule.pattern, RegexOption.IGNORE_CASE)
-                                    rows.mapNotNull { row ->
-                                        row.values.getOrNull(columnIndex)?.takeIf { it.isNotBlank() }
-                                    }.filter { regex.containsMatchIn(it) }.distinct()
+                                    rows
+                                        .mapNotNull { row ->
+                                            row.values.getOrNull(columnIndex)?.takeIf { it.isNotBlank() }
+                                        }.filter { regex.containsMatchIn(it) }
+                                        .distinct()
                                 } catch (_: Exception) {
                                     emptyList()
                                 }

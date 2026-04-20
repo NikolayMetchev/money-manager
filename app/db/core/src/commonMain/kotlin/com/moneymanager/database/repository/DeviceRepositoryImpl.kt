@@ -9,12 +9,11 @@ import com.moneymanager.domain.repository.DeviceRepository
 class DeviceRepositoryImpl(
     private val database: MoneyManagerDatabaseWrapper,
 ) : DeviceRepository {
-    override fun getOrCreateDevice(deviceInfo: DeviceInfo): DeviceId {
-        return when (deviceInfo) {
+    override fun getOrCreateDevice(deviceInfo: DeviceInfo): DeviceId =
+        when (deviceInfo) {
             is DeviceInfo.Jvm -> getOrCreateJvmDevice(deviceInfo)
             is DeviceInfo.Android -> getOrCreateAndroidDevice(deviceInfo)
         }
-    }
 
     private fun getOrCreateJvmDevice(deviceInfo: DeviceInfo.Jvm): DeviceId {
         // Get or create OS
@@ -27,10 +26,11 @@ class DeviceRepositoryImpl(
 
         // Try to find existing device
         val existingDevice =
-            database.deviceQueries.selectByAttributesJvm(
-                os_id = osId,
-                machine_id = machineId,
-            ).executeAsOneOrNull()
+            database.deviceQueries
+                .selectByAttributesJvm(
+                    os_id = osId,
+                    machine_id = machineId,
+                ).executeAsOneOrNull()
 
         if (existingDevice != null) {
             return DeviceId(existingDevice)
@@ -43,10 +43,11 @@ class DeviceRepositoryImpl(
         )
         // Re-query to get the ID (lastInsertRowId doesn't work reliably with JDBC)
         return DeviceId(
-            database.deviceQueries.selectByAttributesJvm(
-                os_id = osId,
-                machine_id = machineId,
-            ).executeAsOne(),
+            database.deviceQueries
+                .selectByAttributesJvm(
+                    os_id = osId,
+                    machine_id = machineId,
+                ).executeAsOne(),
         )
     }
 
@@ -61,10 +62,11 @@ class DeviceRepositoryImpl(
 
         // Try to find existing device
         val existingDevice =
-            database.deviceQueries.selectByAttributesAndroid(
-                device_make_id = makeId,
-                device_model_id = modelId,
-            ).executeAsOneOrNull()
+            database.deviceQueries
+                .selectByAttributesAndroid(
+                    device_make_id = makeId,
+                    device_model_id = modelId,
+                ).executeAsOneOrNull()
 
         if (existingDevice != null) {
             return DeviceId(existingDevice)
@@ -77,10 +79,11 @@ class DeviceRepositoryImpl(
         )
         // Re-query to get the ID (lastInsertRowId doesn't work reliably with JDBC)
         return DeviceId(
-            database.deviceQueries.selectByAttributesAndroid(
-                device_make_id = makeId,
-                device_model_id = modelId,
-            ).executeAsOne(),
+            database.deviceQueries
+                .selectByAttributesAndroid(
+                    device_make_id = makeId,
+                    device_model_id = modelId,
+                ).executeAsOne(),
         )
     }
 

@@ -71,11 +71,14 @@ fun EditAccountDialog(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
 
-    val categories by categoryRepository.getAllCategories()
+    val categories by categoryRepository
+        .getAllCategories()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val people by personRepository.getAllPeople()
+    val people by personRepository
+        .getAllPeople()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val existingOwnerships by personAccountOwnershipRepository.getOwnershipsByAccount(account.id)
+    val existingOwnerships by personAccountOwnershipRepository
+        .getOwnershipsByAccount(account.id)
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
 
     var selectedOwnerIds by remember(existingOwnerships) {

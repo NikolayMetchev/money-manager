@@ -5,7 +5,9 @@ package com.moneymanager.ui
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.MaterialTheme
@@ -109,12 +111,14 @@ fun MoneyManagerApp(
         var transactionRefreshTrigger by remember { mutableStateOf(0) }
 
         var defaultCurrencyLoaded by remember { mutableStateOf(false) }
-        val defaultCurrencyId by settingsRepository.getDefaultCurrencyId()
+        val defaultCurrencyId by settingsRepository
+            .getDefaultCurrencyId()
             .onEach { defaultCurrencyLoaded = true }
             .collectAsStateWithSchemaErrorHandling(initial = null)
 
         // Use schema-error-aware collection for flows that may fail on old databases
-        val accounts by accountRepository.getAllAccounts()
+        val accounts by accountRepository
+            .getAllAccounts()
             .collectAsStateWithSchemaErrorHandling(initial = emptyList())
 
         MaterialTheme {
@@ -127,6 +131,8 @@ fun MoneyManagerApp(
                 modifier =
                     Modifier
                         .fillMaxSize()
+                        .systemBarsPadding()
+                        .imePadding()
                         .mouseButtonNavigation(
                             onBack = { navigationHistory.navigateBack() },
                             onForward = { navigationHistory.navigateForward() },

@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 
 plugins {
     id("moneymanager.kotlin-convention")
@@ -7,12 +8,12 @@ plugins {
 }
 
 val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
+// Android emulator API level sync: update with .github/workflows/build.yml,
+// .idea/runConfigurations/Android_Tests.xml, and AGENTS.md.
+val androidTestManagedDeviceNames = listOf("pixel6api36")
 
-kotlin {
-    jvm()
-
-    // Configure Android target using the new plugin's DSL
-    androidLibrary {
+fun KotlinMultiplatformExtension.configureAndroidTarget() {
+    android {
         // Use group (set by kotlin-convention based on project path)
         // Sanitize hyphens in group name for valid Android package name
         namespace = "com.moneymanager.${project.group.toString().replace("-", ".")}"
@@ -30,22 +31,29 @@ kotlin {
 
             managedDevices {
                 localDevices {
-                    // Create a managed device named "pixel6api34"
-                    create("pixel6api34") {
+                    create("pixel6api36") {
                         device = "Pixel 6"
-                        apiLevel = 34
+                        apiLevel = 36
                         systemImageSource = "aosp-atd"
                     }
                 }
                 // Create a device group for running all tests
                 groups {
                     create("allDevices") {
-                        targetDevices.add(allDevices["pixel6api34"])
+                        androidTestManagedDeviceNames.forEach { deviceName ->
+                            targetDevices.add(allDevices[deviceName])
+                        }
                     }
                 }
             }
         }
     }
+}
+
+kotlin {
+    jvm()
+
+    configureAndroidTarget()
 
     jvmToolchain(libs.findVersion("jvm-toolchain").get().toString().toInt())
 
@@ -69,4 +77,4 @@ tasks.named("build") {
 }
 
 // Configure build scan integration for Android device tests
-configureAndroidTestBuildScan(listOf("pixel6api34"))
+configureAndroidTestBuildScan(androidTestManagedDeviceNames)

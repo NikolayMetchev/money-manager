@@ -7,7 +7,9 @@ import kotlin.time.Instant
 /**
  * Represents the entity types that can have source tracking.
  */
-enum class EntityType(val id: Long) {
+enum class EntityType(
+    val id: Long,
+) {
     ACCOUNT(1),
     PERSON(2),
     CURRENCY(3),

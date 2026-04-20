@@ -49,6 +49,7 @@ import com.moneymanager.database.csv.StrategyMatcher
 import com.moneymanager.database.sql.TransferSourceQueries
 import com.moneymanager.domain.getDeviceInfo
 import com.moneymanager.domain.model.Account
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
@@ -108,11 +109,14 @@ fun ApplyStrategyDialog(
     onImportComplete: (CsvImportResult) -> Unit,
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
-    val strategies by csvImportStrategyRepository.getAllStrategies()
+    val strategies by csvImportStrategyRepository
+        .getAllStrategies()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val accounts by accountRepository.getAllAccounts()
+    val accounts by accountRepository
+        .getAllAccounts()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val currencies by currencyRepository.getAllCurrencies()
+    val currencies by currencyRepository
+        .getAllCurrencies()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
 
     var selectedStrategy by remember { mutableStateOf<CsvImportStrategy?>(null) }
@@ -229,7 +233,7 @@ fun ApplyStrategyDialog(
                                 try {
                                     val account =
                                         Account(
-                                            id = com.moneymanager.domain.model.AccountId(0),
+                                            id = AccountId(0),
                                             name = newAccount.name,
                                             openingDate = Clock.System.now(),
                                             categoryId = newAccount.categoryId,
@@ -333,13 +337,15 @@ fun ApplyStrategyDialog(
 
                             // Fetch existing transfers within the CSV's date range that involve any of the CSV's accounts
                             val existingTransfers =
-                                allAccountIds.flatMap { accountId ->
-                                    transactionRepository.getTransactionsByAccountAndDateRange(
-                                        accountId = accountId,
-                                        startDate = minTimestamp,
-                                        endDate = maxTimestamp,
-                                    ).first()
-                                }.distinctBy { it.id }
+                                allAccountIds
+                                    .flatMap { accountId ->
+                                        transactionRepository
+                                            .getTransactionsByAccountAndDateRange(
+                                                accountId = accountId,
+                                                startDate = minTimestamp,
+                                                endDate = maxTimestamp,
+                                            ).first()
+                                    }.distinctBy { it.id }
 
                             val existingTransferInfoList =
                                 existingTransfers.map { transfer ->
@@ -357,7 +363,8 @@ fun ApplyStrategyDialog(
                                                 val attributeValue =
                                                     transfer.attributes
                                                         .firstOrNull { it.attributeType.name == mapping.attributeTypeName }
-                                                        ?.value.orEmpty()
+                                                        ?.value
+                                                        .orEmpty()
                                                 mapping.columnName to attributeValue
                                             }
 
@@ -767,8 +774,7 @@ private fun ImportPreviewSection(prep: ImportPreparation) {
                         .background(
                             MaterialTheme.colorScheme.surfaceVariant,
                             MaterialTheme.shapes.small,
-                        )
-                        .padding(8.dp),
+                        ).padding(8.dp),
             ) {
                 prep.newAccounts.forEach { account ->
                     Text(
@@ -795,8 +801,7 @@ private fun ImportPreviewSection(prep: ImportPreparation) {
                         .background(
                             MaterialTheme.colorScheme.errorContainer,
                             MaterialTheme.shapes.small,
-                        )
-                        .padding(8.dp),
+                        ).padding(8.dp),
             ) {
                 prep.errorRows.take(5).forEach { error ->
                     Text(
@@ -841,8 +846,7 @@ private fun StatCard(
                 .background(
                     color.copy(alpha = 0.1f),
                     MaterialTheme.shapes.small,
-                )
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                ).padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
         Text(
             text = count.toString(),

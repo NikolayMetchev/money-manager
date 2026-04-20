@@ -5,6 +5,8 @@ package com.moneymanager.domain.model.csvstrategy
 import kotlin.uuid.Uuid
 
 @JvmInline
-value class CsvImportStrategyId(val id: Uuid) {
+value class CsvImportStrategyId(
+    val id: Uuid,
+) {
     override fun toString() = id.toString()
 }

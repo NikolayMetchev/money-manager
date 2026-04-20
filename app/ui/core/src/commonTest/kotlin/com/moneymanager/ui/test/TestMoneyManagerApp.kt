@@ -26,7 +26,10 @@ private sealed class TestDatabaseState {
         val databaseComponent: DatabaseComponent,
     ) : TestDatabaseState()
 
-    data class Error(val location: DbLocation, val error: Throwable) : TestDatabaseState()
+    data class Error(
+        val location: DbLocation,
+        val error: Throwable,
+    ) : TestDatabaseState()
 }
 
 /**

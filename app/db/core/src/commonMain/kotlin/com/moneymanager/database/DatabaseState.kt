@@ -27,5 +27,7 @@ sealed class DatabaseState {
      *
      * @property error The error that occurred
      */
-    data class Error(val error: Throwable) : DatabaseState()
+    data class Error(
+        val error: Throwable,
+    ) : DatabaseState()
 }

@@ -31,12 +31,14 @@ fun buildCategoryForest(categories: List<Category>): List<CategoryNode> {
         depth: Int,
     ): CategoryNode {
         val children =
-            childrenByParentId[category.id].orEmpty()
+            childrenByParentId[category.id]
+                .orEmpty()
                 .map { buildSubtree(it, depth + 1) }
         return CategoryNode(category = category, children = children, depth = depth)
     }
 
-    return childrenByParentId[null].orEmpty()
+    return childrenByParentId[null]
+        .orEmpty()
         .map { buildSubtree(it, depth = 0) }
 }
 

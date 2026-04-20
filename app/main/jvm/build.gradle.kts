@@ -38,7 +38,10 @@ compose.desktop {
         buildTypes.release {
             proguard {
                 isEnabled.set(true)
-                version.set(libs.versions.proguard.get().toString())
+                version.set(
+                    libs.versions.proguard
+                        .get(),
+                )
                 configurationFiles.from(project.file("proguard-rules.pro"))
             }
         }
@@ -46,7 +49,8 @@ compose.desktop {
         // Add required Java modules for the bundled JRE
         jvmArgs +=
             listOf(
-                "--add-modules", "java.sql",
+                "--add-modules",
+                "java.sql",
             )
 
         nativeDistributions {

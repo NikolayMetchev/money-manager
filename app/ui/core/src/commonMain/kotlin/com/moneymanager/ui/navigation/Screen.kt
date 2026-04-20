@@ -8,8 +8,12 @@ import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImportId
 
-sealed class Screen(val title: String) {
-    data class Accounts(val scrollToAccountId: AccountId? = null) : Screen("Accounts")
+sealed class Screen(
+    val title: String,
+) {
+    data class Accounts(
+        val scrollToAccountId: AccountId? = null,
+    ) : Screen("Accounts")
 
     data object Currencies : Screen("Currencies")
 
@@ -33,21 +37,29 @@ sealed class Screen(val title: String) {
     data class CsvImportDetail(
         val importId: CsvImportId,
         val scrollToRowIndex: Long? = null,
-    ) :
-        Screen("CSV Import")
+    ) : Screen("CSV Import")
 
-    data class AuditHistory(val transferId: TransferId) :
-        Screen("Audit History")
+    data class AuditHistory(
+        val transferId: TransferId,
+    ) : Screen("Audit History")
 
-    data class AccountAuditHistory(val accountId: AccountId, val accountName: String) :
-        Screen("Account Audit: $accountName")
+    data class AccountAuditHistory(
+        val accountId: AccountId,
+        val accountName: String,
+    ) : Screen("Account Audit: $accountName")
 
-    data class PersonAuditHistory(val personId: PersonId, val personName: String) :
-        Screen("Person Audit: $personName")
+    data class PersonAuditHistory(
+        val personId: PersonId,
+        val personName: String,
+    ) : Screen("Person Audit: $personName")
 
-    data class CurrencyAuditHistory(val currencyId: CurrencyId, val currencyCode: String) :
-        Screen("Currency Audit: $currencyCode")
+    data class CurrencyAuditHistory(
+        val currencyId: CurrencyId,
+        val currencyCode: String,
+    ) : Screen("Currency Audit: $currencyCode")
 
-    data class CategoryAuditHistory(val categoryId: Long, val categoryName: String) :
-        Screen("Category Audit: $categoryName")
+    data class CategoryAuditHistory(
+        val categoryId: Long,
+        val categoryName: String,
+    ) : Screen("Category Audit: $categoryName")
 }

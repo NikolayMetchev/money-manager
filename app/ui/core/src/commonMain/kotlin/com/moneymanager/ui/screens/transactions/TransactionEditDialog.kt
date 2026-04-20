@@ -35,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.database.ManualSourceRecorder
 import com.moneymanager.database.sql.EntitySourceQueries
@@ -95,7 +96,15 @@ fun TransactionEditDialog(
     var sourceAccountId by remember { mutableStateOf(transaction?.sourceAccountId ?: preSelectedSourceAccountId) }
     var targetAccountId by remember { mutableStateOf(transaction?.targetAccountId) }
     var currencyId by remember { mutableStateOf(transaction?.amount?.currency?.id ?: preSelectedCurrencyId) }
-    var amount by remember { mutableStateOf(transaction?.amount?.toDisplayValue()?.toString().orEmpty()) }
+    var amount by remember {
+        mutableStateOf(
+            transaction
+                ?.amount
+                ?.toDisplayValue()
+                ?.toString()
+                .orEmpty(),
+        )
+    }
     var description by remember { mutableStateOf(transaction?.description.orEmpty()) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
@@ -152,6 +161,11 @@ fun TransactionEditDialog(
         }
     }
 
+    val parsedAmount =
+        remember(amount) {
+            runCatching { BigDecimal(amount.trim()) }.getOrNull()
+        }
+
     // Check if any field has changed from the original transaction (edit mode only)
     val hasChanges =
         remember(
@@ -159,6 +173,7 @@ fun TransactionEditDialog(
             targetAccountId,
             currencyId,
             amount,
+            parsedAmount,
             description,
             selectedDate,
             selectedHour,
@@ -166,20 +181,20 @@ fun TransactionEditDialog(
             editableAttributes,
             originalAttributes,
         ) {
-            if (!isEditMode || transaction == null) {
+            if (transaction == null) {
                 // In create mode, enable save only when all required fields are filled and valid
                 sourceAccountId != null &&
                     targetAccountId != null &&
                     currencyId != null &&
                     amount.isNotBlank() &&
-                    amount.toDoubleOrNull() != null &&
-                    amount.toDouble() > 0 &&
+                    parsedAmount != null &&
+                    parsedAmount > BigDecimal.ZERO &&
                     sourceAccountId != targetAccountId
             } else {
                 sourceAccountId != transaction.sourceAccountId ||
                     targetAccountId != transaction.targetAccountId ||
                     currencyId != transaction.amount.currency.id ||
-                    amount != transaction.amount.toDisplayValue().toString() ||
+                    parsedAmount != transaction.amount.toDisplayValue() ||
                     description != transaction.description ||
                     selectedDate != transactionDateTime!!.date ||
                     selectedHour != transactionDateTime.hour ||
@@ -404,14 +419,15 @@ fun TransactionEditDialog(
         confirmButton = {
             TextButton(
                 onClick = {
+                    val validAmount = parsedAmount
                     when {
                         sourceAccountId == null -> errorMessage = "Source account is required"
                         targetAccountId == null -> errorMessage = "Target account is required"
                         sourceAccountId == targetAccountId -> errorMessage = "Source and target accounts must be different"
                         currencyId == null -> errorMessage = "Currency is required"
                         amount.isBlank() -> errorMessage = "Amount is required"
-                        amount.toDoubleOrNull() == null -> errorMessage = "Invalid amount"
-                        amount.toDouble() <= 0 -> errorMessage = "Amount must be greater than 0"
+                        validAmount == null -> errorMessage = "Invalid amount"
+                        validAmount <= BigDecimal.ZERO -> errorMessage = "Amount must be greater than 0"
                         description.isBlank() -> errorMessage = "Description is required"
                         else -> {
                             isSaving = true
@@ -428,14 +444,14 @@ fun TransactionEditDialog(
                                             .atTime(selectedHour, selectedMinute, originalSecond, originalNanosecond)
                                             .toInstant(TimeZone.currentSystemDefault())
 
-                                    if (isEditMode && transaction != null) {
+                                    if (transaction != null) {
                                         // EDIT MODE: Update existing transaction
                                         // Check if transfer fields actually changed
                                         val transferFieldsChanged =
                                             sourceAccountId != transaction.sourceAccountId ||
                                                 targetAccountId != transaction.targetAccountId ||
                                                 currencyId != transaction.amount.currency.id ||
-                                                amount != transaction.amount.toDisplayValue().toString() ||
+                                                validAmount != transaction.amount.toDisplayValue() ||
                                                 description.trim() != transaction.description ||
                                                 timestamp != transaction.timestamp
 
@@ -448,7 +464,7 @@ fun TransactionEditDialog(
                                                     description = description.trim(),
                                                     sourceAccountId = sourceAccountId!!,
                                                     targetAccountId = targetAccountId!!,
-                                                    amount = Money.fromDisplayValue(amount, currency),
+                                                    amount = Money.fromDisplayValue(validAmount, currency),
                                                 )
                                             } else {
                                                 null
@@ -512,7 +528,7 @@ fun TransactionEditDialog(
                                                 description = description.trim(),
                                                 sourceAccountId = sourceAccountId!!,
                                                 targetAccountId = targetAccountId!!,
-                                                amount = Money.fromDisplayValue(amount, currency),
+                                                amount = Money.fromDisplayValue(validAmount, currency),
                                             )
 
                                         // Build attributes to save (only non-blank ones)

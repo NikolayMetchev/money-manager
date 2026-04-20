@@ -41,7 +41,8 @@ class TransferSourceRepositoryImpl(
                 device_id = deviceId.id,
             )
 
-            queries.selectByTransactionIdAndRevision(transactionId.id, revisionId)
+            queries
+                .selectByTransactionIdAndRevision(transactionId.id, revisionId)
                 .executeAsOne()
                 .let(TransferSourceFromRevisionMapper::map)
         }
@@ -55,10 +56,9 @@ class TransferSourceRepositoryImpl(
         withContext(Dispatchers.Default) {
             // Get device_id from the CSV import metadata
             val csvImport =
-                csvImportQueries.selectImportByTableName(
-                    csvImportQueries.selectImportById(csvImportId.toString())
-                        .executeAsOne().table_name,
-                ).executeAsOne()
+                csvImportQueries
+                    .selectImportById(csvImportId.toString())
+                    .executeAsOne()
 
             // Insert base TransferSource record
             queries.insertCsvImportBase(
@@ -74,7 +74,8 @@ class TransferSourceRepositoryImpl(
                 csv_row_index = rowIndex,
             )
 
-            queries.selectByTransactionIdAndRevision(transactionId.id, revisionId)
+            queries
+                .selectByTransactionIdAndRevision(transactionId.id, revisionId)
                 .executeAsOne()
                 .let(TransferSourceFromRevisionMapper::map)
         }
@@ -109,7 +110,8 @@ class TransferSourceRepositoryImpl(
 
     override suspend fun getSourcesForTransaction(transactionId: TransferId): List<TransferSource> =
         withContext(Dispatchers.Default) {
-            queries.selectAllByTransactionId(transactionId.id)
+            queries
+                .selectAllByTransactionId(transactionId.id)
                 .executeAsList()
                 .map(TransferSourceFromTransactionIdMapper::map)
         }
@@ -119,7 +121,8 @@ class TransferSourceRepositoryImpl(
         revisionId: Long,
     ): TransferSource? =
         withContext(Dispatchers.Default) {
-            queries.selectByTransactionIdAndRevision(transactionId.id, revisionId)
+            queries
+                .selectByTransactionIdAndRevision(transactionId.id, revisionId)
                 .executeAsOneOrNull()
                 ?.let(TransferSourceFromRevisionMapper::map)
         }

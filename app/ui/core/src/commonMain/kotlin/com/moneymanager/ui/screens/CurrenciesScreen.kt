@@ -32,7 +32,8 @@ fun CurrenciesScreen(
     deviceId: DeviceId,
     onAuditClick: (Currency) -> Unit = {},
 ) {
-    val currencies by currencyRepository.getAllCurrencies()
+    val currencies by currencyRepository
+        .getAllCurrencies()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
     var showCreateDialog by remember { mutableStateOf(false) }
 

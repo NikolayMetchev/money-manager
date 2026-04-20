@@ -36,7 +36,11 @@ class CsvAccountMappingRepositoryImplTest : DbTest() {
         val strategyId = CsvImportStrategyId(Uuid.random())
 
         // Create required currency first
-        val currency = repositories.currencyRepository.getAllCurrencies().first().first()
+        val currency =
+            repositories.currencyRepository
+                .getAllCurrencies()
+                .first()
+                .first()
 
         // Create accounts that the strategy references
         val sourceAccount =

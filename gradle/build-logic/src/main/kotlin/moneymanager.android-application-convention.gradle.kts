@@ -43,6 +43,13 @@ configure<ApplicationExtension> {
         sourceCompatibility = JavaVersion.toVersion(jvmTargetVersion)
         targetCompatibility = JavaVersion.toVersion(jvmTargetVersion)
     }
+
+    lint {
+        warningsAsErrors = true
+        abortOnError = true
+        // API 37 is currently beta, so stay on the latest stable SDK while keeping other lint warnings fatal.
+        disable += "OldTargetApi"
+    }
 }
 
 // Disable Compose mapping file generation to work around Java 25 compatibility issue

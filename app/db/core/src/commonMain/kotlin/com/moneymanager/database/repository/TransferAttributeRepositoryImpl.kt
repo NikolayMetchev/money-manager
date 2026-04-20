@@ -21,7 +21,8 @@ class TransferAttributeRepositoryImpl(
     private val queries = database.transferAttributeQueries
 
     override fun getByTransaction(transactionId: TransferId): Flow<List<TransferAttribute>> =
-        queries.selectByTransaction(transactionId.id)
+        queries
+            .selectByTransaction(transactionId.id)
             .asFlow()
             .mapToList(Dispatchers.Default)
             .map { list ->

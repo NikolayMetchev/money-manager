@@ -26,6 +26,8 @@ data class Person(
 
 @Serializable
 @JvmInline
-value class PersonId(val id: Long) {
+value class PersonId(
+    val id: Long,
+) {
     override fun toString() = id.toString()
 }

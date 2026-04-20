@@ -197,14 +197,12 @@ object ColumnDetector {
                             row.values.getOrNull(col.columnIndex)?.isNotBlank() == true
                         }
                     Triple(col.originalName, filledCount, isPreferredFallback(col.originalName))
-                }
-                .filter { (_, count, _) -> count > 0 }
+                }.filter { (_, count, _) -> count > 0 }
                 // Sort by: preferred columns first, then by coverage
                 .sortedWith(
                     compareByDescending<Triple<String, Int, Boolean>> { (_, _, preferred) -> preferred }
                         .thenByDescending { (_, count, _) -> count },
-                )
-                .map { (name, _, _) -> name }
+                ).map { (name, _, _) -> name }
 
         // Return top candidate(s) - typically just the best one
         return candidateColumns.take(1)

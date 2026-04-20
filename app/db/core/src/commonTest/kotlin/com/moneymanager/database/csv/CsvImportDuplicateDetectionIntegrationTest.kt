@@ -62,7 +62,11 @@ class CsvImportDuplicateDetectionIntegrationTest : DbTest() {
                 openingDate = Clock.System.now(),
             )
         repositories.accountRepository.createAccount(sourceAccount)
-        sourceAccount = repositories.accountRepository.getAllAccounts().first().first { it.name == "Test Source" }
+        sourceAccount =
+            repositories.accountRepository
+                .getAllAccounts()
+                .first()
+                .first { it.name == "Test Source" }
 
         targetAccount =
             Account(
@@ -71,11 +75,15 @@ class CsvImportDuplicateDetectionIntegrationTest : DbTest() {
                 openingDate = Clock.System.now(),
             )
         repositories.accountRepository.createAccount(targetAccount)
-        targetAccount = repositories.accountRepository.getAllAccounts().first().first { it.name == "Test Target" }
+        targetAccount =
+            repositories.accountRepository
+                .getAllAccounts()
+                .first()
+                .first { it.name == "Test Target" }
     }
 
-    private fun createTestStrategy(): CsvImportStrategy {
-        return CsvImportStrategy(
+    private fun createTestStrategy(): CsvImportStrategy =
+        CsvImportStrategy(
             id = CsvImportStrategyId(Uuid.random()),
             name = "Test Strategy",
             identificationColumns = setOf("Date", "Description", "Amount"),
@@ -138,16 +146,14 @@ class CsvImportDuplicateDetectionIntegrationTest : DbTest() {
             createdAt = Clock.System.now(),
             updatedAt = Clock.System.now(),
         )
-    }
 
-    private fun createTestColumns(): List<CsvColumn> {
-        return listOf(
+    private fun createTestColumns(): List<CsvColumn> =
+        listOf(
             CsvColumn(CsvColumnId(Uuid.random()), 0, "Transaction ID"),
             CsvColumn(CsvColumnId(Uuid.random()), 1, "Date"),
             CsvColumn(CsvColumnId(Uuid.random()), 2, "Description"),
             CsvColumn(CsvColumnId(Uuid.random()), 3, "Amount"),
         )
-    }
 
     @Test
     fun `full import flow should detect duplicates using existing transfers from repository`() =
@@ -190,10 +196,11 @@ class CsvImportDuplicateDetectionIntegrationTest : DbTest() {
 
             // Query back the created transfer
             val createdTransfersList =
-                repositories.transactionRepository.getTransactionsByDateRange(
-                    startDate = timestamp,
-                    endDate = timestamp,
-                ).first()
+                repositories.transactionRepository
+                    .getTransactionsByDateRange(
+                        startDate = timestamp,
+                        endDate = timestamp,
+                    ).first()
             val existingTransferId = createdTransfersList.first { it.description == "Coffee" }.id
 
             // Verify transfer was created
@@ -210,11 +217,12 @@ class CsvImportDuplicateDetectionIntegrationTest : DbTest() {
 
             // Fetch existing transfers by account and date range (optimized approach)
             val existingTransfers =
-                repositories.transactionRepository.getTransactionsByAccountAndDateRange(
-                    accountId = sourceAccount.id,
-                    startDate = timestamp,
-                    endDate = timestamp,
-                ).first()
+                repositories.transactionRepository
+                    .getTransactionsByAccountAndDateRange(
+                        accountId = sourceAccount.id,
+                        startDate = timestamp,
+                        endDate = timestamp,
+                    ).first()
 
             // Build ExistingTransferInfo list like ApplyStrategyDialog does
             val existingTransferInfoList =
@@ -231,7 +239,8 @@ class CsvImportDuplicateDetectionIntegrationTest : DbTest() {
                                 val attributeValue =
                                     transfer.attributes
                                         .firstOrNull { it.attributeType.name == mapping.attributeTypeName }
-                                        ?.value.orEmpty()
+                                        ?.value
+                                        .orEmpty()
                                 mapping.columnName to attributeValue
                             }
 
@@ -248,7 +257,10 @@ class CsvImportDuplicateDetectionIntegrationTest : DbTest() {
 
             // Create mapper with existing transfers
             val accountsByName =
-                repositories.accountRepository.getAllAccounts().first().associateBy { it.name }
+                repositories.accountRepository
+                    .getAllAccounts()
+                    .first()
+                    .associateBy { it.name }
             val currenciesById = mapOf(testCurrency.id to testCurrency)
             val currenciesByCode = mapOf("GBP" to testCurrency)
 
@@ -266,9 +278,11 @@ class CsvImportDuplicateDetectionIntegrationTest : DbTest() {
             val rows =
                 listOf(
                     // Duplicate - same transaction ID
-                    com.moneymanager.domain.model.csv.CsvRow(1, listOf("TX001", "01/01/2024", "Coffee", "3.50")),
+                    com.moneymanager.domain.model.csv
+                        .CsvRow(1, listOf("TX001", "01/01/2024", "Coffee", "3.50")),
                     // New transaction
-                    com.moneymanager.domain.model.csv.CsvRow(2, listOf("TX002", "02/01/2024", "Lunch", "12.00")),
+                    com.moneymanager.domain.model.csv
+                        .CsvRow(2, listOf("TX002", "02/01/2024", "Lunch", "12.00")),
                 )
 
             val prep = mapper.prepareImport(rows)
@@ -322,10 +336,11 @@ class CsvImportDuplicateDetectionIntegrationTest : DbTest() {
 
             // Query back the created transfer
             val createdTransfersList =
-                repositories.transactionRepository.getTransactionsByDateRange(
-                    startDate = timestamp,
-                    endDate = timestamp,
-                ).first()
+                repositories.transactionRepository
+                    .getTransactionsByDateRange(
+                        startDate = timestamp,
+                        endDate = timestamp,
+                    ).first()
             val existingTransferId = createdTransfersList.first { it.description == "Coffee" }.id
 
             // Create strategy WITHOUT unique identifier attributes
@@ -342,11 +357,12 @@ class CsvImportDuplicateDetectionIntegrationTest : DbTest() {
 
             // Fetch existing transfers by account and date range
             val existingTransfers =
-                repositories.transactionRepository.getTransactionsByAccountAndDateRange(
-                    accountId = sourceAccount.id,
-                    startDate = timestamp,
-                    endDate = timestamp,
-                ).first()
+                repositories.transactionRepository
+                    .getTransactionsByAccountAndDateRange(
+                        accountId = sourceAccount.id,
+                        startDate = timestamp,
+                        endDate = timestamp,
+                    ).first()
             val existingTransferInfoList =
                 existingTransfers.map { transfer ->
                     ExistingTransferInfo(
@@ -358,7 +374,10 @@ class CsvImportDuplicateDetectionIntegrationTest : DbTest() {
                 }
 
             val accountsByName =
-                repositories.accountRepository.getAllAccounts().first().associateBy { it.name }
+                repositories.accountRepository
+                    .getAllAccounts()
+                    .first()
+                    .associateBy { it.name }
             val currenciesById = mapOf(testCurrency.id to testCurrency)
             val currenciesByCode = mapOf("GBP" to testCurrency)
 
@@ -380,7 +399,8 @@ class CsvImportDuplicateDetectionIntegrationTest : DbTest() {
                         listOf("TX001", "01/01/2024", "Coffee", "3.50"),
                     ),
                     // New transaction
-                    com.moneymanager.domain.model.csv.CsvRow(2, listOf("TX002", "02/01/2024", "Lunch", "12.00")),
+                    com.moneymanager.domain.model.csv
+                        .CsvRow(2, listOf("TX002", "02/01/2024", "Lunch", "12.00")),
                 )
 
             val prep = mapper.prepareImport(rows)

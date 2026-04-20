@@ -91,11 +91,14 @@ fun ImportStrategyDialog(
     onDismiss: () -> Unit,
     onImportSuccess: () -> Unit,
 ) {
-    val accounts by accountRepository.getAllAccounts()
+    val accounts by accountRepository
+        .getAllAccounts()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val categories by categoryRepository.getAllCategories()
+    val categories by categoryRepository
+        .getAllCategories()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val currencies by currencyRepository.getAllCurrencies()
+    val currencies by currencyRepository
+        .getAllCurrencies()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
 
     var resolutions by remember {
@@ -114,7 +117,8 @@ fun ImportStrategyDialog(
         }
 
     // Check for name conflict
-    val existingStrategies by csvImportStrategyRepository.getAllStrategies()
+    val existingStrategies by csvImportStrategyRepository
+        .getAllStrategies()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
     val nameConflict = existingStrategies.any { it.name == strategyName }
 
@@ -304,8 +308,7 @@ private fun resolveAccountMappings(
                 ?: resolutions.entries
                     .firstOrNull { (reference) ->
                         reference.type == ReferenceType.ACCOUNT && reference.name == mapping.accountName
-                    }
-                    ?.value
+                    }?.value
         val account =
             when (resolution) {
                 is Resolution.CreateNew ->
@@ -384,7 +387,10 @@ private fun ReferenceResolutionRow(
                         text = reference.name,
                         style = MaterialTheme.typography.titleSmall,
                     )
-                    val refType = reference.type.name.lowercase().replaceFirstChar { it.uppercase() }
+                    val refType =
+                        reference.type.name
+                            .lowercase()
+                            .replaceFirstChar { it.uppercase() }
                     val fieldName =
                         reference.fieldType
                             ?.name

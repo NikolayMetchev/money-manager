@@ -9,7 +9,5 @@ import dev.zacsweers.metro.SingleIn
 interface AppVersionModule {
     @Provides
     @SingleIn(AppScope::class)
-    fun provideAppVersion(): AppVersion {
-        return readAppVersion()
-    }
+    fun provideAppVersion(): AppVersion = readAppVersion()
 }

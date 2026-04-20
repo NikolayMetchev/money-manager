@@ -7,6 +7,13 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
+import app.cash.sqldelight.Query
+import app.cash.sqldelight.Transacter
+import app.cash.sqldelight.db.QueryResult
+import app.cash.sqldelight.db.SqlCursor
+import app.cash.sqldelight.db.SqlDriver
+import app.cash.sqldelight.db.SqlPreparedStatement
+import com.moneymanager.database.sql.EntitySourceQueries
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DeviceId
@@ -170,50 +177,45 @@ class CurrenciesScreenTest {
      * Uses a minimal SqlDriver stub that throws NotImplementedError if actually invoked.
      */
     private companion object {
-        fun createStubEntitySourceQueries(): com.moneymanager.database.sql.EntitySourceQueries {
+        fun createStubEntitySourceQueries(): EntitySourceQueries {
             val stubDriver =
-                object : app.cash.sqldelight.db.SqlDriver {
+                object : SqlDriver {
                     override fun close() = Unit
 
-                    override fun currentTransaction(): app.cash.sqldelight.Transacter.Transaction? = null
+                    override fun currentTransaction(): Transacter.Transaction? = null
 
                     override fun execute(
                         identifier: Int?,
                         sql: String,
                         parameters: Int,
-                        binders: (app.cash.sqldelight.db.SqlPreparedStatement.() -> Unit)?,
-                    ): app.cash.sqldelight.db.QueryResult<Long> {
-                        throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
-                    }
+                        binders: (SqlPreparedStatement.() -> Unit)?,
+                    ): QueryResult<Long> = throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
 
                     override fun <R> executeQuery(
                         identifier: Int?,
                         sql: String,
-                        mapper: (app.cash.sqldelight.db.SqlCursor) -> app.cash.sqldelight.db.QueryResult<R>,
+                        mapper: (SqlCursor) -> QueryResult<R>,
                         parameters: Int,
-                        binders: (app.cash.sqldelight.db.SqlPreparedStatement.() -> Unit)?,
-                    ): app.cash.sqldelight.db.QueryResult<R> {
-                        throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
-                    }
+                        binders: (SqlPreparedStatement.() -> Unit)?,
+                    ): QueryResult<R> = throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
 
-                    override fun newTransaction(): app.cash.sqldelight.db.QueryResult<app.cash.sqldelight.Transacter.Transaction> {
+                    override fun newTransaction(): QueryResult<Transacter.Transaction> =
                         throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
-                    }
 
                     override fun addListener(
                         vararg queryKeys: String,
-                        listener: app.cash.sqldelight.Query.Listener,
+                        listener: Query.Listener,
                     ) = Unit
 
                     override fun removeListener(
                         vararg queryKeys: String,
-                        listener: app.cash.sqldelight.Query.Listener,
+                        listener: Query.Listener,
                     ) = Unit
 
                     override fun notifyListeners(vararg queryKeys: String) = Unit
                 }
 
-            return com.moneymanager.database.sql.EntitySourceQueries(stubDriver)
+            return EntitySourceQueries(stubDriver)
         }
     }
 }

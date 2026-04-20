@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -30,6 +31,7 @@ private const val TAG = "MainActivity"
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
 
         // Set up global exception handler for schema errors
         val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
@@ -71,7 +73,10 @@ private sealed class AppDatabaseState {
         val databaseComponent: DatabaseComponent,
     ) : AppDatabaseState()
 
-    data class Error(val location: DbLocation, val error: Throwable) : AppDatabaseState()
+    data class Error(
+        val location: DbLocation,
+        val error: Throwable,
+    ) : AppDatabaseState()
 }
 
 @Suppress("FunctionName")

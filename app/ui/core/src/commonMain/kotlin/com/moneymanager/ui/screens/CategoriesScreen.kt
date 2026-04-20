@@ -65,6 +65,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CategoryBalance
@@ -93,11 +94,14 @@ fun CategoriesScreen(
     currencyRepository: CurrencyRepository,
     onAuditClick: (Category) -> Unit = {},
 ) {
-    val categories by categoryRepository.getAllCategories()
+    val categories by categoryRepository
+        .getAllCategories()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val categoryBalances by categoryRepository.getCategoryBalances()
+    val categoryBalances by categoryRepository
+        .getCategoryBalances()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val currencies by currencyRepository.getAllCurrencies()
+    val currencies by currencyRepository
+        .getAllCurrencies()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
 
     var expandedIds by remember { mutableStateOf(emptySet<Long>()) }
@@ -133,8 +137,9 @@ fun CategoriesScreen(
                 val maxMoney =
                     categoryBalances
                         .filter { it.balance.currency.id == currency.id }
-                        .maxByOrNull { kotlin.math.abs(it.balance.amount) }?.balance
-                val formattedMax = maxMoney?.let { formatAmount(it) } ?: formatAmount(0.0, currency)
+                        .maxByOrNull { kotlin.math.abs(it.balance.amount) }
+                        ?.balance
+                val formattedMax = maxMoney?.let { formatAmount(it) } ?: formatAmount(BigDecimal.ZERO, currency)
                 // Estimate width: ~8dp per character + 16dp padding
                 val balanceWidth = (formattedMax.length * 8 + 16).dp
                 // Also consider header text width (currency code)
@@ -439,8 +444,7 @@ fun CategoryTreeItem(
                 .onGloballyPositioned { coordinates ->
                     val position = coordinates.positionInRoot()
                     onPositionChanged(position.y, position.y + coordinates.size.height)
-                }
-                .graphicsLayer {
+                }.graphicsLayer {
                     if (isDragging) {
                         translationY = dragOffset.y
                         scaleX = 1.02f
@@ -448,8 +452,7 @@ fun CategoryTreeItem(
                         alpha = 0.9f
                         shadowElevation = 8f
                     }
-                }
-                .then(
+                }.then(
                     if (isDraggable) {
                         Modifier.pointerInput(node.category.id) {
                             detectDragGestures(
@@ -610,7 +613,8 @@ fun CreateCategoryDialogInCategories(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
 
-    val categories by categoryRepository.getAllCategories()
+    val categories by categoryRepository
+        .getAllCategories()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
     val scope = rememberSchemaAwareCoroutineScope()
 

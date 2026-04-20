@@ -421,7 +421,8 @@ class AccountTransactionsScreenTest {
                     // Get the transfer's current revision
                     val savedTransfer =
                         repositories.transactionRepository
-                            .getTransactionById(transferId!!.id).first()!!
+                            .getTransactionById(transferId!!.id)
+                            .first()!!
                     // Note: For revisionId = 1 (newly created transfers), adding attributes
                     // doesn't bump the revision - they're part of the initial creation.
                     // Only existing transfers (revisionId > 1) get bumped when adding attributes.
@@ -433,7 +434,8 @@ class AccountTransactionsScreenTest {
                     // Verify the attribute type was created
                     val attributeType =
                         repositories.attributeTypeRepository
-                            .getByName("Reference Number").first()
+                            .getByName("Reference Number")
+                            .first()
                     assertTrue(
                         attributeType != null,
                         "Attribute type 'Reference Number' should exist in database",
@@ -442,7 +444,8 @@ class AccountTransactionsScreenTest {
                     // Verify the attribute was saved
                     val attributes =
                         repositories.transferAttributeRepository
-                            .getByTransaction(transferId).first()
+                            .getByTransaction(transferId)
+                            .first()
                     assertTrue(
                         attributes.any { it.value == "REF-12345" && it.attributeType.name == "Reference Number" },
                         "Attribute with value 'REF-12345' should exist in database. Found: $attributes",
@@ -866,9 +869,7 @@ class AccountTransactionsScreenTest {
             return newId
         }
 
-        override suspend fun createAccountsBatch(accounts: List<Account>): List<AccountId> {
-            return accounts.map { createAccount(it) }
-        }
+        override suspend fun createAccountsBatch(accounts: List<Account>): List<AccountId> = accounts.map { createAccount(it) }
 
         override suspend fun updateAccount(account: Account): Long {
             accountsFlow.value =
@@ -927,32 +928,33 @@ class AccountTransactionsScreenTest {
             // One from the source account's perspective (outgoing = negative)
             // One from the target account's perspective (incoming = positive)
             val allRows =
-                transfers.flatMap { transfer ->
-                    listOf(
-                        // Source account's perspective (outgoing = negative)
-                        AccountRow(
-                            transactionId = transfer.id,
-                            timestamp = transfer.timestamp,
-                            description = transfer.description,
-                            accountId = transfer.sourceAccountId,
-                            transactionAmount = Money(-transfer.amount.amount, transfer.amount.currency),
-                            runningBalance = transfer.amount,
-                            sourceAccountId = transfer.sourceAccountId,
-                            targetAccountId = transfer.targetAccountId,
-                        ),
-                        // Target account's perspective (incoming = positive)
-                        AccountRow(
-                            transactionId = transfer.id,
-                            timestamp = transfer.timestamp,
-                            description = transfer.description,
-                            accountId = transfer.targetAccountId,
-                            transactionAmount = transfer.amount,
-                            runningBalance = transfer.amount,
-                            sourceAccountId = transfer.sourceAccountId,
-                            targetAccountId = transfer.targetAccountId,
-                        ),
-                    )
-                }.filter { it.accountId == accountId }
+                transfers
+                    .flatMap { transfer ->
+                        listOf(
+                            // Source account's perspective (outgoing = negative)
+                            AccountRow(
+                                transactionId = transfer.id,
+                                timestamp = transfer.timestamp,
+                                description = transfer.description,
+                                accountId = transfer.sourceAccountId,
+                                transactionAmount = Money(-transfer.amount.amount, transfer.amount.currency),
+                                runningBalance = transfer.amount,
+                                sourceAccountId = transfer.sourceAccountId,
+                                targetAccountId = transfer.targetAccountId,
+                            ),
+                            // Target account's perspective (incoming = positive)
+                            AccountRow(
+                                transactionId = transfer.id,
+                                timestamp = transfer.timestamp,
+                                description = transfer.description,
+                                accountId = transfer.targetAccountId,
+                                transactionAmount = transfer.amount,
+                                runningBalance = transfer.amount,
+                                sourceAccountId = transfer.sourceAccountId,
+                                targetAccountId = transfer.targetAccountId,
+                            ),
+                        )
+                    }.filter { it.accountId == accountId }
                     .sortedByDescending { it.timestamp }
 
             // Simple pagination for testing
@@ -992,30 +994,31 @@ class AccountTransactionsScreenTest {
             pageSize: Int,
         ): PageWithTargetIndex<AccountRow> {
             val allRows =
-                transfers.flatMap { transfer ->
-                    listOf(
-                        AccountRow(
-                            transactionId = transfer.id,
-                            timestamp = transfer.timestamp,
-                            description = transfer.description,
-                            accountId = transfer.sourceAccountId,
-                            transactionAmount = Money(-transfer.amount.amount, transfer.amount.currency),
-                            runningBalance = transfer.amount,
-                            sourceAccountId = transfer.sourceAccountId,
-                            targetAccountId = transfer.targetAccountId,
-                        ),
-                        AccountRow(
-                            transactionId = transfer.id,
-                            timestamp = transfer.timestamp,
-                            description = transfer.description,
-                            accountId = transfer.targetAccountId,
-                            transactionAmount = transfer.amount,
-                            runningBalance = transfer.amount,
-                            sourceAccountId = transfer.sourceAccountId,
-                            targetAccountId = transfer.targetAccountId,
-                        ),
-                    )
-                }.filter { it.accountId == accountId }
+                transfers
+                    .flatMap { transfer ->
+                        listOf(
+                            AccountRow(
+                                transactionId = transfer.id,
+                                timestamp = transfer.timestamp,
+                                description = transfer.description,
+                                accountId = transfer.sourceAccountId,
+                                transactionAmount = Money(-transfer.amount.amount, transfer.amount.currency),
+                                runningBalance = transfer.amount,
+                                sourceAccountId = transfer.sourceAccountId,
+                                targetAccountId = transfer.targetAccountId,
+                            ),
+                            AccountRow(
+                                transactionId = transfer.id,
+                                timestamp = transfer.timestamp,
+                                description = transfer.description,
+                                accountId = transfer.targetAccountId,
+                                transactionAmount = transfer.amount,
+                                runningBalance = transfer.amount,
+                                sourceAccountId = transfer.sourceAccountId,
+                                targetAccountId = transfer.targetAccountId,
+                            ),
+                        )
+                    }.filter { it.accountId == accountId }
                     .sortedByDescending { it.timestamp }
 
             val targetIndex = allRows.indexOfFirst { it.transactionId.id == transactionId.id }
@@ -1198,7 +1201,8 @@ class AccountTransactionsScreenTest {
 
     private class FakeDeviceRepository : com.moneymanager.domain.repository.DeviceRepository {
         override fun getOrCreateDevice(deviceInfo: DeviceInfo): com.moneymanager.domain.model.DeviceId =
-            com.moneymanager.domain.model.DeviceId(1L)
+            com.moneymanager.domain.model
+                .DeviceId(1L)
 
         override suspend fun getDeviceById(id: com.moneymanager.domain.model.DeviceId): DeviceInfo? = null
     }
@@ -1209,7 +1213,8 @@ class AccountTransactionsScreenTest {
         override fun getPersonById(id: com.moneymanager.domain.model.PersonId): Flow<com.moneymanager.domain.model.Person?> = flowOf(null)
 
         override suspend fun createPerson(person: com.moneymanager.domain.model.Person): com.moneymanager.domain.model.PersonId =
-            com.moneymanager.domain.model.PersonId(1L)
+            com.moneymanager.domain.model
+                .PersonId(1L)
 
         override suspend fun updatePerson(person: com.moneymanager.domain.model.Person) = Unit
 
@@ -1254,9 +1259,8 @@ class AccountTransactionsScreenTest {
                     sql: String,
                     parameters: Int,
                     binders: (app.cash.sqldelight.db.SqlPreparedStatement.() -> Unit)?,
-                ): app.cash.sqldelight.db.QueryResult<Long> {
+                ): app.cash.sqldelight.db.QueryResult<Long> =
                     throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
-                }
 
                 override fun <R> executeQuery(
                     identifier: Int?,
@@ -1264,13 +1268,11 @@ class AccountTransactionsScreenTest {
                     mapper: (app.cash.sqldelight.db.SqlCursor) -> app.cash.sqldelight.db.QueryResult<R>,
                     parameters: Int,
                     binders: (app.cash.sqldelight.db.SqlPreparedStatement.() -> Unit)?,
-                ): app.cash.sqldelight.db.QueryResult<R> {
+                ): app.cash.sqldelight.db.QueryResult<R> =
                     throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
-                }
 
-                override fun newTransaction(): app.cash.sqldelight.db.QueryResult<app.cash.sqldelight.Transacter.Transaction> {
+                override fun newTransaction(): app.cash.sqldelight.db.QueryResult<app.cash.sqldelight.Transacter.Transaction> =
                     throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
-                }
 
                 override fun addListener(
                     vararg queryKeys: String,
@@ -1285,7 +1287,8 @@ class AccountTransactionsScreenTest {
                 override fun notifyListeners(vararg queryKeys: String) = Unit
             }
 
-        return com.moneymanager.database.sql.TransferSourceQueries(stubDriver)
+        return com.moneymanager.database.sql
+            .TransferSourceQueries(stubDriver)
     }
 
     /**
@@ -1305,9 +1308,8 @@ class AccountTransactionsScreenTest {
                         sql: String,
                         parameters: Int,
                         binders: (app.cash.sqldelight.db.SqlPreparedStatement.() -> Unit)?,
-                    ): app.cash.sqldelight.db.QueryResult<Long> {
+                    ): app.cash.sqldelight.db.QueryResult<Long> =
                         throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
-                    }
 
                     override fun <R> executeQuery(
                         identifier: Int?,
@@ -1315,13 +1317,11 @@ class AccountTransactionsScreenTest {
                         mapper: (app.cash.sqldelight.db.SqlCursor) -> app.cash.sqldelight.db.QueryResult<R>,
                         parameters: Int,
                         binders: (app.cash.sqldelight.db.SqlPreparedStatement.() -> Unit)?,
-                    ): app.cash.sqldelight.db.QueryResult<R> {
+                    ): app.cash.sqldelight.db.QueryResult<R> =
                         throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
-                    }
 
-                    override fun newTransaction(): app.cash.sqldelight.db.QueryResult<app.cash.sqldelight.Transacter.Transaction> {
+                    override fun newTransaction(): app.cash.sqldelight.db.QueryResult<app.cash.sqldelight.Transacter.Transaction> =
                         throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
-                    }
 
                     override fun addListener(
                         vararg queryKeys: String,
@@ -1336,7 +1336,8 @@ class AccountTransactionsScreenTest {
                     override fun notifyListeners(vararg queryKeys: String) = Unit
                 }
 
-            return com.moneymanager.database.sql.EntitySourceQueries(stubDriver)
+            return com.moneymanager.database.sql
+                .EntitySourceQueries(stubDriver)
         }
     }
 }

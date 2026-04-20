@@ -9,7 +9,9 @@ import androidx.compose.runtime.setValue
  * Manages navigation history with back/forward stack support.
  */
 @Stable
-class NavigationHistory(initialScreen: Screen) {
+class NavigationHistory(
+    initialScreen: Screen,
+) {
     private val backStack = mutableListOf<Screen>()
     private val forwardStack = mutableListOf<Screen>()
 

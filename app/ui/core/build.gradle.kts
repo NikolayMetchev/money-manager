@@ -10,12 +10,12 @@ kotlin {
                 api(libs.kotlinx.coroutines.core)
                 api(projects.app.db.core)
                 api(projects.app.model.core)
+                api(projects.utils.bigdecimal)
 
-                implementation(compose.components.resources)
+                implementation(libs.compose.components.resources)
                 implementation(libs.human.readable)
                 implementation(libs.kmlogging)
                 implementation(libs.kotlinx.datetime)
-                implementation(projects.utils.bigdecimal)
                 implementation(projects.utils.compose.filePicker)
                 implementation(projects.utils.compose.scrollbar)
                 implementation(projects.utils.currency)
@@ -63,6 +63,7 @@ kotlin {
                 api(libs.compose.ui.unit.desktop)
                 api(projects.app.db.core)
                 api(projects.app.model.core)
+                api(projects.utils.bigdecimal)
 
                 implementation(libs.compose.animation.core.desktop)
                 implementation(libs.compose.animation.desktop)

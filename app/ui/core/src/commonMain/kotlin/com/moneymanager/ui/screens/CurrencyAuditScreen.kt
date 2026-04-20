@@ -65,8 +65,8 @@ private data class CurrencyAuditDiff(
 private fun computeCurrencyAuditDiffs(
     entries: List<CurrencyAuditEntry>,
     currentCurrency: Currency?,
-): List<CurrencyAuditDiff> {
-    return entries.mapIndexed { index, entry ->
+): List<CurrencyAuditDiff> =
+    entries.mapIndexed { index, entry ->
         when (entry.auditType) {
             AuditType.INSERT ->
                 CurrencyAuditDiff(
@@ -144,7 +144,6 @@ private fun computeCurrencyAuditDiffs(
             }
         }
     }
-}
 
 @Composable
 private fun CurrencyAuditDiffCard(diff: CurrencyAuditDiff) {

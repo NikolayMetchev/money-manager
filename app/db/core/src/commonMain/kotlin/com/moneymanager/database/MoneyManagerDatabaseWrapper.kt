@@ -5,7 +5,9 @@ import app.cash.sqldelight.db.SqlCursor
 import app.cash.sqldelight.db.SqlDriver
 import com.moneymanager.database.sql.MoneyManagerDatabase
 
-class MoneyManagerDatabaseWrapper(private val driver: SqlDriver) : MoneyManagerDatabase by MoneyManagerDatabase(driver) {
+class MoneyManagerDatabaseWrapper(
+    private val driver: SqlDriver,
+) : MoneyManagerDatabase by MoneyManagerDatabase(driver) {
     /**
      * Execute a SQL statement on the database.
      * Delegates to the underlying SqlDriver.

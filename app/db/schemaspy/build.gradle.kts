@@ -20,7 +20,11 @@ val createDatabaseForSchemaSpy by tasks.registering(JavaExec::class) {
     group = "documentation"
     description = "Create a SQLite database file with the schema for SchemaSpy analysis"
 
-    val dbFile = layout.buildDirectory.file("schemaspy-temp.db").get().asFile
+    val dbFile =
+        layout.buildDirectory
+            .file("schemaspy-temp.db")
+            .get()
+            .asFile
 
     // Use the runtime classpath which includes SQLDelight generated code
     classpath = sourceSets["main"].runtimeClasspath
@@ -51,8 +55,16 @@ tasks.register<JavaExec>("generateSchemaSpyDocs") {
     classpath = schemaspyConfiguration
     mainClass.set("org.schemaspy.Main")
 
-    val outputDir = layout.buildDirectory.dir("schemaspy").get().asFile
-    val dbFile = layout.buildDirectory.file("schemaspy-temp.db").get().asFile
+    val outputDir =
+        layout.buildDirectory
+            .dir("schemaspy")
+            .get()
+            .asFile
+    val dbFile =
+        layout.buildDirectory
+            .file("schemaspy-temp.db")
+            .get()
+            .asFile
 
     doFirst {
         // Create output directory
@@ -65,12 +77,18 @@ tasks.register<JavaExec>("generateSchemaSpyDocs") {
     environment("PATH", "C:\\Program Files\\Graphviz\\bin;${System.getenv("PATH")}")
 
     args(
-        "-t", "sqlite-xerial",
-        "-db", dbFile.absolutePath,
-        "-o", outputDir.absolutePath,
-        "-cat", "%",
-        "-s", "main",
-        "-u", "",
+        "-t",
+        "sqlite-xerial",
+        "-db",
+        dbFile.absolutePath,
+        "-o",
+        outputDir.absolutePath,
+        "-cat",
+        "%",
+        "-s",
+        "main",
+        "-u",
+        "",
         "-sso",
         "-norows",
     )

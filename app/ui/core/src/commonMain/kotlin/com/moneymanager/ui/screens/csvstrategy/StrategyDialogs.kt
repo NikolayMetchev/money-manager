@@ -182,7 +182,8 @@ fun SelectCsvImportDialog(
     onCsvSelected: (CsvImport) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val imports by csvImportRepository.getAllImports()
+    val imports by csvImportRepository
+        .getAllImports()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
 
     AlertDialog(

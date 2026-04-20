@@ -50,7 +50,8 @@ fun CsvImportsScreen(
     onStrategiesClick: () -> Unit = {},
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
-    val imports by csvImportRepository.getAllImports()
+    val imports by csvImportRepository
+        .getAllImports()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
     var isImporting by remember { mutableStateOf(false) }
     var importError by remember { mutableStateOf<String?>(null) }

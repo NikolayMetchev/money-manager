@@ -12,7 +12,9 @@ import com.moneymanager.domain.model.csv.ImportStatus
  * Manages dynamic CSV tables in the database.
  * These tables are created at runtime to store imported CSV data.
  */
-class CsvTableManager(private val database: MoneyManagerDatabaseWrapper) {
+class CsvTableManager(
+    private val database: MoneyManagerDatabaseWrapper,
+) {
     /**
      * Creates a new table to store CSV data.
      *

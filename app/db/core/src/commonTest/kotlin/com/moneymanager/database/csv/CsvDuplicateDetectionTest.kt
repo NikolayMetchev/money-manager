@@ -57,8 +57,8 @@ class CsvDuplicateDetectionTest {
             CsvColumn(CsvColumnId(Uuid.random()), 3, "Amount"),
         )
 
-    private fun createStrategy(attributeMappings: List<AttributeColumnMapping> = emptyList()): CsvImportStrategy {
-        return CsvImportStrategy(
+    private fun createStrategy(attributeMappings: List<AttributeColumnMapping> = emptyList()): CsvImportStrategy =
+        CsvImportStrategy(
             id = CsvImportStrategyId(Uuid.random()),
             name = "Test Strategy",
             identificationColumns = setOf("Date", "Description", "Amount"),
@@ -114,7 +114,6 @@ class CsvDuplicateDetectionTest {
             createdAt = Clock.System.now(),
             updatedAt = Clock.System.now(),
         )
-    }
 
     private fun createExistingTransfer(
         transactionId: String,

@@ -20,19 +20,22 @@ class PersonAccountOwnershipRepositoryImpl(
     private val queries = database.personQueries
 
     override fun getOwnershipsByPerson(personId: PersonId): Flow<List<PersonAccountOwnership>> =
-        queries.ownershipSelectByPerson(personId.id)
+        queries
+            .ownershipSelectByPerson(personId.id)
             .asFlow()
             .mapToList(Dispatchers.Default)
             .map(PersonAccountOwnershipMapper::mapList)
 
     override fun getOwnershipsByAccount(accountId: AccountId): Flow<List<PersonAccountOwnership>> =
-        queries.ownershipSelectByAccount(accountId.id)
+        queries
+            .ownershipSelectByAccount(accountId.id)
             .asFlow()
             .mapToList(Dispatchers.Default)
             .map(PersonAccountOwnershipMapper::mapList)
 
     override fun getOwnershipById(id: Long): Flow<PersonAccountOwnership?> =
-        queries.ownershipSelectById(id)
+        queries
+            .ownershipSelectById(id)
             .asFlow()
             .mapToOneOrNull(Dispatchers.Default)
             .map { it?.let(PersonAccountOwnershipMapper::map) }

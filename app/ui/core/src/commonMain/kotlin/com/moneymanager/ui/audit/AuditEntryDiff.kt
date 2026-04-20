@@ -35,7 +35,8 @@ data class AuditEntryDiff(
     val hasChanges: Boolean
         get() =
             listOf(timestamp, description, sourceAccountId, targetAccountId, amount)
-                .any { it is FieldChange.Changed } || attributeChanges.isNotEmpty()
+                .any { it is FieldChange.Changed } ||
+                attributeChanges.isNotEmpty()
 }
 
 /**

@@ -12,7 +12,9 @@ import kotlin.uuid.Uuid
 @JvmInline
 value class CsvImportId
     @OptIn(ExperimentalUuidApi::class)
-    constructor(val id: Uuid) {
+    constructor(
+        val id: Uuid,
+    ) {
         @OptIn(ExperimentalUuidApi::class)
         override fun toString() = id.toString()
     }

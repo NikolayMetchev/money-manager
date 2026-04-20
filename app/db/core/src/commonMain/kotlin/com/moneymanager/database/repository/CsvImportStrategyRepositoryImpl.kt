@@ -27,19 +27,22 @@ class CsvImportStrategyRepositoryImpl(
     private val queries = database.csvImportStrategyQueries
 
     override fun getAllStrategies(): Flow<List<CsvImportStrategy>> =
-        queries.selectAll()
+        queries
+            .selectAll()
             .asFlow()
             .mapToList(coroutineContext)
             .map { strategies -> strategies.map(::toDomain) }
 
     override fun getStrategyById(id: CsvImportStrategyId): Flow<CsvImportStrategy?> =
-        queries.selectById(id.id.toString())
+        queries
+            .selectById(id.id.toString())
             .asFlow()
             .mapToOneOrNull(coroutineContext)
             .map { it?.let(::toDomain) }
 
     override fun getStrategyByName(name: String): Flow<CsvImportStrategy?> =
-        queries.selectByName(name)
+        queries
+            .selectByName(name)
             .asFlow()
             .mapToOneOrNull(coroutineContext)
             .map { it?.let(::toDomain) }

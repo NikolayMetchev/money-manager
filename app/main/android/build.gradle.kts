@@ -13,7 +13,7 @@ android {
 
     sourceSets {
         getByName("main") {
-            assets.srcDirs("src/main/assets")
+            assets.directories.add("src/main/assets")
         }
     }
 }
@@ -37,10 +37,10 @@ tasks.matching { it.name.startsWith("explodeAssetSource") }.configureEach {
 
 dependencies {
     implementation(kotlin("stdlib"))
-    implementation(compose.components.resources)
     implementation(libs.androidx.activity)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.runtime)
+    implementation(libs.compose.components.resources)
     implementation(libs.kotlinx.coroutines.core)
     implementation(projects.app.db.core)
     implementation(projects.app.di.core)
