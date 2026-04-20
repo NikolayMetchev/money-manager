@@ -32,6 +32,7 @@ tasks {
 
     withType<JavaCompile>().configureEach {
         targetCompatibility = jvmTargetVersion
+        options.compilerArgs.addAll(listOf("-Xlint:all", "-Werror"))
     }
 
     // Make detekt aggregate task include KMP source-set tasks without invoking

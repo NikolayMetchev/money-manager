@@ -15,7 +15,7 @@ Money Manager is a Kotlin Multiplatform personal finance app targeting JVM and A
 
 ## Build Commands
 
-**Important**: Always use `--console=plain`. Don't use `--no-daemon`. On Windows, use `./gradlew.bat` directly.
+**Important**: Always use `--console=plain`. Don't use `--no-daemon`. On Windows, use `./gradlew.bat` directly. A full `./gradlew build` always takes longer than 2 minutes, so never run it with a short timeout; use at least 20 minutes.
 
 | Command | Description |
 |---------|-------------|
