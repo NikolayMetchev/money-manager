@@ -44,9 +44,13 @@ updates:
           - "*test*"
           - "*mockk*"
 
-  # GitHub Actions (if any workflow files exist)
+  # GitHub Actions. "/" covers .github/workflows; local composite actions need their own directories.
   - package-ecosystem: "github-actions"
-    directory: "/"
+    directories:
+      - "/"
+      - "/.github/actions/codecov-upload"
+      - "/.github/actions/gradle-run"
+      - "/.github/actions/gradle-setup"
     schedule:
       interval: "weekly"
       day: "monday"
@@ -63,4 +67,4 @@ updates:
       # Group GitHub Actions together
       github-actions:
         patterns:
-          - "actions/*"
+          - "*"
