@@ -21,7 +21,7 @@ buildscript {
 
 plugins {
     id("com.pablisco.gradle.auto.include") version "1.3"
-    id("com.gradle.develocity") version "4.4.0"
+    id("com.gradle.develocity") version "4.4.1"
     id("com.autonomousapps.build-health") version "3.8.0"
 
     // Kotlin plugins declared here for classloader compatibility with DAGP
