@@ -285,6 +285,7 @@ class CategoriesScreenTest {
 
             // Click create
             onNodeWithText("Create").performClick()
+            waitForIdle()
 
             // Then - dialog should be dismissed and category created
             onNodeWithText("Create New Category").assertDoesNotExist()
@@ -385,6 +386,7 @@ class CategoriesScreenTest {
 
             // Click save without changes to verify it works
             onNodeWithText("Save").performClick()
+            waitForIdle()
 
             // Then - dialog should be dismissed
             onNodeWithText("Edit Category").assertDoesNotExist()
