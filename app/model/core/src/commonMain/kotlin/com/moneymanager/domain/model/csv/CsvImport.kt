@@ -3,6 +3,7 @@
 package com.moneymanager.domain.model.csv
 
 import com.moneymanager.domain.model.DeviceInfo
+import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import kotlin.jvm.JvmInline
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
@@ -30,4 +31,8 @@ data class CsvImport(
     val deviceInfo: DeviceInfo,
     val fileChecksum: String,
     val fileLastModified: Instant,
+    val applicationCount: Int = 0,
+    val lastAppliedStrategyId: CsvImportStrategyId? = null,
+    val lastAppliedStrategyName: String? = null,
+    val lastAppliedAt: Instant? = null,
 )

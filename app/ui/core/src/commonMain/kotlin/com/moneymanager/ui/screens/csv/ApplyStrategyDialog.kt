@@ -563,6 +563,16 @@ fun ApplyStrategyDialog(
                             // Refresh materialized views so transfers are visible
                             logger.info { "Refreshing materialized views" }
                             maintenanceService.refreshMaterializedViews()
+
+                            if (failedRows.size < prep.validTransfers.size) {
+                                csvImportRepository.recordImportApplication(
+                                    id = csvImport.id,
+                                    strategyId = strategy.id,
+                                    strategyName = strategy.name,
+                                    appliedAt = Clock.System.now(),
+                                )
+                            }
+
                             logger.info { "Import completed successfully" }
 
                             val result =

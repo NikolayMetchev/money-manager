@@ -39,6 +39,14 @@ SELECT
     csv_import_metadata.device_id,
     csv_import_metadata.file_checksum,
     csv_import_metadata.file_last_modified,
+    (
+        SELECT COUNT(*)
+        FROM csv_import_application application
+        WHERE application.csv_import_id = csv_import_metadata.id
+    ) AS application_count,
+    latest_application.strategy_id AS last_applied_strategy_id,
+    latest_application.strategy_name AS last_applied_strategy_name,
+    latest_application.applied_at AS last_applied_at,
     device_view.platform_name,
     device_view.os_name,
     device_view.machine_name,
@@ -46,6 +54,14 @@ SELECT
     device_view.device_model
 FROM csv_import_metadata
 JOIN device_view ON csv_import_metadata.device_id = device_view.id
+LEFT JOIN csv_import_application latest_application
+    ON latest_application.id = (
+        SELECT application.id
+        FROM csv_import_application application
+        WHERE application.csv_import_id = csv_import_metadata.id
+        ORDER BY application.applied_at DESC, application.id DESC
+        LIMIT 1
+    )
 ORDER BY csv_import_metadata.import_timestamp DESC;
 
 selectImportById:
@@ -59,6 +75,14 @@ SELECT
     csv_import_metadata.device_id,
     csv_import_metadata.file_checksum,
     csv_import_metadata.file_last_modified,
+    (
+        SELECT COUNT(*)
+        FROM csv_import_application application
+        WHERE application.csv_import_id = csv_import_metadata.id
+    ) AS application_count,
+    latest_application.strategy_id AS last_applied_strategy_id,
+    latest_application.strategy_name AS last_applied_strategy_name,
+    latest_application.applied_at AS last_applied_at,
     device_view.platform_name,
     device_view.os_name,
     device_view.machine_name,
@@ -66,6 +90,14 @@ SELECT
     device_view.device_model
 FROM csv_import_metadata
 JOIN device_view ON csv_import_metadata.device_id = device_view.id
+LEFT JOIN csv_import_application latest_application
+    ON latest_application.id = (
+        SELECT application.id
+        FROM csv_import_application application
+        WHERE application.csv_import_id = csv_import_metadata.id
+        ORDER BY application.applied_at DESC, application.id DESC
+        LIMIT 1
+    )
 WHERE csv_import_metadata.id = ?;
 
 selectImportByTableName:
@@ -82,6 +114,14 @@ SELECT
     csv_import_metadata.device_id,
     csv_import_metadata.file_checksum,
     csv_import_metadata.file_last_modified,
+    (
+        SELECT COUNT(*)
+        FROM csv_import_application application
+        WHERE application.csv_import_id = csv_import_metadata.id
+    ) AS application_count,
+    latest_application.strategy_id AS last_applied_strategy_id,
+    latest_application.strategy_name AS last_applied_strategy_name,
+    latest_application.applied_at AS last_applied_at,
     device_view.platform_name,
     device_view.os_name,
     device_view.machine_name,
@@ -89,6 +129,14 @@ SELECT
     device_view.device_model
 FROM csv_import_metadata
 JOIN device_view ON csv_import_metadata.device_id = device_view.id
+LEFT JOIN csv_import_application latest_application
+    ON latest_application.id = (
+        SELECT application.id
+        FROM csv_import_application application
+        WHERE application.csv_import_id = csv_import_metadata.id
+        ORDER BY application.applied_at DESC, application.id DESC
+        LIMIT 1
+    )
 WHERE csv_import_metadata.file_checksum = ?
 ORDER BY csv_import_metadata.import_timestamp DESC;
 
@@ -109,6 +157,24 @@ VALUES (?, ?, ?, ?);
 
 deleteColumnsByImportId:
 DELETE FROM csv_column_metadata WHERE import_id = ?;
+
+-- Strategy applications for each CSV import
+CREATE TABLE csv_import_application (
+    id TEXT PRIMARY KEY NOT NULL,
+    csv_import_id TEXT NOT NULL,
+    strategy_id TEXT,
+    strategy_name TEXT NOT NULL,
+    applied_at INTEGER NOT NULL,
+    FOREIGN KEY (csv_import_id) REFERENCES csv_import_metadata(id) ON DELETE CASCADE,
+    FOREIGN KEY (strategy_id) REFERENCES csv_import_strategy(id) ON DELETE SET NULL
+);
+
+CREATE INDEX idx_csv_import_application_import ON csv_import_application(csv_import_id);
+CREATE INDEX idx_csv_import_application_strategy ON csv_import_application(strategy_id);
+
+insertApplication:
+INSERT INTO csv_import_application (id, csv_import_id, strategy_id, strategy_name, applied_at)
+VALUES (?, ?, ?, ?, ?);
 
 -- Error tracking for CSV imports
 CREATE TABLE csv_import_error (

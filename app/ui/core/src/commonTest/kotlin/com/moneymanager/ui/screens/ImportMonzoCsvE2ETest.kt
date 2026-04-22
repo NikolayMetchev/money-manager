@@ -19,6 +19,8 @@ import com.moneymanager.database.DatabaseManager
 import com.moneymanager.di.database.DatabaseComponent
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.DbLocation
+import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
@@ -26,9 +28,11 @@ import com.moneymanager.ui.test.TestMoneyManagerApp
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import kotlin.test.AfterTest
 import kotlin.test.Test
+import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 /**
  * End-to-end test for importing a Monzo CSV file and creating an import strategy.
@@ -245,6 +249,77 @@ class ImportMonzoCsvE2ETest {
             onNodeWithText("20 rows").assertIsDisplayed()
         }
 
+    @Test
+    fun csvImports_shouldShowImportedAndUnimportedStates() =
+        runMoneyManagerComposeUiTest {
+            testDbLocation = createTestDatabaseLocation()
+            val databaseManager = createTestDatabaseManager()
+
+            kotlinx.coroutines.runBlocking {
+                val db = databaseManager.openDatabase(testDbLocation!!)
+                val databaseComponent = DatabaseComponent.create(db)
+
+                val csvContent = loadTestCsvContent()
+                val lines = csvContent.lines().filter { it.isNotBlank() }
+                val headers = parseCsvLine(lines.first())
+                val rows = lines.drop(1).take(2).map { parseCsvLine(it) }
+                val strategy =
+                    createTestStrategy(
+                        name = "Monzo",
+                        headers = headers,
+                    )
+                databaseComponent.csvImportStrategyRepository.createStrategy(strategy)
+
+                val importedId =
+                    databaseComponent.csvImportRepository.createImport(
+                        fileName = "already_imported.csv",
+                        headers = headers,
+                        rows = rows,
+                        fileChecksum = "already_imported_checksum",
+                        fileLastModified = Instant.fromEpochMilliseconds(1700000000000L),
+                    )
+                databaseComponent.csvImportRepository.recordImportApplication(
+                    id = importedId,
+                    strategyId = strategy.id,
+                    strategyName = "Monzo",
+                    appliedAt = Instant.fromEpochMilliseconds(1701000000000L),
+                )
+
+                databaseComponent.csvImportRepository.createImport(
+                    fileName = "not_imported_yet.csv",
+                    headers = headers,
+                    rows = rows,
+                    fileChecksum = "not_imported_yet_checksum",
+                    fileLastModified = Instant.fromEpochMilliseconds(1700000000001L),
+                )
+            }
+
+            val testDatabaseManager =
+                SimpleDatabaseManager(
+                    databaseManager = databaseManager,
+                    testLocation = testDbLocation!!,
+                )
+
+            setContent {
+                TestMoneyManagerApp(
+                    databaseManager = testDatabaseManager,
+                    appVersion = AppVersion("1.0.0-test"),
+                )
+            }
+
+            waitForIdle()
+            waitUntilExactlyOneExists(hasText("Your Accounts"), timeoutMillis = 15000)
+
+            waitUntilExactlyOneExists(hasText("CSV"), timeoutMillis = 10000)
+            onNodeWithText("CSV", useUnmergedTree = true).performClick()
+            waitForIdle()
+
+            waitUntilExactlyOneExists(hasText("already_imported.csv"), timeoutMillis = 15000)
+            waitUntilExactlyOneExists(hasText("not_imported_yet.csv"), timeoutMillis = 15000)
+            waitUntilExactlyOneExists(hasText("via Monzo", substring = true), timeoutMillis = 10000)
+            waitUntilExactlyOneExists(hasText("Not imported yet"), timeoutMillis = 10000)
+        }
+
     /**
      * Loads the test CSV content from resources.
      * The CSV file should be placed at src/commonTest/resources/monzo_test_export.csv
@@ -298,6 +373,19 @@ class ImportMonzoCsvE2ETest {
 
         return result
     }
+
+    private fun createTestStrategy(
+        name: String,
+        headers: List<String>,
+    ): CsvImportStrategy =
+        CsvImportStrategy(
+            id = CsvImportStrategyId(Uuid.random()),
+            name = name,
+            identificationColumns = headers.toSet(),
+            fieldMappings = emptyMap(),
+            createdAt = Clock.System.now(),
+            updatedAt = Clock.System.now(),
+        )
 }
 
 /**

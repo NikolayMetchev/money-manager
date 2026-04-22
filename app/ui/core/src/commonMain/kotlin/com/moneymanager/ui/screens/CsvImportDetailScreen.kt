@@ -286,14 +286,39 @@ fun CsvImportDetailScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    val localDateTime =
-                        currentImport.importTimestamp
-                            .toLocalDateTime(TimeZone.currentSystemDefault())
                     Text(
-                        text = "Imported: ${localDateTime.date} ${localDateTime.hour}:${localDateTime.minute.toString().padStart(2, '0')}",
+                        text = "Added: ${formatImportTimestamp(currentImport.importTimestamp)}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    currentImport.lastAppliedAt?.let { lastAppliedAt ->
+                        Text(
+                            text =
+                                buildString {
+                                    if (currentImport.applicationCount > 1) {
+                                        append("Latest import: ")
+                                    } else {
+                                        append("Imported: ")
+                                    }
+                                    append(formatImportTimestamp(lastAppliedAt))
+                                    currentImport.lastAppliedStrategyName
+                                        ?.takeIf(String::isNotBlank)
+                                        ?.let { strategyName ->
+                                            append(" via ")
+                                            append(strategyName)
+                                        }
+                                },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (currentImport.applicationCount > 1) {
+                        Text(
+                            text = "Applied ${currentImport.applicationCount} times",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -430,4 +455,9 @@ fun CsvImportDetailScreen(
             onDismiss = { showCreateStrategyDialog = false },
         )
     }
+}
+
+private fun formatImportTimestamp(timestamp: kotlin.time.Instant): String {
+    val localDateTime = timestamp.toLocalDateTime(TimeZone.currentSystemDefault())
+    return "${localDateTime.date} ${localDateTime.hour}:${localDateTime.minute.toString().padStart(2, '0')}"
 }

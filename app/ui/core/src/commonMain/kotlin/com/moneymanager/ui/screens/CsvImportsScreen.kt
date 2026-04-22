@@ -2,6 +2,7 @@
 
 package com.moneymanager.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -42,6 +43,7 @@ import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Clock
+import kotlin.time.Instant
 
 @Composable
 fun CsvImportsScreen(
@@ -187,6 +189,20 @@ private fun CsvImportCard(
     import: CsvImport,
     onClick: () -> Unit,
 ) {
+    val isImported = import.lastAppliedAt != null
+    val containerColor =
+        if (isImported) {
+            MaterialTheme.colorScheme.surfaceVariant
+        } else {
+            MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f)
+        }
+    val metadataColor =
+        if (isImported) {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        } else {
+            MaterialTheme.colorScheme.onSecondaryContainer
+        }
+
     Card(
         modifier =
             Modifier
@@ -194,16 +210,23 @@ private fun CsvImportCard(
                 .clickable(onClick = onClick),
         colors =
             CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                containerColor = containerColor,
             ),
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
         ) {
-            Text(
-                text = import.originalFileName,
-                style = MaterialTheme.typography.titleMedium,
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = import.originalFileName,
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                ImportStateBadge(isImported = isImported)
+            }
             Spacer(modifier = Modifier.height(4.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -212,23 +235,95 @@ private fun CsvImportCard(
                 Text(
                     text = "${import.rowCount} rows, ${import.columnCount} columns",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = metadataColor,
                 )
-                val localDateTime = import.importTimestamp.toLocalDateTime(TimeZone.currentSystemDefault())
                 Text(
-                    text = "${localDateTime.date} ${localDateTime.hour}:${localDateTime.minute.toString().padStart(2, '0')}",
+                    text = "Added ${formatTimestamp(import.importTimestamp)}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = metadataColor,
                 )
             }
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "SHA-256: ${import.fileChecksum.take(16)}...",
+                text =
+                    if (isImported) {
+                        buildString {
+                            if (import.applicationCount > 1) {
+                                append("Latest import on ")
+                            } else {
+                                append("Imported on ")
+                            }
+                            append(formatTimestamp(import.lastAppliedAt!!))
+                            import.lastAppliedStrategyName?.takeIf(String::isNotBlank)?.let { strategyName ->
+                                append(" via ")
+                                append(strategyName)
+                            }
+                        }
+                    } else {
+                        "Not imported yet"
+                    },
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color =
+                    if (isImported) {
+                        metadataColor
+                    } else {
+                        MaterialTheme.colorScheme.secondary
+                    },
             )
+            if (isImported && import.lastAppliedStrategyName.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "Strategy information unavailable",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = metadataColor,
+                )
+            }
+            if (import.applicationCount > 1) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "Applied ${import.applicationCount} times",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = metadataColor,
+                )
+            }
         }
     }
+}
+
+@Composable
+private fun ImportStateBadge(isImported: Boolean) {
+    val containerColor =
+        if (isImported) {
+            MaterialTheme.colorScheme.primaryContainer
+        } else {
+            MaterialTheme.colorScheme.secondaryContainer
+        }
+    val contentColor =
+        if (isImported) {
+            MaterialTheme.colorScheme.onPrimaryContainer
+        } else {
+            MaterialTheme.colorScheme.onSecondaryContainer
+        }
+
+    Box(
+        modifier =
+            Modifier
+                .background(
+                    color = containerColor,
+                    shape = MaterialTheme.shapes.small,
+                ).padding(horizontal = 8.dp, vertical = 4.dp),
+    ) {
+        Text(
+            text = if (isImported) "Imported" else "Unimported",
+            style = MaterialTheme.typography.labelSmall,
+            color = contentColor,
+        )
+    }
+}
+
+private fun formatTimestamp(timestamp: Instant): String {
+    val localDateTime = timestamp.toLocalDateTime(TimeZone.currentSystemDefault())
+    return "${localDateTime.date} ${localDateTime.hour}:${localDateTime.minute.toString().padStart(2, '0')}"
 }
 
 @Composable
@@ -237,15 +332,13 @@ private fun DuplicateImportDialog(
     onDismiss: () -> Unit,
     onViewExisting: () -> Unit,
 ) {
-    val localDateTime = existingImport.importTimestamp.toLocalDateTime(TimeZone.currentSystemDefault())
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("File Already Imported") },
         text = {
             Text(
                 "This file has already been imported as \"${existingImport.originalFileName}\" " +
-                    "on ${localDateTime.date} at ${localDateTime.hour}:" +
-                    "${localDateTime.minute.toString().padStart(2, '0')}.",
+                    "on ${formatTimestamp(existingImport.importTimestamp)}.",
             )
         },
         confirmButton = {
