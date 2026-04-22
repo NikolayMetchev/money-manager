@@ -7,12 +7,12 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.runComposeUiTest
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvColumnId
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
+import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.uuid.Uuid
@@ -21,7 +21,7 @@ import kotlin.uuid.Uuid
 class CsvPreviewTableTest {
     @Test
     fun viewLink_clickInvokesTransferCallback() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             var clickedTransferId: TransferId? = null
             var clickedIsPositiveAmount: Boolean? = null
 
@@ -63,7 +63,7 @@ class CsvPreviewTableTest {
 
     @Test
     fun duplicateLink_clickInvokesDuplicateSourceCallbackWithAmountSign() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             var clickedTransferId: TransferId? = null
             var clickedIsPositiveAmount: Boolean? = null
 
@@ -105,7 +105,7 @@ class CsvPreviewTableTest {
 
     @Test
     fun duplicateLink_withoutDuplicateSourceCallbackIsNotClickable() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             setContent {
                 MaterialTheme {
                     CsvPreviewTable(

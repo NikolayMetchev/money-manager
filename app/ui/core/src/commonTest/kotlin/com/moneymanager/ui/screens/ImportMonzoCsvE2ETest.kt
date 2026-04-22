@@ -12,7 +12,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
-import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import androidx.compose.ui.test.waitUntilDoesNotExist
 import androidx.compose.ui.test.waitUntilExactlyOneExists
@@ -24,6 +23,7 @@ import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
 import com.moneymanager.ui.test.TestMoneyManagerApp
+import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.time.ExperimentalTime
@@ -54,7 +54,7 @@ class ImportMonzoCsvE2ETest {
 
     @Test
     fun navigateToCsvImports_shouldShowCsvImportsScreen() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given: Create fresh database (old databases don't have Device/Platform tables)
             testDbLocation = createTestDatabaseLocation()
             val databaseManager = createTestDatabaseManager()
@@ -87,7 +87,7 @@ class ImportMonzoCsvE2ETest {
 
     @Test
     fun importMonzoCsv_andCreateStrategy_shouldAutoDetectColumnMappings() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given: Create database and populate with CSV data BEFORE starting the app
             testDbLocation = createTestDatabaseLocation()
             val databaseManager = createTestDatabaseManager()
