@@ -6,7 +6,6 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.runComposeUiTest
 import app.cash.sqldelight.Query
 import app.cash.sqldelight.Transacter
 import app.cash.sqldelight.db.QueryResult
@@ -19,6 +18,7 @@ import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.ui.error.ProvideSchemaAwareScope
+import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlin.test.Test
@@ -61,7 +61,7 @@ class CurrenciesScreenTest {
 
     @Test
     fun currenciesScreen_displaysEmptyState_whenNoCurrencies() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             val repository = FakeCurrencyRepository(emptyList())
 
             setContent {
@@ -79,7 +79,7 @@ class CurrenciesScreenTest {
 
     @Test
     fun currenciesScreen_displaysCurrencies_whenCurrenciesExist() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             val testCurrency =
                 Currency(
                     id = CurrencyId(1L),
@@ -104,7 +104,7 @@ class CurrenciesScreenTest {
 
     @Test
     fun currenciesScreen_displaysMultipleCurrencies() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             val currencies =
                 listOf(
                     Currency(id = CurrencyId(1L), code = "USD", name = "US Dollar"),
@@ -133,7 +133,7 @@ class CurrenciesScreenTest {
 
     @Test
     fun currenciesScreen_opensCreateDialog_whenFabClicked() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             val repository = FakeCurrencyRepository(emptyList())
 
             setContent {
@@ -153,7 +153,7 @@ class CurrenciesScreenTest {
 
     @Test
     fun createCurrencyDialog_showsValidationError_whenCodeIsEmpty() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             val repository = FakeCurrencyRepository(emptyList())
 
             setContent {

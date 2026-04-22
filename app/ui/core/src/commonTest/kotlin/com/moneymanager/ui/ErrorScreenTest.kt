@@ -3,14 +3,14 @@ package com.moneymanager.ui
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.runComposeUiTest
+import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import kotlin.test.Test
 
 @OptIn(ExperimentalTestApi::class)
 class ErrorScreenTest {
     @Test
     fun errorScreen_displaysErrorMessage() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given
             val errorMessage = "Database connection failed"
 
@@ -30,7 +30,7 @@ class ErrorScreenTest {
 
     @Test
     fun errorScreen_displaysFullException_whenProvided() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given
             val errorMessage = "Database connection failed"
             val fullException = "java.sql.SQLException: Unable to connect to database at localhost:5432"
@@ -50,7 +50,7 @@ class ErrorScreenTest {
 
     @Test
     fun errorScreen_doesNotDisplayExceptionDetails_whenNotProvided() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given
             val errorMessage = "Database connection failed"
 
@@ -68,7 +68,7 @@ class ErrorScreenTest {
 
     @Test
     fun errorScreen_truncatesLongExceptions() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given
             val errorMessage = "Database connection failed"
             val longException = "x".repeat(600) // 600 characters
@@ -90,7 +90,7 @@ class ErrorScreenTest {
 
     @Test
     fun errorScreen_displaysMultilineErrorMessage() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given
             val errorMessage = "Database connection failed\nPlease check your connection settings"
 
@@ -108,7 +108,7 @@ class ErrorScreenTest {
 
     @Test
     fun errorScreen_handlesEmptyErrorMessage() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given
             val errorMessage = ""
 

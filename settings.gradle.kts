@@ -15,7 +15,16 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath("com.android.tools.build:gradle:9.1.1")
+        val libsVersionsToml = settings.layout.settingsDirectory
+            .file("gradle/libs.versions.toml")
+            .asFile
+            .readText()
+        val androidGradlePluginVersion = Regex("""android-gradle-plugin\s*=\s*"([^"]+)"""")
+            .find(libsVersionsToml)
+            ?.groupValues
+            ?.get(1)
+            ?: error("android-gradle-plugin version not found in gradle/libs.versions.toml")
+        classpath("com.android.tools.build:gradle:$androidGradlePluginVersion")
     }
 }
 

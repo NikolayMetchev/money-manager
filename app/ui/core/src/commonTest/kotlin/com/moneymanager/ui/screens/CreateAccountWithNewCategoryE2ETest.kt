@@ -7,7 +7,6 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
-import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.waitUntilDoesNotExist
 import androidx.compose.ui.test.waitUntilExactlyOneExists
 import com.moneymanager.database.DatabaseManager
@@ -17,6 +16,7 @@ import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
 import com.moneymanager.ui.test.TestMoneyManagerApp
+import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import kotlin.test.AfterTest
 import kotlin.test.Test
 
@@ -45,7 +45,7 @@ class CreateAccountWithNewCategoryE2ETest {
 
     @Test
     fun createAccount_withNewlyCreatedCategory_shouldSucceed() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given: Create a fresh test database
             testDbLocation = createTestDatabaseLocation()
             val databaseManager = createTestDatabaseManager()

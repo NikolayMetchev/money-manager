@@ -5,7 +5,6 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.waitUntilDoesNotExist
 import androidx.compose.ui.test.waitUntilExactlyOneExists
 import com.moneymanager.database.DatabaseManager
@@ -15,6 +14,7 @@ import com.moneymanager.test.database.copyDatabaseFromResources
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
 import com.moneymanager.ui.test.TestMoneyManagerApp
+import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import kotlin.test.AfterTest
 import kotlin.test.Test
 
@@ -42,7 +42,7 @@ class SchemaAwareCoroutineScopeE2ETest {
 
     @Test
     fun schemaAwareScope_showsSchemaErrorDialog_whenCsvTableHasOldSchema() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given: Copy the test database with old CSV schema to a test location
             // Note: Old databases are missing Device/Platform tables, so schema error
             // is shown at startup during device initialization
@@ -72,7 +72,7 @@ class SchemaAwareCoroutineScopeE2ETest {
 
     @Test
     fun schemaAwareScope_allowsRecovery_whenCsvTableHasOldSchema() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given: Copy the test database with old schema to a test location
             // Note: Old databases are missing Device/Platform tables, so schema error
             // is shown at startup during device initialization

@@ -35,3 +35,4 @@ app/main/android/src/main/assets/VERSION
 
 # Claude
 .claude/
+/hs_err_*.log

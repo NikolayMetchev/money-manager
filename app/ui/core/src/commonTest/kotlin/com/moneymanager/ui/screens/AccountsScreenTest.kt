@@ -6,7 +6,6 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.runComposeUiTest
 import app.cash.sqldelight.Query
 import app.cash.sqldelight.Transacter
 import app.cash.sqldelight.db.QueryResult
@@ -39,6 +38,7 @@ import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.ui.error.ProvideSchemaAwareScope
+import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
@@ -54,7 +54,7 @@ class AccountsScreenTest {
 
     @Test
     fun accountsScreen_displaysEmptyState_whenNoAccounts() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given
             val repository = FakeAccountRepository(emptyList())
 
@@ -83,7 +83,7 @@ class AccountsScreenTest {
 
     @Test
     fun accountsScreen_displaysAccounts_whenAccountsExist() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given
             val now = Clock.System.now()
             val accounts =
@@ -126,7 +126,7 @@ class AccountsScreenTest {
 
     @Test
     fun accountsScreen_displaysAddAccountButton() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given
             val repository = FakeAccountRepository(emptyList())
 
@@ -154,7 +154,7 @@ class AccountsScreenTest {
 
     @Test
     fun accountsScreen_opensCreateDialog_whenAddAccountClicked() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given
             val repository = FakeAccountRepository(emptyList())
 
@@ -185,7 +185,7 @@ class AccountsScreenTest {
 
     @Test
     fun accountCard_displaysAccountInformation() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given
             val now = Clock.System.now()
             val account =
@@ -220,7 +220,7 @@ class AccountsScreenTest {
 
     @Test
     fun accountCard_opensDeleteDialog_whenDeleteButtonClicked() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given
             val now = Clock.System.now()
             val account =
@@ -259,7 +259,7 @@ class AccountsScreenTest {
 
     @Test
     fun createAccountDialog_validatesRequiredFields() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given
             val repository = FakeAccountRepository(emptyList())
 
@@ -293,7 +293,7 @@ class AccountsScreenTest {
 
     @Test
     fun createAccountDialog_canBeDismissed() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given
             val repository = FakeAccountRepository(emptyList())
 
@@ -328,7 +328,7 @@ class AccountsScreenTest {
 
     @Test
     fun deleteAccountDialog_canBeDismissed() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given
             val now = Clock.System.now()
             val account =
@@ -370,7 +370,7 @@ class AccountsScreenTest {
 
     @Test
     fun accountsScreen_displaysMultipleAccounts() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given
             val now = Clock.System.now()
             val accounts =

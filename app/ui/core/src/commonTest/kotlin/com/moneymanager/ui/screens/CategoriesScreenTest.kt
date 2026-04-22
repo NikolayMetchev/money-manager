@@ -10,7 +10,6 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
-import androidx.compose.ui.test.runComposeUiTest
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CategoryBalance
 import com.moneymanager.domain.model.Currency
@@ -18,6 +17,7 @@ import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.ui.error.ProvideSchemaAwareScope
+import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
@@ -32,7 +32,7 @@ class CategoriesScreenTest {
 
     @Test
     fun categoriesScreen_displaysEmptyState_whenNoCategories() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given
             val repository = FakeCategoryRepository(emptyList())
 
@@ -53,7 +53,7 @@ class CategoriesScreenTest {
 
     @Test
     fun categoriesScreen_displaysCategories_whenCategoriesExist() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given
             val categories =
                 listOf(
@@ -79,7 +79,7 @@ class CategoriesScreenTest {
 
     @Test
     fun categoriesScreen_displaysAddCategoryButton() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given
             val repository = FakeCategoryRepository(emptyList())
 
@@ -99,7 +99,7 @@ class CategoriesScreenTest {
 
     @Test
     fun categoriesScreen_displaysUncategorizedCategory() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given
             val categories =
                 listOf(
@@ -125,7 +125,7 @@ class CategoriesScreenTest {
 
     @Test
     fun categoriesScreen_displaysChildCount_whenCategoryHasChildren() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given
             val categories =
                 listOf(
@@ -151,7 +151,7 @@ class CategoriesScreenTest {
 
     @Test
     fun categoriesScreen_expandsCategory_whenArrowClicked() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given
             val categories =
                 listOf(
@@ -186,7 +186,7 @@ class CategoriesScreenTest {
 
     @Test
     fun categoriesScreen_opensCreateDialog_whenAddCategoryClicked() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given
             val repository = FakeCategoryRepository(emptyList())
 
@@ -210,7 +210,7 @@ class CategoriesScreenTest {
 
     @Test
     fun createCategoryDialog_validatesRequiredFields() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given
             val repository = FakeCategoryRepository(emptyList())
 
@@ -236,7 +236,7 @@ class CategoriesScreenTest {
 
     @Test
     fun createCategoryDialog_canBeDismissed() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given
             val repository = FakeCategoryRepository(emptyList())
 
@@ -263,7 +263,7 @@ class CategoriesScreenTest {
 
     @Test
     fun createCategoryDialog_createsCategory_whenValidInput() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given
             val repository = FakeCategoryRepository(emptyList())
 
@@ -285,6 +285,7 @@ class CategoriesScreenTest {
 
             // Click create
             onNodeWithText("Create").performClick()
+            waitForIdle()
 
             // Then - dialog should be dismissed and category created
             onNodeWithText("Create New Category").assertDoesNotExist()
@@ -294,7 +295,7 @@ class CategoriesScreenTest {
 
     @Test
     fun createCategoryDialog_showsParentDropdown_withAvailableCategories() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given
             val categories =
                 listOf(
@@ -332,7 +333,7 @@ class CategoriesScreenTest {
 
     @Test
     fun categoriesScreen_opensEditDialog_whenEditButtonClicked() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given
             val categories =
                 listOf(
@@ -359,7 +360,7 @@ class CategoriesScreenTest {
 
     @Test
     fun editCategoryDialog_canRenameCategory() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given
             val categories =
                 listOf(
@@ -385,6 +386,7 @@ class CategoriesScreenTest {
 
             // Click save without changes to verify it works
             onNodeWithText("Save").performClick()
+            waitForIdle()
 
             // Then - dialog should be dismissed
             onNodeWithText("Edit Category").assertDoesNotExist()
@@ -394,7 +396,7 @@ class CategoriesScreenTest {
 
     @Test
     fun editCategoryDialog_validatesRequiredFields() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given
             val categories =
                 listOf(
@@ -426,7 +428,7 @@ class CategoriesScreenTest {
 
     @Test
     fun editCategoryDialog_canBeDismissed() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given
             val categories =
                 listOf(
@@ -457,7 +459,7 @@ class CategoriesScreenTest {
 
     @Test
     fun editCategoryDialog_showsDeleteButton() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given
             val categories =
                 listOf(
@@ -484,7 +486,7 @@ class CategoriesScreenTest {
 
     @Test
     fun editCategoryDialog_opensDeleteConfirmation_whenDeleteClicked() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given
             val categories =
                 listOf(
@@ -515,7 +517,7 @@ class CategoriesScreenTest {
 
     @Test
     fun deleteConfirmationDialog_deletesCategory_whenConfirmed() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given
             val categories =
                 listOf(
@@ -541,6 +543,7 @@ class CategoriesScreenTest {
 
             // Confirm deletion
             onNodeWithText("Delete").performClick()
+            waitForIdle()
 
             // Then
             assertEquals(1, repository.deletedCategoryIds.size)
@@ -549,7 +552,7 @@ class CategoriesScreenTest {
 
     @Test
     fun deleteConfirmationDialog_canBeCancelled() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given
             val categories =
                 listOf(
@@ -590,7 +593,7 @@ class CategoriesScreenTest {
 
     @Test
     fun categoriesScreen_doesNotShowEditButton_forUncategorizedCategory() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given - only Uncategorized category
             val categories =
                 listOf(
@@ -615,7 +618,7 @@ class CategoriesScreenTest {
 
     @Test
     fun categoriesScreen_showsEditButton_forNonUncategorizedCategory() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given - Uncategorized and another category
             val categories =
                 listOf(
@@ -647,7 +650,7 @@ class CategoriesScreenTest {
 
     @Test
     fun editCategoryDialog_excludesSelfFromParentOptions() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given
             val categories =
                 listOf(
@@ -679,7 +682,7 @@ class CategoriesScreenTest {
 
     @Test
     fun editCategoryDialog_excludesDescendantsFromParentOptions() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given - Food has child Groceries, which has child Organic
             val categories =
                 listOf(
@@ -712,7 +715,7 @@ class CategoriesScreenTest {
 
     @Test
     fun editCategoryDialog_canChangeParentCategory() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given
             val categories =
                 listOf(
@@ -743,6 +746,7 @@ class CategoriesScreenTest {
 
             // Save
             onNodeWithText("Save").performClick()
+            waitForIdle()
 
             // Then
             assertEquals(1, repository.updatedCategories.size)
@@ -755,7 +759,7 @@ class CategoriesScreenTest {
 
     @Test
     fun createCategoryDialog_filtersParentCategories_whenSearching() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given
             val categories =
                 listOf(
@@ -794,7 +798,7 @@ class CategoriesScreenTest {
 
     @Test
     fun categoriesScreen_displaysMultipleTopLevelCategories() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given
             val categories =
                 listOf(
@@ -824,7 +828,7 @@ class CategoriesScreenTest {
 
     @Test
     fun categoriesScreen_displaysNestedHierarchy() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given
             val categories =
                 listOf(

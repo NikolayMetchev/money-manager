@@ -5,7 +5,6 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.test.waitUntilDoesNotExist
 import androidx.compose.ui.test.waitUntilExactlyOneExists
 import com.moneymanager.database.DatabaseManager
@@ -15,6 +14,7 @@ import com.moneymanager.test.database.copyDatabaseFromResources
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
 import com.moneymanager.ui.test.TestMoneyManagerApp
+import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import kotlin.test.AfterTest
 import kotlin.test.Test
 
@@ -38,7 +38,7 @@ class DatabaseSchemaErrorDialogE2ETest {
 
     @Test
     fun moneyManagerApp_showsSchemaErrorDialog_whenDatabaseHasSchemaError() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given: Copy the problematic test database to a test location
             testDbLocation = copyDatabaseFromResources("/money_manager.db")
 
@@ -78,7 +78,7 @@ class DatabaseSchemaErrorDialogE2ETest {
 
     @Test
     fun databaseSchemaErrorDialog_allowsBackupAndCreateNew() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given: Copy the problematic test database to a test location
             testDbLocation = copyDatabaseFromResources("/money_manager.db")
             val databaseManager = createTestDatabaseManager()
@@ -116,7 +116,7 @@ class DatabaseSchemaErrorDialogE2ETest {
 
     @Test
     fun databaseSchemaErrorDialog_allowsDeleteAndCreateNew() =
-        runComposeUiTest {
+        runMoneyManagerComposeUiTest {
             // Given: Copy the problematic test database to a test location
             testDbLocation = copyDatabaseFromResources("/money_manager.db")
             val databaseManager = createTestDatabaseManager()
