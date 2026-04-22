@@ -4,9 +4,6 @@ plugins {
 
 android {
     namespace = "com.moneymanager.android"
-    lint {
-        baseline = file("lint-baseline.xml")
-    }
 
     defaultConfig {
         applicationId = "com.moneymanager"

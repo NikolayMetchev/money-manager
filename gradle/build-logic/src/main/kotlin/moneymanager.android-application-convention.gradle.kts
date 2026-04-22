@@ -48,6 +48,7 @@ configure<ApplicationExtension> {
         warningsAsErrors = true
         abortOnError = true
         // API 37 is currently beta, so stay on the latest stable SDK while keeping other lint warnings fatal.
+        disable += "GradleDependency"
         disable += "OldTargetApi"
     }
 }
