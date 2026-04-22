@@ -16,4 +16,51 @@
       <module name="money-manager.shared.jvmTest" target="24" />
     </bytecodeTargetLevel>
   </component>
+  <component name="JavacSettings">
+    <option name="ADDITIONAL_OPTIONS_OVERRIDE">
+      <module name="build-logic" options="-Xlint:all -Werror" />
+      <module name="build-logic.main" options="-Xlint:all -Werror" />
+      <module name="build-logic.test" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.db.core" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.db.core.jvmMain" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.db.core.jvmTest" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.db.schemaspy" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.db.schemaspy.main" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.db.schemaspy.test" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.di.core" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.di.core.jvmMain" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.di.core.jvmTest" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.main.jvm" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.main.jvm.dev" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.main.jvm.main" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.main.jvm.test" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.model.core" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.model.core.jvmMain" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.model.core.jvmTest" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.ui.core" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.ui.core.jvmDev" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.ui.core.jvmMain" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.ui.core.jvmTest" options="-Xlint:all -Werror" />
+      <module name="money-manager.test.app.db" options="-Xlint:all -Werror" />
+      <module name="money-manager.test.app.db.jvmMain" options="-Xlint:all -Werror" />
+      <module name="money-manager.test.app.db.jvmTest" options="-Xlint:all -Werror" />
+      <module name="money-manager.utils.bigdecimal" options="-Xlint:all -Werror" />
+      <module name="money-manager.utils.bigdecimal.jvmMain" options="-Xlint:all -Werror" />
+      <module name="money-manager.utils.bigdecimal.jvmTest" options="-Xlint:all -Werror" />
+      <module name="money-manager.utils.compose.filePicker" options="-Xlint:all -Werror" />
+      <module name="money-manager.utils.compose.filePicker.jvmDev" options="-Xlint:all -Werror" />
+      <module name="money-manager.utils.compose.filePicker.jvmMain" options="-Xlint:all -Werror" />
+      <module name="money-manager.utils.compose.filePicker.jvmTest" options="-Xlint:all -Werror" />
+      <module name="money-manager.utils.compose.scrollbar" options="-Xlint:all -Werror" />
+      <module name="money-manager.utils.compose.scrollbar.jvmDev" options="-Xlint:all -Werror" />
+      <module name="money-manager.utils.compose.scrollbar.jvmMain" options="-Xlint:all -Werror" />
+      <module name="money-manager.utils.compose.scrollbar.jvmTest" options="-Xlint:all -Werror" />
+      <module name="money-manager.utils.currency" options="-Xlint:all -Werror" />
+      <module name="money-manager.utils.currency.jvmMain" options="-Xlint:all -Werror" />
+      <module name="money-manager.utils.currency.jvmTest" options="-Xlint:all -Werror" />
+      <module name="money-manager.utils.parsers.csv" options="-Xlint:all -Werror" />
+      <module name="money-manager.utils.parsers.csv.jvmMain" options="-Xlint:all -Werror" />
+      <module name="money-manager.utils.parsers.csv.jvmTest" options="-Xlint:all -Werror" />
+    </option>
+  </component>
 </project>
