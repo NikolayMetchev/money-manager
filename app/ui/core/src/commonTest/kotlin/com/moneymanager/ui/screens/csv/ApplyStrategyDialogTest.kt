@@ -142,6 +142,35 @@ class ApplyStrategyDialogTest {
         assertTrue(hasBlank)
     }
 
+    @Test
+    fun `buildCreatedAccountNameOverrides returns only trimmed overrides for unmapped new accounts`() {
+        val overrides =
+            buildCreatedAccountNameOverrides(
+                preparation =
+                    ImportPreparation(
+                        validTransfers = emptyList(),
+                        errorRows = emptyList(),
+                        newAccounts =
+                            setOf(
+                                NewAccount(name = "Acme", categoryId = 10),
+                                NewAccount(name = "Coffee", categoryId = 20),
+                                NewAccount(name = "Ignored", categoryId = 30),
+                            ),
+                        existingAccountMatches = emptyMap(),
+                    ),
+                existingAccountSelections = mapOf("Coffee" to AccountId(55)),
+                newAccountNames =
+                    mapOf(
+                        "Acme" to "  Acme Renamed  ",
+                        "Coffee" to "Should Be Ignored",
+                        "Ignored" to "   ",
+                        "NotNew" to "Does Not Matter",
+                    ),
+            )
+
+        assertEquals(mapOf("Acme" to "Acme Renamed"), overrides)
+    }
+
     private fun transferWithDiscoveredMapping(discoveredMapping: DiscoveredAccountMapping): CsvTransferWithAttributes =
         CsvTransferWithAttributes(
             transfer =

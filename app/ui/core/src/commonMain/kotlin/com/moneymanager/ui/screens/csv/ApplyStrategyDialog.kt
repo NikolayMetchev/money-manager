@@ -46,6 +46,7 @@ import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.database.csv.CsvTransferMapper
 import com.moneymanager.database.csv.DiscoveredAccountMapping
 import com.moneymanager.database.csv.ImportPreparation
+import com.moneymanager.database.csv.NewAccount
 import com.moneymanager.database.csv.StrategyMatcher
 import com.moneymanager.database.sql.EntitySourceQueries
 import com.moneymanager.database.sql.TransferSourceQueries
@@ -301,12 +302,11 @@ fun ApplyStrategyDialog(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 baseImportPreparation
-                    ?.newAccounts
-                    ?.takeIf { it.isNotEmpty() }
-                    ?.let { newAccounts ->
+                    ?.takeIf { it.newAccounts.isNotEmpty() }
+                    ?.let { basePrep ->
                         NewAccountResolutionSection(
-                            newAccounts = newAccounts.toList(),
-                            discoveredMappings = baseImportPreparation!!.validTransfers.mapNotNull { it.discoveredMapping },
+                            newAccounts = basePrep.newAccounts.toList(),
+                            discoveredMappings = basePrep.validTransfers.mapNotNull { it.discoveredMapping },
                             accounts = accounts,
                             selectedExistingAccounts = selectedExistingAccounts,
                             selectedNewAccountNames = selectedNewAccountNames,
@@ -896,7 +896,7 @@ private fun StrategySelector(
 
 @Composable
 private fun NewAccountResolutionSection(
-    newAccounts: List<com.moneymanager.database.csv.NewAccount>,
+    newAccounts: List<NewAccount>,
     discoveredMappings: List<DiscoveredAccountMapping>,
     accounts: List<Account>,
     selectedExistingAccounts: Map<String, AccountId>,
@@ -1121,7 +1121,7 @@ private fun ImportPreviewSection(
             )
             StatCard(
                 label = "New Accounts",
-                count = prep.newAccounts.map { renamedNewAccountNames[it.name] ?: it.name }.size,
+                count = prep.newAccounts.size,
                 color = MaterialTheme.colorScheme.tertiary,
             )
         }
@@ -1143,12 +1143,20 @@ private fun ImportPreviewSection(
                             MaterialTheme.shapes.small,
                         ).padding(8.dp),
             ) {
-                prep.newAccounts.forEach { account ->
-                    Text(
-                        text = "• ${account.name}",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
+                prep.newAccounts
+                    .map { account ->
+                        account.copy(
+                            name =
+                                renamedNewAccountNames[account.name]
+                                    ?.takeIf { it.isNotBlank() }
+                                    ?: account.name,
+                        )
+                    }.forEach { account ->
+                        Text(
+                            text = "• ${account.name}",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
             }
         }
 
@@ -1254,12 +1262,12 @@ internal fun buildAccountsToCreate(
     preparation: ImportPreparation,
     existingAccountSelections: Map<String, AccountId>,
     newAccountNames: Map<String, String>,
-): List<com.moneymanager.database.csv.NewAccount> =
+): List<NewAccount> =
     preparation.newAccounts
         .filter { it.name !in existingAccountSelections }
         .mapNotNull { account ->
             val finalName = newAccountNames[account.name]?.trim()?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
-            com.moneymanager.database.csv.NewAccount(
+            NewAccount(
                 name = finalName,
                 categoryId = account.categoryId,
             )
