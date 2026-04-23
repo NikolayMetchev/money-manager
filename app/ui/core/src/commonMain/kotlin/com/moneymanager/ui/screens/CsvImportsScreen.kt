@@ -38,12 +38,10 @@ import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.repository.CsvImportRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.ui.util.formatTimestamp
 import com.moneymanager.ui.util.sha256Hex
 import kotlinx.coroutines.launch
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Clock
-import kotlin.time.Instant
 
 @Composable
 fun CsvImportsScreen(
@@ -319,11 +317,6 @@ private fun ImportStateBadge(isImported: Boolean) {
             color = contentColor,
         )
     }
-}
-
-private fun formatTimestamp(timestamp: Instant): String {
-    val localDateTime = timestamp.toLocalDateTime(TimeZone.currentSystemDefault())
-    return "${localDateTime.date} ${localDateTime.hour}:${localDateTime.minute.toString().padStart(2, '0')}"
 }
 
 @Composable

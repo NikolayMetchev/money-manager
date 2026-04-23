@@ -564,13 +564,19 @@ fun ApplyStrategyDialog(
                             logger.info { "Refreshing materialized views" }
                             maintenanceService.refreshMaterializedViews()
 
-                            if (failedRows.size < prep.validTransfers.size) {
-                                csvImportRepository.recordImportApplication(
-                                    id = csvImport.id,
-                                    strategyId = strategy.id,
-                                    strategyName = strategy.name,
-                                    appliedAt = Clock.System.now(),
-                                )
+                            if (successCount > 0) {
+                                runCatching {
+                                    csvImportRepository.recordImportApplication(
+                                        id = csvImport.id,
+                                        strategyId = strategy.id,
+                                        strategyName = strategy.name,
+                                        appliedAt = Clock.System.now(),
+                                    )
+                                }.onFailure { error ->
+                                    logger.warn {
+                                        "Import application history could not be recorded for import ${csvImport.id}: ${error.message}"
+                                    }
+                                }
                             }
 
                             logger.info { "Import completed successfully" }

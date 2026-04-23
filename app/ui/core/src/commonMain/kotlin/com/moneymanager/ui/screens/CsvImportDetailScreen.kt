@@ -54,9 +54,8 @@ import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.screens.csv.ApplyStrategyDialog
 import com.moneymanager.ui.screens.csvstrategy.CreateCsvStrategyDialog
+import com.moneymanager.ui.util.formatTimestamp
 import kotlinx.coroutines.launch
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 
 @Composable
 fun CsvImportDetailScreen(
@@ -287,7 +286,7 @@ fun CsvImportDetailScreen(
                         )
                     }
                     Text(
-                        text = "Added: ${formatImportTimestamp(currentImport.importTimestamp)}",
+                        text = "Added: ${formatTimestamp(currentImport.importTimestamp)}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -300,7 +299,7 @@ fun CsvImportDetailScreen(
                                     } else {
                                         append("Imported: ")
                                     }
-                                    append(formatImportTimestamp(lastAppliedAt))
+                                    append(formatTimestamp(lastAppliedAt))
                                     currentImport.lastAppliedStrategyName
                                         ?.takeIf(String::isNotBlank)
                                         ?.let { strategyName ->
@@ -455,9 +454,4 @@ fun CsvImportDetailScreen(
             onDismiss = { showCreateStrategyDialog = false },
         )
     }
-}
-
-private fun formatImportTimestamp(timestamp: kotlin.time.Instant): String {
-    val localDateTime = timestamp.toLocalDateTime(TimeZone.currentSystemDefault())
-    return "${localDateTime.date} ${localDateTime.hour}:${localDateTime.minute.toString().padStart(2, '0')}"
 }

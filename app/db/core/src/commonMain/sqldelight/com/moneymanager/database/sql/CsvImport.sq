@@ -169,7 +169,8 @@ CREATE TABLE csv_import_application (
     FOREIGN KEY (strategy_id) REFERENCES csv_import_strategy(id) ON DELETE SET NULL
 );
 
-CREATE INDEX idx_csv_import_application_import ON csv_import_application(csv_import_id);
+CREATE INDEX idx_csv_import_application_import_latest
+ON csv_import_application(csv_import_id, applied_at DESC, id DESC);
 CREATE INDEX idx_csv_import_application_strategy ON csv_import_application(strategy_id);
 
 insertApplication:

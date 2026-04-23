@@ -124,12 +124,13 @@ interface CsvImportRepository {
     )
 
     /**
-     * Records the most recent successful strategy application for a CSV import.
+     * Records one successful strategy application in the CSV import history.
+     * The latest application metadata shown to users is derived when querying imports.
      *
      * @param id The import ID
      * @param strategyId The strategy used for this application
      * @param strategyName The strategy name snapshot shown to users
-     * @param appliedAt When the import run completed successfully
+     * @param appliedAt When this strategy application completed successfully
      */
     suspend fun recordImportApplication(
         id: CsvImportId,
