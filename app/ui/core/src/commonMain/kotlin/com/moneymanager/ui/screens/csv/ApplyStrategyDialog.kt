@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.database.CsvImportSourceRecorder
 import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.database.csv.CsvTransferMapper
+import com.moneymanager.database.csv.DiscoveredAccountMapping
 import com.moneymanager.database.csv.ImportPreparation
 import com.moneymanager.database.csv.StrategyMatcher
 import com.moneymanager.database.sql.EntitySourceQueries
@@ -61,6 +62,7 @@ import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.repository.AccountRepository
@@ -82,6 +84,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
 import kotlin.time.Clock
+import kotlin.time.Instant
 
 private val logger = logging()
 
@@ -134,8 +137,11 @@ fun ApplyStrategyDialog(
 
     var selectedStrategy by remember { mutableStateOf<CsvImportStrategy?>(null) }
     var selectedSourceAccountId by remember { mutableStateOf<AccountId?>(null) }
+    var baseImportPreparation by remember { mutableStateOf<ImportPreparation?>(null) }
     var importPreparation by remember { mutableStateOf<ImportPreparation?>(null) }
     var accountMappings by remember { mutableStateOf<List<CsvAccountMapping>>(emptyList()) }
+    var selectedExistingAccounts by remember { mutableStateOf<Map<String, AccountId>>(emptyMap()) }
+    var selectedNewAccountNames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var isImporting by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
@@ -143,6 +149,8 @@ fun ApplyStrategyDialog(
     LaunchedEffect(selectedStrategy) {
         selectedStrategy?.let { strategy ->
             accountMappings = csvAccountMappingRepository.getMappingsForStrategy(strategy.id).first()
+            selectedExistingAccounts = emptyMap()
+            selectedNewAccountNames = emptyMap()
             // Pre-populate source account from the strategy's SOURCE_ACCOUNT mapping if present.
             // This runs whenever the strategy changes, so switching strategies updates the
             // pre-selected source account to match the new strategy's default.
@@ -164,12 +172,9 @@ fun ApplyStrategyDialog(
     }
 
     // Filter to only show rows that will be processed: ERROR status or no status (never processed)
-    val rowsToProcess =
-        rows.filter { row ->
-            row.importStatus == null || row.importStatus == ImportStatus.ERROR
-        }
+    val rowsToProcess = rows.filter { row -> row.importStatus == null || row.importStatus == ImportStatus.ERROR }
 
-    // Prepare import preview when strategy is selected
+    // Prepare baseline import preview from persisted mappings only.
     LaunchedEffect(selectedStrategy, selectedSourceAccountId, rowsToProcess, accounts, currencies, accountMappings) {
         selectedStrategy?.let { strategy ->
             if (accounts.isNotEmpty() && currencies.isNotEmpty() && rowsToProcess.isNotEmpty()) {
@@ -187,16 +192,72 @@ fun ApplyStrategyDialog(
                             accountMappings = accountMappings,
                             sourceAccountOverride = selectedSourceAccountId,
                         )
+                    val preparation = mapper.prepareImport(rowsToProcess)
+                    baseImportPreparation = preparation
+                    selectedExistingAccounts =
+                        selectedExistingAccounts.filterKeys { selectedName ->
+                            preparation.newAccounts.any { account -> account.name == selectedName }
+                        }
+                    selectedNewAccountNames =
+                        preparation.newAccounts.associate { account ->
+                            val existingName = selectedNewAccountNames[account.name]
+                            account.name to (existingName ?: account.name)
+                        }
+                    errorMessage = null
+                } catch (expected: Exception) {
+                    errorMessage = "Failed to prepare import: ${expected.message}"
+                    baseImportPreparation = null
+                    importPreparation = null
+                }
+            } else if (rowsToProcess.isEmpty() && rows.isNotEmpty()) {
+                // All rows already processed successfully
+                errorMessage = "All rows have already been imported successfully."
+                baseImportPreparation = null
+                importPreparation = null
+            }
+        }
+    }
+
+    // Rebuild preview with any user-selected "map to existing account" overrides.
+    LaunchedEffect(
+        selectedStrategy,
+        selectedSourceAccountId,
+        rowsToProcess,
+        accounts,
+        currencies,
+        accountMappings,
+        baseImportPreparation,
+        selectedExistingAccounts,
+    ) {
+        selectedStrategy?.let { strategy ->
+            val basePreparation = baseImportPreparation
+            if (accounts.isNotEmpty() && currencies.isNotEmpty() && rowsToProcess.isNotEmpty() && basePreparation != null) {
+                try {
+                    val accountsByName = accounts.associateBy { it.name }
+                    val currenciesById = currencies.associateBy { it.id }
+                    val currenciesByCode = currencies.associateBy { it.code.uppercase() }
+                    val previewMappings =
+                        buildPendingAccountMappings(
+                            preparation = basePreparation,
+                            strategyId = strategy.id,
+                            accountSelections = selectedExistingAccounts,
+                        )
+                    val mapper =
+                        CsvTransferMapper(
+                            strategy = strategy,
+                            columns = csvImport.columns,
+                            existingAccounts = accountsByName,
+                            existingCurrencies = currenciesById,
+                            existingCurrenciesByCode = currenciesByCode,
+                            accountMappings = accountMappings + previewMappings,
+                            sourceAccountOverride = selectedSourceAccountId,
+                        )
                     importPreparation = mapper.prepareImport(rowsToProcess)
                     errorMessage = null
                 } catch (expected: Exception) {
                     errorMessage = "Failed to prepare import: ${expected.message}"
                     importPreparation = null
                 }
-            } else if (rowsToProcess.isEmpty() && rows.isNotEmpty()) {
-                // All rows already processed successfully
-                errorMessage = "All rows have already been imported successfully."
-                importPreparation = null
             }
         }
     }
@@ -239,9 +300,48 @@ fun ApplyStrategyDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
+                baseImportPreparation
+                    ?.newAccounts
+                    ?.takeIf { it.isNotEmpty() }
+                    ?.let { newAccounts ->
+                        NewAccountResolutionSection(
+                            newAccounts = newAccounts.toList(),
+                            discoveredMappings = baseImportPreparation!!.validTransfers.mapNotNull { it.discoveredMapping },
+                            accounts = accounts,
+                            selectedExistingAccounts = selectedExistingAccounts,
+                            selectedNewAccountNames = selectedNewAccountNames,
+                            onSelectionChanged = { accountName, selectedAccountId ->
+                                selectedExistingAccounts =
+                                    selectedExistingAccounts.toMutableMap().apply {
+                                        if (selectedAccountId == null) {
+                                            remove(accountName)
+                                        } else {
+                                            put(accountName, selectedAccountId)
+                                        }
+                                    }
+                            },
+                            onNewAccountNameChanged = { accountName, newName ->
+                                selectedNewAccountNames =
+                                    selectedNewAccountNames.toMutableMap().apply {
+                                        put(accountName, newName)
+                                    }
+                            },
+                            enabled = !isImporting,
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+
                 // Import preview
                 importPreparation?.let { prep ->
-                    ImportPreviewSection(prep)
+                    ImportPreviewSection(
+                        prep = prep,
+                        renamedNewAccountNames =
+                            buildCreatedAccountNameOverrides(
+                                preparation = baseImportPreparation,
+                                existingAccountSelections = selectedExistingAccounts,
+                                newAccountNames = selectedNewAccountNames,
+                            ),
+                    )
                 }
 
                 errorMessage?.let {
@@ -258,6 +358,7 @@ fun ApplyStrategyDialog(
             TextButton(
                 onClick = {
                     val strategy = selectedStrategy ?: return@TextButton
+                    val basePrep = baseImportPreparation ?: return@TextButton
                     val prep = importPreparation ?: return@TextButton
 
                     isImporting = true
@@ -267,9 +368,39 @@ fun ApplyStrategyDialog(
                         try {
                             logger.info { "Starting CSV import with ${prep.validTransfers.size} valid transfers" }
 
+                            val accountsToCreate =
+                                buildAccountsToCreate(
+                                    preparation = basePrep,
+                                    existingAccountSelections = selectedExistingAccounts,
+                                    newAccountNames = selectedNewAccountNames,
+                                )
+                            val selectedMappingsToPersist =
+                                buildPendingAccountMappings(
+                                    preparation = basePrep,
+                                    strategyId = strategy.id,
+                                    accountSelections = selectedExistingAccounts,
+                                )
+                            for (mapping in selectedMappingsToPersist) {
+                                try {
+                                    csvAccountMappingRepository.createMapping(
+                                        strategyId = mapping.strategyId,
+                                        columnName = mapping.columnName,
+                                        valuePattern = mapping.valuePattern,
+                                        accountId = mapping.accountId,
+                                    )
+                                    logger.info {
+                                        "Saved mapping '${mapping.valuePattern.pattern}' -> ${mapping.accountId.id}"
+                                    }
+                                } catch (expected: Exception) {
+                                    logger.warn(expected) {
+                                        "Failed to save selected mapping '${mapping.valuePattern.pattern}'"
+                                    }
+                                }
+                            }
+
                             // Create new accounts first (skip failures - transfers using them will fail later)
                             val createdAccountNames = mutableSetOf<String>()
-                            for (newAccount in prep.newAccounts) {
+                            for (newAccount in accountsToCreate) {
                                 try {
                                     val account =
                                         Account(
@@ -311,9 +442,15 @@ fun ApplyStrategyDialog(
                                         .distinctBy { it.csvValue }
 
                                 for (discoveredMapping in regexMappings + exactMappings) {
-                                    // Look up the account by targetAccountName (the actual account name created)
+                                    val createdAccountName =
+                                        selectedNewAccountNames[discoveredMapping.targetAccountName]
+                                            ?.trim()
+                                            ?.takeIf { it.isNotBlank() }
+                                            ?: discoveredMapping.targetAccountName
+
+                                    // Look up the account by the final name created for this detected value
                                     val createdAccount =
-                                        accountsByNameForMapping[discoveredMapping.targetAccountName]
+                                        accountsByNameForMapping[createdAccountName]
                                             ?.takeIf { it.name in createdAccountNames }
 
                                     if (createdAccount != null) {
@@ -656,6 +793,11 @@ fun ApplyStrategyDialog(
                         selectedStrategy != null &&
                         selectedSourceAccountId != null &&
                         importPreparation != null &&
+                        !hasBlankNewAccountNames(
+                            preparation = baseImportPreparation,
+                            existingAccountSelections = selectedExistingAccounts,
+                            newAccountNames = selectedNewAccountNames,
+                        ) &&
                         importPreparation?.validTransfers?.isNotEmpty() == true,
             ) {
                 if (isImporting) {
@@ -753,7 +895,172 @@ private fun StrategySelector(
 }
 
 @Composable
-private fun ImportPreviewSection(prep: ImportPreparation) {
+private fun NewAccountResolutionSection(
+    newAccounts: List<com.moneymanager.database.csv.NewAccount>,
+    discoveredMappings: List<DiscoveredAccountMapping>,
+    accounts: List<Account>,
+    selectedExistingAccounts: Map<String, AccountId>,
+    selectedNewAccountNames: Map<String, String>,
+    onSelectionChanged: (String, AccountId?) -> Unit,
+    onNewAccountNameChanged: (String, String) -> Unit,
+    enabled: Boolean,
+) {
+    Column {
+        Text(
+            text = "New Account Handling",
+            style = MaterialTheme.typography.titleSmall,
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text =
+                "Choose whether to create each detected account or map it to an existing one. " +
+                    "Selected mappings will be saved to the strategy when you import.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        newAccounts
+            .sortedBy { it.name.lowercase() }
+            .forEach { newAccount ->
+                val matchCount = discoveredMappings.count { it.targetAccountName == newAccount.name }
+                NewAccountResolutionRow(
+                    detectedAccountName = newAccount.name,
+                    matchCount = matchCount,
+                    accounts = accounts,
+                    selectedAccountId = selectedExistingAccounts[newAccount.name],
+                    newAccountName = selectedNewAccountNames[newAccount.name] ?: newAccount.name,
+                    onSelectionChanged = { accountId ->
+                        onSelectionChanged(newAccount.name, accountId)
+                    },
+                    onNewAccountNameChanged = { newName ->
+                        onNewAccountNameChanged(newAccount.name, newName)
+                    },
+                    enabled = enabled,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+    }
+}
+
+@Composable
+private fun NewAccountResolutionRow(
+    detectedAccountName: String,
+    matchCount: Int,
+    accounts: List<Account>,
+    selectedAccountId: AccountId?,
+    newAccountName: String,
+    onSelectionChanged: (AccountId?) -> Unit,
+    onNewAccountNameChanged: (String) -> Unit,
+    enabled: Boolean,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val selectedAccount = accounts.find { it.id == selectedAccountId }
+    val isCreateNewSelection = selectedAccountId == null && newAccountName != detectedAccountName
+    val dropdownLabel =
+        when {
+            selectedAccount != null -> selectedAccount.name
+            isCreateNewSelection && newAccountName.isNotBlank() -> "Create New Account: $newAccountName"
+            isCreateNewSelection -> "Create New Account"
+            else -> "Exact match: $detectedAccountName"
+        }
+
+    Column {
+        Text(
+            text = detectedAccountName,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+        )
+        Text(
+            text =
+                if (matchCount == 1) {
+                    "1 matching CSV value in this import"
+                } else {
+                    "$matchCount matching CSV values in this import"
+                },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        ExposedDropdownMenuBox(
+            expanded = expanded,
+            onExpandedChange = { if (enabled) expanded = !expanded },
+        ) {
+            OutlinedTextField(
+                value = dropdownLabel,
+                onValueChange = {},
+                readOnly = true,
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+                enabled = enabled,
+            )
+            ExposedDropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+            ) {
+                DropdownMenuItem(
+                    text = { Text("Exact match: $detectedAccountName") },
+                    onClick = {
+                        onSelectionChanged(null)
+                        onNewAccountNameChanged(detectedAccountName)
+                        expanded = false
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text("Create New Account") },
+                    onClick = {
+                        onSelectionChanged(null)
+                        onNewAccountNameChanged("")
+                        expanded = false
+                    },
+                )
+                accounts
+                    .sortedBy { it.name.lowercase() }
+                    .forEach { account ->
+                        DropdownMenuItem(
+                            text = { Text(account.name) },
+                            onClick = {
+                                onSelectionChanged(account.id)
+                                expanded = false
+                            },
+                        )
+                    }
+            }
+        }
+        if (isCreateNewSelection) {
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedTextField(
+                value = newAccountName,
+                onValueChange = onNewAccountNameChanged,
+                label = { Text("New account name") },
+                placeholder = { Text("Detected: $detectedAccountName") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                enabled = enabled,
+                isError = newAccountName.isBlank(),
+                supportingText = {
+                    Text(
+                        text =
+                            if (newAccountName.isBlank()) {
+                                "Enter the name to create for this detected account"
+                            } else {
+                                "This name will be created and used for future mappings"
+                            },
+                    )
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun ImportPreviewSection(
+    prep: ImportPreparation,
+    renamedNewAccountNames: Map<String, String> = emptyMap(),
+) {
     Column {
         // Summary stats
         Text(
@@ -814,7 +1121,7 @@ private fun ImportPreviewSection(prep: ImportPreparation) {
             )
             StatCard(
                 label = "New Accounts",
-                count = prep.newAccounts.size,
+                count = prep.newAccounts.map { renamedNewAccountNames[it.name] ?: it.name }.size,
                 color = MaterialTheme.colorScheme.tertiary,
             )
         }
@@ -892,6 +1199,89 @@ private fun ImportPreviewSection(prep: ImportPreparation) {
         }
     }
 }
+
+internal fun buildPendingAccountMappings(
+    preparation: ImportPreparation,
+    strategyId: CsvImportStrategyId,
+    accountSelections: Map<String, AccountId>,
+    now: Instant = Clock.System.now(),
+): List<CsvAccountMapping> {
+    if (accountSelections.isEmpty()) {
+        return emptyList()
+    }
+
+    return preparation.validTransfers
+        .mapNotNull { it.discoveredMapping }
+        .filter { discoveredMapping -> discoveredMapping.targetAccountName in accountSelections }
+        .map { discoveredMapping ->
+            val selectedAccountId = accountSelections.getValue(discoveredMapping.targetAccountName)
+            PendingAccountMappingKey(
+                columnName = discoveredMapping.columnName,
+                pattern =
+                    discoveredMapping.matchedPattern
+                        ?: "^${Regex.escape(discoveredMapping.csvValue)}$",
+                accountId = selectedAccountId,
+            )
+        }.distinct()
+        .mapIndexed { index, mapping ->
+            CsvAccountMapping(
+                id = -(index + 1).toLong(),
+                strategyId = strategyId,
+                columnName = mapping.columnName,
+                valuePattern = Regex(mapping.pattern, RegexOption.IGNORE_CASE),
+                accountId = mapping.accountId,
+                createdAt = now,
+                updatedAt = now,
+            )
+        }
+}
+
+internal fun buildCreatedAccountNameOverrides(
+    preparation: ImportPreparation?,
+    existingAccountSelections: Map<String, AccountId>,
+    newAccountNames: Map<String, String>,
+): Map<String, String> {
+    val safePreparation = preparation ?: return emptyMap()
+    return safePreparation.newAccounts
+        .filter { it.name !in existingAccountSelections }
+        .mapNotNull { account ->
+            val renamed = newAccountNames[account.name]?.trim()?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+            account.name to renamed
+        }.toMap()
+}
+
+internal fun buildAccountsToCreate(
+    preparation: ImportPreparation,
+    existingAccountSelections: Map<String, AccountId>,
+    newAccountNames: Map<String, String>,
+): List<com.moneymanager.database.csv.NewAccount> =
+    preparation.newAccounts
+        .filter { it.name !in existingAccountSelections }
+        .mapNotNull { account ->
+            val finalName = newAccountNames[account.name]?.trim()?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+            com.moneymanager.database.csv.NewAccount(
+                name = finalName,
+                categoryId = account.categoryId,
+            )
+        }.distinctBy { it.name }
+
+internal fun hasBlankNewAccountNames(
+    preparation: ImportPreparation?,
+    existingAccountSelections: Map<String, AccountId>,
+    newAccountNames: Map<String, String>,
+): Boolean {
+    val safePreparation = preparation ?: return false
+    return safePreparation.newAccounts.any { account ->
+        account.name !in existingAccountSelections &&
+            newAccountNames[account.name].isNullOrBlank()
+    }
+}
+
+private data class PendingAccountMappingKey(
+    val columnName: String,
+    val pattern: String,
+    val accountId: AccountId,
+)
 
 @Composable
 private fun StatCard(
