@@ -52,6 +52,9 @@ fun KotlinMultiplatformExtension.configureAndroidTarget() {
                 }
             }
         }
+
+        // Enable host tests so commonTest can be shared without KMP Android warnings.
+        withHostTest {}
     }
 }
 

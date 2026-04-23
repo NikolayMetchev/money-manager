@@ -8,6 +8,8 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -15,15 +17,19 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 class CsvImportRepositoryImplTest : DbTest() {
     private val headers = listOf("Date", "Amount", "Description")
     private val lastModified = Instant.fromEpochMilliseconds(1700000000000L)
+    private val appliedAt = Instant.fromEpochMilliseconds(1701000000000L)
+    private val appliedAtSecond = Instant.fromEpochMilliseconds(1702000000000L)
     private val rows =
         listOf(
             listOf("2024-01-01", "100.00", "Test transaction 1"),
@@ -71,6 +77,52 @@ class CsvImportRepositoryImplTest : DbTest() {
             assertNotNull(import)
             assertEquals(checksum, import.fileChecksum)
             assertEquals(lastModified, import.fileLastModified)
+            assertEquals(0, import.applicationCount)
+            assertNull(import.lastAppliedStrategyId)
+            assertNull(import.lastAppliedStrategyName)
+            assertNull(import.lastAppliedAt)
+        }
+
+    @Test
+    fun `recordImportApplication should persist latest application metadata and count`() =
+        runTest {
+            val monzoStrategy = createStrategy("Monzo")
+            val revolutStrategy = createStrategy("Revolut")
+
+            val importId =
+                repositories.csvImportRepository.createImport(
+                    fileName = "test.csv",
+                    headers = headers,
+                    rows = rows,
+                    fileChecksum = "applied_strategy_checksum",
+                    fileLastModified = lastModified,
+                )
+
+            repositories.csvImportRepository.recordImportApplication(
+                id = importId,
+                strategyId = monzoStrategy.id,
+                strategyName = "Monzo",
+                appliedAt = appliedAt,
+            )
+            repositories.csvImportRepository.recordImportApplication(
+                id = importId,
+                strategyId = revolutStrategy.id,
+                strategyName = "Revolut",
+                appliedAt = appliedAtSecond,
+            )
+
+            val import = repositories.csvImportRepository.getImport(importId).first()
+            assertNotNull(import)
+            assertEquals(2, import.applicationCount)
+            assertEquals(revolutStrategy.id, import.lastAppliedStrategyId)
+            assertEquals("Revolut", import.lastAppliedStrategyName)
+            assertEquals(appliedAtSecond, import.lastAppliedAt)
+
+            val allImports = repositories.csvImportRepository.getAllImports().first()
+            assertEquals(2, allImports.single().applicationCount)
+            assertEquals(revolutStrategy.id, allImports.single().lastAppliedStrategyId)
+            assertEquals("Revolut", allImports.single().lastAppliedStrategyName)
+            assertEquals(appliedAtSecond, allImports.single().lastAppliedAt)
         }
 
     @Test
@@ -247,4 +299,18 @@ class CsvImportRepositoryImplTest : DbTest() {
 
             assertEquals(createdTransfer.id, importRows.first { it.rowIndex == 1L }.transferId)
         }
+
+    private suspend fun createStrategy(name: String): CsvImportStrategy {
+        val strategy =
+            CsvImportStrategy(
+                id = CsvImportStrategyId(Uuid.random()),
+                name = name,
+                identificationColumns = headers.toSet(),
+                fieldMappings = emptyMap(),
+                createdAt = Clock.System.now(),
+                updatedAt = Clock.System.now(),
+            )
+        repositories.csvImportStrategyRepository.createStrategy(strategy)
+        return strategy
+    }
 }

@@ -54,6 +54,12 @@ kotlin {
             }
         }
 
+        val androidHostTest by getting {
+            dependencies {
+                implementation(projects.app.di.core)
+            }
+        }
+
         val androidDeviceTest by getting {
             // Note: Cannot use dependsOn(commonTest) due to source set tree restrictions
             // Tests are shared via srcDir() below, but we exclude the expect declarations
@@ -81,5 +87,12 @@ sqldelight {
 }
 
 tasks.withType<app.cash.sqldelight.gradle.VerifyMigrationTask>().configureEach {
+    enabled = false
+}
+
+// Repository tests shared via commonTest use androidx.test.InstrumentationRegistry
+// on Android, which requires a device (or Robolectric). They already run via
+// jvmTest and androidDeviceTest, so skip the host-test run here.
+tasks.matching { it.name == "testAndroidHostTest" }.configureEach {
     enabled = false
 }

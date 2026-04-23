@@ -6,6 +6,7 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csv.CsvRow
+import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import kotlinx.coroutines.flow.Flow
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
@@ -120,6 +121,22 @@ interface CsvImportRepository {
     suspend fun clearError(
         id: CsvImportId,
         rowIndex: Long,
+    )
+
+    /**
+     * Records one successful strategy application in the CSV import history.
+     * The latest application metadata shown to users is derived when querying imports.
+     *
+     * @param id The import ID
+     * @param strategyId The strategy used for this application
+     * @param strategyName The strategy name snapshot shown to users
+     * @param appliedAt When this strategy application completed successfully
+     */
+    suspend fun recordImportApplication(
+        id: CsvImportId,
+        strategyId: CsvImportStrategyId,
+        strategyName: String,
+        appliedAt: Instant,
     )
 
     /**

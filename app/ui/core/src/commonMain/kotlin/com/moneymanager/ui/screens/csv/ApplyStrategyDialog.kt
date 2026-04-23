@@ -440,6 +440,7 @@ fun ApplyStrategyDialog(
                             logger.info { "Starting to create $validCount transfers" }
                             val failedRows = mutableListOf<CsvImportResult.FailedRow>()
                             var successCount = 0
+                            var duplicateCount = 0
                             val deviceId = deviceRepository.getOrCreateDevice(getDeviceInfo())
 
                             for (transferWithAttrs in finalPrep.validTransfers) {
@@ -495,6 +496,7 @@ fun ApplyStrategyDialog(
                                                 existingTransferId,
                                             )
                                             logger.info { "Skipped duplicate row $originalRowIndex" }
+                                            duplicateCount++
                                         }
                                         ImportStatus.UPDATED -> {
                                             // Update existing transfer
@@ -563,6 +565,22 @@ fun ApplyStrategyDialog(
                             // Refresh materialized views so transfers are visible
                             logger.info { "Refreshing materialized views" }
                             maintenanceService.refreshMaterializedViews()
+
+                            if ((successCount + duplicateCount) > 0) {
+                                runCatching {
+                                    csvImportRepository.recordImportApplication(
+                                        id = csvImport.id,
+                                        strategyId = strategy.id,
+                                        strategyName = strategy.name,
+                                        appliedAt = Clock.System.now(),
+                                    )
+                                }.onFailure { error ->
+                                    logger.warn {
+                                        "Import application history could not be recorded for import ${csvImport.id}: ${error.message}"
+                                    }
+                                }
+                            }
+
                             logger.info { "Import completed successfully" }
 
                             val result =

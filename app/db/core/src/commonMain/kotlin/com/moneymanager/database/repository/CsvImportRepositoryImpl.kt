@@ -14,6 +14,7 @@ import com.moneymanager.domain.model.csv.CsvColumnId
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csv.CsvRow
+import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.repository.CsvImportRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -115,6 +116,16 @@ class CsvImportRepositoryImpl(
                             ),
                         fileChecksum = import.file_checksum,
                         fileLastModified = Instant.fromEpochMilliseconds(import.file_last_modified),
+                        applicationCount = import.application_count.toInt(),
+                        lastAppliedStrategyId =
+                            import.last_applied_strategy_id?.let { strategyId ->
+                                CsvImportStrategyId(Uuid.parse(strategyId))
+                            },
+                        lastAppliedStrategyName = import.last_applied_strategy_name,
+                        lastAppliedAt =
+                            import.last_applied_at?.let { appliedAt ->
+                                Instant.fromEpochMilliseconds(appliedAt)
+                            },
                     )
                 }
             }
@@ -161,6 +172,16 @@ class CsvImportRepositoryImpl(
                         ),
                     fileChecksum = it.file_checksum,
                     fileLastModified = Instant.fromEpochMilliseconds(it.file_last_modified),
+                    applicationCount = it.application_count.toInt(),
+                    lastAppliedStrategyId =
+                        it.last_applied_strategy_id?.let { strategyId ->
+                            CsvImportStrategyId(Uuid.parse(strategyId))
+                        },
+                    lastAppliedStrategyName = it.last_applied_strategy_name,
+                    lastAppliedAt =
+                        it.last_applied_at?.let { appliedAt ->
+                            Instant.fromEpochMilliseconds(appliedAt)
+                        },
                 )
             }
         }
@@ -267,6 +288,22 @@ class CsvImportRepositoryImpl(
             )
         }
 
+    override suspend fun recordImportApplication(
+        id: CsvImportId,
+        strategyId: CsvImportStrategyId,
+        strategyName: String,
+        appliedAt: Instant,
+    ): Unit =
+        withContext(coroutineContext) {
+            csvImportQueries.insertApplication(
+                id = Uuid.random().toString(),
+                csv_import_id = id.id.toString(),
+                strategy_id = strategyId.id.toString(),
+                strategy_name = strategyName,
+                applied_at = appliedAt.toEpochMilliseconds(),
+            )
+        }
+
     override suspend fun findImportsByChecksum(checksum: String): List<CsvImport> =
         withContext(coroutineContext) {
             csvImportQueries.selectImportsByChecksum(checksum).executeAsList().map { import ->
@@ -300,6 +337,16 @@ class CsvImportRepositoryImpl(
                         ),
                     fileChecksum = import.file_checksum,
                     fileLastModified = Instant.fromEpochMilliseconds(import.file_last_modified),
+                    applicationCount = import.application_count.toInt(),
+                    lastAppliedStrategyId =
+                        import.last_applied_strategy_id?.let { strategyId ->
+                            CsvImportStrategyId(Uuid.parse(strategyId))
+                        },
+                    lastAppliedStrategyName = import.last_applied_strategy_name,
+                    lastAppliedAt =
+                        import.last_applied_at?.let { appliedAt ->
+                            Instant.fromEpochMilliseconds(appliedAt)
+                        },
                 )
             }
         }

@@ -8,6 +8,7 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 api(libs.kotlinx.coroutines.core)
+                api(libs.kotlinx.datetime)
                 api(projects.app.db.core)
                 api(projects.app.model.core)
                 api(projects.utils.bigdecimal)
@@ -15,7 +16,6 @@ kotlin {
                 implementation(libs.compose.components.resources)
                 implementation(libs.human.readable)
                 implementation(libs.kmlogging)
-                implementation(libs.kotlinx.datetime)
                 implementation(projects.utils.compose.filePicker)
                 implementation(projects.utils.compose.scrollbar)
                 implementation(projects.utils.currency)
@@ -103,6 +103,16 @@ kotlin {
             // Include commonTest resources for test database files
             resources.srcDir("src/commonTest/resources")
         }
+        val androidHostTest by getting {
+            dependencies {
+                implementation(libs.androidx.compose.runtime)
+                implementation(libs.androidx.compose.ui.test)
+                implementation(libs.kotlinx.coroutines.test)
+                implementation(libs.sqldelight.runtime)
+                implementation(projects.app.di.core)
+                implementation(projects.test.app.db)
+            }
+        }
     }
 }
 
@@ -111,4 +121,11 @@ tasks.withType<Test> {
     systemProperty("java.awt.headless", "true")
     // Additional properties for Skiko on Windows
     systemProperty("skiko.test.harness", "true")
+}
+
+// Compose UI tests shared via commonTest require Robolectric (or a device) to run
+// on the JVM. They already execute as jvmTest (Compose Desktop) and
+// androidDeviceTest (managed emulator), so skip the host-test run here.
+tasks.matching { it.name == "testAndroidHostTest" }.configureEach {
+    enabled = false
 }

@@ -54,9 +54,8 @@ import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.screens.csv.ApplyStrategyDialog
 import com.moneymanager.ui.screens.csvstrategy.CreateCsvStrategyDialog
+import com.moneymanager.ui.util.displayDateTime
 import kotlinx.coroutines.launch
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 
 @Composable
 fun CsvImportDetailScreen(
@@ -286,14 +285,39 @@ fun CsvImportDetailScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    val localDateTime =
-                        currentImport.importTimestamp
-                            .toLocalDateTime(TimeZone.currentSystemDefault())
                     Text(
-                        text = "Imported: ${localDateTime.date} ${localDateTime.hour}:${localDateTime.minute.toString().padStart(2, '0')}",
+                        text = "Added: ${currentImport.importTimestamp.displayDateTime()}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    currentImport.lastAppliedAt?.let { lastAppliedAt ->
+                        Text(
+                            text =
+                                buildString {
+                                    if (currentImport.applicationCount > 1) {
+                                        append("Latest import: ")
+                                    } else {
+                                        append("Imported: ")
+                                    }
+                                    append(lastAppliedAt.displayDateTime())
+                                    currentImport.lastAppliedStrategyName
+                                        ?.takeIf(String::isNotBlank)
+                                        ?.let { strategyName ->
+                                            append(" via ")
+                                            append(strategyName)
+                                        }
+                                },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (currentImport.applicationCount > 1) {
+                        Text(
+                            text = "Applied ${currentImport.applicationCount} times",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
