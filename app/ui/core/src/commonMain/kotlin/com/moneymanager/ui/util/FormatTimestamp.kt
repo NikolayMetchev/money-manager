@@ -10,4 +10,4 @@ import kotlin.time.Instant
 
 fun Instant.ISO(timeZone: TimeZone = TimeZone.currentSystemDefault()) =
     toLocalDateTime(timeZone)
-    .format(ISO)
+        .format(ISO)

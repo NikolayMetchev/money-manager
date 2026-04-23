@@ -40,7 +40,6 @@ import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.util.ISO
 import com.moneymanager.ui.util.sha256Hex
-import jdk.jfr.internal.util.ValueFormatter.formatTimestamp
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
 
