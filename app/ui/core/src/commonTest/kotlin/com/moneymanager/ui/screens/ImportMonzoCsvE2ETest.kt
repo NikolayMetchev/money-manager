@@ -159,7 +159,7 @@ class ImportMonzoCsvE2ETest {
 
             // Step 5: Create source account inline via AccountPicker
             // Wait for the dialog to fully load - look for the Source Account section title
-            waitUntilExactlyOneExists(hasText("Source Account"), timeoutMillis = 10000)
+            waitUntilExactlyOneExists(hasText("Source Account (Optional)"), timeoutMillis = 10000)
             // Note: There are two "Select..." elements - one for AccountPicker and one for CurrencyPicker
             waitUntilAtLeastOneExists(hasText("Select..."), timeoutMillis = 10000)
 
@@ -248,6 +248,81 @@ class ImportMonzoCsvE2ETest {
 
             // Verify we're back on the CSV detail screen
             onNodeWithText("20 rows").assertIsDisplayed()
+        }
+
+    @Test
+    fun applyStrategy_shouldAllowCreatingSourceAccount() =
+        runMoneyManagerComposeUiTest {
+            testDbLocation = createTestDatabaseLocation()
+            val databaseManager = createTestDatabaseManager()
+
+            runBlocking {
+                val db = databaseManager.openDatabase(testDbLocation!!)
+                val databaseComponent = DatabaseComponent.create(db)
+
+                val csvContent = loadTestCsvContent()
+                val lines = csvContent.lines().filter { it.isNotBlank() }
+                val headers = parseCsvLine(lines.first())
+                val rows = lines.drop(1).take(2).map { parseCsvLine(it) }
+
+                val strategy =
+                    createTestStrategy(
+                        name = "Monzo",
+                        headers = headers,
+                    )
+                databaseComponent.csvImportStrategyRepository.createStrategy(strategy)
+
+                databaseComponent.csvImportRepository.createImport(
+                    fileName = "monzo_test_export.csv",
+                    headers = headers,
+                    rows = rows,
+                    fileChecksum = "monzo_apply_strategy_checksum",
+                    fileLastModified = Instant.fromEpochMilliseconds(1700000000000L),
+                )
+            }
+
+            val testDatabaseManager =
+                SimpleDatabaseManager(
+                    databaseManager = databaseManager,
+                    testLocation = testDbLocation!!,
+                )
+
+            setContent {
+                TestMoneyManagerApp(
+                    databaseManager = testDatabaseManager,
+                    appVersion = AppVersion("1.0.0-test"),
+                )
+            }
+
+            waitForIdle()
+            waitUntilExactlyOneExists(hasText("Your Accounts"), timeoutMillis = 15000)
+
+            waitUntilExactlyOneExists(hasText("CSV"), timeoutMillis = 10000)
+            onNodeWithText("CSV", useUnmergedTree = true).performClick()
+            waitForIdle()
+
+            waitUntilExactlyOneExists(hasText("monzo_test_export.csv"), timeoutMillis = 15000)
+            onNodeWithText("monzo_test_export.csv").performClick()
+            waitUntilExactlyOneExists(hasText("2 rows"), timeoutMillis = 10000)
+
+            onNodeWithText("Apply Strategy").performClick()
+            waitUntilExactlyOneExists(hasText("Apply Import Strategy"), timeoutMillis = 10000)
+
+            // The matching strategy should be auto-selected.
+            waitUntilExactlyOneExists(hasText("Monzo"), timeoutMillis = 10000)
+            waitForIdle()
+
+            // Create the source account inline from the shared account picker.
+            onNodeWithText("Select...").performClick()
+            waitUntilExactlyOneExists(hasText("+ Create New Account"), timeoutMillis = 10000)
+            onNodeWithText("+ Create New Account", useUnmergedTree = true).performClick()
+
+            waitUntilExactlyOneExists(hasText("Create New Account"), timeoutMillis = 10000)
+            onNodeWithText("Account Name").performTextInput("Monzo Current Account")
+            onAllNodesWithText("Create").onLast().performClick()
+            waitUntilDoesNotExist(hasText("Create New Account"), timeoutMillis = 10000)
+
+            waitUntilExactlyOneExists(hasText("Monzo Current Account"), timeoutMillis = 10000)
         }
 
     @Test

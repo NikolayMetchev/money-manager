@@ -31,7 +31,7 @@ import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
  * Features:
  * - Fetches accounts from repository (auto-updates when accounts change)
  * - Searchable dropdown with type-to-filter
- * - "Create New Account" option at bottom of dropdown
+ * - "Create New Account" option at top of dropdown
  * - Optional account exclusion (e.g., to prevent selecting same source and target)
  *
  * @param selectedAccountId The currently selected account ID, or null if none selected
@@ -114,6 +114,15 @@ fun AccountPicker(
                 searchQuery = ""
             },
         ) {
+            DropdownMenuItem(
+                text = { Text("+ Create New Account") },
+                onClick = {
+                    showCreateAccountDialog = true
+                    expanded = false
+                    searchQuery = ""
+                },
+            )
+            HorizontalDivider()
             filteredAccounts.forEach { account ->
                 DropdownMenuItem(
                     text = { Text(account.name) },
@@ -124,15 +133,6 @@ fun AccountPicker(
                     },
                 )
             }
-            HorizontalDivider()
-            DropdownMenuItem(
-                text = { Text("+ Create New Account") },
-                onClick = {
-                    showCreateAccountDialog = true
-                    expanded = false
-                    searchQuery = ""
-                },
-            )
         }
     }
 

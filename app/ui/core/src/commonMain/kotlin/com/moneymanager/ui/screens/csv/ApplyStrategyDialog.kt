@@ -46,10 +46,12 @@ import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.database.csv.CsvTransferMapper
 import com.moneymanager.database.csv.ImportPreparation
 import com.moneymanager.database.csv.StrategyMatcher
+import com.moneymanager.database.sql.EntitySourceQueries
 import com.moneymanager.database.sql.TransferSourceQueries
 import com.moneymanager.domain.getDeviceInfo
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
@@ -59,15 +61,21 @@ import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
+import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
+import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CsvAccountMappingRepository
 import com.moneymanager.domain.repository.CsvImportRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.DeviceRepository
+import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
+import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.domain.repository.TransferSourceRepository
+import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.flow.first
@@ -97,14 +105,19 @@ fun ApplyStrategyDialog(
     csvImportStrategyRepository: CsvImportStrategyRepository,
     csvAccountMappingRepository: CsvAccountMappingRepository,
     accountRepository: AccountRepository,
+    categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
+    personRepository: PersonRepository,
+    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     transactionRepository: TransactionRepository,
     csvImportRepository: CsvImportRepository,
     attributeTypeRepository: AttributeTypeRepository,
     maintenanceService: DatabaseMaintenanceService,
+    entitySourceQueries: EntitySourceQueries,
     transferSourceQueries: TransferSourceQueries,
     transferSourceRepository: TransferSourceRepository,
     deviceRepository: DeviceRepository,
+    deviceId: DeviceId,
     onDismiss: () -> Unit,
     onImportComplete: (CsvImportResult) -> Unit,
 ) {
@@ -120,15 +133,24 @@ fun ApplyStrategyDialog(
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
 
     var selectedStrategy by remember { mutableStateOf<CsvImportStrategy?>(null) }
+    var selectedSourceAccountId by remember { mutableStateOf<AccountId?>(null) }
     var importPreparation by remember { mutableStateOf<ImportPreparation?>(null) }
     var accountMappings by remember { mutableStateOf<List<CsvAccountMapping>>(emptyList()) }
     var isImporting by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    // Load account mappings when strategy is selected
+    // Load account mappings when strategy is selected and pre-populate source account from strategy
     LaunchedEffect(selectedStrategy) {
         selectedStrategy?.let { strategy ->
             accountMappings = csvAccountMappingRepository.getMappingsForStrategy(strategy.id).first()
+            // Pre-populate source account from the strategy's SOURCE_ACCOUNT mapping if present.
+            // This runs whenever the strategy changes, so switching strategies updates the
+            // pre-selected source account to match the new strategy's default.
+            val strategySourceAccountId =
+                (strategy.fieldMappings[TransferField.SOURCE_ACCOUNT] as? HardCodedAccountMapping)?.accountId
+            if (strategySourceAccountId != null) {
+                selectedSourceAccountId = strategySourceAccountId
+            }
         }
     }
 
@@ -148,7 +170,7 @@ fun ApplyStrategyDialog(
         }
 
     // Prepare import preview when strategy is selected
-    LaunchedEffect(selectedStrategy, rowsToProcess, accounts, currencies, accountMappings) {
+    LaunchedEffect(selectedStrategy, selectedSourceAccountId, rowsToProcess, accounts, currencies, accountMappings) {
         selectedStrategy?.let { strategy ->
             if (accounts.isNotEmpty() && currencies.isNotEmpty() && rowsToProcess.isNotEmpty()) {
                 try {
@@ -163,6 +185,7 @@ fun ApplyStrategyDialog(
                             existingCurrencies = currenciesById,
                             existingCurrenciesByCode = currenciesByCode,
                             accountMappings = accountMappings,
+                            sourceAccountOverride = selectedSourceAccountId,
                         )
                     importPreparation = mapper.prepareImport(rowsToProcess)
                     errorMessage = null
@@ -195,6 +218,23 @@ fun ApplyStrategyDialog(
                     onStrategySelected = { selectedStrategy = it },
                     csvColumns = csvImport.columns,
                     enabled = !isImporting,
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Source account selector
+                AccountPicker(
+                    selectedAccountId = selectedSourceAccountId,
+                    onAccountSelected = { selectedSourceAccountId = it },
+                    label = "Source Account",
+                    accountRepository = accountRepository,
+                    categoryRepository = categoryRepository,
+                    personRepository = personRepository,
+                    personAccountOwnershipRepository = personAccountOwnershipRepository,
+                    entitySourceQueries = entitySourceQueries,
+                    deviceId = deviceId,
+                    enabled = !isImporting,
+                    isError = selectedSourceAccountId == null,
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -390,6 +430,7 @@ fun ApplyStrategyDialog(
                                     existingCurrenciesByCode = currenciesByCode,
                                     existingTransfers = existingTransferInfoList,
                                     accountMappings = latestAccountMappings,
+                                    sourceAccountOverride = selectedSourceAccountId,
                                 )
 
                             // Handle case when all rows are already processed
@@ -613,6 +654,7 @@ fun ApplyStrategyDialog(
                 enabled =
                     !isImporting &&
                         selectedStrategy != null &&
+                        selectedSourceAccountId != null &&
                         importPreparation != null &&
                         importPreparation?.validTransfers?.isNotEmpty() == true,
             ) {
