@@ -89,3 +89,10 @@ sqldelight {
 tasks.withType<app.cash.sqldelight.gradle.VerifyMigrationTask>().configureEach {
     enabled = false
 }
+
+// Repository tests shared via commonTest use androidx.test.InstrumentationRegistry
+// on Android, which requires a device (or Robolectric). They already run via
+// jvmTest and androidDeviceTest, so skip the host-test run here.
+tasks.matching { it.name == "testAndroidHostTest" }.configureEach {
+    enabled = false
+}

@@ -122,3 +122,10 @@ tasks.withType<Test> {
     // Additional properties for Skiko on Windows
     systemProperty("skiko.test.harness", "true")
 }
+
+// Compose UI tests shared via commonTest require Robolectric (or a device) to run
+// on the JVM. They already execute as jvmTest (Compose Desktop) and
+// androidDeviceTest (managed emulator), so skip the host-test run here.
+tasks.matching { it.name == "testAndroidHostTest" }.configureEach {
+    enabled = false
+}
