@@ -38,8 +38,10 @@ data class CsvImportStrategy(
     fun missingFields(): Set<TransferField> = requiredFields - fieldMappings.keys
 
     companion object {
-        /** TransferFields that must be present in a strategy. SOURCE_ACCOUNT is excluded because
-         *  it can be chosen by the user at import time rather than being baked into the strategy. */
+        /**
+         * TransferFields that must be present in a strategy. SOURCE_ACCOUNT is excluded because
+         * it can be chosen by the user at import time rather than being baked into the strategy.
+         */
         val requiredFields: Set<TransferField> = TransferField.entries.toSet() - TransferField.SOURCE_ACCOUNT
     }
 

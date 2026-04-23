@@ -132,8 +132,9 @@ fun ApplyStrategyDialog(
     LaunchedEffect(selectedStrategy) {
         selectedStrategy?.let { strategy ->
             accountMappings = csvAccountMappingRepository.getMappingsForStrategy(strategy.id).first()
-            // Pre-populate source account from the strategy's SOURCE_ACCOUNT mapping if present
-            // and the user hasn't already chosen a different account.
+            // Pre-populate source account from the strategy's SOURCE_ACCOUNT mapping if present.
+            // This runs whenever the strategy changes, so switching strategies updates the
+            // pre-selected source account to match the new strategy's default.
             val strategySourceAccountId =
                 (strategy.fieldMappings[TransferField.SOURCE_ACCOUNT] as? HardCodedAccountMapping)?.accountId
             if (strategySourceAccountId != null) {
