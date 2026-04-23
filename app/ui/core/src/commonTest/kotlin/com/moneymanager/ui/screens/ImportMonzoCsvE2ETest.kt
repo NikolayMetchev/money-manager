@@ -26,6 +26,7 @@ import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
 import com.moneymanager.ui.test.TestMoneyManagerApp
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
+import kotlinx.coroutines.runBlocking
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.time.Clock
@@ -97,7 +98,7 @@ class ImportMonzoCsvE2ETest {
             val databaseManager = createTestDatabaseManager()
 
             // Create and populate the database
-            kotlinx.coroutines.runBlocking {
+            runBlocking {
                 val db = databaseManager.openDatabase(testDbLocation!!)
                 val databaseComponent = DatabaseComponent.create(db)
 
@@ -255,7 +256,7 @@ class ImportMonzoCsvE2ETest {
             testDbLocation = createTestDatabaseLocation()
             val databaseManager = createTestDatabaseManager()
 
-            kotlinx.coroutines.runBlocking {
+            runBlocking {
                 val db = databaseManager.openDatabase(testDbLocation!!)
                 val databaseComponent = DatabaseComponent.create(db)
 

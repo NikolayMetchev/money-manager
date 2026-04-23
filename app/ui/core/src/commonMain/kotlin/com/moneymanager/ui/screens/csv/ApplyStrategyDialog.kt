@@ -440,6 +440,7 @@ fun ApplyStrategyDialog(
                             logger.info { "Starting to create $validCount transfers" }
                             val failedRows = mutableListOf<CsvImportResult.FailedRow>()
                             var successCount = 0
+                            var duplicateCount = 0
                             val deviceId = deviceRepository.getOrCreateDevice(getDeviceInfo())
 
                             for (transferWithAttrs in finalPrep.validTransfers) {
@@ -495,6 +496,7 @@ fun ApplyStrategyDialog(
                                                 existingTransferId,
                                             )
                                             logger.info { "Skipped duplicate row $originalRowIndex" }
+                                            duplicateCount++
                                         }
                                         ImportStatus.UPDATED -> {
                                             // Update existing transfer
@@ -564,7 +566,7 @@ fun ApplyStrategyDialog(
                             logger.info { "Refreshing materialized views" }
                             maintenanceService.refreshMaterializedViews()
 
-                            if (successCount > 0) {
+                            if ((successCount + duplicateCount) > 0) {
                                 runCatching {
                                     csvImportRepository.recordImportApplication(
                                         id = csvImport.id,

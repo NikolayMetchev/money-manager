@@ -27,6 +27,21 @@ CREATE TABLE csv_column_metadata (
 
 CREATE INDEX idx_csv_column_import ON csv_column_metadata(import_id);
 
+-- Strategy applications for each CSV import
+CREATE TABLE csv_import_application (
+    id TEXT PRIMARY KEY NOT NULL,
+    csv_import_id TEXT NOT NULL,
+    strategy_id TEXT,
+    strategy_name TEXT NOT NULL,
+    applied_at INTEGER NOT NULL,
+    FOREIGN KEY (csv_import_id) REFERENCES csv_import_metadata(id) ON DELETE CASCADE,
+    FOREIGN KEY (strategy_id) REFERENCES csv_import_strategy(id) ON DELETE SET NULL
+);
+
+CREATE INDEX idx_csv_import_application_import_latest
+ON csv_import_application(csv_import_id, applied_at DESC, id DESC);
+CREATE INDEX idx_csv_import_application_strategy ON csv_import_application(strategy_id);
+
 -- csv_import_metadata queries
 selectAllImports:
 SELECT
@@ -157,21 +172,6 @@ VALUES (?, ?, ?, ?);
 
 deleteColumnsByImportId:
 DELETE FROM csv_column_metadata WHERE import_id = ?;
-
--- Strategy applications for each CSV import
-CREATE TABLE csv_import_application (
-    id TEXT PRIMARY KEY NOT NULL,
-    csv_import_id TEXT NOT NULL,
-    strategy_id TEXT,
-    strategy_name TEXT NOT NULL,
-    applied_at INTEGER NOT NULL,
-    FOREIGN KEY (csv_import_id) REFERENCES csv_import_metadata(id) ON DELETE CASCADE,
-    FOREIGN KEY (strategy_id) REFERENCES csv_import_strategy(id) ON DELETE SET NULL
-);
-
-CREATE INDEX idx_csv_import_application_import_latest
-ON csv_import_application(csv_import_id, applied_at DESC, id DESC);
-CREATE INDEX idx_csv_import_application_strategy ON csv_import_application(strategy_id);
 
 insertApplication:
 INSERT INTO csv_import_application (id, csv_import_id, strategy_id, strategy_name, applied_at)

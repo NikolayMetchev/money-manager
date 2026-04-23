@@ -242,16 +242,17 @@ private fun CsvImportCard(
                 )
             }
             Spacer(modifier = Modifier.height(4.dp))
+            val lastAppliedAt = import.lastAppliedAt
             Text(
                 text =
-                    if (isImported) {
+                    if (lastAppliedAt != null) {
                         buildString {
                             if (import.applicationCount > 1) {
                                 append("Latest import on ")
                             } else {
                                 append("Imported on ")
                             }
-                            append(formatTimestamp(import.lastAppliedAt!!))
+                            append(formatTimestamp(lastAppliedAt))
                             import.lastAppliedStrategyName?.takeIf(String::isNotBlank)?.let { strategyName ->
                                 append(" via ")
                                 append(strategyName)
@@ -276,7 +277,7 @@ private fun CsvImportCard(
                     color = metadataColor,
                 )
             }
-            if (import.applicationCount > 1) {
+            if (isImported && import.applicationCount > 1) {
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = "Applied ${import.applicationCount} times",
