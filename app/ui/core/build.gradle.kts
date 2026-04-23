@@ -103,6 +103,16 @@ kotlin {
             // Include commonTest resources for test database files
             resources.srcDir("src/commonTest/resources")
         }
+        val androidHostTest by getting {
+            dependencies {
+                implementation(libs.androidx.compose.runtime)
+                implementation(libs.androidx.compose.ui.test)
+                implementation(libs.kotlinx.coroutines.test)
+                implementation(libs.sqldelight.runtime)
+                implementation(projects.app.di.core)
+                implementation(projects.test.app.db)
+            }
+        }
     }
 }
 
