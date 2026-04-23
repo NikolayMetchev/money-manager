@@ -433,7 +433,6 @@ fun CreateCsvStrategyDialog(
     val isFormValid =
         name.isNotBlank() &&
             identificationColumns.isNotEmpty() &&
-            selectedAccountId != null &&
             targetAccountColumnName != null &&
             dateColumnName != null &&
             descriptionColumnName != null &&
@@ -542,7 +541,12 @@ fun CreateCsvStrategyDialog(
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
-                Text("Source Account", style = MaterialTheme.typography.titleSmall)
+                Text("Source Account (Optional)", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    "Can also be chosen each time you apply this strategy",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 AccountPicker(
                     selectedAccountId = selectedAccountId,
                     onAccountSelected = { selectedAccountId = it },
@@ -554,7 +558,7 @@ fun CreateCsvStrategyDialog(
                     entitySourceQueries = entitySourceQueries,
                     deviceId = deviceId,
                     enabled = !isSaving,
-                    isError = selectedAccountId == null,
+                    isError = false,
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -912,92 +916,111 @@ fun CreateCsvStrategyDialog(
                         scope.launch {
                             try {
                                 val now = Clock.System.now()
+                                // Build field mappings; SOURCE_ACCOUNT is optional and only included
+                                // when an account has been selected in the strategy form.
+                                val fieldMappings =
+                                    buildMap {
+                                        selectedAccountId?.let { accountId ->
+                                            put(
+                                                TransferField.SOURCE_ACCOUNT,
+                                                HardCodedAccountMapping(
+                                                    id = FieldMappingId(Uuid.random()),
+                                                    fieldType = TransferField.SOURCE_ACCOUNT,
+                                                    accountId = accountId,
+                                                ),
+                                            )
+                                        }
+                                        put(
+                                            TransferField.TARGET_ACCOUNT,
+                                            when (targetAccountMode) {
+                                                TargetAccountMode.DIRECT_LOOKUP ->
+                                                    AccountLookupMapping(
+                                                        id = FieldMappingId(Uuid.random()),
+                                                        fieldType = TransferField.TARGET_ACCOUNT,
+                                                        columnName = targetAccountColumnName!!,
+                                                        fallbackColumns = targetAccountFallbackColumns,
+                                                    )
+                                                TargetAccountMode.REGEX_MATCH ->
+                                                    RegexAccountMapping(
+                                                        id = FieldMappingId(Uuid.random()),
+                                                        fieldType = TransferField.TARGET_ACCOUNT,
+                                                        columnName = targetAccountColumnName!!,
+                                                        rules = regexRules,
+                                                        fallbackColumns = targetAccountFallbackColumns,
+                                                    )
+                                            },
+                                        )
+                                        put(
+                                            TransferField.TIMESTAMP,
+                                            DateTimeParsingMapping(
+                                                id = FieldMappingId(Uuid.random()),
+                                                fieldType = TransferField.TIMESTAMP,
+                                                dateColumnName = dateColumnName!!,
+                                                dateFormat = dateFormat,
+                                                timeColumnName = timeColumnName,
+                                                timeFormat = timeColumnName?.let { timeFormat },
+                                            ),
+                                        )
+                                        put(
+                                            TransferField.DESCRIPTION,
+                                            DirectColumnMapping(
+                                                id = FieldMappingId(Uuid.random()),
+                                                fieldType = TransferField.DESCRIPTION,
+                                                columnName = descriptionColumnName!!,
+                                                fallbackColumns = descriptionFallbackColumns,
+                                            ),
+                                        )
+                                        put(
+                                            TransferField.AMOUNT,
+                                            AmountParsingMapping(
+                                                id = FieldMappingId(Uuid.random()),
+                                                fieldType = TransferField.AMOUNT,
+                                                mode = AmountMode.SINGLE_COLUMN,
+                                                amountColumnName = amountColumnName!!,
+                                                flipAccountsOnPositive = flipAccountsOnPositive,
+                                            ),
+                                        )
+                                        put(
+                                            TransferField.CURRENCY,
+                                            when (currencyMode) {
+                                                CurrencyMode.HARDCODED ->
+                                                    HardCodedCurrencyMapping(
+                                                        id = FieldMappingId(Uuid.random()),
+                                                        fieldType = TransferField.CURRENCY,
+                                                        currencyId = selectedCurrencyId!!,
+                                                    )
+                                                CurrencyMode.FROM_COLUMN ->
+                                                    CurrencyLookupMapping(
+                                                        id = FieldMappingId(Uuid.random()),
+                                                        fieldType = TransferField.CURRENCY,
+                                                        columnName = currencyColumnName!!,
+                                                    )
+                                            },
+                                        )
+                                        put(
+                                            TransferField.TIMEZONE,
+                                            when (timezoneMode) {
+                                                TimezoneMode.HARDCODED ->
+                                                    HardCodedTimezoneMapping(
+                                                        id = FieldMappingId(Uuid.random()),
+                                                        fieldType = TransferField.TIMEZONE,
+                                                        timezoneId = selectedTimezone,
+                                                    )
+                                                TimezoneMode.FROM_COLUMN ->
+                                                    TimezoneLookupMapping(
+                                                        id = FieldMappingId(Uuid.random()),
+                                                        fieldType = TransferField.TIMEZONE,
+                                                        columnName = timezoneColumnName!!,
+                                                    )
+                                            },
+                                        )
+                                    }
                                 val strategy =
                                     CsvImportStrategy(
                                         id = existingStrategy?.id ?: CsvImportStrategyId(Uuid.random()),
                                         name = name,
                                         identificationColumns = identificationColumns,
-                                        fieldMappings =
-                                            mapOf(
-                                                TransferField.SOURCE_ACCOUNT to
-                                                    HardCodedAccountMapping(
-                                                        id = FieldMappingId(Uuid.random()),
-                                                        fieldType = TransferField.SOURCE_ACCOUNT,
-                                                        accountId = selectedAccountId!!,
-                                                    ),
-                                                TransferField.TARGET_ACCOUNT to
-                                                    when (targetAccountMode) {
-                                                        TargetAccountMode.DIRECT_LOOKUP ->
-                                                            AccountLookupMapping(
-                                                                id = FieldMappingId(Uuid.random()),
-                                                                fieldType = TransferField.TARGET_ACCOUNT,
-                                                                columnName = targetAccountColumnName!!,
-                                                                fallbackColumns = targetAccountFallbackColumns,
-                                                            )
-                                                        TargetAccountMode.REGEX_MATCH ->
-                                                            RegexAccountMapping(
-                                                                id = FieldMappingId(Uuid.random()),
-                                                                fieldType = TransferField.TARGET_ACCOUNT,
-                                                                columnName = targetAccountColumnName!!,
-                                                                rules = regexRules,
-                                                                fallbackColumns = targetAccountFallbackColumns,
-                                                            )
-                                                    },
-                                                TransferField.TIMESTAMP to
-                                                    DateTimeParsingMapping(
-                                                        id = FieldMappingId(Uuid.random()),
-                                                        fieldType = TransferField.TIMESTAMP,
-                                                        dateColumnName = dateColumnName!!,
-                                                        dateFormat = dateFormat,
-                                                        timeColumnName = timeColumnName,
-                                                        timeFormat = timeColumnName?.let { timeFormat },
-                                                    ),
-                                                TransferField.DESCRIPTION to
-                                                    DirectColumnMapping(
-                                                        id = FieldMappingId(Uuid.random()),
-                                                        fieldType = TransferField.DESCRIPTION,
-                                                        columnName = descriptionColumnName!!,
-                                                        fallbackColumns = descriptionFallbackColumns,
-                                                    ),
-                                                TransferField.AMOUNT to
-                                                    AmountParsingMapping(
-                                                        id = FieldMappingId(Uuid.random()),
-                                                        fieldType = TransferField.AMOUNT,
-                                                        mode = AmountMode.SINGLE_COLUMN,
-                                                        amountColumnName = amountColumnName!!,
-                                                        flipAccountsOnPositive = flipAccountsOnPositive,
-                                                    ),
-                                                TransferField.CURRENCY to
-                                                    when (currencyMode) {
-                                                        CurrencyMode.HARDCODED ->
-                                                            HardCodedCurrencyMapping(
-                                                                id = FieldMappingId(Uuid.random()),
-                                                                fieldType = TransferField.CURRENCY,
-                                                                currencyId = selectedCurrencyId!!,
-                                                            )
-                                                        CurrencyMode.FROM_COLUMN ->
-                                                            CurrencyLookupMapping(
-                                                                id = FieldMappingId(Uuid.random()),
-                                                                fieldType = TransferField.CURRENCY,
-                                                                columnName = currencyColumnName!!,
-                                                            )
-                                                    },
-                                                TransferField.TIMEZONE to
-                                                    when (timezoneMode) {
-                                                        TimezoneMode.HARDCODED ->
-                                                            HardCodedTimezoneMapping(
-                                                                id = FieldMappingId(Uuid.random()),
-                                                                fieldType = TransferField.TIMEZONE,
-                                                                timezoneId = selectedTimezone,
-                                                            )
-                                                        TimezoneMode.FROM_COLUMN ->
-                                                            TimezoneLookupMapping(
-                                                                id = FieldMappingId(Uuid.random()),
-                                                                fieldType = TransferField.TIMEZONE,
-                                                                columnName = timezoneColumnName!!,
-                                                            )
-                                                    },
-                                            ),
+                                        fieldMappings = fieldMappings,
                                         attributeMappings = attributeMappings,
                                         createdAt = existingStrategy?.createdAt ?: now,
                                         updatedAt = now,

@@ -59,6 +59,8 @@ import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
+import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CsvAccountMappingRepository
@@ -120,15 +122,23 @@ fun ApplyStrategyDialog(
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
 
     var selectedStrategy by remember { mutableStateOf<CsvImportStrategy?>(null) }
+    var selectedSourceAccountId by remember { mutableStateOf<AccountId?>(null) }
     var importPreparation by remember { mutableStateOf<ImportPreparation?>(null) }
     var accountMappings by remember { mutableStateOf<List<CsvAccountMapping>>(emptyList()) }
     var isImporting by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    // Load account mappings when strategy is selected
+    // Load account mappings when strategy is selected and pre-populate source account from strategy
     LaunchedEffect(selectedStrategy) {
         selectedStrategy?.let { strategy ->
             accountMappings = csvAccountMappingRepository.getMappingsForStrategy(strategy.id).first()
+            // Pre-populate source account from the strategy's SOURCE_ACCOUNT mapping if present
+            // and the user hasn't already chosen a different account.
+            val strategySourceAccountId =
+                (strategy.fieldMappings[TransferField.SOURCE_ACCOUNT] as? HardCodedAccountMapping)?.accountId
+            if (strategySourceAccountId != null) {
+                selectedSourceAccountId = strategySourceAccountId
+            }
         }
     }
 
@@ -148,7 +158,7 @@ fun ApplyStrategyDialog(
         }
 
     // Prepare import preview when strategy is selected
-    LaunchedEffect(selectedStrategy, rowsToProcess, accounts, currencies, accountMappings) {
+    LaunchedEffect(selectedStrategy, selectedSourceAccountId, rowsToProcess, accounts, currencies, accountMappings) {
         selectedStrategy?.let { strategy ->
             if (accounts.isNotEmpty() && currencies.isNotEmpty() && rowsToProcess.isNotEmpty()) {
                 try {
@@ -163,6 +173,7 @@ fun ApplyStrategyDialog(
                             existingCurrencies = currenciesById,
                             existingCurrenciesByCode = currenciesByCode,
                             accountMappings = accountMappings,
+                            sourceAccountOverride = selectedSourceAccountId,
                         )
                     importPreparation = mapper.prepareImport(rowsToProcess)
                     errorMessage = null
@@ -194,6 +205,16 @@ fun ApplyStrategyDialog(
                     selectedStrategy = selectedStrategy,
                     onStrategySelected = { selectedStrategy = it },
                     csvColumns = csvImport.columns,
+                    enabled = !isImporting,
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Source account selector
+                SourceAccountSelector(
+                    accounts = accounts,
+                    selectedAccountId = selectedSourceAccountId,
+                    onAccountSelected = { selectedSourceAccountId = it },
                     enabled = !isImporting,
                 )
 
@@ -390,6 +411,7 @@ fun ApplyStrategyDialog(
                                     existingCurrenciesByCode = currenciesByCode,
                                     existingTransfers = existingTransferInfoList,
                                     accountMappings = latestAccountMappings,
+                                    sourceAccountOverride = selectedSourceAccountId,
                                 )
 
                             // Handle case when all rows are already processed
@@ -613,6 +635,7 @@ fun ApplyStrategyDialog(
                 enabled =
                     !isImporting &&
                         selectedStrategy != null &&
+                        selectedSourceAccountId != null &&
                         importPreparation != null &&
                         importPreparation?.validTransfers?.isNotEmpty() == true,
             ) {
@@ -634,6 +657,71 @@ fun ApplyStrategyDialog(
             }
         },
     )
+}
+
+@Composable
+private fun SourceAccountSelector(
+    accounts: List<Account>,
+    selectedAccountId: AccountId?,
+    onAccountSelected: (AccountId) -> Unit,
+    enabled: Boolean,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val selectedAccount = accounts.firstOrNull { it.id == selectedAccountId }
+
+    Column {
+        Text(
+            text = "Source Account",
+            style = MaterialTheme.typography.titleSmall,
+        )
+        Text(
+            text = "The account this CSV statement belongs to",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+
+        ExposedDropdownMenuBox(
+            expanded = expanded,
+            onExpandedChange = { if (enabled) expanded = !expanded },
+        ) {
+            OutlinedTextField(
+                value = selectedAccount?.name ?: "No account selected",
+                onValueChange = {},
+                readOnly = true,
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+                enabled = enabled,
+                isError = selectedAccountId == null,
+            )
+            ExposedDropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+            ) {
+                accounts.forEach { account ->
+                    DropdownMenuItem(
+                        text = { Text(account.name) },
+                        onClick = {
+                            onAccountSelected(account.id)
+                            expanded = false
+                        },
+                    )
+                }
+            }
+        }
+
+        if (accounts.isEmpty()) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "No accounts available. Create an account first.",
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+    }
 }
 
 @Composable

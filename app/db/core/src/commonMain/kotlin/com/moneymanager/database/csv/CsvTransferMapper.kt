@@ -155,6 +155,8 @@ class CsvTransferMapper(
     private val existingCurrenciesByCode: Map<String, Currency>,
     private val existingTransfers: List<ExistingTransferInfo> = emptyList(),
     private val accountMappings: List<CsvAccountMapping> = emptyList(),
+    /** When set, overrides the strategy's SOURCE_ACCOUNT mapping for every row. */
+    private val sourceAccountOverride: AccountId? = null,
 ) {
     private val columnIndexByName: Map<String, Int> =
         columns.associate { it.originalName to it.columnIndex }
@@ -244,9 +246,6 @@ class CsvTransferMapper(
     fun mapRow(row: CsvRow): MappingResult {
         return try {
             val values = row.values
-            val sourceMapping =
-                strategy.fieldMappings[TransferField.SOURCE_ACCOUNT]
-                    ?: return MappingResult.Error(row.rowIndex, "Missing SOURCE_ACCOUNT mapping")
             val targetMapping =
                 strategy.fieldMappings[TransferField.TARGET_ACCOUNT]
                     ?: return MappingResult.Error(row.rowIndex, "Missing TARGET_ACCOUNT mapping")
@@ -277,8 +276,23 @@ class CsvTransferMapper(
                     amountMapping.flipAccountsOnPositive &&
                     rawAmount > BigDecimal.ZERO
 
+            // Resolve the source account: use override if provided, otherwise fall back to the
+            // strategy's SOURCE_ACCOUNT mapping (if present), or return an error.
+            val resolvedSourceAccountId: AccountId =
+                if (sourceAccountOverride != null) {
+                    sourceAccountOverride
+                } else {
+                    val sourceMapping =
+                        strategy.fieldMappings[TransferField.SOURCE_ACCOUNT]
+                            ?: return MappingResult.Error(
+                                row.rowIndex,
+                                "No source account selected. Please choose a source account before importing.",
+                            )
+                    parseAccount(sourceMapping, values)
+                }
+
             // Parse accounts with potential flipping
-            var sourceAccountId = parseAccount(sourceMapping, values)
+            var sourceAccountId = resolvedSourceAccountId
             var targetAccountId = parseAccount(targetMapping, values)
             if (flipAccounts) {
                 val temp = sourceAccountId

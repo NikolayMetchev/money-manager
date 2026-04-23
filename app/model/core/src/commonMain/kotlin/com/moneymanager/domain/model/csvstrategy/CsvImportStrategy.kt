@@ -27,13 +27,21 @@ data class CsvImportStrategy(
 ) {
     /**
      * Returns true if this strategy has mappings for all required TransferFields.
+     * SOURCE_ACCOUNT is optional because it can be chosen at import time.
      */
-    fun isValid(): Boolean = TransferField.entries.all { it in fieldMappings }
+    fun isValid(): Boolean = requiredFields.all { it in fieldMappings }
 
     /**
      * Returns the set of TransferFields that are missing mappings.
+     * SOURCE_ACCOUNT is excluded because it is optional (chosen at import time).
      */
-    fun missingFields(): Set<TransferField> = TransferField.entries.toSet() - fieldMappings.keys
+    fun missingFields(): Set<TransferField> = requiredFields - fieldMappings.keys
+
+    companion object {
+        /** TransferFields that must be present in a strategy. SOURCE_ACCOUNT is excluded because
+         *  it can be chosen by the user at import time rather than being baked into the strategy. */
+        val requiredFields: Set<TransferField> = TransferField.entries.toSet() - TransferField.SOURCE_ACCOUNT
+    }
 
     /**
      * Returns true if the given CSV column headings match this strategy's identification columns.
