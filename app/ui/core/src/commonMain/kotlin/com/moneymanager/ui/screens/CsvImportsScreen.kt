@@ -38,7 +38,7 @@ import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.repository.CsvImportRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
-import com.moneymanager.ui.util.ISO
+import com.moneymanager.ui.util.displayDateTime
 import com.moneymanager.ui.util.sha256Hex
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
@@ -236,7 +236,7 @@ private fun CsvImportCard(
                     color = metadataColor,
                 )
                 Text(
-                    text = "Added ${import.importTimestamp.ISO()}",
+                    text = "Added ${import.importTimestamp.displayDateTime()}",
                     style = MaterialTheme.typography.bodySmall,
                     color = metadataColor,
                 )
@@ -252,7 +252,7 @@ private fun CsvImportCard(
                             } else {
                                 append("Imported on ")
                             }
-                            append(lastAppliedAt.ISO())
+                            append(lastAppliedAt.displayDateTime())
                             import.lastAppliedStrategyName?.takeIf(String::isNotBlank)?.let { strategyName ->
                                 append(" via ")
                                 append(strategyName)
@@ -332,7 +332,7 @@ private fun DuplicateImportDialog(
         text = {
             Text(
                 "This file has already been imported as \"${existingImport.originalFileName}\" " +
-                    "on ${existingImport.importTimestamp.ISO()}.",
+                    "on ${existingImport.importTimestamp.displayDateTime()}.",
             )
         },
         confirmButton = {

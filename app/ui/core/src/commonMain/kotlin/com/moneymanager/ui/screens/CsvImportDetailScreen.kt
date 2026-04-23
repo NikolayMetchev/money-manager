@@ -54,7 +54,7 @@ import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.screens.csv.ApplyStrategyDialog
 import com.moneymanager.ui.screens.csvstrategy.CreateCsvStrategyDialog
-import com.moneymanager.ui.util.ISO
+import com.moneymanager.ui.util.displayDateTime
 import kotlinx.coroutines.launch
 
 @Composable
@@ -286,7 +286,7 @@ fun CsvImportDetailScreen(
                         )
                     }
                     Text(
-                        text = "Added: ${currentImport.importTimestamp.ISO()}",
+                        text = "Added: ${currentImport.importTimestamp.displayDateTime()}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -299,7 +299,7 @@ fun CsvImportDetailScreen(
                                     } else {
                                         append("Imported: ")
                                     }
-                                    append(lastAppliedAt.ISO())
+                                    append(lastAppliedAt.displayDateTime())
                                     currentImport.lastAppliedStrategyName
                                         ?.takeIf(String::isNotBlank)
                                         ?.let { strategyName ->

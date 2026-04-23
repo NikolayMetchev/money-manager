@@ -54,6 +54,12 @@ kotlin {
             }
         }
 
+        val androidHostTest by getting {
+            dependencies {
+                implementation(projects.app.di.core)
+            }
+        }
+
         val androidDeviceTest by getting {
             // Note: Cannot use dependsOn(commonTest) due to source set tree restrictions
             // Tests are shared via srcDir() below, but we exclude the expect declarations
