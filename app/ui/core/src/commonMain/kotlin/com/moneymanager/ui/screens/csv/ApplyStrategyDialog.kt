@@ -46,10 +46,12 @@ import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.database.csv.CsvTransferMapper
 import com.moneymanager.database.csv.ImportPreparation
 import com.moneymanager.database.csv.StrategyMatcher
+import com.moneymanager.database.sql.EntitySourceQueries
 import com.moneymanager.database.sql.TransferSourceQueries
 import com.moneymanager.domain.getDeviceInfo
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
@@ -63,13 +65,17 @@ import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
+import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CsvAccountMappingRepository
 import com.moneymanager.domain.repository.CsvImportRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.DeviceRepository
+import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
+import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.domain.repository.TransferSourceRepository
+import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.flow.first
@@ -99,14 +105,19 @@ fun ApplyStrategyDialog(
     csvImportStrategyRepository: CsvImportStrategyRepository,
     csvAccountMappingRepository: CsvAccountMappingRepository,
     accountRepository: AccountRepository,
+    categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
+    personRepository: PersonRepository,
+    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     transactionRepository: TransactionRepository,
     csvImportRepository: CsvImportRepository,
     attributeTypeRepository: AttributeTypeRepository,
     maintenanceService: DatabaseMaintenanceService,
+    entitySourceQueries: EntitySourceQueries,
     transferSourceQueries: TransferSourceQueries,
     transferSourceRepository: TransferSourceRepository,
     deviceRepository: DeviceRepository,
+    deviceId: DeviceId,
     onDismiss: () -> Unit,
     onImportComplete: (CsvImportResult) -> Unit,
 ) {
@@ -212,11 +223,18 @@ fun ApplyStrategyDialog(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // Source account selector
-                SourceAccountSelector(
-                    accounts = accounts,
+                AccountPicker(
                     selectedAccountId = selectedSourceAccountId,
                     onAccountSelected = { selectedSourceAccountId = it },
+                    label = "Source Account",
+                    accountRepository = accountRepository,
+                    categoryRepository = categoryRepository,
+                    personRepository = personRepository,
+                    personAccountOwnershipRepository = personAccountOwnershipRepository,
+                    entitySourceQueries = entitySourceQueries,
+                    deviceId = deviceId,
                     enabled = !isImporting,
+                    isError = selectedSourceAccountId == null,
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -658,71 +676,6 @@ fun ApplyStrategyDialog(
             }
         },
     )
-}
-
-@Composable
-private fun SourceAccountSelector(
-    accounts: List<Account>,
-    selectedAccountId: AccountId?,
-    onAccountSelected: (AccountId) -> Unit,
-    enabled: Boolean,
-) {
-    var expanded by remember { mutableStateOf(false) }
-    val selectedAccount = accounts.firstOrNull { it.id == selectedAccountId }
-
-    Column {
-        Text(
-            text = "Source Account",
-            style = MaterialTheme.typography.titleSmall,
-        )
-        Text(
-            text = "The account this CSV statement belongs to",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-
-        ExposedDropdownMenuBox(
-            expanded = expanded,
-            onExpandedChange = { if (enabled) expanded = !expanded },
-        ) {
-            OutlinedTextField(
-                value = selectedAccount?.name ?: "No account selected",
-                onValueChange = {},
-                readOnly = true,
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
-                enabled = enabled,
-                isError = selectedAccountId == null,
-            )
-            ExposedDropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false },
-            ) {
-                accounts.forEach { account ->
-                    DropdownMenuItem(
-                        text = { Text(account.name) },
-                        onClick = {
-                            onAccountSelected(account.id)
-                            expanded = false
-                        },
-                    )
-                }
-            }
-        }
-
-        if (accounts.isEmpty()) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "No accounts available. Create an account first.",
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodySmall,
-            )
-        }
-    }
 }
 
 @Composable
