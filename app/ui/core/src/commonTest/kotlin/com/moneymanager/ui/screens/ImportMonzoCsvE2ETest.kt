@@ -159,7 +159,7 @@ class ImportMonzoCsvE2ETest {
 
             // Step 5: Create source account inline via AccountPicker
             // Wait for the dialog to fully load - look for the Source Account section title
-            waitUntilExactlyOneExists(hasText("Source Account"), timeoutMillis = 10000)
+            waitUntilExactlyOneExists(hasText("Source Account (Optional)"), timeoutMillis = 10000)
             // Note: There are two "Select..." elements - one for AccountPicker and one for CurrencyPicker
             waitUntilAtLeastOneExists(hasText("Select..."), timeoutMillis = 10000)
 
