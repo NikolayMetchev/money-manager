@@ -10,18 +10,25 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -41,6 +48,16 @@ import com.moneymanager.domain.model.csv.ImportStatus
 private val TRANSFER_COLUMN_WIDTH = 120.dp
 private val ROW_INDEX_COLUMN_WIDTH = 60.dp
 private val STATUS_COLUMN_WIDTH = 90.dp
+
+private enum class SortDirection { ASC, DESC }
+
+private sealed interface SortKey {
+    data object Row : SortKey
+    data object Status : SortKey
+    data class CsvData(
+        val columnIndex: Int,
+    ) : SortKey
+}
 
 @Composable
 fun CsvPreviewTable(
@@ -68,6 +85,38 @@ fun CsvPreviewTable(
         }
     }
 
+    var activeSortKey by remember { mutableStateOf<SortKey?>(null) }
+    var sortDirection by remember { mutableStateOf(SortDirection.ASC) }
+
+    fun onHeaderClick(key: SortKey) {
+        when {
+            activeSortKey != key -> {
+                activeSortKey = key
+                sortDirection = SortDirection.ASC
+            }
+            sortDirection == SortDirection.ASC -> sortDirection = SortDirection.DESC
+            else -> activeSortKey = null
+        }
+    }
+
+    val sortedColumns = remember(columns) { columns.sortedBy { it.columnIndex } }
+
+    val sortedRows =
+        remember(rows, activeSortKey, sortDirection) {
+            val key = activeSortKey ?: return@remember rows
+            val comparator: Comparator<CsvRow> =
+                when (key) {
+                    SortKey.Row -> compareBy { it.rowIndex }
+                    SortKey.Status -> compareBy { it.importStatus?.ordinal ?: -1 }
+                    is SortKey.CsvData -> compareBy { it.values.getOrElse(key.columnIndex) { "" } }
+                }
+            if (sortDirection == SortDirection.ASC) {
+                rows.sortedWith(comparator)
+            } else {
+                rows.sortedWith(comparator.reversed())
+            }
+        }
+
     Column(modifier = modifier) {
         // Header row
         Row(
@@ -78,44 +127,26 @@ fun CsvPreviewTable(
                     .background(MaterialTheme.colorScheme.surfaceVariant),
         ) {
             // Row index column header
-            Box(
-                modifier =
-                    Modifier
-                        .width(ROW_INDEX_COLUMN_WIDTH)
-                        .border(
-                            width = 1.dp,
-                            color = MaterialTheme.colorScheme.outline,
-                        ).padding(8.dp),
-            ) {
-                SelectableText(
-                    text = "Row",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+            SortableColumnHeader(
+                text = "Row",
+                sortKey = SortKey.Row,
+                activeSortKey = activeSortKey,
+                sortDirection = sortDirection,
+                onHeaderClick = ::onHeaderClick,
+                width = ROW_INDEX_COLUMN_WIDTH,
+            )
 
             // Status column header
-            Box(
-                modifier =
-                    Modifier
-                        .width(STATUS_COLUMN_WIDTH)
-                        .border(
-                            width = 1.dp,
-                            color = MaterialTheme.colorScheme.outline,
-                        ).padding(8.dp),
-            ) {
-                SelectableText(
-                    text = "Status",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+            SortableColumnHeader(
+                text = "Status",
+                sortKey = SortKey.Status,
+                activeSortKey = activeSortKey,
+                sortDirection = sortDirection,
+                onHeaderClick = ::onHeaderClick,
+                width = STATUS_COLUMN_WIDTH,
+            )
 
-            // Transaction navigation column header
+            // Transaction navigation column header (not sortable)
             Box(
                 modifier =
                     Modifier
@@ -135,31 +166,22 @@ fun CsvPreviewTable(
             }
 
             // CSV columns
-            columns.sortedBy { it.columnIndex }.forEach { column ->
-                Box(
-                    modifier =
-                        Modifier
-                            .width(columnWidth)
-                            .border(
-                                width = 1.dp,
-                                color = MaterialTheme.colorScheme.outline,
-                            ).padding(8.dp),
-                ) {
-                    SelectableText(
-                        text = column.originalName,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+            sortedColumns.forEach { column ->
+                SortableColumnHeader(
+                    text = column.originalName,
+                    sortKey = SortKey.CsvData(column.columnIndex),
+                    activeSortKey = activeSortKey,
+                    sortDirection = sortDirection,
+                    onHeaderClick = ::onHeaderClick,
+                    width = columnWidth,
+                )
             }
         }
 
         // Data rows with vertical scrollbar
         Box(modifier = Modifier.weight(1f)) {
             LazyColumn(state = lazyListState) {
-                itemsIndexed(rows) { _, row ->
+                itemsIndexed(sortedRows) { _, row ->
                     val isFailed = row.rowIndex in failedRowIndexes
                     val hasError = row.errorMessage != null
                     val rowBackground =
@@ -392,5 +414,52 @@ private fun SelectableText(
             maxLines = maxLines,
             overflow = overflow,
         )
+    }
+}
+
+@Composable
+private fun SortableColumnHeader(
+    text: String,
+    sortKey: SortKey,
+    activeSortKey: SortKey?,
+    sortDirection: SortDirection,
+    onHeaderClick: (SortKey) -> Unit,
+    width: Dp,
+) {
+    val isActive = activeSortKey == sortKey
+    Box(
+        modifier =
+            Modifier
+                .width(width)
+                .clickable { onHeaderClick(sortKey) }
+                .border(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.outline,
+                ).padding(8.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            SelectableText(
+                text = text,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            if (isActive) {
+                Icon(
+                    imageVector =
+                        if (sortDirection == SortDirection.ASC) {
+                            Icons.Filled.KeyboardArrowUp
+                        } else {
+                            Icons.Filled.KeyboardArrowDown
+                        },
+                    contentDescription =
+                        if (sortDirection == SortDirection.ASC) "Sorted ascending" else "Sorted descending",
+                    modifier = Modifier.size(14.dp),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
     }
 }
