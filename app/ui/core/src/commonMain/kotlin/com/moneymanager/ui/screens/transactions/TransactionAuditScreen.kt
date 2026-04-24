@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.Account
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.DeviceInfo
@@ -55,6 +56,7 @@ fun TransactionAuditScreen(
     transactionRepository: TransactionRepository,
     currentDeviceId: DeviceId? = null,
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
+    onAccountClick: (AccountId) -> Unit = {},
     onBack: () -> Unit,
 ) {
     val accounts by accountRepository
@@ -108,6 +110,7 @@ fun TransactionAuditScreen(
                 accounts = accounts,
                 currentDeviceId = currentDeviceId,
                 onCsvSourceClick = onCsvSourceClick,
+                onAccountClick = onAccountClick,
             )
         },
     )
@@ -119,6 +122,7 @@ private fun TransactionAuditDiffCard(
     accounts: List<Account>,
     currentDeviceId: DeviceId? = null,
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
+    onAccountClick: (AccountId) -> Unit = {},
 ) {
     AuditDiffCard(
         auditType = diff.auditType,
@@ -126,9 +130,9 @@ private fun TransactionAuditDiffCard(
         revisionId = diff.revisionId,
     ) {
         when (diff.auditType) {
-            AuditType.INSERT -> InsertDiffContent(diff, accounts, currentDeviceId, onCsvSourceClick)
-            AuditType.UPDATE -> UpdateDiffContent(diff, accounts, currentDeviceId, onCsvSourceClick)
-            AuditType.DELETE -> DeleteDiffContent(diff, accounts, currentDeviceId, onCsvSourceClick)
+            AuditType.INSERT -> InsertDiffContent(diff, accounts, currentDeviceId, onCsvSourceClick, onAccountClick)
+            AuditType.UPDATE -> UpdateDiffContent(diff, accounts, currentDeviceId, onCsvSourceClick, onAccountClick)
+            AuditType.DELETE -> DeleteDiffContent(diff, accounts, currentDeviceId, onCsvSourceClick, onAccountClick)
         }
     }
 }
@@ -139,6 +143,7 @@ private fun InsertDiffContent(
     accounts: List<Account>,
     currentDeviceId: DeviceId? = null,
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
+    onAccountClick: (AccountId) -> Unit = {},
 ) {
     val transactionDateTime = diff.timestamp.value().toLocalDateTime(TimeZone.currentSystemDefault())
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -148,8 +153,8 @@ private fun InsertDiffContent(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         FieldValueRow("Date", "${transactionDateTime.date} ${transactionDateTime.time}", labelWidth = LABEL_WIDTH)
-        FieldValueRow("From", resolveAccountName(diff.sourceAccountId.value(), accounts), labelWidth = LABEL_WIDTH)
-        FieldValueRow("To", resolveAccountName(diff.targetAccountId.value(), accounts), labelWidth = LABEL_WIDTH)
+        AccountLinkRow("From", diff.sourceAccountId.value(), accounts, onAccountClick)
+        AccountLinkRow("To", diff.targetAccountId.value(), accounts, onAccountClick)
         FieldValueRow("Amount", formatAmount(diff.amount.value()), labelWidth = LABEL_WIDTH)
         FieldValueRow("Description", diff.description.value().ifBlank { "(none)" }, labelWidth = LABEL_WIDTH)
         AttributesSection(diff.attributeChanges)
@@ -163,6 +168,7 @@ private fun UpdateDiffContent(
     accounts: List<Account>,
     currentDeviceId: DeviceId? = null,
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
+    onAccountClick: (AccountId) -> Unit = {},
 ) {
     val hasAnyChanges = diff.hasChanges
 
@@ -194,21 +200,11 @@ private fun UpdateDiffContent(
             }
             val sourceChange = diff.sourceAccountId
             if (sourceChange is FieldChange.Changed) {
-                FieldChangeRow(
-                    label = "From",
-                    oldValue = resolveAccountName(sourceChange.oldValue, accounts),
-                    newValue = resolveAccountName(sourceChange.newValue, accounts),
-                    labelWidth = LABEL_WIDTH,
-                )
+                AccountChangeRow("From", sourceChange.oldValue, sourceChange.newValue, accounts, onAccountClick)
             }
             val targetChange = diff.targetAccountId
             if (targetChange is FieldChange.Changed) {
-                FieldChangeRow(
-                    label = "To",
-                    oldValue = resolveAccountName(targetChange.oldValue, accounts),
-                    newValue = resolveAccountName(targetChange.newValue, accounts),
-                    labelWidth = LABEL_WIDTH,
-                )
+                AccountChangeRow("To", targetChange.oldValue, targetChange.newValue, accounts, onAccountClick)
             }
             val amountChange = diff.amount
             if (amountChange is FieldChange.Changed) {
@@ -246,6 +242,7 @@ private fun DeleteDiffContent(
     accounts: List<Account>,
     currentDeviceId: DeviceId? = null,
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
+    onAccountClick: (AccountId) -> Unit = {},
 ) {
     val errorColor = MaterialTheme.colorScheme.error
     val transactionDateTime = diff.timestamp.value().toLocalDateTime(TimeZone.currentSystemDefault())
@@ -256,8 +253,8 @@ private fun DeleteDiffContent(
             color = errorColor.copy(alpha = 0.8f),
         )
         FieldValueRow("Date", "${transactionDateTime.date} ${transactionDateTime.time}", errorColor, labelWidth = LABEL_WIDTH)
-        FieldValueRow("From", resolveAccountName(diff.sourceAccountId.value(), accounts), errorColor, labelWidth = LABEL_WIDTH)
-        FieldValueRow("To", resolveAccountName(diff.targetAccountId.value(), accounts), errorColor, labelWidth = LABEL_WIDTH)
+        AccountLinkRow("From", diff.sourceAccountId.value(), accounts, onAccountClick)
+        AccountLinkRow("To", diff.targetAccountId.value(), accounts, onAccountClick)
         FieldValueRow("Amount", formatAmount(diff.amount.value()), errorColor, labelWidth = LABEL_WIDTH)
         FieldValueRow("Description", diff.description.value().ifBlank { "(none)" }, errorColor, labelWidth = LABEL_WIDTH)
         AttributesSection(diff.attributeChanges, errorColor)
@@ -518,6 +515,79 @@ private fun SourceInfoSection(
             SourceType.SYSTEM -> {
                 FieldValueRow("Origin", "System", labelWidth = LABEL_WIDTH)
             }
+        }
+    }
+}
+
+@Composable
+private fun AccountLinkRow(
+    label: String,
+    accountId: AccountId,
+    accounts: List<Account>,
+    onAccountClick: (AccountId) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "$label:",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.width(LABEL_WIDTH),
+        )
+        TextButton(
+            onClick = { onAccountClick(accountId) },
+            contentPadding = PaddingValues(0.dp),
+        ) {
+            Text(resolveAccountName(accountId, accounts))
+        }
+    }
+}
+
+@Composable
+private fun AccountChangeRow(
+    label: String,
+    oldAccountId: AccountId,
+    newAccountId: AccountId,
+    accounts: List<Account>,
+    onAccountClick: (AccountId) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "$label:",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.width(LABEL_WIDTH),
+        )
+        TextButton(
+            onClick = { onAccountClick(oldAccountId) },
+            contentPadding = PaddingValues(0.dp),
+        ) {
+            Text(
+                text = resolveAccountName(oldAccountId, accounts),
+                style =
+                    MaterialTheme.typography.bodyMedium.copy(
+                        textDecoration = TextDecoration.LineThrough,
+                    ),
+                color = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+            )
+        }
+        Text(
+            text = "\u2192",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        TextButton(
+            onClick = { onAccountClick(newAccountId) },
+            contentPadding = PaddingValues(0.dp),
+        ) {
+            Text(resolveAccountName(newAccountId, accounts))
         }
     }
 }

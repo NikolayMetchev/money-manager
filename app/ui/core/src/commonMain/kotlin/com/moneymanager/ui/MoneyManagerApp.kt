@@ -459,6 +459,15 @@ fun MoneyManagerApp(
                                 onCsvSourceClick = { importId, rowIndex ->
                                     navigationHistory.navigateTo(Screen.CsvImportDetail(importId, rowIndex))
                                 },
+                                onAccountClick = { accountId ->
+                                    val account = accounts.find { it.id == accountId }
+                                    navigationHistory.navigateTo(
+                                        Screen.AccountTransactions(
+                                            accountId = accountId,
+                                            accountName = account?.name ?: accountId.toString(),
+                                        ),
+                                    )
+                                },
                                 onBack = { navigationHistory.navigateBack() },
                             )
                         }
