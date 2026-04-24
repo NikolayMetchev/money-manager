@@ -53,7 +53,9 @@ private enum class SortDirection { ASC, DESC }
 
 private sealed interface SortKey {
     data object Row : SortKey
+
     data object Status : SortKey
+
     data class CsvData(
         val columnIndex: Int,
     ) : SortKey
