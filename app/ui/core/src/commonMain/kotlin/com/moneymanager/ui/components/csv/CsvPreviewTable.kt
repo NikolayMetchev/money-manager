@@ -88,16 +88,19 @@ fun CsvPreviewTable(
     var activeSortKey by remember { mutableStateOf<SortKey?>(null) }
     var sortDirection by remember { mutableStateOf(SortDirection.ASC) }
 
-    fun onHeaderClick(key: SortKey) {
-        when {
-            activeSortKey != key -> {
-                activeSortKey = key
-                sortDirection = SortDirection.ASC
+    val onHeaderClick: (SortKey) -> Unit =
+        remember {
+            { key ->
+                when {
+                    activeSortKey != key -> {
+                        activeSortKey = key
+                        sortDirection = SortDirection.ASC
+                    }
+                    sortDirection == SortDirection.ASC -> sortDirection = SortDirection.DESC
+                    else -> activeSortKey = null
+                }
             }
-            sortDirection == SortDirection.ASC -> sortDirection = SortDirection.DESC
-            else -> activeSortKey = null
         }
-    }
 
     val sortedColumns = remember(columns) { columns.sortedBy { it.columnIndex } }
 
@@ -132,7 +135,7 @@ fun CsvPreviewTable(
                 sortKey = SortKey.Row,
                 activeSortKey = activeSortKey,
                 sortDirection = sortDirection,
-                onHeaderClick = ::onHeaderClick,
+                onHeaderClick = onHeaderClick,
                 width = ROW_INDEX_COLUMN_WIDTH,
             )
 
@@ -142,7 +145,7 @@ fun CsvPreviewTable(
                 sortKey = SortKey.Status,
                 activeSortKey = activeSortKey,
                 sortDirection = sortDirection,
-                onHeaderClick = ::onHeaderClick,
+                onHeaderClick = onHeaderClick,
                 width = STATUS_COLUMN_WIDTH,
             )
 
@@ -172,7 +175,7 @@ fun CsvPreviewTable(
                     sortKey = SortKey.CsvData(column.columnIndex),
                     activeSortKey = activeSortKey,
                     sortDirection = sortDirection,
-                    onHeaderClick = ::onHeaderClick,
+                    onHeaderClick = onHeaderClick,
                     width = columnWidth,
                 )
             }
@@ -455,7 +458,7 @@ private fun SortableColumnHeader(
                             Icons.Filled.KeyboardArrowDown
                         },
                     contentDescription =
-                        if (sortDirection == SortDirection.ASC) "Sorted ascending" else "Sorted descending",
+                        if (sortDirection == SortDirection.ASC) "$text sorted ascending" else "$text sorted descending",
                     modifier = Modifier.size(14.dp),
                     tint = MaterialTheme.colorScheme.primary,
                 )
