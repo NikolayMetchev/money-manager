@@ -464,7 +464,7 @@ fun MoneyManagerApp(
                                     navigationHistory.navigateTo(
                                         Screen.AccountTransactions(
                                             accountId = accountId,
-                                            accountName = account?.name ?: accountId.toString(),
+                                            accountName = account?.name ?: "#${accountId.id}",
                                         ),
                                     )
                                 },
