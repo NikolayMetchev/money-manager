@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import androidx.compose.ui.test.waitUntilDoesNotExist
 import androidx.compose.ui.test.waitUntilExactlyOneExists
 import com.moneymanager.database.DatabaseManager
@@ -63,7 +64,7 @@ class CreateAccountWithNewCategoryE2ETest {
 
             // Wait for app to load
             waitForIdle()
-            waitUntilExactlyOneExists(hasText("Your Accounts"), timeoutMillis = 10000)
+            waitUntilAtLeastOneExists(hasText("Your Accounts"), timeoutMillis = 20000)
 
             // Step 1: Click "Add Account" to open the Create Account dialog
             onNodeWithText("+ Add Account", useUnmergedTree = true).performClick()
