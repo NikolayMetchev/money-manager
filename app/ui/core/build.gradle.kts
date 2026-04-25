@@ -16,6 +16,7 @@ kotlin {
                 implementation(libs.compose.components.resources)
                 implementation(libs.human.readable)
                 implementation(libs.kmlogging)
+                implementation(libs.kotlinx.serialization.json)
                 implementation(projects.utils.compose.filePicker)
                 implementation(projects.utils.compose.scrollbar)
                 implementation(projects.utils.currency)
