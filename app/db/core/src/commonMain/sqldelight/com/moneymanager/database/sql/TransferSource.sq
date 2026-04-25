@@ -36,6 +36,25 @@ CREATE INDEX IF NOT EXISTS idx_csv_transfer_source_import ON csv_transfer_source
 -- Note: Validation that csv_transfer_source.id references a CSV_IMPORT source (source_type_id = 2)
 -- is enforced at the application level. SQLDelight's dialect doesn't support trigger validation syntax.
 
+-- api_transfer_source: API-specific data for API sources (source_type_id = 5)
+-- 1:1 relationship with transfer_source
+-- api_session_id and api_request_id can become NULL if the session or request is deleted,
+-- preserving the audit trail even after API session cleanup.
+CREATE TABLE api_transfer_source (
+    id INTEGER PRIMARY KEY,  -- Same as transfer_source.id
+    api_session_id INTEGER,
+    api_request_id INTEGER,
+    FOREIGN KEY (id) REFERENCES transfer_source(id),
+    FOREIGN KEY (api_session_id) REFERENCES api_session(id) ON DELETE SET NULL,
+    FOREIGN KEY (api_request_id) REFERENCES api_request(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_api_transfer_source_session ON api_transfer_source(api_session_id);
+CREATE INDEX IF NOT EXISTS idx_api_transfer_source_request ON api_transfer_source(api_request_id);
+
+-- Note: Validation that api_transfer_source.id references an API source (source_type_id = 5)
+-- is enforced at the application level. SQLDelight's dialect doesn't support trigger validation syntax.
+
 -- Select source by transaction ID and revision with device info
 selectByTransactionIdAndRevision:
 SELECT
@@ -46,6 +65,8 @@ SELECT
     transfer_source.device_id,
     csv_transfer_source.csv_import_id,
     csv_transfer_source.csv_row_index,
+    api_transfer_source.api_session_id,
+    api_transfer_source.api_request_id,
     transfer_source.created_at,
     source_type.name AS source_type,
     csv_import_metadata.original_file_name AS csv_file_name,
@@ -59,6 +80,7 @@ JOIN source_type ON transfer_source.source_type_id = source_type.id
 JOIN device_view ON transfer_source.device_id = device_view.id
 LEFT JOIN csv_transfer_source ON transfer_source.id = csv_transfer_source.id
 LEFT JOIN csv_import_metadata ON csv_transfer_source.csv_import_id = csv_import_metadata.id
+LEFT JOIN api_transfer_source ON transfer_source.id = api_transfer_source.id
 WHERE transfer_source.transaction_id = ? AND transfer_source.revision_id = ?;
 
 -- Select all sources for a transaction (across all revisions)
@@ -71,6 +93,8 @@ SELECT
     transfer_source.device_id,
     csv_transfer_source.csv_import_id,
     csv_transfer_source.csv_row_index,
+    api_transfer_source.api_session_id,
+    api_transfer_source.api_request_id,
     transfer_source.created_at,
     source_type.name AS source_type,
     csv_import_metadata.original_file_name AS csv_file_name,
@@ -84,6 +108,7 @@ JOIN source_type ON transfer_source.source_type_id = source_type.id
 JOIN device_view ON transfer_source.device_id = device_view.id
 LEFT JOIN csv_transfer_source ON transfer_source.id = csv_transfer_source.id
 LEFT JOIN csv_import_metadata ON csv_transfer_source.csv_import_id = csv_import_metadata.id
+LEFT JOIN api_transfer_source ON transfer_source.id = api_transfer_source.id
 WHERE transfer_source.transaction_id = ?
 ORDER BY transfer_source.revision_id DESC;
 
@@ -121,3 +146,18 @@ INSERT INTO transfer_source (
     device_id
 )
 VALUES (?, ?, 3, ?);
+
+-- Insert a new source record for API import (base record)
+insertApiBase:
+INSERT INTO transfer_source (
+    transaction_id, revision_id, source_type_id,
+    device_id
+)
+VALUES (?, ?, 5, ?);
+
+-- Insert API-specific details (must be called after insertApiBase)
+insertApiDetails:
+INSERT INTO api_transfer_source (
+    id, api_session_id, api_request_id
+)
+VALUES (?, ?, ?);

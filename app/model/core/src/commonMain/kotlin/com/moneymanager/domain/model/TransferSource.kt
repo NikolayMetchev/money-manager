@@ -12,10 +12,11 @@ import kotlin.time.Instant
  * @property id Unique identifier for this source record
  * @property transactionId The transaction this source is associated with
  * @property revisionId The revision of the transfer when this source was recorded
- * @property sourceType The type of source (MANUAL, CSV_IMPORT)
+ * @property sourceType The type of source (MANUAL, CSV_IMPORT, API)
  * @property deviceId Database ID of the device that performed this action
  * @property deviceInfo Device information from the platform that initiated the action
  * @property csvSource CSV-specific source details (non-null only for CSV_IMPORT sources)
+ * @property apiSource API-specific source details (non-null only for API sources)
  * @property createdAt When this source record was created
  */
 data class TransferSource(
@@ -26,6 +27,7 @@ data class TransferSource(
     val deviceId: Long,
     val deviceInfo: DeviceInfo,
     val csvSource: CsvSourceDetails?,
+    val apiSource: ApiSourceDetails?,
     val createdAt: Instant,
 )
 
@@ -40,4 +42,15 @@ data class CsvSourceDetails(
     val importId: CsvImportId?,
     val rowIndex: Long,
     val fileName: String?,
+)
+
+/**
+ * Details specific to API import sources.
+ *
+ * @property sessionId The ID of the API session (may be null if session was deleted)
+ * @property requestId The ID of the API request that produced this transfer (may be null if request was deleted)
+ */
+data class ApiSourceDetails(
+    val sessionId: ApiSessionId?,
+    val requestId: ApiRequestId?,
 )

@@ -161,6 +161,22 @@ fun SourceInfoSection(
             SourceType.SYSTEM -> {
                 FieldValueRow("Origin", "System", labelWidth = labelWidth)
             }
+            SourceType.API -> {
+                val deviceInfo = source.deviceInfo
+                // EntitySource does not carry API session/request details — those are only
+                // available on TransferSource. Display device info for context.
+                FieldValueRow("Origin", "API Import", labelWidth = labelWidth)
+                when (deviceInfo) {
+                    is DeviceInfo.Jvm -> {
+                        FieldValueRow("Machine", deviceInfo.machineName, labelWidth = labelWidth)
+                        FieldValueRow("OS", deviceInfo.osName, labelWidth = labelWidth)
+                    }
+                    is DeviceInfo.Android -> {
+                        FieldValueRow("Device", "${deviceInfo.deviceMake} ${deviceInfo.deviceModel}", labelWidth = labelWidth)
+                    }
+                    null -> {}
+                }
+            }
         }
     }
 }

@@ -465,6 +465,7 @@ object DatabaseConfig {
             sourceTypeQueries.insert(id = 2, name = "CSV_IMPORT")
             sourceTypeQueries.insert(id = 3, name = "SAMPLE_GENERATOR")
             sourceTypeQueries.insert(id = 4, name = "SYSTEM")
+            sourceTypeQueries.insert(id = 5, name = "API")
 
             // Seed Platform lookup table
             platformQueries.insert(id = 0, name = "SYSTEM")

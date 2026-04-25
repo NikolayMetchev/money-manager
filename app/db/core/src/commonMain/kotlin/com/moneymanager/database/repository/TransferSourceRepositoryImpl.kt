@@ -5,10 +5,13 @@ package com.moneymanager.database.repository
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.mapper.TransferSourceFromRevisionMapper
 import com.moneymanager.database.mapper.TransferSourceFromTransactionIdMapper
+import com.moneymanager.domain.model.ApiRequestId
+import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.TransferSource
 import com.moneymanager.domain.model.csv.CsvImportId
+import com.moneymanager.domain.repository.ApiSourceRecord
 import com.moneymanager.domain.repository.CsvImportSourceRecord
 import com.moneymanager.domain.repository.DeviceRepository
 import com.moneymanager.domain.repository.SampleGeneratorSourceRecord
@@ -140,6 +143,60 @@ class TransferSourceRepositoryImpl(
                         transaction_id = source.transactionId.id,
                         revision_id = source.revisionId,
                         device_id = deviceId.id,
+                    )
+                }
+            }
+        }
+
+    override suspend fun recordApiSource(
+        transactionId: TransferId,
+        revisionId: Long,
+        sessionId: ApiSessionId,
+        requestId: ApiRequestId,
+        deviceInfo: DeviceInfo,
+    ): TransferSource =
+        withContext(Dispatchers.Default) {
+            val deviceId = deviceRepository.getOrCreateDevice(deviceInfo)
+
+            queries.insertApiBase(
+                transaction_id = transactionId.id,
+                revision_id = revisionId,
+                device_id = deviceId.id,
+            )
+            val transferSourceId = queries.lastInsertedId().executeAsOne()
+            queries.insertApiDetails(
+                id = transferSourceId,
+                api_session_id = sessionId.id,
+                api_request_id = requestId.id,
+            )
+
+            queries
+                .selectByTransactionIdAndRevision(transactionId.id, revisionId)
+                .executeAsOne()
+                .let(TransferSourceFromRevisionMapper::map)
+        }
+
+    override suspend fun recordApiSourcesBatch(
+        sessionId: ApiSessionId,
+        requestId: ApiRequestId,
+        deviceInfo: DeviceInfo,
+        sources: List<ApiSourceRecord>,
+    ): Unit =
+        withContext(Dispatchers.Default) {
+            val deviceId = deviceRepository.getOrCreateDevice(deviceInfo)
+
+            queries.transaction {
+                sources.forEach { source ->
+                    queries.insertApiBase(
+                        transaction_id = source.transactionId.id,
+                        revision_id = source.revisionId,
+                        device_id = deviceId.id,
+                    )
+                    val transferSourceId = queries.lastInsertedId().executeAsOne()
+                    queries.insertApiDetails(
+                        id = transferSourceId,
+                        api_session_id = sessionId.id,
+                        api_request_id = requestId.id,
                     )
                 }
             }

@@ -6,6 +6,9 @@ import com.moneymanager.database.repository.DeviceRepositoryImpl
 import com.moneymanager.database.sql.SelectAllByTransactionId
 import com.moneymanager.database.sql.SelectAuditHistoryForTransfer
 import com.moneymanager.database.sql.SelectByTransactionIdAndRevision
+import com.moneymanager.domain.model.ApiRequestId
+import com.moneymanager.domain.model.ApiSessionId
+import com.moneymanager.domain.model.ApiSourceDetails
 import com.moneymanager.domain.model.CsvSourceDetails
 import com.moneymanager.domain.model.SourceType
 import com.moneymanager.domain.model.TransferSource
@@ -30,6 +33,8 @@ object TransferSourceFromRevisionMapper :
                 )
             TransferSource::csvSource fromValue
                 mapCsvSource(toSourceType(from.source_type), from.csv_import_id, from.csv_row_index, from.csv_file_name)
+            TransferSource::apiSource fromValue
+                mapApiSource(toSourceType(from.source_type), from.api_session_id, from.api_request_id)
         }
 }
 
@@ -50,6 +55,8 @@ object TransferSourceFromTransactionIdMapper :
                 )
             TransferSource::csvSource fromValue
                 mapCsvSource(toSourceType(from.source_type), from.csv_import_id, from.csv_row_index, from.csv_file_name)
+            TransferSource::apiSource fromValue
+                mapApiSource(toSourceType(from.source_type), from.api_session_id, from.api_request_id)
         }
 }
 
@@ -80,6 +87,12 @@ object TransferSourceFromAuditMapper :
                     from.source_csv_row_index,
                     from.source_csv_file_name,
                 )
+            TransferSource::apiSource fromValue
+                mapApiSource(
+                    sourceType,
+                    from.source_api_session_id,
+                    from.source_api_request_id,
+                )
             TransferSource::createdAt fromValue toInstant(from.source_created_at!!)
         }
     }
@@ -96,5 +109,17 @@ private fun mapCsvSource(
         importId = csvImportId?.let { CsvImportId(Uuid.parse(it)) },
         rowIndex = csvRowIndex ?: 0,
         fileName = csvFileName,
+    )
+}
+
+private fun mapApiSource(
+    sourceType: SourceType,
+    apiSessionId: Long?,
+    apiRequestId: Long?,
+): ApiSourceDetails? {
+    if (sourceType != SourceType.API) return null
+    return ApiSourceDetails(
+        sessionId = apiSessionId?.let { ApiSessionId(it) },
+        requestId = apiRequestId?.let { ApiRequestId(it) },
     )
 }

@@ -31,6 +31,9 @@ import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CategoryBalance
 import com.moneymanager.domain.model.CsvSourceDetails
+import com.moneymanager.domain.model.ApiRequestId
+import com.moneymanager.domain.model.ApiSessionId
+import com.moneymanager.domain.model.ApiSourceDetails
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DbLocation
@@ -54,6 +57,7 @@ import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CsvImportSourceRecord
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.SampleGeneratorSourceRecord
+import com.moneymanager.domain.repository.ApiSourceRecord
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.domain.repository.TransferSourceRepository
 import com.moneymanager.test.database.createTestDatabaseLocation
@@ -1132,6 +1136,7 @@ class AccountTransactionsScreenTest {
                     deviceId = 1L,
                     deviceInfo = deviceInfo,
                     csvSource = null,
+                    apiSource = null,
                     createdAt = Clock.System.now(),
                 )
             sources.add(source)
@@ -1153,6 +1158,7 @@ class AccountTransactionsScreenTest {
                     deviceId = 1L,
                     deviceInfo = DeviceInfo.Jvm(osName = "Test", machineName = "Test"),
                     csvSource = CsvSourceDetails(importId = csvImportId, rowIndex = rowIndex, fileName = "test.csv"),
+                    apiSource = null,
                     createdAt = Clock.System.now(),
                 )
             sources.add(source)
@@ -1167,6 +1173,36 @@ class AccountTransactionsScreenTest {
         override suspend fun recordSampleGeneratorSourcesBatch(
             deviceInfo: DeviceInfo,
             sources: List<SampleGeneratorSourceRecord>,
+        ) {}
+
+        override suspend fun recordApiSource(
+            transactionId: TransferId,
+            revisionId: Long,
+            sessionId: ApiSessionId,
+            requestId: ApiRequestId,
+            deviceInfo: DeviceInfo,
+        ): TransferSource {
+            val source =
+                TransferSource(
+                    id = sourceIdCounter++,
+                    transactionId = transactionId,
+                    revisionId = revisionId,
+                    sourceType = SourceType.API,
+                    deviceId = 1L,
+                    deviceInfo = deviceInfo,
+                    csvSource = null,
+                    apiSource = ApiSourceDetails(sessionId = sessionId, requestId = requestId),
+                    createdAt = Clock.System.now(),
+                )
+            sources.add(source)
+            return source
+        }
+
+        override suspend fun recordApiSourcesBatch(
+            sessionId: ApiSessionId,
+            requestId: ApiRequestId,
+            deviceInfo: DeviceInfo,
+            sources: List<ApiSourceRecord>,
         ) {}
 
         override suspend fun getSourcesForTransaction(transactionId: TransferId): List<TransferSource> =
