@@ -7,6 +7,7 @@ import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -18,8 +19,7 @@ class ApiSessionRepositoryImplTest : DbTest() {
     private val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
     private val token = "test-token-abc123"
 
-    private suspend fun deviceId() =
-        repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-os", "test-machine"))
+    private fun deviceId() = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-os", "test-machine"))
 
     @Test
     fun `createSession returns a positive id`() =
@@ -164,6 +164,104 @@ class ApiSessionRepositoryImplTest : DbTest() {
             val active = repositories.apiSessionRepository.getActiveSessions(now + 2.hours)
             assertEquals(1, active.size)
             assertEquals("valid-token", active.first().token)
+        }
+
+    @Test
+    fun `insertRequest stores json and headers`() =
+        runTest {
+            val deviceId = deviceId()
+            val sessionId = repositories.apiSessionRepository.createSession(token, deviceId, now, null)
+            val requestJson = """{"path":"/accounts","method":"GET"}"""
+            val headerMap =
+                linkedMapOf(
+                    "Authorization" to "Bearer token",
+                    "Accept" to "application/json",
+                )
+
+            val requestId =
+                repositories.apiSessionRepository.insertRequest(
+                    sessionId = sessionId,
+                    requestedAt = now + 1.hours,
+                    json = requestJson,
+                    headers = headerMap,
+                )
+
+            assertTrue(requestId.id > 0, "Request ID should be positive: $requestId")
+
+            val requests = repositories.apiSessionRepository.getRequestsBySession(sessionId)
+            assertEquals(1, requests.size)
+            val request = requests.single()
+            assertEquals(requestId, request.id)
+            assertEquals(sessionId, request.sessionId)
+            assertEquals(now + 1.hours, request.requestedAt)
+            assertEquals(requestJson, request.json)
+            assertContentEquals(headerMap.keys.toList(), request.headers.map { it.key })
+            assertContentEquals(headerMap.values.toList(), request.headers.map { it.value })
+        }
+
+    @Test
+    fun `getRequestsBySession returns newest first`() =
+        runTest {
+            val deviceId = deviceId()
+            val sessionId = repositories.apiSessionRepository.createSession(token, deviceId, now, null)
+
+            repositories.apiSessionRepository.insertRequest(sessionId, now + 1.hours, """{"request":1}""", emptyMap())
+            repositories.apiSessionRepository.insertRequest(sessionId, now + 2.hours, """{"request":2}""", emptyMap())
+
+            val requests = repositories.apiSessionRepository.getRequestsBySession(sessionId)
+            assertEquals(2, requests.size)
+            assertEquals("""{"request":2}""", requests.first().json)
+            assertEquals("""{"request":1}""", requests.last().json)
+        }
+
+    @Test
+    fun `insertResponse stores json`() =
+        runTest {
+            val deviceId = deviceId()
+            val sessionId = repositories.apiSessionRepository.createSession(token, deviceId, now, null)
+            val responseJson = """{"accounts":[{"id":1}]}"""
+
+            val responseId =
+                repositories.apiSessionRepository.insertResponse(
+                    sessionId = sessionId,
+                    respondedAt = now + 1.hours,
+                    json = responseJson,
+                )
+
+            assertTrue(responseId.id > 0, "Response ID should be positive: $responseId")
+
+            val responses = repositories.apiSessionRepository.getResponsesBySession(sessionId)
+            assertEquals(1, responses.size)
+            val response = responses.single()
+            assertEquals(responseId, response.id)
+            assertEquals(sessionId, response.sessionId)
+            assertEquals(now + 1.hours, response.respondedAt)
+            assertEquals(responseJson, response.json)
+        }
+
+    @Test
+    fun `deleteSession cascades to requests headers and responses`() =
+        runTest {
+            val deviceId = deviceId()
+            val sessionId = repositories.apiSessionRepository.createSession(token, deviceId, now, null)
+
+            repositories.apiSessionRepository.insertRequest(
+                sessionId = sessionId,
+                requestedAt = now + 1.hours,
+                json = """{"request":true}""",
+                headers = mapOf("Authorization" to "Bearer token"),
+            )
+            repositories.apiSessionRepository.insertResponse(
+                sessionId = sessionId,
+                respondedAt = now + 2.hours,
+                json = """{"response":true}""",
+            )
+
+            repositories.apiSessionRepository.deleteSession(sessionId)
+
+            assertNull(repositories.apiSessionRepository.getSessionById(sessionId))
+            assertTrue(repositories.apiSessionRepository.getRequestsBySession(sessionId).isEmpty())
+            assertTrue(repositories.apiSessionRepository.getResponsesBySession(sessionId).isEmpty())
         }
 
     @Test

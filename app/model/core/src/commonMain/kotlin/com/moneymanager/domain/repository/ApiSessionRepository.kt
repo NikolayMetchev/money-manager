@@ -2,6 +2,10 @@
 
 package com.moneymanager.domain.repository
 
+import com.moneymanager.domain.model.ApiRequest
+import com.moneymanager.domain.model.ApiRequestId
+import com.moneymanager.domain.model.ApiResponse
+import com.moneymanager.domain.model.ApiResponseId
 import com.moneymanager.domain.model.ApiSession
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.DeviceId
@@ -78,6 +82,35 @@ interface ApiSessionRepository {
         deviceId: DeviceId,
         revokedAt: Instant,
     )
+
+    /**
+     * Stores one API request payload and its headers for the given session.
+     */
+    suspend fun insertRequest(
+        sessionId: ApiSessionId,
+        requestedAt: Instant,
+        json: String,
+        headers: Map<String, String>,
+    ): ApiRequestId
+
+    /**
+     * Returns all requests for the given session, newest first.
+     */
+    suspend fun getRequestsBySession(sessionId: ApiSessionId): List<ApiRequest>
+
+    /**
+     * Stores one API response payload for the given session.
+     */
+    suspend fun insertResponse(
+        sessionId: ApiSessionId,
+        respondedAt: Instant,
+        json: String,
+    ): ApiResponseId
+
+    /**
+     * Returns all responses for the given session, newest first.
+     */
+    suspend fun getResponsesBySession(sessionId: ApiSessionId): List<ApiResponse>
 
     /**
      * Deletes the session with the given ID permanently.
