@@ -190,7 +190,8 @@ fun MonzoAuthScreen(
                     onClick = {
                         val trimmedToken = tokenInput.trim()
                         if (trimmedToken.isBlank()) {
-                            errorMessage = "Token cannot be empty. Copy the access token from the Monzo Developer Playground and paste it here."
+                            errorMessage =
+                                "Token cannot be empty. Copy the access token from the Monzo Developer Playground and paste it here."
                             return@Button
                         }
                         isSaving = true
