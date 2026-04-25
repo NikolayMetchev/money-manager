@@ -39,7 +39,7 @@ class ApiSessionRepositoryImplTest : DbTest() {
             assertNotNull(session)
             assertEquals(id, session.id)
             assertEquals(token, session.token)
-            assertEquals(deviceId.id, session.deviceId)
+            assertEquals(deviceId, session.deviceId)
             assertEquals(now, session.createdAt)
             assertNull(session.expiresAt)
             assertNull(session.revokedAt)
@@ -91,7 +91,7 @@ class ApiSessionRepositoryImplTest : DbTest() {
 
             val sessions = repositories.apiSessionRepository.getSessionsByDevice(deviceId)
             assertEquals(2, sessions.size)
-            assertTrue(sessions.all { it.deviceId == deviceId.id })
+            assertTrue(sessions.all { it.deviceId == deviceId })
         }
 
     @Test

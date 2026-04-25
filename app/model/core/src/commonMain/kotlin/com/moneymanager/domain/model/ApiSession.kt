@@ -7,7 +7,7 @@ import kotlin.time.Instant
 data class ApiSession(
     val id: ApiSessionId,
     val token: String,
-    val deviceId: Long,
+    val deviceId: DeviceId,
     val createdAt: Instant,
     val expiresAt: Instant?,
     val revokedAt: Instant?,

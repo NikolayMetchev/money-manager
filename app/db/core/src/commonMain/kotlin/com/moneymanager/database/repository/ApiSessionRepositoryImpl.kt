@@ -98,7 +98,7 @@ class ApiSessionRepositoryImpl(
         ApiSession(
             id = ApiSessionId(id),
             token = token,
-            deviceId = device_id,
+            deviceId = DeviceId(device_id),
             createdAt = Instant.fromEpochMilliseconds(created_at),
             expiresAt = expires_at?.let { Instant.fromEpochMilliseconds(it) },
             revokedAt = revoked_at?.let { Instant.fromEpochMilliseconds(it) },
