@@ -5,10 +5,12 @@ package com.moneymanager.ui.monzo
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.repository.ApiSessionRepository
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 import kotlin.time.Clock
 
 private const val MONZO_BASE_URL = "https://api.monzo.com"
@@ -70,7 +72,10 @@ private suspend fun fetchAndStore(
     apiSessionRepository.insertRequest(
         sessionId = sessionId,
         requestedAt = Clock.System.now(),
-        json = """{"method":"GET","url":"$url"}""",
+        json = buildJsonObject {
+            put("method", "GET")
+            put("url", url)
+        }.toString(),
         headers = mapOf("Authorization" to "Bearer $token"),
     )
 

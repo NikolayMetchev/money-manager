@@ -22,9 +22,9 @@ private class MonzoApiClientJvm : MonzoApiClient {
                 val statusCode = connection.responseCode
                 val body =
                     if (statusCode < 400) {
-                        connection.inputStream.bufferedReader().readText()
+                        connection.inputStream.use { it.bufferedReader().readText() }
                     } else {
-                        connection.errorStream?.bufferedReader()?.readText() ?: ""
+                        connection.errorStream?.use { it.bufferedReader().readText() } ?: ""
                     }
                 MonzoHttpResponse(statusCode = statusCode, body = body)
             } finally {

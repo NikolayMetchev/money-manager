@@ -303,7 +303,7 @@ fun MonzoAuthScreen(
 
                     Button(
                         onClick = {
-                            val session = activeSessions.first()
+                            val session = activeSessions.firstOrNull() ?: return@Button
                             isImporting = true
                             importResult = null
                             importError = null
