@@ -62,4 +62,6 @@ sealed class Screen(
         val categoryId: Long,
         val categoryName: String,
     ) : Screen("Category Audit: $categoryName")
+
+    data object MonzoConnect : Screen("Monzo Connection")
 }

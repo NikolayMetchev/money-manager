@@ -34,6 +34,7 @@ import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.repository.AccountRepository
+import com.moneymanager.domain.repository.ApiSessionRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.AuditRepository
 import com.moneymanager.domain.repository.CategoryRepository
@@ -63,6 +64,7 @@ import com.moneymanager.ui.screens.CsvImportDetailScreen
 import com.moneymanager.ui.screens.CsvImportsScreen
 import com.moneymanager.ui.screens.CurrenciesScreen
 import com.moneymanager.ui.screens.CurrencyAuditScreen
+import com.moneymanager.ui.screens.MonzoAuthScreen
 import com.moneymanager.ui.screens.PeopleScreen
 import com.moneymanager.ui.screens.PersonAuditScreen
 import com.moneymanager.ui.screens.SettingsScreen
@@ -80,6 +82,7 @@ fun MoneyManagerApp(
     appVersion: AppVersion,
     databaseLocation: DbLocation,
     accountRepository: AccountRepository,
+    apiSessionRepository: ApiSessionRepository,
     attributeTypeRepository: AttributeTypeRepository,
     auditRepository: AuditRepository,
     categoryRepository: CategoryRepository,
@@ -315,6 +318,9 @@ fun MoneyManagerApp(
                                 transferSourceQueries = transferSourceQueries,
                                 entitySourceQueries = entitySourceQueries,
                                 deviceId = deviceId,
+                                onMonzoConnectClick = {
+                                    navigationHistory.navigateTo(Screen.MonzoConnect)
+                                },
                             )
                         }
                         is Screen.AccountTransactions -> {
@@ -501,6 +507,16 @@ fun MoneyManagerApp(
                                 auditRepository = auditRepository,
                                 categoryRepository = categoryRepository,
                                 onBack = { navigationHistory.navigateBack() },
+                            )
+                        }
+                        is Screen.MonzoConnect -> {
+                            LaunchedEffect(Unit) {
+                                currentlyViewedAccountId = null
+                                currentlyViewedCurrencyId = null
+                            }
+                            MonzoAuthScreen(
+                                apiSessionRepository = apiSessionRepository,
+                                deviceId = deviceId,
                             )
                         }
                     }
