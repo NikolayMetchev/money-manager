@@ -4,7 +4,9 @@ package com.moneymanager.ui.screens
 
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onLast
@@ -305,7 +307,9 @@ class ImportMonzoCsvE2ETest {
             onNodeWithText("monzo_test_export.csv").performClick()
             waitUntilExactlyOneExists(hasText("2 rows"), timeoutMillis = 10000)
 
-            onNodeWithText("Apply Strategy").performClick()
+            waitUntilAtLeastOneExists(hasText("Apply Strategy") and isEnabled(), timeoutMillis = 15000)
+            onAllNodesWithText("Apply Strategy").onFirst().assertIsEnabled()
+            onAllNodesWithText("Apply Strategy").onFirst().performClick()
             waitUntilAtLeastOneExists(hasText("Apply Import Strategy"), timeoutMillis = 15000)
 
             // The matching strategy should be auto-selected.
