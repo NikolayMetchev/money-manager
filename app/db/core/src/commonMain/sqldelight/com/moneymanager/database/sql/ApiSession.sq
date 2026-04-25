@@ -1,0 +1,49 @@
+CREATE TABLE api_session (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    token TEXT NOT NULL UNIQUE CHECK(length(trim(token)) > 0),
+    device_id INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER,
+    revoked_at INTEGER,
+    FOREIGN KEY (device_id) REFERENCES device(id)
+);
+
+CREATE INDEX idx_api_session_token ON api_session(token);
+CREATE INDEX idx_api_session_device ON api_session(device_id);
+
+selectAll:
+SELECT * FROM api_session ORDER BY created_at DESC;
+
+selectById:
+SELECT * FROM api_session WHERE id = ?;
+
+selectByToken:
+SELECT * FROM api_session WHERE token = ?;
+
+selectByDeviceId:
+SELECT * FROM api_session WHERE device_id = ? ORDER BY created_at DESC;
+
+selectActiveSessions:
+SELECT * FROM api_session
+WHERE revoked_at IS NULL
+AND (expires_at IS NULL OR expires_at > ?)
+ORDER BY created_at DESC;
+
+insert:
+INSERT INTO api_session(token, device_id, created_at, expires_at)
+VALUES (?, ?, ?, ?);
+
+revoke:
+UPDATE api_session SET revoked_at = ? WHERE id = ?;
+
+revokeByToken:
+UPDATE api_session SET revoked_at = ? WHERE token = ?;
+
+revokeAllForDevice:
+UPDATE api_session SET revoked_at = ? WHERE device_id = ? AND revoked_at IS NULL;
+
+delete:
+DELETE FROM api_session WHERE id = ?;
+
+lastInsertRowId:
+SELECT last_insert_rowid();
