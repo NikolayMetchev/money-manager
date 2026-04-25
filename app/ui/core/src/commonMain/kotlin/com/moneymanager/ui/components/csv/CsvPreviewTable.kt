@@ -277,10 +277,12 @@ fun CsvPreviewTable(
                             // CSV data cells
                             row.values.forEachIndexed { index, value ->
                                 if (index < columns.size) {
+                                    var expanded by remember(row.rowIndex, index) { mutableStateOf(false) }
                                     Box(
                                         modifier =
                                             Modifier
                                                 .width(columnWidth)
+                                                .clickable { expanded = !expanded }
                                                 .border(
                                                     width = 1.dp,
                                                     color = MaterialTheme.colorScheme.outlineVariant,
@@ -295,8 +297,8 @@ fun CsvPreviewTable(
                                                 } else {
                                                     MaterialTheme.colorScheme.onSurface
                                                 },
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
+                                            maxLines = if (expanded) Int.MAX_VALUE else 1,
+                                            overflow = if (expanded) TextOverflow.Clip else TextOverflow.Ellipsis,
                                         )
                                     }
                                 }
