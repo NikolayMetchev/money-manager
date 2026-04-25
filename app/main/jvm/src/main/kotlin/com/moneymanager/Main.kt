@@ -118,6 +118,7 @@ private fun MainWindow(onExit: () -> Unit) {
                     appVersion = appVersion,
                     databaseLocation = state.location,
                     accountRepository = dc.accountRepository,
+                    apiSessionRepository = dc.apiSessionRepository,
                     attributeTypeRepository = dc.attributeTypeRepository,
                     auditRepository = dc.auditRepository,
                     categoryRepository = dc.categoryRepository,

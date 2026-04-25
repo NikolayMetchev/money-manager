@@ -121,6 +121,7 @@ fun SettingsScreen(
     transferSourceQueries: TransferSourceQueries,
     entitySourceQueries: EntitySourceQueries,
     deviceId: DeviceId,
+    onMonzoConnectClick: () -> Unit = {},
 ) {
     var showWarningDialog by remember { mutableStateOf(false) }
     var isGenerating by remember { mutableStateOf(false) }
@@ -349,6 +350,37 @@ fun SettingsScreen(
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
+                }
+            }
+        }
+
+        // Monzo Section
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = "Monzo",
+                    style = MaterialTheme.typography.titleMedium,
+                )
+
+                Text(
+                    text = "Connect your Monzo account to import transactions directly via the Monzo API.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+
+                OutlinedButton(
+                    onClick = onMonzoConnectClick,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Connect Monzo")
                 }
             }
         }
