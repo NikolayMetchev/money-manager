@@ -76,7 +76,7 @@ fun MonzoAuthScreen(
                         apiSessionRepository.revokeSession(session.id, Clock.System.now())
                         refreshSessions()
                     } catch (expected: Exception) {
-                        errorMessage = "Failed to revoke session: ${expected.message}"
+                        errorMessage = "Failed to revoke session: ${expected.message}. Please try again."
                     }
                 }
             },
@@ -190,7 +190,7 @@ fun MonzoAuthScreen(
                     onClick = {
                         val trimmedToken = tokenInput.trim()
                         if (trimmedToken.isBlank()) {
-                            errorMessage = "Token cannot be empty."
+                            errorMessage = "Token cannot be empty. Copy the access token from the Monzo Developer Playground and paste it here."
                             return@Button
                         }
                         isSaving = true
@@ -208,7 +208,8 @@ fun MonzoAuthScreen(
                                 successMessage = "Token saved successfully."
                                 refreshSessions()
                             } catch (expected: Exception) {
-                                errorMessage = "Failed to save token: ${expected.message}"
+                                errorMessage = "Failed to save token: ${expected.message}. " +
+                                    "Ensure the token is valid and try again."
                             } finally {
                                 isSaving = false
                             }
