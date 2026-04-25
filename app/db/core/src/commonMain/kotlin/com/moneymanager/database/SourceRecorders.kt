@@ -4,6 +4,8 @@ package com.moneymanager.database
 
 import com.moneymanager.database.sql.EntitySourceQueries
 import com.moneymanager.database.sql.TransferSourceQueries
+import com.moneymanager.domain.model.ApiRequestId
+import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.SourceRecorder
@@ -59,6 +61,30 @@ class CsvImportSourceRecorder(
             transferSourceId,
             csvImportId.id.toString(),
             rowIndexForTransfer(transfer.id),
+        )
+    }
+}
+
+/** API import with session and request tracking. */
+class ApiImportSourceRecorder(
+    private val queries: TransferSourceQueries,
+    private val deviceId: DeviceId,
+    private val sessionId: ApiSessionId,
+    private val requestId: ApiRequestId,
+) : SourceRecorder {
+    override fun insert(transfer: Transfer) {
+        // Insert base TransferSource record
+        queries.insertApiBase(
+            transfer.id.id,
+            transfer.revisionId,
+            deviceId.id,
+        )
+        // Get the auto-generated ID and insert API-specific details
+        val transferSourceId = queries.lastInsertedId().executeAsOne()
+        queries.insertApiDetails(
+            transferSourceId,
+            sessionId.id,
+            requestId.id,
         )
     }
 }

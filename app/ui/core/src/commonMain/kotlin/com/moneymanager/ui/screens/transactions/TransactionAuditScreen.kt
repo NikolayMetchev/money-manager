@@ -515,6 +515,29 @@ private fun SourceInfoSection(
             SourceType.SYSTEM -> {
                 FieldValueRow("Origin", "System", labelWidth = LABEL_WIDTH)
             }
+            SourceType.API -> {
+                val apiSource = source.apiSource
+                val deviceInfo = source.deviceInfo
+                val thisDeviceSuffix = if (isThisDevice) " (This Device)" else ""
+                FieldValueRow("Origin", "API Import$thisDeviceSuffix", labelWidth = LABEL_WIDTH)
+                if (apiSource != null) {
+                    apiSource.sessionId?.let {
+                        FieldValueRow("Session", it.id.toString(), labelWidth = LABEL_WIDTH)
+                    }
+                    apiSource.requestId?.let {
+                        FieldValueRow("Request", it.id.toString(), labelWidth = LABEL_WIDTH)
+                    }
+                }
+                when (deviceInfo) {
+                    is DeviceInfo.Jvm -> {
+                        FieldValueRow("Machine", deviceInfo.machineName, labelWidth = LABEL_WIDTH)
+                        FieldValueRow("OS", deviceInfo.osName, labelWidth = LABEL_WIDTH)
+                    }
+                    is DeviceInfo.Android -> {
+                        FieldValueRow("Device", "${deviceInfo.deviceMake} ${deviceInfo.deviceModel}", labelWidth = LABEL_WIDTH)
+                    }
+                }
+            }
         }
     }
 }

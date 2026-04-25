@@ -93,6 +93,7 @@ class MoneyManagerDatabaseWrapper(
             "entity_type",
             "transfer_source",
             "csv_transfer_source",
+            "api_transfer_source",
             "platform",
             "os",
             "machine",

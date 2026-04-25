@@ -18,6 +18,9 @@ enum class SourceType(
 
     /** System-generated (e.g., seeded currencies) */
     SYSTEM(4),
+
+    /** Imported via REST API call */
+    API(5),
     ;
 
     companion object {
