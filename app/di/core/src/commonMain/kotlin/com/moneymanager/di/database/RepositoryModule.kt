@@ -4,6 +4,7 @@ import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.database.DatabaseMaintenanceServiceImpl
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.repository.AccountRepositoryImpl
+import com.moneymanager.database.repository.ApiSessionRepositoryImpl
 import com.moneymanager.database.repository.AttributeTypeRepositoryImpl
 import com.moneymanager.database.repository.AuditRepositoryImpl
 import com.moneymanager.database.repository.CategoryRepositoryImpl
@@ -24,6 +25,7 @@ import com.moneymanager.database.sql.TransferSourceQueries
 import com.moneymanager.di.DatabaseScope
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.repository.AccountRepository
+import com.moneymanager.domain.repository.ApiSessionRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.AuditRepository
 import com.moneymanager.domain.repository.CategoryRepository
@@ -58,6 +60,10 @@ interface RepositoryModule {
     @Provides
     @SingleIn(DatabaseScope::class)
     fun provideAccountRepository(database: MoneyManagerDatabaseWrapper): AccountRepository = AccountRepositoryImpl(database)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideApiSessionRepository(database: MoneyManagerDatabaseWrapper): ApiSessionRepository = ApiSessionRepositoryImpl(database)
 
     @Provides
     @SingleIn(DatabaseScope::class)

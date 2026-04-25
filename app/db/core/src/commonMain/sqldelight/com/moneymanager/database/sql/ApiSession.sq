@@ -1,0 +1,102 @@
+CREATE TABLE api_session (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    token TEXT NOT NULL UNIQUE CHECK(length(trim(token)) > 0),
+    device_id INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER,
+    revoked_at INTEGER,
+    FOREIGN KEY (device_id) REFERENCES device(id)
+);
+
+CREATE INDEX idx_api_session_token ON api_session(token);
+CREATE INDEX idx_api_session_device ON api_session(device_id);
+
+CREATE TABLE api_request (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL,
+    requested_at INTEGER NOT NULL,
+    json TEXT NOT NULL CHECK(length(trim(json)) > 0),
+    FOREIGN KEY (session_id) REFERENCES api_session(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_api_request_session ON api_request(session_id);
+CREATE INDEX idx_api_request_requested_at ON api_request(requested_at);
+
+CREATE TABLE api_request_header (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    request_id INTEGER NOT NULL,
+    key TEXT NOT NULL CHECK(length(trim(key)) > 0),
+    value TEXT NOT NULL,
+    FOREIGN KEY (request_id) REFERENCES api_request(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_api_request_header_request ON api_request_header(request_id);
+
+CREATE TABLE api_response (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL,
+    responded_at INTEGER NOT NULL,
+    json TEXT NOT NULL CHECK(length(trim(json)) > 0),
+    FOREIGN KEY (session_id) REFERENCES api_session(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_api_response_session ON api_response(session_id);
+CREATE INDEX idx_api_response_responded_at ON api_response(responded_at);
+
+selectAll:
+SELECT * FROM api_session ORDER BY created_at DESC;
+
+selectById:
+SELECT * FROM api_session WHERE id = ?;
+
+selectByToken:
+SELECT * FROM api_session WHERE token = ?;
+
+selectByDeviceId:
+SELECT * FROM api_session WHERE device_id = ? ORDER BY created_at DESC;
+
+selectActiveSessions:
+SELECT * FROM api_session
+WHERE revoked_at IS NULL
+AND (expires_at IS NULL OR expires_at > ?)
+ORDER BY created_at DESC;
+
+insert:
+INSERT INTO api_session(token, device_id, created_at, expires_at)
+VALUES (?, ?, ?, ?);
+
+revoke:
+UPDATE api_session SET revoked_at = ? WHERE id = ?;
+
+revokeByToken:
+UPDATE api_session SET revoked_at = ? WHERE token = ?;
+
+revokeAllForDevice:
+UPDATE api_session SET revoked_at = ? WHERE device_id = ? AND revoked_at IS NULL;
+
+insertRequest:
+INSERT INTO api_request(session_id, requested_at, json)
+VALUES (?, ?, ?);
+
+selectRequestsBySession:
+SELECT * FROM api_request WHERE session_id = ? ORDER BY requested_at DESC, id DESC;
+
+insertRequestHeader:
+INSERT INTO api_request_header(request_id, key, value)
+VALUES (?, ?, ?);
+
+selectHeadersByRequestIds:
+SELECT * FROM api_request_header WHERE request_id IN ? ORDER BY request_id, id;
+
+insertResponse:
+INSERT INTO api_response(session_id, responded_at, json)
+VALUES (?, ?, ?);
+
+selectResponsesBySession:
+SELECT * FROM api_response WHERE session_id = ? ORDER BY responded_at DESC, id DESC;
+
+delete:
+DELETE FROM api_session WHERE id = ?;
+
+lastInsertRowId:
+SELECT last_insert_rowid();

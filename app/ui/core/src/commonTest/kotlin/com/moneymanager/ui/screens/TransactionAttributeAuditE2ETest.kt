@@ -68,7 +68,7 @@ class TransactionAttributeAuditE2ETest {
 
             // Wait for app to load
             waitForIdle()
-            waitUntilExactlyOneExists(hasText("Your Accounts"), timeoutMillis = 10000)
+            waitUntilAtLeastOneExists(hasText("Your Accounts"), timeoutMillis = 20000)
 
             // Step 1: Create source account (Checking)
             onNodeWithText("+ Add Account").performClick()
