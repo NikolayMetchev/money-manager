@@ -467,6 +467,9 @@ object DatabaseConfig {
             sourceTypeQueries.insert(id = 4, name = "SYSTEM")
             sourceTypeQueries.insert(id = 5, name = "API")
 
+            // Seed API session type lookup table
+            apiSessionQueries.insertSessionType(id = 1, name = "Monzo")
+
             // Seed Platform lookup table
             platformQueries.insert(id = 0, name = "SYSTEM")
             platformQueries.insert(id = 1, name = "JVM")

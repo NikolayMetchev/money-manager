@@ -105,6 +105,7 @@ class MoneyManagerDatabaseWrapper(
             "_import_batch",
             "_creation_mode",
             "settings",
+            "api_session_type",
             "api_session",
             "api_request",
             "api_request_header",

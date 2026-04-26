@@ -29,9 +29,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.ApiSession
+import com.moneymanager.domain.model.ApiSessionType
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.repository.ApiSessionRepository
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -40,17 +43,22 @@ import com.moneymanager.ui.monzo.createMonzoApiClient
 import com.moneymanager.ui.monzo.importMonzoData
 import com.moneymanager.ui.util.displayDateTime
 import kotlinx.coroutines.launch
+import org.lighthousegames.logging.logging
 import kotlin.time.Clock
 
 private const val MONZO_DEVELOPER_PORTAL_URL = "https://developers.monzo.com/"
 
+private val logger = logging()
+
 @Composable
+@Suppress("DEPRECATION")
 fun MonzoAuthScreen(
     apiSessionRepository: ApiSessionRepository,
     deviceId: DeviceId,
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
     val uriHandler = LocalUriHandler.current
+    val clipboardManager = LocalClipboardManager.current
 
     var activeSessions by remember { mutableStateOf<List<ApiSession>>(emptyList()) }
     var tokenInput by remember { mutableStateOf("") }
@@ -61,7 +69,6 @@ fun MonzoAuthScreen(
     var isImporting by remember { mutableStateOf(false) }
     var importResult by remember { mutableStateOf<MonzoImportResult?>(null) }
     var importError by remember { mutableStateOf<String?>(null) }
-    val monzoApiClient = remember { createMonzoApiClient() }
 
     LaunchedEffect(Unit) {
         activeSessions = apiSessionRepository.getActiveSessions(Clock.System.now())
@@ -211,6 +218,7 @@ fun MonzoAuthScreen(
                                     deviceId = deviceId,
                                     createdAt = Clock.System.now(),
                                     expiresAt = null,
+                                    type = ApiSessionType.MONZO,
                                 )
                                 tokenInput = ""
                                 successMessage = "Token saved successfully."
@@ -295,11 +303,22 @@ fun MonzoAuthScreen(
                     }
 
                     importError?.let { error ->
-                        Text(
-                            text = error,
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Text(
+                                text = error,
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.weight(1f),
+                            )
+                            TextButton(
+                                onClick = { clipboardManager.setText(AnnotatedString(error)) },
+                            ) {
+                                Text("Copy")
+                            }
+                        }
                     }
 
                     Button(
@@ -313,12 +332,16 @@ fun MonzoAuthScreen(
                                     importResult =
                                         importMonzoData(
                                             token = session.token,
-                                            sessionId = session.id,
-                                            apiSessionRepository = apiSessionRepository,
-                                            apiClient = monzoApiClient,
+                                            apiClient =
+                                                createMonzoApiClient(
+                                                    sessionId = session.id,
+                                                    apiSessionRepository = apiSessionRepository,
+                                                ),
                                         )
                                 } catch (expected: Exception) {
-                                    importError = "Import failed: ${expected.message}"
+                                    val message = "Import failed: ${expected.message}"
+                                    logger.error(expected) { message }
+                                    importError = message
                                 } finally {
                                     isImporting = false
                                 }

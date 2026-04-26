@@ -9,6 +9,7 @@ kotlin {
             dependencies {
                 api(libs.kotlinx.coroutines.core)
                 api(libs.kotlinx.datetime)
+                api(libs.ktor.client.core)
                 api(projects.app.db.core)
                 api(projects.app.model.core)
                 api(projects.utils.bigdecimal)
@@ -17,6 +18,7 @@ kotlin {
                 implementation(libs.human.readable)
                 implementation(libs.kmlogging)
                 implementation(libs.kotlinx.serialization.json)
+                implementation(libs.ktor.client.cio)
                 implementation(projects.utils.compose.filePicker)
                 implementation(projects.utils.compose.scrollbar)
                 implementation(projects.utils.currency)
@@ -51,6 +53,8 @@ kotlin {
                 implementation(libs.androidx.compose.ui.graphics)
                 implementation(libs.androidx.compose.ui.text)
                 implementation(libs.diamondedge.logging)
+                implementation(libs.ktor.http)
+                implementation(libs.ktor.utils)
             }
         }
         val jvmMain by getting {
@@ -75,6 +79,8 @@ kotlin {
                 implementation(libs.compose.ui.graphics.desktop)
                 implementation(libs.compose.ui.text.desktop)
                 implementation(libs.diamondedge.logging)
+                implementation(libs.ktor.http)
+                implementation(libs.ktor.utils)
             }
         }
         val jvmTest by getting {

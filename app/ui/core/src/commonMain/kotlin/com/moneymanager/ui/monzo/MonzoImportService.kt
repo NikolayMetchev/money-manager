@@ -2,16 +2,13 @@
 
 package com.moneymanager.ui.monzo
 
-import com.moneymanager.domain.model.ApiSessionId
-import com.moneymanager.domain.repository.ApiSessionRepository
+import io.ktor.http.URLBuilder
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
-import kotlin.time.Clock
+import kotlin.time.Instant
 
 private const val MONZO_BASE_URL = "https://api.monzo.com"
 private const val TRANSACTION_PAGE_LIMIT = 100
@@ -23,37 +20,31 @@ data class MonzoImportResult(
 
 suspend fun importMonzoData(
     token: String,
-    sessionId: ApiSessionId,
-    apiSessionRepository: ApiSessionRepository,
     apiClient: MonzoApiClient,
 ): MonzoImportResult {
     val accountIds =
-        fetchAndStore(
+        fetch(
             url = "$MONZO_BASE_URL/accounts",
             token = token,
-            sessionId = sessionId,
-            apiSessionRepository = apiSessionRepository,
             apiClient = apiClient,
         ).let { parseIds(it, "accounts") }
 
     var transactionCount = 0
 
     for (accountId in accountIds) {
-        var sinceId: String? = null
+        var before: Instant? = null
         do {
-            val url = buildTransactionUrl(accountId, sinceId)
+            val url = buildTransactionUrl(accountId, before)
             val body =
-                fetchAndStore(
+                fetch(
                     url = url,
                     token = token,
-                    sessionId = sessionId,
-                    apiSessionRepository = apiSessionRepository,
                     apiClient = apiClient,
                 )
-            val txIds = parseIds(body, "transactions")
-            transactionCount += txIds.size
-            sinceId = txIds.lastOrNull()
-        } while (txIds.isNotEmpty())
+            val transactions = parseTransactions(body)
+            transactionCount += transactions.size
+            before = transactions.map { it.created }.minOrNull()
+        } while (transactions.isNotEmpty())
     }
 
     return MonzoImportResult(
@@ -62,32 +53,12 @@ suspend fun importMonzoData(
     )
 }
 
-private suspend fun fetchAndStore(
+private suspend fun fetch(
     url: String,
     token: String,
-    sessionId: ApiSessionId,
-    apiSessionRepository: ApiSessionRepository,
     apiClient: MonzoApiClient,
 ): String {
-    apiSessionRepository.insertRequest(
-        sessionId = sessionId,
-        requestedAt = Clock.System.now(),
-        json =
-            buildJsonObject {
-                put("method", "GET")
-                put("url", url)
-            }.toString(),
-        headers = mapOf("Authorization" to "Bearer $token"),
-    )
-
     val response = apiClient.get(url = url, bearerToken = token)
-
-    apiSessionRepository.insertResponse(
-        sessionId = sessionId,
-        respondedAt = Clock.System.now(),
-        json = response.body,
-    )
-
     if (response.statusCode != 200) {
         throw MonzoApiException("HTTP ${response.statusCode}: ${response.body}")
     }
@@ -114,10 +85,36 @@ private fun parseIds(
         emptyList()
     }
 
+private data class MonzoTransactionPageItem(
+    val created: Instant,
+)
+
+private fun parseTransactions(json: String): List<MonzoTransactionPageItem> =
+    try {
+        Json
+            .parseToJsonElement(json)
+            .jsonObject["transactions"]
+            ?.jsonArray
+            ?.mapNotNull { element ->
+                val obj = element.jsonObject
+                val created = obj["created"]?.jsonPrimitive?.contentOrNull?.let { Instant.parse(it) }
+
+                created?.let { MonzoTransactionPageItem(created = it) }
+            }
+            ?: emptyList()
+    } catch (_: Exception) {
+        emptyList()
+    }
+
 private fun buildTransactionUrl(
     accountId: String,
-    sinceId: String?,
-): String {
-    val base = "$MONZO_BASE_URL/transactions?account_id=$accountId&limit=$TRANSACTION_PAGE_LIMIT"
-    return if (sinceId != null) "$base&since=$sinceId" else base
-}
+    before: Instant?,
+): String =
+    URLBuilder("$MONZO_BASE_URL/transactions")
+        .apply {
+            parameters.append("account_id", accountId)
+            parameters.append("limit", TRANSACTION_PAGE_LIMIT.toString())
+            if (before != null) {
+                parameters.append("before", before.toString())
+            }
+        }.buildString()
