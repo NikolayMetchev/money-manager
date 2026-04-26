@@ -72,10 +72,11 @@ private suspend fun fetchAndStore(
     apiSessionRepository.insertRequest(
         sessionId = sessionId,
         requestedAt = Clock.System.now(),
-        json = buildJsonObject {
-            put("method", "GET")
-            put("url", url)
-        }.toString(),
+        json =
+            buildJsonObject {
+                put("method", "GET")
+                put("url", url)
+            }.toString(),
         headers = mapOf("Authorization" to "Bearer $token"),
     )
 
@@ -103,7 +104,8 @@ private fun parseIds(
     arrayKey: String,
 ): List<String> =
     try {
-        Json.parseToJsonElement(json)
+        Json
+            .parseToJsonElement(json)
             .jsonObject[arrayKey]
             ?.jsonArray
             ?.mapNotNull { it.jsonObject["id"]?.jsonPrimitive?.contentOrNull }

@@ -286,8 +286,9 @@ fun MonzoAuthScreen(
 
                     importResult?.let { result ->
                         Text(
-                            text = "Import complete: ${result.accountCount} account(s), " +
-                                "${result.transactionCount} transaction(s).",
+                            text =
+                                "Import complete: ${result.accountCount} account(s), " +
+                                    "${result.transactionCount} transaction(s).",
                             color = MaterialTheme.colorScheme.primary,
                             style = MaterialTheme.typography.bodySmall,
                         )
