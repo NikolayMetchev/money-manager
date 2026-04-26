@@ -8,6 +8,7 @@ import com.moneymanager.domain.model.ApiResponse
 import com.moneymanager.domain.model.ApiResponseId
 import com.moneymanager.domain.model.ApiSession
 import com.moneymanager.domain.model.ApiSessionId
+import com.moneymanager.domain.model.ApiSessionType
 import com.moneymanager.domain.model.DeviceId
 import kotlin.time.Instant
 
@@ -26,6 +27,7 @@ interface ApiSessionRepository {
         deviceId: DeviceId,
         createdAt: Instant,
         expiresAt: Instant?,
+        type: ApiSessionType = ApiSessionType.MONZO,
     ): ApiSessionId
 
     /**

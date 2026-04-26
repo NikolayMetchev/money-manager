@@ -6,12 +6,26 @@ import kotlin.time.Instant
 
 data class ApiSession(
     val id: ApiSessionId,
+    val type: ApiSessionType,
     val token: String,
     val deviceId: DeviceId,
     val createdAt: Instant,
     val expiresAt: Instant?,
     val revokedAt: Instant?,
 )
+
+enum class ApiSessionType(
+    val id: Long,
+) {
+    MONZO(1),
+    ;
+
+    companion object {
+        fun fromId(id: Long): ApiSessionType =
+            entries.firstOrNull { it.id == id }
+                ?: error("Unknown API session type id: $id")
+    }
+}
 
 data class ApiRequest(
     val id: ApiRequestId,

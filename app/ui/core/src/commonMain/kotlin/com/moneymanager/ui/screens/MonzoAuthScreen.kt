@@ -29,25 +29,37 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.ApiSession
+import com.moneymanager.domain.model.ApiSessionType
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.repository.ApiSessionRepository
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.ui.monzo.MonzoImportProgress
+import com.moneymanager.ui.monzo.MonzoImportResult
+import com.moneymanager.ui.monzo.createMonzoApiClient
+import com.moneymanager.ui.monzo.importMonzoData
 import com.moneymanager.ui.util.displayDateTime
 import kotlinx.coroutines.launch
+import org.lighthousegames.logging.logging
 import kotlin.time.Clock
 
 private const val MONZO_DEVELOPER_PORTAL_URL = "https://developers.monzo.com/"
 
+private val logger = logging()
+
 @Composable
+@Suppress("DEPRECATION")
 fun MonzoAuthScreen(
     apiSessionRepository: ApiSessionRepository,
     deviceId: DeviceId,
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
     val uriHandler = LocalUriHandler.current
+    val clipboardManager = LocalClipboardManager.current
 
     var activeSessions by remember { mutableStateOf<List<ApiSession>>(emptyList()) }
     var tokenInput by remember { mutableStateOf("") }
@@ -55,6 +67,10 @@ fun MonzoAuthScreen(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var successMessage by remember { mutableStateOf<String?>(null) }
     var sessionToRevoke by remember { mutableStateOf<ApiSession?>(null) }
+    var isImporting by remember { mutableStateOf(false) }
+    var importResult by remember { mutableStateOf<MonzoImportResult?>(null) }
+    var importProgress by remember { mutableStateOf<MonzoImportProgress?>(null) }
+    var importError by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
         activeSessions = apiSessionRepository.getActiveSessions(Clock.System.now())
@@ -204,6 +220,7 @@ fun MonzoAuthScreen(
                                     deviceId = deviceId,
                                     createdAt = Clock.System.now(),
                                     expiresAt = null,
+                                    type = ApiSessionType.MONZO,
                                 )
                                 tokenInput = ""
                                 successMessage = "Token saved successfully."
@@ -251,6 +268,119 @@ fun MonzoAuthScreen(
                             session = session,
                             onRevoke = { sessionToRevoke = session },
                         )
+                    }
+                }
+            }
+        }
+
+        // Import data card - only shown when there are active sessions
+        if (activeSessions.isNotEmpty()) {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Text(
+                        text = "Import Data",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+
+                    Text(
+                        text = "Fetch all accounts and transactions from Monzo and store them locally.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+
+                    importResult?.let { result ->
+                        Text(
+                            text =
+                                "Import complete: ${result.accountCount} account(s), " +
+                                    "${result.transactionCount} transaction(s).",
+                            color = MaterialTheme.colorScheme.primary,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+
+                    if (isImporting) {
+                        val progress = importProgress
+                        Text(
+                            text =
+                                if (progress == null) {
+                                    "Preparing import..."
+                                } else {
+                                    "Importing account ${progress.accountIndex}/${progress.accountCount}, " +
+                                        "page ${progress.page}. " +
+                                        "${progress.importedTransactionCount} transaction(s) imported so far."
+                                },
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+
+                    importError?.let { error ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Text(
+                                text = error,
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.weight(1f),
+                            )
+                            TextButton(
+                                onClick = { clipboardManager.setText(AnnotatedString(error)) },
+                            ) {
+                                Text("Copy")
+                            }
+                        }
+                    }
+
+                    Button(
+                        onClick = {
+                            val session = activeSessions.firstOrNull() ?: return@Button
+                            isImporting = true
+                            importResult = null
+                            importProgress = null
+                            importError = null
+                            scope.launch {
+                                try {
+                                    importResult =
+                                        importMonzoData(
+                                            token = session.token,
+                                            apiClient =
+                                                createMonzoApiClient(
+                                                    sessionId = session.id,
+                                                    apiSessionRepository = apiSessionRepository,
+                                                ),
+                                            onProgress = { progress ->
+                                                importProgress = progress
+                                            },
+                                        )
+                                } catch (expected: Exception) {
+                                    val message = "Import failed: ${expected.message}"
+                                    logger.error(expected) { message }
+                                    importError = message
+                                } finally {
+                                    isImporting = false
+                                    importProgress = null
+                                }
+                            }
+                        },
+                        enabled = !isImporting,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        if (isImporting) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                            )
+                        } else {
+                            Text("Import Data from Monzo")
+                        }
                     }
                 }
             }

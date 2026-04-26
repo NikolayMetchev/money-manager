@@ -11,6 +11,7 @@ import com.moneymanager.domain.model.ApiResponse
 import com.moneymanager.domain.model.ApiResponseId
 import com.moneymanager.domain.model.ApiSession
 import com.moneymanager.domain.model.ApiSessionId
+import com.moneymanager.domain.model.ApiSessionType
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.repository.ApiSessionRepository
 import kotlinx.coroutines.Dispatchers
@@ -27,11 +28,13 @@ class ApiSessionRepositoryImpl(
         deviceId: DeviceId,
         createdAt: Instant,
         expiresAt: Instant?,
+        type: ApiSessionType,
     ): ApiSessionId =
         withContext(Dispatchers.Default) {
             val id =
                 queries.transactionWithResult {
                     queries.insert(
+                        type_id = type.id,
                         token = token,
                         device_id = deviceId.id,
                         created_at = createdAt.toEpochMilliseconds(),
@@ -201,6 +204,7 @@ class ApiSessionRepositoryImpl(
     private fun com.moneymanager.database.sql.Api_session.toApiSession(): ApiSession =
         ApiSession(
             id = ApiSessionId(id),
+            type = ApiSessionType.fromId(type_id),
             token = token,
             deviceId = DeviceId(device_id),
             createdAt = Instant.fromEpochMilliseconds(created_at),

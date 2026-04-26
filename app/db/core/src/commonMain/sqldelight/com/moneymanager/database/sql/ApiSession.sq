@@ -1,13 +1,21 @@
+CREATE TABLE api_session_type (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE
+);
+
 CREATE TABLE api_session (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    type_id INTEGER NOT NULL,
     token TEXT NOT NULL UNIQUE CHECK(length(trim(token)) > 0),
     device_id INTEGER NOT NULL,
     created_at INTEGER NOT NULL,
     expires_at INTEGER,
     revoked_at INTEGER,
+    FOREIGN KEY (type_id) REFERENCES api_session_type(id),
     FOREIGN KEY (device_id) REFERENCES device(id)
 );
 
+CREATE INDEX idx_api_session_type ON api_session(type_id);
 CREATE INDEX idx_api_session_token ON api_session(token);
 CREATE INDEX idx_api_session_device ON api_session(device_id);
 
@@ -62,8 +70,11 @@ AND (expires_at IS NULL OR expires_at > ?)
 ORDER BY created_at DESC;
 
 insert:
-INSERT INTO api_session(token, device_id, created_at, expires_at)
-VALUES (?, ?, ?, ?);
+INSERT INTO api_session(type_id, token, device_id, created_at, expires_at)
+VALUES (?, ?, ?, ?, ?);
+
+insertSessionType:
+INSERT INTO api_session_type(id, name) VALUES (?, ?);
 
 revoke:
 UPDATE api_session SET revoked_at = ? WHERE id = ?;
