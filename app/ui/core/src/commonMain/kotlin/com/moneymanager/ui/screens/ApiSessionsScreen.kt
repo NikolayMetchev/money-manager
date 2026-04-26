@@ -72,8 +72,11 @@ fun ApiSessionsScreen(
 
     fun refreshSessions() {
         scope.launch {
-            sessions = apiSessionRepository.getSessionsByDevice(deviceId)
-            isLoading = false
+            try {
+                sessions = apiSessionRepository.getSessionsByDevice(deviceId)
+            } finally {
+                isLoading = false
+            }
         }
     }
 
@@ -240,7 +243,7 @@ private fun ApiSessionCard(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = session.type.name.replaceFirstChar { it.uppercase() },
+                    text = session.type.name.lowercase().replaceFirstChar { it.uppercase() },
                     style = MaterialTheme.typography.titleMedium,
                 )
                 SessionStatusBadge(isActive = isActive)
