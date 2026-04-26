@@ -64,4 +64,6 @@ sealed class Screen(
     ) : Screen("Category Audit: $categoryName")
 
     data object MonzoConnect : Screen("Monzo Connection")
+
+    data object ApiSessions : Screen("API Sessions")
 }
