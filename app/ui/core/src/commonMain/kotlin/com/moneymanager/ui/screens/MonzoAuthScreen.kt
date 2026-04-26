@@ -38,6 +38,7 @@ import com.moneymanager.domain.model.ApiSessionType
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.repository.ApiSessionRepository
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.ui.monzo.MonzoImportProgress
 import com.moneymanager.ui.monzo.MonzoImportResult
 import com.moneymanager.ui.monzo.createMonzoApiClient
 import com.moneymanager.ui.monzo.importMonzoData
@@ -68,6 +69,7 @@ fun MonzoAuthScreen(
     var sessionToRevoke by remember { mutableStateOf<ApiSession?>(null) }
     var isImporting by remember { mutableStateOf(false) }
     var importResult by remember { mutableStateOf<MonzoImportResult?>(null) }
+    var importProgress by remember { mutableStateOf<MonzoImportProgress?>(null) }
     var importError by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
@@ -302,6 +304,22 @@ fun MonzoAuthScreen(
                         )
                     }
 
+                    if (isImporting) {
+                        val progress = importProgress
+                        Text(
+                            text =
+                                if (progress == null) {
+                                    "Preparing import..."
+                                } else {
+                                    "Importing account ${progress.accountIndex}/${progress.accountCount}, " +
+                                        "page ${progress.page}. " +
+                                        "${progress.importedTransactionCount} transaction(s) imported so far."
+                                },
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+
                     importError?.let { error ->
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -326,6 +344,7 @@ fun MonzoAuthScreen(
                             val session = activeSessions.firstOrNull() ?: return@Button
                             isImporting = true
                             importResult = null
+                            importProgress = null
                             importError = null
                             scope.launch {
                                 try {
@@ -337,6 +356,9 @@ fun MonzoAuthScreen(
                                                     sessionId = session.id,
                                                     apiSessionRepository = apiSessionRepository,
                                                 ),
+                                            onProgress = { progress ->
+                                                importProgress = progress
+                                            },
                                         )
                                 } catch (expected: Exception) {
                                     val message = "Import failed: ${expected.message}"
@@ -344,6 +366,7 @@ fun MonzoAuthScreen(
                                     importError = message
                                 } finally {
                                     isImporting = false
+                                    importProgress = null
                                 }
                             }
                         },

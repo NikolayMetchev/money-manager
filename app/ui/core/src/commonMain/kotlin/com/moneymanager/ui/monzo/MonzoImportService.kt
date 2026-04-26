@@ -2,12 +2,8 @@
 
 package com.moneymanager.ui.monzo
 
-import io.ktor.http.URLBuilder
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import io.ktor.http.*
+import kotlinx.serialization.json.*
 import kotlin.time.Instant
 
 private const val MONZO_BASE_URL = "https://api.monzo.com"
@@ -18,9 +14,17 @@ data class MonzoImportResult(
     val transactionCount: Int,
 )
 
+data class MonzoImportProgress(
+    val accountIndex: Int,
+    val accountCount: Int,
+    val page: Int,
+    val importedTransactionCount: Int,
+)
+
 suspend fun importMonzoData(
     token: String,
     apiClient: MonzoApiClient,
+    onProgress: (MonzoImportProgress) -> Unit = {},
 ): MonzoImportResult {
     val accountIds =
         fetch(
@@ -31,9 +35,18 @@ suspend fun importMonzoData(
 
     var transactionCount = 0
 
-    for (accountId in accountIds) {
+    for ((index, accountId) in accountIds.withIndex()) {
         var before: Instant? = null
+        var page = 1
         do {
+            onProgress(
+                MonzoImportProgress(
+                    accountIndex = index + 1,
+                    accountCount = accountIds.size,
+                    page = page,
+                    importedTransactionCount = transactionCount,
+                ),
+            )
             val url = buildTransactionUrl(accountId, before)
             val body =
                 fetch(
@@ -44,6 +57,15 @@ suspend fun importMonzoData(
             val transactions = parseTransactions(body)
             transactionCount += transactions.size
             before = transactions.map { it.created }.minOrNull()
+            onProgress(
+                MonzoImportProgress(
+                    accountIndex = index + 1,
+                    accountCount = accountIds.size,
+                    page = page,
+                    importedTransactionCount = transactionCount,
+                ),
+            )
+            page += 1
         } while (transactions.isNotEmpty())
     }
 
