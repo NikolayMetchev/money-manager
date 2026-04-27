@@ -34,8 +34,8 @@ plugins {
     id("com.autonomousapps.build-health") version "3.8.0"
 
     // Kotlin plugins declared here for classloader compatibility with DAGP
-    id("org.jetbrains.kotlin.multiplatform") version "2.3.20" apply false
-    id("org.jetbrains.kotlin.jvm") version "2.3.20" apply false
+    id("org.jetbrains.kotlin.multiplatform") version "2.3.21" apply false
+    id("org.jetbrains.kotlin.jvm") version "2.3.21" apply false
     id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
 
