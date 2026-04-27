@@ -58,6 +58,7 @@ import com.moneymanager.ui.navigation.Screen
 import com.moneymanager.ui.navigation.mouseButtonNavigation
 import com.moneymanager.ui.screens.AccountAuditScreen
 import com.moneymanager.ui.screens.AccountsScreen
+import com.moneymanager.ui.screens.ApiSessionTrafficScreen
 import com.moneymanager.ui.screens.ApiSessionsScreen
 import com.moneymanager.ui.screens.CategoriesScreen
 import com.moneymanager.ui.screens.CategoryAuditScreen
@@ -202,7 +203,7 @@ fun MoneyManagerApp(
                         NavigationBarItem(
                             icon = { Text("\uD83D\uDD17") },
                             label = { Text("API") },
-                            selected = currentScreen is Screen.ApiSessions,
+                            selected = currentScreen is Screen.ApiSessions || currentScreen is Screen.ApiSessionTraffic,
                             onClick = { navigationHistory.navigateTo(Screen.ApiSessions) },
                         )
                         NavigationBarItem(
@@ -537,6 +538,20 @@ fun MoneyManagerApp(
                                 onMonzoConnectClick = {
                                     navigationHistory.navigateTo(Screen.MonzoConnect)
                                 },
+                                onSessionClick = { session ->
+                                    navigationHistory.navigateTo(Screen.ApiSessionTraffic(session.id))
+                                },
+                            )
+                        }
+                        is Screen.ApiSessionTraffic -> {
+                            LaunchedEffect(Unit) {
+                                currentlyViewedAccountId = null
+                                currentlyViewedCurrencyId = null
+                            }
+                            ApiSessionTrafficScreen(
+                                apiSessionRepository = apiSessionRepository,
+                                sessionId = screen.sessionId,
+                                onBack = { navigationHistory.navigateBack() },
                             )
                         }
                     }
