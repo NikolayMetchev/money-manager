@@ -82,6 +82,7 @@ fun ApiSessionsScreen(
     var importResultBySession by remember { mutableStateOf<Map<ApiSessionId, MonzoImportResult>>(emptyMap()) }
     var importProgressBySession by remember { mutableStateOf<Map<ApiSessionId, MonzoImportProgress?>>(emptyMap()) }
     var importErrorBySession by remember { mutableStateOf<Map<ApiSessionId, String>>(emptyMap()) }
+
     fun refreshSessions() {
         scope.launch {
             try {
@@ -176,8 +177,9 @@ fun ApiSessionsScreen(
                     ) {
                         items(sessions) { session ->
                             val expiresAt = session.expiresAt
-                            val isActive = session.revokedAt == null &&
-                                (expiresAt == null || expiresAt > Clock.System.now())
+                            val isActive =
+                                session.revokedAt == null &&
+                                    (expiresAt == null || expiresAt > Clock.System.now())
                             val isImporting = importingSessionId == session.id
                             val importResult = importResultBySession[session.id]
                             val importProgress = importProgressBySession[session.id]
@@ -272,7 +274,10 @@ private fun ApiSessionCard(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = session.type.name.lowercase().replaceFirstChar { it.uppercase() },
+                    text =
+                        session.type.name
+                            .lowercase()
+                            .replaceFirstChar { it.uppercase() },
                     style = MaterialTheme.typography.titleMedium,
                 )
                 SessionStatusBadge(isActive = isActive)
@@ -464,8 +469,9 @@ fun ApiSessionTrafficScreen(
                     style = MaterialTheme.typography.headlineMedium,
                 )
                 Text(
-                    text = session?.let { "${it.type.name.lowercase().replaceFirstChar { char -> char.uppercase() }} session #${it.id}" }
-                        ?: "Session #$sessionId",
+                    text =
+                        session?.let { "${it.type.name.lowercase().replaceFirstChar { char -> char.uppercase() }} session #${it.id}" }
+                            ?: "Session #$sessionId",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
