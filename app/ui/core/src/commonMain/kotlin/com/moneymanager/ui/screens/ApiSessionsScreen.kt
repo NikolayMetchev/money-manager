@@ -56,6 +56,12 @@ import com.moneymanager.ui.monzo.createMonzoApiClient
 import com.moneymanager.ui.monzo.importMonzoData
 import com.moneymanager.ui.util.displayDateTime
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import org.lighthousegames.logging.logging
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -535,7 +541,7 @@ private fun ApiTrafficPairCard(pair: ApiTrafficPair) {
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             pair.request?.let { request ->
-                TrafficItem(
+                RequestTrafficItem(
                     title = "Request #${request.id}",
                     timestamp = request.requestedAt.displayDateTime(),
                     body = request.displayBody(),
@@ -545,10 +551,10 @@ private fun ApiTrafficPairCard(pair: ApiTrafficPair) {
             HorizontalDivider()
 
             pair.response?.let { response ->
-                TrafficItem(
+                ResponseTrafficItem(
                     title = "Response #${response.id}",
                     timestamp = response.respondedAt.displayDateTime(),
-                    body = response.json,
+                    json = response.json,
                 )
             } ?: MissingTrafficItem(label = "Response")
         }
@@ -565,7 +571,7 @@ private fun MissingTrafficItem(label: String) {
 }
 
 @Composable
-private fun TrafficItem(
+private fun RequestTrafficItem(
     title: String,
     timestamp: String,
     body: String,
@@ -579,21 +585,10 @@ private fun TrafficItem(
                     shape = MaterialTheme.shapes.small,
                 ).padding(8.dp),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.labelLarge,
-            )
-            Text(
-                text = timestamp,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        TrafficItemHeader(
+            title = title,
+            timestamp = timestamp,
+        )
         SelectionContainer {
             Text(
                 text = body,
@@ -602,6 +597,147 @@ private fun TrafficItem(
                 maxLines = 8,
                 overflow = TextOverflow.Ellipsis,
             )
+        }
+    }
+}
+
+@Composable
+private fun ResponseTrafficItem(
+    title: String,
+    timestamp: String,
+    json: String,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.55f),
+                    shape = MaterialTheme.shapes.small,
+                ).padding(8.dp),
+    ) {
+        TrafficItemHeader(
+            title = title,
+            timestamp = timestamp,
+        )
+        JsonViewer(json = json)
+    }
+}
+
+@Composable
+private fun TrafficItemHeader(
+    title: String,
+    timestamp: String,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelLarge,
+        )
+        Text(
+            text = timestamp,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun JsonViewer(json: String) {
+    val jsonElement = remember(json) {
+        runCatching { Json.parseToJsonElement(json) }.getOrNull()
+    }
+
+    if (jsonElement == null) {
+        SelectionContainer {
+            Text(
+                text = json,
+                style = MaterialTheme.typography.bodySmall,
+                fontFamily = FontFamily.Monospace,
+                maxLines = 8,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    } else {
+        Column {
+            JsonTreeNode(
+                label = null,
+                element = jsonElement,
+                depth = 0,
+            )
+        }
+    }
+}
+
+@Composable
+private fun JsonTreeNode(
+    label: String?,
+    element: JsonElement,
+    depth: Int,
+) {
+    val childCount = element.childCount()
+    val expandable = childCount > 0
+    var expanded by remember(label, element) { mutableStateOf(depth == 0) }
+    val prefix =
+        if (expandable) {
+            if (expanded) "- " else "+ "
+        } else {
+            "  "
+        }
+    val line =
+        buildString {
+            append(prefix)
+            if (label != null) {
+                append(label)
+                append(": ")
+            }
+            append(element.summary(expanded))
+        }
+
+    Text(
+        text = line,
+        style = MaterialTheme.typography.bodySmall,
+        fontFamily = FontFamily.Monospace,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(start = (depth * 12).dp)
+                .then(
+                    if (expandable) {
+                        Modifier.clickable { expanded = !expanded }
+                    } else {
+                        Modifier
+                    },
+                ),
+    )
+
+    if (expanded) {
+        when (element) {
+            is JsonObject -> {
+                element.entries.forEach { (key, value) ->
+                    JsonTreeNode(
+                        label = "\"$key\"",
+                        element = value,
+                        depth = depth + 1,
+                    )
+                }
+            }
+            is JsonArray -> {
+                element.forEachIndexed { index, value ->
+                    JsonTreeNode(
+                        label = "[$index]",
+                        element = value,
+                        depth = depth + 1,
+                    )
+                }
+            }
+            else -> Unit
         }
     }
 }
@@ -615,37 +751,46 @@ private fun pairRequestsAndResponses(
     requests: List<ApiRequest>,
     responses: List<ApiResponse>,
 ): List<ApiTrafficPair> {
-    val unmatchedResponses = responses.sortedBy { it.respondedAt }.toMutableList()
-    val pairs =
-        requests
-            .sortedBy { it.requestedAt }
-            .map { request ->
-                val responseIndex =
-                    unmatchedResponses.indexOfFirst { response ->
-                        response.respondedAt >= request.requestedAt
-                    }
-                val response =
-                    if (responseIndex >= 0) {
-                        unmatchedResponses.removeAt(responseIndex)
-                    } else {
-                        null
-                    }
-                ApiTrafficPair(request = request, response = response)
-            }
+    val responsesByRequestId = responses.associateBy { it.requestId }
+    val requestPairs =
+        requests.map { request ->
+            ApiTrafficPair(
+                request = request,
+                response = responsesByRequestId[request.id],
+            )
+        }
+    val orphanResponses =
+        responses
+            .filter { response -> requests.none { request -> request.id == response.requestId } }
+            .map { response -> ApiTrafficPair(request = null, response = response) }
 
-    return (pairs + unmatchedResponses.map { response -> ApiTrafficPair(request = null, response = response) })
+    return (requestPairs + orphanResponses)
         .sortedByDescending { pair -> pair.request?.requestedAt ?: pair.response?.respondedAt ?: Instant.DISTANT_PAST }
 }
 
 private fun ApiRequest.displayBody(): String =
     buildString {
-        append(json)
+        appendLine("$method $url")
         if (headers.isNotEmpty()) {
-            appendLine()
             appendLine()
             appendLine("Headers:")
             headers.forEach { header ->
                 appendLine("${header.key}: ${header.value}")
             }
         }
+    }.trimEnd()
+
+private fun JsonElement.childCount(): Int =
+    when (this) {
+        is JsonObject -> size
+        is JsonArray -> size
+        else -> 0
+    }
+
+private fun JsonElement.summary(expanded: Boolean): String =
+    when (this) {
+        is JsonObject -> if (expanded) "{" else "{...} $size item(s)"
+        is JsonArray -> if (expanded) "[" else "[...] $size item(s)"
+        JsonNull -> "null"
+        is JsonPrimitive -> toString()
     }

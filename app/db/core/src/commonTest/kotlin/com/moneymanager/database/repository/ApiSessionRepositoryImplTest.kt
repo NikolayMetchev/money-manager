@@ -12,7 +12,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 class ApiSessionRepositoryImplTest : DbTest() {
@@ -167,24 +169,25 @@ class ApiSessionRepositoryImplTest : DbTest() {
         }
 
     @Test
-    fun `insertRequest stores json and headers`() =
+    fun `insertRequest stores method url and headers`() =
         runTest {
             val deviceId = deviceId()
             val sessionId = repositories.apiSessionRepository.createSession(token, deviceId, now, null)
-            val requestJson = """{"path":"/accounts","method":"GET"}"""
             val headerMap =
                 linkedMapOf(
                     "Authorization" to "Bearer token",
                     "Accept" to "application/json",
                 )
 
+            val beforeInsert = Clock.System.now()
             val requestId =
                 repositories.apiSessionRepository.insertRequest(
                     sessionId = sessionId,
-                    requestedAt = now + 1.hours,
-                    json = requestJson,
+                    method = "GET",
+                    url = "https://api.monzo.com/accounts",
                     headers = headerMap,
                 )
+            val afterInsert = Clock.System.now()
 
             assertTrue(requestId.id > 0, "Request ID should be positive: $requestId")
 
@@ -193,8 +196,9 @@ class ApiSessionRepositoryImplTest : DbTest() {
             val request = requests.single()
             assertEquals(requestId, request.id)
             assertEquals(sessionId, request.sessionId)
-            assertEquals(now + 1.hours, request.requestedAt)
-            assertEquals(requestJson, request.json)
+            assertTimestampBetween(request.requestedAt, beforeInsert, afterInsert)
+            assertEquals("GET", request.method)
+            assertEquals("https://api.monzo.com/accounts", request.url)
             assertContentEquals(headerMap.keys.toList(), request.headers.map { it.key })
             assertContentEquals(headerMap.values.toList(), request.headers.map { it.value })
         }
@@ -205,13 +209,15 @@ class ApiSessionRepositoryImplTest : DbTest() {
             val deviceId = deviceId()
             val sessionId = repositories.apiSessionRepository.createSession(token, deviceId, now, null)
 
-            repositories.apiSessionRepository.insertRequest(sessionId, now + 1.hours, """{"request":1}""", emptyMap())
-            repositories.apiSessionRepository.insertRequest(sessionId, now + 2.hours, """{"request":2}""", emptyMap())
+            repositories.apiSessionRepository.insertRequest(sessionId, "GET", "https://example.test/1", emptyMap())
+            repositories.apiSessionRepository.insertRequest(sessionId, "POST", "https://example.test/2", emptyMap())
 
             val requests = repositories.apiSessionRepository.getRequestsBySession(sessionId)
             assertEquals(2, requests.size)
-            assertEquals("""{"request":2}""", requests.first().json)
-            assertEquals("""{"request":1}""", requests.last().json)
+            assertEquals("POST", requests.first().method)
+            assertEquals("https://example.test/2", requests.first().url)
+            assertEquals("GET", requests.last().method)
+            assertEquals("https://example.test/1", requests.last().url)
         }
 
     @Test
@@ -220,13 +226,22 @@ class ApiSessionRepositoryImplTest : DbTest() {
             val deviceId = deviceId()
             val sessionId = repositories.apiSessionRepository.createSession(token, deviceId, now, null)
             val responseJson = """{"accounts":[{"id":1}]}"""
+            val requestId =
+                repositories.apiSessionRepository.insertRequest(
+                    sessionId = sessionId,
+                    method = "GET",
+                    url = "https://example.test/accounts",
+                    headers = emptyMap(),
+                )
 
+            val beforeInsert = Clock.System.now()
             val responseId =
                 repositories.apiSessionRepository.insertResponse(
+                    requestId = requestId,
                     sessionId = sessionId,
-                    respondedAt = now + 1.hours,
                     json = responseJson,
                 )
+            val afterInsert = Clock.System.now()
 
             assertTrue(responseId.id > 0, "Response ID should be positive: $responseId")
 
@@ -234,8 +249,9 @@ class ApiSessionRepositoryImplTest : DbTest() {
             assertEquals(1, responses.size)
             val response = responses.single()
             assertEquals(responseId, response.id)
+            assertEquals(requestId, response.requestId)
             assertEquals(sessionId, response.sessionId)
-            assertEquals(now + 1.hours, response.respondedAt)
+            assertTimestampBetween(response.respondedAt, beforeInsert, afterInsert)
             assertEquals(responseJson, response.json)
         }
 
@@ -245,15 +261,16 @@ class ApiSessionRepositoryImplTest : DbTest() {
             val deviceId = deviceId()
             val sessionId = repositories.apiSessionRepository.createSession(token, deviceId, now, null)
 
-            repositories.apiSessionRepository.insertRequest(
-                sessionId = sessionId,
-                requestedAt = now + 1.hours,
-                json = """{"request":true}""",
-                headers = mapOf("Authorization" to "Bearer token"),
-            )
+            val requestId =
+                repositories.apiSessionRepository.insertRequest(
+                    sessionId = sessionId,
+                    method = "GET",
+                    url = "https://example.test/request",
+                    headers = mapOf("Authorization" to "Bearer token"),
+                )
             repositories.apiSessionRepository.insertResponse(
+                requestId = requestId,
                 sessionId = sessionId,
-                respondedAt = now + 2.hours,
                 json = """{"response":true}""",
             )
 
@@ -275,4 +292,13 @@ class ApiSessionRepositoryImplTest : DbTest() {
             val session = repositories.apiSessionRepository.getSessionById(id)
             assertNull(session)
         }
+
+    private fun assertTimestampBetween(
+        actual: Instant,
+        start: Instant,
+        end: Instant,
+    ) {
+        assertTrue(actual >= start - 1.seconds, "Expected $actual to be at or after $start")
+        assertTrue(actual <= end + 1.seconds, "Expected $actual to be at or before $end")
+    }
 }
