@@ -38,7 +38,7 @@ jobs:
         with:
           # Gradle version sync: keep this aligned with gradle/wrapper/gradle-wrapper.properties
           # and .github/actions/gradle-setup/action.yml.
-          gradle-version: 9.4.1
+          gradle-version: 9.5.0
 
       - name: Run lintFormat
         run: ./gradlew lintFormat --no-daemon -Dktlint.ignoreFailures=true --continue

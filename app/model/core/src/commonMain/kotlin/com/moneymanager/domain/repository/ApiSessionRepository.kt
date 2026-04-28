@@ -90,8 +90,8 @@ interface ApiSessionRepository {
      */
     suspend fun insertRequest(
         sessionId: ApiSessionId,
-        requestedAt: Instant,
-        json: String,
+        method: String,
+        url: String,
         headers: Map<String, String>,
     ): ApiRequestId
 
@@ -104,8 +104,8 @@ interface ApiSessionRepository {
      * Stores one API response payload for the given session.
      */
     suspend fun insertResponse(
+        requestId: ApiRequestId,
         sessionId: ApiSessionId,
-        respondedAt: Instant,
         json: String,
     ): ApiResponseId
 

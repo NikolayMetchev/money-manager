@@ -100,8 +100,8 @@ class ApiSessionRepositoryImpl(
 
     override suspend fun insertRequest(
         sessionId: ApiSessionId,
-        requestedAt: Instant,
-        json: String,
+        method: String,
+        url: String,
         headers: Map<String, String>,
     ): ApiRequestId =
         withContext(Dispatchers.Default) {
@@ -109,8 +109,8 @@ class ApiSessionRepositoryImpl(
                 queries.transactionWithResult {
                     queries.insertRequest(
                         session_id = sessionId.id,
-                        requested_at = requestedAt.toEpochMilliseconds(),
-                        json = json,
+                        method = method,
+                        url = url,
                     )
                     val requestId = queries.lastInsertRowId().executeAsOne()
 
@@ -147,16 +147,16 @@ class ApiSessionRepositoryImpl(
         }
 
     override suspend fun insertResponse(
+        requestId: ApiRequestId,
         sessionId: ApiSessionId,
-        respondedAt: Instant,
         json: String,
     ): ApiResponseId =
         withContext(Dispatchers.Default) {
             val id =
                 queries.transactionWithResult {
                     queries.insertResponse(
+                        request_id = requestId.id,
                         session_id = sessionId.id,
-                        responded_at = respondedAt.toEpochMilliseconds(),
                         json = json,
                     )
                     queries.lastInsertRowId().executeAsOne()
@@ -181,7 +181,8 @@ class ApiSessionRepositoryImpl(
             id = ApiRequestId(id),
             sessionId = ApiSessionId(session_id),
             requestedAt = Instant.fromEpochMilliseconds(requested_at),
-            json = json,
+            method = method,
+            url = url,
             headers = headers.map { it.toApiRequestHeader() },
         )
 
@@ -196,6 +197,7 @@ class ApiSessionRepositoryImpl(
     private fun com.moneymanager.database.sql.Api_response.toApiResponse(): ApiResponse =
         ApiResponse(
             id = ApiResponseId(id),
+            requestId = ApiRequestId(request_id),
             sessionId = ApiSessionId(session_id),
             respondedAt = Instant.fromEpochMilliseconds(responded_at),
             json = json,

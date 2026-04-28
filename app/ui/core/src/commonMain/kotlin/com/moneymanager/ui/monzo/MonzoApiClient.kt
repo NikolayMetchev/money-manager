@@ -12,9 +12,6 @@ import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
 import io.ktor.util.AttributeKey
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
-import kotlin.time.Clock
 
 class MonzoApiClient(
     private val httpClient: HttpClient,
@@ -50,27 +47,24 @@ fun createMonzoApiClient(
     val httpClient = HttpClient()
 
     httpClient.plugin(HttpSend).intercept { request ->
-        apiSessionRepository.insertRequest(
-            sessionId = sessionId,
-            requestedAt = Clock.System.now(),
-            json =
-                buildJsonObject {
-                    put("method", request.method.value)
-                    put("url", request.url.buildString())
-                }.toString(),
-            headers =
-                request.headers
-                    .entries()
-                    .associate { (key, values) -> key to values.joinToString(",") }
-                    .filterKeys { it != HttpHeaders.Authorization },
-        )
+        val requestId =
+            apiSessionRepository.insertRequest(
+                sessionId = sessionId,
+                method = request.method.value,
+                url = request.url.buildString(),
+                headers =
+                    request.headers
+                        .entries()
+                        .associate { (key, values) -> key to values.joinToString(",") }
+                        .filterKeys { it != HttpHeaders.Authorization },
+            )
 
         val call = execute(request)
         val responseBody = call.response.bodyAsText()
 
         apiSessionRepository.insertResponse(
+            requestId = requestId,
             sessionId = sessionId,
-            respondedAt = Clock.System.now(),
             json = responseBody,
         )
         call.attributes.put(MonzoApiResponseBodyKey, responseBody)
