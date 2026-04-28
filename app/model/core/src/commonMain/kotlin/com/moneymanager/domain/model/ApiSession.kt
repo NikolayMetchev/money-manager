@@ -31,7 +31,8 @@ data class ApiRequest(
     val id: ApiRequestId,
     val sessionId: ApiSessionId,
     val requestedAt: Instant,
-    val json: String,
+    val method: String,
+    val url: String,
     val headers: List<ApiRequestHeader>,
 )
 
@@ -58,6 +59,7 @@ value class ApiRequestHeaderId(
 
 data class ApiResponse(
     val id: ApiResponseId,
+    val requestId: ApiRequestId,
     val sessionId: ApiSessionId,
     val respondedAt: Instant,
     val json: String,

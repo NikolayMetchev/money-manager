@@ -3,6 +3,7 @@
 package com.moneymanager.ui.navigation
 
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.TransferId
@@ -64,4 +65,10 @@ sealed class Screen(
     ) : Screen("Category Audit: $categoryName")
 
     data object MonzoConnect : Screen("Monzo Connection")
+
+    data object ApiSessions : Screen("API Sessions")
+
+    data class ApiSessionTraffic(
+        val sessionId: ApiSessionId,
+    ) : Screen("API Traffic")
 }

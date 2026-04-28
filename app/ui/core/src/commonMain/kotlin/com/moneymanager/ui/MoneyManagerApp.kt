@@ -58,6 +58,8 @@ import com.moneymanager.ui.navigation.Screen
 import com.moneymanager.ui.navigation.mouseButtonNavigation
 import com.moneymanager.ui.screens.AccountAuditScreen
 import com.moneymanager.ui.screens.AccountsScreen
+import com.moneymanager.ui.screens.ApiSessionTrafficScreen
+import com.moneymanager.ui.screens.ApiSessionsScreen
 import com.moneymanager.ui.screens.CategoriesScreen
 import com.moneymanager.ui.screens.CategoryAuditScreen
 import com.moneymanager.ui.screens.CsvImportDetailScreen
@@ -197,6 +199,12 @@ fun MoneyManagerApp(
                             label = { Text("CSV") },
                             selected = currentScreen is Screen.CsvImports || currentScreen is Screen.CsvImportDetail,
                             onClick = { navigationHistory.navigateTo(Screen.CsvImports) },
+                        )
+                        NavigationBarItem(
+                            icon = { Text("\uD83D\uDD17") },
+                            label = { Text("API") },
+                            selected = currentScreen is Screen.ApiSessions || currentScreen is Screen.ApiSessionTraffic,
+                            onClick = { navigationHistory.navigateTo(Screen.ApiSessions) },
                         )
                         NavigationBarItem(
                             icon = { Text("\u2699\uFE0F") },
@@ -517,6 +525,33 @@ fun MoneyManagerApp(
                             MonzoAuthScreen(
                                 apiSessionRepository = apiSessionRepository,
                                 deviceId = deviceId,
+                            )
+                        }
+                        is Screen.ApiSessions -> {
+                            LaunchedEffect(Unit) {
+                                currentlyViewedAccountId = null
+                                currentlyViewedCurrencyId = null
+                            }
+                            ApiSessionsScreen(
+                                apiSessionRepository = apiSessionRepository,
+                                deviceId = deviceId,
+                                onMonzoConnectClick = {
+                                    navigationHistory.navigateTo(Screen.MonzoConnect)
+                                },
+                                onSessionClick = { session ->
+                                    navigationHistory.navigateTo(Screen.ApiSessionTraffic(session.id))
+                                },
+                            )
+                        }
+                        is Screen.ApiSessionTraffic -> {
+                            LaunchedEffect(Unit) {
+                                currentlyViewedAccountId = null
+                                currentlyViewedCurrencyId = null
+                            }
+                            ApiSessionTrafficScreen(
+                                apiSessionRepository = apiSessionRepository,
+                                sessionId = screen.sessionId,
+                                onBack = { navigationHistory.navigateBack() },
                             )
                         }
                     }
