@@ -65,7 +65,7 @@ suspend fun importMonzoData(
 
             // Record each transaction's state in api_response_transaction when we have a response ID
             val responseId = response.responseId
-            if (responseId != null && transactions.isNotEmpty()) {
+            if (responseId != null) {
                 transactions.forEach { item ->
                     apiSessionRepository.insertResponseTransaction(
                         responseId = responseId,

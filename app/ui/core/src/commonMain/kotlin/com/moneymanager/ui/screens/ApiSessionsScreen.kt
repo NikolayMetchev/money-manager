@@ -840,8 +840,8 @@ private fun JsonViewer(
  */
 private fun parseJsonPathSegments(jsonPath: String?): List<String>? {
     if (jsonPath == null) return null
-    // Strip leading "$." and then split on "." and "[…]"
-    val stripped = jsonPath.removePrefix("$").removePrefix(".")
+    // Strip leading "$." prefix, then split on "." and "[…]"
+    val stripped = jsonPath.removePrefix("$.").removePrefix("$")
     if (stripped.isEmpty()) return null
 
     val segments = mutableListOf<String>()
@@ -875,8 +875,6 @@ private fun JsonTreeNode(
     // Force-expand the node if it's on the highlight path
     val forceExpand = remainingHighlightSegments != null && remainingHighlightSegments.isNotEmpty()
     var expanded by remember(label, element) { mutableStateOf(depth == 0 || forceExpand) }
-    // Keep expanded when we need to show the highlight path
-    if (forceExpand && !expanded) expanded = true
 
     val prefix =
         if (expandable) {
