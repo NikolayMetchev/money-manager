@@ -42,7 +42,7 @@ proguard = "7.8.2"
 metro = "0.13.2"
 schemaspy = "7.0.2"
 slf4j = "2.0.17"
-sort-dependencies = "0.16"
+sort-dependencies = "0.17.1"
 sqldelight = "2.3.2"
 turbine = "1.2.1"
 
