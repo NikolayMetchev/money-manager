@@ -2,6 +2,7 @@
 
 package com.moneymanager.ui.monzo
 
+import com.moneymanager.domain.model.ApiResponseId
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.repository.ApiSessionRepository
 import io.ktor.client.HttpClient
@@ -27,10 +28,12 @@ class MonzoApiClient(
         val body =
             response.call.attributes.getOrNull(MonzoApiResponseBodyKey)
                 ?: response.bodyAsText()
+        val responseId = response.call.attributes.getOrNull(MonzoApiResponseIdKey)
 
         return MonzoHttpResponse(
             statusCode = response.status.value,
             body = body,
+            responseId = responseId,
         )
     }
 }
@@ -38,6 +41,7 @@ class MonzoApiClient(
 data class MonzoHttpResponse(
     val statusCode: Int,
     val body: String,
+    val responseId: ApiResponseId? = null,
 )
 
 fun createMonzoApiClient(
@@ -62,12 +66,14 @@ fun createMonzoApiClient(
         val call = execute(request)
         val responseBody = call.response.bodyAsText()
 
-        apiSessionRepository.insertResponse(
-            requestId = requestId,
-            sessionId = sessionId,
-            json = responseBody,
-        )
+        val responseId =
+            apiSessionRepository.insertResponse(
+                requestId = requestId,
+                sessionId = sessionId,
+                json = responseBody,
+            )
         call.attributes.put(MonzoApiResponseBodyKey, responseBody)
+        call.attributes.put(MonzoApiResponseIdKey, responseId)
 
         call
     }
@@ -76,3 +82,4 @@ fun createMonzoApiClient(
 }
 
 private val MonzoApiResponseBodyKey = AttributeKey<String>("MonzoApiResponseBody")
+private val MonzoApiResponseIdKey = AttributeKey<ApiResponseId>("MonzoApiResponseId")

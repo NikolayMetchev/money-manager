@@ -2,6 +2,8 @@
 
 package com.moneymanager.ui.monzo
 
+import com.moneymanager.domain.model.ApiResponseTransactionState
+import com.moneymanager.domain.repository.ApiSessionRepository
 import io.ktor.http.*
 import kotlinx.serialization.json.*
 import kotlin.time.Instant
@@ -12,6 +14,8 @@ private const val TRANSACTION_PAGE_LIMIT = 100
 data class MonzoImportResult(
     val accountCount: Int,
     val transactionCount: Int,
+    val duplicateCount: Int = 0,
+    val errorCount: Int = 0,
 )
 
 data class MonzoImportProgress(
@@ -24,14 +28,16 @@ data class MonzoImportProgress(
 suspend fun importMonzoData(
     token: String,
     apiClient: MonzoApiClient,
+    apiSessionRepository: ApiSessionRepository,
     onProgress: (MonzoImportProgress) -> Unit = {},
 ): MonzoImportResult {
-    val accountIds =
-        fetch(
+    val accountsResponse =
+        fetchResponse(
             url = "$MONZO_BASE_URL/accounts",
             token = token,
             apiClient = apiClient,
-        ).let { parseIds(it, "accounts") }
+        )
+    val accountIds = parseIds(accountsResponse.body, "accounts")
 
     var transactionCount = 0
 
@@ -48,14 +54,30 @@ suspend fun importMonzoData(
                 ),
             )
             val url = buildTransactionUrl(accountId, before)
-            val body =
-                fetch(
+            val response =
+                fetchResponse(
                     url = url,
                     token = token,
                     apiClient = apiClient,
                 )
-            val transactions = parseTransactions(body)
+            val transactions = parseTransactionsWithPath(response.body)
             transactionCount += transactions.size
+
+            // Record each transaction's state in api_response_transaction when we have a response ID
+            val responseId = response.responseId
+            if (responseId != null && transactions.isNotEmpty()) {
+                transactions.forEach { item ->
+                    apiSessionRepository.insertResponseTransaction(
+                        responseId = responseId,
+                        jsonPath = item.jsonPath,
+                        state = ApiResponseTransactionState.IMPORTED,
+                        transactionId = null,
+                        duplicateOfTransactionId = null,
+                        errorMessage = null,
+                    )
+                }
+            }
+
             before = transactions.map { it.created }.minOrNull()
             onProgress(
                 MonzoImportProgress(
@@ -75,17 +97,16 @@ suspend fun importMonzoData(
     )
 }
 
-private suspend fun fetch(
+private suspend fun fetchResponse(
     url: String,
     token: String,
     apiClient: MonzoApiClient,
-): String {
+): MonzoHttpResponse {
     val response = apiClient.get(url = url, bearerToken = token)
     if (response.statusCode != 200) {
         throw MonzoApiException("HTTP ${response.statusCode}: ${response.body}")
     }
-
-    return response.body
+    return response
 }
 
 class MonzoApiException(
@@ -109,19 +130,24 @@ private fun parseIds(
 
 private data class MonzoTransactionPageItem(
     val created: Instant,
+    val jsonPath: String,
 )
 
-private fun parseTransactions(json: String): List<MonzoTransactionPageItem> =
+private fun parseTransactionsWithPath(json: String): List<MonzoTransactionPageItem> =
     try {
         Json
             .parseToJsonElement(json)
             .jsonObject["transactions"]
             ?.jsonArray
-            ?.mapNotNull { element ->
+            ?.mapIndexedNotNull { index, element ->
                 val obj = element.jsonObject
                 val created = obj["created"]?.jsonPrimitive?.contentOrNull?.let { Instant.parse(it) }
-
-                created?.let { MonzoTransactionPageItem(created = it) }
+                created?.let {
+                    MonzoTransactionPageItem(
+                        created = it,
+                        jsonPath = "$.transactions[$index]",
+                    )
+                }
             }
             ?: emptyList()
     } catch (_: Exception) {

@@ -19,6 +19,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.DeviceInfo
@@ -56,6 +57,7 @@ fun TransactionAuditScreen(
     transactionRepository: TransactionRepository,
     currentDeviceId: DeviceId? = null,
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
+    onApiSourceClick: (ApiSessionId, String?) -> Unit = { _, _ -> },
     onAccountClick: (AccountId) -> Unit = {},
     onBack: () -> Unit,
 ) {
@@ -110,6 +112,7 @@ fun TransactionAuditScreen(
                 accounts = accounts,
                 currentDeviceId = currentDeviceId,
                 onCsvSourceClick = onCsvSourceClick,
+                onApiSourceClick = onApiSourceClick,
                 onAccountClick = onAccountClick,
             )
         },
@@ -122,6 +125,7 @@ private fun TransactionAuditDiffCard(
     accounts: List<Account>,
     currentDeviceId: DeviceId? = null,
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
+    onApiSourceClick: (ApiSessionId, String?) -> Unit = { _, _ -> },
     onAccountClick: (AccountId) -> Unit = {},
 ) {
     AuditDiffCard(
@@ -130,9 +134,9 @@ private fun TransactionAuditDiffCard(
         revisionId = diff.revisionId,
     ) {
         when (diff.auditType) {
-            AuditType.INSERT -> InsertDiffContent(diff, accounts, currentDeviceId, onCsvSourceClick, onAccountClick)
-            AuditType.UPDATE -> UpdateDiffContent(diff, accounts, currentDeviceId, onCsvSourceClick, onAccountClick)
-            AuditType.DELETE -> DeleteDiffContent(diff, accounts, currentDeviceId, onCsvSourceClick, onAccountClick)
+            AuditType.INSERT -> InsertDiffContent(diff, accounts, currentDeviceId, onCsvSourceClick, onApiSourceClick, onAccountClick)
+            AuditType.UPDATE -> UpdateDiffContent(diff, accounts, currentDeviceId, onCsvSourceClick, onApiSourceClick, onAccountClick)
+            AuditType.DELETE -> DeleteDiffContent(diff, accounts, currentDeviceId, onCsvSourceClick, onApiSourceClick, onAccountClick)
         }
     }
 }
@@ -143,6 +147,7 @@ private fun InsertDiffContent(
     accounts: List<Account>,
     currentDeviceId: DeviceId? = null,
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
+    onApiSourceClick: (ApiSessionId, String?) -> Unit = { _, _ -> },
     onAccountClick: (AccountId) -> Unit = {},
 ) {
     val transactionDateTime = diff.timestamp.value().toLocalDateTime(TimeZone.currentSystemDefault())
@@ -158,7 +163,7 @@ private fun InsertDiffContent(
         FieldValueRow("Amount", formatAmount(diff.amount.value()), labelWidth = LABEL_WIDTH)
         FieldValueRow("Description", diff.description.value().ifBlank { "(none)" }, labelWidth = LABEL_WIDTH)
         AttributesSection(diff.attributeChanges)
-        SourceInfoSection(diff.source, currentDeviceId = currentDeviceId, onCsvSourceClick = onCsvSourceClick)
+        SourceInfoSection(diff.source, currentDeviceId = currentDeviceId, onCsvSourceClick = onCsvSourceClick, onApiSourceClick = onApiSourceClick)
     }
 }
 
@@ -168,6 +173,7 @@ private fun UpdateDiffContent(
     accounts: List<Account>,
     currentDeviceId: DeviceId? = null,
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
+    onApiSourceClick: (ApiSessionId, String?) -> Unit = { _, _ -> },
     onAccountClick: (AccountId) -> Unit = {},
 ) {
     val hasAnyChanges = diff.hasChanges
@@ -232,7 +238,7 @@ private fun UpdateDiffContent(
                 AttributeChangesSection(significantAttrChanges)
             }
         }
-        SourceInfoSection(diff.source, currentDeviceId = currentDeviceId, onCsvSourceClick = onCsvSourceClick)
+        SourceInfoSection(diff.source, currentDeviceId = currentDeviceId, onCsvSourceClick = onCsvSourceClick, onApiSourceClick = onApiSourceClick)
     }
 }
 
@@ -242,6 +248,7 @@ private fun DeleteDiffContent(
     accounts: List<Account>,
     currentDeviceId: DeviceId? = null,
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
+    onApiSourceClick: (ApiSessionId, String?) -> Unit = { _, _ -> },
     onAccountClick: (AccountId) -> Unit = {},
 ) {
     val errorColor = MaterialTheme.colorScheme.error
@@ -263,6 +270,7 @@ private fun DeleteDiffContent(
             currentDeviceId = currentDeviceId,
             labelColor = errorColor.copy(alpha = 0.8f),
             onCsvSourceClick = onCsvSourceClick,
+            onApiSourceClick = onApiSourceClick,
         )
     }
 }
@@ -426,6 +434,7 @@ private fun SourceInfoSection(
     currentDeviceId: DeviceId? = null,
     labelColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
+    onApiSourceClick: (ApiSessionId, String?) -> Unit = { _, _ -> },
 ) {
     if (source == null) return
 
@@ -521,11 +530,21 @@ private fun SourceInfoSection(
                 val thisDeviceSuffix = if (isThisDevice) " (This Device)" else ""
                 FieldValueRow("Origin", "API Import$thisDeviceSuffix", labelWidth = LABEL_WIDTH)
                 if (apiSource != null) {
-                    apiSource.sessionId?.let {
-                        FieldValueRow("Session", it.id.toString(), labelWidth = LABEL_WIDTH)
+                    val sessionId = apiSource.sessionId
+                    if (sessionId != null) {
+                        ApiSourceLinkRow(
+                            label = "Session",
+                            value = sessionId.id.toString(),
+                            sessionId = sessionId,
+                            jsonPath = apiSource.jsonPath,
+                            onApiSourceClick = onApiSourceClick,
+                        )
                     }
                     apiSource.requestId?.let {
                         FieldValueRow("Request", it.id.toString(), labelWidth = LABEL_WIDTH)
+                    }
+                    apiSource.jsonPath?.let {
+                        FieldValueRow("JSON Path", it, labelWidth = LABEL_WIDTH)
                     }
                 }
                 when (deviceInfo) {
@@ -636,6 +655,34 @@ private fun CsvSourceLinkRow(
         )
         TextButton(
             onClick = { onCsvSourceClick(csvImportId, rowIndex) },
+            contentPadding = PaddingValues(0.dp),
+        ) {
+            Text(value)
+        }
+    }
+}
+
+@Composable
+private fun ApiSourceLinkRow(
+    label: String,
+    value: String,
+    sessionId: ApiSessionId,
+    jsonPath: String?,
+    onApiSourceClick: (ApiSessionId, String?) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "$label:",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.width(LABEL_WIDTH),
+        )
+        TextButton(
+            onClick = { onApiSourceClick(sessionId, jsonPath) },
             contentPadding = PaddingValues(0.dp),
         ) {
             Text(value)

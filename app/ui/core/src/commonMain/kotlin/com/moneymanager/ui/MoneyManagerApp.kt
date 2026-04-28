@@ -473,6 +473,14 @@ fun MoneyManagerApp(
                                 onCsvSourceClick = { importId, rowIndex ->
                                     navigationHistory.navigateTo(Screen.CsvImportDetail(importId, rowIndex))
                                 },
+                                onApiSourceClick = { sessionId, jsonPath ->
+                                    navigationHistory.navigateTo(
+                                        Screen.ApiSessionTraffic(
+                                            sessionId = sessionId,
+                                            highlightJsonPath = jsonPath,
+                                        ),
+                                    )
+                                },
                                 onAccountClick = { accountId ->
                                     val account = accounts.find { it.id == accountId }
                                     navigationHistory.navigateTo(
@@ -551,6 +559,7 @@ fun MoneyManagerApp(
                             ApiSessionTrafficScreen(
                                 apiSessionRepository = apiSessionRepository,
                                 sessionId = screen.sessionId,
+                                highlightJsonPath = screen.highlightJsonPath,
                                 onBack = { navigationHistory.navigateBack() },
                             )
                         }

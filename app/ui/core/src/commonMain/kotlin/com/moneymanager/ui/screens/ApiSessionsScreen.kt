@@ -37,6 +37,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -45,6 +46,9 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.domain.model.ApiRequest
 import com.moneymanager.domain.model.ApiResponse
+import com.moneymanager.domain.model.ApiResponseId
+import com.moneymanager.domain.model.ApiResponseTransaction
+import com.moneymanager.domain.model.ApiResponseTransactionState
 import com.moneymanager.domain.model.ApiSession
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.DeviceId
@@ -215,6 +219,7 @@ fun ApiSessionsScreen(
                                                             sessionId = session.id,
                                                             apiSessionRepository = apiSessionRepository,
                                                         ),
+                                                    apiSessionRepository = apiSessionRepository,
                                                     onProgress = { progress ->
                                                         importProgressBySession = importProgressBySession + (session.id to progress)
                                                     },
@@ -440,11 +445,13 @@ private fun SessionStatusBadge(isActive: Boolean) {
 fun ApiSessionTrafficScreen(
     apiSessionRepository: ApiSessionRepository,
     sessionId: ApiSessionId,
+    highlightJsonPath: String? = null,
     onBack: () -> Unit,
 ) {
     var session by remember { mutableStateOf<ApiSession?>(null) }
     var requests by remember { mutableStateOf<List<ApiRequest>>(emptyList()) }
     var responses by remember { mutableStateOf<List<ApiResponse>>(emptyList()) }
+    var responseTransactionsByResponseId by remember { mutableStateOf<Map<ApiResponseId, List<ApiResponseTransaction>>>(emptyMap()) }
     var isLoading by remember { mutableStateOf(true) }
     val pairs = remember(requests, responses) { pairRequestsAndResponses(requests, responses) }
 
@@ -453,6 +460,10 @@ fun ApiSessionTrafficScreen(
             session = apiSessionRepository.getSessionById(sessionId)
             requests = apiSessionRepository.getRequestsBySession(sessionId)
             responses = apiSessionRepository.getResponsesBySession(sessionId)
+            responseTransactionsByResponseId =
+                responses.associate { response ->
+                    response.id to apiSessionRepository.getResponseTransactions(response.id)
+                }
         } finally {
             isLoading = false
         }
@@ -507,6 +518,27 @@ fun ApiSessionTrafficScreen(
             else -> {
                 val lazyListState = rememberLazyListState()
 
+                // Find and scroll to the pair that contains the highlighted response
+                val highlightedPairIndex =
+                    remember(highlightJsonPath, pairs) {
+                        if (highlightJsonPath == null) {
+                            -1
+                        } else {
+                            // +1 accounts for the summary item at index 0
+                            pairs.indexOfFirst { pair ->
+                                pair.response != null &&
+                                    responseTransactionsByResponseId[pair.response.id]
+                                        ?.any { it.jsonPath == highlightJsonPath } == true
+                            }.let { if (it >= 0) it + 1 else -1 }
+                        }
+                    }
+
+                LaunchedEffect(highlightedPairIndex) {
+                    if (highlightedPairIndex >= 0) {
+                        lazyListState.animateScrollToItem(highlightedPairIndex)
+                    }
+                }
+
                 Box(modifier = Modifier.fillMaxSize()) {
                     LazyColumn(
                         state = lazyListState,
@@ -520,7 +552,17 @@ fun ApiSessionTrafficScreen(
                             )
                         }
                         items(pairs) { pair ->
-                            ApiTrafficPairCard(pair = pair)
+                            val responseTransactions =
+                                pair.response?.let { responseTransactionsByResponseId[it.id] }
+                                    ?: emptyList()
+                            val isHighlighted =
+                                highlightJsonPath != null &&
+                                    responseTransactions.any { it.jsonPath == highlightJsonPath }
+                            ApiTrafficPairCard(
+                                pair = pair,
+                                responseTransactions = responseTransactions,
+                                highlightJsonPath = if (isHighlighted) highlightJsonPath else null,
+                            )
                         }
                     }
                     VerticalScrollbarForLazyList(
@@ -534,8 +576,22 @@ fun ApiSessionTrafficScreen(
 }
 
 @Composable
-private fun ApiTrafficPairCard(pair: ApiTrafficPair) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+private fun ApiTrafficPairCard(
+    pair: ApiTrafficPair,
+    responseTransactions: List<ApiResponseTransaction> = emptyList(),
+    highlightJsonPath: String? = null,
+) {
+    val isHighlighted = highlightJsonPath != null
+    val cardContainerColor =
+        if (isHighlighted) {
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+        } else {
+            MaterialTheme.colorScheme.surface
+        }
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = cardContainerColor),
+    ) {
         Column(
             modifier = Modifier.padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -555,6 +611,8 @@ private fun ApiTrafficPairCard(pair: ApiTrafficPair) {
                     title = "Response #${response.id}",
                     timestamp = response.respondedAt.displayDateTime(),
                     json = response.json,
+                    responseTransactions = responseTransactions,
+                    highlightJsonPath = highlightJsonPath,
                 )
             } ?: MissingTrafficItem(label = "Response")
         }
@@ -606,6 +664,8 @@ private fun ResponseTrafficItem(
     title: String,
     timestamp: String,
     json: String,
+    responseTransactions: List<ApiResponseTransaction> = emptyList(),
+    highlightJsonPath: String? = null,
 ) {
     Column(
         modifier =
@@ -620,7 +680,97 @@ private fun ResponseTrafficItem(
             title = title,
             timestamp = timestamp,
         )
-        JsonViewer(json = json)
+        if (responseTransactions.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(4.dp))
+            ResponseTransactionStates(
+                transactions = responseTransactions,
+                highlightJsonPath = highlightJsonPath,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+        }
+        JsonViewer(json = json, highlightJsonPath = highlightJsonPath)
+    }
+}
+
+@Composable
+private fun ResponseTransactionStates(
+    transactions: List<ApiResponseTransaction>,
+    highlightJsonPath: String? = null,
+) {
+    val importedCount = transactions.count { it.state == ApiResponseTransactionState.IMPORTED }
+    val duplicateCount = transactions.count { it.state == ApiResponseTransactionState.DUPLICATE }
+    val errorCount = transactions.count { it.state == ApiResponseTransactionState.ERROR }
+
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+            text =
+                buildString {
+                    append("${transactions.size} transaction(s)")
+                    if (importedCount > 0) append(" • $importedCount imported")
+                    if (duplicateCount > 0) append(" • $duplicateCount duplicate(s)")
+                    if (errorCount > 0) append(" • $errorCount error(s)")
+                },
+            style = MaterialTheme.typography.labelSmall,
+            color =
+                when {
+                    errorCount > 0 -> MaterialTheme.colorScheme.error
+                    duplicateCount > 0 -> MaterialTheme.colorScheme.tertiary
+                    else -> MaterialTheme.colorScheme.primary
+                },
+        )
+
+        // Show duplicate and error entries individually
+        transactions.filter { it.state != ApiResponseTransactionState.IMPORTED }.forEach { tx ->
+            val isHighlighted = tx.jsonPath == highlightJsonPath
+            val stateColor =
+                when (tx.state) {
+                    ApiResponseTransactionState.DUPLICATE -> MaterialTheme.colorScheme.tertiary
+                    ApiResponseTransactionState.ERROR -> MaterialTheme.colorScheme.error
+                    ApiResponseTransactionState.IMPORTED -> MaterialTheme.colorScheme.primary
+                }
+            val bgColor =
+                if (isHighlighted) {
+                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                } else {
+                    Color.Transparent
+                }
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .background(bgColor, MaterialTheme.shapes.extraSmall)
+                        .padding(horizontal = 4.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text =
+                        when (tx.state) {
+                            ApiResponseTransactionState.DUPLICATE -> "Duplicate"
+                            ApiResponseTransactionState.ERROR -> "Error"
+                            ApiResponseTransactionState.IMPORTED -> "Imported"
+                        },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = stateColor,
+                )
+                Text(
+                    text = tx.jsonPath,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                tx.errorMessage?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -647,7 +797,10 @@ private fun TrafficItemHeader(
 }
 
 @Composable
-private fun JsonViewer(json: String) {
+private fun JsonViewer(
+    json: String,
+    highlightJsonPath: String? = null,
+) {
     val jsonElement =
         remember(json) {
             runCatching { Json.parseToJsonElement(json) }.getOrNull()
@@ -664,14 +817,48 @@ private fun JsonViewer(json: String) {
             )
         }
     } else {
+        // Parse the highlight path into segments (e.g. "$.transactions[0]" → ["transactions", "0"])
+        val highlightSegments =
+            remember(highlightJsonPath) {
+                parseJsonPathSegments(highlightJsonPath)
+            }
         Column {
             JsonTreeNode(
                 label = null,
                 element = jsonElement,
                 depth = 0,
+                remainingHighlightSegments = highlightSegments,
             )
         }
     }
+}
+
+/**
+ * Converts a simple JSONPath (e.g. "$.transactions[2]") into a list of
+ * string segments (["transactions", "2"]) used to trace the highlight path
+ * through the JSON tree.  Returns null when no highlight is needed.
+ */
+private fun parseJsonPathSegments(jsonPath: String?): List<String>? {
+    if (jsonPath == null) return null
+    // Strip leading "$." and then split on "." and "[…]"
+    val stripped = jsonPath.removePrefix("$").removePrefix(".")
+    if (stripped.isEmpty()) return null
+
+    val segments = mutableListOf<String>()
+    // Split on "." first, then strip "[index]" from each part
+    for (part in stripped.split(".")) {
+        val bracketStart = part.indexOf('[')
+        if (bracketStart < 0) {
+            segments.add(part)
+        } else {
+            if (bracketStart > 0) segments.add(part.substring(0, bracketStart))
+            val bracketEnd = part.indexOf(']', bracketStart)
+            if (bracketEnd > bracketStart) {
+                segments.add(part.substring(bracketStart + 1, bracketEnd))
+            }
+        }
+    }
+    return segments.ifEmpty { null }
 }
 
 @Composable
@@ -679,10 +866,18 @@ private fun JsonTreeNode(
     label: String?,
     element: JsonElement,
     depth: Int,
+    remainingHighlightSegments: List<String>? = null,
 ) {
     val childCount = element.childCount()
     val expandable = childCount > 0
-    var expanded by remember(label, element) { mutableStateOf(depth == 0) }
+    // This node is the target if all highlight segments have been consumed
+    val isHighlightTarget = remainingHighlightSegments != null && remainingHighlightSegments.isEmpty()
+    // Force-expand the node if it's on the highlight path
+    val forceExpand = remainingHighlightSegments != null && remainingHighlightSegments.isNotEmpty()
+    var expanded by remember(label, element) { mutableStateOf(depth == 0 || forceExpand) }
+    // Keep expanded when we need to show the highlight path
+    if (forceExpand && !expanded) expanded = true
+
     val prefix =
         if (expandable) {
             if (expanded) "- " else "+ "
@@ -699,15 +894,24 @@ private fun JsonTreeNode(
             append(element.summary(expanded))
         }
 
+    val highlightBackground =
+        if (isHighlightTarget) {
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+        } else {
+            Color.Transparent
+        }
+
     Text(
         text = line,
         style = MaterialTheme.typography.bodySmall,
         fontFamily = FontFamily.Monospace,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
+        color = if (isHighlightTarget) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
         modifier =
             Modifier
                 .fillMaxWidth()
+                .background(highlightBackground, MaterialTheme.shapes.extraSmall)
                 .padding(start = (depth * 12).dp)
                 .then(
                     if (expandable) {
@@ -722,19 +926,35 @@ private fun JsonTreeNode(
         when (element) {
             is JsonObject -> {
                 element.entries.forEach { (key, value) ->
+                    val nextSegments =
+                        when {
+                            remainingHighlightSegments == null -> null
+                            remainingHighlightSegments.isEmpty() -> null
+                            remainingHighlightSegments.first() == key -> remainingHighlightSegments.drop(1)
+                            else -> null
+                        }
                     JsonTreeNode(
                         label = "\"$key\"",
                         element = value,
                         depth = depth + 1,
+                        remainingHighlightSegments = nextSegments,
                     )
                 }
             }
             is JsonArray -> {
                 element.forEachIndexed { index, value ->
+                    val nextSegments =
+                        when {
+                            remainingHighlightSegments == null -> null
+                            remainingHighlightSegments.isEmpty() -> null
+                            remainingHighlightSegments.first() == index.toString() -> remainingHighlightSegments.drop(1)
+                            else -> null
+                        }
                     JsonTreeNode(
                         label = "[$index]",
                         element = value,
                         depth = depth + 1,
+                        remainingHighlightSegments = nextSegments,
                     )
                 }
             }

@@ -70,5 +70,7 @@ sealed class Screen(
 
     data class ApiSessionTraffic(
         val sessionId: ApiSessionId,
+        /** When non-null the traffic screen should expand and highlight this JSONPath. */
+        val highlightJsonPath: String? = null,
     ) : Screen("API Traffic")
 }

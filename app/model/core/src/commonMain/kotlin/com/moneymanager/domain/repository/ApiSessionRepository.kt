@@ -6,6 +6,9 @@ import com.moneymanager.domain.model.ApiRequest
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiResponse
 import com.moneymanager.domain.model.ApiResponseId
+import com.moneymanager.domain.model.ApiResponseTransaction
+import com.moneymanager.domain.model.ApiResponseTransactionId
+import com.moneymanager.domain.model.ApiResponseTransactionState
 import com.moneymanager.domain.model.ApiSession
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.ApiSessionType
@@ -118,4 +121,29 @@ interface ApiSessionRepository {
      * Deletes the session with the given ID permanently.
      */
     suspend fun deleteSession(id: ApiSessionId)
+
+    /**
+     * Records the import state of a single transaction entry found in an API response.
+     *
+     * @param responseId The ID of the API response containing the transaction
+     * @param jsonPath JSONPath expression locating the transaction within the response body
+     * @param state The import state (IMPORTED, DUPLICATE, or ERROR)
+     * @param transactionId The Money Manager transaction ID (for IMPORTED/DUPLICATE states)
+     * @param duplicateOfTransactionId For DUPLICATE state: the already-imported transaction ID
+     * @param errorMessage For ERROR state: description of what went wrong
+     * @return The ID of the newly created record
+     */
+    suspend fun insertResponseTransaction(
+        responseId: ApiResponseId,
+        jsonPath: String,
+        state: ApiResponseTransactionState,
+        transactionId: Long?,
+        duplicateOfTransactionId: Long?,
+        errorMessage: String?,
+    ): ApiResponseTransactionId
+
+    /**
+     * Returns all [ApiResponseTransaction] records for the given response, ordered by id.
+     */
+    suspend fun getResponseTransactions(responseId: ApiResponseId): List<ApiResponseTransaction>
 }

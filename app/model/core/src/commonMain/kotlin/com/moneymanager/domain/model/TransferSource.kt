@@ -49,8 +49,10 @@ data class CsvSourceDetails(
  *
  * @property sessionId The ID of the API session (may be null if session was deleted)
  * @property requestId The ID of the API request that produced this transfer (may be null if request was deleted)
+ * @property jsonPath The JSONPath expression pointing to this transaction within the response body
  */
 data class ApiSourceDetails(
     val sessionId: ApiSessionId?,
     val requestId: ApiRequestId?,
+    val jsonPath: String? = null,
 )

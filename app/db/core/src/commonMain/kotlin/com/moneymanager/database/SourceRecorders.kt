@@ -71,6 +71,7 @@ class ApiImportSourceRecorder(
     private val deviceId: DeviceId,
     private val sessionId: ApiSessionId,
     private val requestId: ApiRequestId,
+    private val jsonPathForTransfer: (TransferId) -> String? = { null },
 ) : SourceRecorder {
     override fun insert(transfer: Transfer) {
         // Insert base TransferSource record
@@ -85,6 +86,7 @@ class ApiImportSourceRecorder(
             transferSourceId,
             sessionId.id,
             requestId.id,
+            jsonPathForTransfer(transfer.id),
         )
     }
 }

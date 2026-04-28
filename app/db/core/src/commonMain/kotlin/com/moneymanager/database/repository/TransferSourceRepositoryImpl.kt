@@ -154,6 +154,7 @@ class TransferSourceRepositoryImpl(
         sessionId: ApiSessionId,
         requestId: ApiRequestId,
         deviceInfo: DeviceInfo,
+        jsonPath: String?,
     ): TransferSource =
         withContext(Dispatchers.Default) {
             val deviceId = deviceRepository.getOrCreateDevice(deviceInfo)
@@ -168,6 +169,7 @@ class TransferSourceRepositoryImpl(
                 id = transferSourceId,
                 api_session_id = sessionId.id,
                 api_request_id = requestId.id,
+                json_path = jsonPath,
             )
 
             queries
@@ -197,6 +199,7 @@ class TransferSourceRepositoryImpl(
                         id = transferSourceId,
                         api_session_id = sessionId.id,
                         api_request_id = requestId.id,
+                        json_path = source.jsonPath,
                     )
                 }
             }

@@ -110,6 +110,7 @@ class MoneyManagerDatabaseWrapper(
             "api_request",
             "api_request_header",
             "api_response",
+            "api_response_transaction",
         )
 
     /**

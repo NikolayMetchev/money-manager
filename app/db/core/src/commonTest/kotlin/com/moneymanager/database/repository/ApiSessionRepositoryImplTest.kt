@@ -293,6 +293,120 @@ class ApiSessionRepositoryImplTest : DbTest() {
             assertNull(session)
         }
 
+    @Test
+    fun `insertResponseTransaction records an imported transaction`() =
+        runTest {
+            val deviceId = deviceId()
+            val sessionId = repositories.apiSessionRepository.createSession(token, deviceId, now, null)
+            val requestId =
+                repositories.apiSessionRepository.insertRequest(sessionId, "GET", "https://example.test/transactions", emptyMap())
+            val responseId =
+                repositories.apiSessionRepository.insertResponse(
+                    requestId = requestId,
+                    sessionId = sessionId,
+                    json = """{"transactions":[{"id":"tx_1"},{"id":"tx_2"}]}""",
+                )
+
+            val rtId =
+                repositories.apiSessionRepository.insertResponseTransaction(
+                    responseId = responseId,
+                    jsonPath = "$.transactions[0]",
+                    state = com.moneymanager.domain.model.ApiResponseTransactionState.IMPORTED,
+                    transactionId = null,
+                    duplicateOfTransactionId = null,
+                    errorMessage = null,
+                )
+
+            assertTrue(rtId.id > 0, "Response transaction ID should be positive")
+        }
+
+    @Test
+    fun `getResponseTransactions returns all entries for a response`() =
+        runTest {
+            val deviceId = deviceId()
+            val sessionId = repositories.apiSessionRepository.createSession(token, deviceId, now, null)
+            val requestId =
+                repositories.apiSessionRepository.insertRequest(sessionId, "GET", "https://example.test/transactions", emptyMap())
+            val responseId =
+                repositories.apiSessionRepository.insertResponse(
+                    requestId = requestId,
+                    sessionId = sessionId,
+                    json = """{"transactions":[{"id":"tx_1"},{"id":"tx_2"}]}""",
+                )
+
+            repositories.apiSessionRepository.insertResponseTransaction(
+                responseId = responseId,
+                jsonPath = "$.transactions[0]",
+                state = com.moneymanager.domain.model.ApiResponseTransactionState.IMPORTED,
+                transactionId = null,
+                duplicateOfTransactionId = null,
+                errorMessage = null,
+            )
+            repositories.apiSessionRepository.insertResponseTransaction(
+                responseId = responseId,
+                jsonPath = "$.transactions[1]",
+                state = com.moneymanager.domain.model.ApiResponseTransactionState.DUPLICATE,
+                transactionId = null,
+                duplicateOfTransactionId = null,
+                errorMessage = null,
+            )
+
+            val entries = repositories.apiSessionRepository.getResponseTransactions(responseId)
+            assertEquals(2, entries.size)
+            assertEquals("$.transactions[0]", entries[0].jsonPath)
+            assertEquals(com.moneymanager.domain.model.ApiResponseTransactionState.IMPORTED, entries[0].state)
+            assertEquals("$.transactions[1]", entries[1].jsonPath)
+            assertEquals(com.moneymanager.domain.model.ApiResponseTransactionState.DUPLICATE, entries[1].state)
+        }
+
+    @Test
+    fun `getResponseTransactions returns empty for response with no entries`() =
+        runTest {
+            val deviceId = deviceId()
+            val sessionId = repositories.apiSessionRepository.createSession(token, deviceId, now, null)
+            val requestId =
+                repositories.apiSessionRepository.insertRequest(sessionId, "GET", "https://example.test/transactions", emptyMap())
+            val responseId =
+                repositories.apiSessionRepository.insertResponse(
+                    requestId = requestId,
+                    sessionId = sessionId,
+                    json = """{"transactions":[]}""",
+                )
+
+            val entries = repositories.apiSessionRepository.getResponseTransactions(responseId)
+            assertTrue(entries.isEmpty())
+        }
+
+    @Test
+    fun `deleteSession cascades to api_response_transaction`() =
+        runTest {
+            val deviceId = deviceId()
+            val sessionId = repositories.apiSessionRepository.createSession(token, deviceId, now, null)
+            val requestId =
+                repositories.apiSessionRepository.insertRequest(sessionId, "GET", "https://example.test/transactions", emptyMap())
+            val responseId =
+                repositories.apiSessionRepository.insertResponse(
+                    requestId = requestId,
+                    sessionId = sessionId,
+                    json = """{"transactions":[{"id":"tx_1"}]}""",
+                )
+            repositories.apiSessionRepository.insertResponseTransaction(
+                responseId = responseId,
+                jsonPath = "$.transactions[0]",
+                state = com.moneymanager.domain.model.ApiResponseTransactionState.IMPORTED,
+                transactionId = null,
+                duplicateOfTransactionId = null,
+                errorMessage = null,
+            )
+
+            repositories.apiSessionRepository.deleteSession(sessionId)
+
+            assertNull(repositories.apiSessionRepository.getSessionById(sessionId))
+            // After cascading delete, response_transaction records should be gone
+            val entries = repositories.apiSessionRepository.getResponseTransactions(responseId)
+            assertTrue(entries.isEmpty())
+        }
+
     private fun assertTimestampBetween(
         actual: Instant,
         start: Instant,

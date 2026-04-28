@@ -34,7 +34,7 @@ object TransferSourceFromRevisionMapper :
             TransferSource::csvSource fromValue
                 mapCsvSource(toSourceType(from.source_type), from.csv_import_id, from.csv_row_index, from.csv_file_name)
             TransferSource::apiSource fromValue
-                mapApiSource(toSourceType(from.source_type), from.api_session_id, from.api_request_id)
+                mapApiSource(toSourceType(from.source_type), from.api_session_id, from.api_request_id, from.api_json_path)
         }
 }
 
@@ -56,7 +56,7 @@ object TransferSourceFromTransactionIdMapper :
             TransferSource::csvSource fromValue
                 mapCsvSource(toSourceType(from.source_type), from.csv_import_id, from.csv_row_index, from.csv_file_name)
             TransferSource::apiSource fromValue
-                mapApiSource(toSourceType(from.source_type), from.api_session_id, from.api_request_id)
+                mapApiSource(toSourceType(from.source_type), from.api_session_id, from.api_request_id, from.api_json_path)
         }
 }
 
@@ -92,6 +92,7 @@ object TransferSourceFromAuditMapper :
                     sourceType,
                     from.source_api_session_id,
                     from.source_api_request_id,
+                    from.source_api_json_path,
                 )
             TransferSource::createdAt fromValue toInstant(from.source_created_at!!)
         }
@@ -116,10 +117,12 @@ private fun mapApiSource(
     sourceType: SourceType,
     apiSessionId: Long?,
     apiRequestId: Long?,
+    apiJsonPath: String?,
 ): ApiSourceDetails? {
     if (sourceType != SourceType.API) return null
     return ApiSourceDetails(
         sessionId = apiSessionId?.let { ApiSessionId(it) },
         requestId = apiRequestId?.let { ApiRequestId(it) },
+        jsonPath = apiJsonPath,
     )
 }
