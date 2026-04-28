@@ -648,9 +648,10 @@ private fun TrafficItemHeader(
 
 @Composable
 private fun JsonViewer(json: String) {
-    val jsonElement = remember(json) {
-        runCatching { Json.parseToJsonElement(json) }.getOrNull()
-    }
+    val jsonElement =
+        remember(json) {
+            runCatching { Json.parseToJsonElement(json) }.getOrNull()
+        }
 
     if (jsonElement == null) {
         SelectionContainer {
