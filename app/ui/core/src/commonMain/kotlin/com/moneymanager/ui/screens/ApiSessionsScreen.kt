@@ -271,7 +271,7 @@ fun ApiSessionsScreen(
                                                 deviceId = deviceId,
                                                 sessionId = session.id,
                                                 onProgress = ::update,
-                                        )
+                                            )
                                         importResultBySession = importResultBySession + (session.id to result)
                                         importProgressBySession = importProgressBySession - session.id
                                         onTransactionsImported()
@@ -611,12 +611,13 @@ fun ApiSessionTrafficScreen(
                             -1
                         } else {
                             // +1 accounts for the summary item at index 0
-                            pairs.indexOfFirst { pair ->
-                                pair.response != null &&
-                                    (highlightRequestId == null || pair.request?.id == highlightRequestId) &&
-                                    responseTransactionsByResponseId[pair.response.id]
-                                        ?.any { it.jsonPath == highlightJsonPath } == true
-                            }.let { if (it >= 0) it + 1 else -1 }
+                            pairs
+                                .indexOfFirst { pair ->
+                                    pair.response != null &&
+                                        (highlightRequestId == null || pair.request?.id == highlightRequestId) &&
+                                        responseTransactionsByResponseId[pair.response.id]
+                                            ?.any { it.jsonPath == highlightJsonPath } == true
+                                }.let { if (it >= 0) it + 1 else -1 }
                         }
                     }
 

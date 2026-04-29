@@ -49,8 +49,7 @@ class BackgroundTaskManager(
     private var nextTaskId = 1L
     val tasks = mutableStateListOf<BackgroundTask>()
 
-    fun isRunning(key: String): Boolean =
-        tasks.any { task -> task.key == key && task.status == BackgroundTaskStatus.RUNNING }
+    fun isRunning(key: String): Boolean = tasks.any { task -> task.key == key && task.status == BackgroundTaskStatus.RUNNING }
 
     fun startTask(
         key: String,
@@ -110,8 +109,7 @@ val LocalBackgroundTaskManager =
     }
 
 @Composable
-fun rememberBackgroundTaskManager(scope: CoroutineScope): BackgroundTaskManager =
-    remember(scope) { BackgroundTaskManager(scope) }
+fun rememberBackgroundTaskManager(scope: CoroutineScope): BackgroundTaskManager = remember(scope) { BackgroundTaskManager(scope) }
 
 @Composable
 fun BackgroundTaskPanel(
@@ -176,4 +174,3 @@ private fun BackgroundTaskStatus.label(): String =
         BackgroundTaskStatus.SUCCEEDED -> "Done"
         BackgroundTaskStatus.FAILED -> "Failed"
     }
-
