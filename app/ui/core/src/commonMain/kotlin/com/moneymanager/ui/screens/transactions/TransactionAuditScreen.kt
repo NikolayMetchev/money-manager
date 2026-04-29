@@ -164,7 +164,12 @@ private fun InsertDiffContent(
         FieldValueRow("Amount", formatAmount(diff.amount.value()), labelWidth = LABEL_WIDTH)
         FieldValueRow("Description", diff.description.value().ifBlank { "(none)" }, labelWidth = LABEL_WIDTH)
         AttributesSection(diff.attributeChanges)
-        SourceInfoSection(diff.source, currentDeviceId = currentDeviceId, onCsvSourceClick = onCsvSourceClick, onApiSourceClick = onApiSourceClick)
+        SourceInfoSection(
+            diff.source,
+            currentDeviceId = currentDeviceId,
+            onCsvSourceClick = onCsvSourceClick,
+            onApiSourceClick = onApiSourceClick,
+        )
     }
 }
 
@@ -239,7 +244,12 @@ private fun UpdateDiffContent(
                 AttributeChangesSection(significantAttrChanges)
             }
         }
-        SourceInfoSection(diff.source, currentDeviceId = currentDeviceId, onCsvSourceClick = onCsvSourceClick, onApiSourceClick = onApiSourceClick)
+        SourceInfoSection(
+            diff.source,
+            currentDeviceId = currentDeviceId,
+            onCsvSourceClick = onCsvSourceClick,
+            onApiSourceClick = onApiSourceClick,
+        )
     }
 }
 

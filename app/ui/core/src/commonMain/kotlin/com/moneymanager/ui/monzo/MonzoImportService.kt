@@ -140,7 +140,9 @@ suspend fun importMonzoSessionTransactions(
     val currencyCache = CurrencyCache(currencyRepository)
 
     responses.forEachIndexed { index, response ->
-        onProgress("Importing response ${index + 1}/${responses.size}: $transactionCount imported, $duplicateCount duplicate(s), $errorCount error(s).")
+        onProgress(
+            "Importing response ${index + 1}/${responses.size}: $transactionCount imported, $duplicateCount duplicate(s), $errorCount error(s).",
+        )
         val request = requestsById[response.requestId] ?: return@forEachIndexed
         val monzoAccount = monzoAccountsById[request.accountIdParameter()] ?: return@forEachIndexed
         val monzoAccountId = accountCache.getOrCreateAccountId(monzoAccount.localAccountName())
@@ -159,7 +161,9 @@ suspend fun importMonzoSessionTransactions(
         transactionCount += pageResult.importedCount
         duplicateCount += pageResult.duplicateCount
         errorCount += pageResult.errorCount
-        onProgress("Imported response ${index + 1}/${responses.size}: $transactionCount imported, $duplicateCount duplicate(s), $errorCount error(s).")
+        onProgress(
+            "Imported response ${index + 1}/${responses.size}: $transactionCount imported, $duplicateCount duplicate(s), $errorCount error(s).",
+        )
     }
 
     return MonzoImportResult(
@@ -356,8 +360,7 @@ private suspend fun importValidTransactionItem(
             responseId = responseId,
             jsonPath = item.jsonPath,
             state = ApiResponseTransactionState.DUPLICATE,
-            transactionId = duplicateTransferId.id,
-            duplicateOfTransactionId = duplicateTransferId.id,
+            referencedTransactionId = duplicateTransferId.id,
             errorMessage = null,
         )
         return ApiResponseTransactionState.DUPLICATE
@@ -383,8 +386,7 @@ private suspend fun importValidTransactionItem(
         responseId = responseId,
         jsonPath = item.jsonPath,
         state = ApiResponseTransactionState.IMPORTED,
-        transactionId = importedTransferId.id,
-        duplicateOfTransactionId = null,
+        referencedTransactionId = importedTransferId.id,
         errorMessage = null,
     )
     return ApiResponseTransactionState.IMPORTED
@@ -441,8 +443,7 @@ private fun ApiResponse.toApiHttpResponse(): ApiHttpResponse =
         requestId = requestId.id,
     )
 
-private fun ApiRequest.accountIdParameter(): String? =
-    runCatching { URLBuilder(url).parameters["account_id"] }.getOrNull()
+private fun ApiRequest.accountIdParameter(): String? = runCatching { URLBuilder(url).parameters["account_id"] }.getOrNull()
 
 private class AccountCache(
     private val accountRepository: AccountRepository,
@@ -466,14 +467,14 @@ private class AccountCache(
             )
         accountsByName =
             loadAccounts() +
-                (
-                    normalizedName to
-                        Account(
-                            id = accountId,
-                            name = normalizedName,
-                            openingDate = now,
-                        )
-                )
+            (
+                normalizedName to
+                    Account(
+                        id = accountId,
+                        name = normalizedName,
+                        openingDate = now,
+                    )
+            )
         return accountId
     }
 
@@ -492,8 +493,7 @@ private class CurrencyCache(
 ) {
     private var currenciesByCode: Map<String, Currency>? = null
 
-    suspend fun getCurrency(code: String): Currency? =
-        loadCurrencies()[code.uppercase()]
+    suspend fun getCurrency(code: String): Currency? = loadCurrencies()[code.uppercase()]
 
     private suspend fun loadCurrencies(): Map<String, Currency> {
         val currencies = currenciesByCode
@@ -505,8 +505,7 @@ private class CurrencyCache(
     }
 }
 
-private fun MonzoAccount.localAccountName(): String =
-    MONZO_ACCOUNT_PREFIX + description.ifBlank { id }
+private fun MonzoAccount.localAccountName(): String = MONZO_ACCOUNT_PREFIX + description.ifBlank { id }
 
 private fun MonzoTransactionPageItem.counterpartyName(): String =
     merchantName?.takeIf { it.isNotBlank() }
@@ -547,14 +546,11 @@ private suspend fun ApiSessionRepository.recordTransactionError(
         responseId = responseId,
         jsonPath = jsonPath,
         state = ApiResponseTransactionState.ERROR,
-        transactionId = null,
-        duplicateOfTransactionId = null,
+        referencedTransactionId = null,
         errorMessage = message,
     )
 }
 
-private fun JsonObject.jsonObjectOrNull(key: String): JsonObject? =
-    this[key]?.let { element -> element as? JsonObject }
+private fun JsonObject.jsonObjectOrNull(key: String): JsonObject? = this[key]?.let { element -> element as? JsonObject }
 
-private fun JsonObject.stringOrNull(key: String): String? =
-    this[key]?.jsonPrimitive?.contentOrNull
+private fun JsonObject.stringOrNull(key: String): String? = this[key]?.jsonPrimitive?.contentOrNull

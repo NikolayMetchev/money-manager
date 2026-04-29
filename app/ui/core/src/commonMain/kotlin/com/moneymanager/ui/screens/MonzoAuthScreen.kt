@@ -443,7 +443,7 @@ fun MonzoAuthScreen(
                                         deviceId = deviceId,
                                         sessionId = session.id,
                                         onProgress = ::update,
-                                )
+                                    )
                                 importResult = result
                                 importProgress = null
                                 onTransactionsImported()
