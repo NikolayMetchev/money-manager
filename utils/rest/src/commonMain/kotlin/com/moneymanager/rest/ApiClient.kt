@@ -55,9 +55,7 @@ interface ApiTrafficRecorder {
     ): Long
 }
 
-fun createApiClient(
-    trafficRecorder: ApiTrafficRecorder? = null,
-): ApiClient {
+fun createApiClient(trafficRecorder: ApiTrafficRecorder? = null): ApiClient {
     val httpClient = HttpClient()
 
     if (trafficRecorder != null) {
