@@ -128,8 +128,8 @@ interface ApiSessionRepository {
      * @param responseId The ID of the API response containing the transaction
      * @param jsonPath JSONPath expression locating the transaction within the response body
      * @param state The import state (IMPORTED, DUPLICATE, or ERROR)
-     * @param transactionId The Money Manager transaction ID (for IMPORTED/DUPLICATE states)
-     * @param duplicateOfTransactionId For DUPLICATE state: the already-imported transaction ID
+     * @param referencedTransactionId For IMPORTED: the new transaction ID. For DUPLICATE: the
+     *   pre-existing transaction ID that this entry duplicates. Null for ERROR.
      * @param errorMessage For ERROR state: description of what went wrong
      * @return The ID of the newly created record
      */
@@ -137,8 +137,7 @@ interface ApiSessionRepository {
         responseId: ApiResponseId,
         jsonPath: String,
         state: ApiResponseTransactionState,
-        transactionId: Long?,
-        duplicateOfTransactionId: Long?,
+        referencedTransactionId: Long?,
         errorMessage: String?,
     ): ApiResponseTransactionId
 

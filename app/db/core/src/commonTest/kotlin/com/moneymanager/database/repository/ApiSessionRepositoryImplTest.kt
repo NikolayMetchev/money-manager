@@ -312,8 +312,7 @@ class ApiSessionRepositoryImplTest : DbTest() {
                     responseId = responseId,
                     jsonPath = "$.transactions[0]",
                     state = com.moneymanager.domain.model.ApiResponseTransactionState.IMPORTED,
-                    transactionId = null,
-                    duplicateOfTransactionId = null,
+                    referencedTransactionId = null,
                     errorMessage = null,
                 )
 
@@ -338,16 +337,14 @@ class ApiSessionRepositoryImplTest : DbTest() {
                 responseId = responseId,
                 jsonPath = "$.transactions[0]",
                 state = com.moneymanager.domain.model.ApiResponseTransactionState.IMPORTED,
-                transactionId = null,
-                duplicateOfTransactionId = null,
+                referencedTransactionId = null,
                 errorMessage = null,
             )
             repositories.apiSessionRepository.insertResponseTransaction(
                 responseId = responseId,
                 jsonPath = "$.transactions[1]",
                 state = com.moneymanager.domain.model.ApiResponseTransactionState.DUPLICATE,
-                transactionId = null,
-                duplicateOfTransactionId = null,
+                referencedTransactionId = null,
                 errorMessage = null,
             )
 
@@ -394,8 +391,7 @@ class ApiSessionRepositoryImplTest : DbTest() {
                 responseId = responseId,
                 jsonPath = "$.transactions[0]",
                 state = com.moneymanager.domain.model.ApiResponseTransactionState.IMPORTED,
-                transactionId = null,
-                duplicateOfTransactionId = null,
+                referencedTransactionId = null,
                 errorMessage = null,
             )
 

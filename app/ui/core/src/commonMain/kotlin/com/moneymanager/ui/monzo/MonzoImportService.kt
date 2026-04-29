@@ -358,8 +358,7 @@ private suspend fun importValidTransactionItem(
             responseId = responseId,
             jsonPath = item.jsonPath,
             state = ApiResponseTransactionState.DUPLICATE,
-            transactionId = duplicateTransferId.id,
-            duplicateOfTransactionId = duplicateTransferId.id,
+            referencedTransactionId = duplicateTransferId.id,
             errorMessage = null,
         )
         return ApiResponseTransactionState.DUPLICATE
@@ -385,8 +384,7 @@ private suspend fun importValidTransactionItem(
         responseId = responseId,
         jsonPath = item.jsonPath,
         state = ApiResponseTransactionState.IMPORTED,
-        transactionId = importedTransferId.id,
-        duplicateOfTransactionId = null,
+        referencedTransactionId = importedTransferId.id,
         errorMessage = null,
     )
     return ApiResponseTransactionState.IMPORTED
@@ -546,8 +544,7 @@ private suspend fun ApiSessionRepository.recordTransactionError(
         responseId = responseId,
         jsonPath = jsonPath,
         state = ApiResponseTransactionState.ERROR,
-        transactionId = null,
-        duplicateOfTransactionId = null,
+        referencedTransactionId = null,
         errorMessage = message,
     )
 }

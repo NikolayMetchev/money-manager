@@ -181,8 +181,7 @@ class ApiSessionRepositoryImpl(
         responseId: ApiResponseId,
         jsonPath: String,
         state: ApiResponseTransactionState,
-        transactionId: Long?,
-        duplicateOfTransactionId: Long?,
+        referencedTransactionId: Long?,
         errorMessage: String?,
     ): ApiResponseTransactionId =
         withContext(Dispatchers.Default) {
@@ -192,8 +191,7 @@ class ApiSessionRepositoryImpl(
                         response_id = responseId.id,
                         json_path = jsonPath,
                         state = state.id.toLong(),
-                        transaction_id = transactionId,
-                        duplicate_of_transaction_id = duplicateOfTransactionId,
+                        referenced_transaction_id = referencedTransactionId,
                         error_message = errorMessage,
                     )
                     queries.lastInsertApiResponseTransactionId().executeAsOne()
@@ -209,8 +207,7 @@ class ApiSessionRepositoryImpl(
                     responseId = ApiResponseId(row.response_id),
                     jsonPath = row.json_path,
                     state = ApiResponseTransactionState.fromId(row.state.toInt()),
-                    transactionId = row.transaction_id,
-                    duplicateOfTransactionId = row.duplicate_of_transaction_id,
+                    referencedTransactionId = row.referenced_transaction_id,
                     errorMessage = row.error_message,
                 )
             }
