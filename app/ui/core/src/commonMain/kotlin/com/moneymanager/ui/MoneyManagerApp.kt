@@ -23,7 +23,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.database.service.CsvStrategyExportService
 import com.moneymanager.database.sql.EntitySourceQueries
@@ -48,6 +51,9 @@ import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.SettingsRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.domain.repository.TransferSourceRepository
+import com.moneymanager.ui.background.BackgroundTaskPanel
+import com.moneymanager.ui.background.LocalBackgroundTaskManager
+import com.moneymanager.ui.background.rememberBackgroundTaskManager
 import com.moneymanager.ui.components.DefaultCurrencyInitDialog
 import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
@@ -106,6 +112,7 @@ fun MoneyManagerApp(
 ) {
     ProvideSchemaAwareScope {
         val scope = rememberSchemaAwareCoroutineScope()
+        val backgroundTaskManager = rememberBackgroundTaskManager(scope)
         val navigationHistory = remember { NavigationHistory(Screen.Accounts()) }
         val currentScreen = navigationHistory.currentScreen
         var showTransactionDialog by remember { mutableStateOf(false) }
@@ -127,6 +134,7 @@ fun MoneyManagerApp(
             .collectAsStateWithSchemaErrorHandling(initial = emptyList())
 
         MaterialTheme {
+            CompositionLocalProvider(LocalBackgroundTaskManager provides backgroundTaskManager) {
             // Handle system back button (Android) when there's navigation history
             PlatformBackHandler(enabled = navigationHistory.canGoBack) {
                 navigationHistory.navigateBack()
@@ -473,10 +481,11 @@ fun MoneyManagerApp(
                                 onCsvSourceClick = { importId, rowIndex ->
                                     navigationHistory.navigateTo(Screen.CsvImportDetail(importId, rowIndex))
                                 },
-                                onApiSourceClick = { sessionId, jsonPath ->
+                                onApiSourceClick = { sessionId, requestId, jsonPath ->
                                     navigationHistory.navigateTo(
                                         Screen.ApiSessionTraffic(
                                             sessionId = sessionId,
+                                            highlightRequestId = requestId,
                                             highlightJsonPath = jsonPath,
                                         ),
                                     )
@@ -532,7 +541,14 @@ fun MoneyManagerApp(
                             }
                             MonzoAuthScreen(
                                 apiSessionRepository = apiSessionRepository,
+                                accountRepository = accountRepository,
+                                currencyRepository = currencyRepository,
+                                transactionRepository = transactionRepository,
+                                transferSourceQueries = transferSourceQueries,
                                 deviceId = deviceId,
+                                onTransactionsImported = {
+                                    transactionRefreshTrigger++
+                                },
                             )
                         }
                         is Screen.ApiSessions -> {
@@ -542,7 +558,14 @@ fun MoneyManagerApp(
                             }
                             ApiSessionsScreen(
                                 apiSessionRepository = apiSessionRepository,
+                                accountRepository = accountRepository,
+                                currencyRepository = currencyRepository,
+                                transactionRepository = transactionRepository,
+                                transferSourceQueries = transferSourceQueries,
                                 deviceId = deviceId,
+                                onTransactionsImported = {
+                                    transactionRefreshTrigger++
+                                },
                                 onMonzoConnectClick = {
                                     navigationHistory.navigateTo(Screen.MonzoConnect)
                                 },
@@ -559,11 +582,19 @@ fun MoneyManagerApp(
                             ApiSessionTrafficScreen(
                                 apiSessionRepository = apiSessionRepository,
                                 sessionId = screen.sessionId,
+                                highlightRequestId = screen.highlightRequestId,
                                 highlightJsonPath = screen.highlightJsonPath,
                                 onBack = { navigationHistory.navigateBack() },
                             )
                         }
                     }
+                    BackgroundTaskPanel(
+                        manager = backgroundTaskManager,
+                        modifier =
+                            Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(16.dp),
+                    )
                 }
             }
 
@@ -601,6 +632,7 @@ fun MoneyManagerApp(
                         transactionRefreshTrigger++
                     },
                 )
+            }
             }
         }
     }

@@ -44,7 +44,9 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
+import com.moneymanager.database.sql.TransferSourceQueries
 import com.moneymanager.domain.model.ApiRequest
+import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiResponse
 import com.moneymanager.domain.model.ApiResponseId
 import com.moneymanager.domain.model.ApiResponseTransaction
@@ -52,12 +54,18 @@ import com.moneymanager.domain.model.ApiResponseTransactionState
 import com.moneymanager.domain.model.ApiSession
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.DeviceId
+import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.ApiSessionRepository
+import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.ui.background.LocalBackgroundTaskManager
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.ui.monzo.MonzoDownloadResult
 import com.moneymanager.ui.monzo.MonzoImportProgress
 import com.moneymanager.ui.monzo.MonzoImportResult
 import com.moneymanager.ui.monzo.createMonzoApiClient
-import com.moneymanager.ui.monzo.importMonzoData
+import com.moneymanager.ui.monzo.downloadMonzoTransactions
+import com.moneymanager.ui.monzo.importMonzoSessionTransactions
 import com.moneymanager.ui.util.displayDateTime
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
@@ -76,19 +84,26 @@ private val logger = logging()
 @Suppress("DEPRECATION")
 fun ApiSessionsScreen(
     apiSessionRepository: ApiSessionRepository,
+    accountRepository: AccountRepository,
+    currencyRepository: CurrencyRepository,
+    transactionRepository: TransactionRepository,
+    transferSourceQueries: TransferSourceQueries,
     deviceId: DeviceId,
     onMonzoConnectClick: () -> Unit = {},
     onSessionClick: (ApiSession) -> Unit = {},
+    onTransactionsImported: () -> Unit = {},
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
+    val backgroundTasks = LocalBackgroundTaskManager.current
     val clipboardManager = LocalClipboardManager.current
 
     var sessions by remember { mutableStateOf<List<ApiSession>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var sessionToRevoke by remember { mutableStateOf<ApiSession?>(null) }
 
-    // Per-session import state keyed by session id
-    var importingSessionId by remember { mutableStateOf<ApiSessionId?>(null) }
+    // Per-session download/import state keyed by session id
+    var downloadResultBySession by remember { mutableStateOf<Map<ApiSessionId, MonzoDownloadResult>>(emptyMap()) }
+    var downloadProgressBySession by remember { mutableStateOf<Map<ApiSessionId, MonzoImportProgress?>>(emptyMap()) }
     var importResultBySession by remember { mutableStateOf<Map<ApiSessionId, MonzoImportResult>>(emptyMap()) }
     var importProgressBySession by remember { mutableStateOf<Map<ApiSessionId, MonzoImportProgress?>>(emptyMap()) }
     var importErrorBySession by remember { mutableStateOf<Map<ApiSessionId, String>>(emptyMap()) }
@@ -190,7 +205,10 @@ fun ApiSessionsScreen(
                             val isActive =
                                 session.revokedAt == null &&
                                     (expiresAt == null || expiresAt > Clock.System.now())
-                            val isImporting = importingSessionId == session.id
+                            val isDownloading = backgroundTasks.isRunning(monzoDownloadTaskKey(session.id))
+                            val isImporting = backgroundTasks.isRunning(monzoImportTaskKey(session.id))
+                            val downloadResult = downloadResultBySession[session.id]
+                            val downloadProgress = downloadProgressBySession[session.id]
                             val importResult = importResultBySession[session.id]
                             val importProgress = importProgressBySession[session.id]
                             val importError = importErrorBySession[session.id]
@@ -198,41 +216,66 @@ fun ApiSessionsScreen(
                             ApiSessionCard(
                                 session = session,
                                 isActive = isActive,
+                                isDownloading = isDownloading,
                                 isImporting = isImporting,
+                                downloadResult = downloadResult,
+                                downloadProgress = downloadProgress,
                                 importResult = importResult,
                                 importProgress = importProgress,
                                 importError = importError,
                                 onRevoke = { sessionToRevoke = session },
                                 onOpenTraffic = { onSessionClick(session) },
+                                onDownload = {
+                                    downloadResultBySession = downloadResultBySession - session.id
+                                    downloadProgressBySession = downloadProgressBySession - session.id
+                                    importErrorBySession = importErrorBySession - session.id
+                                    backgroundTasks.startTask(
+                                        key = monzoDownloadTaskKey(session.id),
+                                        title = "Download Transactions",
+                                        initialDetail = "Starting Monzo download for session #${session.id}.",
+                                    ) {
+                                        val result =
+                                            downloadMonzoTransactions(
+                                                token = session.token,
+                                                apiClient =
+                                                    createMonzoApiClient(
+                                                        sessionId = session.id,
+                                                        apiSessionRepository = apiSessionRepository,
+                                                    ),
+                                                onProgress = { progress ->
+                                                    downloadProgressBySession = downloadProgressBySession + (session.id to progress)
+                                                    update(progress.downloadDetail())
+                                                },
+                                            )
+                                        downloadResultBySession = downloadResultBySession + (session.id to result)
+                                        downloadProgressBySession = downloadProgressBySession - session.id
+                                        result.displaySummary()
+                                    }
+                                },
                                 onImport = {
-                                    importingSessionId = session.id
                                     importResultBySession = importResultBySession - session.id
                                     importProgressBySession = importProgressBySession - session.id
                                     importErrorBySession = importErrorBySession - session.id
-                                    scope.launch {
-                                        try {
-                                            val result =
-                                                importMonzoData(
-                                                    token = session.token,
-                                                    apiClient =
-                                                        createMonzoApiClient(
-                                                            sessionId = session.id,
-                                                            apiSessionRepository = apiSessionRepository,
-                                                        ),
-                                                    apiSessionRepository = apiSessionRepository,
-                                                    onProgress = { progress ->
-                                                        importProgressBySession = importProgressBySession + (session.id to progress)
-                                                    },
-                                                )
-                                            importResultBySession = importResultBySession + (session.id to result)
-                                        } catch (expected: Exception) {
-                                            val message = "Import failed: ${expected.message}"
-                                            logger.error(expected) { message }
-                                            importErrorBySession = importErrorBySession + (session.id to message)
-                                        } finally {
-                                            importingSessionId = null
-                                            importProgressBySession = importProgressBySession - session.id
-                                        }
+                                    backgroundTasks.startTask(
+                                        key = monzoImportTaskKey(session.id),
+                                        title = "Import Transactions",
+                                        initialDetail = "Starting transaction import for session #${session.id}.",
+                                    ) {
+                                        val result =
+                                            importMonzoSessionTransactions(
+                                                apiSessionRepository = apiSessionRepository,
+                                                accountRepository = accountRepository,
+                                                currencyRepository = currencyRepository,
+                                                transactionRepository = transactionRepository,
+                                                transferSourceQueries = transferSourceQueries,
+                                                deviceId = deviceId,
+                                                sessionId = session.id,
+                                                onProgress = ::update,
+                                        )
+                                        importResultBySession = importResultBySession + (session.id to result)
+                                        importProgressBySession = importProgressBySession - session.id
+                                        onTransactionsImported()
+                                        result.displaySummary()
                                     }
                                 },
                                 onCopyError = { error ->
@@ -255,12 +298,16 @@ fun ApiSessionsScreen(
 private fun ApiSessionCard(
     session: ApiSession,
     isActive: Boolean,
+    isDownloading: Boolean,
     isImporting: Boolean,
+    downloadResult: MonzoDownloadResult?,
+    downloadProgress: MonzoImportProgress?,
     importResult: MonzoImportResult?,
     importProgress: MonzoImportProgress?,
     importError: String?,
     onRevoke: () -> Unit,
     onOpenTraffic: () -> Unit,
+    onDownload: () -> Unit,
     onImport: () -> Unit,
     onCopyError: (String) -> Unit,
 ) {
@@ -320,7 +367,7 @@ private fun ApiSessionCard(
 
             val displayToken =
                 if (session.token.length > 16) {
-                    "${session.token.take(8)}…${session.token.takeLast(8)}"
+                    "${session.token.take(8)}...${session.token.takeLast(8)}"
                 } else {
                     session.token
                 }
@@ -333,12 +380,35 @@ private fun ApiSessionCard(
             if (isActive) {
                 Spacer(modifier = Modifier.height(8.dp))
 
+                downloadResult?.let { result ->
+                    Text(
+                        text = result.displaySummary(),
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
+
                 importResult?.let { result ->
                     Text(
-                        text =
-                            "Import complete: ${result.accountCount} account(s), " +
-                                "${result.transactionCount} transaction(s).",
+                        text = result.displaySummary(),
                         color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
+
+                if (isDownloading) {
+                    Text(
+                        text =
+                            if (downloadProgress == null) {
+                                "Preparing download..."
+                            } else {
+                                "Downloading account ${downloadProgress.accountIndex}/${downloadProgress.accountCount}, " +
+                                    "page ${downloadProgress.page}. " +
+                                    "${downloadProgress.importedTransactionCount} response(s) downloaded so far."
+                            },
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall,
                     )
                     Spacer(modifier = Modifier.height(4.dp))
@@ -348,7 +418,7 @@ private fun ApiSessionCard(
                     Text(
                         text =
                             if (importProgress == null) {
-                                "Preparing import…"
+                                "Preparing import..."
                             } else {
                                 "Importing account ${importProgress.accountIndex}/${importProgress.accountCount}, " +
                                     "page ${importProgress.page}. " +
@@ -383,8 +453,23 @@ private fun ApiSessionCard(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Button(
+                        onClick = onDownload,
+                        enabled = !isDownloading && !isImporting,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        if (isDownloading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                            )
+                        } else {
+                            Text("Download Transactions")
+                        }
+                    }
+
+                    Button(
                         onClick = onImport,
-                        enabled = !isImporting,
+                        enabled = !isDownloading && !isImporting,
                         modifier = Modifier.weight(1f),
                     ) {
                         if (isImporting) {
@@ -393,7 +478,7 @@ private fun ApiSessionCard(
                                 strokeWidth = 2.dp,
                             )
                         } else {
-                            Text("Import")
+                            Text("Import Transactions")
                         }
                     }
 
@@ -445,6 +530,7 @@ private fun SessionStatusBadge(isActive: Boolean) {
 fun ApiSessionTrafficScreen(
     apiSessionRepository: ApiSessionRepository,
     sessionId: ApiSessionId,
+    highlightRequestId: ApiRequestId? = null,
     highlightJsonPath: String? = null,
     onBack: () -> Unit,
 ) {
@@ -520,13 +606,14 @@ fun ApiSessionTrafficScreen(
 
                 // Find and scroll to the pair that contains the highlighted response
                 val highlightedPairIndex =
-                    remember(highlightJsonPath, pairs) {
+                    remember(highlightRequestId, highlightJsonPath, pairs) {
                         if (highlightJsonPath == null) {
                             -1
                         } else {
                             // +1 accounts for the summary item at index 0
                             pairs.indexOfFirst { pair ->
                                 pair.response != null &&
+                                    (highlightRequestId == null || pair.request?.id == highlightRequestId) &&
                                     responseTransactionsByResponseId[pair.response.id]
                                         ?.any { it.jsonPath == highlightJsonPath } == true
                             }.let { if (it >= 0) it + 1 else -1 }
@@ -557,6 +644,7 @@ fun ApiSessionTrafficScreen(
                                     ?: emptyList()
                             val isHighlighted =
                                 highlightJsonPath != null &&
+                                    (highlightRequestId == null || pair.request?.id == highlightRequestId) &&
                                     responseTransactions.any { it.jsonPath == highlightJsonPath }
                             ApiTrafficPairCard(
                                 pair = pair,
@@ -680,15 +768,11 @@ private fun ResponseTrafficItem(
             title = title,
             timestamp = timestamp,
         )
-        if (responseTransactions.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(4.dp))
-            ResponseTransactionStates(
-                transactions = responseTransactions,
-                highlightJsonPath = highlightJsonPath,
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-        }
-        JsonViewer(json = json, highlightJsonPath = highlightJsonPath)
+        JsonViewer(
+            json = json,
+            responseTransactions = responseTransactions,
+            highlightJsonPath = highlightJsonPath,
+        )
     }
 }
 
@@ -799,6 +883,7 @@ private fun TrafficItemHeader(
 @Composable
 private fun JsonViewer(
     json: String,
+    responseTransactions: List<ApiResponseTransaction> = emptyList(),
     highlightJsonPath: String? = null,
 ) {
     val jsonElement =
@@ -822,11 +907,17 @@ private fun JsonViewer(
             remember(highlightJsonPath) {
                 parseJsonPathSegments(highlightJsonPath)
             }
+        val transactionsByJsonPath =
+            remember(responseTransactions) {
+                responseTransactions.groupBy { it.jsonPath }
+            }
         Column {
             JsonTreeNode(
                 label = null,
                 element = jsonElement,
+                jsonPath = "$",
                 depth = 0,
+                transactionsByJsonPath = transactionsByJsonPath,
                 remainingHighlightSegments = highlightSegments,
             )
         }
@@ -865,7 +956,9 @@ private fun parseJsonPathSegments(jsonPath: String?): List<String>? {
 private fun JsonTreeNode(
     label: String?,
     element: JsonElement,
+    jsonPath: String,
     depth: Int,
+    transactionsByJsonPath: Map<String, List<ApiResponseTransaction>> = emptyMap(),
     remainingHighlightSegments: List<String>? = null,
 ) {
     val childCount = element.childCount()
@@ -892,34 +985,59 @@ private fun JsonTreeNode(
             append(element.summary(expanded))
         }
 
+    val nodeTransactions = transactionsByJsonPath[jsonPath].orEmpty()
     val highlightBackground =
-        if (isHighlightTarget) {
-            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
-        } else {
-            Color.Transparent
+        when {
+            isHighlightTarget -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+            nodeTransactions.isNotEmpty() -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            else -> Color.Transparent
         }
+    val lineModifier =
+        Modifier
+            .fillMaxWidth()
+            .background(highlightBackground, MaterialTheme.shapes.extraSmall)
+            .padding(start = (depth * 12).dp)
+            .then(
+                if (expandable) {
+                    Modifier.clickable { expanded = !expanded }
+                } else {
+                    Modifier
+                },
+            )
 
-    Text(
-        text = line,
-        style = MaterialTheme.typography.bodySmall,
-        fontFamily = FontFamily.Monospace,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        color = if (isHighlightTarget) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(highlightBackground, MaterialTheme.shapes.extraSmall)
-                .padding(start = (depth * 12).dp)
-                .then(
-                    if (expandable) {
-                        Modifier.clickable { expanded = !expanded }
-                    } else {
-                        Modifier
-                    },
-                ),
-    )
-
+    Row(
+        modifier = lineModifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = line,
+            style = MaterialTheme.typography.bodySmall,
+            fontFamily = FontFamily.Monospace,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            color = if (isHighlightTarget) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+        )
+        nodeTransactions.forEach { transaction ->
+            JsonTransactionStatus(transaction = transaction)
+        }
+    }
+    nodeTransactions
+        .mapNotNull { it.errorMessage }
+        .forEach { errorMessage ->
+            Text(
+                text = errorMessage,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.error,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(start = ((depth + 1) * 12).dp),
+            )
+        }
     if (expanded) {
         when (element) {
             is JsonObject -> {
@@ -934,7 +1052,9 @@ private fun JsonTreeNode(
                     JsonTreeNode(
                         label = "\"$key\"",
                         element = value,
+                        jsonPath = jsonObjectChildPath(jsonPath, key),
                         depth = depth + 1,
+                        transactionsByJsonPath = transactionsByJsonPath,
                         remainingHighlightSegments = nextSegments,
                     )
                 }
@@ -951,7 +1071,9 @@ private fun JsonTreeNode(
                     JsonTreeNode(
                         label = "[$index]",
                         element = value,
+                        jsonPath = "$jsonPath[$index]",
                         depth = depth + 1,
+                        transactionsByJsonPath = transactionsByJsonPath,
                         remainingHighlightSegments = nextSegments,
                     )
                 }
@@ -960,6 +1082,42 @@ private fun JsonTreeNode(
         }
     }
 }
+
+@Composable
+private fun JsonTransactionStatus(transaction: ApiResponseTransaction) {
+    val stateColor =
+        when (transaction.state) {
+            ApiResponseTransactionState.IMPORTED -> MaterialTheme.colorScheme.primary
+            ApiResponseTransactionState.DUPLICATE -> MaterialTheme.colorScheme.tertiary
+            ApiResponseTransactionState.ERROR -> MaterialTheme.colorScheme.error
+        }
+    val label =
+        when (transaction.state) {
+            ApiResponseTransactionState.IMPORTED -> "Imported"
+            ApiResponseTransactionState.DUPLICATE -> "Duplicate"
+            ApiResponseTransactionState.ERROR -> "Error"
+        }
+    Text(
+        text = label,
+        style = MaterialTheme.typography.labelSmall,
+        color = stateColor,
+        maxLines = 1,
+        modifier =
+            Modifier
+                .background(stateColor.copy(alpha = 0.12f), MaterialTheme.shapes.extraSmall)
+                .padding(horizontal = 6.dp, vertical = 2.dp),
+    )
+}
+
+private fun jsonObjectChildPath(
+    parentPath: String,
+    key: String,
+): String =
+    if (parentPath == "$") {
+        "$.$key"
+    } else {
+        "$parentPath.$key"
+    }
 
 private data class ApiTrafficPair(
     val request: ApiRequest?,
@@ -998,6 +1156,36 @@ private fun ApiRequest.displayBody(): String =
             }
         }
     }.trimEnd()
+
+private fun MonzoDownloadResult.displaySummary(): String =
+    "Download complete: $accountCount account(s), $transactionResponseCount transaction response page(s)."
+
+private fun MonzoImportProgress.downloadDetail(): String =
+    "Downloading account $accountIndex/$accountCount, page $page. $importedTransactionCount response page(s) downloaded so far."
+
+private fun MonzoImportResult.displaySummary(): String =
+    buildString {
+        append("Import complete: ")
+        append(accountCount)
+        append(" account(s), ")
+        append(transactionCount)
+        append(" imported transaction(s)")
+        if (duplicateCount > 0) {
+            append(", ")
+            append(duplicateCount)
+            append(" duplicate(s)")
+        }
+        if (errorCount > 0) {
+            append(", ")
+            append(errorCount)
+            append(" error(s)")
+        }
+        append(".")
+    }
+
+private fun monzoDownloadTaskKey(sessionId: ApiSessionId): String = "monzo-download-${sessionId.id}"
+
+private fun monzoImportTaskKey(sessionId: ApiSessionId): String = "monzo-import-${sessionId.id}"
 
 private fun JsonElement.childCount(): Int =
     when (this) {

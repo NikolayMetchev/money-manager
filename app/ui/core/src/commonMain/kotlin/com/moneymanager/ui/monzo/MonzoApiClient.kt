@@ -2,6 +2,7 @@
 
 package com.moneymanager.ui.monzo
 
+import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiResponseId
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.repository.ApiSessionRepository
@@ -29,11 +30,13 @@ class MonzoApiClient(
             response.call.attributes.getOrNull(MonzoApiResponseBodyKey)
                 ?: response.bodyAsText()
         val responseId = response.call.attributes.getOrNull(MonzoApiResponseIdKey)
+        val requestId = response.call.attributes.getOrNull(MonzoApiRequestIdKey)
 
         return MonzoHttpResponse(
             statusCode = response.status.value,
             body = body,
             responseId = responseId,
+            requestId = requestId,
         )
     }
 }
@@ -42,6 +45,7 @@ data class MonzoHttpResponse(
     val statusCode: Int,
     val body: String,
     val responseId: ApiResponseId? = null,
+    val requestId: ApiRequestId? = null,
 )
 
 fun createMonzoApiClient(
@@ -74,6 +78,7 @@ fun createMonzoApiClient(
             )
         call.attributes.put(MonzoApiResponseBodyKey, responseBody)
         call.attributes.put(MonzoApiResponseIdKey, responseId)
+        call.attributes.put(MonzoApiRequestIdKey, requestId)
 
         call
     }
@@ -83,3 +88,4 @@ fun createMonzoApiClient(
 
 private val MonzoApiResponseBodyKey = AttributeKey<String>("MonzoApiResponseBody")
 private val MonzoApiResponseIdKey = AttributeKey<ApiResponseId>("MonzoApiResponseId")
+private val MonzoApiRequestIdKey = AttributeKey<ApiRequestId>("MonzoApiRequestId")
