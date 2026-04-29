@@ -42,12 +42,13 @@ import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.ApiSessionRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.rest.createApiClient
+import com.moneymanager.ui.api.ApiSessionTrafficRecorder
 import com.moneymanager.ui.background.LocalBackgroundTaskManager
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.monzo.MonzoDownloadResult
 import com.moneymanager.ui.monzo.MonzoImportProgress
 import com.moneymanager.ui.monzo.MonzoImportResult
-import com.moneymanager.ui.monzo.createMonzoApiClient
 import com.moneymanager.ui.monzo.downloadMonzoTransactions
 import com.moneymanager.ui.monzo.importMonzoSessionTransactions
 import com.moneymanager.ui.util.displayDateTime
@@ -391,9 +392,12 @@ fun MonzoAuthScreen(
                                     downloadMonzoTransactions(
                                         token = session.token,
                                         apiClient =
-                                            createMonzoApiClient(
-                                                sessionId = session.id,
-                                                apiSessionRepository = apiSessionRepository,
+                                            createApiClient(
+                                                trafficRecorder =
+                                                    ApiSessionTrafficRecorder(
+                                                        sessionId = session.id,
+                                                        apiSessionRepository = apiSessionRepository,
+                                                    ),
                                             ),
                                         onProgress = { progress ->
                                             downloadProgress = progress

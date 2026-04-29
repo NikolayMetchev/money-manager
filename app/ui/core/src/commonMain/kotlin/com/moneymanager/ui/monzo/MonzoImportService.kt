@@ -22,6 +22,8 @@ import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.ApiSessionRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.rest.ApiClient
+import com.moneymanager.rest.ApiHttpResponse
 import io.ktor.http.URLBuilder
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.Json
@@ -60,7 +62,7 @@ data class MonzoImportProgress(
 
 suspend fun downloadMonzoTransactions(
     token: String,
-    apiClient: MonzoApiClient,
+    apiClient: ApiClient,
     onProgress: (MonzoImportProgress) -> Unit = {},
 ): MonzoDownloadResult {
     val accountsResponse =
@@ -144,7 +146,7 @@ suspend fun importMonzoSessionTransactions(
         val monzoAccountId = accountCache.getOrCreateAccountId(monzoAccount.localAccountName())
         val pageResult =
             importTransactionPage(
-                response = response.toMonzoHttpResponse(),
+                response = response.toApiHttpResponse(),
                 monzoAccountId = monzoAccountId,
                 sessionId = sessionId,
                 deviceId = deviceId,
@@ -171,8 +173,8 @@ suspend fun importMonzoSessionTransactions(
 private suspend fun fetchResponse(
     url: String,
     token: String,
-    apiClient: MonzoApiClient,
-): MonzoHttpResponse {
+    apiClient: ApiClient,
+): ApiHttpResponse {
     val response = apiClient.get(url = url, bearerToken = token)
     if (response.statusCode != 200) {
         throw MonzoApiException("HTTP ${response.statusCode}: ${response.body}")
@@ -227,7 +229,7 @@ private data class MonzoImportPageResult(
 )
 
 private suspend fun importTransactionPage(
-    response: MonzoHttpResponse,
+    response: ApiHttpResponse,
     monzoAccountId: AccountId,
     sessionId: ApiSessionId,
     deviceId: DeviceId,
@@ -238,8 +240,8 @@ private suspend fun importTransactionPage(
     transferSourceQueries: TransferSourceQueries,
 ): MonzoImportPageResult {
     val transactions = parseTransactionsWithPath(response.body)
-    val responseId = response.responseId
-    val requestId = response.requestId
+    val responseId = response.responseId?.let(::ApiResponseId)
+    val requestId = response.requestId?.let(::ApiRequestId)
 
     if (responseId == null || requestId == null) {
         return MonzoImportPageResult(
@@ -431,12 +433,12 @@ private fun buildTransactionUrl(
             }
         }.buildString()
 
-private fun ApiResponse.toMonzoHttpResponse(): MonzoHttpResponse =
-    MonzoHttpResponse(
+private fun ApiResponse.toApiHttpResponse(): ApiHttpResponse =
+    ApiHttpResponse(
         statusCode = 200,
         body = json,
-        responseId = id,
-        requestId = requestId,
+        responseId = id.id,
+        requestId = requestId.id,
     )
 
 private fun ApiRequest.accountIdParameter(): String? =

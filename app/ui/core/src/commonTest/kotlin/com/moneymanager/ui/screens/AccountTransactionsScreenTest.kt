@@ -1181,6 +1181,7 @@ class AccountTransactionsScreenTest {
             sessionId: ApiSessionId,
             requestId: ApiRequestId,
             deviceInfo: DeviceInfo,
+            jsonPath: String?,
         ): TransferSource {
             val source =
                 TransferSource(
@@ -1191,7 +1192,7 @@ class AccountTransactionsScreenTest {
                     deviceId = 1L,
                     deviceInfo = deviceInfo,
                     csvSource = null,
-                    apiSource = ApiSourceDetails(sessionId = sessionId, requestId = requestId),
+                    apiSource = ApiSourceDetails(sessionId = sessionId, requestId = requestId, jsonPath = jsonPath),
                     createdAt = Clock.System.now(),
                 )
             sources.add(source)

@@ -6,15 +6,23 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Card
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CoroutineScope
@@ -121,10 +129,53 @@ fun BackgroundTaskPanel(
     val visibleTasks = manager.tasks.takeLast(3)
     if (visibleTasks.isEmpty()) return
 
+    val hasRunningTask = visibleTasks.any { task -> task.status == BackgroundTaskStatus.RUNNING }
+    val latestTaskId = visibleTasks.lastOrNull()?.id
+    var expanded by remember { mutableStateOf(hasRunningTask) }
+    var lastSeenTaskId by remember { mutableStateOf<Long?>(null) }
+
+    LaunchedEffect(latestTaskId) {
+        if (latestTaskId != null && latestTaskId != lastSeenTaskId) {
+            lastSeenTaskId = latestTaskId
+            expanded = visibleTasks.last().status == BackgroundTaskStatus.RUNNING
+        }
+    }
+
+    LaunchedEffect(hasRunningTask) {
+        if (!hasRunningTask) {
+            expanded = false
+        }
+    }
+
+    if (!expanded) {
+        CollapsedBackgroundTaskPanel(
+            taskCount = visibleTasks.size,
+            hasRunningTask = hasRunningTask,
+            onClick = { expanded = true },
+            modifier = modifier,
+        )
+        return
+    }
+
     Column(
         modifier = modifier.widthIn(max = 420.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = "Background Tasks",
+                style = MaterialTheme.typography.titleSmall,
+            )
+            IconButton(onClick = { expanded = false }) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Hide background tasks",
+                )
+            }
+        }
         visibleTasks.forEach { task ->
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(
@@ -163,6 +214,47 @@ fun BackgroundTaskPanel(
 }
 
 @Composable
+private fun CollapsedBackgroundTaskPanel(
+    taskCount: Int,
+    hasRunningTask: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        onClick = onClick,
+        modifier = modifier.widthIn(max = 260.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = "$taskCount background task(s)",
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Text(
+                    text = if (hasRunningTask) "Running" else "Done",
+                    style = MaterialTheme.typography.labelSmall,
+                    color =
+                        if (hasRunningTask) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.tertiary
+                        },
+                )
+            }
+            if (hasRunningTask) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            }
+        }
+    }
+}
+
+@Composable
 private fun BackgroundTaskStatus.color() =
     when (this) {
         BackgroundTaskStatus.RUNNING -> MaterialTheme.colorScheme.primary
@@ -176,4 +268,3 @@ private fun BackgroundTaskStatus.label(): String =
         BackgroundTaskStatus.SUCCEEDED -> "Done"
         BackgroundTaskStatus.FAILED -> "Failed"
     }
-
