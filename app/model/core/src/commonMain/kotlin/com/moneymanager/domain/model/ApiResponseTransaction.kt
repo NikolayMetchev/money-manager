@@ -5,7 +5,7 @@ package com.moneymanager.domain.model
  * Allows the UI to display which transactions were imported, which were duplicates,
  * and which encountered errors.
  *
- * [referencedTransactionId] meaning depends on [state]:
+ * [transactionId] meaning depends on [state]:
  * - IMPORTED: the newly created Money Manager transaction ID
  * - DUPLICATE: the pre-existing transaction ID that this entry duplicates
  * - ERROR: null
@@ -13,9 +13,9 @@ package com.moneymanager.domain.model
 data class ApiResponseTransaction(
     val id: ApiResponseTransactionId,
     val responseId: ApiResponseId,
-    val jsonPath: String,
+    val jsonPath: JsonPath,
     val state: ApiResponseTransactionState,
-    val referencedTransactionId: Long?,
+    val transactionId: TransferId?,
     val errorMessage: String?,
 )
 

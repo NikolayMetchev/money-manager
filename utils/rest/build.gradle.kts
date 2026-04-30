@@ -8,7 +8,16 @@ kotlin {
         commonMain {
             dependencies {
                 api(libs.ktor.client.core)
+                api(projects.app.model.core)
                 implementation(libs.ktor.client.cio)
+            }
+        }
+
+        commonTest {
+            dependencies {
+                implementation(kotlin("test"))
+                implementation(libs.kotlinx.coroutines.test)
+                implementation(libs.ktor.client.mock)
             }
         }
 
@@ -21,6 +30,7 @@ kotlin {
 
         jvmMain {
             dependencies {
+                api(projects.app.model.core)
                 implementation(libs.ktor.http)
                 implementation(libs.ktor.utils)
             }

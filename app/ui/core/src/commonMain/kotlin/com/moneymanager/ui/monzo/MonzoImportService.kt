@@ -15,6 +15,7 @@ import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.DeviceId
+import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
@@ -219,7 +220,7 @@ private data class MonzoTransactionPageItem(
     val created: Instant,
     val currencyCode: String,
     val description: String,
-    val jsonPath: String,
+    val jsonPath: JsonPath,
     val merchantName: String?,
     val counterpartyName: String?,
 )
@@ -244,18 +245,8 @@ private suspend fun importTransactionPage(
     transferSourceQueries: TransferSourceQueries,
 ): MonzoImportPageResult {
     val transactions = parseTransactionsWithPath(response.body)
-    val responseId = response.responseId?.let(::ApiResponseId)
-    val requestId = response.requestId?.let(::ApiRequestId)
-
-    if (responseId == null || requestId == null) {
-        return MonzoImportPageResult(
-            importedCount = 0,
-            duplicateCount = 0,
-            errorCount = transactions.size,
-            before = transactions.map { it.created }.minOrNull(),
-            hasTransactions = transactions.isNotEmpty(),
-        )
-    }
+    val responseId = ApiResponseId(response.responseId)
+    val requestId = ApiRequestId(response.requestId)
 
     val states =
         transactions.map { item ->
@@ -360,13 +351,12 @@ private suspend fun importValidTransactionItem(
             responseId = responseId,
             jsonPath = item.jsonPath,
             state = ApiResponseTransactionState.DUPLICATE,
-            referencedTransactionId = duplicateTransferId.id,
+            transactionId = duplicateTransferId,
             errorMessage = null,
         )
         return ApiResponseTransactionState.DUPLICATE
     }
 
-    var createdTransferId: TransferId? = null
     transactionRepository.createTransfers(
         transfers = listOf(transfer),
         sourceRecorder =
@@ -375,18 +365,20 @@ private suspend fun importValidTransactionItem(
                 deviceId = deviceId,
                 sessionId = sessionId,
                 requestId = requestId,
-                jsonPathForTransfer = { generatedTransferId ->
-                    createdTransferId = generatedTransferId
-                    item.jsonPath
-                },
+                jsonPathForTransfer = { item.jsonPath },
             ),
     )
-    val importedTransferId = createdTransferId ?: transfer.id
+    val importedTransferId =
+        transactionRepository
+            .getTransactionsByAccount(monzoAccountId)
+            .first()
+            .first { it.matches(transfer) }
+            .id
     apiSessionRepository.insertResponseTransaction(
         responseId = responseId,
         jsonPath = item.jsonPath,
         state = ApiResponseTransactionState.IMPORTED,
-        referencedTransactionId = importedTransferId.id,
+        transactionId = importedTransferId,
         errorMessage = null,
     )
     return ApiResponseTransactionState.IMPORTED
@@ -409,7 +401,7 @@ private fun parseTransactionsWithPath(json: String): List<MonzoTransactionPageIt
                         created = created,
                         currencyCode = currency.uppercase(),
                         description = obj["description"]?.jsonPrimitive?.contentOrNull.orEmpty(),
-                        jsonPath = "$.transactions[$index]",
+                        jsonPath = JsonPath("$.transactions[$index]"),
                         merchantName = obj.jsonObjectOrNull("merchant")?.stringOrNull("name"),
                         counterpartyName = obj.jsonObjectOrNull("counterparty")?.stringOrNull("name"),
                     )
@@ -539,14 +531,14 @@ private fun Transfer.matches(other: Transfer): Boolean =
 
 private suspend fun ApiSessionRepository.recordTransactionError(
     responseId: ApiResponseId,
-    jsonPath: String,
+    jsonPath: JsonPath,
     message: String,
 ) {
     insertResponseTransaction(
         responseId = responseId,
         jsonPath = jsonPath,
         state = ApiResponseTransactionState.ERROR,
-        referencedTransactionId = null,
+        transactionId = null,
         errorMessage = message,
     )
 }

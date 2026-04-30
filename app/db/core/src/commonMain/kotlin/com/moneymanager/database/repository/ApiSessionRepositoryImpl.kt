@@ -16,6 +16,8 @@ import com.moneymanager.domain.model.ApiSession
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.ApiSessionType
 import com.moneymanager.domain.model.DeviceId
+import com.moneymanager.domain.model.JsonPath
+import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.ApiSessionRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -179,9 +181,9 @@ class ApiSessionRepositoryImpl(
 
     override suspend fun insertResponseTransaction(
         responseId: ApiResponseId,
-        jsonPath: String,
+        jsonPath: JsonPath,
         state: ApiResponseTransactionState,
-        referencedTransactionId: Long?,
+        transactionId: TransferId?,
         errorMessage: String?,
     ): ApiResponseTransactionId =
         withContext(Dispatchers.Default) {
@@ -189,9 +191,9 @@ class ApiSessionRepositoryImpl(
                 queries.transactionWithResult {
                     queries.insertResponseTransaction(
                         response_id = responseId.id,
-                        json_path = jsonPath,
+                        json_path = jsonPath.value,
                         state = state.id.toLong(),
-                        referenced_transaction_id = referencedTransactionId,
+                        transaction_id = transactionId?.id,
                         error_message = errorMessage,
                     )
                     queries.lastInsertApiResponseTransactionId().executeAsOne()
@@ -205,9 +207,9 @@ class ApiSessionRepositoryImpl(
                 ApiResponseTransaction(
                     id = ApiResponseTransactionId(row.id),
                     responseId = ApiResponseId(row.response_id),
-                    jsonPath = row.json_path,
+                    jsonPath = JsonPath(row.json_path),
                     state = ApiResponseTransactionState.fromId(row.state.toInt()),
-                    referencedTransactionId = row.referenced_transaction_id,
+                    transactionId = row.transaction_id?.let(::TransferId),
                     errorMessage = row.error_message,
                 )
             }

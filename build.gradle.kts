@@ -78,10 +78,6 @@ dependencyAnalysis {
             ignoreSourceSet("jvmDev")
         }
 
-        project(":utils:rest") {
-            ignoreSourceSet("commonTest")
-        }
-
         project(":app:ui:core") {
             ignoreSourceSet("jvmDev")
             sourceSet("commonTest") {

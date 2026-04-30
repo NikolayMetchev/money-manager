@@ -119,7 +119,7 @@ SELECT last_insert_rowid();
 -- Tracks the import state of each transaction entry found in an API response.
 -- Created when processing responses during import so that the UI can display
 -- which transactions were imported, which were duplicates, and which failed.
--- referenced_transaction_id meaning depends on state:
+-- transaction_id meaning depends on state:
 --   state=imported (1): the newly created transaction
 --   state=duplicate (2): the pre-existing transaction this entry duplicates
 --   state=error (3): NULL
@@ -129,18 +129,18 @@ CREATE TABLE api_response_transaction (
     json_path TEXT NOT NULL,
     -- State: 1=imported, 2=duplicate, 3=error
     state INTEGER NOT NULL,
-    referenced_transaction_id INTEGER,
+    transaction_id INTEGER,
     error_message TEXT,
     created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now') * 1000),
     FOREIGN KEY (response_id) REFERENCES api_response(id) ON DELETE CASCADE,
-    FOREIGN KEY (referenced_transaction_id) REFERENCES transaction_id(id)
+    FOREIGN KEY (transaction_id) REFERENCES transaction_id(id)
 );
 
 CREATE INDEX idx_api_response_transaction_response ON api_response_transaction(response_id);
-CREATE INDEX idx_api_response_transaction_transaction ON api_response_transaction(referenced_transaction_id);
+CREATE INDEX idx_api_response_transaction_transaction ON api_response_transaction(transaction_id);
 
 insertResponseTransaction:
-INSERT INTO api_response_transaction(response_id, json_path, state, referenced_transaction_id, error_message)
+INSERT INTO api_response_transaction(response_id, json_path, state, transaction_id, error_message)
 VALUES (?, ?, ?, ?, ?);
 
 selectResponseTransactionsByResponseId:

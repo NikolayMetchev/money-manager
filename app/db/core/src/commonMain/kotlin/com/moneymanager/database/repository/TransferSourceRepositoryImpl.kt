@@ -8,6 +8,7 @@ import com.moneymanager.database.mapper.TransferSourceFromTransactionIdMapper
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.DeviceInfo
+import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.TransferSource
 import com.moneymanager.domain.model.csv.CsvImportId
@@ -154,7 +155,7 @@ class TransferSourceRepositoryImpl(
         sessionId: ApiSessionId,
         requestId: ApiRequestId,
         deviceInfo: DeviceInfo,
-        jsonPath: String?,
+        jsonPath: JsonPath,
     ): TransferSource =
         withContext(Dispatchers.Default) {
             val deviceId = deviceRepository.getOrCreateDevice(deviceInfo)
@@ -169,7 +170,7 @@ class TransferSourceRepositoryImpl(
                 id = transferSourceId,
                 api_session_id = sessionId.id,
                 api_request_id = requestId.id,
-                json_path = jsonPath,
+                json_path = jsonPath.value,
             )
 
             queries
@@ -199,7 +200,7 @@ class TransferSourceRepositoryImpl(
                         id = transferSourceId,
                         api_session_id = sessionId.id,
                         api_request_id = requestId.id,
-                        json_path = source.jsonPath,
+                        json_path = source.jsonPath.value,
                     )
                 }
             }

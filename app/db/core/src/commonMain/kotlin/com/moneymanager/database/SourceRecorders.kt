@@ -8,6 +8,7 @@ import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.EntityType
+import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.SourceRecorder
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
@@ -71,7 +72,7 @@ class ApiImportSourceRecorder(
     private val deviceId: DeviceId,
     private val sessionId: ApiSessionId,
     private val requestId: ApiRequestId,
-    private val jsonPathForTransfer: (TransferId) -> String? = { null },
+    private val jsonPathForTransfer: (TransferId) -> JsonPath,
 ) : SourceRecorder {
     override fun insert(transfer: Transfer) {
         // Insert base TransferSource record
@@ -86,7 +87,7 @@ class ApiImportSourceRecorder(
             transferSourceId,
             sessionId.id,
             requestId.id,
-            jsonPathForTransfer(transfer.id),
+            jsonPathForTransfer(transfer.id).value,
         )
     }
 }

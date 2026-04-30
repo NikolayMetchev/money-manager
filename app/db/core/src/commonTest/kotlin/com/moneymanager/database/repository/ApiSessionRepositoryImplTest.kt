@@ -4,6 +4,7 @@ package com.moneymanager.database.repository
 
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.DeviceInfo
+import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -310,9 +311,9 @@ class ApiSessionRepositoryImplTest : DbTest() {
             val rtId =
                 repositories.apiSessionRepository.insertResponseTransaction(
                     responseId = responseId,
-                    jsonPath = "$.transactions[0]",
+                    jsonPath = JsonPath("$.transactions[0]"),
                     state = com.moneymanager.domain.model.ApiResponseTransactionState.IMPORTED,
-                    referencedTransactionId = null,
+                    transactionId = null,
                     errorMessage = null,
                 )
 
@@ -335,24 +336,24 @@ class ApiSessionRepositoryImplTest : DbTest() {
 
             repositories.apiSessionRepository.insertResponseTransaction(
                 responseId = responseId,
-                jsonPath = "$.transactions[0]",
+                jsonPath = JsonPath("$.transactions[0]"),
                 state = com.moneymanager.domain.model.ApiResponseTransactionState.IMPORTED,
-                referencedTransactionId = null,
+                transactionId = null,
                 errorMessage = null,
             )
             repositories.apiSessionRepository.insertResponseTransaction(
                 responseId = responseId,
-                jsonPath = "$.transactions[1]",
+                jsonPath = JsonPath("$.transactions[1]"),
                 state = com.moneymanager.domain.model.ApiResponseTransactionState.DUPLICATE,
-                referencedTransactionId = null,
+                transactionId = null,
                 errorMessage = null,
             )
 
             val entries = repositories.apiSessionRepository.getResponseTransactions(responseId)
             assertEquals(2, entries.size)
-            assertEquals("$.transactions[0]", entries[0].jsonPath)
+            assertEquals(JsonPath("$.transactions[0]"), entries[0].jsonPath)
             assertEquals(com.moneymanager.domain.model.ApiResponseTransactionState.IMPORTED, entries[0].state)
-            assertEquals("$.transactions[1]", entries[1].jsonPath)
+            assertEquals(JsonPath("$.transactions[1]"), entries[1].jsonPath)
             assertEquals(com.moneymanager.domain.model.ApiResponseTransactionState.DUPLICATE, entries[1].state)
         }
 
@@ -389,9 +390,9 @@ class ApiSessionRepositoryImplTest : DbTest() {
                 )
             repositories.apiSessionRepository.insertResponseTransaction(
                 responseId = responseId,
-                jsonPath = "$.transactions[0]",
+                jsonPath = JsonPath("$.transactions[0]"),
                 state = com.moneymanager.domain.model.ApiResponseTransactionState.IMPORTED,
-                referencedTransactionId = null,
+                transactionId = null,
                 errorMessage = null,
             )
 

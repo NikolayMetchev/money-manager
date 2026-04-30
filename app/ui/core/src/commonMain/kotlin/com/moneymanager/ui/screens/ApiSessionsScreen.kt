@@ -58,8 +58,8 @@ import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.ApiSessionRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.createApiClient
-import com.moneymanager.ui.api.ApiSessionTrafficRecorder
 import com.moneymanager.ui.background.LocalBackgroundTaskManager
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.monzo.MonzoDownloadResult
@@ -620,7 +620,7 @@ fun ApiSessionTrafficScreen(
                                     pair.response != null &&
                                         (highlightRequestId == null || pair.request?.id == highlightRequestId) &&
                                         responseTransactionsByResponseId[pair.response.id]
-                                            ?.any { it.jsonPath == highlightJsonPath } == true
+                                            ?.any { it.jsonPath.value == highlightJsonPath } == true
                                 }.let { if (it >= 0) it + 1 else -1 }
                         }
                     }
@@ -650,7 +650,7 @@ fun ApiSessionTrafficScreen(
                             val isHighlighted =
                                 highlightJsonPath != null &&
                                     (highlightRequestId == null || pair.request?.id == highlightRequestId) &&
-                                    responseTransactions.any { it.jsonPath == highlightJsonPath }
+                                    responseTransactions.any { it.jsonPath.value == highlightJsonPath }
                             ApiTrafficPairCard(
                                 pair = pair,
                                 responseTransactions = responseTransactions,
@@ -810,7 +810,7 @@ private fun ResponseTransactionStates(
 
         // Show duplicate and error entries individually
         transactions.filter { it.state != ApiResponseTransactionState.IMPORTED }.forEach { tx ->
-            val isHighlighted = tx.jsonPath == highlightJsonPath
+            val isHighlighted = tx.jsonPath.value == highlightJsonPath
             val stateColor =
                 when (tx.state) {
                     ApiResponseTransactionState.DUPLICATE -> MaterialTheme.colorScheme.tertiary
@@ -842,7 +842,7 @@ private fun ResponseTransactionStates(
                     color = stateColor,
                 )
                 Text(
-                    text = tx.jsonPath,
+                    text = tx.jsonPath.value,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -914,7 +914,7 @@ private fun JsonViewer(
             }
         val transactionsByJsonPath =
             remember(responseTransactions) {
-                responseTransactions.groupBy { it.jsonPath }
+                responseTransactions.groupBy { it.jsonPath.value }
             }
         Column {
             JsonTreeNode(

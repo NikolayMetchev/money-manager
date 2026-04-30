@@ -39,6 +39,7 @@ import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.DeviceInfo
+import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.PageWithTargetIndex
@@ -1181,7 +1182,7 @@ class AccountTransactionsScreenTest {
             sessionId: ApiSessionId,
             requestId: ApiRequestId,
             deviceInfo: DeviceInfo,
-            jsonPath: String?,
+            jsonPath: JsonPath,
         ): TransferSource {
             val source =
                 TransferSource(
