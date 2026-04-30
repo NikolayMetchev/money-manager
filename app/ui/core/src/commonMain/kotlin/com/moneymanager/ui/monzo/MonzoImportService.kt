@@ -244,18 +244,8 @@ private suspend fun importTransactionPage(
     transferSourceQueries: TransferSourceQueries,
 ): MonzoImportPageResult {
     val transactions = parseTransactionsWithPath(response.body)
-    val responseId = response.responseId?.let(::ApiResponseId)
-    val requestId = response.requestId?.let(::ApiRequestId)
-
-    if (responseId == null || requestId == null) {
-        return MonzoImportPageResult(
-            importedCount = 0,
-            duplicateCount = 0,
-            errorCount = transactions.size,
-            before = transactions.map { it.created }.minOrNull(),
-            hasTransactions = transactions.isNotEmpty(),
-        )
-    }
+    val responseId = ApiResponseId(response.responseId)
+    val requestId = ApiRequestId(response.requestId)
 
     val states =
         transactions.map { item ->
@@ -360,33 +350,30 @@ private suspend fun importValidTransactionItem(
             responseId = responseId,
             jsonPath = item.jsonPath,
             state = ApiResponseTransactionState.DUPLICATE,
-            referencedTransactionId = duplicateTransferId.id,
+            transactionId = duplicateTransferId.id,
             errorMessage = null,
         )
         return ApiResponseTransactionState.DUPLICATE
     }
 
-    var createdTransferId: TransferId? = null
+    val sourceRecorder =
+        ApiImportSourceRecorder(
+            queries = transferSourceQueries,
+            deviceId = deviceId,
+            sessionId = sessionId,
+            requestId = requestId,
+            jsonPath = item.jsonPath,
+        )
     transactionRepository.createTransfers(
         transfers = listOf(transfer),
-        sourceRecorder =
-            ApiImportSourceRecorder(
-                queries = transferSourceQueries,
-                deviceId = deviceId,
-                sessionId = sessionId,
-                requestId = requestId,
-                jsonPathForTransfer = { generatedTransferId ->
-                    createdTransferId = generatedTransferId
-                    item.jsonPath
-                },
-            ),
+        sourceRecorder = sourceRecorder,
     )
-    val importedTransferId = createdTransferId ?: transfer.id
+    val importedTransferId = sourceRecorder.insertedTransferId ?: transfer.id
     apiSessionRepository.insertResponseTransaction(
         responseId = responseId,
         jsonPath = item.jsonPath,
         state = ApiResponseTransactionState.IMPORTED,
-        referencedTransactionId = importedTransferId.id,
+        transactionId = importedTransferId.id,
         errorMessage = null,
     )
     return ApiResponseTransactionState.IMPORTED
@@ -546,7 +533,7 @@ private suspend fun ApiSessionRepository.recordTransactionError(
         responseId = responseId,
         jsonPath = jsonPath,
         state = ApiResponseTransactionState.ERROR,
-        referencedTransactionId = null,
+        transactionId = null,
         errorMessage = message,
     )
 }

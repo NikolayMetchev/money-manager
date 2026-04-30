@@ -1,6 +1,7 @@
 package com.moneymanager.rest
 
 import io.ktor.client.HttpClient
+import io.ktor.client.engine.HttpClientEngine
 import io.ktor.client.plugins.HttpSend
 import io.ktor.client.plugins.plugin
 import io.ktor.client.request.bearerAuth
@@ -21,10 +22,10 @@ class ApiClient(
                 bearerAuth(bearerToken)
             }
         val body =
-            response.call.attributes.getOrNull(ApiResponseBodyKey)
+            response.call.attributes.getOrNull(apiResponseBodyKey)
                 ?: response.bodyAsText()
-        val responseId = response.call.attributes.getOrNull(ApiResponseIdKey)
-        val requestId = response.call.attributes.getOrNull(ApiRequestIdKey)
+        val responseId = response.call.attributes[apiResponseIdKey]
+        val requestId = response.call.attributes[apiRequestIdKey]
 
         return ApiHttpResponse(
             statusCode = response.status.value,
@@ -38,8 +39,8 @@ class ApiClient(
 data class ApiHttpResponse(
     val statusCode: Int,
     val body: String,
-    val responseId: Long? = null,
-    val requestId: Long? = null,
+    val responseId: Long,
+    val requestId: Long,
 )
 
 interface ApiTrafficRecorder {
@@ -55,36 +56,39 @@ interface ApiTrafficRecorder {
     ): Long
 }
 
-fun createApiClient(trafficRecorder: ApiTrafficRecorder? = null): ApiClient {
-    val httpClient = HttpClient()
+fun createApiClient(trafficRecorder: ApiTrafficRecorder): ApiClient = createApiClient(trafficRecorder, engine = null)
 
-    if (trafficRecorder != null) {
-        httpClient.plugin(HttpSend).intercept { request ->
-            val requestId =
-                trafficRecorder.recordRequest(
-                    method = request.method.value,
-                    url = request.url.buildString(),
-                    headers =
-                        request.headers
-                            .entries()
-                            .associate { (key, values) -> key to values.joinToString(",") }
-                            .filterKeys { it != HttpHeaders.Authorization },
-                )
+internal fun createApiClient(
+    trafficRecorder: ApiTrafficRecorder,
+    engine: HttpClientEngine?,
+): ApiClient {
+    val httpClient = if (engine != null) HttpClient(engine) else HttpClient()
 
-            val call = execute(request)
-            val responseBody = call.response.bodyAsText()
-            val responseId = trafficRecorder.recordResponse(requestId, responseBody)
-            call.attributes.put(ApiResponseBodyKey, responseBody)
-            call.attributes.put(ApiResponseIdKey, responseId)
-            call.attributes.put(ApiRequestIdKey, requestId)
+    httpClient.plugin(HttpSend).intercept { request ->
+        val requestId =
+            trafficRecorder.recordRequest(
+                method = request.method.value,
+                url = request.url.buildString(),
+                headers =
+                    request.headers
+                        .entries()
+                        .associate { (key, values) -> key to values.joinToString(",") }
+                        .filterKeys { it != HttpHeaders.Authorization },
+            )
 
-            call
-        }
+        val call = execute(request)
+        val responseBody = call.response.bodyAsText()
+        val responseId = trafficRecorder.recordResponse(requestId, responseBody)
+        call.attributes.put(apiResponseBodyKey, responseBody)
+        call.attributes.put(apiResponseIdKey, responseId)
+        call.attributes.put(apiRequestIdKey, requestId)
+
+        call
     }
 
     return ApiClient(httpClient)
 }
 
-private val ApiResponseBodyKey = AttributeKey<String>("ApiResponseBody")
-private val ApiResponseIdKey = AttributeKey<Long>("ApiResponseId")
-private val ApiRequestIdKey = AttributeKey<Long>("ApiRequestId")
+private val apiResponseBodyKey = AttributeKey<String>("ApiResponseBody")
+private val apiResponseIdKey = AttributeKey<Long>("ApiResponseId")
+private val apiRequestIdKey = AttributeKey<Long>("ApiRequestId")

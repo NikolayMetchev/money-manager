@@ -1181,7 +1181,7 @@ class AccountTransactionsScreenTest {
             sessionId: ApiSessionId,
             requestId: ApiRequestId,
             deviceInfo: DeviceInfo,
-            jsonPath: String?,
+            jsonPath: String,
         ): TransferSource {
             val source =
                 TransferSource(

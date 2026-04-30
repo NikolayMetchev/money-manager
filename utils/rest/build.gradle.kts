@@ -8,6 +8,7 @@ kotlin {
         commonMain {
             dependencies {
                 api(libs.ktor.client.core)
+                api(projects.app.model.core)
                 implementation(libs.ktor.client.cio)
             }
         }
@@ -23,6 +24,14 @@ kotlin {
             dependencies {
                 implementation(libs.ktor.http)
                 implementation(libs.ktor.utils)
+            }
+        }
+
+        commonTest {
+            dependencies {
+                implementation(kotlin("test"))
+                implementation(libs.ktor.client.mock)
+                implementation(libs.kotlinx.coroutines.test)
             }
         }
     }

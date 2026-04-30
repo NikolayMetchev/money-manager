@@ -154,7 +154,7 @@ class TransferSourceRepositoryImpl(
         sessionId: ApiSessionId,
         requestId: ApiRequestId,
         deviceInfo: DeviceInfo,
-        jsonPath: String?,
+        jsonPath: String,
     ): TransferSource =
         withContext(Dispatchers.Default) {
             val deviceId = deviceRepository.getOrCreateDevice(deviceInfo)

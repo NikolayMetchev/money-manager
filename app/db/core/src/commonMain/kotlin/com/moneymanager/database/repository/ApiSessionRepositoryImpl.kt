@@ -181,7 +181,7 @@ class ApiSessionRepositoryImpl(
         responseId: ApiResponseId,
         jsonPath: String,
         state: ApiResponseTransactionState,
-        referencedTransactionId: Long?,
+        transactionId: Long?,
         errorMessage: String?,
     ): ApiResponseTransactionId =
         withContext(Dispatchers.Default) {
@@ -191,7 +191,7 @@ class ApiSessionRepositoryImpl(
                         response_id = responseId.id,
                         json_path = jsonPath,
                         state = state.id.toLong(),
-                        referenced_transaction_id = referencedTransactionId,
+                        transaction_id = transactionId,
                         error_message = errorMessage,
                     )
                     queries.lastInsertApiResponseTransactionId().executeAsOne()
@@ -207,7 +207,7 @@ class ApiSessionRepositoryImpl(
                     responseId = ApiResponseId(row.response_id),
                     jsonPath = row.json_path,
                     state = ApiResponseTransactionState.fromId(row.state.toInt()),
-                    referencedTransactionId = row.referenced_transaction_id,
+                    transactionId = row.transaction_id,
                     errorMessage = row.error_message,
                 )
             }

@@ -94,7 +94,7 @@ interface TransferSourceRepository {
      * @param sessionId The ID of the API session
      * @param requestId The ID of the API request that produced this transfer
      * @param deviceInfo Device information from the platform
-     * @param jsonPath Optional JSONPath expression locating the transaction within the response body
+     * @param jsonPath JSONPath expression locating the transaction within the response body
      * @return The created source record
      */
     suspend fun recordApiSource(
@@ -103,7 +103,7 @@ interface TransferSourceRepository {
         sessionId: ApiSessionId,
         requestId: ApiRequestId,
         deviceInfo: DeviceInfo,
-        jsonPath: String? = null,
+        jsonPath: String,
     ): TransferSource
 
     /**
@@ -145,6 +145,6 @@ data class CsvImportSourceRecord(
 data class ApiSourceRecord(
     val transactionId: TransferId,
     val revisionId: Long,
-    /** Optional JSONPath locating this transaction within the response body. */
-    val jsonPath: String? = null,
+    /** JSONPath locating this transaction within the response body. */
+    val jsonPath: String,
 )

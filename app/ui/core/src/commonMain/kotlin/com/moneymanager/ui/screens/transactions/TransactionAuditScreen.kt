@@ -58,7 +58,7 @@ fun TransactionAuditScreen(
     transactionRepository: TransactionRepository,
     currentDeviceId: DeviceId? = null,
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
-    onApiSourceClick: (ApiSessionId, ApiRequestId?, String?) -> Unit = { _, _, _ -> },
+    onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
     onAccountClick: (AccountId) -> Unit = {},
     onBack: () -> Unit,
 ) {
@@ -126,7 +126,7 @@ private fun TransactionAuditDiffCard(
     accounts: List<Account>,
     currentDeviceId: DeviceId? = null,
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
-    onApiSourceClick: (ApiSessionId, ApiRequestId?, String?) -> Unit = { _, _, _ -> },
+    onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
     onAccountClick: (AccountId) -> Unit = {},
 ) {
     AuditDiffCard(
@@ -148,7 +148,7 @@ private fun InsertDiffContent(
     accounts: List<Account>,
     currentDeviceId: DeviceId? = null,
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
-    onApiSourceClick: (ApiSessionId, ApiRequestId?, String?) -> Unit = { _, _, _ -> },
+    onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
     onAccountClick: (AccountId) -> Unit = {},
 ) {
     val transactionDateTime = diff.timestamp.value().toLocalDateTime(TimeZone.currentSystemDefault())
@@ -179,7 +179,7 @@ private fun UpdateDiffContent(
     accounts: List<Account>,
     currentDeviceId: DeviceId? = null,
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
-    onApiSourceClick: (ApiSessionId, ApiRequestId?, String?) -> Unit = { _, _, _ -> },
+    onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
     onAccountClick: (AccountId) -> Unit = {},
 ) {
     val hasAnyChanges = diff.hasChanges
@@ -259,7 +259,7 @@ private fun DeleteDiffContent(
     accounts: List<Account>,
     currentDeviceId: DeviceId? = null,
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
-    onApiSourceClick: (ApiSessionId, ApiRequestId?, String?) -> Unit = { _, _, _ -> },
+    onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
     onAccountClick: (AccountId) -> Unit = {},
 ) {
     val errorColor = MaterialTheme.colorScheme.error
@@ -445,7 +445,7 @@ private fun SourceInfoSection(
     currentDeviceId: DeviceId? = null,
     labelColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
-    onApiSourceClick: (ApiSessionId, ApiRequestId?, String?) -> Unit = { _, _, _ -> },
+    onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
 ) {
     if (source == null) return
 
@@ -541,34 +541,23 @@ private fun SourceInfoSection(
                 val thisDeviceSuffix = if (isThisDevice) " (This Device)" else ""
                 FieldValueRow("Origin", "API Import$thisDeviceSuffix", labelWidth = LABEL_WIDTH)
                 if (apiSource != null) {
-                    val sessionId = apiSource.sessionId
-                    if (sessionId != null) {
-                        ApiSourceLinkRow(
-                            label = "Session",
-                            value = sessionId.id.toString(),
-                            sessionId = sessionId,
-                            requestId = apiSource.requestId,
-                            jsonPath = apiSource.jsonPath,
-                            onApiSourceClick = onApiSourceClick,
-                        )
-                    }
-                    apiSource.requestId?.let {
-                        FieldValueRow("Request", it.id.toString(), labelWidth = LABEL_WIDTH)
-                    }
-                    apiSource.jsonPath?.let { jsonPath ->
-                        if (sessionId != null) {
-                            ApiSourceLinkRow(
-                                label = "JSON Path",
-                                value = jsonPath,
-                                sessionId = sessionId,
-                                requestId = apiSource.requestId,
-                                jsonPath = jsonPath,
-                                onApiSourceClick = onApiSourceClick,
-                            )
-                        } else {
-                            FieldValueRow("JSON Path", jsonPath, labelWidth = LABEL_WIDTH)
-                        }
-                    }
+                    ApiSourceLinkRow(
+                        label = "Session",
+                        value = apiSource.sessionId.id.toString(),
+                        sessionId = apiSource.sessionId,
+                        requestId = apiSource.requestId,
+                        jsonPath = apiSource.jsonPath,
+                        onApiSourceClick = onApiSourceClick,
+                    )
+                    FieldValueRow("Request", apiSource.requestId.id.toString(), labelWidth = LABEL_WIDTH)
+                    ApiSourceLinkRow(
+                        label = "JSON Path",
+                        value = apiSource.jsonPath,
+                        sessionId = apiSource.sessionId,
+                        requestId = apiSource.requestId,
+                        jsonPath = apiSource.jsonPath,
+                        onApiSourceClick = onApiSourceClick,
+                    )
                 }
                 when (deviceInfo) {
                     is DeviceInfo.Jvm -> {
@@ -690,9 +679,9 @@ private fun ApiSourceLinkRow(
     label: String,
     value: String,
     sessionId: ApiSessionId,
-    requestId: ApiRequestId?,
-    jsonPath: String?,
-    onApiSourceClick: (ApiSessionId, ApiRequestId?, String?) -> Unit,
+    requestId: ApiRequestId,
+    jsonPath: String,
+    onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),

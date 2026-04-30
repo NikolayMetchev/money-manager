@@ -1,9 +1,8 @@
-package com.moneymanager.ui.api
+package com.moneymanager.rest
 
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.repository.ApiSessionRepository
-import com.moneymanager.rest.ApiTrafficRecorder
 
 class ApiSessionTrafficRecorder(
     private val sessionId: ApiSessionId,
