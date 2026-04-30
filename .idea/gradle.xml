@@ -45,6 +45,7 @@
             <option value="$PROJECT_DIR$/utils/currency" />
             <option value="$PROJECT_DIR$/utils/parsers" />
             <option value="$PROJECT_DIR$/utils/parsers/csv" />
+            <option value="$PROJECT_DIR$/utils/rest" />
           </set>
         </option>
       </GradleProjectSettings>
