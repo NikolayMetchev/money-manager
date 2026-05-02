@@ -817,9 +817,13 @@ private fun JsonViewer(
             remember(highlightJsonPath) {
                 parseJsonPathSegments(highlightJsonPath)
             }
-        val transactionsByJsonPath =
+        val latestTransactionByJsonPath =
             remember(responseTransactions) {
-                responseTransactions.groupBy { it.jsonPath.value }
+                responseTransactions
+                    .groupBy { it.jsonPath.value }
+                    .mapValues { (_, transactions) ->
+                        transactions.maxBy { it.id.id }
+                    }
             }
         Column {
             JsonTreeNode(
@@ -827,7 +831,7 @@ private fun JsonViewer(
                 element = jsonElement,
                 jsonPath = "$",
                 depth = 0,
-                transactionsByJsonPath = transactionsByJsonPath,
+                latestTransactionByJsonPath = latestTransactionByJsonPath,
                 remainingHighlightSegments = highlightSegments,
             )
         }
@@ -868,7 +872,7 @@ private fun JsonTreeNode(
     element: JsonElement,
     jsonPath: String,
     depth: Int,
-    transactionsByJsonPath: Map<String, List<ApiResponseTransaction>> = emptyMap(),
+    latestTransactionByJsonPath: Map<String, ApiResponseTransaction> = emptyMap(),
     remainingHighlightSegments: List<String>? = null,
     forceExpandSubtree: Boolean = false,
     highlightSubtree: Boolean = false,
@@ -900,13 +904,13 @@ private fun JsonTreeNode(
             append(element.summary(expanded))
         }
 
-    val nodeTransactions = transactionsByJsonPath[jsonPath].orEmpty()
+    val nodeTransaction = latestTransactionByJsonPath[jsonPath]
     val isInHighlightedSubtree = highlightSubtree || isHighlightTarget
     val highlightBackground =
         when {
             isHighlightTarget -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.85f)
             highlightSubtree -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.35f)
-            nodeTransactions.isNotEmpty() -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            nodeTransaction != null -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
             else -> Color.Transparent
         }
     val highlightTextColor =
@@ -942,7 +946,7 @@ private fun JsonTreeNode(
             color = highlightTextColor,
             modifier = Modifier.weight(1f),
         )
-        nodeTransactions.forEach { transaction ->
+        nodeTransaction?.let { transaction ->
             JsonTransactionStatus(transaction = transaction)
         }
     }
@@ -962,7 +966,7 @@ private fun JsonTreeNode(
                         element = value,
                         jsonPath = jsonObjectChildPath(jsonPath, key),
                         depth = depth + 1,
-                        transactionsByJsonPath = transactionsByJsonPath,
+                        latestTransactionByJsonPath = latestTransactionByJsonPath,
                         remainingHighlightSegments = nextSegments,
                         forceExpandSubtree = forceExpandSubtree || isHighlightTarget,
                         highlightSubtree = isInHighlightedSubtree,
@@ -983,7 +987,7 @@ private fun JsonTreeNode(
                         element = value,
                         jsonPath = "$jsonPath[$index]",
                         depth = depth + 1,
-                        transactionsByJsonPath = transactionsByJsonPath,
+                        latestTransactionByJsonPath = latestTransactionByJsonPath,
                         remainingHighlightSegments = nextSegments,
                         forceExpandSubtree = forceExpandSubtree || isHighlightTarget,
                         highlightSubtree = isInHighlightedSubtree,
