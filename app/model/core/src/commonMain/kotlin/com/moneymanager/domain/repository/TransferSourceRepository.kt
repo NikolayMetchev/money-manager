@@ -146,5 +146,6 @@ data class CsvImportSourceRecord(
 data class ApiSourceRecord(
     val transactionId: TransferId,
     val revisionId: Long,
+    /** JSONPath locating this transaction within the response body. */
     val jsonPath: JsonPath,
 )

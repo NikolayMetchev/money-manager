@@ -357,23 +357,19 @@ private suspend fun importValidTransactionItem(
         return ApiResponseTransactionState.DUPLICATE
     }
 
+    val sourceRecorder =
+        ApiImportSourceRecorder(
+            queries = transferSourceQueries,
+            deviceId = deviceId,
+            sessionId = sessionId,
+            requestId = requestId,
+            jsonPath = item.jsonPath,
+        )
     transactionRepository.createTransfers(
         transfers = listOf(transfer),
-        sourceRecorder =
-            ApiImportSourceRecorder(
-                queries = transferSourceQueries,
-                deviceId = deviceId,
-                sessionId = sessionId,
-                requestId = requestId,
-                jsonPathForTransfer = { item.jsonPath },
-            ),
+        sourceRecorder = sourceRecorder,
     )
-    val importedTransferId =
-        transactionRepository
-            .getTransactionsByAccount(monzoAccountId)
-            .first()
-            .first { it.matches(transfer) }
-            .id
+    val importedTransferId = sourceRecorder.insertedTransferId ?: transfer.id
     apiSessionRepository.insertResponseTransaction(
         responseId = responseId,
         jsonPath = item.jsonPath,

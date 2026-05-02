@@ -38,14 +38,16 @@ CREATE INDEX IF NOT EXISTS idx_csv_transfer_source_import ON csv_transfer_source
 
 -- api_transfer_source: API-specific data for API sources (source_type_id = 5)
 -- 1:1 relationship with transfer_source
+-- Sessions and requests must not be deleted while transfer sources reference them (ON DELETE RESTRICT),
+-- preserving referential integrity of the audit trail.
 CREATE TABLE api_transfer_source (
     id INTEGER PRIMARY KEY,  -- Same as transfer_source.id
     api_session_id INTEGER NOT NULL,
     api_request_id INTEGER NOT NULL,
     json_path TEXT NOT NULL,
     FOREIGN KEY (id) REFERENCES transfer_source(id),
-    FOREIGN KEY (api_session_id) REFERENCES api_session(id) ON DELETE CASCADE,
-    FOREIGN KEY (api_request_id) REFERENCES api_request(id) ON DELETE CASCADE
+    FOREIGN KEY (api_session_id) REFERENCES api_session(id) ON DELETE RESTRICT,
+    FOREIGN KEY (api_request_id) REFERENCES api_request(id) ON DELETE RESTRICT
 );
 
 CREATE INDEX IF NOT EXISTS idx_api_transfer_source_session ON api_transfer_source(api_session_id);

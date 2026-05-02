@@ -122,8 +122,8 @@ private fun mapApiSource(
 ): ApiSourceDetails? {
     if (sourceType != SourceType.API) return null
     return ApiSourceDetails(
-        sessionId = ApiSessionId(apiSessionId!!),
-        requestId = ApiRequestId(apiRequestId!!),
-        jsonPath = JsonPath(apiJsonPath!!),
+        sessionId = ApiSessionId(checkNotNull(apiSessionId)),
+        requestId = ApiRequestId(checkNotNull(apiRequestId)),
+        jsonPath = JsonPath(checkNotNull(apiJsonPath)),
     )
 }
