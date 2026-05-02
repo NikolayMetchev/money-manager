@@ -455,7 +455,8 @@ object DatabaseConfig {
         with(database) {
             // Added alongside api_entity_source source tracking for account audit history.
             // Existing databases opened before this migration was introduced will not have this
-            // table, causing selectAuditHistoryForAccount to fail with "no such table".
+            // table, causing selectAuditHistoryForAccount and selectOwnershipAuditHistoryForAccount
+            // to fail with "no such table".
             execute(
                 null,
                 """
