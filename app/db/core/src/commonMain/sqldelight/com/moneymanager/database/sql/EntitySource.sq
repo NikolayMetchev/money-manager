@@ -38,10 +38,36 @@ CREATE INDEX IF NOT EXISTS idx_entity_source_type ON entity_source(source_type_i
 CREATE INDEX IF NOT EXISTS idx_entity_source_entity_revision ON entity_source(entity_type_id, entity_id, revision_id);
 CREATE INDEX IF NOT EXISTS idx_entity_source_device ON entity_source(device_id);
 
+-- api_entity_source: API-specific data for API sources (source_type_id = 5)
+-- 1:1 relationship with entity_source
+-- Sessions and requests must not be deleted while entity sources reference them (ON DELETE RESTRICT),
+-- preserving referential integrity of the audit trail.
+CREATE TABLE api_entity_source (
+    id INTEGER PRIMARY KEY,  -- Same as entity_source.id
+    api_session_id INTEGER NOT NULL,
+    api_request_id INTEGER NOT NULL,
+    json_path TEXT NOT NULL,
+    FOREIGN KEY (id) REFERENCES entity_source(id),
+    FOREIGN KEY (api_session_id) REFERENCES api_session(id) ON DELETE RESTRICT,
+    FOREIGN KEY (api_request_id) REFERENCES api_request(id) ON DELETE RESTRICT
+);
+
+CREATE INDEX IF NOT EXISTS idx_api_entity_source_session ON api_entity_source(api_session_id);
+CREATE INDEX IF NOT EXISTS idx_api_entity_source_request ON api_entity_source(api_request_id);
+
 -- Insert source for an entity
 insertSource:
 INSERT INTO entity_source (entity_type_id, entity_id, revision_id, source_type_id, device_id)
 VALUES (?, ?, ?, ?, ?);
+
+-- Get the last inserted entity_source ID
+lastInsertedId:
+SELECT last_insert_rowid();
+
+-- Insert API-specific details for an entity source (must be called after insertSource)
+insertApiSource:
+INSERT INTO api_entity_source (id, api_session_id, api_request_id, json_path)
+VALUES (?, ?, ?, ?);
 
 -- Get source for a specific entity revision
 selectSourceByEntityAndRevision:
@@ -59,11 +85,15 @@ SELECT
     device_view.machine_name,
     device_view.device_make,
     device_view.device_model,
-    entity_source.created_at
+    entity_source.created_at,
+    api_entity_source.api_session_id,
+    api_entity_source.api_request_id,
+    api_entity_source.json_path AS api_json_path
 FROM entity_source
 JOIN entity_type ON entity_source.entity_type_id = entity_type.id
 JOIN source_type ON entity_source.source_type_id = source_type.id
 LEFT JOIN device_view ON entity_source.device_id = device_view.id
+LEFT JOIN api_entity_source ON entity_source.id = api_entity_source.id
 WHERE entity_source.entity_type_id = ? AND entity_source.entity_id = ? AND entity_source.revision_id = ?;
 
 -- Get all sources for an entity (all revisions)
@@ -82,10 +112,14 @@ SELECT
     device_view.machine_name,
     device_view.device_make,
     device_view.device_model,
-    entity_source.created_at
+    entity_source.created_at,
+    api_entity_source.api_session_id,
+    api_entity_source.api_request_id,
+    api_entity_source.json_path AS api_json_path
 FROM entity_source
 JOIN entity_type ON entity_source.entity_type_id = entity_type.id
 JOIN source_type ON entity_source.source_type_id = source_type.id
 LEFT JOIN device_view ON entity_source.device_id = device_view.id
+LEFT JOIN api_entity_source ON entity_source.id = api_entity_source.id
 WHERE entity_source.entity_type_id = ? AND entity_source.entity_id = ?
 ORDER BY entity_source.revision_id DESC;

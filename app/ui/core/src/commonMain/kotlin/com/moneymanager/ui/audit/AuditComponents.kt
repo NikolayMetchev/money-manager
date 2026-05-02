@@ -2,12 +2,14 @@ package com.moneymanager.ui.audit
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -15,6 +17,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.moneymanager.domain.model.ApiRequestId
+import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.EntitySource
 import com.moneymanager.domain.model.SourceType
@@ -96,6 +100,7 @@ fun SourceInfoSection(
     source: EntitySource?,
     labelColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     labelWidth: Dp = 100.dp,
+    onApiSourceClick: ((ApiSessionId, ApiRequestId, String) -> Unit)? = null,
 ) {
     if (source == null) return
 
@@ -163,9 +168,20 @@ fun SourceInfoSection(
             }
             SourceType.API -> {
                 val deviceInfo = source.deviceInfo
-                // EntitySource does not carry API session/request details — those are only
-                // available on TransferSource. Display device info for context.
-                FieldValueRow("Origin", "API Import", labelWidth = labelWidth)
+                val apiSource = source.apiSource
+                if (apiSource != null && onApiSourceClick != null) {
+                    ApiSourceLinkRow(
+                        label = "Origin",
+                        value = "API Import",
+                        sessionId = apiSource.sessionId,
+                        requestId = apiSource.requestId,
+                        jsonPath = apiSource.jsonPath.value,
+                        onApiSourceClick = onApiSourceClick,
+                        labelWidth = labelWidth,
+                    )
+                } else {
+                    FieldValueRow("Origin", "API Import", labelWidth = labelWidth)
+                }
                 when (deviceInfo) {
                     is DeviceInfo.Jvm -> {
                         FieldValueRow("Machine", deviceInfo.machineName, labelWidth = labelWidth)
@@ -177,6 +193,36 @@ fun SourceInfoSection(
                     null -> {}
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ApiSourceLinkRow(
+    label: String,
+    value: String,
+    sessionId: ApiSessionId,
+    requestId: ApiRequestId,
+    jsonPath: String,
+    onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit,
+    labelWidth: Dp = 100.dp,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "$label:",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.width(labelWidth),
+        )
+        TextButton(
+            onClick = { onApiSourceClick(sessionId, requestId, jsonPath) },
+            contentPadding = PaddingValues(0.dp),
+        ) {
+            Text(value)
         }
     }
 }

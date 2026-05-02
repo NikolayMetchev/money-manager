@@ -142,3 +142,34 @@ class SampleGeneratorEntitySourceRecorder(
         )
     }
 }
+
+/** Records source for entity operations (API import). */
+class ApiEntitySourceRecorder(
+    private val queries: EntitySourceQueries,
+    private val deviceId: DeviceId,
+    private val sessionId: ApiSessionId,
+    private val requestId: ApiRequestId,
+    private val jsonPath: JsonPath,
+) {
+    fun insert(
+        entityType: EntityType,
+        entityId: Long,
+        revisionId: Long,
+    ) {
+        // source_type_id 5 = API
+        queries.insertSource(
+            entity_type_id = entityType.id,
+            entity_id = entityId,
+            revision_id = revisionId,
+            source_type_id = 5L,
+            device_id = deviceId.id,
+        )
+        val entitySourceId = queries.lastInsertedId().executeAsOne()
+        queries.insertApiSource(
+            id = entitySourceId,
+            api_session_id = sessionId.id,
+            api_request_id = requestId.id,
+            json_path = jsonPath.value,
+        )
+    }
+}

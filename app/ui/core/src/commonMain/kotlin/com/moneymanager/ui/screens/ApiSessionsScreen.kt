@@ -44,6 +44,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
+import com.moneymanager.database.sql.EntitySourceQueries
 import com.moneymanager.database.sql.TransferSourceQueries
 import com.moneymanager.domain.model.ApiRequest
 import com.moneymanager.domain.model.ApiRequestId
@@ -89,6 +90,7 @@ fun ApiSessionsScreen(
     currencyRepository: CurrencyRepository,
     transactionRepository: TransactionRepository,
     transferSourceQueries: TransferSourceQueries,
+    entitySourceQueries: EntitySourceQueries,
     deviceId: DeviceId,
     onMonzoConnectClick: () -> Unit = {},
     onSessionClick: (ApiSession) -> Unit = {},
@@ -268,6 +270,7 @@ fun ApiSessionsScreen(
                                                 currencyRepository = currencyRepository,
                                                 transactionRepository = transactionRepository,
                                                 transferSourceQueries = transferSourceQueries,
+                                                entitySourceQueries = entitySourceQueries,
                                                 deviceId = deviceId,
                                                 sessionId = session.id,
                                                 onProgress = ::update,
@@ -598,17 +601,32 @@ fun ApiSessionTrafficScreen(
                 // Find and scroll to the pair that contains the highlighted response
                 val highlightedPairIndex =
                     remember(highlightRequestId, highlightJsonPath, pairs, responseTransactionsByResponseId) {
-                        if (highlightJsonPath == null) {
+                        if (highlightRequestId == null && highlightJsonPath == null) {
                             -1
                         } else {
                             // +1 accounts for the summary item at index 0
-                            pairs
-                                .indexOfFirst { pair ->
-                                    pair.response != null &&
-                                        (highlightRequestId == null || pair.request?.id == highlightRequestId) &&
-                                        responseTransactionsByResponseId[pair.response.id]
-                                            ?.any { it.jsonPath.value == highlightJsonPath } == true
-                                }.let { if (it >= 0) it + 1 else -1 }
+                            // First try to match by jsonPath in response transactions (for transaction sources)
+                            val byJsonPath =
+                                if (highlightJsonPath != null) {
+                                    pairs.indexOfFirst { pair ->
+                                        pair.response != null &&
+                                            (highlightRequestId == null || pair.request?.id == highlightRequestId) &&
+                                            responseTransactionsByResponseId[pair.response.id]
+                                                ?.any { it.jsonPath.value == highlightJsonPath } == true
+                                    }
+                                } else {
+                                    -1
+                                }
+                            // Fall back to matching by requestId alone (for entity/account sources)
+                            val result =
+                                if (byJsonPath >= 0) {
+                                    byJsonPath
+                                } else if (highlightRequestId != null) {
+                                    pairs.indexOfFirst { pair -> pair.request?.id == highlightRequestId }
+                                } else {
+                                    -1
+                                }
+                            if (result >= 0) result + 1 else -1
                         }
                     }
 
@@ -634,10 +652,16 @@ fun ApiSessionTrafficScreen(
                             val responseTransactions =
                                 pair.response?.let { responseTransactionsByResponseId[it.id] }
                                     ?: emptyList()
+                            val requestMatches = highlightRequestId == null || pair.request?.id == highlightRequestId
                             val isHighlighted =
-                                highlightJsonPath != null &&
-                                    (highlightRequestId == null || pair.request?.id == highlightRequestId) &&
-                                    responseTransactions.any { it.jsonPath.value == highlightJsonPath }
+                                (highlightRequestId != null || highlightJsonPath != null) &&
+                                    requestMatches &&
+                                    (
+                                        // Highlight by specific jsonPath when available (transaction sources)
+                                        (highlightJsonPath != null && responseTransactions.any { it.jsonPath.value == highlightJsonPath }) ||
+                                            // Highlight by requestId alone when no jsonPath match (entity/account sources)
+                                            (highlightJsonPath == null && highlightRequestId != null)
+                                    )
                             ApiTrafficPairCard(
                                 pair = pair,
                                 responseTransactions = responseTransactions,

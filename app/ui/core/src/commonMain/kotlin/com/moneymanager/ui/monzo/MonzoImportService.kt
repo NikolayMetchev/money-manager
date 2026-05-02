@@ -2,7 +2,9 @@
 
 package com.moneymanager.ui.monzo
 
+import com.moneymanager.database.ApiEntitySourceRecorder
 import com.moneymanager.database.ApiImportSourceRecorder
+import com.moneymanager.database.sql.EntitySourceQueries
 import com.moneymanager.database.sql.TransferSourceQueries
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
@@ -15,6 +17,7 @@ import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.DeviceId
+import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Transfer
@@ -125,19 +128,37 @@ suspend fun importMonzoSessionTransactions(
     currencyRepository: CurrencyRepository,
     transactionRepository: TransactionRepository,
     transferSourceQueries: TransferSourceQueries,
+    entitySourceQueries: EntitySourceQueries,
     deviceId: DeviceId,
     sessionId: ApiSessionId,
     onProgress: (String) -> Unit = {},
 ): MonzoImportResult {
     val requestsById = apiSessionRepository.getRequestsBySession(sessionId).associateBy { it.id }
     val responses = apiSessionRepository.getResponsesBySession(sessionId)
+
+    // Build a map from Monzo account ID to the accounts-list source (request + jsonPath)
+    // so newly created accounts can be linked back to their API origin.
+    val accountApiSourceByMonzoId =
+        responses.flatMap { response ->
+            val requestId = requestsById[response.requestId]?.id ?: return@flatMap emptyList()
+            parseAccountsWithPaths(response.json).map { (account, jsonPath) ->
+                account.id to AccountApiSource(sessionId, requestId, jsonPath)
+            }
+        }.toMap()
+
     val monzoAccounts = responses.flatMap { response -> parseAccounts(response.json) }
     val monzoAccountsById = monzoAccounts.associateBy { it.id }
 
     var transactionCount = 0
     var duplicateCount = 0
     var errorCount = 0
-    val accountCache = AccountCache(accountRepository)
+    val accountCache =
+        AccountCache(
+            accountRepository = accountRepository,
+            entitySourceQueries = entitySourceQueries,
+            deviceId = deviceId,
+            accountApiSourceByMonzoId = accountApiSourceByMonzoId,
+        )
     val currencyCache = CurrencyCache(currencyRepository)
 
     responses.forEachIndexed { index, response ->
@@ -146,7 +167,7 @@ suspend fun importMonzoSessionTransactions(
         )
         val request = requestsById[response.requestId] ?: return@forEachIndexed
         val monzoAccount = monzoAccountsById[request.accountIdParameter()] ?: return@forEachIndexed
-        val monzoAccountId = accountCache.getOrCreateAccountId(monzoAccount.localAccountName())
+        val monzoAccountId = accountCache.getOrCreateAccountId(monzoAccount.id, monzoAccount.localAccountName())
         val pageResult =
             importTransactionPage(
                 response = response.toApiHttpResponse(),
@@ -209,6 +230,25 @@ private fun parseAccounts(json: String): List<MonzoAccount> =
                     id = id,
                     description = account["description"]?.jsonPrimitive?.contentOrNull.orEmpty(),
                 )
+            }
+            ?: emptyList()
+    } catch (_: Exception) {
+        emptyList()
+    }
+
+private fun parseAccountsWithPaths(json: String): List<Pair<MonzoAccount, JsonPath>> =
+    try {
+        Json
+            .parseToJsonElement(json)
+            .jsonObject["accounts"]
+            ?.jsonArray
+            ?.mapIndexedNotNull { index, element ->
+                val account = element.jsonObject
+                val id = account["id"]?.jsonPrimitive?.contentOrNull ?: return@mapIndexedNotNull null
+                MonzoAccount(
+                    id = id,
+                    description = account["description"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+                ) to JsonPath("$.accounts[$index]")
             }
             ?: emptyList()
     } catch (_: Exception) {
@@ -437,12 +477,24 @@ private fun ApiResponse.toApiHttpResponse(): ApiHttpResponse =
 
 private fun ApiRequest.accountIdParameter(): String? = runCatching { URLBuilder(url).parameters["account_id"] }.getOrNull()
 
+private data class AccountApiSource(
+    val sessionId: ApiSessionId,
+    val requestId: ApiRequestId,
+    val jsonPath: JsonPath,
+)
+
 private class AccountCache(
     private val accountRepository: AccountRepository,
+    private val entitySourceQueries: EntitySourceQueries,
+    private val deviceId: DeviceId,
+    private val accountApiSourceByMonzoId: Map<String, AccountApiSource>,
 ) {
     private var accountsByName: Map<String, Account>? = null
 
-    suspend fun getOrCreateAccountId(name: String): AccountId {
+    suspend fun getOrCreateAccountId(
+        monzoId: String,
+        name: String,
+    ): AccountId {
         val normalizedName = name.ifBlank { "Unknown" }
         val existing = loadAccounts()[normalizedName]
         if (existing != null) return existing.id
@@ -457,6 +509,16 @@ private class AccountCache(
                     categoryId = Category.UNCATEGORIZED_ID,
                 ),
             )
+        val apiSource = accountApiSourceByMonzoId[monzoId]
+        if (apiSource != null) {
+            ApiEntitySourceRecorder(
+                queries = entitySourceQueries,
+                deviceId = deviceId,
+                sessionId = apiSource.sessionId,
+                requestId = apiSource.requestId,
+                jsonPath = apiSource.jsonPath,
+            ).insert(EntityType.ACCOUNT, accountId.id, 1L)
+        }
         accountsByName =
             loadAccounts() +
             (
@@ -469,6 +531,9 @@ private class AccountCache(
             )
         return accountId
     }
+
+    // Used when creating counterparty accounts (no Monzo ID / API source)
+    suspend fun getOrCreateAccountId(name: String): AccountId = getOrCreateAccountId("", name)
 
     private suspend fun loadAccounts(): Map<String, Account> {
         val accounts = accountsByName

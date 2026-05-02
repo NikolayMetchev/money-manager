@@ -33,6 +33,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
+import com.moneymanager.database.sql.EntitySourceQueries
 import com.moneymanager.database.sql.TransferSourceQueries
 import com.moneymanager.domain.model.ApiSession
 import com.moneymanager.domain.model.ApiSessionId
@@ -65,6 +66,7 @@ fun MonzoAuthScreen(
     currencyRepository: CurrencyRepository,
     transactionRepository: TransactionRepository,
     transferSourceQueries: TransferSourceQueries,
+    entitySourceQueries: EntitySourceQueries,
     deviceId: DeviceId,
     onTransactionsImported: () -> Unit = {},
 ) {
@@ -430,6 +432,7 @@ fun MonzoAuthScreen(
                                         currencyRepository = currencyRepository,
                                         transactionRepository = transactionRepository,
                                         transferSourceQueries = transferSourceQueries,
+                                        entitySourceQueries = entitySourceQueries,
                                         deviceId = deviceId,
                                         sessionId = session.id,
                                         onProgress = ::update,

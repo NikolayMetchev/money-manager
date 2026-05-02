@@ -37,4 +37,5 @@ data class EntitySource(
     val deviceId: Long,
     val deviceInfo: DeviceInfo?,
     val createdAt: Instant,
+    val apiSource: ApiSourceDetails? = null,
 )
