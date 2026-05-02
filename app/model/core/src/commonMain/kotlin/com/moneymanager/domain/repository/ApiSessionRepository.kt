@@ -6,10 +6,15 @@ import com.moneymanager.domain.model.ApiRequest
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiResponse
 import com.moneymanager.domain.model.ApiResponseId
+import com.moneymanager.domain.model.ApiResponseTransaction
+import com.moneymanager.domain.model.ApiResponseTransactionId
+import com.moneymanager.domain.model.ApiResponseTransactionState
 import com.moneymanager.domain.model.ApiSession
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.ApiSessionType
 import com.moneymanager.domain.model.DeviceId
+import com.moneymanager.domain.model.JsonPath
+import com.moneymanager.domain.model.TransferId
 import kotlin.time.Instant
 
 interface ApiSessionRepository {
@@ -118,4 +123,33 @@ interface ApiSessionRepository {
      * Deletes the session with the given ID permanently.
      */
     suspend fun deleteSession(id: ApiSessionId)
+
+    /**
+     * Records the import state of a single transaction entry found in an API response.
+     *
+     * @param responseId The ID of the API response containing the transaction
+     * @param jsonPath JSONPath expression locating the transaction within the response body
+     * @param state The import state (IMPORTED, DUPLICATE, or ERROR)
+     * @param transactionId For IMPORTED: the new transaction ID. For DUPLICATE: the
+     *   pre-existing transaction ID that this entry duplicates. Null for ERROR.
+     * @param errorMessage For ERROR state: description of what went wrong
+     * @return The ID of the newly created record
+     */
+    suspend fun insertResponseTransaction(
+        responseId: ApiResponseId,
+        jsonPath: JsonPath,
+        state: ApiResponseTransactionState,
+        transactionId: TransferId?,
+        errorMessage: String?,
+    ): ApiResponseTransactionId
+
+    /**
+     * Returns all [ApiResponseTransaction] records for the given response, ordered by id.
+     */
+    suspend fun getResponseTransactions(responseId: ApiResponseId): List<ApiResponseTransaction>
+
+    /**
+     * Returns all [ApiResponseTransaction] records for responses in the given session, ordered by response then id.
+     */
+    suspend fun getResponseTransactionsBySession(sessionId: ApiSessionId): List<ApiResponseTransaction>
 }

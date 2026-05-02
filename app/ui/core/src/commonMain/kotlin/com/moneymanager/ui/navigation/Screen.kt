@@ -3,6 +3,7 @@
 package com.moneymanager.ui.navigation
 
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.PersonId
@@ -70,5 +71,9 @@ sealed class Screen(
 
     data class ApiSessionTraffic(
         val sessionId: ApiSessionId,
+        /** When non-null the traffic screen should scroll to this request/response pair. */
+        val highlightRequestId: ApiRequestId? = null,
+        /** When non-null the traffic screen should expand and highlight this JSONPath. */
+        val highlightJsonPath: String? = null,
     ) : Screen("API Traffic")
 }

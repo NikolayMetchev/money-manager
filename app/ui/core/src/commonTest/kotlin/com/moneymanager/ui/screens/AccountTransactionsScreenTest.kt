@@ -39,6 +39,7 @@ import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.DeviceInfo
+import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.PageWithTargetIndex
@@ -1181,6 +1182,7 @@ class AccountTransactionsScreenTest {
             sessionId: ApiSessionId,
             requestId: ApiRequestId,
             deviceInfo: DeviceInfo,
+            jsonPath: JsonPath,
         ): TransferSource {
             val source =
                 TransferSource(
@@ -1191,7 +1193,7 @@ class AccountTransactionsScreenTest {
                     deviceId = 1L,
                     deviceInfo = deviceInfo,
                     csvSource = null,
-                    apiSource = ApiSourceDetails(sessionId = sessionId, requestId = requestId),
+                    apiSource = ApiSourceDetails(sessionId = sessionId, requestId = requestId, jsonPath = jsonPath),
                     createdAt = Clock.System.now(),
                 )
             sources.add(source)

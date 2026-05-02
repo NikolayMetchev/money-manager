@@ -5,6 +5,7 @@ package com.moneymanager.domain.repository
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.DeviceInfo
+import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.TransferSource
 import com.moneymanager.domain.model.csv.CsvImportId
@@ -94,6 +95,7 @@ interface TransferSourceRepository {
      * @param sessionId The ID of the API session
      * @param requestId The ID of the API request that produced this transfer
      * @param deviceInfo Device information from the platform
+     * @param jsonPath JSONPath expression locating the transaction within the response body
      * @return The created source record
      */
     suspend fun recordApiSource(
@@ -102,6 +104,7 @@ interface TransferSourceRepository {
         sessionId: ApiSessionId,
         requestId: ApiRequestId,
         deviceInfo: DeviceInfo,
+        jsonPath: JsonPath,
     ): TransferSource
 
     /**
@@ -143,4 +146,6 @@ data class CsvImportSourceRecord(
 data class ApiSourceRecord(
     val transactionId: TransferId,
     val revisionId: Long,
+    /** JSONPath locating this transaction within the response body. */
+    val jsonPath: JsonPath,
 )

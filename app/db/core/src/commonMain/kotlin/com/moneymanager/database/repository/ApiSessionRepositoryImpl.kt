@@ -9,10 +9,15 @@ import com.moneymanager.domain.model.ApiRequestHeaderId
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiResponse
 import com.moneymanager.domain.model.ApiResponseId
+import com.moneymanager.domain.model.ApiResponseTransaction
+import com.moneymanager.domain.model.ApiResponseTransactionId
+import com.moneymanager.domain.model.ApiResponseTransactionState
 import com.moneymanager.domain.model.ApiSession
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.ApiSessionType
 import com.moneymanager.domain.model.DeviceId
+import com.moneymanager.domain.model.JsonPath
+import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.ApiSessionRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -172,6 +177,56 @@ class ApiSessionRepositoryImpl(
     override suspend fun deleteSession(id: ApiSessionId): Unit =
         withContext(Dispatchers.Default) {
             queries.delete(id.id)
+        }
+
+    override suspend fun insertResponseTransaction(
+        responseId: ApiResponseId,
+        jsonPath: JsonPath,
+        state: ApiResponseTransactionState,
+        transactionId: TransferId?,
+        errorMessage: String?,
+    ): ApiResponseTransactionId =
+        withContext(Dispatchers.Default) {
+            val id =
+                queries.transactionWithResult {
+                    queries.insertResponseTransaction(
+                        response_id = responseId.id,
+                        json_path = jsonPath.value,
+                        state = state.id.toLong(),
+                        transaction_id = transactionId?.id,
+                        error_message = errorMessage,
+                    )
+                    queries.lastInsertApiResponseTransactionId().executeAsOne()
+                }
+            ApiResponseTransactionId(id)
+        }
+
+    override suspend fun getResponseTransactions(responseId: ApiResponseId): List<ApiResponseTransaction> =
+        withContext(Dispatchers.Default) {
+            queries.selectResponseTransactionsByResponseId(responseId.id).executeAsList().map { row ->
+                ApiResponseTransaction(
+                    id = ApiResponseTransactionId(row.id),
+                    responseId = ApiResponseId(row.response_id),
+                    jsonPath = JsonPath(row.json_path),
+                    state = ApiResponseTransactionState.fromId(row.state.toInt()),
+                    transactionId = row.transaction_id?.let(::TransferId),
+                    errorMessage = row.error_message,
+                )
+            }
+        }
+
+    override suspend fun getResponseTransactionsBySession(sessionId: ApiSessionId): List<ApiResponseTransaction> =
+        withContext(Dispatchers.Default) {
+            queries.selectResponseTransactionsBySession(sessionId.id).executeAsList().map { row ->
+                ApiResponseTransaction(
+                    id = ApiResponseTransactionId(row.id),
+                    responseId = ApiResponseId(row.response_id),
+                    jsonPath = JsonPath(row.json_path),
+                    state = ApiResponseTransactionState.fromId(row.state.toInt()),
+                    transactionId = row.transaction_id?.let(::TransferId),
+                    errorMessage = row.error_message,
+                )
+            }
         }
 
     private fun com.moneymanager.database.sql.Api_request.toApiRequest(
