@@ -492,7 +492,7 @@ private class AccountCache(
     private var accountsByName: Map<String, Account>? = null
 
     suspend fun getOrCreateAccountId(
-        monzoId: String,
+        monzoAccountId: String?,
         name: String,
     ): AccountId {
         val normalizedName = name.ifBlank { "Unknown" }
@@ -509,7 +509,7 @@ private class AccountCache(
                     categoryId = Category.UNCATEGORIZED_ID,
                 ),
             )
-        val apiSource = accountApiSourceByMonzoId[monzoId]
+        val apiSource = monzoAccountId?.let { accountApiSourceByMonzoId[it] }
         if (apiSource != null) {
             ApiEntitySourceRecorder(
                 queries = entitySourceQueries,
@@ -533,7 +533,7 @@ private class AccountCache(
     }
 
     // Used when creating counterparty accounts (no Monzo ID / API source)
-    suspend fun getOrCreateAccountId(name: String): AccountId = getOrCreateAccountId("", name)
+    suspend fun getOrCreateAccountId(name: String): AccountId = getOrCreateAccountId(null, name)
 
     private suspend fun loadAccounts(): Map<String, Account> {
         val accounts = accountsByName
