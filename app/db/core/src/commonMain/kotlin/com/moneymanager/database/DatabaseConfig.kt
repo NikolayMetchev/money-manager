@@ -445,6 +445,46 @@ object DatabaseConfig {
     }
 
     /**
+     * Runs incremental schema migrations that are safe to apply on both new and existing databases.
+     * Uses CREATE TABLE/INDEX IF NOT EXISTS so it is idempotent.
+     *
+     * Call this on every database open, after the initial schema creation (for new databases)
+     * or directly (for existing databases that may be missing tables added in later versions).
+     */
+    fun migrateIfNeeded(database: MoneyManagerDatabaseWrapper) {
+        with(database) {
+            // Added alongside api_entity_source source tracking for account audit history.
+            // Existing databases opened before this migration was introduced will not have this
+            // table, causing selectAuditHistoryForAccount to fail with "no such table".
+            execute(
+                null,
+                """
+                CREATE TABLE IF NOT EXISTS api_entity_source (
+                    id INTEGER PRIMARY KEY,
+                    api_session_id INTEGER NOT NULL,
+                    api_request_id INTEGER NOT NULL,
+                    json_path TEXT NOT NULL,
+                    FOREIGN KEY (id) REFERENCES entity_source(id),
+                    FOREIGN KEY (api_session_id) REFERENCES api_session(id) ON DELETE RESTRICT,
+                    FOREIGN KEY (api_request_id) REFERENCES api_request(id) ON DELETE RESTRICT
+                )
+                """.trimIndent(),
+                0,
+            )
+            execute(
+                null,
+                "CREATE INDEX IF NOT EXISTS idx_api_entity_source_session ON api_entity_source(api_session_id)",
+                0,
+            )
+            execute(
+                null,
+                "CREATE INDEX IF NOT EXISTS idx_api_entity_source_request ON api_entity_source(api_request_id)",
+                0,
+            )
+        }
+    }
+
+    /**
      * Seeds the database with all available currencies and creates incremental refresh triggers.
      * Should be called once after creating a new database.
      *

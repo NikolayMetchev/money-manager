@@ -102,8 +102,6 @@ fun SourceInfoSection(
     labelWidth: Dp = 100.dp,
     onApiSourceClick: ((ApiSessionId, ApiRequestId, String) -> Unit)? = null,
 ) {
-    if (source == null) return
-
     Column(
         modifier = Modifier.padding(top = 8.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -114,83 +112,91 @@ fun SourceInfoSection(
             color = labelColor,
         )
 
-        when (source.sourceType) {
-            SourceType.MANUAL -> {
-                val deviceInfo = source.deviceInfo
-                when (deviceInfo) {
-                    is DeviceInfo.Jvm -> {
-                        FieldValueRow("Origin", "Manual (Desktop)", labelWidth = labelWidth)
-                        FieldValueRow("Machine", deviceInfo.machineName, labelWidth = labelWidth)
-                        FieldValueRow("OS", deviceInfo.osName, labelWidth = labelWidth)
-                    }
-                    is DeviceInfo.Android -> {
-                        FieldValueRow("Origin", "Manual (Android)", labelWidth = labelWidth)
-                        FieldValueRow("Device", "${deviceInfo.deviceMake} ${deviceInfo.deviceModel}", labelWidth = labelWidth)
-                    }
-                    null -> {
-                        FieldValueRow("Origin", "Manual", labelWidth = labelWidth)
-                    }
-                }
-            }
-            SourceType.CSV_IMPORT -> {
-                val deviceInfo = source.deviceInfo
-                FieldValueRow("Origin", "CSV Import", labelWidth = labelWidth)
-                when (deviceInfo) {
-                    is DeviceInfo.Jvm -> {
-                        FieldValueRow("Machine", deviceInfo.machineName, labelWidth = labelWidth)
-                        FieldValueRow("OS", deviceInfo.osName, labelWidth = labelWidth)
-                    }
-                    is DeviceInfo.Android -> {
-                        FieldValueRow("Device", "${deviceInfo.deviceMake} ${deviceInfo.deviceModel}", labelWidth = labelWidth)
-                    }
-                    null -> {}
-                }
-            }
-            SourceType.SAMPLE_GENERATOR -> {
-                val deviceInfo = source.deviceInfo
-                when (deviceInfo) {
-                    is DeviceInfo.Jvm -> {
-                        FieldValueRow("Origin", "Sample Generator (Desktop)", labelWidth = labelWidth)
-                        FieldValueRow("Machine", deviceInfo.machineName, labelWidth = labelWidth)
-                        FieldValueRow("OS", deviceInfo.osName, labelWidth = labelWidth)
-                    }
-                    is DeviceInfo.Android -> {
-                        FieldValueRow("Origin", "Sample Generator (Android)", labelWidth = labelWidth)
-                        FieldValueRow("Device", "${deviceInfo.deviceMake} ${deviceInfo.deviceModel}", labelWidth = labelWidth)
-                    }
-                    null -> {
-                        FieldValueRow("Origin", "Sample Generator", labelWidth = labelWidth)
+        if (source == null) {
+            Text(
+                text = "Source data missing",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+            )
+        } else {
+            when (source.sourceType) {
+                SourceType.MANUAL -> {
+                    val deviceInfo = source.deviceInfo
+                    when (deviceInfo) {
+                        is DeviceInfo.Jvm -> {
+                            FieldValueRow("Origin", "Manual (Desktop)", labelWidth = labelWidth)
+                            FieldValueRow("Machine", deviceInfo.machineName, labelWidth = labelWidth)
+                            FieldValueRow("OS", deviceInfo.osName, labelWidth = labelWidth)
+                        }
+                        is DeviceInfo.Android -> {
+                            FieldValueRow("Origin", "Manual (Android)", labelWidth = labelWidth)
+                            FieldValueRow("Device", "${deviceInfo.deviceMake} ${deviceInfo.deviceModel}", labelWidth = labelWidth)
+                        }
+                        null -> {
+                            FieldValueRow("Origin", "Manual", labelWidth = labelWidth)
+                        }
                     }
                 }
-            }
-            SourceType.SYSTEM -> {
-                FieldValueRow("Origin", "System", labelWidth = labelWidth)
-            }
-            SourceType.API -> {
-                val deviceInfo = source.deviceInfo
-                val apiSource = source.apiSource
-                if (apiSource != null && onApiSourceClick != null) {
-                    ApiSourceLinkRow(
-                        label = "Origin",
-                        value = "API Import",
-                        sessionId = apiSource.sessionId,
-                        requestId = apiSource.requestId,
-                        jsonPath = apiSource.jsonPath.value,
-                        onApiSourceClick = onApiSourceClick,
-                        labelWidth = labelWidth,
-                    )
-                } else {
-                    FieldValueRow("Origin", "API Import", labelWidth = labelWidth)
+                SourceType.CSV_IMPORT -> {
+                    val deviceInfo = source.deviceInfo
+                    FieldValueRow("Origin", "CSV Import", labelWidth = labelWidth)
+                    when (deviceInfo) {
+                        is DeviceInfo.Jvm -> {
+                            FieldValueRow("Machine", deviceInfo.machineName, labelWidth = labelWidth)
+                            FieldValueRow("OS", deviceInfo.osName, labelWidth = labelWidth)
+                        }
+                        is DeviceInfo.Android -> {
+                            FieldValueRow("Device", "${deviceInfo.deviceMake} ${deviceInfo.deviceModel}", labelWidth = labelWidth)
+                        }
+                        null -> {}
+                    }
                 }
-                when (deviceInfo) {
-                    is DeviceInfo.Jvm -> {
-                        FieldValueRow("Machine", deviceInfo.machineName, labelWidth = labelWidth)
-                        FieldValueRow("OS", deviceInfo.osName, labelWidth = labelWidth)
+                SourceType.SAMPLE_GENERATOR -> {
+                    val deviceInfo = source.deviceInfo
+                    when (deviceInfo) {
+                        is DeviceInfo.Jvm -> {
+                            FieldValueRow("Origin", "Sample Generator (Desktop)", labelWidth = labelWidth)
+                            FieldValueRow("Machine", deviceInfo.machineName, labelWidth = labelWidth)
+                            FieldValueRow("OS", deviceInfo.osName, labelWidth = labelWidth)
+                        }
+                        is DeviceInfo.Android -> {
+                            FieldValueRow("Origin", "Sample Generator (Android)", labelWidth = labelWidth)
+                            FieldValueRow("Device", "${deviceInfo.deviceMake} ${deviceInfo.deviceModel}", labelWidth = labelWidth)
+                        }
+                        null -> {
+                            FieldValueRow("Origin", "Sample Generator", labelWidth = labelWidth)
+                        }
                     }
-                    is DeviceInfo.Android -> {
-                        FieldValueRow("Device", "${deviceInfo.deviceMake} ${deviceInfo.deviceModel}", labelWidth = labelWidth)
+                }
+                SourceType.SYSTEM -> {
+                    FieldValueRow("Origin", "System", labelWidth = labelWidth)
+                }
+                SourceType.API -> {
+                    val deviceInfo = source.deviceInfo
+                    val apiSource = source.apiSource
+                    if (apiSource != null && onApiSourceClick != null) {
+                        ApiSourceLinkRow(
+                            label = "Origin",
+                            value = "API Import",
+                            sessionId = apiSource.sessionId,
+                            requestId = apiSource.requestId,
+                            jsonPath = apiSource.jsonPath.value,
+                            onApiSourceClick = onApiSourceClick,
+                            labelWidth = labelWidth,
+                        )
+                    } else {
+                        FieldValueRow("Origin", "API Import", labelWidth = labelWidth)
                     }
-                    null -> {}
+                    when (deviceInfo) {
+                        is DeviceInfo.Jvm -> {
+                            FieldValueRow("Machine", deviceInfo.machineName, labelWidth = labelWidth)
+                            FieldValueRow("OS", deviceInfo.osName, labelWidth = labelWidth)
+                        }
+                        is DeviceInfo.Android -> {
+                            FieldValueRow("Device", "${deviceInfo.deviceMake} ${deviceInfo.deviceModel}", labelWidth = labelWidth)
+                        }
+                        null -> {}
+                    }
                 }
             }
         }

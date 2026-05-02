@@ -60,6 +60,9 @@ class JvmDatabaseManager : DatabaseManager {
                 DatabaseConfig.seedDatabase(database, CurrencyRepositoryImpl(database))
             }
 
+            // Apply incremental migrations (idempotent - safe to run on both new and existing DBs)
+            DatabaseConfig.migrateIfNeeded(database)
+
             database
         }
 
