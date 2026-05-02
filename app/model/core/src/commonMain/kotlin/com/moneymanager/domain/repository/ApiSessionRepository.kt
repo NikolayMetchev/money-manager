@@ -147,4 +147,9 @@ interface ApiSessionRepository {
      * Returns all [ApiResponseTransaction] records for the given response, ordered by id.
      */
     suspend fun getResponseTransactions(responseId: ApiResponseId): List<ApiResponseTransaction>
+
+    /**
+     * Returns all [ApiResponseTransaction] records for responses in the given session, ordered by response then id.
+     */
+    suspend fun getResponseTransactionsBySession(sessionId: ApiSessionId): List<ApiResponseTransaction>
 }

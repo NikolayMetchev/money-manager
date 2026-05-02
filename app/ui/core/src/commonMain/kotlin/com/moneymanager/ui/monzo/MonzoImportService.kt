@@ -54,17 +54,17 @@ data class MonzoDownloadResult(
     val transactionResponseCount: Int,
 )
 
-data class MonzoImportProgress(
+data class MonzoDownloadProgress(
     val accountIndex: Int,
     val accountCount: Int,
     val page: Int,
-    val importedTransactionCount: Int,
+    val downloadedResponsePageCount: Int,
 )
 
 suspend fun downloadMonzoTransactions(
     token: String,
     apiClient: ApiClient,
-    onProgress: (MonzoImportProgress) -> Unit = {},
+    onProgress: (MonzoDownloadProgress) -> Unit = {},
 ): MonzoDownloadResult {
     val accountsResponse =
         fetchResponse(
@@ -82,11 +82,11 @@ suspend fun downloadMonzoTransactions(
         var hasTransactions: Boolean
         do {
             onProgress(
-                MonzoImportProgress(
+                MonzoDownloadProgress(
                     accountIndex = index + 1,
                     accountCount = monzoAccounts.size,
                     page = page,
-                    importedTransactionCount = transactionResponseCount,
+                    downloadedResponsePageCount = transactionResponseCount,
                 ),
             )
             val url = buildTransactionUrl(monzoAccount.id, before)
@@ -102,11 +102,11 @@ suspend fun downloadMonzoTransactions(
             before = transactions.map { it.created }.minOrNull()
             hasTransactions = transactions.isNotEmpty()
             onProgress(
-                MonzoImportProgress(
+                MonzoDownloadProgress(
                     accountIndex = index + 1,
                     accountCount = monzoAccounts.size,
                     page = page,
-                    importedTransactionCount = transactionResponseCount,
+                    downloadedResponsePageCount = transactionResponseCount,
                 ),
             )
             page += 1
@@ -247,6 +247,7 @@ private suspend fun importTransactionPage(
     val transactions = parseTransactionsWithPath(response.body)
     val responseId = ApiResponseId(response.responseId)
     val requestId = ApiRequestId(response.requestId)
+    val existingTransfers = transactionRepository.getTransactionsByAccount(monzoAccountId).first().toMutableList()
 
     val states =
         transactions.map { item ->
@@ -259,6 +260,7 @@ private suspend fun importTransactionPage(
                 deviceId = deviceId,
                 accountCache = accountCache,
                 currencyCache = currencyCache,
+                existingTransfers = existingTransfers,
                 apiSessionRepository = apiSessionRepository,
                 transactionRepository = transactionRepository,
                 transferSourceQueries = transferSourceQueries,
@@ -283,6 +285,7 @@ private suspend fun importTransactionItem(
     deviceId: DeviceId,
     accountCache: AccountCache,
     currencyCache: CurrencyCache,
+    existingTransfers: MutableList<Transfer>,
     apiSessionRepository: ApiSessionRepository,
     transactionRepository: TransactionRepository,
     transferSourceQueries: TransferSourceQueries,
@@ -307,6 +310,7 @@ private suspend fun importTransactionItem(
             sessionId = sessionId,
             deviceId = deviceId,
             accountCache = accountCache,
+            existingTransfers = existingTransfers,
             apiSessionRepository = apiSessionRepository,
             transactionRepository = transactionRepository,
             transferSourceQueries = transferSourceQueries,
@@ -330,6 +334,7 @@ private suspend fun importValidTransactionItem(
     sessionId: ApiSessionId,
     deviceId: DeviceId,
     accountCache: AccountCache,
+    existingTransfers: MutableList<Transfer>,
     apiSessionRepository: ApiSessionRepository,
     transactionRepository: TransactionRepository,
     transferSourceQueries: TransferSourceQueries,
@@ -340,9 +345,7 @@ private suspend fun importValidTransactionItem(
         )
     val transfer = item.toTransfer(monzoAccountId, counterpartyAccountId, currency)
     val duplicateTransferId =
-        transactionRepository
-            .getTransactionsByAccount(monzoAccountId)
-            .first()
+        existingTransfers
             .firstOrNull { it.matches(transfer) }
             ?.id
 
@@ -370,6 +373,7 @@ private suspend fun importValidTransactionItem(
         sourceRecorder = sourceRecorder,
     )
     val importedTransferId = sourceRecorder.insertedTransferId ?: transfer.id
+    existingTransfers.add(transfer.copy(id = importedTransferId))
     apiSessionRepository.insertResponseTransaction(
         responseId = responseId,
         jsonPath = item.jsonPath,

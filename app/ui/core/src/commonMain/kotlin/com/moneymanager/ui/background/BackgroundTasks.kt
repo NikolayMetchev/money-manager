@@ -25,7 +25,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 enum class BackgroundTaskStatus {
@@ -54,6 +56,10 @@ class BackgroundTaskController internal constructor(
 class BackgroundTaskManager(
     private val scope: CoroutineScope,
 ) {
+    private companion object {
+        const val MAX_RETAINED_TASKS = 20
+    }
+
     private var nextTaskId = 1L
     val tasks = mutableStateListOf<BackgroundTask>()
 
@@ -83,12 +89,15 @@ class BackgroundTaskManager(
                 updateTask(taskId) { task -> task.copy(detail = detail) }
             }
 
-        scope.launch {
+        scope.launch(Dispatchers.Default) {
             try {
                 val finalDetail = controller.block()
                 updateTask(taskId) { task ->
                     task.copy(detail = finalDetail, status = BackgroundTaskStatus.SUCCEEDED)
                 }
+                pruneCompletedTasks()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (expected: Exception) {
                 updateTask(taskId) { task ->
                     task.copy(
@@ -96,6 +105,7 @@ class BackgroundTaskManager(
                         status = BackgroundTaskStatus.FAILED,
                     )
                 }
+                pruneCompletedTasks()
             }
         }
     }
@@ -107,6 +117,18 @@ class BackgroundTaskManager(
         val index = tasks.indexOfFirst { task -> task.id == taskId }
         if (index >= 0) {
             tasks[index] = transform(tasks[index])
+        }
+    }
+
+    private fun pruneCompletedTasks() {
+        val completedTaskIdsToRemove =
+            tasks
+                .filter { task -> task.status != BackgroundTaskStatus.RUNNING }
+                .dropLast(MAX_RETAINED_TASKS)
+                .map { task -> task.id }
+                .toSet()
+        if (completedTaskIdsToRemove.isNotEmpty()) {
+            tasks.removeAll { task -> task.id in completedTaskIdsToRemove }
         }
     }
 }

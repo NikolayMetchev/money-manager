@@ -62,8 +62,8 @@ import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.createApiClient
 import com.moneymanager.ui.background.LocalBackgroundTaskManager
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.ui.monzo.MonzoDownloadProgress
 import com.moneymanager.ui.monzo.MonzoDownloadResult
-import com.moneymanager.ui.monzo.MonzoImportProgress
 import com.moneymanager.ui.monzo.MonzoImportResult
 import com.moneymanager.ui.monzo.downloadMonzoTransactions
 import com.moneymanager.ui.monzo.importMonzoSessionTransactions
@@ -104,9 +104,8 @@ fun ApiSessionsScreen(
 
     // Per-session download/import state keyed by session id
     var downloadResultBySession by remember { mutableStateOf<Map<ApiSessionId, MonzoDownloadResult>>(emptyMap()) }
-    var downloadProgressBySession by remember { mutableStateOf<Map<ApiSessionId, MonzoImportProgress?>>(emptyMap()) }
+    var downloadProgressBySession by remember { mutableStateOf<Map<ApiSessionId, MonzoDownloadProgress?>>(emptyMap()) }
     var importResultBySession by remember { mutableStateOf<Map<ApiSessionId, MonzoImportResult>>(emptyMap()) }
-    var importProgressBySession by remember { mutableStateOf<Map<ApiSessionId, MonzoImportProgress?>>(emptyMap()) }
     var importErrorBySession by remember { mutableStateOf<Map<ApiSessionId, String>>(emptyMap()) }
 
     fun refreshSessions() {
@@ -211,7 +210,6 @@ fun ApiSessionsScreen(
                             val downloadResult = downloadResultBySession[session.id]
                             val downloadProgress = downloadProgressBySession[session.id]
                             val importResult = importResultBySession[session.id]
-                            val importProgress = importProgressBySession[session.id]
                             val importError = importErrorBySession[session.id]
 
                             ApiSessionCard(
@@ -222,7 +220,6 @@ fun ApiSessionsScreen(
                                 downloadResult = downloadResult,
                                 downloadProgress = downloadProgress,
                                 importResult = importResult,
-                                importProgress = importProgress,
                                 importError = importError,
                                 onRevoke = { sessionToRevoke = session },
                                 onOpenTraffic = { onSessionClick(session) },
@@ -258,7 +255,6 @@ fun ApiSessionsScreen(
                                 },
                                 onImport = {
                                     importResultBySession = importResultBySession - session.id
-                                    importProgressBySession = importProgressBySession - session.id
                                     importErrorBySession = importErrorBySession - session.id
                                     backgroundTasks.startTask(
                                         key = monzoImportTaskKey(session.id),
@@ -277,7 +273,6 @@ fun ApiSessionsScreen(
                                                 onProgress = ::update,
                                             )
                                         importResultBySession = importResultBySession + (session.id to result)
-                                        importProgressBySession = importProgressBySession - session.id
                                         onTransactionsImported()
                                         result.displaySummary()
                                     }
@@ -305,9 +300,8 @@ private fun ApiSessionCard(
     isDownloading: Boolean,
     isImporting: Boolean,
     downloadResult: MonzoDownloadResult?,
-    downloadProgress: MonzoImportProgress?,
+    downloadProgress: MonzoDownloadProgress?,
     importResult: MonzoImportResult?,
-    importProgress: MonzoImportProgress?,
     importError: String?,
     onRevoke: () -> Unit,
     onOpenTraffic: () -> Unit,
@@ -410,7 +404,7 @@ private fun ApiSessionCard(
                             } else {
                                 "Downloading account ${downloadProgress.accountIndex}/${downloadProgress.accountCount}, " +
                                     "page ${downloadProgress.page}. " +
-                                    "${downloadProgress.importedTransactionCount} response(s) downloaded so far."
+                                    "${downloadProgress.downloadedResponsePageCount} response(s) downloaded so far."
                             },
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall,
@@ -420,14 +414,7 @@ private fun ApiSessionCard(
 
                 if (isImporting) {
                     Text(
-                        text =
-                            if (importProgress == null) {
-                                "Preparing import..."
-                            } else {
-                                "Importing account ${importProgress.accountIndex}/${importProgress.accountCount}, " +
-                                    "page ${importProgress.page}. " +
-                                    "${importProgress.importedTransactionCount} transaction(s) so far."
-                            },
+                        text = "Importing transactions...",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall,
                     )
@@ -551,9 +538,9 @@ fun ApiSessionTrafficScreen(
             requests = apiSessionRepository.getRequestsBySession(sessionId)
             responses = apiSessionRepository.getResponsesBySession(sessionId)
             responseTransactionsByResponseId =
-                responses.associate { response ->
-                    response.id to apiSessionRepository.getResponseTransactions(response.id)
-                }
+                apiSessionRepository
+                    .getResponseTransactionsBySession(sessionId)
+                    .groupBy { responseTransaction -> responseTransaction.responseId }
         } finally {
             isLoading = false
         }
@@ -610,7 +597,7 @@ fun ApiSessionTrafficScreen(
 
                 // Find and scroll to the pair that contains the highlighted response
                 val highlightedPairIndex =
-                    remember(highlightRequestId, highlightJsonPath, pairs) {
+                    remember(highlightRequestId, highlightJsonPath, pairs, responseTransactionsByResponseId) {
                         if (highlightJsonPath == null) {
                             -1
                         } else {
@@ -773,6 +760,12 @@ private fun ResponseTrafficItem(
             title = title,
             timestamp = timestamp,
         )
+        if (responseTransactions.isNotEmpty()) {
+            ResponseTransactionStates(
+                transactions = responseTransactions,
+                highlightJsonPath = highlightJsonPath,
+            )
+        }
         JsonViewer(
             json = json,
             responseTransactions = responseTransactions,
@@ -972,7 +965,7 @@ private fun JsonTreeNode(
     val isHighlightTarget = remainingHighlightSegments != null && remainingHighlightSegments.isEmpty()
     // Force-expand the node if it's on the highlight path
     val forceExpand = remainingHighlightSegments != null && remainingHighlightSegments.isNotEmpty()
-    var expanded by remember(label, element) { mutableStateOf(depth == 0 || forceExpand) }
+    var expanded by remember(label, element, remainingHighlightSegments) { mutableStateOf(depth == 0 || forceExpand) }
 
     val prefix =
         if (expandable) {
@@ -1165,8 +1158,8 @@ private fun ApiRequest.displayBody(): String =
 private fun MonzoDownloadResult.displaySummary(): String =
     "Download complete: $accountCount account(s), $transactionResponseCount transaction response page(s)."
 
-private fun MonzoImportProgress.downloadDetail(): String =
-    "Downloading account $accountIndex/$accountCount, page $page. $importedTransactionCount response page(s) downloaded so far."
+private fun MonzoDownloadProgress.downloadDetail(): String =
+    "Downloading account $accountIndex/$accountCount, page $page. $downloadedResponsePageCount response page(s) downloaded so far."
 
 private fun MonzoImportResult.displaySummary(): String =
     buildString {

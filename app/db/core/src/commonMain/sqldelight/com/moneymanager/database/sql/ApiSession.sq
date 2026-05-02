@@ -128,15 +128,20 @@ CREATE TABLE api_response_transaction (
     response_id INTEGER NOT NULL,
     json_path TEXT NOT NULL,
     -- State: 1=imported, 2=duplicate, 3=error
-    state INTEGER NOT NULL,
+    state INTEGER NOT NULL CHECK(state IN (1, 2, 3)),
     transaction_id INTEGER,
     error_message TEXT,
     created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now') * 1000),
+    CHECK (
+        (state IN (1, 2) AND transaction_id IS NOT NULL AND error_message IS NULL) OR
+        (state = 3 AND transaction_id IS NULL)
+    ),
     FOREIGN KEY (response_id) REFERENCES api_response(id) ON DELETE CASCADE,
     FOREIGN KEY (transaction_id) REFERENCES transaction_id(id)
 );
 
-CREATE INDEX idx_api_response_transaction_response ON api_response_transaction(response_id);
+CREATE UNIQUE INDEX idx_api_response_transaction_response_json_path
+    ON api_response_transaction(response_id, json_path);
 CREATE INDEX idx_api_response_transaction_transaction ON api_response_transaction(transaction_id);
 
 insertResponseTransaction:
@@ -145,6 +150,13 @@ VALUES (?, ?, ?, ?, ?);
 
 selectResponseTransactionsByResponseId:
 SELECT * FROM api_response_transaction WHERE response_id = ? ORDER BY id;
+
+selectResponseTransactionsBySession:
+SELECT api_response_transaction.*
+FROM api_response_transaction
+JOIN api_response ON api_response_transaction.response_id = api_response.id
+WHERE api_response.session_id = ?
+ORDER BY api_response_transaction.response_id, api_response_transaction.id;
 
 selectResponseTransactionByResponseIdAndJsonPath:
 SELECT * FROM api_response_transaction WHERE response_id = ? AND json_path = ? LIMIT 1;

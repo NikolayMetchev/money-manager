@@ -46,8 +46,8 @@ import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.createApiClient
 import com.moneymanager.ui.background.LocalBackgroundTaskManager
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.ui.monzo.MonzoDownloadProgress
 import com.moneymanager.ui.monzo.MonzoDownloadResult
-import com.moneymanager.ui.monzo.MonzoImportProgress
 import com.moneymanager.ui.monzo.MonzoImportResult
 import com.moneymanager.ui.monzo.downloadMonzoTransactions
 import com.moneymanager.ui.monzo.importMonzoSessionTransactions
@@ -80,9 +80,8 @@ fun MonzoAuthScreen(
     var successMessage by remember { mutableStateOf<String?>(null) }
     var sessionToRevoke by remember { mutableStateOf<ApiSession?>(null) }
     var downloadResult by remember { mutableStateOf<MonzoDownloadResult?>(null) }
-    var downloadProgress by remember { mutableStateOf<MonzoImportProgress?>(null) }
+    var downloadProgress by remember { mutableStateOf<MonzoDownloadProgress?>(null) }
     var importResult by remember { mutableStateOf<MonzoImportResult?>(null) }
-    var importProgress by remember { mutableStateOf<MonzoImportProgress?>(null) }
     var importError by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
@@ -335,7 +334,7 @@ fun MonzoAuthScreen(
                                 } else {
                                     "Downloading account ${progress.accountIndex}/${progress.accountCount}, " +
                                         "page ${progress.page}. " +
-                                        "${progress.importedTransactionCount} response(s) downloaded so far."
+                                        "${progress.downloadedResponsePageCount} response(s) downloaded so far."
                                 },
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodySmall,
@@ -343,16 +342,8 @@ fun MonzoAuthScreen(
                     }
 
                     if (isImporting) {
-                        val progress = importProgress
                         Text(
-                            text =
-                                if (progress == null) {
-                                    "Preparing import..."
-                                } else {
-                                    "Importing account ${progress.accountIndex}/${progress.accountCount}, " +
-                                        "page ${progress.page}. " +
-                                        "${progress.importedTransactionCount} transaction(s) imported so far."
-                                },
+                            text = "Importing transactions...",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodySmall,
                         )
@@ -426,7 +417,6 @@ fun MonzoAuthScreen(
                         onClick = {
                             val session = activeSessions.firstOrNull() ?: return@Button
                             importResult = null
-                            importProgress = null
                             importError = null
                             backgroundTasks.startTask(
                                 key = monzoImportTaskKey(session.id),
@@ -445,7 +435,6 @@ fun MonzoAuthScreen(
                                         onProgress = ::update,
                                     )
                                 importResult = result
-                                importProgress = null
                                 onTransactionsImported()
                                 result.displaySummary()
                             }
@@ -566,8 +555,8 @@ private fun MonzoImportResult.displaySummary(): String =
 private fun MonzoDownloadResult.displaySummary(): String =
     "Download complete: $accountCount account(s), $transactionResponseCount transaction response page(s)."
 
-private fun MonzoImportProgress.downloadDetail(): String =
-    "Downloading account $accountIndex/$accountCount, page $page. $importedTransactionCount response page(s) downloaded so far."
+private fun MonzoDownloadProgress.downloadDetail(): String =
+    "Downloading account $accountIndex/$accountCount, page $page. $downloadedResponsePageCount response page(s) downloaded so far."
 
 private fun monzoDownloadTaskKey(sessionId: ApiSessionId): String = "monzo-download-${sessionId.id}"
 

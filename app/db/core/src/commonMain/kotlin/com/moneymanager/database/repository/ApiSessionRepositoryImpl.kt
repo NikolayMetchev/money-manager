@@ -215,6 +215,20 @@ class ApiSessionRepositoryImpl(
             }
         }
 
+    override suspend fun getResponseTransactionsBySession(sessionId: ApiSessionId): List<ApiResponseTransaction> =
+        withContext(Dispatchers.Default) {
+            queries.selectResponseTransactionsBySession(sessionId.id).executeAsList().map { row ->
+                ApiResponseTransaction(
+                    id = ApiResponseTransactionId(row.id),
+                    responseId = ApiResponseId(row.response_id),
+                    jsonPath = JsonPath(row.json_path),
+                    state = ApiResponseTransactionState.fromId(row.state.toInt()),
+                    transactionId = row.transaction_id?.let(::TransferId),
+                    errorMessage = row.error_message,
+                )
+            }
+        }
+
     private fun com.moneymanager.database.sql.Api_request.toApiRequest(
         headers: List<com.moneymanager.database.sql.Api_request_header>,
     ): ApiRequest =
