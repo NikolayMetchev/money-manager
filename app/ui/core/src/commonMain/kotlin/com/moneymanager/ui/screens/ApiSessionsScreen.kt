@@ -870,14 +870,18 @@ private fun JsonTreeNode(
     depth: Int,
     transactionsByJsonPath: Map<String, List<ApiResponseTransaction>> = emptyMap(),
     remainingHighlightSegments: List<String>? = null,
+    forceExpandSubtree: Boolean = false,
 ) {
     val childCount = element.childCount()
     val expandable = childCount > 0
     // This node is the target if all highlight segments have been consumed
     val isHighlightTarget = remainingHighlightSegments != null && remainingHighlightSegments.isEmpty()
     // Force-expand the node if it's on the highlight path
-    val forceExpand = remainingHighlightSegments != null && remainingHighlightSegments.isNotEmpty()
-    var expanded by remember(label, element, remainingHighlightSegments) { mutableStateOf(depth == 0 || forceExpand) }
+    val forceExpandPath = remainingHighlightSegments != null && remainingHighlightSegments.isNotEmpty()
+    val shouldForceExpand = forceExpandSubtree || forceExpandPath || isHighlightTarget
+    var expanded by remember(label, element, remainingHighlightSegments, forceExpandSubtree) {
+        mutableStateOf(depth == 0 || shouldForceExpand)
+    }
 
     val prefix =
         if (expandable) {
@@ -898,9 +902,15 @@ private fun JsonTreeNode(
     val nodeTransactions = transactionsByJsonPath[jsonPath].orEmpty()
     val highlightBackground =
         when {
-            isHighlightTarget -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+            isHighlightTarget -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.85f)
             nodeTransactions.isNotEmpty() -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
             else -> Color.Transparent
+        }
+    val highlightTextColor =
+        if (isHighlightTarget) {
+            MaterialTheme.colorScheme.onTertiaryContainer
+        } else {
+            MaterialTheme.colorScheme.onSurface
         }
     val lineModifier =
         Modifier
@@ -926,7 +936,7 @@ private fun JsonTreeNode(
             fontFamily = FontFamily.Monospace,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            color = if (isHighlightTarget) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+            color = highlightTextColor,
             modifier = Modifier.weight(1f),
         )
         nodeTransactions.forEach { transaction ->
@@ -951,6 +961,7 @@ private fun JsonTreeNode(
                         depth = depth + 1,
                         transactionsByJsonPath = transactionsByJsonPath,
                         remainingHighlightSegments = nextSegments,
+                        forceExpandSubtree = forceExpandSubtree || isHighlightTarget,
                     )
                 }
             }
@@ -970,6 +981,7 @@ private fun JsonTreeNode(
                         depth = depth + 1,
                         transactionsByJsonPath = transactionsByJsonPath,
                         remainingHighlightSegments = nextSegments,
+                        forceExpandSubtree = forceExpandSubtree || isHighlightTarget,
                     )
                 }
             }
