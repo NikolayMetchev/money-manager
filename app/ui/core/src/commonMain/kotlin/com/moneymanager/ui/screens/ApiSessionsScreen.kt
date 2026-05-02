@@ -760,99 +760,11 @@ private fun ResponseTrafficItem(
             title = title,
             timestamp = timestamp,
         )
-        if (responseTransactions.isNotEmpty()) {
-            ResponseTransactionStates(
-                transactions = responseTransactions,
-                highlightJsonPath = highlightJsonPath,
-            )
-        }
         JsonViewer(
             json = json,
             responseTransactions = responseTransactions,
             highlightJsonPath = highlightJsonPath,
         )
-    }
-}
-
-@Composable
-private fun ResponseTransactionStates(
-    transactions: List<ApiResponseTransaction>,
-    highlightJsonPath: String? = null,
-) {
-    val importedCount = transactions.count { it.state == ApiResponseTransactionState.IMPORTED }
-    val duplicateCount = transactions.count { it.state == ApiResponseTransactionState.DUPLICATE }
-    val errorCount = transactions.count { it.state == ApiResponseTransactionState.ERROR }
-
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(
-            text =
-                buildString {
-                    append("${transactions.size} transaction(s)")
-                    if (importedCount > 0) append(" • $importedCount imported")
-                    if (duplicateCount > 0) append(" • $duplicateCount duplicate(s)")
-                    if (errorCount > 0) append(" • $errorCount error(s)")
-                },
-            style = MaterialTheme.typography.labelSmall,
-            color =
-                when {
-                    errorCount > 0 -> MaterialTheme.colorScheme.error
-                    duplicateCount > 0 -> MaterialTheme.colorScheme.tertiary
-                    else -> MaterialTheme.colorScheme.primary
-                },
-        )
-
-        // Show duplicate and error entries individually
-        transactions.filter { it.state != ApiResponseTransactionState.IMPORTED }.forEach { tx ->
-            val isHighlighted = tx.jsonPath.value == highlightJsonPath
-            val stateColor =
-                when (tx.state) {
-                    ApiResponseTransactionState.DUPLICATE -> MaterialTheme.colorScheme.tertiary
-                    ApiResponseTransactionState.ERROR -> MaterialTheme.colorScheme.error
-                    ApiResponseTransactionState.IMPORTED -> MaterialTheme.colorScheme.primary
-                }
-            val bgColor =
-                if (isHighlighted) {
-                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                } else {
-                    Color.Transparent
-                }
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .background(bgColor, MaterialTheme.shapes.extraSmall)
-                        .padding(horizontal = 4.dp, vertical = 2.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(
-                    text =
-                        when (tx.state) {
-                            ApiResponseTransactionState.DUPLICATE -> "Duplicate"
-                            ApiResponseTransactionState.ERROR -> "Error"
-                            ApiResponseTransactionState.IMPORTED -> "Imported"
-                        },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = stateColor,
-                )
-                Text(
-                    text = tx.jsonPath.value,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                tx.errorMessage?.let {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.error,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
-        }
     }
 }
 
@@ -1021,21 +933,6 @@ private fun JsonTreeNode(
             JsonTransactionStatus(transaction = transaction)
         }
     }
-    nodeTransactions
-        .mapNotNull { it.errorMessage }
-        .forEach { errorMessage ->
-            Text(
-                text = errorMessage,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.error,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(start = ((depth + 1) * 12).dp),
-            )
-        }
     if (expanded) {
         when (element) {
             is JsonObject -> {
