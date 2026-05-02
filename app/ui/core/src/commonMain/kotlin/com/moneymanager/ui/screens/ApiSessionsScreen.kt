@@ -871,6 +871,7 @@ private fun JsonTreeNode(
     transactionsByJsonPath: Map<String, List<ApiResponseTransaction>> = emptyMap(),
     remainingHighlightSegments: List<String>? = null,
     forceExpandSubtree: Boolean = false,
+    highlightSubtree: Boolean = false,
 ) {
     val childCount = element.childCount()
     val expandable = childCount > 0
@@ -900,14 +901,16 @@ private fun JsonTreeNode(
         }
 
     val nodeTransactions = transactionsByJsonPath[jsonPath].orEmpty()
+    val isInHighlightedSubtree = highlightSubtree || isHighlightTarget
     val highlightBackground =
         when {
             isHighlightTarget -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.85f)
+            highlightSubtree -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.35f)
             nodeTransactions.isNotEmpty() -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
             else -> Color.Transparent
         }
     val highlightTextColor =
-        if (isHighlightTarget) {
+        if (isInHighlightedSubtree) {
             MaterialTheme.colorScheme.onTertiaryContainer
         } else {
             MaterialTheme.colorScheme.onSurface
@@ -962,6 +965,7 @@ private fun JsonTreeNode(
                         transactionsByJsonPath = transactionsByJsonPath,
                         remainingHighlightSegments = nextSegments,
                         forceExpandSubtree = forceExpandSubtree || isHighlightTarget,
+                        highlightSubtree = isInHighlightedSubtree,
                     )
                 }
             }
@@ -982,6 +986,7 @@ private fun JsonTreeNode(
                         transactionsByJsonPath = transactionsByJsonPath,
                         remainingHighlightSegments = nextSegments,
                         forceExpandSubtree = forceExpandSubtree || isHighlightTarget,
+                        highlightSubtree = isInHighlightedSubtree,
                     )
                 }
             }
