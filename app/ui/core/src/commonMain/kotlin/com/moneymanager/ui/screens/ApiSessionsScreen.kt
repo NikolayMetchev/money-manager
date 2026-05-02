@@ -606,7 +606,7 @@ fun ApiSessionTrafficScreen(
                         } else {
                             // +1 accounts for the summary item at index 0
                             // First try to match by jsonPath in response transactions (for transaction sources)
-                            val byJsonPath =
+                            val jsonPathMatchIndex =
                                 if (highlightJsonPath != null) {
                                     pairs.indexOfFirst { pair ->
                                         pair.response != null &&
@@ -618,15 +618,15 @@ fun ApiSessionTrafficScreen(
                                     -1
                                 }
                             // Fall back to matching by requestId alone (for entity/account sources)
-                            val result =
-                                if (byJsonPath >= 0) {
-                                    byJsonPath
+                            val highlightedIndex =
+                                if (jsonPathMatchIndex >= 0) {
+                                    jsonPathMatchIndex
                                 } else if (highlightRequestId != null) {
                                     pairs.indexOfFirst { pair -> pair.request?.id == highlightRequestId }
                                 } else {
                                     -1
                                 }
-                            if (result >= 0) result + 1 else -1
+                            if (highlightedIndex >= 0) highlightedIndex + 1 else -1
                         }
                     }
 
