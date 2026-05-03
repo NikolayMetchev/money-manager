@@ -3,6 +3,8 @@
 package com.moneymanager.database
 
 import com.moneymanager.currency.Currency
+import com.moneymanager.domain.model.EntityType
+import com.moneymanager.domain.model.SourceType
 import com.moneymanager.domain.repository.CurrencyRepository
 
 /**
@@ -508,14 +510,14 @@ object DatabaseConfig {
                 deviceQueries.selectSystemDevice(platform_id = 0).executeAsOneOrNull()
                     ?: deviceQueries.lastInsertRowId().executeAsOne()
 
-            // Seed currencies with source tracking (entity_type_id=3 CURRENCY, source_type_id=4 SYSTEM)
+            // Seed currencies with source tracking
             allCurrencies.forEach { currency ->
                 val currencyId = currencyRepository.upsertCurrencyByCode(currency.code, currency.displayName)
                 entitySourceQueries.insertSource(
-                    entity_type_id = 3,
+                    entity_type_id = EntityType.CURRENCY.id,
                     entity_id = currencyId.id,
                     revision_id = 1,
-                    source_type_id = 4,
+                    source_type_id = SourceType.SYSTEM.id.toLong(),
                     device_id = systemDeviceId,
                 )
             }

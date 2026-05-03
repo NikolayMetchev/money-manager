@@ -10,6 +10,7 @@ import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.SourceRecorder
+import com.moneymanager.domain.model.SourceType
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImportId
@@ -111,12 +112,11 @@ class ManualEntitySourceRecorder(
         entityId: Long,
         revisionId: Long,
     ) {
-        // source_type_id 1 = MANUAL
         queries.insertSource(
             entity_type_id = entityType.id,
             entity_id = entityId,
             revision_id = revisionId,
-            source_type_id = 1L,
+            source_type_id = SourceType.MANUAL.id.toLong(),
             device_id = deviceId.id,
         )
     }
@@ -132,12 +132,11 @@ class SampleGeneratorEntitySourceRecorder(
         entityId: Long,
         revisionId: Long,
     ) {
-        // source_type_id 3 = SAMPLE_GENERATOR
         queries.insertSource(
             entity_type_id = entityType.id,
             entity_id = entityId,
             revision_id = revisionId,
-            source_type_id = 3L,
+            source_type_id = SourceType.SAMPLE_GENERATOR.id.toLong(),
             device_id = deviceId.id,
         )
     }
@@ -157,12 +156,11 @@ class ApiEntitySourceRecorder(
         revisionId: Long,
     ) {
         queries.transaction {
-            // source_type_id 5 = API
             queries.insertSource(
                 entity_type_id = entityType.id,
                 entity_id = entityId,
                 revision_id = revisionId,
-                source_type_id = 5L,
+                source_type_id = SourceType.API.id.toLong(),
                 device_id = deviceId.id,
             )
             val entitySourceId = queries.lastInsertedId().executeAsOne()
