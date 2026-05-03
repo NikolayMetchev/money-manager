@@ -16,6 +16,8 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountAuditEntry
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.ApiRequestId
+import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.EntitySource
 import com.moneymanager.domain.model.PersonAccountOwnershipAuditEntry
@@ -37,6 +39,7 @@ fun AccountAuditScreen(
     accountId: AccountId,
     auditRepository: AuditRepository,
     accountRepository: AccountRepository,
+    onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
     onBack: () -> Unit,
 ) {
     AuditScreen(
@@ -55,7 +58,7 @@ fun AccountAuditScreen(
         },
         diffKey = { it.id },
         onBack = onBack,
-        diffCard = { diff -> AccountAuditDiffCard(diff) },
+        diffCard = { diff -> AccountAuditDiffCard(diff, onApiSourceClick) },
     )
 }
 
@@ -194,7 +197,10 @@ private fun computeAccountAuditDiffs(
 }
 
 @Composable
-private fun AccountAuditDiffCard(diff: AccountAuditDiff) {
+private fun AccountAuditDiffCard(
+    diff: AccountAuditDiff,
+    onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
+) {
     AuditDiffCard(
         auditType = diff.auditType,
         auditTimestamp = diff.auditTimestamp,
@@ -212,7 +218,7 @@ private fun AccountAuditDiffCard(diff: AccountAuditDiff) {
                 FieldValueRow("Opening Date", "${openingDate.date}")
                 FieldValueRow("Category", diff.categoryName.value() ?: "Uncategorized")
                 OwnershipChangesSection(diff.ownersAdded, diff.ownersRemoved)
-                SourceInfoSection(diff.source)
+                SourceInfoSection(diff.source, onApiSourceClick = onApiSourceClick)
             }
             AuditType.UPDATE -> {
                 if (!diff.hasChanges) {
@@ -241,7 +247,7 @@ private fun AccountAuditDiffCard(diff: AccountAuditDiff) {
                     }
                     OwnershipChangesSection(diff.ownersAdded, diff.ownersRemoved)
                 }
-                SourceInfoSection(diff.source)
+                SourceInfoSection(diff.source, onApiSourceClick = onApiSourceClick)
             }
             AuditType.DELETE -> {
                 val errorColor = MaterialTheme.colorScheme.error
@@ -255,7 +261,7 @@ private fun AccountAuditDiffCard(diff: AccountAuditDiff) {
                 FieldValueRow("Opening Date", "${openingDate.date}", errorColor)
                 FieldValueRow("Category", diff.categoryName.value() ?: "Uncategorized", errorColor)
                 OwnershipChangesSection(diff.ownersAdded, diff.ownersRemoved)
-                SourceInfoSection(diff.source, labelColor = errorColor.copy(alpha = 0.8f))
+                SourceInfoSection(diff.source, labelColor = errorColor.copy(alpha = 0.8f), onApiSourceClick = onApiSourceClick)
             }
         }
     }

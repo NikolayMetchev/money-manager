@@ -507,6 +507,15 @@ fun MoneyManagerApp(
                                     accountId = screen.accountId,
                                     auditRepository = auditRepository,
                                     accountRepository = accountRepository,
+                                    onApiSourceClick = { sessionId, requestId, jsonPath ->
+                                        navigationHistory.navigateTo(
+                                            Screen.ApiSessionTraffic(
+                                                sessionId = sessionId,
+                                                highlightRequestId = requestId,
+                                                highlightJsonPath = jsonPath,
+                                            ),
+                                        )
+                                    },
                                     onBack = { navigationHistory.navigateBack() },
                                 )
                             }
@@ -545,6 +554,8 @@ fun MoneyManagerApp(
                                     currencyRepository = currencyRepository,
                                     transactionRepository = transactionRepository,
                                     transferSourceQueries = transferSourceQueries,
+                                    entitySourceQueries = entitySourceQueries,
+                                    maintenanceService = maintenanceService,
                                     deviceId = deviceId,
                                     onTransactionsImported = {
                                         transactionRefreshTrigger++
@@ -562,6 +573,8 @@ fun MoneyManagerApp(
                                     currencyRepository = currencyRepository,
                                     transactionRepository = transactionRepository,
                                     transferSourceQueries = transferSourceQueries,
+                                    entitySourceQueries = entitySourceQueries,
+                                    maintenanceService = maintenanceService,
                                     deviceId = deviceId,
                                     onTransactionsImported = {
                                         transactionRefreshTrigger++

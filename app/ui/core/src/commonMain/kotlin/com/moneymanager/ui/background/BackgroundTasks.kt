@@ -29,6 +29,9 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import org.lighthousegames.logging.logging
+
+private val logger = logging()
 
 enum class BackgroundTaskStatus {
     RUNNING,
@@ -99,6 +102,7 @@ class BackgroundTaskManager(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (expected: Exception) {
+                logger.error(expected) { "Background task failed: ${expected.message}" }
                 updateTask(taskId) { task ->
                     task.copy(
                         detail = expected.message ?: "Task failed.",

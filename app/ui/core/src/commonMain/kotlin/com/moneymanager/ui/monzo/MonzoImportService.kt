@@ -2,37 +2,21 @@
 
 package com.moneymanager.ui.monzo
 
+import com.moneymanager.database.ApiEntitySourceRecorder
 import com.moneymanager.database.ApiImportSourceRecorder
+import com.moneymanager.database.sql.EntitySourceQueries
 import com.moneymanager.database.sql.TransferSourceQueries
-import com.moneymanager.domain.model.Account
-import com.moneymanager.domain.model.AccountId
-import com.moneymanager.domain.model.ApiRequest
-import com.moneymanager.domain.model.ApiRequestId
-import com.moneymanager.domain.model.ApiResponse
-import com.moneymanager.domain.model.ApiResponseId
-import com.moneymanager.domain.model.ApiResponseTransactionState
-import com.moneymanager.domain.model.ApiSessionId
-import com.moneymanager.domain.model.Category
-import com.moneymanager.domain.model.Currency
-import com.moneymanager.domain.model.DeviceId
-import com.moneymanager.domain.model.JsonPath
-import com.moneymanager.domain.model.Money
-import com.moneymanager.domain.model.Transfer
-import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.*
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.ApiSessionRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.rest.ApiClient
 import com.moneymanager.rest.ApiHttpResponse
-import io.ktor.http.URLBuilder
+import com.moneymanager.ui.screens.transactions.logger
+import io.ktor.http.*
 import kotlinx.coroutines.flow.first
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.*
 import kotlin.math.absoluteValue
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -41,6 +25,7 @@ private const val MONZO_BASE_URL = "https://api.monzo.com"
 private const val TRANSACTION_PAGE_LIMIT = 100
 private const val MONZO_ACCOUNT_PREFIX = "Monzo: "
 private const val MONZO_COUNTERPARTY_PREFIX = "Monzo Counterparty: "
+private const val MONZO_VOID_COUNTERPARTY = "Monzo Counterparty: Void"
 
 data class MonzoImportResult(
     val accountCount: Int,
@@ -125,19 +110,38 @@ suspend fun importMonzoSessionTransactions(
     currencyRepository: CurrencyRepository,
     transactionRepository: TransactionRepository,
     transferSourceQueries: TransferSourceQueries,
+    entitySourceQueries: EntitySourceQueries,
     deviceId: DeviceId,
     sessionId: ApiSessionId,
     onProgress: (String) -> Unit = {},
 ): MonzoImportResult {
     val requestsById = apiSessionRepository.getRequestsBySession(sessionId).associateBy { it.id }
     val responses = apiSessionRepository.getResponsesBySession(sessionId)
+
+    // Build a map from Monzo account ID to the accounts-list source (request + jsonPath)
+    // so newly created accounts can be linked back to their API origin.
+    val accountApiSourceByMonzoId =
+        responses
+            .flatMap { response ->
+                val requestId = requestsById[response.requestId]?.id ?: return@flatMap emptyList()
+                parseAccountsWithPaths(response.json).map { (account, jsonPath) ->
+                    account.id to AccountApiSource(sessionId, requestId, jsonPath)
+                }
+            }.toMap()
+
     val monzoAccounts = responses.flatMap { response -> parseAccounts(response.json) }
     val monzoAccountsById = monzoAccounts.associateBy { it.id }
 
     var transactionCount = 0
     var duplicateCount = 0
     var errorCount = 0
-    val accountCache = AccountCache(accountRepository)
+    val accountCache =
+        AccountCache(
+            accountRepository = accountRepository,
+            entitySourceQueries = entitySourceQueries,
+            deviceId = deviceId,
+            accountApiSourceByMonzoId = accountApiSourceByMonzoId,
+        )
     val currencyCache = CurrencyCache(currencyRepository)
 
     responses.forEachIndexed { index, response ->
@@ -146,7 +150,7 @@ suspend fun importMonzoSessionTransactions(
         )
         val request = requestsById[response.requestId] ?: return@forEachIndexed
         val monzoAccount = monzoAccountsById[request.accountIdParameter()] ?: return@forEachIndexed
-        val monzoAccountId = accountCache.getOrCreateAccountId(monzoAccount.localAccountName())
+        val monzoAccountId = accountCache.getOrCreateAccountId(monzoAccount.id, monzoAccount.localAccountName())
         val pageResult =
             importTransactionPage(
                 response = response.toApiHttpResponse(),
@@ -214,6 +218,21 @@ private fun parseAccounts(json: String): List<MonzoAccount> =
     } catch (_: Exception) {
         emptyList()
     }
+
+private fun parseAccountsWithPaths(json: String): List<Pair<MonzoAccount, JsonPath>> =
+    Json
+        .parseToJsonElement(json)
+        .jsonObject["accounts"]
+        ?.jsonArray
+        ?.mapIndexedNotNull { index, element ->
+            val account = element.jsonObject
+            val id = account["id"]?.jsonPrimitive?.contentOrNull ?: return@mapIndexedNotNull null
+            MonzoAccount(
+                id = id,
+                description = account["description"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+            ) to JsonPath("$.accounts[$index]")
+        }
+        ?: emptyList()
 
 private data class MonzoTransactionPageItem(
     val amountMinorUnits: Long,
@@ -316,6 +335,7 @@ private suspend fun importTransactionItem(
             transferSourceQueries = transferSourceQueries,
         )
     } catch (expected: Exception) {
+        logger.error(expected) { "Error importing Monzo transaction: ${expected.message}" }
         apiSessionRepository.recordTransactionError(
             responseId = responseId,
             jsonPath = item.jsonPath,
@@ -341,7 +361,8 @@ private suspend fun importValidTransactionItem(
 ): ApiResponseTransactionState {
     val counterpartyAccountId =
         accountCache.getOrCreateAccountId(
-            MONZO_COUNTERPARTY_PREFIX + item.counterpartyName(),
+            name = if (item.amountMinorUnits == 0L) MONZO_VOID_COUNTERPARTY else MONZO_COUNTERPARTY_PREFIX + item.counterpartyName(),
+            transactionApiSource = AccountApiSource(sessionId, requestId, JsonPath("${item.jsonPath.value}.counterparty")),
         )
     val transfer = item.toTransfer(monzoAccountId, counterpartyAccountId, currency)
     val duplicateTransferId =
@@ -437,18 +458,33 @@ private fun ApiResponse.toApiHttpResponse(): ApiHttpResponse =
 
 private fun ApiRequest.accountIdParameter(): String? = runCatching { URLBuilder(url).parameters["account_id"] }.getOrNull()
 
+private data class AccountApiSource(
+    val sessionId: ApiSessionId,
+    val requestId: ApiRequestId,
+    val jsonPath: JsonPath,
+)
+
 private class AccountCache(
     private val accountRepository: AccountRepository,
+    private val entitySourceQueries: EntitySourceQueries,
+    private val deviceId: DeviceId,
+    private val accountApiSourceByMonzoId: Map<String, AccountApiSource>,
 ) {
     private var accountsByName: Map<String, Account>? = null
 
-    suspend fun getOrCreateAccountId(name: String): AccountId {
+    suspend fun getOrCreateAccountId(
+        monzoAccountId: String?,
+        name: String,
+        explicitApiSource: AccountApiSource? = null,
+    ): AccountId {
         val normalizedName = name.ifBlank { "Unknown" }
         val existing = loadAccounts()[normalizedName]
-        if (existing != null) return existing.id
+        if (existing != null) {
+            return existing.id
+        }
 
         val now = Clock.System.now()
-        val accountId =
+        val newId =
             accountRepository.createAccount(
                 Account(
                     id = AccountId(0L),
@@ -462,13 +498,31 @@ private class AccountCache(
             (
                 normalizedName to
                     Account(
-                        id = accountId,
+                        id = newId,
                         name = normalizedName,
                         openingDate = now,
                     )
             )
-        return accountId
+
+        val apiSource = monzoAccountId?.let { accountApiSourceByMonzoId[it] } ?: explicitApiSource
+        if (apiSource != null) {
+            ApiEntitySourceRecorder(
+                queries = entitySourceQueries,
+                deviceId = deviceId,
+                sessionId = apiSource.sessionId,
+                requestId = apiSource.requestId,
+                jsonPath = apiSource.jsonPath,
+            ).insert(EntityType.ACCOUNT, newId.id, 1L)
+        }
+        return newId
     }
+
+    // Used when creating counterparty accounts — pass the transaction's API source so the
+    // counterparty account's audit history records where it was first discovered.
+    suspend fun getOrCreateAccountId(
+        name: String,
+        transactionApiSource: AccountApiSource,
+    ): AccountId = getOrCreateAccountId(null, name, explicitApiSource = transactionApiSource)
 
     private suspend fun loadAccounts(): Map<String, Account> {
         val accounts = accountsByName
@@ -509,7 +563,6 @@ private fun MonzoTransactionPageItem.toTransfer(
     counterpartyAccountId: AccountId,
     currency: Currency,
 ): Transfer {
-    require(amountMinorUnits != 0L) { "Monzo transaction amount is zero" }
     val money = Money(amountMinorUnits.absoluteValue, currency)
     val isIncoming = amountMinorUnits > 0
     return Transfer(

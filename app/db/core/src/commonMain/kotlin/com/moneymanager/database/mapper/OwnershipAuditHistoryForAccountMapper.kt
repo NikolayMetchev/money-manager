@@ -1,11 +1,15 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
+@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
 
 package com.moneymanager.database.mapper
 
 import com.moneymanager.database.sql.SelectOwnershipAuditHistoryForAccount
+import com.moneymanager.domain.model.ApiRequestId
+import com.moneymanager.domain.model.ApiSessionId
+import com.moneymanager.domain.model.ApiSourceDetails
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.EntitySource
 import com.moneymanager.domain.model.EntityType
+import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.PersonAccountOwnershipAuditEntry
 import com.moneymanager.domain.model.SourceType
 import tech.mappie.api.ObjectMappie
@@ -69,6 +73,17 @@ private fun SelectOwnershipAuditHistoryForAccount.toEntitySource(): EntitySource
             else -> null
         }
 
+    val apiSource =
+        if (source_api_session_id != null && source_api_request_id != null && source_api_json_path != null) {
+            ApiSourceDetails(
+                sessionId = ApiSessionId(source_api_session_id),
+                requestId = ApiRequestId(source_api_request_id),
+                jsonPath = JsonPath(source_api_json_path),
+            )
+        } else {
+            null
+        }
+
     return EntitySource(
         id = sourceId,
         entityType = EntityType.PERSON_ACCOUNT_OWNERSHIP,
@@ -78,5 +93,6 @@ private fun SelectOwnershipAuditHistoryForAccount.toEntitySource(): EntitySource
         deviceId = deviceId,
         deviceInfo = deviceInfo,
         createdAt = Instant.fromEpochMilliseconds(createdAt),
+        apiSource = apiSource,
     )
 }
