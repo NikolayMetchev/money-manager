@@ -101,7 +101,7 @@ private val TRANSACTIONS_PAGE_1_JSON =
 }
     """.trimIndent()
 
-private val EMPTY_TRANSACTIONS_JSON = """{ "transactions": [] }"""
+private const val EMPTY_TRANSACTIONS_JSON = """{ "transactions": [] }"""
 
 class MonzoImportE2ETest : DbTest() {
     @Test
