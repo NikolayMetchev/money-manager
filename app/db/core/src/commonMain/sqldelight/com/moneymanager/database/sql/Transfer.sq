@@ -50,6 +50,7 @@ CREATE INDEX IF NOT EXISTS idx_running_balance_mv_timestamp ON running_balance_m
 CREATE INDEX IF NOT EXISTS idx_running_balance_mv_account_timestamp ON running_balance_materialized_view(account_id, timestamp DESC);
 
 -- Views for computing balances (used for incremental refresh)
+-- Declined transactions are excluded from all balance calculations
 CREATE VIEW account_balance_view AS
 SELECT
     account_id,
@@ -62,6 +63,7 @@ FROM (
         SUM(amount) AS incoming,
         0 AS outgoing
     FROM transfer
+    WHERE id NOT IN (SELECT transaction_id FROM declined_transaction)
     GROUP BY target_account_id, currency_id
 
     UNION ALL
@@ -72,6 +74,7 @@ FROM (
         0 AS incoming,
         SUM(amount) AS outgoing
     FROM transfer
+    WHERE id NOT IN (SELECT transaction_id FROM declined_transaction)
     GROUP BY source_account_id, currency_id
 )
 GROUP BY account_id, currency_id;
@@ -89,9 +92,11 @@ SELECT
         FROM (
             SELECT tr.id, tr.timestamp, tr.target_account_id AS account_id, tr.currency_id, tr.amount AS transaction_amount
             FROM transfer tr
+            WHERE tr.id NOT IN (SELECT transaction_id FROM declined_transaction)
             UNION ALL
             SELECT tr.id, tr.timestamp, tr.source_account_id AS account_id, tr.currency_id, -tr.amount AS transaction_amount
             FROM transfer tr
+            WHERE tr.id NOT IN (SELECT transaction_id FROM declined_transaction)
         ) m2
         WHERE m2.account_id = m.account_id
           AND m2.currency_id = m.currency_id
@@ -100,9 +105,11 @@ SELECT
 FROM (
     SELECT tr.id, tr.timestamp, tr.description, tr.target_account_id AS account_id, tr.currency_id, tr.amount AS transaction_amount
     FROM transfer tr
+    WHERE tr.id NOT IN (SELECT transaction_id FROM declined_transaction)
     UNION ALL
     SELECT tr.id, tr.timestamp, tr.description, tr.source_account_id AS account_id, tr.currency_id, -tr.amount AS transaction_amount
     FROM transfer tr
+    WHERE tr.id NOT IN (SELECT transaction_id FROM declined_transaction)
 ) m;
 
 -- Table to track pending changes for incremental refresh
@@ -140,6 +147,7 @@ FROM (
         SUM(amount) AS incoming,
         0 AS outgoing
     FROM transfer
+    WHERE id NOT IN (SELECT transaction_id FROM declined_transaction)
     GROUP BY target_account_id, currency_id
 
     UNION ALL
@@ -150,6 +158,7 @@ FROM (
         0 AS incoming,
         SUM(amount) AS outgoing
     FROM transfer
+    WHERE id NOT IN (SELECT transaction_id FROM declined_transaction)
     GROUP BY source_account_id, currency_id
 )
 GROUP BY account_id, currency_id;
@@ -171,9 +180,11 @@ SELECT
         FROM (
             SELECT tr.id, tr.timestamp, tr.target_account_id AS account_id, tr.currency_id, tr.amount AS transaction_amount
             FROM transfer tr
+            WHERE tr.id NOT IN (SELECT transaction_id FROM declined_transaction)
             UNION ALL
             SELECT tr.id, tr.timestamp, tr.source_account_id AS account_id, tr.currency_id, -tr.amount AS transaction_amount
             FROM transfer tr
+            WHERE tr.id NOT IN (SELECT transaction_id FROM declined_transaction)
         ) m2
         WHERE m2.account_id = m.account_id
           AND m2.currency_id = m.currency_id
@@ -182,9 +193,11 @@ SELECT
 FROM (
     SELECT tr.id, tr.timestamp, tr.description, tr.target_account_id AS account_id, tr.currency_id, tr.amount AS transaction_amount
     FROM transfer tr
+    WHERE tr.id NOT IN (SELECT transaction_id FROM declined_transaction)
     UNION ALL
     SELECT tr.id, tr.timestamp, tr.description, tr.source_account_id AS account_id, tr.currency_id, -tr.amount AS transaction_amount
     FROM transfer tr
+    WHERE tr.id NOT IN (SELECT transaction_id FROM declined_transaction)
 ) m;
 
 -- Incremental refresh queries

@@ -146,6 +146,75 @@ object DatabaseConfig {
     }
 
     /**
+     * Creates triggers for incremental materialized view refresh when a transaction is declined or un-declined.
+     * These triggers track changes to the declined_transaction table in pending_materialized_view_changes.
+     *
+     * NOTE: Triggers are created at runtime (not in schema) due to SQLDelight 2.2.1 parser limitations.
+     * Called automatically from seedDatabase() during database initialization.
+     */
+    private fun MoneyManagerDatabaseWrapper.createDeclinedTransactionTriggers() {
+        // INSERT trigger - when a transaction is marked declined, schedule balance refresh
+        execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_declined_transaction_insert_track_changes
+            AFTER INSERT ON declined_transaction
+            FOR EACH ROW
+            BEGIN
+                INSERT OR IGNORE INTO pending_materialized_view_changes (account_id, currency_id, min_timestamp)
+                SELECT source_account_id, currency_id, timestamp FROM transfer WHERE id = NEW.transaction_id;
+
+                UPDATE pending_materialized_view_changes
+                SET min_timestamp = (SELECT timestamp FROM transfer WHERE id = NEW.transaction_id)
+                WHERE account_id = (SELECT source_account_id FROM transfer WHERE id = NEW.transaction_id)
+                  AND currency_id = (SELECT currency_id FROM transfer WHERE id = NEW.transaction_id)
+                  AND min_timestamp > (SELECT timestamp FROM transfer WHERE id = NEW.transaction_id);
+
+                INSERT OR IGNORE INTO pending_materialized_view_changes (account_id, currency_id, min_timestamp)
+                SELECT target_account_id, currency_id, timestamp FROM transfer WHERE id = NEW.transaction_id;
+
+                UPDATE pending_materialized_view_changes
+                SET min_timestamp = (SELECT timestamp FROM transfer WHERE id = NEW.transaction_id)
+                WHERE account_id = (SELECT target_account_id FROM transfer WHERE id = NEW.transaction_id)
+                  AND currency_id = (SELECT currency_id FROM transfer WHERE id = NEW.transaction_id)
+                  AND min_timestamp > (SELECT timestamp FROM transfer WHERE id = NEW.transaction_id);
+            END
+            """.trimIndent(),
+            0,
+        )
+
+        // DELETE trigger - when a transaction is un-declined, schedule balance refresh
+        execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_declined_transaction_delete_track_changes
+            AFTER DELETE ON declined_transaction
+            FOR EACH ROW
+            BEGIN
+                INSERT OR IGNORE INTO pending_materialized_view_changes (account_id, currency_id, min_timestamp)
+                SELECT source_account_id, currency_id, timestamp FROM transfer WHERE id = OLD.transaction_id;
+
+                UPDATE pending_materialized_view_changes
+                SET min_timestamp = (SELECT timestamp FROM transfer WHERE id = OLD.transaction_id)
+                WHERE account_id = (SELECT source_account_id FROM transfer WHERE id = OLD.transaction_id)
+                  AND currency_id = (SELECT currency_id FROM transfer WHERE id = OLD.transaction_id)
+                  AND min_timestamp > (SELECT timestamp FROM transfer WHERE id = OLD.transaction_id);
+
+                INSERT OR IGNORE INTO pending_materialized_view_changes (account_id, currency_id, min_timestamp)
+                SELECT target_account_id, currency_id, timestamp FROM transfer WHERE id = OLD.transaction_id;
+
+                UPDATE pending_materialized_view_changes
+                SET min_timestamp = (SELECT timestamp FROM transfer WHERE id = OLD.transaction_id)
+                WHERE account_id = (SELECT target_account_id FROM transfer WHERE id = OLD.transaction_id)
+                  AND currency_id = (SELECT currency_id FROM transfer WHERE id = OLD.transaction_id)
+                  AND min_timestamp > (SELECT timestamp FROM transfer WHERE id = OLD.transaction_id);
+            END
+            """.trimIndent(),
+            0,
+        )
+    }
+
+    /**
      * Creates a trigger to update children's parentId when a category is deleted.
      * Children inherit the deleted category's parent (grandparent becomes parent).
      */
@@ -479,6 +548,9 @@ object DatabaseConfig {
 
             // Create triggers for incremental materialized view refresh
             createIncrementalRefreshTriggers()
+
+            // Create triggers for declined transaction balance exclusion
+            createDeclinedTransactionTriggers()
 
             // Create trigger for category deletion (children inherit grandparent)
             createCategoryDeleteTrigger()

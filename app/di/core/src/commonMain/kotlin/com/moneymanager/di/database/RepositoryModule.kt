@@ -12,6 +12,7 @@ import com.moneymanager.database.repository.CsvAccountMappingRepositoryImpl
 import com.moneymanager.database.repository.CsvImportRepositoryImpl
 import com.moneymanager.database.repository.CsvImportStrategyRepositoryImpl
 import com.moneymanager.database.repository.CurrencyRepositoryImpl
+import com.moneymanager.database.repository.DeclinedTransactionRepositoryImpl
 import com.moneymanager.database.repository.DeviceRepositoryImpl
 import com.moneymanager.database.repository.PersonAccountOwnershipRepositoryImpl
 import com.moneymanager.database.repository.PersonRepositoryImpl
@@ -33,6 +34,7 @@ import com.moneymanager.domain.repository.CsvAccountMappingRepository
 import com.moneymanager.domain.repository.CsvImportRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.domain.repository.DeclinedTransactionRepository
 import com.moneymanager.domain.repository.DeviceRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
@@ -111,6 +113,11 @@ interface RepositoryModule {
     @Provides
     @SingleIn(DatabaseScope::class)
     fun provideCurrencyRepository(database: MoneyManagerDatabaseWrapper): CurrencyRepository = CurrencyRepositoryImpl(database)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideDeclinedTransactionRepository(database: MoneyManagerDatabaseWrapper): DeclinedTransactionRepository =
+        DeclinedTransactionRepositoryImpl(database)
 
     @Provides
     @SingleIn(DatabaseScope::class)
