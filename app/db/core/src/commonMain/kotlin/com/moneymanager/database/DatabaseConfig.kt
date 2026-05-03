@@ -149,6 +149,11 @@ object DatabaseConfig {
      * Creates triggers for incremental materialized view refresh when a transaction is declined or un-declined.
      * These triggers track changes to the declined_transaction table in pending_materialized_view_changes.
      *
+     * If a declined_transaction row references a transaction_id that has no corresponding transfer record
+     * (e.g. a declined transaction that was never stored as a transfer), the SELECT from transfer returns
+     * no rows and the INSERT/UPDATE statements are no-ops. This is the correct behavior: there is no
+     * transfer balance to update.
+     *
      * NOTE: Triggers are created at runtime (not in schema) due to SQLDelight 2.2.1 parser limitations.
      * Called automatically from seedDatabase() during database initialization.
      */

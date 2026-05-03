@@ -63,7 +63,8 @@ FROM (
         SUM(amount) AS incoming,
         0 AS outgoing
     FROM transfer
-    WHERE id NOT IN (SELECT transaction_id FROM declined_transaction)
+    LEFT JOIN declined_transaction dt ON transfer.id = dt.transaction_id
+    WHERE dt.transaction_id IS NULL
     GROUP BY target_account_id, currency_id
 
     UNION ALL
@@ -74,7 +75,8 @@ FROM (
         0 AS incoming,
         SUM(amount) AS outgoing
     FROM transfer
-    WHERE id NOT IN (SELECT transaction_id FROM declined_transaction)
+    LEFT JOIN declined_transaction dt ON transfer.id = dt.transaction_id
+    WHERE dt.transaction_id IS NULL
     GROUP BY source_account_id, currency_id
 )
 GROUP BY account_id, currency_id;
@@ -92,11 +94,13 @@ SELECT
         FROM (
             SELECT tr.id, tr.timestamp, tr.target_account_id AS account_id, tr.currency_id, tr.amount AS transaction_amount
             FROM transfer tr
-            WHERE tr.id NOT IN (SELECT transaction_id FROM declined_transaction)
+            LEFT JOIN declined_transaction dt ON tr.id = dt.transaction_id
+            WHERE dt.transaction_id IS NULL
             UNION ALL
             SELECT tr.id, tr.timestamp, tr.source_account_id AS account_id, tr.currency_id, -tr.amount AS transaction_amount
             FROM transfer tr
-            WHERE tr.id NOT IN (SELECT transaction_id FROM declined_transaction)
+            LEFT JOIN declined_transaction dt ON tr.id = dt.transaction_id
+            WHERE dt.transaction_id IS NULL
         ) m2
         WHERE m2.account_id = m.account_id
           AND m2.currency_id = m.currency_id
@@ -105,11 +109,13 @@ SELECT
 FROM (
     SELECT tr.id, tr.timestamp, tr.description, tr.target_account_id AS account_id, tr.currency_id, tr.amount AS transaction_amount
     FROM transfer tr
-    WHERE tr.id NOT IN (SELECT transaction_id FROM declined_transaction)
+    LEFT JOIN declined_transaction dt ON tr.id = dt.transaction_id
+    WHERE dt.transaction_id IS NULL
     UNION ALL
     SELECT tr.id, tr.timestamp, tr.description, tr.source_account_id AS account_id, tr.currency_id, -tr.amount AS transaction_amount
     FROM transfer tr
-    WHERE tr.id NOT IN (SELECT transaction_id FROM declined_transaction)
+    LEFT JOIN declined_transaction dt ON tr.id = dt.transaction_id
+    WHERE dt.transaction_id IS NULL
 ) m;
 
 -- Table to track pending changes for incremental refresh
@@ -147,7 +153,8 @@ FROM (
         SUM(amount) AS incoming,
         0 AS outgoing
     FROM transfer
-    WHERE id NOT IN (SELECT transaction_id FROM declined_transaction)
+    LEFT JOIN declined_transaction dt ON transfer.id = dt.transaction_id
+    WHERE dt.transaction_id IS NULL
     GROUP BY target_account_id, currency_id
 
     UNION ALL
@@ -158,7 +165,8 @@ FROM (
         0 AS incoming,
         SUM(amount) AS outgoing
     FROM transfer
-    WHERE id NOT IN (SELECT transaction_id FROM declined_transaction)
+    LEFT JOIN declined_transaction dt ON transfer.id = dt.transaction_id
+    WHERE dt.transaction_id IS NULL
     GROUP BY source_account_id, currency_id
 )
 GROUP BY account_id, currency_id;
@@ -180,11 +188,13 @@ SELECT
         FROM (
             SELECT tr.id, tr.timestamp, tr.target_account_id AS account_id, tr.currency_id, tr.amount AS transaction_amount
             FROM transfer tr
-            WHERE tr.id NOT IN (SELECT transaction_id FROM declined_transaction)
+            LEFT JOIN declined_transaction dt ON tr.id = dt.transaction_id
+            WHERE dt.transaction_id IS NULL
             UNION ALL
             SELECT tr.id, tr.timestamp, tr.source_account_id AS account_id, tr.currency_id, -tr.amount AS transaction_amount
             FROM transfer tr
-            WHERE tr.id NOT IN (SELECT transaction_id FROM declined_transaction)
+            LEFT JOIN declined_transaction dt ON tr.id = dt.transaction_id
+            WHERE dt.transaction_id IS NULL
         ) m2
         WHERE m2.account_id = m.account_id
           AND m2.currency_id = m.currency_id
@@ -193,11 +203,13 @@ SELECT
 FROM (
     SELECT tr.id, tr.timestamp, tr.description, tr.target_account_id AS account_id, tr.currency_id, tr.amount AS transaction_amount
     FROM transfer tr
-    WHERE tr.id NOT IN (SELECT transaction_id FROM declined_transaction)
+    LEFT JOIN declined_transaction dt ON tr.id = dt.transaction_id
+    WHERE dt.transaction_id IS NULL
     UNION ALL
     SELECT tr.id, tr.timestamp, tr.description, tr.source_account_id AS account_id, tr.currency_id, -tr.amount AS transaction_amount
     FROM transfer tr
-    WHERE tr.id NOT IN (SELECT transaction_id FROM declined_transaction)
+    LEFT JOIN declined_transaction dt ON tr.id = dt.transaction_id
+    WHERE dt.transaction_id IS NULL
 ) m;
 
 -- Incremental refresh queries
