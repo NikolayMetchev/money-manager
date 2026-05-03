@@ -1004,8 +1004,7 @@ private fun JsonTreeNode(
                 } else {
                     Modifier
                 },
-            )
-            .then(
+            ).then(
                 if (expandable) {
                     Modifier.clickable { expanded = !expanded }
                 } else {
