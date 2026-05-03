@@ -260,5 +260,4 @@ class MonzoImportE2ETest : DbTest() {
                 }
             }
         }
-
 }
