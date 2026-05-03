@@ -58,6 +58,7 @@ import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.ApiSessionRepository
 import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.createApiClient
@@ -91,6 +92,7 @@ fun ApiSessionsScreen(
     transactionRepository: TransactionRepository,
     transferSourceQueries: TransferSourceQueries,
     entitySourceQueries: EntitySourceQueries,
+    maintenanceService: DatabaseMaintenanceService,
     deviceId: DeviceId,
     onMonzoConnectClick: () -> Unit = {},
     onSessionClick: (ApiSession) -> Unit = {},
@@ -275,6 +277,7 @@ fun ApiSessionsScreen(
                                                 sessionId = session.id,
                                                 onProgress = ::update,
                                             )
+                                        maintenanceService.refreshMaterializedViews()
                                         importResultBySession = importResultBySession + (session.id to result)
                                         onTransactionsImported()
                                         result.displaySummary()

@@ -60,13 +60,27 @@ insertSource:
 INSERT INTO entity_source (entity_type_id, entity_id, revision_id, source_type_id, device_id)
 VALUES (?, ?, ?, ?, ?);
 
+-- Insert source for an entity, ignoring if already exists (idempotent)
+insertOrIgnoreSource:
+INSERT OR IGNORE INTO entity_source (entity_type_id, entity_id, revision_id, source_type_id, device_id)
+VALUES (?, ?, ?, ?, ?);
+
 -- Get the last inserted entity_source ID
 lastInsertedId:
 SELECT last_insert_rowid();
 
+-- Get entity_source ID for a specific entity revision (used after insertOrIgnoreSource)
+selectIdByEntity:
+SELECT id FROM entity_source WHERE entity_type_id = ? AND entity_id = ? AND revision_id = ?;
+
 -- Insert API-specific details for an entity source (must be called after insertSource)
 insertApiSource:
 INSERT INTO api_entity_source (id, api_session_id, api_request_id, json_path)
+VALUES (?, ?, ?, ?);
+
+-- Insert API-specific details, ignoring if already exists (idempotent)
+insertOrIgnoreApiSource:
+INSERT OR IGNORE INTO api_entity_source (id, api_session_id, api_request_id, json_path)
 VALUES (?, ?, ?, ?);
 
 -- Get source for a specific entity revision

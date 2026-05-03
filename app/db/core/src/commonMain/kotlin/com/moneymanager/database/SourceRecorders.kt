@@ -50,19 +50,19 @@ class CsvImportSourceRecorder(
     private val rowIndexForTransfer: (TransferId) -> Long,
 ) : SourceRecorder {
     override fun insert(transfer: Transfer) {
-        // Insert base TransferSource record
-        queries.insertCsvImportBase(
-            transfer.id.id,
-            transfer.revisionId,
-            deviceId.id,
-        )
-        // Get the auto-generated ID and insert CSV-specific details
-        val transferSourceId = queries.lastInsertedId().executeAsOne()
-        queries.insertCsvImportDetails(
-            transferSourceId,
-            csvImportId.id.toString(),
-            rowIndexForTransfer(transfer.id),
-        )
+        queries.transaction {
+            queries.insertCsvImportBase(
+                transfer.id.id,
+                transfer.revisionId,
+                deviceId.id,
+            )
+            val transferSourceId = queries.lastInsertedId().executeAsOne()
+            queries.insertCsvImportDetails(
+                transferSourceId,
+                csvImportId.id.toString(),
+                rowIndexForTransfer(transfer.id),
+            )
+        }
     }
 }
 
@@ -80,20 +80,20 @@ class ApiImportSourceRecorder(
 
     override fun insert(transfer: Transfer) {
         insertedTransferId = transfer.id
-        // Insert base TransferSource record
-        queries.insertApiBase(
-            transfer.id.id,
-            transfer.revisionId,
-            deviceId.id,
-        )
-        // Get the auto-generated ID and insert API-specific details
-        val transferSourceId = queries.lastInsertedId().executeAsOne()
-        queries.insertApiDetails(
-            transferSourceId,
-            sessionId.id,
-            requestId.id,
-            jsonPath.value,
-        )
+        queries.transaction {
+            queries.insertApiBase(
+                transfer.id.id,
+                transfer.revisionId,
+                deviceId.id,
+            )
+            val transferSourceId = queries.lastInsertedId().executeAsOne()
+            queries.insertApiDetails(
+                transferSourceId,
+                sessionId.id,
+                requestId.id,
+                jsonPath.value,
+            )
+        }
     }
 }
 
@@ -156,20 +156,22 @@ class ApiEntitySourceRecorder(
         entityId: Long,
         revisionId: Long,
     ) {
-        // source_type_id 5 = API
-        queries.insertSource(
-            entity_type_id = entityType.id,
-            entity_id = entityId,
-            revision_id = revisionId,
-            source_type_id = 5L,
-            device_id = deviceId.id,
-        )
-        val entitySourceId = queries.lastInsertedId().executeAsOne()
-        queries.insertApiSource(
-            id = entitySourceId,
-            api_session_id = sessionId.id,
-            api_request_id = requestId.id,
-            json_path = jsonPath.value,
-        )
+        queries.transaction {
+            // source_type_id 5 = API
+            queries.insertOrIgnoreSource(
+                entity_type_id = entityType.id,
+                entity_id = entityId,
+                revision_id = revisionId,
+                source_type_id = 5L,
+                device_id = deviceId.id,
+            )
+            val entitySourceId = queries.selectIdByEntity(entityType.id, entityId, revisionId).executeAsOne()
+            queries.insertOrIgnoreApiSource(
+                id = entitySourceId,
+                api_session_id = sessionId.id,
+                api_request_id = requestId.id,
+                json_path = jsonPath.value,
+            )
+        }
     }
 }

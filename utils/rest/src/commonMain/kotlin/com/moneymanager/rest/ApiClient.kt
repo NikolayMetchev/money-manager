@@ -58,7 +58,7 @@ interface ApiTrafficRecorder {
 
 fun createApiClient(trafficRecorder: ApiTrafficRecorder): ApiClient = createApiClient(trafficRecorder, engine = null)
 
-internal fun createApiClient(
+fun createApiClient(
     trafficRecorder: ApiTrafficRecorder,
     engine: HttpClientEngine?,
 ): ApiClient {

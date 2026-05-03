@@ -555,6 +555,7 @@ fun MoneyManagerApp(
                                     transactionRepository = transactionRepository,
                                     transferSourceQueries = transferSourceQueries,
                                     entitySourceQueries = entitySourceQueries,
+                                    maintenanceService = maintenanceService,
                                     deviceId = deviceId,
                                     onTransactionsImported = {
                                         transactionRefreshTrigger++
@@ -573,6 +574,7 @@ fun MoneyManagerApp(
                                     transactionRepository = transactionRepository,
                                     transferSourceQueries = transferSourceQueries,
                                     entitySourceQueries = entitySourceQueries,
+                                    maintenanceService = maintenanceService,
                                     deviceId = deviceId,
                                     onTransactionsImported = {
                                         transactionRefreshTrigger++
