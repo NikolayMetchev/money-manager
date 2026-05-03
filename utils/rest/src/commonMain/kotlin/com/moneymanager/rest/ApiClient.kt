@@ -56,8 +56,6 @@ interface ApiTrafficRecorder {
     ): Long
 }
 
-fun createApiClient(trafficRecorder: ApiTrafficRecorder): ApiClient = createApiClient(trafficRecorder, engine = null)
-
 fun createApiClient(
     trafficRecorder: ApiTrafficRecorder,
     engine: HttpClientEngine?,

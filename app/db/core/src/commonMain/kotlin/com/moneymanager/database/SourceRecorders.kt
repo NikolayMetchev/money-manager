@@ -158,15 +158,15 @@ class ApiEntitySourceRecorder(
     ) {
         queries.transaction {
             // source_type_id 5 = API
-            queries.insertOrIgnoreSource(
+            queries.insertSource(
                 entity_type_id = entityType.id,
                 entity_id = entityId,
                 revision_id = revisionId,
                 source_type_id = 5L,
                 device_id = deviceId.id,
             )
-            val entitySourceId = queries.selectIdByEntity(entityType.id, entityId, revisionId).executeAsOne()
-            queries.insertOrIgnoreApiSource(
+            val entitySourceId = queries.lastInsertedId().executeAsOne()
+            queries.insertApiSource(
                 id = entitySourceId,
                 api_session_id = sessionId.id,
                 api_request_id = requestId.id,

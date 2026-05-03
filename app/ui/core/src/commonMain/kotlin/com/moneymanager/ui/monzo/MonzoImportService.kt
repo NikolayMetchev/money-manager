@@ -220,23 +220,19 @@ private fun parseAccounts(json: String): List<MonzoAccount> =
     }
 
 private fun parseAccountsWithPaths(json: String): List<Pair<MonzoAccount, JsonPath>> =
-    try {
-        Json
-            .parseToJsonElement(json)
-            .jsonObject["accounts"]
-            ?.jsonArray
-            ?.mapIndexedNotNull { index, element ->
-                val account = element.jsonObject
-                val id = account["id"]?.jsonPrimitive?.contentOrNull ?: return@mapIndexedNotNull null
-                MonzoAccount(
-                    id = id,
-                    description = account["description"]?.jsonPrimitive?.contentOrNull.orEmpty(),
-                ) to JsonPath("$.accounts[$index]")
-            }
-            ?: emptyList()
-    } catch (_: Exception) {
-        emptyList()
-    }
+    Json
+        .parseToJsonElement(json)
+        .jsonObject["accounts"]
+        ?.jsonArray
+        ?.mapIndexedNotNull { index, element ->
+            val account = element.jsonObject
+            val id = account["id"]?.jsonPrimitive?.contentOrNull ?: return@mapIndexedNotNull null
+            MonzoAccount(
+                id = id,
+                description = account["description"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+            ) to JsonPath("$.accounts[$index]")
+        }
+        ?: emptyList()
 
 private data class MonzoTransactionPageItem(
     val amountMinorUnits: Long,
@@ -483,32 +479,31 @@ private class AccountCache(
     ): AccountId {
         val normalizedName = name.ifBlank { "Unknown" }
         val existing = loadAccounts()[normalizedName]
-        val accountId =
-            if (existing != null) {
-                existing.id
-            } else {
-                val now = Clock.System.now()
-                val newId =
-                    accountRepository.createAccount(
-                        Account(
-                            id = AccountId(0L),
-                            name = normalizedName,
-                            openingDate = now,
-                            categoryId = Category.UNCATEGORIZED_ID,
-                        ),
+        if (existing != null) {
+            return existing.id
+        }
+
+        val now = Clock.System.now()
+        val newId =
+            accountRepository.createAccount(
+                Account(
+                    id = AccountId(0L),
+                    name = normalizedName,
+                    openingDate = now,
+                    categoryId = Category.UNCATEGORIZED_ID,
+                ),
+            )
+        accountsByName =
+            loadAccounts() +
+            (
+                normalizedName to
+                    Account(
+                        id = newId,
+                        name = normalizedName,
+                        openingDate = now,
                     )
-                accountsByName =
-                    loadAccounts() +
-                    (
-                        normalizedName to
-                            Account(
-                                id = newId,
-                                name = normalizedName,
-                                openingDate = now,
-                            )
-                    )
-                newId
-            }
+            )
+
         val apiSource = monzoAccountId?.let { accountApiSourceByMonzoId[it] } ?: explicitApiSource
         if (apiSource != null) {
             ApiEntitySourceRecorder(
@@ -517,9 +512,9 @@ private class AccountCache(
                 sessionId = apiSource.sessionId,
                 requestId = apiSource.requestId,
                 jsonPath = apiSource.jsonPath,
-            ).insert(EntityType.ACCOUNT, accountId.id, 1L)
+            ).insert(EntityType.ACCOUNT, newId.id, 1L)
         }
-        return accountId
+        return newId
     }
 
     // Used when creating counterparty accounts — pass the transaction's API source so the

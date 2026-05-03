@@ -246,6 +246,7 @@ fun ApiSessionsScreen(
                                                                 sessionId = session.id,
                                                                 apiSessionRepository = apiSessionRepository,
                                                             ),
+                                                        engine = null,
                                                     ),
                                                 onProgress = { progress ->
                                                     downloadProgressBySession = downloadProgressBySession + (session.id to progress)
@@ -537,6 +538,7 @@ fun ApiSessionTrafficScreen(
     var responseTransactionsByResponseId by remember { mutableStateOf<Map<ApiResponseId, List<ApiResponseTransaction>>>(emptyMap()) }
     var isLoading by remember { mutableStateOf(true) }
     val pairs = remember(requests, responses) { pairRequestsAndResponses(requests, responses) }
+    val pairsList = remember(pairs) { pairs.values.toList() }
 
     LaunchedEffect(sessionId) {
         try {
@@ -611,7 +613,7 @@ fun ApiSessionTrafficScreen(
                             // First try to match by jsonPath in response transactions (for transaction sources)
                             val jsonPathMatchIndex =
                                 if (highlightJsonPath != null) {
-                                    pairs.indexOfFirst { pair ->
+                                    pairsList.indexOfFirst { pair ->
                                         pair.response != null &&
                                             (highlightRequestId == null || pair.request?.id == highlightRequestId) &&
                                             responseTransactionsByResponseId[pair.response.id]
@@ -625,7 +627,7 @@ fun ApiSessionTrafficScreen(
                                 if (jsonPathMatchIndex >= 0) {
                                     jsonPathMatchIndex
                                 } else if (highlightRequestId != null) {
-                                    pairs.indexOfFirst { pair -> pair.request?.id == highlightRequestId }
+                                    pairs[highlightRequestId]?.let { pairsList.indexOf(it) } ?: -1
                                 } else {
                                     -1
                                 }
@@ -651,7 +653,7 @@ fun ApiSessionTrafficScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        items(pairs) { pair ->
+                        items(pairsList) { pair ->
                             val responseTransactions =
                                 pair.response?.let { responseTransactionsByResponseId[it.id] }
                                     ?: emptyList()
@@ -1075,22 +1077,23 @@ private data class ApiTrafficPair(
 private fun pairRequestsAndResponses(
     requests: List<ApiRequest>,
     responses: List<ApiResponse>,
-): List<ApiTrafficPair> {
+): Map<ApiRequestId, ApiTrafficPair> {
     val responsesByRequestId = responses.associateBy { it.requestId }
     val requestPairs =
         requests.map { request ->
-            ApiTrafficPair(
+            request.id to ApiTrafficPair(
                 request = request,
                 response = responsesByRequestId[request.id],
             )
         }
-    val orphanResponses =
+    val orphanPairs =
         responses
             .filter { response -> requests.none { request -> request.id == response.requestId } }
-            .map { response -> ApiTrafficPair(request = null, response = response) }
+            .map { response -> response.requestId to ApiTrafficPair(request = null, response = response) }
 
-    return (requestPairs + orphanResponses)
-        .sortedByDescending { pair -> pair.request?.requestedAt ?: pair.response?.respondedAt ?: Instant.DISTANT_PAST }
+    return (requestPairs + orphanPairs)
+        .sortedByDescending { (_, pair) -> pair.request?.requestedAt ?: pair.response?.respondedAt ?: Instant.DISTANT_PAST }
+        .toMap()
 }
 
 private fun ApiRequest.displayBody(): String =

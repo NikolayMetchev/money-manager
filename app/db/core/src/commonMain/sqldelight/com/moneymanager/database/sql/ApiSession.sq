@@ -145,7 +145,7 @@ CREATE UNIQUE INDEX idx_api_response_transaction_response_json_path
 CREATE INDEX idx_api_response_transaction_transaction ON api_response_transaction(transaction_id);
 
 insertResponseTransaction:
-INSERT OR IGNORE INTO api_response_transaction(response_id, json_path, state, transaction_id, error_message)
+INSERT INTO api_response_transaction(response_id, json_path, state, transaction_id, error_message)
 VALUES (?, ?, ?, ?, ?);
 
 selectResponseTransactionsByResponseId:
