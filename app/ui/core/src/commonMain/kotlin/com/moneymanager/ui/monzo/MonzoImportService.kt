@@ -242,6 +242,7 @@ private data class MonzoTransactionPageItem(
     val jsonPath: JsonPath,
     val merchantName: String?,
     val counterpartyName: String?,
+    val declineReason: String?,
 )
 
 private data class MonzoImportPageResult(
@@ -269,7 +270,7 @@ private suspend fun importTransactionPage(
     val existingTransfers = transactionRepository.getTransactionsByAccount(monzoAccountId).first().toMutableList()
 
     val states =
-        transactions.map { item ->
+        transactions.filter { it.declineReason.isNullOrBlank() }.map { item ->
             importTransactionItem(
                 item = item,
                 monzoAccountId = monzoAccountId,
@@ -417,7 +418,7 @@ private fun parseTransactionsWithPath(json: String): List<MonzoTransactionPageIt
                 val amount = obj["amount"]?.jsonPrimitive?.contentOrNull?.toLongOrNull()
                 val currency = obj["currency"]?.jsonPrimitive?.contentOrNull
                 val declineReason = obj["decline_reason"]?.jsonPrimitive?.contentOrNull
-                if (created != null && amount != null && currency != null && declineReason.isNullOrBlank()) {
+                if (created != null && amount != null && currency != null) {
                     MonzoTransactionPageItem(
                         amountMinorUnits = amount,
                         created = created,
@@ -426,8 +427,10 @@ private fun parseTransactionsWithPath(json: String): List<MonzoTransactionPageIt
                         jsonPath = JsonPath("$.transactions[$index]"),
                         merchantName = obj.jsonObjectOrNull("merchant")?.stringOrNull("name"),
                         counterpartyName = obj.jsonObjectOrNull("counterparty")?.stringOrNull("name"),
+                        declineReason = declineReason,
                     )
                 } else {
+                    logger.error { "Skipping Monzo transaction at index $index: missing required fields (created=$created, amount=$amount, currency=$currency)" }
                     null
                 }
             }

@@ -116,6 +116,62 @@ private val TRANSACTIONS_PAGE_1_JSON =
 
 private const val EMPTY_TRANSACTIONS_JSON = """{ "transactions": [] }"""
 
+/**
+ * A page that contains only declined transactions — no settled tx at all.
+ * Used to verify that an all-declined page does not prematurely stop pagination.
+ */
+private val DECLINED_ONLY_PAGE_JSON =
+    """
+{
+  "transactions": [
+    {
+      "id": "tx_00009TEST000000000010",
+      "account_id": "$ACCOUNT_ID",
+      "created": "2024-04-15T09:00:00.000Z",
+      "amount": -5000,
+      "currency": "GBP",
+      "description": "DECLINED ATTEMPT 1",
+      "decline_reason": "INSUFFICIENT_FUNDS",
+      "merchant": { "name": "Shop A" },
+      "counterparty": {}
+    },
+    {
+      "id": "tx_00009TEST000000000011",
+      "account_id": "$ACCOUNT_ID",
+      "created": "2024-04-14T10:00:00.000Z",
+      "amount": -1000,
+      "currency": "GBP",
+      "description": "DECLINED ATTEMPT 2",
+      "decline_reason": "INVALID_PIN",
+      "merchant": { "name": "Shop B" },
+      "counterparty": {}
+    }
+  ]
+}
+    """.trimIndent()
+
+/**
+ * A page with one settled transaction that follows the all-declined page.
+ * The import must reach and process this page.
+ */
+private val SETTLED_AFTER_DECLINED_PAGE_JSON =
+    """
+{
+  "transactions": [
+    {
+      "id": "tx_00009TEST000000000012",
+      "account_id": "$ACCOUNT_ID",
+      "created": "2024-04-13T08:00:00.000Z",
+      "amount": -2500,
+      "currency": "GBP",
+      "description": "SETTLED AFTER DECLINED",
+      "merchant": { "name": "Shop C" },
+      "counterparty": {}
+    }
+  ]
+}
+    """.trimIndent()
+
 class MonzoImportE2ETest : DbTest() {
     @Test
     fun `downloaded transactions are imported with correct API audit source on accounts and transfers`() =
@@ -272,5 +328,88 @@ class MonzoImportE2ETest : DbTest() {
                     "${counterparty.name} json_path '${cpApiSource.jsonPath.value}' should be a $.transactions[N].counterparty path"
                 }
             }
+        }
+
+    @Test
+    fun `pagination continues past a page that contains only declined transactions`() =
+        runTest {
+            val deviceId =
+                repositories.deviceRepository.getOrCreateDevice(
+                    DeviceInfo.Jvm("test-machine", "Test OS"),
+                )
+            val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
+            val sessionId =
+                repositories.apiSessionRepository.createSession(
+                    token = "test-monzo-token",
+                    deviceId = deviceId,
+                    createdAt = now,
+                    expiresAt = null,
+                )
+
+            // Page sequence:
+            //   page 1 (no before=)                         → all-declined page
+            //   page 2 (before=2024-04-14T10:00:00.000Z)    → one settled transaction
+            //   page 3 (before=2024-04-13T08:00:00.000Z)    → empty → stop
+            var transactionRequestCount = 0
+            val mockEngine =
+                MockEngine { request ->
+                    val url = request.url.toString()
+                    val json =
+                        when {
+                            url.contains("/accounts") -> ACCOUNTS_JSON
+                            url.contains("/transactions") -> {
+                                transactionRequestCount++
+                                when (transactionRequestCount) {
+                                    1 -> DECLINED_ONLY_PAGE_JSON
+                                    2 -> SETTLED_AFTER_DECLINED_PAGE_JSON
+                                    else -> EMPTY_TRANSACTIONS_JSON
+                                }
+                            }
+                            else -> error("Unexpected request: $url")
+                        }
+                    respond(
+                        content = json,
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                    )
+                }
+
+            val apiClient =
+                createApiClient(
+                    trafficRecorder =
+                        ApiSessionTrafficRecorder(
+                            sessionId = sessionId,
+                            apiSessionRepository = repositories.apiSessionRepository,
+                        ),
+                    engine = mockEngine,
+                )
+
+            downloadMonzoTransactions(token = "test-monzo-token", apiClient = apiClient)
+
+            val importResult =
+                importMonzoSessionTransactions(
+                    apiSessionRepository = repositories.apiSessionRepository,
+                    accountRepository = repositories.accountRepository,
+                    currencyRepository = repositories.currencyRepository,
+                    transactionRepository = repositories.transactionRepository,
+                    transferSourceQueries = transferSourceQueries,
+                    entitySourceQueries = repositories.entitySourceQueries,
+                    deviceId = deviceId,
+                    sessionId = sessionId,
+                )
+
+            // Pagination must have continued past the all-declined page to reach the settled tx
+            assertEquals(3, transactionRequestCount, "Should have fetched 3 transaction pages (declined, settled, empty)")
+            assertEquals(1, importResult.transactionCount, "Only the one settled transaction should be imported")
+            assertEquals(0, importResult.errorCount)
+
+            val allAccounts = repositories.accountRepository.getAllAccounts().first()
+            val monzoAccount = allAccounts.single { it.name == "Monzo: $ACCOUNT_DESCRIPTION" }
+            val transfers =
+                repositories.transactionRepository
+                    .getTransactionsByAccount(monzoAccount.id)
+                    .first()
+            assertEquals(1, transfers.size, "Only the settled transaction should appear as a transfer")
+            assertEquals(2500L, transfers.single().amount.amount)
         }
 }
