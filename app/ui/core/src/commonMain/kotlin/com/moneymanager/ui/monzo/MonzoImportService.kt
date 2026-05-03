@@ -430,7 +430,9 @@ private fun parseTransactionsWithPath(json: String): List<MonzoTransactionPageIt
                         declineReason = declineReason,
                     )
                 } else {
-                    logger.error { "Skipping Monzo transaction at index $index: missing required fields (created=$created, amount=$amount, currency=$currency)" }
+                    logger.error {
+                        "Skipping Monzo transaction at index $index: missing required fields (created=$created, amount=$amount, currency=$currency)"
+                    }
                     null
                 }
             }
