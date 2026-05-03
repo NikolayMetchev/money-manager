@@ -416,7 +416,8 @@ private fun parseTransactionsWithPath(json: String): List<MonzoTransactionPageIt
                 val created = obj["created"]?.jsonPrimitive?.contentOrNull?.let { Instant.parse(it) }
                 val amount = obj["amount"]?.jsonPrimitive?.contentOrNull?.toLongOrNull()
                 val currency = obj["currency"]?.jsonPrimitive?.contentOrNull
-                if (created != null && amount != null && currency != null) {
+                val declineReason = obj["decline_reason"]?.jsonPrimitive?.contentOrNull
+                if (created != null && amount != null && currency != null && declineReason.isNullOrBlank()) {
                     MonzoTransactionPageItem(
                         amountMinorUnits = amount,
                         created = created,

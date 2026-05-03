@@ -48,10 +48,12 @@ private val ACCOUNTS_JSON =
     """.trimIndent()
 
 /**
- * Three anonymised transactions:
+ * Four anonymised transactions plus one declined transaction:
  *   tx1 – outgoing payment to a merchant  (amount negative, merchant.name set)
  *   tx2 – incoming payment from a person  (amount positive, counterparty.name set)
  *   tx3 – outgoing direct debit           (amount negative, description only)
+ *   tx4 – zero-amount card verification   (amount zero)
+ *   tx5 – DECLINED outgoing payment       (decline_reason set — must be skipped)
  */
 private val TRANSACTIONS_PAGE_1_JSON =
     """
@@ -95,6 +97,17 @@ private val TRANSACTIONS_PAGE_1_JSON =
       "currency": "GBP",
       "description": "CRV*Card Verification",
       "merchant": null,
+      "counterparty": {}
+    },
+    {
+      "id": "tx_00009TEST000000000005",
+      "account_id": "$ACCOUNT_ID",
+      "created": "2024-05-30T12:00:00.000Z",
+      "amount": -30000,
+      "currency": "GBP",
+      "description": "DECLINED PAYMENT ATTEMPT",
+      "decline_reason": "INVALID_PIN",
+      "merchant": { "name": "Some Merchant" },
       "counterparty": {}
     }
   ]
@@ -164,8 +177,8 @@ class MonzoImportE2ETest : DbTest() {
                     sessionId = sessionId,
                 )
 
-            // THEN — import counts
-            assertEquals(4, importResult.transactionCount, "Should have imported 4 transactions")
+            // THEN — import counts (the declined tx5 must be excluded)
+            assertEquals(4, importResult.transactionCount, "Should have imported 4 transactions (declined tx skipped)")
             assertEquals(0, importResult.errorCount, "Should have no import errors")
 
             // --- Account audit ---
