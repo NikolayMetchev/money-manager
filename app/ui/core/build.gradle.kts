@@ -103,6 +103,7 @@ kotlin {
                 implementation(libs.androidx.compose.runtime)
                 implementation(libs.androidx.compose.ui.test)
                 implementation(libs.kotlinx.coroutines.test)
+                implementation(libs.ktor.client.mock)
                 implementation(libs.sqldelight.runtime)
                 implementation(projects.app.di.core)
                 implementation(projects.test.app.db)
