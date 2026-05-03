@@ -39,7 +39,8 @@ import kotlin.time.Instant
 private const val AUDIT_E2E_ACCOUNT_ID = "acc_00009TEST000000000001"
 private const val AUDIT_E2E_ACCOUNT_DESCRIPTION = "user_00009TEST000000user"
 
-private val AUDIT_E2E_ACCOUNTS_JSON = """
+private val AUDIT_E2E_ACCOUNTS_JSON =
+    """
 {
   "accounts": [
     {
@@ -52,9 +53,10 @@ private val AUDIT_E2E_ACCOUNTS_JSON = """
     }
   ]
 }
-""".trimIndent()
+    """.trimIndent()
 
-private val AUDIT_E2E_TRANSACTIONS_JSON = """
+private val AUDIT_E2E_TRANSACTIONS_JSON =
+    """
 {
   "transactions": [
     {
@@ -99,7 +101,7 @@ private val AUDIT_E2E_TRANSACTIONS_JSON = """
     }
   ]
 }
-""".trimIndent()
+    """.trimIndent()
 
 /**
  * UI end-to-end test for Monzo account audit history.
@@ -140,30 +142,35 @@ class MonzoImportAuditE2ETest {
                 val db = databaseManager.openDatabase(testDbLocation!!)
                 val dc = DatabaseComponent.create(db)
 
-                val deviceId = dc.deviceRepository.getOrCreateDevice(
-                    DeviceInfo.Jvm("test-machine", "Test OS"),
-                )
-                val sessionId = dc.apiSessionRepository.createSession(
-                    token = "test-monzo-token",
-                    deviceId = deviceId,
-                    createdAt = Instant.fromEpochMilliseconds(1_700_000_000_000L),
-                    expiresAt = null,
-                )
+                val deviceId =
+                    dc.deviceRepository.getOrCreateDevice(
+                        DeviceInfo.Jvm("test-machine", "Test OS"),
+                    )
+                val sessionId =
+                    dc.apiSessionRepository.createSession(
+                        token = "test-monzo-token",
+                        deviceId = deviceId,
+                        createdAt = Instant.fromEpochMilliseconds(1_700_000_000_000L),
+                        expiresAt = null,
+                    )
 
-                val mockEngine = MockEngine { request ->
-                    val url = request.url.toString()
-                    val json = when {
-                        url.contains("/accounts") -> AUDIT_E2E_ACCOUNTS_JSON
-                        url.contains("/transactions") && !url.contains("before=") -> AUDIT_E2E_TRANSACTIONS_JSON
-                        else -> """{ "transactions": [] }"""
+                val mockEngine =
+                    MockEngine { request ->
+                        val url = request.url.toString()
+                        val json =
+                            when {
+                                url.contains("/accounts") -> AUDIT_E2E_ACCOUNTS_JSON
+                                url.contains("/transactions") && !url.contains("before=") -> AUDIT_E2E_TRANSACTIONS_JSON
+                                else -> """{ "transactions": [] }"""
+                            }
+                        respond(json, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
                     }
-                    respond(json, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
-                }
 
-                val apiClient = createApiClient(
-                    trafficRecorder = ApiSessionTrafficRecorder(sessionId, dc.apiSessionRepository),
-                    engine = mockEngine,
-                )
+                val apiClient =
+                    createApiClient(
+                        trafficRecorder = ApiSessionTrafficRecorder(sessionId, dc.apiSessionRepository),
+                        engine = mockEngine,
+                    )
 
                 downloadMonzoTransactions(token = "test-monzo-token", apiClient = apiClient)
                 importMonzoSessionTransactions(
@@ -178,10 +185,11 @@ class MonzoImportAuditE2ETest {
                 )
             }
 
-            val testDatabaseManager = AuditTestDatabaseManager(
-                databaseManager = databaseManager,
-                testLocation = testDbLocation!!,
-            )
+            val testDatabaseManager =
+                AuditTestDatabaseManager(
+                    databaseManager = databaseManager,
+                    testLocation = testDbLocation!!,
+                )
 
             setContent {
                 TestMoneyManagerApp(

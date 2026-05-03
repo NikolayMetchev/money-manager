@@ -20,7 +20,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-import kotlin.time.Clock
 import kotlin.time.Instant
 
 /**
@@ -32,7 +31,8 @@ import kotlin.time.Instant
 private const val ACCOUNT_ID = "acc_00009TEST000000000001"
 private const val ACCOUNT_DESCRIPTION = "user_00009TEST000000user"
 
-private val ACCOUNTS_JSON = """
+private val ACCOUNTS_JSON =
+    """
 {
   "accounts": [
     {
@@ -45,7 +45,7 @@ private val ACCOUNTS_JSON = """
     }
   ]
 }
-""".trimIndent()
+    """.trimIndent()
 
 /**
  * Three anonymised transactions:
@@ -53,7 +53,8 @@ private val ACCOUNTS_JSON = """
  *   tx2 – incoming payment from a person  (amount positive, counterparty.name set)
  *   tx3 – outgoing direct debit           (amount negative, description only)
  */
-private val TRANSACTIONS_PAGE_1_JSON = """
+private val TRANSACTIONS_PAGE_1_JSON =
+    """
 {
   "transactions": [
     {
@@ -98,64 +99,70 @@ private val TRANSACTIONS_PAGE_1_JSON = """
     }
   ]
 }
-""".trimIndent()
+    """.trimIndent()
 
 private val EMPTY_TRANSACTIONS_JSON = """{ "transactions": [] }"""
 
 class MonzoImportE2ETest : DbTest() {
-
     @Test
     fun `downloaded transactions are imported with correct API audit source on accounts and transfers`() =
         runTest {
             // GIVEN — device and session
-            val deviceId = repositories.deviceRepository.getOrCreateDevice(
-                DeviceInfo.Jvm("test-machine", "Test OS"),
-            )
+            val deviceId =
+                repositories.deviceRepository.getOrCreateDevice(
+                    DeviceInfo.Jvm("test-machine", "Test OS"),
+                )
             val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
-            val sessionId = repositories.apiSessionRepository.createSession(
-                token = "test-monzo-token",
-                deviceId = deviceId,
-                createdAt = now,
-                expiresAt = null,
-            )
+            val sessionId =
+                repositories.apiSessionRepository.createSession(
+                    token = "test-monzo-token",
+                    deviceId = deviceId,
+                    createdAt = now,
+                    expiresAt = null,
+                )
 
             // Mock engine: returns fixed JSON per URL shape
-            val mockEngine = MockEngine { request ->
-                val url = request.url.toString()
-                val json = when {
-                    url.contains("/accounts") -> ACCOUNTS_JSON
-                    url.contains("/transactions") && !url.contains("before=") -> TRANSACTIONS_PAGE_1_JSON
-                    url.contains("/transactions") && url.contains("before=") -> EMPTY_TRANSACTIONS_JSON
-                    else -> error("Unexpected request: $url")
+            val mockEngine =
+                MockEngine { request ->
+                    val url = request.url.toString()
+                    val json =
+                        when {
+                            url.contains("/accounts") -> ACCOUNTS_JSON
+                            url.contains("/transactions") && !url.contains("before=") -> TRANSACTIONS_PAGE_1_JSON
+                            url.contains("/transactions") && url.contains("before=") -> EMPTY_TRANSACTIONS_JSON
+                            else -> error("Unexpected request: $url")
+                        }
+                    respond(
+                        content = json,
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                    )
                 }
-                respond(
-                    content = json,
-                    status = HttpStatusCode.OK,
-                    headers = headersOf(HttpHeaders.ContentType, "application/json"),
-                )
-            }
 
-            val apiClient = createApiClient(
-                trafficRecorder = ApiSessionTrafficRecorder(
-                    sessionId = sessionId,
-                    apiSessionRepository = repositories.apiSessionRepository,
-                ),
-                engine = mockEngine,
-            )
+            val apiClient =
+                createApiClient(
+                    trafficRecorder =
+                        ApiSessionTrafficRecorder(
+                            sessionId = sessionId,
+                            apiSessionRepository = repositories.apiSessionRepository,
+                        ),
+                    engine = mockEngine,
+                )
 
             // WHEN — download then import
             downloadMonzoTransactions(token = "test-monzo-token", apiClient = apiClient)
 
-            val importResult = importMonzoSessionTransactions(
-                apiSessionRepository = repositories.apiSessionRepository,
-                accountRepository = repositories.accountRepository,
-                currencyRepository = repositories.currencyRepository,
-                transactionRepository = repositories.transactionRepository,
-                transferSourceQueries = transferSourceQueries,
-                entitySourceQueries = repositories.entitySourceQueries,
-                deviceId = deviceId,
-                sessionId = sessionId,
-            )
+            val importResult =
+                importMonzoSessionTransactions(
+                    apiSessionRepository = repositories.apiSessionRepository,
+                    accountRepository = repositories.accountRepository,
+                    currencyRepository = repositories.currencyRepository,
+                    transactionRepository = repositories.transactionRepository,
+                    transferSourceQueries = transferSourceQueries,
+                    entitySourceQueries = repositories.entitySourceQueries,
+                    deviceId = deviceId,
+                    sessionId = sessionId,
+                )
 
             // THEN — import counts
             assertEquals(4, importResult.transactionCount, "Should have imported 4 transactions")
@@ -181,9 +188,10 @@ class MonzoImportE2ETest : DbTest() {
             assertNotNull(accountsRequestId, "Account source must reference the API request")
 
             // --- Transfer audit ---
-            val transfers = repositories.transactionRepository
-                .getTransactionsByAccount(monzoAccount.id)
-                .first()
+            val transfers =
+                repositories.transactionRepository
+                    .getTransactionsByAccount(monzoAccount.id)
+                    .first()
             assertEquals(4, transfers.size, "Should have 4 transfers for the Monzo account")
 
             // Zero-amount transaction should use the Void counterparty account
@@ -199,7 +207,8 @@ class MonzoImportE2ETest : DbTest() {
             transfers.forEachIndexed { index, transfer ->
                 val auditEntries = repositories.auditRepository.getAuditHistoryForTransfer(transfer.id)
                 assertEquals(
-                    1, auditEntries.size,
+                    1,
+                    auditEntries.size,
                     "Transfer ${transfer.id} should have exactly one audit entry (INSERT)",
                 )
                 val txAudit = auditEntries.single()
@@ -210,7 +219,8 @@ class MonzoImportE2ETest : DbTest() {
                 val txApiSource = txSource.apiSource
                 assertNotNull(txApiSource, "Transfer $index source must have API details")
                 assertEquals(
-                    sessionId, txApiSource.sessionId,
+                    sessionId,
+                    txApiSource.sessionId,
                     "Transfer $index source session should match the download session",
                 )
                 val path = txApiSource.jsonPath.value
@@ -220,13 +230,13 @@ class MonzoImportE2ETest : DbTest() {
             }
 
             // Verify each transaction maps to a distinct json_path
-            val jsonPaths = transfers
-                .mapNotNull { t ->
-                    val entry = repositories.auditRepository.getAuditHistoryForTransfer(t.id).single()
-                    val src = entry.source
-                    src?.apiSource?.jsonPath
-                }
-                .toSet()
+            val jsonPaths =
+                transfers
+                    .mapNotNull { t ->
+                        val entry = repositories.auditRepository.getAuditHistoryForTransfer(t.id).single()
+                        val src = entry.source
+                        src?.apiSource?.jsonPath
+                    }.toSet()
             assertEquals(4, jsonPaths.size, "Each transaction should have a distinct json_path")
 
             // --- Counterparty account audit ---
@@ -254,32 +264,37 @@ class MonzoImportE2ETest : DbTest() {
     @Test
     fun `re-running import on same session produces duplicates not new transactions`() =
         runTest {
-            val deviceId = repositories.deviceRepository.getOrCreateDevice(
-                DeviceInfo.Jvm("test-machine", "Test OS"),
-            )
+            val deviceId =
+                repositories.deviceRepository.getOrCreateDevice(
+                    DeviceInfo.Jvm("test-machine", "Test OS"),
+                )
             val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
-            val sessionId = repositories.apiSessionRepository.createSession(
-                token = "test-monzo-token",
-                deviceId = deviceId,
-                createdAt = now,
-                expiresAt = null,
-            )
+            val sessionId =
+                repositories.apiSessionRepository.createSession(
+                    token = "test-monzo-token",
+                    deviceId = deviceId,
+                    createdAt = now,
+                    expiresAt = null,
+                )
 
-            val mockEngine = MockEngine { request ->
-                val url = request.url.toString()
-                val json = when {
-                    url.contains("/accounts") -> ACCOUNTS_JSON
-                    url.contains("/transactions") && !url.contains("before=") -> TRANSACTIONS_PAGE_1_JSON
-                    url.contains("/transactions") && url.contains("before=") -> EMPTY_TRANSACTIONS_JSON
-                    else -> error("Unexpected request: $url")
+            val mockEngine =
+                MockEngine { request ->
+                    val url = request.url.toString()
+                    val json =
+                        when {
+                            url.contains("/accounts") -> ACCOUNTS_JSON
+                            url.contains("/transactions") && !url.contains("before=") -> TRANSACTIONS_PAGE_1_JSON
+                            url.contains("/transactions") && url.contains("before=") -> EMPTY_TRANSACTIONS_JSON
+                            else -> error("Unexpected request: $url")
+                        }
+                    respond(json, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
                 }
-                respond(json, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
-            }
 
-            val apiClient = createApiClient(
-                trafficRecorder = ApiSessionTrafficRecorder(sessionId, repositories.apiSessionRepository),
-                engine = mockEngine,
-            )
+            val apiClient =
+                createApiClient(
+                    trafficRecorder = ApiSessionTrafficRecorder(sessionId, repositories.apiSessionRepository),
+                    engine = mockEngine,
+                )
 
             downloadMonzoTransactions(token = "test-monzo-token", apiClient = apiClient)
             importMonzoSessionTransactions(
@@ -294,16 +309,17 @@ class MonzoImportE2ETest : DbTest() {
             )
 
             // Re-run import on the same session
-            val secondResult = importMonzoSessionTransactions(
-                apiSessionRepository = repositories.apiSessionRepository,
-                accountRepository = repositories.accountRepository,
-                currencyRepository = repositories.currencyRepository,
-                transactionRepository = repositories.transactionRepository,
-                transferSourceQueries = transferSourceQueries,
-                entitySourceQueries = repositories.entitySourceQueries,
-                deviceId = deviceId,
-                sessionId = sessionId,
-            )
+            val secondResult =
+                importMonzoSessionTransactions(
+                    apiSessionRepository = repositories.apiSessionRepository,
+                    accountRepository = repositories.accountRepository,
+                    currencyRepository = repositories.currencyRepository,
+                    transactionRepository = repositories.transactionRepository,
+                    transferSourceQueries = transferSourceQueries,
+                    entitySourceQueries = repositories.entitySourceQueries,
+                    deviceId = deviceId,
+                    sessionId = sessionId,
+                )
 
             assertEquals(0, secondResult.transactionCount, "Re-import should create no new transactions")
             assertEquals(4, secondResult.duplicateCount, "Re-import should report all 4 as duplicates")
@@ -312,9 +328,10 @@ class MonzoImportE2ETest : DbTest() {
             // Still only 4 transfers in the DB
             val allAccounts = repositories.accountRepository.getAllAccounts().first()
             val monzoAccount = allAccounts.single { it.name == "Monzo: $ACCOUNT_DESCRIPTION" }
-            val transfers = repositories.transactionRepository
-                .getTransactionsByAccount(monzoAccount.id)
-                .first()
+            val transfers =
+                repositories.transactionRepository
+                    .getTransactionsByAccount(monzoAccount.id)
+                    .first()
             assertEquals(4, transfers.size, "Should still have exactly 4 transfers after re-import")
         }
 }
