@@ -48,10 +48,12 @@ private val ACCOUNTS_JSON =
     """.trimIndent()
 
 /**
- * Three anonymised transactions:
+ * Four anonymised transactions plus one declined transaction:
  *   tx1 – outgoing payment to a merchant  (amount negative, merchant.name set)
  *   tx2 – incoming payment from a person  (amount positive, counterparty.name set)
  *   tx3 – outgoing direct debit           (amount negative, description only)
+ *   tx4 – zero-amount card verification   (amount zero)
+ *   tx5 – DECLINED outgoing payment       (decline_reason set — must be skipped)
  */
 private val TRANSACTIONS_PAGE_1_JSON =
     """
@@ -96,12 +98,79 @@ private val TRANSACTIONS_PAGE_1_JSON =
       "description": "CRV*Card Verification",
       "merchant": null,
       "counterparty": {}
+    },
+    {
+      "id": "tx_00009TEST000000000005",
+      "account_id": "$ACCOUNT_ID",
+      "created": "2024-05-30T12:00:00.000Z",
+      "amount": -30000,
+      "currency": "GBP",
+      "description": "DECLINED PAYMENT ATTEMPT",
+      "decline_reason": "INVALID_PIN",
+      "merchant": { "name": "Some Merchant" },
+      "counterparty": {}
     }
   ]
 }
     """.trimIndent()
 
 private const val EMPTY_TRANSACTIONS_JSON = """{ "transactions": [] }"""
+
+/**
+ * A page that contains only declined transactions — no settled tx at all.
+ * Used to verify that an all-declined page does not prematurely stop pagination.
+ */
+private val DECLINED_ONLY_PAGE_JSON =
+    """
+{
+  "transactions": [
+    {
+      "id": "tx_00009TEST000000000010",
+      "account_id": "$ACCOUNT_ID",
+      "created": "2024-04-15T09:00:00.000Z",
+      "amount": -5000,
+      "currency": "GBP",
+      "description": "DECLINED ATTEMPT 1",
+      "decline_reason": "INSUFFICIENT_FUNDS",
+      "merchant": { "name": "Shop A" },
+      "counterparty": {}
+    },
+    {
+      "id": "tx_00009TEST000000000011",
+      "account_id": "$ACCOUNT_ID",
+      "created": "2024-04-14T10:00:00.000Z",
+      "amount": -1000,
+      "currency": "GBP",
+      "description": "DECLINED ATTEMPT 2",
+      "decline_reason": "INVALID_PIN",
+      "merchant": { "name": "Shop B" },
+      "counterparty": {}
+    }
+  ]
+}
+    """.trimIndent()
+
+/**
+ * A page with one settled transaction that follows the all-declined page.
+ * The import must reach and process this page.
+ */
+private val SETTLED_AFTER_DECLINED_PAGE_JSON =
+    """
+{
+  "transactions": [
+    {
+      "id": "tx_00009TEST000000000012",
+      "account_id": "$ACCOUNT_ID",
+      "created": "2024-04-13T08:00:00.000Z",
+      "amount": -2500,
+      "currency": "GBP",
+      "description": "SETTLED AFTER DECLINED",
+      "merchant": { "name": "Shop C" },
+      "counterparty": {}
+    }
+  ]
+}
+    """.trimIndent()
 
 class MonzoImportE2ETest : DbTest() {
     @Test
@@ -164,8 +233,8 @@ class MonzoImportE2ETest : DbTest() {
                     sessionId = sessionId,
                 )
 
-            // THEN — import counts
-            assertEquals(4, importResult.transactionCount, "Should have imported 4 transactions")
+            // THEN — import counts (the declined tx5 must be excluded)
+            assertEquals(4, importResult.transactionCount, "Should have imported 4 transactions (declined tx skipped)")
             assertEquals(0, importResult.errorCount, "Should have no import errors")
 
             // --- Account audit ---
@@ -259,5 +328,88 @@ class MonzoImportE2ETest : DbTest() {
                     "${counterparty.name} json_path '${cpApiSource.jsonPath.value}' should be a $.transactions[N].counterparty path"
                 }
             }
+        }
+
+    @Test
+    fun `pagination continues past a page that contains only declined transactions`() =
+        runTest {
+            val deviceId =
+                repositories.deviceRepository.getOrCreateDevice(
+                    DeviceInfo.Jvm("test-machine", "Test OS"),
+                )
+            val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
+            val sessionId =
+                repositories.apiSessionRepository.createSession(
+                    token = "test-monzo-token",
+                    deviceId = deviceId,
+                    createdAt = now,
+                    expiresAt = null,
+                )
+
+            // Page sequence:
+            //   page 1 (no before=)                         → all-declined page
+            //   page 2 (before=2024-04-14T10:00:00.000Z)    → one settled transaction
+            //   page 3 (before=2024-04-13T08:00:00.000Z)    → empty → stop
+            var transactionRequestCount = 0
+            val mockEngine =
+                MockEngine { request ->
+                    val url = request.url.toString()
+                    val json =
+                        when {
+                            url.contains("/accounts") -> ACCOUNTS_JSON
+                            url.contains("/transactions") -> {
+                                transactionRequestCount++
+                                when (transactionRequestCount) {
+                                    1 -> DECLINED_ONLY_PAGE_JSON
+                                    2 -> SETTLED_AFTER_DECLINED_PAGE_JSON
+                                    else -> EMPTY_TRANSACTIONS_JSON
+                                }
+                            }
+                            else -> error("Unexpected request: $url")
+                        }
+                    respond(
+                        content = json,
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                    )
+                }
+
+            val apiClient =
+                createApiClient(
+                    trafficRecorder =
+                        ApiSessionTrafficRecorder(
+                            sessionId = sessionId,
+                            apiSessionRepository = repositories.apiSessionRepository,
+                        ),
+                    engine = mockEngine,
+                )
+
+            downloadMonzoTransactions(token = "test-monzo-token", apiClient = apiClient)
+
+            val importResult =
+                importMonzoSessionTransactions(
+                    apiSessionRepository = repositories.apiSessionRepository,
+                    accountRepository = repositories.accountRepository,
+                    currencyRepository = repositories.currencyRepository,
+                    transactionRepository = repositories.transactionRepository,
+                    transferSourceQueries = transferSourceQueries,
+                    entitySourceQueries = repositories.entitySourceQueries,
+                    deviceId = deviceId,
+                    sessionId = sessionId,
+                )
+
+            // Pagination must have continued past the all-declined page to reach the settled tx
+            assertEquals(3, transactionRequestCount, "Should have fetched 3 transaction pages (declined, settled, empty)")
+            assertEquals(1, importResult.transactionCount, "Only the one settled transaction should be imported")
+            assertEquals(0, importResult.errorCount)
+
+            val allAccounts = repositories.accountRepository.getAllAccounts().first()
+            val monzoAccount = allAccounts.single { it.name == "Monzo: $ACCOUNT_DESCRIPTION" }
+            val transfers =
+                repositories.transactionRepository
+                    .getTransactionsByAccount(monzoAccount.id)
+                    .first()
+            assertEquals(1, transfers.size, "Only the settled transaction should appear as a transfer")
+            assertEquals(2500L, transfers.single().amount.amount)
         }
 }
