@@ -44,6 +44,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
+import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.database.sql.EntitySourceQueries
 import com.moneymanager.database.sql.TransferSourceQueries
 import com.moneymanager.domain.model.ApiRequest
@@ -58,7 +59,6 @@ import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.ApiSessionRepository
 import com.moneymanager.domain.repository.CurrencyRepository
-import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.createApiClient
@@ -661,7 +661,12 @@ fun ApiSessionTrafficScreen(
                                     requestMatches &&
                                     (
                                         // Highlight by specific jsonPath when available (transaction sources)
-                                        (highlightJsonPath != null && responseTransactions.any { it.jsonPath.value == highlightJsonPath }) ||
+                                        (
+                                            highlightJsonPath != null &&
+                                                responseTransactions.any {
+                                                    it.jsonPath.value == highlightJsonPath
+                                                }
+                                        ) ||
                                             // Highlight by requestId alone when no jsonPath match (entity/account sources)
                                             (highlightJsonPath == null && highlightRequestId != null)
                                     )

@@ -121,12 +121,13 @@ suspend fun importMonzoSessionTransactions(
     // Build a map from Monzo account ID to the accounts-list source (request + jsonPath)
     // so newly created accounts can be linked back to their API origin.
     val accountApiSourceByMonzoId =
-        responses.flatMap { response ->
-            val requestId = requestsById[response.requestId]?.id ?: return@flatMap emptyList()
-            parseAccountsWithPaths(response.json).map { (account, jsonPath) ->
-                account.id to AccountApiSource(sessionId, requestId, jsonPath)
-            }
-        }.toMap()
+        responses
+            .flatMap { response ->
+                val requestId = requestsById[response.requestId]?.id ?: return@flatMap emptyList()
+                parseAccountsWithPaths(response.json).map { (account, jsonPath) ->
+                    account.id to AccountApiSource(sessionId, requestId, jsonPath)
+                }
+            }.toMap()
 
     val monzoAccounts = responses.flatMap { response -> parseAccounts(response.json) }
     val monzoAccountsById = monzoAccounts.associateBy { it.id }
@@ -482,31 +483,32 @@ private class AccountCache(
     ): AccountId {
         val normalizedName = name.ifBlank { "Unknown" }
         val existing = loadAccounts()[normalizedName]
-        val accountId = if (existing != null) {
-            existing.id
-        } else {
-            val now = Clock.System.now()
-            val newId =
-                accountRepository.createAccount(
-                    Account(
-                        id = AccountId(0L),
-                        name = normalizedName,
-                        openingDate = now,
-                        categoryId = Category.UNCATEGORIZED_ID,
-                    ),
-                )
-            accountsByName =
-                loadAccounts() +
-                (
-                    normalizedName to
+        val accountId =
+            if (existing != null) {
+                existing.id
+            } else {
+                val now = Clock.System.now()
+                val newId =
+                    accountRepository.createAccount(
                         Account(
-                            id = newId,
+                            id = AccountId(0L),
                             name = normalizedName,
                             openingDate = now,
-                        )
-                )
-            newId
-        }
+                            categoryId = Category.UNCATEGORIZED_ID,
+                        ),
+                    )
+                accountsByName =
+                    loadAccounts() +
+                    (
+                        normalizedName to
+                            Account(
+                                id = newId,
+                                name = normalizedName,
+                                openingDate = now,
+                            )
+                    )
+                newId
+            }
         val apiSource = monzoAccountId?.let { accountApiSourceByMonzoId[it] } ?: explicitApiSource
         if (apiSource != null) {
             ApiEntitySourceRecorder(
