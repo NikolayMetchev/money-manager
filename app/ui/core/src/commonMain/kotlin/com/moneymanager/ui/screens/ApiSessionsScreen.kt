@@ -1081,10 +1081,11 @@ private fun pairRequestsAndResponses(
     val responsesByRequestId = responses.associateBy { it.requestId }
     val requestPairs =
         requests.map { request ->
-            request.id to ApiTrafficPair(
-                request = request,
-                response = responsesByRequestId[request.id],
-            )
+            request.id to
+                ApiTrafficPair(
+                    request = request,
+                    response = responsesByRequestId[request.id],
+                )
         }
     val orphanPairs =
         responses
