@@ -31,7 +31,6 @@ kotlin {
             dependencies {
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)
-                implementation(libs.ktor.client.mock)
                 implementation(projects.test.app.db)
             }
         }
@@ -53,6 +52,7 @@ kotlin {
                 implementation(libs.androidx.compose.ui.graphics)
                 implementation(libs.androidx.compose.ui.text)
                 implementation(libs.diamondedge.logging)
+                implementation(libs.ktor.client.core)
                 implementation(libs.ktor.http)
             }
         }
@@ -79,6 +79,7 @@ kotlin {
                 implementation(libs.compose.ui.graphics.desktop)
                 implementation(libs.compose.ui.text.desktop)
                 implementation(libs.diamondedge.logging)
+                implementation(libs.ktor.client.core)
                 implementation(libs.ktor.http)
             }
         }
