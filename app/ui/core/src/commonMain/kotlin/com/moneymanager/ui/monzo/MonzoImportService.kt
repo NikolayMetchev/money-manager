@@ -362,7 +362,7 @@ private suspend fun importValidTransactionItem(
     val counterpartyAccountId =
         accountCache.getOrCreateAccountId(
             name = if (item.amountMinorUnits == 0L) MONZO_VOID_COUNTERPARTY else MONZO_COUNTERPARTY_PREFIX + item.counterpartyName(),
-            transactionApiSource = AccountApiSource(sessionId, requestId, item.jsonPath),
+            transactionApiSource = AccountApiSource(sessionId, requestId, JsonPath("${item.jsonPath.value}.counterparty")),
         )
     val transfer = item.toTransfer(monzoAccountId, counterpartyAccountId, currency)
     val duplicateTransferId =
