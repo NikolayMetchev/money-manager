@@ -575,6 +575,22 @@ fun AccountTransactionsScreen(
                 }
             }
 
+            // Transactions toolbar — filter options that apply to the list below
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                androidx.compose.material3.FilterChip(
+                    selected = showExcluded,
+                    onClick = { showExcluded = !showExcluded },
+                    label = { Text("Show excluded", style = MaterialTheme.typography.labelSmall) },
+                )
+            }
+
             // Transactions Section (70% of screen) - with independent loading
             if (isTransactionsLoading) {
                 // Loading indicator for transactions
@@ -672,24 +688,8 @@ fun AccountTransactionsScreen(
                         softWrap = false,
                         modifier = Modifier.weight(0.15f).padding(start = 8.dp),
                     )
-                    // Show excluded toggle
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.width(64.dp),
-                    ) {
-                        androidx.compose.material3.Checkbox(
-                            checked = showExcluded,
-                            onCheckedChange = { showExcluded = it },
-                            modifier = Modifier.size(20.dp),
-                        )
-                        Text(
-                            text = "excl.",
-                            style = headerStyle,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            softWrap = false,
-                        )
-                    }
+                    // Spacer for edit and audit button columns
+                    Spacer(modifier = Modifier.width(64.dp))
                 }
 
                 val listState = rememberLazyListState()
