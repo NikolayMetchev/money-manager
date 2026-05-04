@@ -584,10 +584,15 @@ fun AccountTransactionsScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                androidx.compose.material3.FilterChip(
-                    selected = showExcluded,
-                    onClick = { showExcluded = !showExcluded },
-                    label = { Text("Show excluded", style = MaterialTheme.typography.labelSmall) },
+                androidx.compose.material3.Checkbox(
+                    checked = showExcluded,
+                    onCheckedChange = { showExcluded = it },
+                )
+                Text(
+                    text = "Show excluded",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.clickable { showExcluded = !showExcluded },
                 )
             }
 
