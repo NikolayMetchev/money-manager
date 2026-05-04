@@ -143,6 +143,7 @@ class TransactionRepositoryImpl(
                         currency_scale_factor,
                         source_account_id,
                         target_account_id,
+                        is_excluded,
                         ->
                         AccountRowMapper.mapRaw(
                             id,
@@ -157,6 +158,7 @@ class TransactionRepositoryImpl(
                             currency_scale_factor,
                             source_account_id,
                             target_account_id,
+                            is_excluded,
                         )
                     }.executeAsList()
 
@@ -212,6 +214,7 @@ class TransactionRepositoryImpl(
                         currency_scale_factor,
                         source_account_id,
                         target_account_id,
+                        is_excluded,
                         ->
                         AccountRowMapper.mapRaw(
                             id,
@@ -226,6 +229,7 @@ class TransactionRepositoryImpl(
                             currency_scale_factor,
                             source_account_id,
                             target_account_id,
+                            is_excluded,
                         )
                     }.executeAsList()
                     // Reverse to get correct display order (newest first)
@@ -313,6 +317,7 @@ class TransactionRepositoryImpl(
                         currency_scale_factor,
                         source_account_id,
                         target_account_id,
+                        is_excluded,
                         ->
                         AccountRowMapper.mapRaw(
                             id,
@@ -327,6 +332,7 @@ class TransactionRepositoryImpl(
                             currency_scale_factor,
                             source_account_id,
                             target_account_id,
+                            is_excluded,
                         )
                     }.executeAsList()
 

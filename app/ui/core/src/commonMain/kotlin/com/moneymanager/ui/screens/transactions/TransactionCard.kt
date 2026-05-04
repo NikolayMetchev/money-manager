@@ -52,21 +52,25 @@ fun AccountTransactionCard(
             else -> null
         }
 
+    val cardColors =
+        when {
+            isHighlighted -> CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+            runningBalance.isExcluded ->
+                CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f),
+                )
+            else -> CardDefaults.cardColors()
+        }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        colors =
-            if (isHighlighted) {
-                CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                )
-            } else {
-                CardDefaults.cardColors()
-            },
+        colors = cardColors,
     ) {
         // Use consistent style and autoSize for all columns
         val cellStyle = MaterialTheme.typography.bodyMedium
         val cellAutoSize = TextAutoSize.StepBased(minFontSize = 8.sp, maxFontSize = 14.sp)
+        val mutedAlpha = if (runningBalance.isExcluded) 0.5f else 1f
 
         Row(
             modifier =
@@ -81,7 +85,7 @@ fun AccountTransactionCard(
             Text(
                 text = "${dateTime.date}",
                 style = cellStyle,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = mutedAlpha),
                 maxLines = 1,
                 autoSize = cellAutoSize,
                 modifier = Modifier.weight(0.15f),
@@ -99,7 +103,7 @@ fun AccountTransactionCard(
                 Text(
                     text = timeText,
                     style = cellStyle,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = mutedAlpha),
                     maxLines = 1,
                     autoSize = cellAutoSize,
                     modifier = Modifier.weight(0.1f),
@@ -112,9 +116,9 @@ fun AccountTransactionCard(
                 style = cellStyle,
                 color =
                     if (otherAccount != null) {
-                        MaterialTheme.colorScheme.primary
+                        MaterialTheme.colorScheme.primary.copy(alpha = mutedAlpha)
                     } else {
-                        MaterialTheme.colorScheme.onSurface
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = mutedAlpha)
                     },
                 maxLines = 1,
                 autoSize = cellAutoSize,
@@ -134,7 +138,7 @@ fun AccountTransactionCard(
                 Text(
                     text = runningBalance.description,
                     style = cellStyle,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = mutedAlpha),
                     maxLines = 1,
                     autoSize = cellAutoSize,
                     modifier = Modifier.weight(0.25f).padding(horizontal = 8.dp),
@@ -149,9 +153,9 @@ fun AccountTransactionCard(
                 style = cellStyle,
                 color =
                     if (runningBalance.transactionAmount.amount >= 0) {
-                        MaterialTheme.colorScheme.primary
+                        MaterialTheme.colorScheme.primary.copy(alpha = mutedAlpha)
                     } else {
-                        MaterialTheme.colorScheme.error
+                        MaterialTheme.colorScheme.error.copy(alpha = mutedAlpha)
                     },
                 textAlign = TextAlign.End,
                 maxLines = 1,
@@ -165,9 +169,9 @@ fun AccountTransactionCard(
                 style = cellStyle,
                 color =
                     if (runningBalance.runningBalance.amount >= 0) {
-                        MaterialTheme.colorScheme.primary
+                        MaterialTheme.colorScheme.primary.copy(alpha = mutedAlpha)
                     } else {
-                        MaterialTheme.colorScheme.error
+                        MaterialTheme.colorScheme.error.copy(alpha = mutedAlpha)
                     },
                 textAlign = TextAlign.End,
                 maxLines = 1,

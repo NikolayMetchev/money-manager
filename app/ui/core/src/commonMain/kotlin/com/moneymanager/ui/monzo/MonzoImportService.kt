@@ -37,6 +37,7 @@ data class MonzoImportResult(
     val transactionCount: Int,
     val duplicateCount: Int = 0,
     val errorCount: Int = 0,
+    val excludedCount: Int = 0,
 )
 
 data class MonzoDownloadResult(
@@ -151,6 +152,7 @@ suspend fun importMonzoSessionTransactions(
     var totalImported = 0
     var totalDuplicates = 0
     var totalErrors = 0
+    var totalExcluded = 0
     val progressMutex = Mutex()
     val pageResults =
         coroutineScope {
@@ -175,6 +177,7 @@ suspend fun importMonzoSessionTransactions(
                         totalImported += pageResult.importedCount
                         totalDuplicates += pageResult.duplicateCount
                         totalErrors += pageResult.errorCount
+                        totalExcluded += pageResult.excludedCount
                         listOf(++completedCount, totalImported, totalDuplicates, totalErrors)
                     }
                     onProgress(
@@ -185,12 +188,12 @@ suspend fun importMonzoSessionTransactions(
             }.awaitAll()
         }
 
-    val successfulPageResults = pageResults.filterNotNull()
     return MonzoImportResult(
         accountCount = monzoAccountsById.size,
-        transactionCount = successfulPageResults.sumOf { it.importedCount },
-        duplicateCount = successfulPageResults.sumOf { it.duplicateCount },
-        errorCount = successfulPageResults.sumOf { it.errorCount },
+        transactionCount = totalImported,
+        duplicateCount = totalDuplicates,
+        errorCount = totalErrors,
+        excludedCount = totalExcluded,
     )
 }
 
@@ -264,6 +267,7 @@ private data class MonzoImportPageResult(
     val importedCount: Int,
     val duplicateCount: Int,
     val errorCount: Int,
+    val excludedCount: Int,
     val before: Instant?,
     val hasTransactions: Boolean,
 )
@@ -285,7 +289,7 @@ private suspend fun importTransactionPage(
     val existingTransfers = transactionRepository.getTransactionsByAccount(monzoAccountId).first().toMutableList()
 
     val states =
-        transactions.filter { it.declineReason.isNullOrBlank() }.map { item ->
+        transactions.map { item ->
             importTransactionItem(
                 item = item,
                 monzoAccountId = monzoAccountId,
@@ -306,6 +310,10 @@ private suspend fun importTransactionPage(
         importedCount = states.count { it == ApiResponseTransactionState.IMPORTED },
         duplicateCount = states.count { it == ApiResponseTransactionState.DUPLICATE },
         errorCount = states.count { it == ApiResponseTransactionState.ERROR },
+        excludedCount =
+            transactions.zip(states).count { (item, state) ->
+                state == ApiResponseTransactionState.IMPORTED && !item.declineReason.isNullOrBlank()
+            },
         before = transactions.map { it.created }.minOrNull(),
         hasTransactions = transactions.isNotEmpty(),
     )
@@ -349,6 +357,7 @@ private suspend fun importTransactionItem(
             apiSessionRepository = apiSessionRepository,
             transactionRepository = transactionRepository,
             transferSourceQueries = transferSourceQueries,
+            declineReason = item.declineReason,
         )
     } catch (expected: Exception) {
         logger.error(expected) { "Error importing Monzo transaction: ${expected.message}" }
@@ -374,6 +383,7 @@ private suspend fun importValidTransactionItem(
     apiSessionRepository: ApiSessionRepository,
     transactionRepository: TransactionRepository,
     transferSourceQueries: TransferSourceQueries,
+    declineReason: String? = null,
 ): ApiResponseTransactionState {
     val counterpartyAccountId =
         accountCache.getOrCreateAccountId(
@@ -405,8 +415,15 @@ private suspend fun importValidTransactionItem(
             requestId = requestId,
             jsonPath = item.jsonPath,
         )
+    val excludedAttributes =
+        if (!declineReason.isNullOrBlank()) {
+            mapOf(transfer.id to listOf(NewAttribute(typeId = AttributeTypeId(-1), value = "declined: $declineReason")))
+        } else {
+            emptyMap()
+        }
     transactionRepository.createTransfers(
         transfers = listOf(transfer),
+        newAttributes = excludedAttributes,
         sourceRecorder = sourceRecorder,
     )
     val importedTransferId = sourceRecorder.insertedTransferId ?: transfer.id
