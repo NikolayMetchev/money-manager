@@ -22,16 +22,6 @@ object DatabaseConfig {
             "PRAGMA foreign_keys = ON",
         )
 
-    // Applied only on JVM where multiple JDBC connections can contend for the write lock.
-    // Android uses a single managed connection pool so these are handled differently there.
-    val jvmConnectionPragmas =
-        listOf(
-            // WAL mode allows concurrent reads alongside writes — faster for parallel imports.
-            "PRAGMA journal_mode = WAL",
-            // Retry for up to 5 seconds when another connection holds a write lock.
-            "PRAGMA busy_timeout = 5000",
-        )
-
     /**
      * All available ISO 4217 currencies from the platform.
      */
