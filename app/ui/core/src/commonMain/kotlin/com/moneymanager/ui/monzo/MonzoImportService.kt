@@ -146,11 +146,16 @@ suspend fun importMonzoSessionTransactions(
         )
     val currencyCache = CurrencyCache(currencyRepository)
 
+    val transactionResponses = responses.filter { requestsById[it.requestId]?.accountIdParameter() != null }
+    var completedCount = 0
+    var totalImported = 0
+    var totalDuplicates = 0
+    var totalErrors = 0
+    val progressMutex = Mutex()
     val pageResults =
         coroutineScope {
-            responses.mapIndexed { index, response ->
+            responses.map { response ->
                 async {
-                    onProgress("Importing response ${index + 1}/${responses.size}.")
                     val request = requestsById[response.requestId] ?: return@async null
                     val monzoAccount = monzoAccountsById[request.accountIdParameter()] ?: return@async null
                     val monzoAccountId = accountCache.getOrCreateAccountId(monzoAccount.id, monzoAccount.localAccountName())
@@ -166,8 +171,14 @@ suspend fun importMonzoSessionTransactions(
                             transactionRepository = transactionRepository,
                             transferSourceQueries = transferSourceQueries,
                         )
+                    val (completed, imported, duplicates, errors) = progressMutex.withLock {
+                        totalImported += pageResult.importedCount
+                        totalDuplicates += pageResult.duplicateCount
+                        totalErrors += pageResult.errorCount
+                        listOf(++completedCount, totalImported, totalDuplicates, totalErrors)
+                    }
                     onProgress(
-                        "Imported response ${index + 1}/${responses.size}: ${pageResult.importedCount} imported, ${pageResult.duplicateCount} duplicate(s), ${pageResult.errorCount} error(s).",
+                        "Imported $completed/${transactionResponses.size} responses: $imported transaction(s) imported, $duplicates duplicate(s), $errors error(s).",
                     )
                     pageResult
                 }
