@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -43,6 +44,7 @@ import com.moneymanager.compose.scrollbar.VerticalScrollbarForScrollState
 import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.database.sql.EntitySourceQueries
 import com.moneymanager.database.sql.TransferSourceQueries
+import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DeviceId
@@ -58,6 +60,7 @@ import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.domain.repository.TransferSourceRepository
+import com.moneymanager.ui.components.EditAccountDialog
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.util.formatAmount
@@ -112,6 +115,9 @@ fun AccountTransactionsScreen(
     // Edit transaction state - stores the transfer ID to edit, actual transfer is fetched from repository
     var transactionIdToEdit by remember { mutableStateOf<TransferId?>(null) }
     var transactionToEdit by remember { mutableStateOf<Transfer?>(null) }
+
+    // Edit account state - stores the account selected for editing
+    var accountToEdit by remember { mutableStateOf<Account?>(null) }
 
     // Refresh trigger - increment to force reload after edits
     var refreshTrigger by remember { mutableStateOf(0) }
@@ -432,17 +438,32 @@ fun AccountTransactionsScreen(
                                                 }.padding(vertical = 4.dp),
                                         contentAlignment = Alignment.Center,
                                     ) {
-                                        Text(
-                                            text = account.name,
-                                            style = MaterialTheme.typography.labelLarge,
-                                            color =
-                                                when {
-                                                    isColumnSelected -> MaterialTheme.colorScheme.primary
-                                                    isCellSelected -> MaterialTheme.colorScheme.secondary
-                                                    else -> MaterialTheme.colorScheme.onSurface
-                                                },
-                                            maxLines = 1,
-                                        )
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.Center,
+                                        ) {
+                                            Text(
+                                                text = account.name,
+                                                style = MaterialTheme.typography.labelLarge,
+                                                color =
+                                                    when {
+                                                        isColumnSelected -> MaterialTheme.colorScheme.primary
+                                                        isCellSelected -> MaterialTheme.colorScheme.secondary
+                                                        else -> MaterialTheme.colorScheme.onSurface
+                                                    },
+                                                maxLines = 1,
+                                                modifier = Modifier.weight(1f, fill = false),
+                                            )
+                                            IconButton(
+                                                onClick = { accountToEdit = account },
+                                                modifier = Modifier.size(20.dp),
+                                            ) {
+                                                Text(
+                                                    text = "✏️",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -938,6 +959,21 @@ fun AccountTransactionsScreen(
             deviceId = deviceId,
             onDismiss = { transactionIdToEdit = null },
             onSaved = { refreshTrigger++ },
+        )
+    }
+
+    // Show edit dialog if an account is selected for editing
+    accountToEdit?.let { account ->
+        EditAccountDialog(
+            account = account,
+            accountRepository = accountRepository,
+            categoryRepository = categoryRepository,
+            personRepository = personRepository,
+            personAccountOwnershipRepository = personAccountOwnershipRepository,
+            entitySourceQueries = entitySourceQueries,
+            deviceId = deviceId,
+            // No onSaved refresh needed: allAccounts is collected from a Flow and updates automatically
+            onDismiss = { accountToEdit = null },
         )
     }
 }
