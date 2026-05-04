@@ -188,6 +188,11 @@ fun AccountTransactionsScreen(
             runningBalances.filter { it.transactionAmount.currency.id == currencyId }
         } ?: runningBalances
 
+    // Whether to show transactions marked as excluded
+    var showExcluded by remember { mutableStateOf(false) }
+    val displayedRunningBalances =
+        if (showExcluded) filteredRunningBalances else filteredRunningBalances.filter { !it.isExcluded }
+
     // Get all unique currencies from account balances for matrix
     val uniqueCurrencyIds = accountBalances.map { it.balance.currency.id }.distinct()
 
@@ -667,8 +672,24 @@ fun AccountTransactionsScreen(
                         softWrap = false,
                         modifier = Modifier.weight(0.15f).padding(start = 8.dp),
                     )
-                    // Spacer for edit and audit button columns
-                    Spacer(modifier = Modifier.width(64.dp))
+                    // Show excluded toggle
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.width(64.dp),
+                    ) {
+                        androidx.compose.material3.Checkbox(
+                            checked = showExcluded,
+                            onCheckedChange = { showExcluded = it },
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Text(
+                            text = "excl.",
+                            style = headerStyle,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            softWrap = false,
+                        )
+                    }
                 }
 
                 val listState = rememberLazyListState()
@@ -749,7 +770,7 @@ fun AccountTransactionsScreen(
                     }.collect { lastVisibleIndex ->
                         // Load more when within 10 items of the end
                         if (lastVisibleIndex != null &&
-                            lastVisibleIndex >= filteredRunningBalances.size - 10 &&
+                            lastVisibleIndex >= displayedRunningBalances.size - 10 &&
                             !isLoadingPage &&
                             currentPagingInfo?.hasMore == true
                         ) {
@@ -781,7 +802,7 @@ fun AccountTransactionsScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         items(
-                            items = filteredRunningBalances,
+                            items = displayedRunningBalances,
                             key = { "${it.transactionId}-${it.accountId}" },
                         ) { runningBalance ->
                             AccountTransactionCard(

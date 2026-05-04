@@ -32,6 +32,7 @@ data class MonzoImportResult(
     val transactionCount: Int,
     val duplicateCount: Int = 0,
     val errorCount: Int = 0,
+    val excludedCount: Int = 0,
 )
 
 data class MonzoDownloadResult(
@@ -135,6 +136,7 @@ suspend fun importMonzoSessionTransactions(
     var transactionCount = 0
     var duplicateCount = 0
     var errorCount = 0
+    var excludedCount = 0
     val accountCache =
         AccountCache(
             accountRepository = accountRepository,
@@ -166,6 +168,7 @@ suspend fun importMonzoSessionTransactions(
         transactionCount += pageResult.importedCount
         duplicateCount += pageResult.duplicateCount
         errorCount += pageResult.errorCount
+        excludedCount += pageResult.excludedCount
         onProgress(
             "Imported response ${index + 1}/${responses.size}: $transactionCount imported, $duplicateCount duplicate(s), $errorCount error(s).",
         )
@@ -176,6 +179,7 @@ suspend fun importMonzoSessionTransactions(
         transactionCount = transactionCount,
         duplicateCount = duplicateCount,
         errorCount = errorCount,
+        excludedCount = excludedCount,
     )
 }
 
@@ -249,6 +253,7 @@ private data class MonzoImportPageResult(
     val importedCount: Int,
     val duplicateCount: Int,
     val errorCount: Int,
+    val excludedCount: Int,
     val before: Instant?,
     val hasTransactions: Boolean,
 )
@@ -270,7 +275,7 @@ private suspend fun importTransactionPage(
     val existingTransfers = transactionRepository.getTransactionsByAccount(monzoAccountId).first().toMutableList()
 
     val states =
-        transactions.filter { it.declineReason.isNullOrBlank() }.map { item ->
+        transactions.map { item ->
             importTransactionItem(
                 item = item,
                 monzoAccountId = monzoAccountId,
@@ -291,6 +296,10 @@ private suspend fun importTransactionPage(
         importedCount = states.count { it == ApiResponseTransactionState.IMPORTED },
         duplicateCount = states.count { it == ApiResponseTransactionState.DUPLICATE },
         errorCount = states.count { it == ApiResponseTransactionState.ERROR },
+        excludedCount =
+            transactions.zip(states).count { (item, state) ->
+                state == ApiResponseTransactionState.IMPORTED && !item.declineReason.isNullOrBlank()
+            },
         before = transactions.map { it.created }.minOrNull(),
         hasTransactions = transactions.isNotEmpty(),
     )
@@ -334,6 +343,7 @@ private suspend fun importTransactionItem(
             apiSessionRepository = apiSessionRepository,
             transactionRepository = transactionRepository,
             transferSourceQueries = transferSourceQueries,
+            declineReason = item.declineReason,
         )
     } catch (expected: Exception) {
         logger.error(expected) { "Error importing Monzo transaction: ${expected.message}" }
@@ -359,6 +369,7 @@ private suspend fun importValidTransactionItem(
     apiSessionRepository: ApiSessionRepository,
     transactionRepository: TransactionRepository,
     transferSourceQueries: TransferSourceQueries,
+    declineReason: String? = null,
 ): ApiResponseTransactionState {
     val counterpartyAccountId =
         accountCache.getOrCreateAccountId(
@@ -390,8 +401,15 @@ private suspend fun importValidTransactionItem(
             requestId = requestId,
             jsonPath = item.jsonPath,
         )
+    val excludedAttributes =
+        if (!declineReason.isNullOrBlank()) {
+            mapOf(transfer.id to listOf(NewAttribute(typeId = AttributeTypeId(-1), value = "declined: $declineReason")))
+        } else {
+            emptyMap()
+        }
     transactionRepository.createTransfers(
         transfers = listOf(transfer),
+        newAttributes = excludedAttributes,
         sourceRecorder = sourceRecorder,
     )
     val importedTransferId = sourceRecorder.insertedTransferId ?: transfer.id

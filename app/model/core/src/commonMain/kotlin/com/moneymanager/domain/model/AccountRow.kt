@@ -13,4 +13,5 @@ data class AccountRow(
     val runningBalance: Money,
     val sourceAccountId: AccountId,
     val targetAccountId: AccountId,
+    val isExcluded: Boolean = false,
 )

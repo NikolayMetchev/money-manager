@@ -40,6 +40,7 @@ CREATE TABLE running_balance_materialized_view (
     currency_id INTEGER NOT NULL,
     transaction_amount INTEGER NOT NULL,
     running_balance INTEGER NOT NULL,
+    is_excluded INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (id, account_id),
     FOREIGN KEY (account_id) REFERENCES account(id) ON DELETE CASCADE,
     FOREIGN KEY (currency_id) REFERENCES currency(id) ON DELETE CASCADE
@@ -50,7 +51,8 @@ CREATE INDEX IF NOT EXISTS idx_running_balance_mv_timestamp ON running_balance_m
 CREATE INDEX IF NOT EXISTS idx_running_balance_mv_account_timestamp ON running_balance_materialized_view(account_id, timestamp DESC);
 
 -- Views for computing balances (used for incremental refresh)
--- Declined transactions are excluded from all balance calculations
+-- Excluded transactions (those with the well-known "excluded" attribute, attribute_type_id = -1)
+-- are excluded from all balance calculations but remain visible in the running balance view.
 CREATE VIEW account_balance_view AS
 SELECT
     account_id,
@@ -63,8 +65,8 @@ FROM (
         SUM(amount) AS incoming,
         0 AS outgoing
     FROM transfer
-    LEFT JOIN declined_transaction dt ON transfer.id = dt.transaction_id
-    WHERE dt.transaction_id IS NULL
+    LEFT JOIN transfer_attribute ta ON transfer.id = ta.transaction_id AND ta.attribute_type_id = -1
+    WHERE ta.transaction_id IS NULL
     GROUP BY target_account_id, currency_id
 
     UNION ALL
@@ -75,12 +77,15 @@ FROM (
         0 AS incoming,
         SUM(amount) AS outgoing
     FROM transfer
-    LEFT JOIN declined_transaction dt ON transfer.id = dt.transaction_id
-    WHERE dt.transaction_id IS NULL
+    LEFT JOIN transfer_attribute ta ON transfer.id = ta.transaction_id AND ta.attribute_type_id = -1
+    WHERE ta.transaction_id IS NULL
     GROUP BY source_account_id, currency_id
 )
 GROUP BY account_id, currency_id;
 
+-- running_balance_view includes ALL transactions with an is_excluded flag.
+-- The running_balance subquery only sums non-excluded transactions, so excluded rows
+-- show the balance as if they were never there.
 CREATE VIEW running_balance_view AS
 SELECT
     m.id,
@@ -89,33 +94,34 @@ SELECT
     m.account_id,
     m.currency_id,
     m.transaction_amount,
+    m.is_excluded,
     (
         SELECT SUM(m2.transaction_amount)
         FROM (
             SELECT tr.id, tr.timestamp, tr.target_account_id AS account_id, tr.currency_id, tr.amount AS transaction_amount
             FROM transfer tr
-            LEFT JOIN declined_transaction dt ON tr.id = dt.transaction_id
-            WHERE dt.transaction_id IS NULL
+            LEFT JOIN transfer_attribute ta ON tr.id = ta.transaction_id AND ta.attribute_type_id = -1
+            WHERE ta.transaction_id IS NULL
             UNION ALL
             SELECT tr.id, tr.timestamp, tr.source_account_id AS account_id, tr.currency_id, -tr.amount AS transaction_amount
             FROM transfer tr
-            LEFT JOIN declined_transaction dt ON tr.id = dt.transaction_id
-            WHERE dt.transaction_id IS NULL
+            LEFT JOIN transfer_attribute ta ON tr.id = ta.transaction_id AND ta.attribute_type_id = -1
+            WHERE ta.transaction_id IS NULL
         ) m2
         WHERE m2.account_id = m.account_id
           AND m2.currency_id = m.currency_id
           AND (m2.timestamp < m.timestamp OR (m2.timestamp = m.timestamp AND m2.id <= m.id))
     ) AS running_balance
 FROM (
-    SELECT tr.id, tr.timestamp, tr.description, tr.target_account_id AS account_id, tr.currency_id, tr.amount AS transaction_amount
+    SELECT tr.id, tr.timestamp, tr.description, tr.target_account_id AS account_id, tr.currency_id, tr.amount AS transaction_amount,
+           CASE WHEN ta.transaction_id IS NOT NULL THEN 1 ELSE 0 END AS is_excluded
     FROM transfer tr
-    LEFT JOIN declined_transaction dt ON tr.id = dt.transaction_id
-    WHERE dt.transaction_id IS NULL
+    LEFT JOIN transfer_attribute ta ON tr.id = ta.transaction_id AND ta.attribute_type_id = -1
     UNION ALL
-    SELECT tr.id, tr.timestamp, tr.description, tr.source_account_id AS account_id, tr.currency_id, -tr.amount AS transaction_amount
+    SELECT tr.id, tr.timestamp, tr.description, tr.source_account_id AS account_id, tr.currency_id, -tr.amount AS transaction_amount,
+           CASE WHEN ta.transaction_id IS NOT NULL THEN 1 ELSE 0 END AS is_excluded
     FROM transfer tr
-    LEFT JOIN declined_transaction dt ON tr.id = dt.transaction_id
-    WHERE dt.transaction_id IS NULL
+    LEFT JOIN transfer_attribute ta ON tr.id = ta.transaction_id AND ta.attribute_type_id = -1
 ) m;
 
 -- Table to track pending changes for incremental refresh
@@ -142,75 +148,15 @@ DELETE FROM account_balance_materialized_view;
 
 populateAccountBalances:
 INSERT INTO account_balance_materialized_view (account_id, currency_id, balance)
-SELECT
-    account_id,
-    currency_id,
-    SUM(COALESCE(incoming, 0) - COALESCE(outgoing, 0)) AS balance
-FROM (
-    SELECT
-        target_account_id AS account_id,
-        currency_id,
-        SUM(amount) AS incoming,
-        0 AS outgoing
-    FROM transfer
-    LEFT JOIN declined_transaction dt ON transfer.id = dt.transaction_id
-    WHERE dt.transaction_id IS NULL
-    GROUP BY target_account_id, currency_id
-
-    UNION ALL
-
-    SELECT
-        source_account_id AS account_id,
-        currency_id,
-        0 AS incoming,
-        SUM(amount) AS outgoing
-    FROM transfer
-    LEFT JOIN declined_transaction dt ON transfer.id = dt.transaction_id
-    WHERE dt.transaction_id IS NULL
-    GROUP BY source_account_id, currency_id
-)
-GROUP BY account_id, currency_id;
+SELECT account_id, currency_id, balance FROM account_balance_view;
 
 refreshRunningBalances:
 DELETE FROM running_balance_materialized_view;
 
 populateRunningBalances:
-INSERT INTO running_balance_materialized_view (id, timestamp, description, account_id, currency_id, transaction_amount, running_balance)
-SELECT
-    m.id,
-    m.timestamp,
-    m.description,
-    m.account_id,
-    m.currency_id,
-    m.transaction_amount,
-    (
-        SELECT SUM(m2.transaction_amount)
-        FROM (
-            SELECT tr.id, tr.timestamp, tr.target_account_id AS account_id, tr.currency_id, tr.amount AS transaction_amount
-            FROM transfer tr
-            LEFT JOIN declined_transaction dt ON tr.id = dt.transaction_id
-            WHERE dt.transaction_id IS NULL
-            UNION ALL
-            SELECT tr.id, tr.timestamp, tr.source_account_id AS account_id, tr.currency_id, -tr.amount AS transaction_amount
-            FROM transfer tr
-            LEFT JOIN declined_transaction dt ON tr.id = dt.transaction_id
-            WHERE dt.transaction_id IS NULL
-        ) m2
-        WHERE m2.account_id = m.account_id
-          AND m2.currency_id = m.currency_id
-          AND (m2.timestamp < m.timestamp OR (m2.timestamp = m.timestamp AND m2.id <= m.id))
-    ) AS running_balance
-FROM (
-    SELECT tr.id, tr.timestamp, tr.description, tr.target_account_id AS account_id, tr.currency_id, tr.amount AS transaction_amount
-    FROM transfer tr
-    LEFT JOIN declined_transaction dt ON tr.id = dt.transaction_id
-    WHERE dt.transaction_id IS NULL
-    UNION ALL
-    SELECT tr.id, tr.timestamp, tr.description, tr.source_account_id AS account_id, tr.currency_id, -tr.amount AS transaction_amount
-    FROM transfer tr
-    LEFT JOIN declined_transaction dt ON tr.id = dt.transaction_id
-    WHERE dt.transaction_id IS NULL
-) m;
+INSERT INTO running_balance_materialized_view (id, timestamp, description, account_id, currency_id, transaction_amount, running_balance, is_excluded)
+SELECT id, timestamp, description, account_id, currency_id, transaction_amount, running_balance, is_excluded
+FROM running_balance_view;
 
 -- Incremental refresh queries
 
@@ -243,15 +189,8 @@ AND timestamp >= (
 );
 
 incrementalPopulateRunningBalances:
-INSERT INTO running_balance_materialized_view (id, timestamp, description, account_id, currency_id, transaction_amount, running_balance)
-SELECT
-    v.id,
-    v.timestamp,
-    v.description,
-    v.account_id,
-    v.currency_id,
-    v.transaction_amount,
-    v.running_balance
+INSERT INTO running_balance_materialized_view (id, timestamp, description, account_id, currency_id, transaction_amount, running_balance, is_excluded)
+SELECT v.id, v.timestamp, v.description, v.account_id, v.currency_id, v.transaction_amount, v.running_balance, v.is_excluded
 FROM running_balance_view v
 INNER JOIN pending_materialized_view_changes p
     ON v.account_id = p.account_id AND v.currency_id = p.currency_id
@@ -371,7 +310,8 @@ SELECT
     currency.name AS currency_name,
     currency.scale_factor AS currency_scale_factor,
     transfer.source_account_id,
-    transfer.target_account_id
+    transfer.target_account_id,
+    running_balance_materialized_view.is_excluded
 FROM running_balance_materialized_view
 JOIN currency ON running_balance_materialized_view.currency_id = currency.id
 JOIN transfer ON running_balance_materialized_view.id = transfer.id
@@ -398,7 +338,8 @@ SELECT
     currency.name AS currency_name,
     currency.scale_factor AS currency_scale_factor,
     transfer.source_account_id,
-    transfer.target_account_id
+    transfer.target_account_id,
+    running_balance_materialized_view.is_excluded
 FROM running_balance_materialized_view
 JOIN currency ON running_balance_materialized_view.currency_id = currency.id
 JOIN transfer ON running_balance_materialized_view.id = transfer.id
@@ -432,7 +373,8 @@ SELECT
     currency.name AS currency_name,
     currency.scale_factor AS currency_scale_factor,
     transfer.source_account_id,
-    transfer.target_account_id
+    transfer.target_account_id,
+    running_balance_materialized_view.is_excluded
 FROM running_balance_materialized_view
 JOIN currency ON running_balance_materialized_view.currency_id = currency.id
 JOIN transfer ON running_balance_materialized_view.id = transfer.id

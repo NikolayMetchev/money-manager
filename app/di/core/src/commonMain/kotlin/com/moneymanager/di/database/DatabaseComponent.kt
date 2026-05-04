@@ -16,7 +16,6 @@ import com.moneymanager.domain.repository.CsvAccountMappingRepository
 import com.moneymanager.domain.repository.CsvImportRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
-import com.moneymanager.domain.repository.DeclinedTransactionRepository
 import com.moneymanager.domain.repository.DeviceRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
@@ -43,7 +42,6 @@ interface DatabaseComponent {
     val csvImportStrategyRepository: CsvImportStrategyRepository
     val csvStrategyExportService: CsvStrategyExportService
     val currencyRepository: CurrencyRepository
-    val declinedTransactionRepository: DeclinedTransactionRepository
     val deviceRepository: DeviceRepository
     val maintenanceService: DatabaseMaintenanceService
     val personAccountOwnershipRepository: PersonAccountOwnershipRepository

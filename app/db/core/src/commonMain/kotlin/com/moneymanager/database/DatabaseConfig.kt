@@ -146,25 +146,25 @@ object DatabaseConfig {
     }
 
     /**
-     * Creates triggers for incremental materialized view refresh when a transaction is declined or un-declined.
-     * These triggers track changes to the declined_transaction table in pending_materialized_view_changes.
+     * Creates triggers to schedule a materialized view refresh when the "excluded" attribute
+     * (attribute_type_id = -1) is added to or removed from a transfer.
      *
-     * If a declined_transaction row references a transaction_id that has no corresponding transfer record
-     * (e.g. a declined transaction that was never stored as a transfer), the SELECT from transfer returns
-     * no rows and the INSERT/UPDATE statements are no-ops. This is the correct behavior: there is no
-     * transfer balance to update.
+     * These fire in addition to the general attribute audit triggers and are responsible only
+     * for updating pending_materialized_view_changes so that balance and running-balance
+     * materialized views are refreshed from the affected timestamp onward.
      *
      * NOTE: Triggers are created at runtime (not in schema) due to SQLDelight 2.2.1 parser limitations.
      * Called automatically from seedDatabase() during database initialization.
      */
-    private fun MoneyManagerDatabaseWrapper.createDeclinedTransactionTriggers() {
-        // INSERT trigger - when a transaction is marked declined, schedule balance refresh
+    private fun MoneyManagerDatabaseWrapper.createExcludedAttributeTriggers() {
+        // INSERT trigger - when a transaction is marked excluded, schedule balance refresh
         execute(
             null,
             """
-            CREATE TRIGGER IF NOT EXISTS trigger_declined_transaction_insert_track_changes
-            AFTER INSERT ON declined_transaction
+            CREATE TRIGGER IF NOT EXISTS trigger_excluded_attribute_insert_track_changes
+            AFTER INSERT ON transfer_attribute
             FOR EACH ROW
+            WHEN NEW.attribute_type_id = -1
             BEGIN
                 INSERT OR IGNORE INTO pending_materialized_view_changes (account_id, currency_id, min_timestamp)
                 SELECT source_account_id, currency_id, timestamp FROM transfer WHERE id = NEW.transaction_id;
@@ -188,13 +188,14 @@ object DatabaseConfig {
             0,
         )
 
-        // DELETE trigger - when a transaction is un-declined, schedule balance refresh
+        // DELETE trigger - when a transaction is un-excluded, schedule balance refresh
         execute(
             null,
             """
-            CREATE TRIGGER IF NOT EXISTS trigger_declined_transaction_delete_track_changes
-            AFTER DELETE ON declined_transaction
+            CREATE TRIGGER IF NOT EXISTS trigger_excluded_attribute_delete_track_changes
+            AFTER DELETE ON transfer_attribute
             FOR EACH ROW
+            WHEN OLD.attribute_type_id = -1
             BEGIN
                 INSERT OR IGNORE INTO pending_materialized_view_changes (account_id, currency_id, min_timestamp)
                 SELECT source_account_id, currency_id, timestamp FROM transfer WHERE id = OLD.transaction_id;
@@ -554,8 +555,8 @@ object DatabaseConfig {
             // Create triggers for incremental materialized view refresh
             createIncrementalRefreshTriggers()
 
-            // Create triggers for declined transaction balance exclusion
-            createDeclinedTransactionTriggers()
+            // Create triggers to schedule refresh when the "excluded" attribute is added/removed
+            createExcludedAttributeTriggers()
 
             // Create trigger for category deletion (children inherit grandparent)
             createCategoryDeleteTrigger()
@@ -579,6 +580,11 @@ object DatabaseConfig {
                 name = "Uncategorized",
                 parent_id = null,
             )
+
+            // Seed well-known "excluded" attribute type (id=-1).
+            // Transactions carrying this attribute are excluded from all balance calculations
+            // but remain visible in the UI (highlighted as excluded).
+            attributeTypeQueries.insertWithId(id = -1, name = "excluded")
 
             // Create system device for system-generated source tracking
             // Platform 0 = SYSTEM, no os/machine/make/model needed
