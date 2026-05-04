@@ -146,6 +146,81 @@ object DatabaseConfig {
     }
 
     /**
+     * Creates triggers to schedule a materialized view refresh when the "excluded" attribute
+     * (attribute_type_id = -1) is added to or removed from a transfer.
+     *
+     * These fire in addition to the general attribute audit triggers and are responsible only
+     * for updating pending_materialized_view_changes so that balance and running-balance
+     * materialized views are refreshed from the affected timestamp onward.
+     *
+     * NOTE: Triggers are created at runtime (not in schema) due to SQLDelight 2.2.1 parser limitations.
+     * Called automatically from seedDatabase() during database initialization.
+     */
+    private fun MoneyManagerDatabaseWrapper.createExcludedAttributeTriggers() {
+        // INSERT trigger - when a transaction is marked excluded, schedule balance refresh
+        execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_excluded_attribute_insert_track_changes
+            AFTER INSERT ON transfer_attribute
+            FOR EACH ROW
+            WHEN NEW.attribute_type_id = -1
+            BEGIN
+                INSERT OR IGNORE INTO pending_materialized_view_changes (account_id, currency_id, min_timestamp)
+                SELECT source_account_id, currency_id, timestamp FROM transfer WHERE id = NEW.transaction_id;
+
+                UPDATE pending_materialized_view_changes
+                SET min_timestamp = (SELECT timestamp FROM transfer WHERE id = NEW.transaction_id)
+                WHERE account_id = (SELECT source_account_id FROM transfer WHERE id = NEW.transaction_id)
+                  AND currency_id = (SELECT currency_id FROM transfer WHERE id = NEW.transaction_id)
+                  AND min_timestamp > (SELECT timestamp FROM transfer WHERE id = NEW.transaction_id);
+
+                INSERT OR IGNORE INTO pending_materialized_view_changes (account_id, currency_id, min_timestamp)
+                SELECT target_account_id, currency_id, timestamp FROM transfer WHERE id = NEW.transaction_id;
+
+                UPDATE pending_materialized_view_changes
+                SET min_timestamp = (SELECT timestamp FROM transfer WHERE id = NEW.transaction_id)
+                WHERE account_id = (SELECT target_account_id FROM transfer WHERE id = NEW.transaction_id)
+                  AND currency_id = (SELECT currency_id FROM transfer WHERE id = NEW.transaction_id)
+                  AND min_timestamp > (SELECT timestamp FROM transfer WHERE id = NEW.transaction_id);
+            END
+            """.trimIndent(),
+            0,
+        )
+
+        // DELETE trigger - when a transaction is un-excluded, schedule balance refresh
+        execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_excluded_attribute_delete_track_changes
+            AFTER DELETE ON transfer_attribute
+            FOR EACH ROW
+            WHEN OLD.attribute_type_id = -1
+            BEGIN
+                INSERT OR IGNORE INTO pending_materialized_view_changes (account_id, currency_id, min_timestamp)
+                SELECT source_account_id, currency_id, timestamp FROM transfer WHERE id = OLD.transaction_id;
+
+                UPDATE pending_materialized_view_changes
+                SET min_timestamp = (SELECT timestamp FROM transfer WHERE id = OLD.transaction_id)
+                WHERE account_id = (SELECT source_account_id FROM transfer WHERE id = OLD.transaction_id)
+                  AND currency_id = (SELECT currency_id FROM transfer WHERE id = OLD.transaction_id)
+                  AND min_timestamp > (SELECT timestamp FROM transfer WHERE id = OLD.transaction_id);
+
+                INSERT OR IGNORE INTO pending_materialized_view_changes (account_id, currency_id, min_timestamp)
+                SELECT target_account_id, currency_id, timestamp FROM transfer WHERE id = OLD.transaction_id;
+
+                UPDATE pending_materialized_view_changes
+                SET min_timestamp = (SELECT timestamp FROM transfer WHERE id = OLD.transaction_id)
+                WHERE account_id = (SELECT target_account_id FROM transfer WHERE id = OLD.transaction_id)
+                  AND currency_id = (SELECT currency_id FROM transfer WHERE id = OLD.transaction_id)
+                  AND min_timestamp > (SELECT timestamp FROM transfer WHERE id = OLD.transaction_id);
+            END
+            """.trimIndent(),
+            0,
+        )
+    }
+
+    /**
      * Creates a trigger to update children's parentId when a category is deleted.
      * Children inherit the deleted category's parent (grandparent becomes parent).
      */
@@ -480,6 +555,9 @@ object DatabaseConfig {
             // Create triggers for incremental materialized view refresh
             createIncrementalRefreshTriggers()
 
+            // Create triggers to schedule refresh when the "excluded" attribute is added/removed
+            createExcludedAttributeTriggers()
+
             // Create trigger for category deletion (children inherit grandparent)
             createCategoryDeleteTrigger()
 
@@ -502,6 +580,11 @@ object DatabaseConfig {
                 name = "Uncategorized",
                 parent_id = null,
             )
+
+            // Seed well-known "excluded" attribute type (id=-1).
+            // Transactions carrying this attribute are excluded from all balance calculations
+            // but remain visible in the UI (highlighted as excluded).
+            attributeTypeQueries.insertWithId(id = -1, name = "excluded")
 
             // Create system device for system-generated source tracking
             // Platform 0 = SYSTEM, no os/machine/make/model needed

@@ -12,6 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -43,6 +44,7 @@ import com.moneymanager.database.sql.TransferSourceQueries
 import com.moneymanager.domain.getDeviceInfo
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeType
+import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.Money
@@ -124,8 +126,15 @@ fun TransactionEditDialog(
     // Attribute state - in edit mode, initialize from transaction's embedded attributes
     // (already loaded by TransactionsScreen via getTransactionById which calls loadAttributesForTransfer)
     var existingAttributeTypes by remember { mutableStateOf<List<AttributeType>>(emptyList()) }
+
+    // The "excluded" attribute (type id = -1) is managed separately via its own checkbox.
+    val originalExcludedAttr = remember { transaction?.attributes?.find { it.attributeType.name == "excluded" } }
+    var isExcluded by remember { mutableStateOf(originalExcludedAttr != null) }
+    var excludeReason by remember { mutableStateOf(originalExcludedAttr?.value.orEmpty()) }
+
+    // Generic attributes exclude the well-known "excluded" one — that is handled above.
     val originalAttributes by remember {
-        mutableStateOf(transaction?.attributes.orEmpty())
+        mutableStateOf(transaction?.attributes.orEmpty().filter { it.attributeType.name != "excluded" })
     }
 
     // EditableAttribute represents the current state of each attribute in the UI
@@ -133,7 +142,7 @@ fun TransactionEditDialog(
     // value: Pair(attributeTypeName, value)
     var editableAttributes by remember {
         mutableStateOf(
-            transaction?.attributes.orEmpty().associate { attr ->
+            originalAttributes.associate { attr ->
                 attr.id to Pair(attr.attributeType.name, attr.value)
             },
         )
@@ -180,6 +189,8 @@ fun TransactionEditDialog(
             selectedMinute,
             editableAttributes,
             originalAttributes,
+            isExcluded,
+            excludeReason,
         ) {
             if (transaction == null) {
                 // In create mode, enable save only when all required fields are filled and valid
@@ -199,7 +210,9 @@ fun TransactionEditDialog(
                     selectedDate != transactionDateTime!!.date ||
                     selectedHour != transactionDateTime.hour ||
                     selectedMinute != transactionDateTime.minute ||
-                    hasAttributeChanges()
+                    hasAttributeChanges() ||
+                    isExcluded != (originalExcludedAttr != null) ||
+                    (isExcluded && excludeReason != (originalExcludedAttr?.value.orEmpty()))
             }
         }
 
@@ -339,6 +352,37 @@ fun TransactionEditDialog(
                     enabled = !isSaving,
                 )
 
+                // Excluded toggle
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Checkbox(
+                            checked = isExcluded,
+                            onCheckedChange = { isExcluded = it },
+                            enabled = !isSaving,
+                        )
+                        Text(
+                            text = "Excluded from balances",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                    if (isExcluded) {
+                        OutlinedTextField(
+                            value = excludeReason,
+                            onValueChange = { excludeReason = it },
+                            label = { Text("Reason") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            enabled = !isSaving,
+                        )
+                    }
+                }
+
                 // Attributes Section
                 Column(
                     modifier = Modifier.fillMaxWidth(),
@@ -473,7 +517,7 @@ fun TransactionEditDialog(
                                         // Build attribute change data structures
                                         val originalIds = originalAttributes.map { it.id }.toSet()
                                         val editableIds = editableAttributes.keys
-                                        val deletedAttributeIds = originalIds - editableIds
+                                        val deletedAttributeIds = (originalIds - editableIds).toMutableSet()
 
                                         // Build updated attributes map (id -> NewAttribute)
                                         val updatedAttributes = mutableMapOf<Long, NewAttribute>()
@@ -498,6 +542,17 @@ fun TransactionEditDialog(
                                                 val typeId = attributeTypeRepository.getOrCreate(typeName)
                                                 newAttributes.add(NewAttribute(typeId, value))
                                             }
+                                        }
+
+                                        // Handle the "excluded" attribute (well-known id = -1)
+                                        when {
+                                            isExcluded && originalExcludedAttr == null ->
+                                                newAttributes.add(NewAttribute(AttributeTypeId(-1), excludeReason))
+                                            isExcluded && excludeReason != originalExcludedAttr!!.value ->
+                                                updatedAttributes[originalExcludedAttr.id] =
+                                                    NewAttribute(AttributeTypeId(-1), excludeReason)
+                                            !isExcluded && originalExcludedAttr != null ->
+                                                deletedAttributeIds.add(originalExcludedAttr.id)
                                         }
 
                                         // Use the atomic method to update transfer and attributes together
@@ -538,7 +593,11 @@ fun TransactionEditDialog(
                                                 .map { (_, pair) ->
                                                     val typeId = attributeTypeRepository.getOrCreate(pair.first.trim())
                                                     NewAttribute(typeId, pair.second.trim())
-                                                }
+                                                }.toMutableList()
+
+                                        if (isExcluded) {
+                                            attributesToSave.add(NewAttribute(AttributeTypeId(-1), excludeReason))
+                                        }
 
                                         val transferDeviceId = deviceRepository.getOrCreateDevice(getDeviceInfo())
                                         transactionRepository.createTransfers(

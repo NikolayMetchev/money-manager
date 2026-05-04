@@ -25,6 +25,7 @@ object AccountRowMapper {
         currency_scale_factor: Long,
         source_account_id: Long,
         target_account_id: Long,
+        is_excluded: Long,
     ): AccountRow =
         AccountRow(
             transactionId = TransferId(id),
@@ -53,5 +54,6 @@ object AccountRowMapper {
                 ),
             sourceAccountId = AccountId(source_account_id),
             targetAccountId = AccountId(target_account_id),
+            isExcluded = is_excluded != 0L,
         )
 }

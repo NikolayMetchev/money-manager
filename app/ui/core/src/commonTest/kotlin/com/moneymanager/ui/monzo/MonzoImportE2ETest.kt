@@ -233,8 +233,9 @@ class MonzoImportE2ETest : DbTest() {
                     sessionId = sessionId,
                 )
 
-            // THEN — import counts (the declined tx5 must be excluded)
-            assertEquals(4, importResult.transactionCount, "Should have imported 4 transactions (declined tx skipped)")
+            // THEN — import counts (declined tx5 is stored but marked excluded)
+            assertEquals(5, importResult.transactionCount, "Should have imported 5 transactions (declined tx stored as excluded)")
+            assertEquals(1, importResult.excludedCount, "Declined tx5 should be counted as excluded")
             assertEquals(0, importResult.errorCount, "Should have no import errors")
 
             // --- Account audit ---
@@ -261,7 +262,7 @@ class MonzoImportE2ETest : DbTest() {
                 repositories.transactionRepository
                     .getTransactionsByAccount(monzoAccount.id)
                     .first()
-            assertEquals(4, transfers.size, "Should have 4 transfers for the Monzo account")
+            assertEquals(5, transfers.size, "Should have 5 transfers for the Monzo account (including declined tx stored as excluded)")
 
             // Zero-amount transaction should use the Void counterparty account
             val voidAccount = allAccounts.find { it.name == "Monzo Counterparty: Void" }
@@ -306,7 +307,7 @@ class MonzoImportE2ETest : DbTest() {
                         val src = entry.source
                         src?.apiSource?.jsonPath
                     }.toSet()
-            assertEquals(4, jsonPaths.size, "Each transaction should have a distinct json_path")
+            assertEquals(5, jsonPaths.size, "Each transaction should have a distinct json_path")
 
             // --- Counterparty account audit ---
             // Every counterparty account created during import must also have an API entity source.
@@ -400,7 +401,9 @@ class MonzoImportE2ETest : DbTest() {
 
             // Pagination must have continued past the all-declined page to reach the settled tx
             assertEquals(3, transactionRequestCount, "Should have fetched 3 transaction pages (declined, settled, empty)")
-            assertEquals(1, importResult.transactionCount, "Only the one settled transaction should be imported")
+            // 2 declined + 1 settled = 3 total imported; declined ones carry the "excluded" attribute
+            assertEquals(3, importResult.transactionCount, "All 3 transactions should be imported (2 declined as excluded + 1 settled)")
+            assertEquals(2, importResult.excludedCount, "The 2 declined transactions should be marked excluded")
             assertEquals(0, importResult.errorCount)
 
             val allAccounts = repositories.accountRepository.getAllAccounts().first()
@@ -409,7 +412,8 @@ class MonzoImportE2ETest : DbTest() {
                 repositories.transactionRepository
                     .getTransactionsByAccount(monzoAccount.id)
                     .first()
-            assertEquals(1, transfers.size, "Only the settled transaction should appear as a transfer")
-            assertEquals(2500L, transfers.single().amount.amount)
+            assertEquals(3, transfers.size, "All 3 transactions (2 excluded + 1 settled) should be stored as transfers")
+            val settledTransfer = transfers.single { it.attributes.none { attr -> attr.attributeType.name == "excluded" } }
+            assertEquals(2500L, settledTransfer.amount.amount)
         }
 }
