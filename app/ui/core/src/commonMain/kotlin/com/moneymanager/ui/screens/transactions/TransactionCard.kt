@@ -38,7 +38,6 @@ fun AccountTransactionCard(
     onAccountClick: (AccountId) -> Unit = {},
     onEditClick: (Transfer) -> Unit = {},
     onAuditClick: (TransferId) -> Unit = {},
-    showExcluded: Boolean = true,
 ) {
     // Determine which account to display based on the current view
     // The account column should show the OTHER account in the transaction
