@@ -156,36 +156,38 @@ suspend fun importMonzoSessionTransactions(
     val progressMutex = Mutex()
     val pageResults =
         coroutineScope {
-            responses.map { response ->
-                async {
-                    val request = requestsById[response.requestId] ?: return@async null
-                    val monzoAccount = monzoAccountsById[request.accountIdParameter()] ?: return@async null
-                    val monzoAccountId = accountCache.getOrCreateAccountId(monzoAccount.id, monzoAccount.localAccountName())
-                    val pageResult =
-                        importTransactionPage(
-                            response = response.toApiHttpResponse(),
-                            monzoAccountId = monzoAccountId,
-                            sessionId = sessionId,
-                            deviceId = deviceId,
-                            accountCache = accountCache,
-                            currencyCache = currencyCache,
-                            apiSessionRepository = apiSessionRepository,
-                            transactionRepository = transactionRepository,
-                            transferSourceQueries = transferSourceQueries,
+            responses
+                .map { response ->
+                    async {
+                        val request = requestsById[response.requestId] ?: return@async null
+                        val monzoAccount = monzoAccountsById[request.accountIdParameter()] ?: return@async null
+                        val monzoAccountId = accountCache.getOrCreateAccountId(monzoAccount.id, monzoAccount.localAccountName())
+                        val pageResult =
+                            importTransactionPage(
+                                response = response.toApiHttpResponse(),
+                                monzoAccountId = monzoAccountId,
+                                sessionId = sessionId,
+                                deviceId = deviceId,
+                                accountCache = accountCache,
+                                currencyCache = currencyCache,
+                                apiSessionRepository = apiSessionRepository,
+                                transactionRepository = transactionRepository,
+                                transferSourceQueries = transferSourceQueries,
+                            )
+                        val (completed, imported, duplicates, errors) =
+                            progressMutex.withLock {
+                                totalImported += pageResult.importedCount
+                                totalDuplicates += pageResult.duplicateCount
+                                totalErrors += pageResult.errorCount
+                                totalExcluded += pageResult.excludedCount
+                                listOf(++completedCount, totalImported, totalDuplicates, totalErrors)
+                            }
+                        onProgress(
+                            "Imported $completed/${transactionResponses.size} responses: $imported transaction(s) imported, $duplicates duplicate(s), $errors error(s).",
                         )
-                    val (completed, imported, duplicates, errors) = progressMutex.withLock {
-                        totalImported += pageResult.importedCount
-                        totalDuplicates += pageResult.duplicateCount
-                        totalErrors += pageResult.errorCount
-                        totalExcluded += pageResult.excludedCount
-                        listOf(++completedCount, totalImported, totalDuplicates, totalErrors)
+                        pageResult
                     }
-                    onProgress(
-                        "Imported $completed/${transactionResponses.size} responses: $imported transaction(s) imported, $duplicates duplicate(s), $errors error(s).",
-                    )
-                    pageResult
-                }
-            }.awaitAll()
+                }.awaitAll()
         }
 
     return MonzoImportResult(
