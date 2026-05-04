@@ -103,7 +103,7 @@ fun AccountTransactionCard(
                 Text(
                     text = timeText,
                     style = cellStyle,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = mutedAlpha),
                     maxLines = 1,
                     autoSize = cellAutoSize,
                     modifier = Modifier.weight(0.1f),

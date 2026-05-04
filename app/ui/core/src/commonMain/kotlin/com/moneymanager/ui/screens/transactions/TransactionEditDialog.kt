@@ -593,7 +593,11 @@ fun TransactionEditDialog(
                                                 .map { (_, pair) ->
                                                     val typeId = attributeTypeRepository.getOrCreate(pair.first.trim())
                                                     NewAttribute(typeId, pair.second.trim())
-                                                }
+                                                }.toMutableList()
+
+                                        if (isExcluded) {
+                                            attributesToSave.add(NewAttribute(AttributeTypeId(-1), excludeReason))
+                                        }
 
                                         val transferDeviceId = deviceRepository.getOrCreateDevice(getDeviceInfo())
                                         transactionRepository.createTransfers(
