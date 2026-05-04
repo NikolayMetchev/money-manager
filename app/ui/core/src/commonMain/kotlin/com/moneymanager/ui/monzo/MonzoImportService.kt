@@ -138,22 +138,51 @@ suspend fun importMonzoSessionTransactions(
     val monzoAccounts = responses.flatMap { response -> parseAccounts(response.json) }
     val monzoAccountsById = monzoAccounts.associateBy { it.id }
 
-    val accountCache =
-        AccountCache(
-            accountRepository = accountRepository,
-            entitySourceQueries = entitySourceQueries,
-            deviceId = deviceId,
-            accountApiSourceByMonzoId = accountApiSourceByMonzoId,
-        )
-    val currencyCache = CurrencyCache(currencyRepository)
-
     val transactionResponses = responses.filter { requestsById[it.requestId]?.accountIdParameter() != null }
     var completedCount = 0
     var totalImported = 0
     var totalDuplicates = 0
     var totalErrors = 0
     var totalExcluded = 0
+    var sourceAccountsCreated = 0
+    var counterpartyAccountsCreated = 0
     val progressMutex = Mutex()
+
+    fun progressMessage(): String {
+        val transactionParts = buildList {
+            if (totalImported > 0) add("$totalImported imported")
+            if (totalDuplicates > 0) add("$totalDuplicates duplicate(s)")
+            if (totalErrors > 0) add("$totalErrors error(s)")
+        }
+        val accountParts = buildList {
+            if (sourceAccountsCreated > 0) add("$sourceAccountsCreated source")
+            if (counterpartyAccountsCreated > 0) add("$counterpartyAccountsCreated counterparty")
+        }
+        val parts = buildList {
+            add("Imported $completedCount/${transactionResponses.size} responses")
+            if (transactionParts.isNotEmpty()) add("${transactionParts.joinToString(", ")} transaction(s)")
+            if (accountParts.isNotEmpty()) add("${accountParts.joinToString(" and ")} account(s) created")
+        }
+        return parts.joinToString(". ") + "."
+    }
+
+    onProgress(progressMessage())
+
+    val accountCache =
+        AccountCache(
+            accountRepository = accountRepository,
+            entitySourceQueries = entitySourceQueries,
+            deviceId = deviceId,
+            accountApiSourceByMonzoId = accountApiSourceByMonzoId,
+            onAccountCreated = { isSourceAccount ->
+                val message = progressMutex.withLock {
+                    if (isSourceAccount) ++sourceAccountsCreated else ++counterpartyAccountsCreated
+                    progressMessage()
+                }
+                onProgress(message)
+            },
+        )
+    val currencyCache = CurrencyCache(currencyRepository)
     val pageResults =
         coroutineScope {
             transactionResponses
@@ -180,7 +209,8 @@ suspend fun importMonzoSessionTransactions(
                                 totalDuplicates += pageResult.duplicateCount
                                 totalErrors += pageResult.errorCount
                                 totalExcluded += pageResult.excludedCount
-                                "Imported ${++completedCount}/${transactionResponses.size} responses: $totalImported transaction(s) imported, $totalDuplicates duplicate(s), $totalErrors error(s)."
+                                ++completedCount
+                                progressMessage()
                             }
                         onProgress(progressMessage)
                         pageResult
@@ -507,6 +537,7 @@ private class AccountCache(
     private val entitySourceQueries: EntitySourceQueries,
     private val deviceId: DeviceId,
     private val accountApiSourceByMonzoId: Map<String, AccountApiSource>,
+    private val onAccountCreated: suspend (isSourceAccount: Boolean) -> Unit = {},
 ) {
     private val mutex = Mutex()
     private var accountsByName: Map<String, Account>? = null
@@ -543,6 +574,7 @@ private class AccountCache(
                             openingDate = now,
                         )
                 )
+            onAccountCreated(monzoAccountId != null)
 
             val apiSource = monzoAccountId?.let { accountApiSourceByMonzoId[it] } ?: explicitApiSource
             if (apiSource != null) {
