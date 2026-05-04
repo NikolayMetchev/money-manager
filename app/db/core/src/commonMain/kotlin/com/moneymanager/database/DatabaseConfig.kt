@@ -20,11 +20,15 @@ object DatabaseConfig {
         listOf(
             // Enable foreign key constraints (disabled by default in SQLite)
             "PRAGMA foreign_keys = ON",
-            // WAL mode allows concurrent reads alongside writes and is significantly faster
-            // for multi-threaded workloads (e.g. parallel API import coroutines).
+        )
+
+    // Applied only on JVM where multiple JDBC connections can contend for the write lock.
+    // Android uses a single managed connection pool so these are handled differently there.
+    val jvmConnectionPragmas =
+        listOf(
+            // WAL mode allows concurrent reads alongside writes — faster for parallel imports.
             "PRAGMA journal_mode = WAL",
-            // Retry for up to 5 seconds when another connection holds a write lock,
-            // preventing SQLITE_BUSY errors during parallel imports.
+            // Retry for up to 5 seconds when another connection holds a write lock.
             "PRAGMA busy_timeout = 5000",
         )
 

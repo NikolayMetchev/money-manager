@@ -45,6 +45,7 @@ class JvmDatabaseManager : DatabaseManager {
             // Note: foreign_keys is already enabled via Properties above
             DatabaseConfig.connectionPragmas
                 .filterNot { it.contains("foreign_keys", ignoreCase = true) }
+                .plus(DatabaseConfig.jvmConnectionPragmas)
                 .forEach { pragma ->
                     driver.execute(null, pragma, 0)
                 }

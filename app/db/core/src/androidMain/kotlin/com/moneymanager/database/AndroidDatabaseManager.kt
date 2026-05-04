@@ -54,10 +54,12 @@ class AndroidDatabaseManager(
 
                             override fun onOpen(db: SupportSQLiteDatabase) {
                                 super.onOpen(db)
-                                // Apply connection-level PRAGMA settings
                                 DatabaseConfig.connectionPragmas.forEach { pragma ->
                                     db.execSQL(pragma)
                                 }
+                                // WAL mode improves concurrent read/write performance.
+                                // Must be enabled via API rather than PRAGMA on Android.
+                                db.enableWriteAheadLogging()
                             }
                         },
                 )
