@@ -33,6 +33,16 @@ class AndroidDatabaseManager(
                     name = location.name,
                     callback =
                         object : AndroidSqliteDriver.Callback(MoneyManagerDatabase.Schema) {
+                            override fun onConfigure(db: SupportSQLiteDatabase) {
+                                super.onConfigure(db)
+                                // WAL must be enabled in onConfigure so it is active during
+                                // onCreate and onUpgrade, not just after onOpen.
+                                db.enableWriteAheadLogging()
+                                DatabaseConfig.connectionPragmas.forEach { pragma ->
+                                    db.execSQL(pragma)
+                                }
+                            }
+
                             override fun onCreate(db: SupportSQLiteDatabase) {
                                 // Only create schema for truly new databases
                                 if (isNewDatabase) {
@@ -50,14 +60,6 @@ class AndroidDatabaseManager(
                             ) {
                                 // Skip automatic migration - let schema errors surface at runtime
                                 // The global schema error handler will show DatabaseSchemaErrorDialog
-                            }
-
-                            override fun onOpen(db: SupportSQLiteDatabase) {
-                                super.onOpen(db)
-                                // Apply connection-level PRAGMA settings
-                                DatabaseConfig.connectionPragmas.forEach { pragma ->
-                                    db.execSQL(pragma)
-                                }
                             }
                         },
                 )

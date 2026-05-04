@@ -41,10 +41,12 @@ class JvmDatabaseManager : DatabaseManager {
                 }
             val driver = JdbcSqliteDriver(location.jdbcUrl, properties)
 
-            // Apply additional connection-level PRAGMA settings (if any beyond foreign_keys)
-            // Note: foreign_keys is already enabled via Properties above
+            // Apply cross-platform pragmas (foreign_keys already set via Properties above).
+            // WAL mode and busy_timeout are JVM-only: on Android WAL is enabled via
+            // enableWriteAheadLogging() and the connection pool handles contention differently.
             DatabaseConfig.connectionPragmas
                 .filterNot { it.contains("foreign_keys", ignoreCase = true) }
+                .plus(listOf("PRAGMA journal_mode = WAL", "PRAGMA busy_timeout = 5000"))
                 .forEach { pragma ->
                     driver.execute(null, pragma, 0)
                 }
