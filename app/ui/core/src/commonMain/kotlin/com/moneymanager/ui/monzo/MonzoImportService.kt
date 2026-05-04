@@ -107,8 +107,13 @@ suspend fun downloadMonzoTransactions(
     val existingResponsesByRequestId = existingResponses.associateBy { it.requestId }
     val existingRequestsByUrl = existingRequests.associateBy { it.url }
 
-    // Read accounts from stored session responses
-    val monzoAccounts = existingResponses.flatMap { response -> parseAccounts(response.json) }
+    // Read accounts from the stored accounts response only (not from transaction responses)
+    val accountsUrl = "$MONZO_BASE_URL/accounts"
+    val accountsRequestIds = existingRequests.filter { it.url == accountsUrl }.map { it.id }.toSet()
+    val monzoAccounts =
+        existingResponses
+            .filter { it.requestId in accountsRequestIds }
+            .flatMap { response -> parseAccounts(response.json) }
 
     var transactionResponseCount = 0
 
@@ -306,6 +311,9 @@ private suspend fun importPeopleFromAccounts(
                 if (existingPerson != null) {
                     existingPerson.id
                 } else {
+                    // Split on first space: "John Doe" → firstName="John", lastName="Doe".
+                    // For single-word names the lastName is null.
+                    // Note: this is a simplified Western-centric split; users can edit names after import.
                     val nameParts = name.split(" ", limit = 2)
                     val person =
                         Person(
