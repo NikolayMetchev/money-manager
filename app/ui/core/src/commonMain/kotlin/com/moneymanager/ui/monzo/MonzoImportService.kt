@@ -156,7 +156,7 @@ suspend fun importMonzoSessionTransactions(
     val progressMutex = Mutex()
     val pageResults =
         coroutineScope {
-            responses
+            transactionResponses
                 .map { response ->
                     async {
                         val request = requestsById[response.requestId] ?: return@async null
