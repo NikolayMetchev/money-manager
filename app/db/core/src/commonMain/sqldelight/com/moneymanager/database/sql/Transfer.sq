@@ -95,7 +95,7 @@ SELECT
     m.currency_id,
     m.transaction_amount,
     m.is_excluded,
-    (
+    COALESCE((
         SELECT SUM(m2.transaction_amount)
         FROM (
             SELECT tr.id, tr.timestamp, tr.target_account_id AS account_id, tr.currency_id, tr.amount AS transaction_amount
@@ -111,7 +111,7 @@ SELECT
         WHERE m2.account_id = m.account_id
           AND m2.currency_id = m.currency_id
           AND (m2.timestamp < m.timestamp OR (m2.timestamp = m.timestamp AND m2.id <= m.id))
-    ) AS running_balance
+    ), 0) AS running_balance
 FROM (
     SELECT tr.id, tr.timestamp, tr.description, tr.target_account_id AS account_id, tr.currency_id, tr.amount AS transaction_amount,
            CASE WHEN ta.transaction_id IS NOT NULL THEN 1 ELSE 0 END AS is_excluded
