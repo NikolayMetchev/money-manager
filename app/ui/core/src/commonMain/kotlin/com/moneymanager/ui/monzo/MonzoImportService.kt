@@ -148,26 +148,16 @@ suspend fun importMonzoSessionTransactions(
     var counterpartyAccountsCreated = 0
     val progressMutex = Mutex()
 
-    fun progressMessage(): String {
-        val transactionParts =
-            buildList {
-                if (totalImported > 0) add("$totalImported imported")
-                if (totalDuplicates > 0) add("$totalDuplicates duplicate(s)")
-                if (totalErrors > 0) add("$totalErrors error(s)")
-            }
-        val accountParts =
-            buildList {
-                if (sourceAccountsCreated > 0) add("$sourceAccountsCreated source")
-                if (counterpartyAccountsCreated > 0) add("$counterpartyAccountsCreated counterparty")
-            }
-        val parts =
-            buildList {
-                add("Imported $completedCount/${transactionResponses.size} responses")
-                if (transactionParts.isNotEmpty()) add("${transactionParts.joinToString(", ")} transaction(s)")
-                if (accountParts.isNotEmpty()) add("${accountParts.joinToString(" and ")} account(s) created")
-            }
-        return parts.joinToString(". ") + "."
-    }
+    fun progressMessage() =
+        buildString {
+            append("Imported $completedCount/${transactionResponses.size} responses")
+            if (totalImported > 0) append(". $totalImported imported transaction(s)")
+            if (totalDuplicates > 0) append(". $totalDuplicates duplicate(s)")
+            if (totalErrors > 0) append(". $totalErrors error(s)")
+            if (sourceAccountsCreated > 0) append(". $sourceAccountsCreated source account(s) created")
+            if (counterpartyAccountsCreated > 0) append(". $counterpartyAccountsCreated counterparty account(s) created")
+            append(".")
+        }
 
     onProgress(progressMessage())
 
