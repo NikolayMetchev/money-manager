@@ -21,6 +21,7 @@ import com.moneymanager.rest.createApiClient
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
+import com.moneymanager.ui.monzo.downloadMonzoAccounts
 import com.moneymanager.ui.monzo.downloadMonzoTransactions
 import com.moneymanager.ui.monzo.importMonzoSessionTransactions
 import com.moneymanager.ui.test.TestMoneyManagerApp
@@ -172,7 +173,18 @@ class MonzoImportAuditE2ETest {
                         engine = mockEngine,
                     )
 
-                downloadMonzoTransactions(token = "test-monzo-token", apiClient = apiClient)
+                downloadMonzoAccounts(
+                    token = "test-monzo-token",
+                    apiClient = apiClient,
+                    apiSessionRepository = dc.apiSessionRepository,
+                    sessionId = sessionId,
+                )
+                downloadMonzoTransactions(
+                    token = "test-monzo-token",
+                    apiClient = apiClient,
+                    apiSessionRepository = dc.apiSessionRepository,
+                    sessionId = sessionId,
+                )
                 importMonzoSessionTransactions(
                     apiSessionRepository = dc.apiSessionRepository,
                     accountRepository = dc.accountRepository,
@@ -180,6 +192,8 @@ class MonzoImportAuditE2ETest {
                     transactionRepository = dc.transactionRepository,
                     transferSourceQueries = db.transferSourceQueries,
                     entitySourceQueries = db.entitySourceQueries,
+                    personRepository = dc.personRepository,
+                    personAccountOwnershipRepository = dc.personAccountOwnershipRepository,
                     deviceId = deviceId,
                     sessionId = sessionId,
                 )

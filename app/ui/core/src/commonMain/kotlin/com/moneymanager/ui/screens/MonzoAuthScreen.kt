@@ -43,14 +43,18 @@ import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.ApiSessionRepository
 import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
+import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.createApiClient
 import com.moneymanager.ui.background.LocalBackgroundTaskManager
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.ui.monzo.MonzoAccountsDownloadResult
 import com.moneymanager.ui.monzo.MonzoDownloadProgress
 import com.moneymanager.ui.monzo.MonzoDownloadResult
 import com.moneymanager.ui.monzo.MonzoImportResult
+import com.moneymanager.ui.monzo.downloadMonzoAccounts
 import com.moneymanager.ui.monzo.downloadMonzoTransactions
 import com.moneymanager.ui.monzo.importMonzoSessionTransactions
 import com.moneymanager.ui.util.displayDateTime
@@ -69,6 +73,8 @@ fun MonzoAuthScreen(
     transferSourceQueries: TransferSourceQueries,
     entitySourceQueries: EntitySourceQueries,
     maintenanceService: DatabaseMaintenanceService,
+    personRepository: PersonRepository,
+    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     deviceId: DeviceId,
     onTransactionsImported: () -> Unit = {},
 ) {
@@ -83,6 +89,7 @@ fun MonzoAuthScreen(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var successMessage by remember { mutableStateOf<String?>(null) }
     var sessionToRevoke by remember { mutableStateOf<ApiSession?>(null) }
+    var accountsDownloadResult by remember { mutableStateOf<MonzoAccountsDownloadResult?>(null) }
     var downloadResult by remember { mutableStateOf<MonzoDownloadResult?>(null) }
     var downloadProgress by remember { mutableStateOf<MonzoDownloadProgress?>(null) }
     var importResult by remember { mutableStateOf<MonzoImportResult?>(null) }
@@ -292,8 +299,10 @@ fun MonzoAuthScreen(
         // Import data card - only shown when there are active sessions
         if (activeSessions.isNotEmpty()) {
             val activeSession = activeSessions.first()
+            val isDownloadingAccounts = backgroundTasks.isRunning(monzoAccountsDownloadTaskKey(activeSession.id))
             val isDownloading = backgroundTasks.isRunning(monzoDownloadTaskKey(activeSession.id))
             val isImporting = backgroundTasks.isRunning(monzoImportTaskKey(activeSession.id))
+            val isBusy = isDownloadingAccounts || isDownloading || isImporting
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier =
@@ -303,15 +312,23 @@ fun MonzoAuthScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Text(
-                        text = "Monzo Transactions",
+                        text = "Monzo Data",
                         style = MaterialTheme.typography.titleMedium,
                     )
 
                     Text(
-                        text = "Download transactions into API traffic first, then import the stored responses into transactions.",
+                        text = "Download accounts and transactions into API traffic first, then import the stored responses.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+
+                    accountsDownloadResult?.let { result ->
+                        Text(
+                            text = result.displaySummary(),
+                            color = MaterialTheme.colorScheme.primary,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
 
                     downloadResult?.let { result ->
                         Text(
@@ -325,6 +342,14 @@ fun MonzoAuthScreen(
                         Text(
                             text = result.displaySummary(),
                             color = MaterialTheme.colorScheme.primary,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+
+                    if (isDownloadingAccounts) {
+                        Text(
+                            text = "Downloading accounts...",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
@@ -372,49 +397,97 @@ fun MonzoAuthScreen(
                         }
                     }
 
-                    Button(
-                        onClick = {
-                            val session = activeSessions.firstOrNull() ?: return@Button
-                            downloadResult = null
-                            downloadProgress = null
-                            importError = null
-                            backgroundTasks.startTask(
-                                key = monzoDownloadTaskKey(session.id),
-                                title = "Download Transactions",
-                                initialDetail = "Starting Monzo download for session #${session.id}.",
-                            ) {
-                                val result =
-                                    downloadMonzoTransactions(
-                                        token = session.token,
-                                        apiClient =
-                                            createApiClient(
-                                                trafficRecorder =
-                                                    ApiSessionTrafficRecorder(
-                                                        sessionId = session.id,
-                                                        apiSessionRepository = apiSessionRepository,
-                                                    ),
-                                                engine = null,
-                                            ),
-                                        onProgress = { progress ->
-                                            downloadProgress = progress
-                                            update(progress.downloadDetail())
-                                        },
-                                    )
-                                downloadResult = result
-                                downloadProgress = null
-                                result.displaySummary()
-                            }
-                        },
-                        enabled = !isDownloading && !isImporting,
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        if (isDownloading) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(16.dp),
-                                strokeWidth = 2.dp,
-                            )
-                        } else {
-                            Text("Download Transactions")
+                        Button(
+                            onClick = {
+                                val session = activeSessions.firstOrNull() ?: return@Button
+                                accountsDownloadResult = null
+                                backgroundTasks.startTask(
+                                    key = monzoAccountsDownloadTaskKey(session.id),
+                                    title = "Download Accounts",
+                                    initialDetail = "Starting Monzo accounts download for session #${session.id}.",
+                                ) {
+                                    val result =
+                                        downloadMonzoAccounts(
+                                            token = session.token,
+                                            apiClient =
+                                                createApiClient(
+                                                    trafficRecorder =
+                                                        ApiSessionTrafficRecorder(
+                                                            sessionId = session.id,
+                                                            apiSessionRepository = apiSessionRepository,
+                                                        ),
+                                                    engine = null,
+                                                ),
+                                            apiSessionRepository = apiSessionRepository,
+                                            sessionId = session.id,
+                                        )
+                                    accountsDownloadResult = result
+                                    result.displaySummary()
+                                }
+                            },
+                            enabled = !isBusy,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            if (isDownloadingAccounts) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp,
+                                )
+                            } else {
+                                Text("Download Accounts")
+                            }
+                        }
+
+                        Button(
+                            onClick = {
+                                val session = activeSessions.firstOrNull() ?: return@Button
+                                downloadResult = null
+                                downloadProgress = null
+                                importError = null
+                                backgroundTasks.startTask(
+                                    key = monzoDownloadTaskKey(session.id),
+                                    title = "Download Transactions",
+                                    initialDetail = "Starting Monzo transactions download for session #${session.id}.",
+                                ) {
+                                    val result =
+                                        downloadMonzoTransactions(
+                                            token = session.token,
+                                            apiClient =
+                                                createApiClient(
+                                                    trafficRecorder =
+                                                        ApiSessionTrafficRecorder(
+                                                            sessionId = session.id,
+                                                            apiSessionRepository = apiSessionRepository,
+                                                        ),
+                                                    engine = null,
+                                                ),
+                                            apiSessionRepository = apiSessionRepository,
+                                            sessionId = session.id,
+                                            onProgress = { progress ->
+                                                downloadProgress = progress
+                                                update(progress.downloadDetail())
+                                            },
+                                        )
+                                    downloadResult = result
+                                    downloadProgress = null
+                                    result.displaySummary()
+                                }
+                            },
+                            enabled = !isBusy,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            if (isDownloading) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.dp,
+                                )
+                            } else {
+                                Text("Download Transactions")
+                            }
                         }
                     }
 
@@ -436,6 +509,8 @@ fun MonzoAuthScreen(
                                         transactionRepository = transactionRepository,
                                         transferSourceQueries = transferSourceQueries,
                                         entitySourceQueries = entitySourceQueries,
+                                        personRepository = personRepository,
+                                        personAccountOwnershipRepository = personAccountOwnershipRepository,
                                         deviceId = deviceId,
                                         sessionId = session.id,
                                         onProgress = ::update,
@@ -446,7 +521,7 @@ fun MonzoAuthScreen(
                                 result.displaySummary()
                             }
                         },
-                        enabled = !isDownloading && !isImporting,
+                        enabled = !isBusy,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         if (isImporting) {
@@ -546,6 +621,11 @@ private fun MonzoImportResult.displaySummary(): String =
         append(" account(s), ")
         append(transactionCount)
         append(" imported transaction(s)")
+        if (personCount > 0) {
+            append(", ")
+            append(personCount)
+            append(" person(s) created")
+        }
         if (duplicateCount > 0) {
             append(", ")
             append(duplicateCount)
@@ -559,11 +639,20 @@ private fun MonzoImportResult.displaySummary(): String =
         append(".")
     }
 
+private fun MonzoAccountsDownloadResult.displaySummary(): String =
+    if (skipped) {
+        "Accounts already downloaded: $accountCount account(s) (skipped)."
+    } else {
+        "Accounts downloaded: $accountCount account(s)."
+    }
+
 private fun MonzoDownloadResult.displaySummary(): String =
-    "Download complete: $accountCount account(s), $transactionResponseCount transaction response page(s)."
+    "Transactions downloaded: $accountCount account(s), $transactionResponseCount new response page(s)."
 
 private fun MonzoDownloadProgress.downloadDetail(): String =
     "Downloading account $accountIndex/$accountCount, page $page. $downloadedResponsePageCount response page(s) downloaded so far."
+
+private fun monzoAccountsDownloadTaskKey(sessionId: ApiSessionId): String = "monzo-accounts-download-${sessionId.id}"
 
 private fun monzoDownloadTaskKey(sessionId: ApiSessionId): String = "monzo-download-${sessionId.id}"
 
