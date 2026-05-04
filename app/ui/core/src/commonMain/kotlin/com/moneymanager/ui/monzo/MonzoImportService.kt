@@ -149,20 +149,23 @@ suspend fun importMonzoSessionTransactions(
     val progressMutex = Mutex()
 
     fun progressMessage(): String {
-        val transactionParts = buildList {
-            if (totalImported > 0) add("$totalImported imported")
-            if (totalDuplicates > 0) add("$totalDuplicates duplicate(s)")
-            if (totalErrors > 0) add("$totalErrors error(s)")
-        }
-        val accountParts = buildList {
-            if (sourceAccountsCreated > 0) add("$sourceAccountsCreated source")
-            if (counterpartyAccountsCreated > 0) add("$counterpartyAccountsCreated counterparty")
-        }
-        val parts = buildList {
-            add("Imported $completedCount/${transactionResponses.size} responses")
-            if (transactionParts.isNotEmpty()) add("${transactionParts.joinToString(", ")} transaction(s)")
-            if (accountParts.isNotEmpty()) add("${accountParts.joinToString(" and ")} account(s) created")
-        }
+        val transactionParts =
+            buildList {
+                if (totalImported > 0) add("$totalImported imported")
+                if (totalDuplicates > 0) add("$totalDuplicates duplicate(s)")
+                if (totalErrors > 0) add("$totalErrors error(s)")
+            }
+        val accountParts =
+            buildList {
+                if (sourceAccountsCreated > 0) add("$sourceAccountsCreated source")
+                if (counterpartyAccountsCreated > 0) add("$counterpartyAccountsCreated counterparty")
+            }
+        val parts =
+            buildList {
+                add("Imported $completedCount/${transactionResponses.size} responses")
+                if (transactionParts.isNotEmpty()) add("${transactionParts.joinToString(", ")} transaction(s)")
+                if (accountParts.isNotEmpty()) add("${accountParts.joinToString(" and ")} account(s) created")
+            }
         return parts.joinToString(". ") + "."
     }
 
@@ -175,10 +178,11 @@ suspend fun importMonzoSessionTransactions(
             deviceId = deviceId,
             accountApiSourceByMonzoId = accountApiSourceByMonzoId,
             onAccountCreated = { isSourceAccount ->
-                val message = progressMutex.withLock {
-                    if (isSourceAccount) ++sourceAccountsCreated else ++counterpartyAccountsCreated
-                    progressMessage()
-                }
+                val message =
+                    progressMutex.withLock {
+                        if (isSourceAccount) ++sourceAccountsCreated else ++counterpartyAccountsCreated
+                        progressMessage()
+                    }
                 onProgress(message)
             },
         )
