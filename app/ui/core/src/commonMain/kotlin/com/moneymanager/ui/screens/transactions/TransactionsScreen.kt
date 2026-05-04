@@ -459,7 +459,7 @@ fun AccountTransactionsScreen(
                                                 modifier = Modifier.size(20.dp),
                                             ) {
                                                 Text(
-                                                    text = "✏️",
+                                                    text = "⚙️",
                                                     style = MaterialTheme.typography.labelSmall,
                                                 )
                                             }
