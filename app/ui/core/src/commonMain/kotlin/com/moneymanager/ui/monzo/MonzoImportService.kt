@@ -174,17 +174,15 @@ suspend fun importMonzoSessionTransactions(
                                 transactionRepository = transactionRepository,
                                 transferSourceQueries = transferSourceQueries,
                             )
-                        val (completed, imported, duplicates, errors) =
+                        val progressMessage =
                             progressMutex.withLock {
                                 totalImported += pageResult.importedCount
                                 totalDuplicates += pageResult.duplicateCount
                                 totalErrors += pageResult.errorCount
                                 totalExcluded += pageResult.excludedCount
-                                listOf(++completedCount, totalImported, totalDuplicates, totalErrors)
+                                "Imported ${++completedCount}/${transactionResponses.size} responses: $totalImported transaction(s) imported, $totalDuplicates duplicate(s), $totalErrors error(s)."
                             }
-                        onProgress(
-                            "Imported $completed/${transactionResponses.size} responses: $imported transaction(s) imported, $duplicates duplicate(s), $errors error(s).",
-                        )
+                        onProgress(progressMessage)
                         pageResult
                     }
                 }.awaitAll()
