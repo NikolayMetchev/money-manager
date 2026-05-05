@@ -12,8 +12,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.Account
+import com.moneymanager.domain.model.AccountAttributeAuditEntry
 import com.moneymanager.domain.model.AccountAuditEntry
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.ApiRequestId
@@ -72,6 +74,7 @@ private data class AccountAuditDiff(
     val categoryName: FieldChange<String?>,
     val ownersAdded: List<String>,
     val ownersRemoved: List<String>,
+    val attributeChanges: List<com.moneymanager.domain.model.AccountAttributeAuditEntry>,
     val source: EntitySource?,
 ) {
     val hasFieldChanges: Boolean
@@ -81,7 +84,7 @@ private data class AccountAuditDiff(
         get() = ownersAdded.isNotEmpty() || ownersRemoved.isNotEmpty()
 
     val hasChanges: Boolean
-        get() = hasFieldChanges || hasOwnershipChanges
+        get() = hasFieldChanges || hasOwnershipChanges || attributeChanges.isNotEmpty()
 }
 
 private fun computeAccountAuditDiffs(
@@ -136,6 +139,7 @@ private fun computeAccountAuditDiffs(
                     categoryName = FieldChange.Created(entry.categoryName),
                     ownersAdded = ownershipChanges.ownersAdded,
                     ownersRemoved = ownershipChanges.ownersRemoved,
+                    attributeChanges = entry.attributeChanges,
                     source = effectiveSource,
                 )
             AuditType.DELETE ->
@@ -149,6 +153,7 @@ private fun computeAccountAuditDiffs(
                     categoryName = FieldChange.Deleted(entry.categoryName),
                     ownersAdded = ownershipChanges.ownersAdded,
                     ownersRemoved = ownershipChanges.ownersRemoved,
+                    attributeChanges = entry.attributeChanges,
                     source = effectiveSource,
                 )
             AuditType.UPDATE -> {
@@ -189,6 +194,7 @@ private fun computeAccountAuditDiffs(
                         },
                     ownersAdded = ownershipChanges.ownersAdded,
                     ownersRemoved = ownershipChanges.ownersRemoved,
+                    attributeChanges = entry.attributeChanges,
                     source = effectiveSource,
                 )
             }
@@ -218,6 +224,7 @@ private fun AccountAuditDiffCard(
                 FieldValueRow("Opening Date", "${openingDate.date}")
                 FieldValueRow("Category", diff.categoryName.value() ?: "Uncategorized")
                 OwnershipChangesSection(diff.ownersAdded, diff.ownersRemoved)
+                AccountAttributeChangesSection(diff.attributeChanges)
                 SourceInfoSection(diff.source, onApiSourceClick = onApiSourceClick)
             }
             AuditType.UPDATE -> {
@@ -246,6 +253,7 @@ private fun AccountAuditDiffCard(
                         )
                     }
                     OwnershipChangesSection(diff.ownersAdded, diff.ownersRemoved)
+                    AccountAttributeChangesSection(diff.attributeChanges)
                 }
                 SourceInfoSection(diff.source, onApiSourceClick = onApiSourceClick)
             }
@@ -261,6 +269,7 @@ private fun AccountAuditDiffCard(
                 FieldValueRow("Opening Date", "${openingDate.date}", errorColor)
                 FieldValueRow("Category", diff.categoryName.value() ?: "Uncategorized", errorColor)
                 OwnershipChangesSection(diff.ownersAdded, diff.ownersRemoved)
+                AccountAttributeChangesSection(diff.attributeChanges, errorColor)
                 SourceInfoSection(diff.source, labelColor = errorColor.copy(alpha = 0.8f), onApiSourceClick = onApiSourceClick)
             }
         }
@@ -311,6 +320,54 @@ private fun OwnershipChangesSection(
                     text = ownersRemoved.joinToString(", "),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.error,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AccountAttributeChangesSection(
+    attributeChanges: List<AccountAttributeAuditEntry>,
+    valueColor: Color = MaterialTheme.colorScheme.onSurface,
+) {
+    if (attributeChanges.isEmpty()) return
+
+    Column(
+        modifier = Modifier.padding(top = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Text(
+            text = "Attributes:",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        attributeChanges.forEach { entry ->
+            Row(
+                modifier = Modifier.padding(start = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                val prefix =
+                    when (entry.auditType) {
+                        AuditType.INSERT -> "+"
+                        AuditType.DELETE -> "-"
+                        AuditType.UPDATE -> "~"
+                    }
+                val color =
+                    when (entry.auditType) {
+                        AuditType.INSERT -> MaterialTheme.colorScheme.primary
+                        AuditType.DELETE -> MaterialTheme.colorScheme.error
+                        AuditType.UPDATE -> valueColor
+                    }
+                Text(
+                    text = "$prefix${entry.attributeType.name}:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = color,
+                )
+                Text(
+                    text = entry.value,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = color,
                 )
             }
         }

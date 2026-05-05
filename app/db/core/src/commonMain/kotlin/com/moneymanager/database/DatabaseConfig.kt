@@ -440,6 +440,97 @@ object DatabaseConfig {
     }
 
     /**
+     * Creates triggers for account attribute auditing.
+     *
+     * Each attribute change (INSERT/UPDATE/DELETE) bumps the account revision
+     * and records the change in AccountAttributeAudit.
+     *
+     * Storage pattern (same as Transfer_Attribute_Audit):
+     * - INSERT: stores NEW value (attribute that was added)
+     * - UPDATE: stores OLD value (value before the change)
+     * - DELETE: stores OLD value (value that was removed)
+     *
+     * Flag tables control trigger behavior:
+     * - _import_batch: skip trigger entirely (CSV import - no audit)
+     * - _creation_mode: record audit but don't bump revision (initial creation)
+     * - neither: bump revision, then record audit (later modification)
+     */
+    private fun MoneyManagerDatabaseWrapper.createAccountAttributeTriggers() {
+        // Attribute INSERT trigger - records new attribute addition (stores NEW value)
+        execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_account_attribute_insert_audit
+            AFTER INSERT ON account_attribute
+            FOR EACH ROW
+            WHEN NOT EXISTS (SELECT 1 FROM _import_batch)
+            BEGIN
+                -- Only bump revision if NOT in creation mode
+                UPDATE account
+                SET revision_id = revision_id + 1
+                WHERE id = NEW.account_id
+                  AND NOT EXISTS (SELECT 1 FROM _creation_mode);
+
+                -- Always record the addition in audit table at current revision
+                INSERT INTO account_attribute_audit (audit_timestamp, audit_type_id, account_id, revision_id, attribute_type_id, attribute_value)
+                SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, NEW.account_id, revision_id, NEW.attribute_type_id, NEW.attribute_value
+                FROM account WHERE id = NEW.account_id;
+            END
+            """.trimIndent(),
+            0,
+        )
+
+        // Attribute UPDATE trigger - records attribute value change (stores OLD value)
+        execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_account_attribute_update_audit
+            AFTER UPDATE ON account_attribute
+            FOR EACH ROW
+            WHEN NOT EXISTS (SELECT 1 FROM _import_batch)
+              AND OLD.attribute_value != NEW.attribute_value
+            BEGIN
+                -- Only bump revision if NOT in creation mode
+                UPDATE account
+                SET revision_id = revision_id + 1
+                WHERE id = NEW.account_id
+                  AND NOT EXISTS (SELECT 1 FROM _creation_mode);
+
+                -- Always record the change in audit table (OLD value - what it was before)
+                INSERT INTO account_attribute_audit (audit_timestamp, audit_type_id, account_id, revision_id, attribute_type_id, attribute_value)
+                SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, NEW.account_id, revision_id, NEW.attribute_type_id, OLD.attribute_value
+                FROM account WHERE id = NEW.account_id;
+            END
+            """.trimIndent(),
+            0,
+        )
+
+        // Attribute DELETE trigger - records attribute removal (stores OLD value)
+        execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_account_attribute_delete_audit
+            AFTER DELETE ON account_attribute
+            FOR EACH ROW
+            WHEN NOT EXISTS (SELECT 1 FROM _import_batch)
+            BEGIN
+                -- Only bump revision if NOT in creation mode
+                UPDATE account
+                SET revision_id = revision_id + 1
+                WHERE id = OLD.account_id
+                  AND NOT EXISTS (SELECT 1 FROM _creation_mode);
+
+                -- Always record the deletion in audit table (OLD value - what was deleted)
+                INSERT INTO account_attribute_audit (audit_timestamp, audit_type_id, account_id, revision_id, attribute_type_id, attribute_value)
+                SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, OLD.account_id, revision_id, OLD.attribute_type_id, OLD.attribute_value
+                FROM account WHERE id = OLD.account_id;
+            END
+            """.trimIndent(),
+            0,
+        )
+    }
+
+    /**
      * Creates audit triggers dynamically for all main tables.
      * Queries sqlite_master to discover tables and their columns, then generates triggers.
      *
@@ -565,6 +656,7 @@ object DatabaseConfig {
             createBatchImportTable()
             createCreationModeTable()
             createAttributeTriggers()
+            createAccountAttributeTriggers()
 
             // Create custom category audit triggers (must be before generic ones)
             // These include parent_name denormalization via subquery

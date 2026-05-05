@@ -78,7 +78,7 @@ internal fun formatTimeDiff(
  * Shows existing types in a dropdown, with the option to type a new one.
  */
 @Composable
-internal fun AttributeTypeField(
+fun AttributeTypeField(
     value: String,
     onValueChange: (String) -> Unit,
     existingTypes: List<AttributeType>,

@@ -92,6 +92,22 @@ CREATE TABLE transfer_attribute_audit (
 CREATE INDEX IF NOT EXISTS idx_transfer_attribute_audit_transfer_id ON transfer_attribute_audit(transfer_id);
 CREATE INDEX IF NOT EXISTS idx_transfer_attribute_audit_revision ON transfer_attribute_audit(transfer_id, revision_id);
 
+-- account_attribute_audit: Audit trail for account attributes
+CREATE TABLE account_attribute_audit (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    audit_timestamp INTEGER NOT NULL,
+    audit_type_id INTEGER NOT NULL,
+    account_id INTEGER NOT NULL,
+    revision_id INTEGER NOT NULL,
+    attribute_type_id INTEGER NOT NULL,
+    attribute_value TEXT NOT NULL,
+    FOREIGN KEY (audit_type_id) REFERENCES audit_type(id),
+    FOREIGN KEY (attribute_type_id) REFERENCES attribute_type(id) ON DELETE RESTRICT
+);
+
+CREATE INDEX IF NOT EXISTS idx_account_attribute_audit_account_id ON account_attribute_audit(account_id);
+CREATE INDEX IF NOT EXISTS idx_account_attribute_audit_revision ON account_attribute_audit(account_id, revision_id);
+
 -- Queries to retrieve audit history for each table
 
 selectAuditHistoryForTransfer:
@@ -157,6 +173,22 @@ JOIN audit_type ON transfer_attribute_audit.audit_type_id = audit_type.id
 JOIN attribute_type ON transfer_attribute_audit.attribute_type_id = attribute_type.id
 WHERE transfer_attribute_audit.transfer_id = ?
 ORDER BY transfer_attribute_audit.revision_id DESC, attribute_type.name;
+
+-- Get all attribute audit records for an account
+selectAttributeAuditByAccount:
+SELECT
+    account_attribute_audit.id,
+    audit_type.name AS audit_type,
+    account_attribute_audit.account_id,
+    account_attribute_audit.revision_id,
+    account_attribute_audit.attribute_type_id,
+    account_attribute_audit.attribute_value,
+    attribute_type.name AS attribute_type_name
+FROM account_attribute_audit
+JOIN audit_type ON account_attribute_audit.audit_type_id = audit_type.id
+JOIN attribute_type ON account_attribute_audit.attribute_type_id = attribute_type.id
+WHERE account_attribute_audit.account_id = ?
+ORDER BY account_attribute_audit.revision_id DESC, attribute_type.name;
 
 -- person_audit: Audit trail for person table
 CREATE TABLE person_audit (

@@ -117,6 +117,7 @@ private fun MainWindow(onExit: () -> Unit) {
                 MoneyManagerApp(
                     appVersion = appVersion,
                     databaseLocation = state.location,
+                    accountAttributeRepository = dc.accountAttributeRepository,
                     accountRepository = dc.accountRepository,
                     apiSessionRepository = dc.apiSessionRepository,
                     attributeTypeRepository = dc.attributeTypeRepository,
