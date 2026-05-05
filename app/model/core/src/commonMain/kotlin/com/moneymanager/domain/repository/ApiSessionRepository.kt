@@ -187,9 +187,10 @@ interface ApiSessionRepository {
 
     /**
      * Marks the given session as imported at the given timestamp.
+     * Returns the number of rows updated (0 if the session id doesn't exist).
      */
     suspend fun markSessionImported(
         id: ApiSessionId,
         importedAt: Instant,
-    )
+    ): Long
 }

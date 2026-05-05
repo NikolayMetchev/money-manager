@@ -276,11 +276,10 @@ class ApiSessionRepositoryImpl(
     override suspend fun markSessionImported(
         id: ApiSessionId,
         importedAt: Instant,
-    ) {
+    ): Long =
         withContext(Dispatchers.Default) {
-            queries.markSessionImported(importedAt.toEpochMilliseconds(), id.id)
+            queries.markSessionImported(importedAt.toEpochMilliseconds(), id.id).await()
         }
-    }
 
     private fun com.moneymanager.database.sql.Api_request.toApiRequest(
         headers: List<com.moneymanager.database.sql.Api_request_header>,

@@ -2,7 +2,6 @@ package com.moneymanager.ui.screens
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
@@ -57,7 +56,6 @@ fun ImportsScreen(
                 text = { Text("API") },
             )
         }
-        HorizontalDivider()
 
         when (selectedTab) {
             ImportTab.CSV ->
