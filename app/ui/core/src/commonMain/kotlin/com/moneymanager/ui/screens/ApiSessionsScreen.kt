@@ -351,6 +351,7 @@ fun ApiSessionsScreen(
                                                 accountsSessionId = accountsSession?.id,
                                                 onProgress = ::update,
                                             )
+                                        apiSessionRepository.markSessionImported(session.id, Clock.System.now())
                                         maintenanceService.refreshMaterializedViews()
                                         importResultBySession = importResultBySession + (session.id to result)
                                         refresh()
@@ -406,9 +407,10 @@ private fun CredentialCard(
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
                 text =
-                    credential.type.name
-                        .lowercase()
-                        .replaceFirstChar { it.uppercase() },
+                    "Credential · " +
+                        credential.type.name
+                            .lowercase()
+                            .replaceFirstChar { it.uppercase() },
                 style = MaterialTheme.typography.titleMedium,
             )
             Text(

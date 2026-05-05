@@ -215,7 +215,7 @@ fun MoneyManagerApp(
                                     val tab =
                                         when (currentScreen) {
                                             is Screen.ApiSessionTraffic, is Screen.MonzoConnect -> ImportTab.API
-                                            is Screen.Imports -> (currentScreen as Screen.Imports).tab
+                                            is Screen.Imports -> currentScreen.tab
                                             else -> ImportTab.CSV
                                         }
                                     navigationHistory.navigateTo(Screen.Imports(tab))
