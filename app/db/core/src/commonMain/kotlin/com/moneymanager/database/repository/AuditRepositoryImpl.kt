@@ -98,48 +98,33 @@ class AuditRepositoryImpl(
 
     override suspend fun getAttributeAuditByAccount(accountId: AccountId): List<AccountAttributeAuditEntry> =
         withContext(Dispatchers.Default) {
-            queries
-                .selectAttributeAuditByAccount(accountId.id)
-                .executeAsList()
-                .map { row ->
-                    AccountAttributeAuditEntry(
-                        id = row.id,
-                        accountId = AccountId(row.account_id),
-                        revisionId = row.revision_id,
-                        attributeType =
-                            AttributeType(
-                                id = AttributeTypeId(row.attribute_type_id),
-                                name = row.attribute_type_name,
-                            ),
-                        auditType = mapAuditType(row.audit_type),
-                        value = row.attribute_value,
-                    )
-                }
+            fetchAccountAttributeAudit(accountId)
         }
+
+    private fun fetchAccountAttributeAudit(accountId: AccountId): List<AccountAttributeAuditEntry> =
+        queries
+            .selectAttributeAuditByAccount(accountId.id)
+            .executeAsList()
+            .map { row ->
+                AccountAttributeAuditEntry(
+                    id = row.id,
+                    accountId = AccountId(row.account_id),
+                    revisionId = row.revision_id,
+                    attributeType =
+                        AttributeType(
+                            id = AttributeTypeId(row.attribute_type_id),
+                            name = row.attribute_type_name,
+                        ),
+                    auditType = mapAuditType(row.audit_type),
+                    value = row.attribute_value,
+                )
+            }
 
     private fun attachAccountAttributeChanges(
         accountId: AccountId,
         entries: List<AccountAuditEntry>,
     ): List<AccountAuditEntry> {
-        // Fetch all attribute audit entries for this account
-        val allAttributeChanges =
-            queries
-                .selectAttributeAuditByAccount(accountId.id)
-                .executeAsList()
-                .map { row ->
-                    AccountAttributeAuditEntry(
-                        id = row.id,
-                        accountId = AccountId(row.account_id),
-                        revisionId = row.revision_id,
-                        attributeType =
-                            AttributeType(
-                                id = AttributeTypeId(row.attribute_type_id),
-                                name = row.attribute_type_name,
-                            ),
-                        auditType = mapAuditType(row.audit_type),
-                        value = row.attribute_value,
-                    )
-                }
+        val allAttributeChanges = fetchAccountAttributeAudit(accountId)
 
         // Group attribute changes by revisionId
         val changesByRevision = allAttributeChanges.groupBy { it.revisionId }
