@@ -824,8 +824,9 @@ fun ApiSessionTrafficScreen(
                                                     highlightJsonPath.startsWithJsonPath(it.jsonPath.value)
                                                 }
                                         ) ||
-                                            // Highlight by requestId alone when no jsonPath match (entity/account sources)
-                                            (highlightJsonPath == null && highlightRequestId != null)
+                                            // Highlight by requestId when jsonPath doesn't match any transaction
+                                            // (e.g. main account sources stored at $.accounts[0], not transaction paths)
+                                            highlightRequestId != null
                                     )
                             ApiTrafficPairCard(
                                 pair = pair,
