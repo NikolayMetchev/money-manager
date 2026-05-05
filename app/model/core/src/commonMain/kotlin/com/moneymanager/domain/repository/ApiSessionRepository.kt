@@ -179,4 +179,18 @@ interface ApiSessionRepository {
      * Returns all [ApiResponseTransaction] records for responses in the given session, ordered by response then id.
      */
     suspend fun getResponseTransactionsBySession(sessionId: ApiSessionId): List<ApiResponseTransaction>
+
+    /**
+     * Returns the set of session IDs that have been marked as imported.
+     */
+    suspend fun getImportedSessionIds(): Set<ApiSessionId>
+
+    /**
+     * Marks the given session as imported at the given timestamp.
+     * Returns the number of rows updated (0 if the session id doesn't exist).
+     */
+    suspend fun markSessionImported(
+        id: ApiSessionId,
+        importedAt: Instant,
+    ): Long
 }
