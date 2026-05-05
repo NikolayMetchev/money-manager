@@ -550,15 +550,8 @@ fun MoneyManagerApp(
                                 }
                                 MonzoAuthScreen(
                                     apiSessionRepository = apiSessionRepository,
-                                    accountRepository = accountRepository,
-                                    currencyRepository = currencyRepository,
-                                    transactionRepository = transactionRepository,
-                                    transferSourceQueries = transferSourceQueries,
-                                    entitySourceQueries = entitySourceQueries,
-                                    maintenanceService = maintenanceService,
-                                    deviceId = deviceId,
-                                    onTransactionsImported = {
-                                        transactionRefreshTrigger++
+                                    onCredentialSaved = {
+                                        navigationHistory.navigateBack()
                                     },
                                 )
                             }
@@ -575,6 +568,8 @@ fun MoneyManagerApp(
                                     transferSourceQueries = transferSourceQueries,
                                     entitySourceQueries = entitySourceQueries,
                                     maintenanceService = maintenanceService,
+                                    personRepository = personRepository,
+                                    personAccountOwnershipRepository = personAccountOwnershipRepository,
                                     deviceId = deviceId,
                                     onTransactionsImported = {
                                         transactionRefreshTrigger++

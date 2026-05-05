@@ -219,7 +219,18 @@ class MonzoImportE2ETest : DbTest() {
                 )
 
             // WHEN — download then import
-            downloadMonzoTransactions(token = "test-monzo-token", apiClient = apiClient)
+            downloadMonzoAccounts(
+                token = "test-monzo-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+            )
+            downloadMonzoTransactions(
+                token = "test-monzo-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+            )
 
             val importResult =
                 importMonzoSessionTransactions(
@@ -229,6 +240,8 @@ class MonzoImportE2ETest : DbTest() {
                     transactionRepository = repositories.transactionRepository,
                     transferSourceQueries = transferSourceQueries,
                     entitySourceQueries = repositories.entitySourceQueries,
+                    personRepository = repositories.personRepository,
+                    personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                     deviceId = deviceId,
                     sessionId = sessionId,
                 )
@@ -385,7 +398,18 @@ class MonzoImportE2ETest : DbTest() {
                     engine = mockEngine,
                 )
 
-            downloadMonzoTransactions(token = "test-monzo-token", apiClient = apiClient)
+            downloadMonzoAccounts(
+                token = "test-monzo-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+            )
+            downloadMonzoTransactions(
+                token = "test-monzo-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+            )
 
             val importResult =
                 importMonzoSessionTransactions(
@@ -395,6 +419,8 @@ class MonzoImportE2ETest : DbTest() {
                     transactionRepository = repositories.transactionRepository,
                     transferSourceQueries = transferSourceQueries,
                     entitySourceQueries = repositories.entitySourceQueries,
+                    personRepository = repositories.personRepository,
+                    personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                     deviceId = deviceId,
                     sessionId = sessionId,
                 )

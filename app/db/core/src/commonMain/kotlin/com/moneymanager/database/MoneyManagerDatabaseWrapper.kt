@@ -107,6 +107,7 @@ class MoneyManagerDatabaseWrapper(
             "_creation_mode",
             "settings",
             "api_session_type",
+            "api_credential",
             "api_session",
             "api_request",
             "api_request_header",

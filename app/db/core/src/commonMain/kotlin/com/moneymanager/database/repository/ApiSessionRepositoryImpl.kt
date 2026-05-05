@@ -14,9 +14,12 @@ import com.moneymanager.domain.model.ApiResponseTransactionId
 import com.moneymanager.domain.model.ApiResponseTransactionState
 import com.moneymanager.domain.model.ApiSession
 import com.moneymanager.domain.model.ApiSessionId
+import com.moneymanager.domain.model.ApiSessionKind
 import com.moneymanager.domain.model.ApiSessionType
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.JsonPath
+import com.moneymanager.domain.model.MonzoCredential
+import com.moneymanager.domain.model.MonzoCredentialId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.ApiSessionRepository
 import kotlinx.coroutines.Dispatchers
@@ -28,12 +31,42 @@ class ApiSessionRepositoryImpl(
 ) : ApiSessionRepository {
     private val queries = database.apiSessionQueries
 
+    override suspend fun createCredential(
+        token: String,
+        createdAt: Instant,
+        type: ApiSessionType,
+    ): MonzoCredentialId =
+        withContext(Dispatchers.Default) {
+            val id =
+                queries.transactionWithResult {
+                    queries.insertCredential(
+                        type_id = type.id,
+                        token = token,
+                        created_at = createdAt.toEpochMilliseconds(),
+                    )
+                    queries.lastInsertCredentialRowId().executeAsOne()
+                }
+            MonzoCredentialId(id)
+        }
+
+    override suspend fun getAllCredentials(): List<MonzoCredential> =
+        withContext(Dispatchers.Default) {
+            queries.selectAllCredentials().executeAsList().map { it.toMonzoCredential() }
+        }
+
+    override suspend fun getSessionsByCredential(credentialId: MonzoCredentialId): List<ApiSession> =
+        withContext(Dispatchers.Default) {
+            queries.selectByCredentialId(credentialId.id).executeAsList().map { it.toApiSession() }
+        }
+
     override suspend fun createSession(
         token: String,
         deviceId: DeviceId,
         createdAt: Instant,
         expiresAt: Instant?,
         type: ApiSessionType,
+        credentialId: MonzoCredentialId?,
+        kind: ApiSessionKind?,
     ): ApiSessionId =
         withContext(Dispatchers.Default) {
             val id =
@@ -44,6 +77,8 @@ class ApiSessionRepositoryImpl(
                         device_id = deviceId.id,
                         created_at = createdAt.toEpochMilliseconds(),
                         expires_at = expiresAt?.toEpochMilliseconds(),
+                        credential_id = credentialId?.id,
+                        kind = kind?.value,
                     )
                     queries.lastInsertRowId().executeAsOne()
                 }
@@ -258,6 +293,14 @@ class ApiSessionRepositoryImpl(
             json = json,
         )
 
+    private fun com.moneymanager.database.sql.Api_credential.toMonzoCredential(): MonzoCredential =
+        MonzoCredential(
+            id = MonzoCredentialId(id),
+            type = ApiSessionType.fromId(type_id),
+            token = token,
+            createdAt = Instant.fromEpochMilliseconds(created_at),
+        )
+
     private fun com.moneymanager.database.sql.Api_session.toApiSession(): ApiSession =
         ApiSession(
             id = ApiSessionId(id),
@@ -267,6 +310,8 @@ class ApiSessionRepositoryImpl(
             createdAt = Instant.fromEpochMilliseconds(created_at),
             expiresAt = expires_at?.let { Instant.fromEpochMilliseconds(it) },
             revokedAt = revoked_at?.let { Instant.fromEpochMilliseconds(it) },
+            credentialId = credential_id?.let { MonzoCredentialId(it) },
+            kind = ApiSessionKind.fromValueOrNull(kind),
         )
 
     private fun <K, V> Map<K, List<V>>.getValueOrDefault(key: K): List<V> = get(key).orEmpty()

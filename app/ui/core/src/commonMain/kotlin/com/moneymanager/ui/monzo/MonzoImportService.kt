@@ -10,6 +10,8 @@ import com.moneymanager.domain.model.*
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.ApiSessionRepository
 import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
+import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.rest.ApiClient
 import com.moneymanager.rest.ApiHttpResponse
@@ -35,9 +37,15 @@ private const val MONZO_VOID_COUNTERPARTY = "Monzo Counterparty: Void"
 data class MonzoImportResult(
     val accountCount: Int,
     val transactionCount: Int,
+    val personCount: Int = 0,
     val duplicateCount: Int = 0,
     val errorCount: Int = 0,
     val excludedCount: Int = 0,
+)
+
+data class MonzoAccountsDownloadResult(
+    val accountCount: Int,
+    val skipped: Boolean = false,
 )
 
 data class MonzoDownloadResult(
@@ -52,18 +60,77 @@ data class MonzoDownloadProgress(
     val downloadedResponsePageCount: Int,
 )
 
+/**
+ * Downloads accounts from the Monzo API and stores them in the session traffic.
+ * Incremental: if accounts have already been downloaded for this session, returns the existing
+ * count without making a new API call.
+ */
+suspend fun downloadMonzoAccounts(
+    token: String,
+    apiClient: ApiClient,
+    apiSessionRepository: ApiSessionRepository,
+    sessionId: ApiSessionId,
+): MonzoAccountsDownloadResult {
+    val accountsUrl = "$MONZO_BASE_URL/accounts"
+    val existingRequests = apiSessionRepository.getRequestsBySession(sessionId)
+
+    // Incremental: skip only when both the request and its response are already stored.
+    // If the request exists but has no response (interrupted prior run), fall through and re-fetch.
+    val existingAccountsRequest = existingRequests.firstOrNull { it.url == accountsUrl }
+    if (existingAccountsRequest != null) {
+        val existingResponse =
+            apiSessionRepository
+                .getResponsesBySession(sessionId)
+                .firstOrNull { it.requestId == existingAccountsRequest.id }
+        if (existingResponse != null) {
+            return MonzoAccountsDownloadResult(accountCount = parseAccounts(existingResponse.json).size, skipped = true)
+        }
+    }
+
+    val response = fetchResponse(url = accountsUrl, token = token, apiClient = apiClient)
+    val accounts = parseAccounts(response.body)
+    return MonzoAccountsDownloadResult(accountCount = accounts.size)
+}
+
+/**
+ * Downloads transactions for all accounts stored in [accountsSessionId] (or [sessionId] if not
+ * provided). Incremental: pages whose URL is already stored in [sessionId] are skipped.
+ *
+ * Call [downloadMonzoAccounts] first so that an accounts response exists.
+ */
 suspend fun downloadMonzoTransactions(
     token: String,
     apiClient: ApiClient,
+    apiSessionRepository: ApiSessionRepository,
+    sessionId: ApiSessionId,
+    accountsSessionId: ApiSessionId? = null,
     onProgress: (MonzoDownloadProgress) -> Unit = {},
 ): MonzoDownloadResult {
-    val accountsResponse =
-        fetchResponse(
-            url = "$MONZO_BASE_URL/accounts",
-            token = token,
-            apiClient = apiClient,
-        )
-    val monzoAccounts = parseAccounts(accountsResponse.body)
+    val existingRequests = apiSessionRepository.getRequestsBySession(sessionId)
+    val existingResponses = apiSessionRepository.getResponsesBySession(sessionId)
+    val existingResponsesByRequestId = existingResponses.associateBy { it.requestId }
+    val existingRequestsByUrl = existingRequests.associateBy { it.url }
+
+    // Read accounts from a separate accounts session if provided, otherwise from this session
+    val accountsUrl = "$MONZO_BASE_URL/accounts"
+    val resolvedAccountsSessionId = accountsSessionId ?: sessionId
+    val accountsRequests =
+        if (accountsSessionId != null && accountsSessionId != sessionId) {
+            apiSessionRepository.getRequestsBySession(resolvedAccountsSessionId)
+        } else {
+            existingRequests
+        }
+    val accountsResponses =
+        if (accountsSessionId != null && accountsSessionId != sessionId) {
+            apiSessionRepository.getResponsesBySession(resolvedAccountsSessionId)
+        } else {
+            existingResponses
+        }
+    val accountsRequestIds = accountsRequests.filter { it.url == accountsUrl }.map { it.id }.toSet()
+    val monzoAccounts =
+        accountsResponses
+            .filter { it.requestId in accountsRequestIds }
+            .flatMap { response -> parseAccounts(response.json) }
 
     var transactionResponseCount = 0
 
@@ -81,14 +148,19 @@ suspend fun downloadMonzoTransactions(
                 ),
             )
             val url = buildTransactionUrl(monzoAccount.id, before)
-            val response =
-                fetchResponse(
-                    url = url,
-                    token = token,
-                    apiClient = apiClient,
-                )
-            val transactions = parseTransactionsWithPath(response.body)
-            transactionResponseCount += 1
+
+            // Incremental: reuse a stored response only when both request and response are present.
+            // An orphan request (response missing from an interrupted prior run) is treated as a
+            // cache miss so pagination can make progress on retry.
+            val existingResponse = existingRequestsByUrl[url]?.let { existingResponsesByRequestId[it.id] }
+            val transactions: List<MonzoTransactionPageItem> =
+                if (existingResponse != null) {
+                    parseTransactionsWithPath(existingResponse.json)
+                } else {
+                    val response = fetchResponse(url = url, token = token, apiClient = apiClient)
+                    transactionResponseCount += 1
+                    parseTransactionsWithPath(response.body)
+                }
 
             before = transactions.map { it.created }.minOrNull()
             hasTransactions = transactions.isNotEmpty()
@@ -117,25 +189,43 @@ suspend fun importMonzoSessionTransactions(
     transactionRepository: TransactionRepository,
     transferSourceQueries: TransferSourceQueries,
     entitySourceQueries: EntitySourceQueries,
+    personRepository: PersonRepository,
+    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     deviceId: DeviceId,
     sessionId: ApiSessionId,
+    accountsSessionId: ApiSessionId? = null,
     onProgress: (String) -> Unit = {},
 ): MonzoImportResult {
     val requestsById = apiSessionRepository.getRequestsBySession(sessionId).associateBy { it.id }
     val responses = apiSessionRepository.getResponsesBySession(sessionId)
 
+    // When accounts were downloaded into a separate session, load them from there
+    val resolvedAccountsSessionId = accountsSessionId ?: sessionId
+    val accountsRequestsById =
+        if (accountsSessionId != null && accountsSessionId != sessionId) {
+            apiSessionRepository.getRequestsBySession(resolvedAccountsSessionId).associateBy { it.id }
+        } else {
+            requestsById
+        }
+    val accountsResponses =
+        if (accountsSessionId != null && accountsSessionId != sessionId) {
+            apiSessionRepository.getResponsesBySession(resolvedAccountsSessionId)
+        } else {
+            responses
+        }
+
     // Build a map from Monzo account ID to the accounts-list source (request + jsonPath)
     // so newly created accounts can be linked back to their API origin.
     val accountApiSourceByMonzoId =
-        responses
+        accountsResponses
             .flatMap { response ->
-                val requestId = requestsById[response.requestId]?.id ?: return@flatMap emptyList()
+                val requestId = accountsRequestsById[response.requestId]?.id ?: return@flatMap emptyList()
                 parseAccountsWithPaths(response.json).map { (account, jsonPath) ->
-                    account.id to AccountApiSource(sessionId, requestId, jsonPath)
+                    account.id to AccountApiSource(resolvedAccountsSessionId, requestId, jsonPath)
                 }
             }.toMap()
 
-    val monzoAccounts = responses.flatMap { response -> parseAccounts(response.json) }
+    val monzoAccounts = accountsResponses.flatMap { response -> parseAccounts(response.json) }
     val monzoAccountsById = monzoAccounts.associateBy { it.id }
 
     val transactionResponses = responses.filter { requestsById[it.requestId]?.accountIdParameter() != null }
@@ -212,13 +302,80 @@ suspend fun importMonzoSessionTransactions(
                 }.awaitAll()
         }
 
+    val totalPeople =
+        importPeopleFromAccounts(
+            monzoAccountsById = monzoAccountsById,
+            accountCache = accountCache,
+            personRepository = personRepository,
+            personAccountOwnershipRepository = personAccountOwnershipRepository,
+        )
+
     return MonzoImportResult(
         accountCount = monzoAccountsById.size,
         transactionCount = totalImported,
+        personCount = totalPeople,
         duplicateCount = totalDuplicates,
         errorCount = totalErrors,
         excludedCount = totalExcluded,
     )
+}
+
+private suspend fun importPeopleFromAccounts(
+    monzoAccountsById: Map<String, MonzoAccount>,
+    accountCache: AccountCache,
+    personRepository: PersonRepository,
+    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
+): Int {
+    val peopleByFullName =
+        personRepository
+            .getAllPeople()
+            .first()
+            .associateBy { it.fullName }
+            .toMutableMap()
+    var newPeopleCount = 0
+
+    for (monzoAccount in monzoAccountsById.values) {
+        if (monzoAccount.owners.isEmpty()) continue
+
+        val accountId = accountCache.getOrCreateAccountId(monzoAccount.id, monzoAccount.localAccountName())
+        val existingOwnerPersonIds =
+            personAccountOwnershipRepository
+                .getOwnershipsByAccount(accountId)
+                .first()
+                .map { it.personId }
+                .toSet()
+
+        for (owner in monzoAccount.owners) {
+            val name = owner.preferredName.trim()
+            if (name.isBlank()) continue
+
+            val personId =
+                peopleByFullName[name]?.id
+                    ?: run {
+                        // Split on first space: "John Doe" → firstName="John", lastName="Doe".
+                        // For single-word names the lastName is null.
+                        // Note: this is a simplified Western-centric split; users can edit names after import.
+                        val nameParts = name.split(" ", limit = 2)
+                        val person =
+                            Person(
+                                id = PersonId(0L),
+                                firstName = nameParts[0],
+                                middleName = null,
+                                lastName = nameParts.getOrNull(1)?.ifBlank { null },
+                            )
+                        val newId = personRepository.createPerson(person)
+                        peopleByFullName[name] = person.copy(id = newId)
+                        newPeopleCount++
+                        newId
+                    }
+
+            if (personId !in existingOwnerPersonIds) {
+                personAccountOwnershipRepository.createOwnership(personId, accountId)
+            }
+        }
+    }
+
+    return newPeopleCount
 }
 
 private suspend fun fetchResponse(
@@ -240,6 +397,12 @@ class MonzoApiException(
 private data class MonzoAccount(
     val id: String,
     val description: String,
+    val owners: List<MonzoAccountOwner> = emptyList(),
+)
+
+private data class MonzoAccountOwner(
+    val userId: String,
+    val preferredName: String,
 )
 
 private fun parseAccounts(json: String): List<MonzoAccount> =
@@ -254,12 +417,24 @@ private fun parseAccounts(json: String): List<MonzoAccount> =
                 MonzoAccount(
                     id = id,
                     description = account["description"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+                    owners = parseAccountOwners(account),
                 )
             }
             ?: emptyList()
     } catch (_: Exception) {
         emptyList()
     }
+
+private fun parseAccountOwners(account: JsonObject): List<MonzoAccountOwner> =
+    account["owners"]
+        ?.jsonArray
+        ?.mapNotNull { element ->
+            val owner = element as? JsonObject ?: return@mapNotNull null
+            val userId = owner["user_id"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+            val preferredName = owner["preferred_name"]?.jsonPrimitive?.contentOrNull.orEmpty()
+            MonzoAccountOwner(userId = userId, preferredName = preferredName)
+        }
+        ?: emptyList()
 
 private fun parseAccountsWithPaths(json: String): List<Pair<MonzoAccount, JsonPath>> =
     Json
@@ -272,6 +447,7 @@ private fun parseAccountsWithPaths(json: String): List<Pair<MonzoAccount, JsonPa
             MonzoAccount(
                 id = id,
                 description = account["description"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+                owners = parseAccountOwners(account),
             ) to JsonPath("$.accounts[$index]")
         }
         ?: emptyList()

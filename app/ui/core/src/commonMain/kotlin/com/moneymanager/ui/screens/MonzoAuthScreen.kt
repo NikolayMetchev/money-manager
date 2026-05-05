@@ -4,7 +4,6 @@ package com.moneymanager.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,108 +12,38 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
-import com.moneymanager.database.DatabaseMaintenanceService
-import com.moneymanager.database.sql.EntitySourceQueries
-import com.moneymanager.database.sql.TransferSourceQueries
-import com.moneymanager.domain.model.ApiSession
-import com.moneymanager.domain.model.ApiSessionId
-import com.moneymanager.domain.model.ApiSessionType
-import com.moneymanager.domain.model.DeviceId
-import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.ApiSessionRepository
-import com.moneymanager.domain.repository.CurrencyRepository
-import com.moneymanager.domain.repository.TransactionRepository
-import com.moneymanager.rest.ApiSessionTrafficRecorder
-import com.moneymanager.rest.createApiClient
-import com.moneymanager.ui.background.LocalBackgroundTaskManager
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
-import com.moneymanager.ui.monzo.MonzoDownloadProgress
-import com.moneymanager.ui.monzo.MonzoDownloadResult
-import com.moneymanager.ui.monzo.MonzoImportResult
-import com.moneymanager.ui.monzo.downloadMonzoTransactions
-import com.moneymanager.ui.monzo.importMonzoSessionTransactions
-import com.moneymanager.ui.util.displayDateTime
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
 
 private const val MONZO_DEVELOPER_PORTAL_URL = "https://developers.monzo.com/"
 
 @Composable
-@Suppress("DEPRECATION")
 fun MonzoAuthScreen(
     apiSessionRepository: ApiSessionRepository,
-    accountRepository: AccountRepository,
-    currencyRepository: CurrencyRepository,
-    transactionRepository: TransactionRepository,
-    transferSourceQueries: TransferSourceQueries,
-    entitySourceQueries: EntitySourceQueries,
-    maintenanceService: DatabaseMaintenanceService,
-    deviceId: DeviceId,
-    onTransactionsImported: () -> Unit = {},
+    onCredentialSaved: () -> Unit = {},
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
-    val backgroundTasks = LocalBackgroundTaskManager.current
     val uriHandler = LocalUriHandler.current
-    val clipboardManager = LocalClipboardManager.current
 
-    var activeSessions by remember { mutableStateOf<List<ApiSession>>(emptyList()) }
     var tokenInput by remember { mutableStateOf("") }
     var isSaving by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    var successMessage by remember { mutableStateOf<String?>(null) }
-    var sessionToRevoke by remember { mutableStateOf<ApiSession?>(null) }
-    var downloadResult by remember { mutableStateOf<MonzoDownloadResult?>(null) }
-    var downloadProgress by remember { mutableStateOf<MonzoDownloadProgress?>(null) }
-    var importResult by remember { mutableStateOf<MonzoImportResult?>(null) }
-    var importError by remember { mutableStateOf<String?>(null) }
-
-    LaunchedEffect(Unit) {
-        activeSessions = apiSessionRepository.getActiveSessions(Clock.System.now())
-    }
-
-    fun refreshSessions() {
-        scope.launch {
-            activeSessions = apiSessionRepository.getActiveSessions(Clock.System.now())
-        }
-    }
-
-    sessionToRevoke?.let { session ->
-        RevokeSessionDialog(
-            session = session,
-            onConfirm = {
-                sessionToRevoke = null
-                scope.launch {
-                    try {
-                        apiSessionRepository.revokeSession(session.id, Clock.System.now())
-                        refreshSessions()
-                    } catch (expected: Exception) {
-                        errorMessage = "Failed to revoke session: ${expected.message}. Please try again."
-                    }
-                }
-            },
-            onDismiss = { sessionToRevoke = null },
-        )
-    }
 
     Column(
         modifier =
@@ -129,7 +58,6 @@ fun MonzoAuthScreen(
             style = MaterialTheme.typography.headlineMedium,
         )
 
-        // Instructions card
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(
                 modifier =
@@ -142,28 +70,14 @@ fun MonzoAuthScreen(
                     text = "How to connect your Monzo account",
                     style = MaterialTheme.typography.titleMedium,
                 )
-
-                Text(
-                    text = "1. Open the Monzo Developer Playground in your browser.",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Text(
-                    text = "2. Log in with your Monzo account credentials.",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
+                Text(text = "1. Open the Monzo Developer Playground in your browser.", style = MaterialTheme.typography.bodyMedium)
+                Text(text = "2. Log in with your Monzo account credentials.", style = MaterialTheme.typography.bodyMedium)
                 Text(
                     text = "3. Monzo will send a magic link to your email or app. Approve the login.",
                     style = MaterialTheme.typography.bodyMedium,
                 )
-                Text(
-                    text = "4. Copy the access token shown on the playground page.",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Text(
-                    text = "5. Paste the token below and tap \"Save Token\".",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-
+                Text(text = "4. Copy the access token shown on the playground page.", style = MaterialTheme.typography.bodyMedium)
+                Text(text = "5. Paste the token below and tap \"Save Token\".", style = MaterialTheme.typography.bodyMedium)
                 Button(
                     onClick = { uriHandler.openUri(MONZO_DEVELOPER_PORTAL_URL) },
                     modifier = Modifier.fillMaxWidth(),
@@ -173,7 +87,6 @@ fun MonzoAuthScreen(
             }
         }
 
-        // Token input card
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(
                 modifier =
@@ -182,17 +95,13 @@ fun MonzoAuthScreen(
                         .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text(
-                    text = "Enter Access Token",
-                    style = MaterialTheme.typography.titleMedium,
-                )
+                Text(text = "Enter Access Token", style = MaterialTheme.typography.titleMedium)
 
                 OutlinedTextField(
                     value = tokenInput,
                     onValueChange = {
                         tokenInput = it
                         errorMessage = null
-                        successMessage = null
                     },
                     label = { Text("Access Token") },
                     placeholder = { Text("Paste your Monzo access token here") },
@@ -210,40 +119,24 @@ fun MonzoAuthScreen(
                     )
                 }
 
-                successMessage?.let { success ->
-                    Text(
-                        text = success,
-                        color = MaterialTheme.colorScheme.primary,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-
                 Button(
                     onClick = {
                         val trimmedToken = tokenInput.trim()
                         if (trimmedToken.isBlank()) {
-                            errorMessage =
-                                "Token cannot be empty. Copy the access token from the Monzo Developer Playground and paste it here."
+                            errorMessage = "Token cannot be empty."
                             return@Button
                         }
                         isSaving = true
                         errorMessage = null
-                        successMessage = null
                         scope.launch {
                             try {
-                                apiSessionRepository.createSession(
+                                apiSessionRepository.createCredential(
                                     token = trimmedToken,
-                                    deviceId = deviceId,
                                     createdAt = Clock.System.now(),
-                                    expiresAt = null,
-                                    type = ApiSessionType.MONZO,
                                 )
-                                tokenInput = ""
-                                successMessage = "Token saved successfully."
-                                refreshSessions()
+                                onCredentialSaved()
                             } catch (expected: Exception) {
-                                errorMessage = "Failed to save token: ${expected.message}. " +
-                                    "Ensure the token is valid and try again."
+                                errorMessage = "Failed to save token: ${expected.message}"
                             } finally {
                                 isSaving = false
                             }
@@ -253,210 +146,9 @@ fun MonzoAuthScreen(
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     if (isSaving) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp),
-                            strokeWidth = 2.dp,
-                        )
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                     } else {
                         Text("Save Token")
-                    }
-                }
-            }
-        }
-
-        // Active sessions card
-        if (activeSessions.isNotEmpty()) {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Text(
-                        text = "Active Sessions",
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-
-                    activeSessions.forEach { session ->
-                        ActiveSessionItem(
-                            session = session,
-                            onRevoke = { sessionToRevoke = session },
-                        )
-                    }
-                }
-            }
-        }
-
-        // Import data card - only shown when there are active sessions
-        if (activeSessions.isNotEmpty()) {
-            val activeSession = activeSessions.first()
-            val isDownloading = backgroundTasks.isRunning(monzoDownloadTaskKey(activeSession.id))
-            val isImporting = backgroundTasks.isRunning(monzoImportTaskKey(activeSession.id))
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Text(
-                        text = "Monzo Transactions",
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-
-                    Text(
-                        text = "Download transactions into API traffic first, then import the stored responses into transactions.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-
-                    downloadResult?.let { result ->
-                        Text(
-                            text = result.displaySummary(),
-                            color = MaterialTheme.colorScheme.primary,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-
-                    importResult?.let { result ->
-                        Text(
-                            text = result.displaySummary(),
-                            color = MaterialTheme.colorScheme.primary,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-
-                    if (isDownloading) {
-                        val progress = downloadProgress
-                        Text(
-                            text =
-                                if (progress == null) {
-                                    "Preparing download..."
-                                } else {
-                                    "Downloading account ${progress.accountIndex}/${progress.accountCount}, " +
-                                        "page ${progress.page}. " +
-                                        "${progress.downloadedResponsePageCount} response(s) downloaded so far."
-                                },
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-
-                    if (isImporting) {
-                        Text(
-                            text = "Importing transactions...",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-
-                    importError?.let { error ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            Text(
-                                text = error,
-                                color = MaterialTheme.colorScheme.error,
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.weight(1f),
-                            )
-                            TextButton(
-                                onClick = { clipboardManager.setText(AnnotatedString(error)) },
-                            ) {
-                                Text("Copy")
-                            }
-                        }
-                    }
-
-                    Button(
-                        onClick = {
-                            val session = activeSessions.firstOrNull() ?: return@Button
-                            downloadResult = null
-                            downloadProgress = null
-                            importError = null
-                            backgroundTasks.startTask(
-                                key = monzoDownloadTaskKey(session.id),
-                                title = "Download Transactions",
-                                initialDetail = "Starting Monzo download for session #${session.id}.",
-                            ) {
-                                val result =
-                                    downloadMonzoTransactions(
-                                        token = session.token,
-                                        apiClient =
-                                            createApiClient(
-                                                trafficRecorder =
-                                                    ApiSessionTrafficRecorder(
-                                                        sessionId = session.id,
-                                                        apiSessionRepository = apiSessionRepository,
-                                                    ),
-                                                engine = null,
-                                            ),
-                                        onProgress = { progress ->
-                                            downloadProgress = progress
-                                            update(progress.downloadDetail())
-                                        },
-                                    )
-                                downloadResult = result
-                                downloadProgress = null
-                                result.displaySummary()
-                            }
-                        },
-                        enabled = !isDownloading && !isImporting,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        if (isDownloading) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(16.dp),
-                                strokeWidth = 2.dp,
-                            )
-                        } else {
-                            Text("Download Transactions")
-                        }
-                    }
-
-                    Button(
-                        onClick = {
-                            val session = activeSessions.firstOrNull() ?: return@Button
-                            importResult = null
-                            importError = null
-                            backgroundTasks.startTask(
-                                key = monzoImportTaskKey(session.id),
-                                title = "Import Transactions",
-                                initialDetail = "Starting transaction import for session #${session.id}.",
-                            ) {
-                                val result =
-                                    importMonzoSessionTransactions(
-                                        apiSessionRepository = apiSessionRepository,
-                                        accountRepository = accountRepository,
-                                        currencyRepository = currencyRepository,
-                                        transactionRepository = transactionRepository,
-                                        transferSourceQueries = transferSourceQueries,
-                                        entitySourceQueries = entitySourceQueries,
-                                        deviceId = deviceId,
-                                        sessionId = session.id,
-                                        onProgress = ::update,
-                                    )
-                                maintenanceService.refreshMaterializedViews()
-                                importResult = result
-                                onTransactionsImported()
-                                result.displaySummary()
-                            }
-                        },
-                        enabled = !isDownloading && !isImporting,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        if (isImporting) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(16.dp),
-                                strokeWidth = 2.dp,
-                            )
-                        } else {
-                            Text("Import Transactions")
-                        }
                     }
                 }
             }
@@ -465,106 +157,3 @@ fun MonzoAuthScreen(
         Spacer(modifier = Modifier.height(16.dp))
     }
 }
-
-@Composable
-private fun ActiveSessionItem(
-    session: ApiSession,
-    onRevoke: () -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = "Created: ${session.createdAt.displayDateTime()}",
-                style = MaterialTheme.typography.bodySmall,
-            )
-            val expiresAt = session.expiresAt
-            if (expiresAt != null) {
-                Text(
-                    text = "Expires: ${expiresAt.displayDateTime()}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            // Show only the beginning and end of the token for identification
-            val displayToken =
-                if (session.token.length > 16) {
-                    "${session.token.take(8)}...${session.token.takeLast(8)}"
-                } else {
-                    session.token
-                }
-            Text(
-                text = displayToken,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        OutlinedButton(
-            onClick = onRevoke,
-            modifier = Modifier.padding(start = 8.dp),
-        ) {
-            Text("Revoke")
-        }
-    }
-}
-
-@Composable
-private fun RevokeSessionDialog(
-    session: ApiSession,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Revoke Session?") },
-        text = {
-            Text(
-                "This will revoke the Monzo access token created on ${session.createdAt.displayDateTime()}. " +
-                    "You will need to reconnect to use Monzo features again.",
-            )
-        },
-        confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text("Revoke")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        },
-    )
-}
-
-private fun MonzoImportResult.displaySummary(): String =
-    buildString {
-        append("Import complete: ")
-        append(accountCount)
-        append(" account(s), ")
-        append(transactionCount)
-        append(" imported transaction(s)")
-        if (duplicateCount > 0) {
-            append(", ")
-            append(duplicateCount)
-            append(" duplicate(s)")
-        }
-        if (errorCount > 0) {
-            append(", ")
-            append(errorCount)
-            append(" error(s)")
-        }
-        append(".")
-    }
-
-private fun MonzoDownloadResult.displaySummary(): String =
-    "Download complete: $accountCount account(s), $transactionResponseCount transaction response page(s)."
-
-private fun MonzoDownloadProgress.downloadDetail(): String =
-    "Downloading account $accountIndex/$accountCount, page $page. $downloadedResponsePageCount response page(s) downloaded so far."
-
-private fun monzoDownloadTaskKey(sessionId: ApiSessionId): String = "monzo-download-${sessionId.id}"
-
-private fun monzoImportTaskKey(sessionId: ApiSessionId): String = "monzo-import-${sessionId.id}"
