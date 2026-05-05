@@ -74,13 +74,17 @@ suspend fun downloadMonzoAccounts(
     val accountsUrl = "$MONZO_BASE_URL/accounts"
     val existingRequests = apiSessionRepository.getRequestsBySession(sessionId)
 
-    // Incremental: skip if accounts already downloaded for this session
+    // Incremental: skip only when both the request and its response are already stored.
+    // If the request exists but has no response (interrupted prior run), fall through and re-fetch.
     val existingAccountsRequest = existingRequests.firstOrNull { it.url == accountsUrl }
     if (existingAccountsRequest != null) {
-        val existingResponses = apiSessionRepository.getResponsesBySession(sessionId)
-        val existingResponse = existingResponses.firstOrNull { it.requestId == existingAccountsRequest.id }
-        val accountCount = existingResponse?.let { parseAccounts(it.json).size } ?: 0
-        return MonzoAccountsDownloadResult(accountCount = accountCount, skipped = true)
+        val existingResponse =
+            apiSessionRepository
+                .getResponsesBySession(sessionId)
+                .firstOrNull { it.requestId == existingAccountsRequest.id }
+        if (existingResponse != null) {
+            return MonzoAccountsDownloadResult(accountCount = parseAccounts(existingResponse.json).size, skipped = true)
+        }
     }
 
     val response = fetchResponse(url = accountsUrl, token = token, apiClient = apiClient)
@@ -145,17 +149,18 @@ suspend fun downloadMonzoTransactions(
             )
             val url = buildTransactionUrl(monzoAccount.id, before)
 
-            // Incremental: reuse stored response if this URL was already fetched
-            val existingRequest = existingRequestsByUrl[url]
-            val transactions: List<MonzoTransactionPageItem>
-            if (existingRequest != null) {
-                val existingResponse = existingResponsesByRequestId[existingRequest.id]
-                transactions = existingResponse?.let { parseTransactionsWithPath(it.json) } ?: emptyList()
-            } else {
-                val response = fetchResponse(url = url, token = token, apiClient = apiClient)
-                transactions = parseTransactionsWithPath(response.body)
-                transactionResponseCount += 1
-            }
+            // Incremental: reuse a stored response only when both request and response are present.
+            // An orphan request (response missing from an interrupted prior run) is treated as a
+            // cache miss so pagination can make progress on retry.
+            val existingResponse = existingRequestsByUrl[url]?.let { existingResponsesByRequestId[it.id] }
+            val transactions: List<MonzoTransactionPageItem> =
+                if (existingResponse != null) {
+                    parseTransactionsWithPath(existingResponse.json)
+                } else {
+                    val response = fetchResponse(url = url, token = token, apiClient = apiClient)
+                    transactionResponseCount += 1
+                    parseTransactionsWithPath(response.body)
+                }
 
             before = transactions.map { it.created }.minOrNull()
             hasTransactions = transactions.isNotEmpty()
@@ -321,41 +326,48 @@ private suspend fun importPeopleFromAccounts(
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
 ): Int {
-    val allPeople = personRepository.getAllPeople().first().toMutableList()
+    val peopleByFullName =
+        personRepository
+            .getAllPeople()
+            .first()
+            .associateBy { it.fullName }
+            .toMutableMap()
     var newPeopleCount = 0
 
     for (monzoAccount in monzoAccountsById.values) {
         if (monzoAccount.owners.isEmpty()) continue
 
         val accountId = accountCache.getOrCreateAccountId(monzoAccount.id, monzoAccount.localAccountName())
-        val existingOwnerships = personAccountOwnershipRepository.getOwnershipsByAccount(accountId).first()
-        val existingOwnerPersonIds = existingOwnerships.map { it.personId }.toSet()
+        val existingOwnerPersonIds =
+            personAccountOwnershipRepository
+                .getOwnershipsByAccount(accountId)
+                .first()
+                .map { it.personId }
+                .toSet()
 
         for (owner in monzoAccount.owners) {
             val name = owner.preferredName.trim()
             if (name.isBlank()) continue
 
-            val existingPerson = allPeople.firstOrNull { it.fullName == name }
             val personId =
-                if (existingPerson != null) {
-                    existingPerson.id
-                } else {
-                    // Split on first space: "John Doe" → firstName="John", lastName="Doe".
-                    // For single-word names the lastName is null.
-                    // Note: this is a simplified Western-centric split; users can edit names after import.
-                    val nameParts = name.split(" ", limit = 2)
-                    val person =
-                        Person(
-                            id = PersonId(0L),
-                            firstName = nameParts[0],
-                            middleName = null,
-                            lastName = nameParts.getOrNull(1)?.ifBlank { null },
-                        )
-                    val newId = personRepository.createPerson(person)
-                    allPeople.add(person.copy(id = newId))
-                    newPeopleCount++
-                    newId
-                }
+                peopleByFullName[name]?.id
+                    ?: run {
+                        // Split on first space: "John Doe" → firstName="John", lastName="Doe".
+                        // For single-word names the lastName is null.
+                        // Note: this is a simplified Western-centric split; users can edit names after import.
+                        val nameParts = name.split(" ", limit = 2)
+                        val person =
+                            Person(
+                                id = PersonId(0L),
+                                firstName = nameParts[0],
+                                middleName = null,
+                                lastName = nameParts.getOrNull(1)?.ifBlank { null },
+                            )
+                        val newId = personRepository.createPerson(person)
+                        peopleByFullName[name] = person.copy(id = newId)
+                        newPeopleCount++
+                        newId
+                    }
 
             if (personId !in existingOwnerPersonIds) {
                 personAccountOwnershipRepository.createOwnership(personId, accountId)
