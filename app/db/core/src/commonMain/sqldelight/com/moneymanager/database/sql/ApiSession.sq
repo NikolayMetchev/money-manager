@@ -3,20 +3,34 @@ CREATE TABLE api_session_type (
     name TEXT NOT NULL UNIQUE
 );
 
-CREATE TABLE api_session (
+-- Stores a saved token/credential. One credential can produce many download sessions.
+CREATE TABLE api_credential (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     type_id INTEGER NOT NULL,
     token TEXT NOT NULL UNIQUE CHECK(length(trim(token)) > 0),
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY (type_id) REFERENCES api_session_type(id)
+);
+
+CREATE INDEX idx_api_credential_token ON api_credential(token);
+
+-- kind: 'ACCOUNTS' for account-download sessions, 'TRANSACTIONS' for transaction-download sessions
+CREATE TABLE api_session (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    type_id INTEGER NOT NULL,
+    token TEXT NOT NULL CHECK(length(trim(token)) > 0),
     device_id INTEGER NOT NULL,
     created_at INTEGER NOT NULL,
     expires_at INTEGER,
     revoked_at INTEGER,
+    credential_id INTEGER,
+    kind TEXT,
     FOREIGN KEY (type_id) REFERENCES api_session_type(id),
-    FOREIGN KEY (device_id) REFERENCES device(id)
+    FOREIGN KEY (device_id) REFERENCES device(id),
+    FOREIGN KEY (credential_id) REFERENCES api_credential(id) ON DELETE CASCADE
 );
 
 CREATE INDEX idx_api_session_type ON api_session(type_id);
-CREATE INDEX idx_api_session_token ON api_session(token);
 CREATE INDEX idx_api_session_device ON api_session(device_id);
 
 CREATE TABLE api_request (
@@ -55,6 +69,19 @@ CREATE INDEX idx_api_response_request ON api_response(request_id);
 CREATE INDEX idx_api_response_session ON api_response(session_id);
 CREATE INDEX idx_api_response_responded_at ON api_response(responded_at);
 
+insertCredential:
+INSERT INTO api_credential(type_id, token, created_at)
+VALUES (?, ?, ?);
+
+lastInsertCredentialRowId:
+SELECT last_insert_rowid();
+
+selectAllCredentials:
+SELECT * FROM api_credential ORDER BY created_at DESC;
+
+selectCredentialByToken:
+SELECT * FROM api_credential WHERE token = ?;
+
 selectAll:
 SELECT * FROM api_session ORDER BY created_at DESC;
 
@@ -62,10 +89,13 @@ selectById:
 SELECT * FROM api_session WHERE id = ?;
 
 selectByToken:
-SELECT * FROM api_session WHERE token = ?;
+SELECT * FROM api_session WHERE token = ? ORDER BY created_at DESC LIMIT 1;
 
 selectByDeviceId:
 SELECT * FROM api_session WHERE device_id = ? ORDER BY created_at DESC;
+
+selectByCredentialId:
+SELECT * FROM api_session WHERE credential_id = ? ORDER BY created_at DESC;
 
 selectActiveSessions:
 SELECT * FROM api_session
@@ -74,8 +104,8 @@ AND (expires_at IS NULL OR expires_at > ?)
 ORDER BY created_at DESC;
 
 insert:
-INSERT INTO api_session(type_id, token, device_id, created_at, expires_at)
-VALUES (?, ?, ?, ?, ?);
+INSERT INTO api_session(type_id, token, device_id, created_at, expires_at, credential_id, kind)
+VALUES (?, ?, ?, ?, ?, ?, ?);
 
 insertSessionType:
 INSERT INTO api_session_type(id, name) VALUES (?, ?);

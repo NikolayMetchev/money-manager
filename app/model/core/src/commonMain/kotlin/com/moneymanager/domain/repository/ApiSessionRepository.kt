@@ -11,13 +11,36 @@ import com.moneymanager.domain.model.ApiResponseTransactionId
 import com.moneymanager.domain.model.ApiResponseTransactionState
 import com.moneymanager.domain.model.ApiSession
 import com.moneymanager.domain.model.ApiSessionId
+import com.moneymanager.domain.model.ApiSessionKind
 import com.moneymanager.domain.model.ApiSessionType
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.JsonPath
+import com.moneymanager.domain.model.MonzoCredential
+import com.moneymanager.domain.model.MonzoCredentialId
 import com.moneymanager.domain.model.TransferId
 import kotlin.time.Instant
 
 interface ApiSessionRepository {
+    /**
+     * Creates a new credential (saved token). Returns the existing credential ID if the token
+     * is already saved.
+     */
+    suspend fun createCredential(
+        token: String,
+        createdAt: Instant,
+        type: ApiSessionType = ApiSessionType.MONZO,
+    ): MonzoCredentialId
+
+    /**
+     * Returns all credentials, newest first.
+     */
+    suspend fun getAllCredentials(): List<MonzoCredential>
+
+    /**
+     * Returns all sessions for the given credential, newest first.
+     */
+    suspend fun getSessionsByCredential(credentialId: MonzoCredentialId): List<ApiSession>
+
     /**
      * Creates a new API session for the given device.
      *
@@ -25,6 +48,8 @@ interface ApiSessionRepository {
      * @param deviceId The device that owns this session
      * @param createdAt The creation timestamp
      * @param expiresAt Optional expiry timestamp; null means the session never expires
+     * @param credentialId Optional credential this session was created from
+     * @param kind Whether this session downloaded accounts or transactions
      * @return The ID of the newly created session
      */
     suspend fun createSession(
@@ -33,6 +58,8 @@ interface ApiSessionRepository {
         createdAt: Instant,
         expiresAt: Instant?,
         type: ApiSessionType = ApiSessionType.MONZO,
+        credentialId: MonzoCredentialId? = null,
+        kind: ApiSessionKind? = null,
     ): ApiSessionId
 
     /**

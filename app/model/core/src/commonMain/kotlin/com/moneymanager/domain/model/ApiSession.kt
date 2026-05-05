@@ -4,6 +4,32 @@ package com.moneymanager.domain.model
 
 import kotlin.time.Instant
 
+data class MonzoCredential(
+    val id: MonzoCredentialId,
+    val type: ApiSessionType,
+    val token: String,
+    val createdAt: Instant,
+)
+
+@JvmInline
+value class MonzoCredentialId(
+    val id: Long,
+) {
+    override fun toString() = id.toString()
+}
+
+enum class ApiSessionKind(
+    val value: String,
+) {
+    ACCOUNTS("ACCOUNTS"),
+    TRANSACTIONS("TRANSACTIONS"),
+    ;
+
+    companion object {
+        fun fromValueOrNull(value: String?): ApiSessionKind? = value?.let { v -> entries.firstOrNull { it.value == v } }
+    }
+}
+
 data class ApiSession(
     val id: ApiSessionId,
     val type: ApiSessionType,
@@ -12,6 +38,8 @@ data class ApiSession(
     val createdAt: Instant,
     val expiresAt: Instant?,
     val revokedAt: Instant?,
+    val credentialId: MonzoCredentialId?,
+    val kind: ApiSessionKind?,
 )
 
 enum class ApiSessionType(
