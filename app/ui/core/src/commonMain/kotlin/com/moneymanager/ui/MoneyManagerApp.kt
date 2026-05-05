@@ -58,6 +58,7 @@ import com.moneymanager.ui.components.DefaultCurrencyInitDialog
 import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.ui.navigation.ImportTab
 import com.moneymanager.ui.navigation.NavigationHistory
 import com.moneymanager.ui.navigation.PlatformBackHandler
 import com.moneymanager.ui.navigation.Screen
@@ -65,13 +66,12 @@ import com.moneymanager.ui.navigation.mouseButtonNavigation
 import com.moneymanager.ui.screens.AccountAuditScreen
 import com.moneymanager.ui.screens.AccountsScreen
 import com.moneymanager.ui.screens.ApiSessionTrafficScreen
-import com.moneymanager.ui.screens.ApiSessionsScreen
 import com.moneymanager.ui.screens.CategoriesScreen
 import com.moneymanager.ui.screens.CategoryAuditScreen
 import com.moneymanager.ui.screens.CsvImportDetailScreen
-import com.moneymanager.ui.screens.CsvImportsScreen
 import com.moneymanager.ui.screens.CurrenciesScreen
 import com.moneymanager.ui.screens.CurrencyAuditScreen
+import com.moneymanager.ui.screens.ImportsScreen
 import com.moneymanager.ui.screens.MonzoAuthScreen
 import com.moneymanager.ui.screens.PeopleScreen
 import com.moneymanager.ui.screens.PersonAuditScreen
@@ -204,15 +204,22 @@ fun MoneyManagerApp(
                             )
                             NavigationBarItem(
                                 icon = { Text("\uD83D\uDCC4") },
-                                label = { Text("CSV") },
-                                selected = currentScreen is Screen.CsvImports || currentScreen is Screen.CsvImportDetail,
-                                onClick = { navigationHistory.navigateTo(Screen.CsvImports) },
-                            )
-                            NavigationBarItem(
-                                icon = { Text("\uD83D\uDD17") },
-                                label = { Text("API") },
-                                selected = currentScreen is Screen.ApiSessions || currentScreen is Screen.ApiSessionTraffic,
-                                onClick = { navigationHistory.navigateTo(Screen.ApiSessions) },
+                                label = { Text("Imports") },
+                                selected =
+                                    currentScreen is Screen.Imports ||
+                                        currentScreen is Screen.CsvImportDetail ||
+                                        currentScreen is Screen.CsvStrategies ||
+                                        currentScreen is Screen.ApiSessionTraffic ||
+                                        currentScreen is Screen.MonzoConnect,
+                                onClick = {
+                                    val tab =
+                                        when (currentScreen) {
+                                            is Screen.ApiSessionTraffic, is Screen.MonzoConnect -> ImportTab.API
+                                            is Screen.Imports -> (currentScreen as Screen.Imports).tab
+                                            else -> ImportTab.CSV
+                                        }
+                                    navigationHistory.navigateTo(Screen.Imports(tab))
+                                },
                             )
                             NavigationBarItem(
                                 icon = { Text("\u2699\uFE0F") },
@@ -334,9 +341,6 @@ fun MoneyManagerApp(
                                     transferSourceQueries = transferSourceQueries,
                                     entitySourceQueries = entitySourceQueries,
                                     deviceId = deviceId,
-                                    onMonzoConnectClick = {
-                                        navigationHistory.navigateTo(Screen.MonzoConnect)
-                                    },
                                 )
                             }
                             is Screen.AccountTransactions -> {
@@ -382,18 +386,41 @@ fun MoneyManagerApp(
                                     externalRefreshTrigger = transactionRefreshTrigger,
                                 )
                             }
-                            is Screen.CsvImports -> {
+                            is Screen.Imports -> {
                                 LaunchedEffect(Unit) {
                                     currentlyViewedAccountId = null
                                     currentlyViewedCurrencyId = null
                                 }
-                                CsvImportsScreen(
+                                ImportsScreen(
+                                    selectedTab = screen.tab,
+                                    onTabSelected = { tab ->
+                                        navigationHistory.replaceCurrentScreen(Screen.Imports(tab))
+                                    },
                                     csvImportRepository = csvImportRepository,
-                                    onImportClick = { importId ->
+                                    apiSessionRepository = apiSessionRepository,
+                                    accountRepository = accountRepository,
+                                    currencyRepository = currencyRepository,
+                                    transactionRepository = transactionRepository,
+                                    transferSourceQueries = transferSourceQueries,
+                                    entitySourceQueries = entitySourceQueries,
+                                    maintenanceService = maintenanceService,
+                                    personRepository = personRepository,
+                                    personAccountOwnershipRepository = personAccountOwnershipRepository,
+                                    deviceId = deviceId,
+                                    onCsvImportClick = { importId ->
                                         navigationHistory.navigateTo(Screen.CsvImportDetail(importId))
                                     },
-                                    onStrategiesClick = {
+                                    onCsvStrategiesClick = {
                                         navigationHistory.navigateTo(Screen.CsvStrategies)
+                                    },
+                                    onAddCredentialClick = {
+                                        navigationHistory.navigateTo(Screen.MonzoConnect)
+                                    },
+                                    onSessionClick = { session ->
+                                        navigationHistory.navigateTo(Screen.ApiSessionTraffic(session.id))
+                                    },
+                                    onTransactionsImported = {
+                                        transactionRefreshTrigger++
                                     },
                                 )
                             }
@@ -418,7 +445,7 @@ fun MoneyManagerApp(
                                     deviceRepository = deviceRepository,
                                     deviceId = deviceId,
                                     onBack = { navigationHistory.navigateBack() },
-                                    onDeleted = { navigationHistory.navigateTo(Screen.CsvImports) },
+                                    onDeleted = { navigationHistory.navigateTo(Screen.Imports(ImportTab.CSV)) },
                                     onCsvSourceClick = { importId, rowIndex ->
                                         navigationHistory.navigateTo(Screen.CsvImportDetail(importId, rowIndex))
                                     },
@@ -555,33 +582,7 @@ fun MoneyManagerApp(
                                     },
                                 )
                             }
-                            is Screen.ApiSessions -> {
-                                LaunchedEffect(Unit) {
-                                    currentlyViewedAccountId = null
-                                    currentlyViewedCurrencyId = null
-                                }
-                                ApiSessionsScreen(
-                                    apiSessionRepository = apiSessionRepository,
-                                    accountRepository = accountRepository,
-                                    currencyRepository = currencyRepository,
-                                    transactionRepository = transactionRepository,
-                                    transferSourceQueries = transferSourceQueries,
-                                    entitySourceQueries = entitySourceQueries,
-                                    maintenanceService = maintenanceService,
-                                    personRepository = personRepository,
-                                    personAccountOwnershipRepository = personAccountOwnershipRepository,
-                                    deviceId = deviceId,
-                                    onTransactionsImported = {
-                                        transactionRefreshTrigger++
-                                    },
-                                    onMonzoConnectClick = {
-                                        navigationHistory.navigateTo(Screen.MonzoConnect)
-                                    },
-                                    onSessionClick = { session ->
-                                        navigationHistory.navigateTo(Screen.ApiSessionTraffic(session.id))
-                                    },
-                                )
-                            }
+
                             is Screen.ApiSessionTraffic -> {
                                 LaunchedEffect(Unit) {
                                     currentlyViewedAccountId = null

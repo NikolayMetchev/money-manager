@@ -188,6 +188,11 @@ JOIN api_response ON api_response_transaction.response_id = api_response.id
 WHERE api_response.session_id = ?
 ORDER BY api_response_transaction.response_id, api_response_transaction.id;
 
+selectImportedSessionIds:
+SELECT DISTINCT api_response.session_id
+FROM api_response_transaction
+JOIN api_response ON api_response_transaction.response_id = api_response.id;
+
 selectResponseTransactionByResponseIdAndJsonPath:
 SELECT * FROM api_response_transaction WHERE response_id = ? AND json_path = ? LIMIT 1;
 

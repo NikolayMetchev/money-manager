@@ -179,4 +179,10 @@ interface ApiSessionRepository {
      * Returns all [ApiResponseTransaction] records for responses in the given session, ordered by response then id.
      */
     suspend fun getResponseTransactionsBySession(sessionId: ApiSessionId): List<ApiResponseTransaction>
+
+    /**
+     * Returns the set of session IDs that have at least one [ApiResponseTransaction] record,
+     * i.e. sessions whose downloaded data has already been imported.
+     */
+    suspend fun getImportedSessionIds(): Set<ApiSessionId>
 }
