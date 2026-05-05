@@ -117,6 +117,7 @@ fun ApiSessionsScreen(
 
     var credentials by remember { mutableStateOf<List<MonzoCredential>>(emptyList()) }
     var sessionsByCredential by remember { mutableStateOf<Map<MonzoCredentialId, List<ApiSession>>>(emptyMap()) }
+    var importedSessionIds by remember { mutableStateOf<Set<ApiSessionId>>(emptySet()) }
     var isLoading by remember { mutableStateOf(true) }
     var sessionToRevoke by remember { mutableStateOf<ApiSession?>(null) }
 
@@ -139,6 +140,7 @@ fun ApiSessionsScreen(
                     allSessions
                         .filter { it.credentialId != null }
                         .groupBy { it.credentialId!! }
+                importedSessionIds = apiSessionRepository.getImportedSessionIds()
             } finally {
                 isLoading = false
             }
@@ -224,6 +226,7 @@ fun ApiSessionsScreen(
                                 downloadProgress = downloadProgressByCredential[credential.id],
                                 importResultBySession = importResultBySession,
                                 importErrorBySession = importErrorBySession,
+                                importedSessionIds = importedSessionIds,
                                 isImportingSession = { sessionId -> backgroundTasks.isRunning(monzoImportTaskKey(sessionId)) },
                                 onDownloadAccounts = {
                                     accountsDownloadResultByCredential = accountsDownloadResultByCredential - credential.id
@@ -348,8 +351,10 @@ fun ApiSessionsScreen(
                                                 accountsSessionId = accountsSession?.id,
                                                 onProgress = ::update,
                                             )
+                                        apiSessionRepository.markSessionImported(session.id, Clock.System.now())
                                         maintenanceService.refreshMaterializedViews()
                                         importResultBySession = importResultBySession + (session.id to result)
+                                        refresh()
                                         onTransactionsImported()
                                         result.displaySummary()
                                     }
@@ -381,6 +386,7 @@ private fun CredentialCard(
     downloadProgress: MonzoDownloadProgress?,
     importResultBySession: Map<ApiSessionId, MonzoImportResult>,
     importErrorBySession: Map<ApiSessionId, String>,
+    importedSessionIds: Set<ApiSessionId>,
     isImportingSession: (ApiSessionId) -> Boolean,
     onDownloadAccounts: () -> Unit,
     onDownloadTransactions: () -> Unit,
@@ -401,9 +407,10 @@ private fun CredentialCard(
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
                 text =
-                    credential.type.name
-                        .lowercase()
-                        .replaceFirstChar { it.uppercase() },
+                    "Credential · " +
+                        credential.type.name
+                            .lowercase()
+                            .replaceFirstChar { it.uppercase() },
                 style = MaterialTheme.typography.titleMedium,
             )
             Text(
@@ -468,6 +475,7 @@ private fun CredentialCard(
                     SessionRow(
                         session = session,
                         isImporting = isImportingSession(session.id),
+                        isAlreadyImported = session.id in importedSessionIds,
                         importResult = importResultBySession[session.id],
                         importError = importErrorBySession[session.id],
                         onImport = { onImport(session) },
@@ -485,6 +493,7 @@ private fun CredentialCard(
 private fun SessionRow(
     session: ApiSession,
     isImporting: Boolean,
+    isAlreadyImported: Boolean,
     importResult: MonzoImportResult?,
     importError: String?,
     onImport: () -> Unit,
@@ -524,7 +533,12 @@ private fun SessionRow(
                     null -> "Session"
                 }
             Text(text = kindLabel, style = MaterialTheme.typography.labelLarge)
-            SessionStatusBadge(isActive = isActive)
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (isAlreadyImported) {
+                    ImportedBadge()
+                }
+                SessionStatusBadge(isActive = isActive)
+            }
         }
 
         Text(
@@ -575,7 +589,11 @@ private fun SessionRow(
                     null -> "Import Transactions"
                 }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = onImport, enabled = !isImporting, modifier = Modifier.weight(1f)) {
+                Button(
+                    onClick = onImport,
+                    enabled = !isImporting && !isAlreadyImported,
+                    modifier = Modifier.weight(1f),
+                ) {
                     if (isImporting) {
                         CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                     } else {
@@ -590,6 +608,24 @@ private fun SessionRow(
                 OutlinedButton(onClick = onOpenTraffic) { Text("Traffic") }
             }
         }
+    }
+}
+
+@Composable
+private fun ImportedBadge() {
+    Box(
+        modifier =
+            Modifier
+                .background(
+                    color = MaterialTheme.colorScheme.tertiaryContainer,
+                    shape = MaterialTheme.shapes.small,
+                ).padding(horizontal = 8.dp, vertical = 4.dp),
+    ) {
+        Text(
+            text = "Imported",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onTertiaryContainer,
+        )
     }
 }
 

@@ -264,6 +264,23 @@ class ApiSessionRepositoryImpl(
             }
         }
 
+    override suspend fun getImportedSessionIds(): Set<ApiSessionId> =
+        withContext(Dispatchers.Default) {
+            queries
+                .selectImportedSessionIds()
+                .executeAsList()
+                .map { ApiSessionId(it) }
+                .toSet()
+        }
+
+    override suspend fun markSessionImported(
+        id: ApiSessionId,
+        importedAt: Instant,
+    ): Long =
+        withContext(Dispatchers.Default) {
+            queries.markSessionImported(importedAt.toEpochMilliseconds(), id.id).await()
+        }
+
     private fun com.moneymanager.database.sql.Api_request.toApiRequest(
         headers: List<com.moneymanager.database.sql.Api_request_header>,
     ): ApiRequest =

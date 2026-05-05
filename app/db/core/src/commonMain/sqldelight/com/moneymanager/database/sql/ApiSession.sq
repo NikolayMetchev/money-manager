@@ -25,6 +25,7 @@ CREATE TABLE api_session (
     revoked_at INTEGER,
     credential_id INTEGER,
     kind TEXT,
+    imported_at INTEGER,
     FOREIGN KEY (type_id) REFERENCES api_session_type(id),
     FOREIGN KEY (device_id) REFERENCES device(id),
     FOREIGN KEY (credential_id) REFERENCES api_credential(id) ON DELETE CASCADE
@@ -187,6 +188,12 @@ FROM api_response_transaction
 JOIN api_response ON api_response_transaction.response_id = api_response.id
 WHERE api_response.session_id = ?
 ORDER BY api_response_transaction.response_id, api_response_transaction.id;
+
+selectImportedSessionIds:
+SELECT id FROM api_session WHERE imported_at IS NOT NULL;
+
+markSessionImported:
+UPDATE api_session SET imported_at = ? WHERE id = ?;
 
 selectResponseTransactionByResponseIdAndJsonPath:
 SELECT * FROM api_response_transaction WHERE response_id = ? AND json_path = ? LIMIT 1;

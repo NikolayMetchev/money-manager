@@ -10,6 +10,8 @@ import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImportId
 
+enum class ImportTab { CSV, API }
+
 sealed class Screen(
     val title: String,
 ) {
@@ -23,7 +25,9 @@ sealed class Screen(
 
     data object People : Screen("People")
 
-    data object CsvImports : Screen("CSV Imports")
+    data class Imports(
+        val tab: ImportTab = ImportTab.CSV,
+    ) : Screen("Imports")
 
     data object CsvStrategies : Screen("Import Strategies")
 
@@ -66,8 +70,6 @@ sealed class Screen(
     ) : Screen("Category Audit: $categoryName")
 
     data object MonzoConnect : Screen("Monzo Connection")
-
-    data object ApiSessions : Screen("API Sessions")
 
     data class ApiSessionTraffic(
         val sessionId: ApiSessionId,
