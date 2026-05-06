@@ -19,7 +19,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -93,11 +92,8 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import org.lighthousegames.logging.logging
 import kotlin.time.Clock
 import kotlin.time.Instant
-
-private val logger = logging()
 
 @Composable
 fun ApiSessionsScreen(
@@ -123,8 +119,6 @@ fun ApiSessionsScreen(
     var sessionsByCredential by remember { mutableStateOf<Map<MonzoCredentialId, List<ApiSession>>>(emptyMap()) }
     var importedSessionIds by remember { mutableStateOf<Set<ApiSessionId>>(emptySet()) }
     var isLoading by remember { mutableStateOf(true) }
-    var sessionToRevoke by remember { mutableStateOf<ApiSession?>(null) }
-
     // Per-session import state
     var importResultBySession by remember { mutableStateOf<Map<ApiSessionId, MonzoImportResult>>(emptyMap()) }
     var importErrorBySession by remember { mutableStateOf<Map<ApiSessionId, String>>(emptyMap()) }
@@ -152,34 +146,6 @@ fun ApiSessionsScreen(
     }
 
     LaunchedEffect(Unit) { refresh() }
-
-    sessionToRevoke?.let { session ->
-        AlertDialog(
-            onDismissRequest = { sessionToRevoke = null },
-            title = { Text("Revoke Session?") },
-            text = {
-                Text("This will revoke the session created on ${session.createdAt.displayDateTime()}.")
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        sessionToRevoke = null
-                        scope.launch {
-                            try {
-                                apiSessionRepository.revokeSession(session.id, Clock.System.now())
-                                refresh()
-                            } catch (expected: Exception) {
-                                logger.error(expected) { "Failed to revoke session: ${expected.message}" }
-                            }
-                        }
-                    },
-                ) { Text("Revoke") }
-            },
-            dismissButton = {
-                TextButton(onClick = { sessionToRevoke = null }) { Text("Cancel") }
-            },
-        )
-    }
 
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
@@ -364,7 +330,6 @@ fun ApiSessionsScreen(
                                     }
                                 },
                                 onSessionClick = onSessionClick,
-                                onRevokeSession = { sessionToRevoke = it },
                                 onCopyError = { error -> scope.launch { clipboard.setPlainText(error) } },
                             )
                         }
@@ -396,7 +361,6 @@ private fun CredentialCard(
     onDownloadTransactions: () -> Unit,
     onImport: (ApiSession) -> Unit,
     onSessionClick: (ApiSession) -> Unit,
-    onRevokeSession: (ApiSession) -> Unit,
     onCopyError: (String) -> Unit,
 ) {
     val displayToken =
@@ -484,7 +448,6 @@ private fun CredentialCard(
                         importError = importErrorBySession[session.id],
                         onImport = { onImport(session) },
                         onOpenTraffic = { onSessionClick(session) },
-                        onRevoke = { onRevokeSession(session) },
                         onCopyError = onCopyError,
                     )
                 }
@@ -502,12 +465,9 @@ private fun SessionRow(
     importError: String?,
     onImport: () -> Unit,
     onOpenTraffic: () -> Unit,
-    onRevoke: () -> Unit,
     onCopyError: (String) -> Unit,
 ) {
-    val isActive =
-        session.revokedAt == null &&
-            (session.expiresAt?.let { it > Clock.System.now() } ?: true)
+    val isActive = session.expiresAt?.let { it > Clock.System.now() } ?: true
 
     val containerColor =
         if (isActive) {
@@ -550,14 +510,6 @@ private fun SessionRow(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-
-        session.revokedAt?.let {
-            Text(
-                text = "Revoked: ${it.displayDateTime()}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-            )
-        }
 
         importResult?.let {
             Text(text = it.displaySummary(), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
@@ -605,7 +557,6 @@ private fun SessionRow(
                     }
                 }
                 OutlinedButton(onClick = onOpenTraffic) { Text("Traffic") }
-                OutlinedButton(onClick = onRevoke) { Text("Revoke") }
             }
         } else {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

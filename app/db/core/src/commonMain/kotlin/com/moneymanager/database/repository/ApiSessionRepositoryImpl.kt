@@ -100,42 +100,9 @@ class ApiSessionRepositoryImpl(
             queries.selectByDeviceId(deviceId.id).executeAsList().map { it.toApiSession() }
         }
 
-    override suspend fun getActiveSessions(now: Instant): List<ApiSession> =
+    override suspend fun getSessions(now: Instant): List<ApiSession> =
         withContext(Dispatchers.Default) {
-            queries.selectActiveSessions(now.toEpochMilliseconds()).executeAsList().map { it.toApiSession() }
-        }
-
-    override suspend fun revokeSession(
-        id: ApiSessionId,
-        revokedAt: Instant,
-    ): Unit =
-        withContext(Dispatchers.Default) {
-            queries.revoke(
-                revoked_at = revokedAt.toEpochMilliseconds(),
-                id = id.id,
-            )
-        }
-
-    override suspend fun revokeSessionByToken(
-        token: String,
-        revokedAt: Instant,
-    ): Unit =
-        withContext(Dispatchers.Default) {
-            queries.revokeByToken(
-                revoked_at = revokedAt.toEpochMilliseconds(),
-                token = token,
-            )
-        }
-
-    override suspend fun revokeAllSessionsForDevice(
-        deviceId: DeviceId,
-        revokedAt: Instant,
-    ): Unit =
-        withContext(Dispatchers.Default) {
-            queries.revokeAllForDevice(
-                revoked_at = revokedAt.toEpochMilliseconds(),
-                device_id = deviceId.id,
-            )
+            queries.selectSessions(now.toEpochMilliseconds()).executeAsList().map { it.toApiSession() }
         }
 
     override suspend fun insertRequest(
@@ -326,7 +293,6 @@ class ApiSessionRepositoryImpl(
             deviceId = DeviceId(device_id),
             createdAt = Instant.fromEpochMilliseconds(created_at),
             expiresAt = expires_at?.let { Instant.fromEpochMilliseconds(it) },
-            revokedAt = revoked_at?.let { Instant.fromEpochMilliseconds(it) },
             credentialId = credential_id?.let { MonzoCredentialId(it) },
             kind = ApiSessionKind.fromValueOrNull(kind),
         )
