@@ -507,7 +507,6 @@ class TransactionRepositoryImpl(
             }
         }
 
-
     override suspend fun deleteTransaction(id: Long): Unit =
         withContext(Dispatchers.Default) {
             transferQueries.delete(id)
