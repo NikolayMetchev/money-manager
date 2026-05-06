@@ -44,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.Clipboard
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
@@ -84,6 +85,7 @@ import com.moneymanager.ui.monzo.importMonzoSessionTransactions
 import com.moneymanager.ui.util.ContentCopyIcon
 import com.moneymanager.ui.util.displayDateTime
 import com.moneymanager.ui.util.setPlainText
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -1026,6 +1028,22 @@ private fun JsonViewer(
         remember(json) {
             runCatching { Json.parseToJsonElement(json) }.getOrNull()
         }
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
+    val prettyPrinter = remember { Json { prettyPrint = true } }
+    // Parse the highlight path into segments (e.g. "$.transactions[0]" → ["transactions", "0"])
+    val highlightSegments =
+        remember(highlightJsonPath) {
+            parseJsonPathSegments(highlightJsonPath)
+        }
+    val latestTransactionByJsonPath =
+        remember(responseTransactions) {
+            responseTransactions
+                .groupBy { it.jsonPath.value }
+                .mapValues { (_, transactions) ->
+                    transactions.maxBy { it.id.id }
+                }
+        }
 
     if (jsonElement == null) {
         SelectionContainer {
@@ -1038,19 +1056,6 @@ private fun JsonViewer(
             )
         }
     } else {
-        // Parse the highlight path into segments (e.g. "$.transactions[0]" → ["transactions", "0"])
-        val highlightSegments =
-            remember(highlightJsonPath) {
-                parseJsonPathSegments(highlightJsonPath)
-            }
-        val latestTransactionByJsonPath =
-            remember(responseTransactions) {
-                responseTransactions
-                    .groupBy { it.jsonPath.value }
-                    .mapValues { (_, transactions) ->
-                        transactions.maxBy { it.id.id }
-                    }
-            }
         Column {
             JsonTreeNode(
                 label = null,
@@ -1060,6 +1065,9 @@ private fun JsonViewer(
                 latestTransactionByJsonPath = latestTransactionByJsonPath,
                 remainingHighlightSegments = highlightSegments,
                 onHighlightPositioned = onHighlightPositioned,
+                clipboard = clipboard,
+                copyScope = scope,
+                prettyPrinter = prettyPrinter,
             )
         }
     }
@@ -1106,6 +1114,9 @@ private fun JsonTreeNode(
     element: JsonElement,
     jsonPath: String,
     depth: Int,
+    clipboard: Clipboard,
+    copyScope: CoroutineScope,
+    prettyPrinter: Json,
     latestTransactionByJsonPath: Map<String, ApiResponseTransaction> = emptyMap(),
     remainingHighlightSegments: List<String>? = null,
     forceExpandSubtree: Boolean = false,
@@ -1175,10 +1186,6 @@ private fun JsonTreeNode(
                 },
             )
 
-    val clipboard = LocalClipboard.current
-    val scope = rememberCoroutineScope()
-    val prettyPrinter = remember { Json { prettyPrint = true } }
-
     Row(
         modifier = lineModifier,
         verticalAlignment = Alignment.CenterVertically,
@@ -1203,7 +1210,7 @@ private fun JsonTreeNode(
             modifier =
                 Modifier
                     .size(14.dp)
-                    .clickable { scope.launch { clipboard.setPlainText(prettyPrinter.encodeToString<JsonElement>(element)) } },
+                    .clickable { copyScope.launch { clipboard.setPlainText(prettyPrinter.encodeToString<JsonElement>(element)) } },
         )
     }
     if (expanded) {
@@ -1222,6 +1229,9 @@ private fun JsonTreeNode(
                         element = value,
                         jsonPath = jsonObjectChildPath(jsonPath, key),
                         depth = depth + 1,
+                        clipboard = clipboard,
+                        copyScope = copyScope,
+                        prettyPrinter = prettyPrinter,
                         latestTransactionByJsonPath = latestTransactionByJsonPath,
                         remainingHighlightSegments = nextSegments,
                         forceExpandSubtree = forceExpandSubtree || isHighlightTarget,
@@ -1244,6 +1254,9 @@ private fun JsonTreeNode(
                         element = value,
                         jsonPath = "$jsonPath[$index]",
                         depth = depth + 1,
+                        clipboard = clipboard,
+                        copyScope = copyScope,
+                        prettyPrinter = prettyPrinter,
                         latestTransactionByJsonPath = latestTransactionByJsonPath,
                         remainingHighlightSegments = nextSegments,
                         forceExpandSubtree = forceExpandSubtree || isHighlightTarget,
