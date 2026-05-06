@@ -713,7 +713,7 @@ object DatabaseConfig {
     }
 
     /** Fixed UUID for the built-in Monzo strategy so it can be referenced reliably. */
-    val monzoStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000001")
+    private val monzoStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000001")
 
     /**
      * Seeds the built-in Monzo API import strategy.

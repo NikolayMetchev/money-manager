@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -50,6 +51,7 @@ fun ApiStrategiesScreen(
 
     var strategyToEdit by remember { mutableStateOf<ApiImportStrategy?>(null) }
     var showCreateDialog by remember { mutableStateOf(false) }
+    var strategyPendingDelete by remember { mutableStateOf<ApiImportStrategy?>(null) }
     val scope = rememberCoroutineScope()
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -93,11 +95,7 @@ fun ApiStrategiesScreen(
                             StrategyCard(
                                 strategy = strategy,
                                 onClick = { strategyToEdit = strategy },
-                                onDelete = {
-                                    scope.launch {
-                                        apiImportStrategyRepository.deleteStrategy(strategy.id)
-                                    }
-                                },
+                                onDelete = { strategyPendingDelete = strategy },
                             )
                         }
                     }
@@ -108,6 +106,30 @@ fun ApiStrategiesScreen(
                 }
             }
         }
+    }
+
+    // Delete confirmation dialog
+    strategyPendingDelete?.let { strategy ->
+        AlertDialog(
+            onDismissRequest = { strategyPendingDelete = null },
+            title = { Text("Delete Strategy") },
+            text = { Text("Delete \"${strategy.name}\"? Credentials using this strategy will no longer be associated with it.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        scope.launch {
+                            apiImportStrategyRepository.deleteStrategy(strategy.id)
+                        }
+                        strategyPendingDelete = null
+                    },
+                ) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { strategyPendingDelete = null }) { Text("Cancel") }
+            },
+        )
     }
 
     if (showCreateDialog) {

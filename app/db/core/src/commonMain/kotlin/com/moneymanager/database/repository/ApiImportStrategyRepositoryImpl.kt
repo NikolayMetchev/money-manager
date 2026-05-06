@@ -49,6 +49,9 @@ class ApiImportStrategyRepositoryImpl(
 
     override suspend fun createStrategy(strategy: ApiImportStrategy): ApiImportStrategyId =
         withContext(coroutineContext) {
+            // Use the current time as the authoritative creation timestamp rather than the one
+            // supplied in the domain object. This mirrors CsvImportStrategyRepositoryImpl and
+            // ensures the database always records when the row was actually persisted.
             val now = Clock.System.now()
             queries.insert(
                 id = strategy.id.id.toString(),
