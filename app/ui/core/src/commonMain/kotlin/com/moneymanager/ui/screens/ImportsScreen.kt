@@ -40,6 +40,7 @@ fun ImportsScreen(
     onCsvImportClick: (CsvImportId) -> Unit,
     onCsvStrategiesClick: () -> Unit,
     onAddCredentialClick: () -> Unit,
+    onApiStrategiesClick: () -> Unit,
     onSessionClick: (ApiSession) -> Unit,
     onTransactionsImported: () -> Unit,
 ) {
@@ -77,9 +78,11 @@ fun ImportsScreen(
                     personAccountOwnershipRepository = personAccountOwnershipRepository,
                     deviceId = deviceId,
                     onMonzoConnectClick = onAddCredentialClick,
+                    onApiStrategiesClick = onApiStrategiesClick,
                     onSessionClick = onSessionClick,
                     onTransactionsImported = onTransactionsImported,
                 )
         }
     }
 }
+

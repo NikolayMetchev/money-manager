@@ -38,6 +38,7 @@ import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
+import com.moneymanager.domain.repository.ApiImportStrategyRepository
 import com.moneymanager.domain.repository.ApiSessionRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.AuditRepository
@@ -77,6 +78,7 @@ import com.moneymanager.ui.screens.MonzoAuthScreen
 import com.moneymanager.ui.screens.PeopleScreen
 import com.moneymanager.ui.screens.PersonAuditScreen
 import com.moneymanager.ui.screens.SettingsScreen
+import com.moneymanager.ui.screens.apistrategy.ApiStrategiesScreen
 import com.moneymanager.ui.screens.csvstrategy.CsvStrategiesScreen
 import com.moneymanager.ui.screens.transactions.AccountTransactionsScreen
 import com.moneymanager.ui.screens.transactions.TransactionAuditScreen
@@ -92,6 +94,7 @@ fun MoneyManagerApp(
     databaseLocation: DbLocation,
     accountAttributeRepository: AccountAttributeRepository,
     accountRepository: AccountRepository,
+    apiImportStrategyRepository: ApiImportStrategyRepository,
     apiSessionRepository: ApiSessionRepository,
     attributeTypeRepository: AttributeTypeRepository,
     auditRepository: AuditRepository,
@@ -211,12 +214,15 @@ fun MoneyManagerApp(
                                     currentScreen is Screen.Imports ||
                                         currentScreen is Screen.CsvImportDetail ||
                                         currentScreen is Screen.CsvStrategies ||
+                                        currentScreen is Screen.ApiStrategies ||
                                         currentScreen is Screen.ApiSessionTraffic ||
                                         currentScreen is Screen.MonzoConnect,
                                 onClick = {
                                     val tab =
                                         when (currentScreen) {
-                                            is Screen.ApiSessionTraffic, is Screen.MonzoConnect -> ImportTab.API
+                                            is Screen.ApiSessionTraffic, is Screen.MonzoConnect,
+                                            is Screen.ApiStrategies,
+                                            -> ImportTab.API
                                             is Screen.Imports -> currentScreen.tab
                                             else -> ImportTab.CSV
                                         }
@@ -421,12 +427,25 @@ fun MoneyManagerApp(
                                     onAddCredentialClick = {
                                         navigationHistory.navigateTo(Screen.MonzoConnect)
                                     },
+                                    onApiStrategiesClick = {
+                                        navigationHistory.navigateTo(Screen.ApiStrategies)
+                                    },
                                     onSessionClick = { session ->
                                         navigationHistory.navigateTo(Screen.ApiSessionTraffic(session.id))
                                     },
                                     onTransactionsImported = {
                                         transactionRefreshTrigger++
                                     },
+                                )
+                            }
+                            is Screen.ApiStrategies -> {
+                                LaunchedEffect(Unit) {
+                                    currentlyViewedAccountId = null
+                                    currentlyViewedCurrencyId = null
+                                }
+                                ApiStrategiesScreen(
+                                    apiImportStrategyRepository = apiImportStrategyRepository,
+                                    onBack = { navigationHistory.navigateBack() },
                                 )
                             }
                             is Screen.CsvImportDetail -> {

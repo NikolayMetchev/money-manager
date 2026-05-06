@@ -108,6 +108,7 @@ fun ApiSessionsScreen(
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     deviceId: DeviceId,
     onMonzoConnectClick: () -> Unit = {},
+    onApiStrategiesClick: () -> Unit = {},
     onSessionClick: (ApiSession) -> Unit = {},
     onTransactionsImported: () -> Unit = {},
 ) {
@@ -156,7 +157,10 @@ fun ApiSessionsScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(text = "API Sessions", style = MaterialTheme.typography.headlineMedium)
-            TextButton(onClick = onMonzoConnectClick) { Text("+ Connect") }
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                TextButton(onClick = onApiStrategiesClick) { Text("Strategies") }
+                TextButton(onClick = onMonzoConnectClick) { Text("+ Connect") }
+            }
         }
 
         Spacer(modifier = Modifier.height(16.dp))

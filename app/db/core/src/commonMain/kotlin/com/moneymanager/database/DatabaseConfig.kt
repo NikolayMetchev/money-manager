@@ -1,11 +1,21 @@
-@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
+@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
 
 package com.moneymanager.database
 
 import com.moneymanager.currency.Currency
+import com.moneymanager.database.json.ApiStrategyConfigJson
+import com.moneymanager.database.json.ApiStrategyJsonCodec
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.SourceType
+import com.moneymanager.domain.model.apistrategy.ApiAccountMappings
+import com.moneymanager.domain.model.apistrategy.ApiAuthType
+import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
+import com.moneymanager.domain.model.apistrategy.ApiPaginationConfig
+import com.moneymanager.domain.model.apistrategy.ApiQueryParam
+import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
 import com.moneymanager.domain.repository.CurrencyRepository
+import kotlin.time.Clock
+import kotlin.uuid.Uuid
 
 /**
  * Centralized database configuration for SQLite PRAGMA settings and seed data.
@@ -638,6 +648,9 @@ object DatabaseConfig {
             // Seed API session type lookup table
             apiSessionQueries.insertSessionType(id = 1, name = "Monzo")
 
+            // Seed the built-in Monzo API import strategy
+            seedMonzoStrategy(database)
+
             // Seed Platform lookup table
             platformQueries.insert(id = 0, name = "SYSTEM")
             platformQueries.insert(id = 1, name = "JVM")
@@ -697,5 +710,67 @@ object DatabaseConfig {
                 )
             }
         }
+    }
+
+    /** Fixed UUID for the built-in Monzo strategy so it can be referenced reliably. */
+    val MONZO_STRATEGY_ID: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000001")
+
+    /**
+     * Seeds the built-in Monzo API import strategy.
+     * Called once during new-database initialisation.
+     */
+    private fun seedMonzoStrategy(database: MoneyManagerDatabaseWrapper) {
+        val config =
+            ApiStrategyConfigJson(
+                baseUrl = "https://api.monzo.com",
+                authType = ApiAuthType.BEARER_TOKEN,
+                accountsEndpoint =
+                    ApiEndpointConfig(
+                        path = "/accounts",
+                        responseArrayKey = "accounts",
+                    ),
+                transactionsEndpoint =
+                    ApiEndpointConfig(
+                        path = "/transactions",
+                        responseArrayKey = "transactions",
+                        queryParams =
+                            listOf(
+                                ApiQueryParam(name = "account_id", dynamicSource = "account.id"),
+                            ),
+                        pagination =
+                            ApiPaginationConfig(
+                                limitParam = "limit",
+                                limitValue = 100,
+                                cursorParam = "before",
+                                cursorResponseField = "created",
+                            ),
+                    ),
+                accountMappings =
+                    ApiAccountMappings(
+                        idField = "id",
+                        descriptionField = "description",
+                        ownerNameField = "preferred_name",
+                    ),
+                transactionMappings =
+                    ApiTransactionMappings(
+                        amountField = "amount",
+                        timestampField = "created",
+                        currencyField = "currency",
+                        descriptionField = "description",
+                        merchantNameField = "merchant.name",
+                        counterpartyNameField = "counterparty.name",
+                        declineReasonField = "decline_reason",
+                    ),
+                accountNamePrefix = "Monzo: ",
+                counterpartyPrefix = "Monzo Counterparty: ",
+            )
+        val now = Clock.System.now().toEpochMilliseconds()
+        database.apiImportStrategyQueries.insert(
+            id = MONZO_STRATEGY_ID.toString(),
+            name = "Monzo",
+            config_json = ApiStrategyJsonCodec.encode(config),
+            created_at = now,
+            updated_at = now,
+        )
     }
 }

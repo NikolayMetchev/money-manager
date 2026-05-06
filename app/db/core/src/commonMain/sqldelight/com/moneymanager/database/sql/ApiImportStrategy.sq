@@ -1,0 +1,38 @@
+-- Stores reusable API import strategies for mapping API responses to accounts, transactions,
+-- and people. The full strategy configuration is stored as JSON.
+CREATE TABLE api_import_strategy (
+    id TEXT PRIMARY KEY NOT NULL,
+    name TEXT NOT NULL UNIQUE,
+    config_json TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+);
+
+CREATE INDEX idx_api_import_strategy_name ON api_import_strategy(name);
+
+-- Select all strategies ordered by name
+selectAll:
+SELECT * FROM api_import_strategy ORDER BY name;
+
+-- Select a strategy by ID
+selectById:
+SELECT * FROM api_import_strategy WHERE id = ?;
+
+-- Select a strategy by name
+selectByName:
+SELECT * FROM api_import_strategy WHERE name = ?;
+
+-- Insert a new strategy
+insert:
+INSERT INTO api_import_strategy (id, name, config_json, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?);
+
+-- Update an existing strategy
+update:
+UPDATE api_import_strategy
+SET name = ?, config_json = ?, updated_at = ?
+WHERE id = ?;
+
+-- Delete a strategy by ID
+deleteById:
+DELETE FROM api_import_strategy WHERE id = ?;

@@ -31,6 +31,8 @@ sealed class Screen(
 
     data object CsvStrategies : Screen("Import Strategies")
 
+    data object ApiStrategies : Screen("API Import Strategies")
+
     data object Settings : Screen("Settings")
 
     data class AccountTransactions(
