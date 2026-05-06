@@ -27,6 +27,11 @@ WHERE id = ?;
 selectRevisionById:
 SELECT revision_id FROM account WHERE id = ?;
 
+bumpRevisionOnly:
+UPDATE account
+SET revision_id = revision_id + 1
+WHERE id = ?;
+
 delete:
 DELETE FROM account WHERE id = ?;
 

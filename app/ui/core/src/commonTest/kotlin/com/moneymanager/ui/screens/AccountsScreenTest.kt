@@ -15,9 +15,12 @@ import app.cash.sqldelight.db.SqlPreparedStatement
 import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.database.sql.EntitySourceQueries
 import com.moneymanager.domain.model.Account
+import com.moneymanager.domain.model.AccountAttribute
 import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
+import com.moneymanager.domain.model.AttributeType
+import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CategoryBalance
 import com.moneymanager.domain.model.DeviceId
@@ -32,7 +35,9 @@ import com.moneymanager.domain.model.SourceRecorder
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
+import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
@@ -63,6 +68,8 @@ class AccountsScreenTest {
                 ProvideSchemaAwareScope {
                     AccountsScreen(
                         accountRepository = repository,
+                        accountAttributeRepository = FakeAccountAttributeRepository(),
+                        attributeTypeRepository = FakeAttributeTypeRepository(),
                         categoryRepository = FakeCategoryRepository(),
                         transactionRepository = FakeTransactionRepository(),
                         personRepository = FakePersonRepository(),
@@ -106,6 +113,8 @@ class AccountsScreenTest {
                 ProvideSchemaAwareScope {
                     AccountsScreen(
                         accountRepository = repository,
+                        accountAttributeRepository = FakeAccountAttributeRepository(),
+                        attributeTypeRepository = FakeAttributeTypeRepository(),
                         categoryRepository = FakeCategoryRepository(),
                         transactionRepository = FakeTransactionRepository(),
                         personRepository = FakePersonRepository(),
@@ -135,6 +144,8 @@ class AccountsScreenTest {
                 ProvideSchemaAwareScope {
                     AccountsScreen(
                         accountRepository = repository,
+                        accountAttributeRepository = FakeAccountAttributeRepository(),
+                        attributeTypeRepository = FakeAttributeTypeRepository(),
                         categoryRepository = FakeCategoryRepository(),
                         transactionRepository = FakeTransactionRepository(),
                         personRepository = FakePersonRepository(),
@@ -163,6 +174,8 @@ class AccountsScreenTest {
                 ProvideSchemaAwareScope {
                     AccountsScreen(
                         accountRepository = repository,
+                        accountAttributeRepository = FakeAccountAttributeRepository(),
+                        attributeTypeRepository = FakeAttributeTypeRepository(),
                         categoryRepository = FakeCategoryRepository(),
                         transactionRepository = FakeTransactionRepository(),
                         personRepository = FakePersonRepository(),
@@ -201,6 +214,8 @@ class AccountsScreenTest {
                 ProvideSchemaAwareScope {
                     AccountsScreen(
                         accountRepository = repository,
+                        accountAttributeRepository = FakeAccountAttributeRepository(),
+                        attributeTypeRepository = FakeAttributeTypeRepository(),
                         categoryRepository = FakeCategoryRepository(),
                         transactionRepository = FakeTransactionRepository(),
                         personRepository = FakePersonRepository(),
@@ -236,6 +251,8 @@ class AccountsScreenTest {
                 ProvideSchemaAwareScope {
                     AccountsScreen(
                         accountRepository = repository,
+                        accountAttributeRepository = FakeAccountAttributeRepository(),
+                        attributeTypeRepository = FakeAttributeTypeRepository(),
                         categoryRepository = FakeCategoryRepository(),
                         transactionRepository = FakeTransactionRepository(),
                         personRepository = FakePersonRepository(),
@@ -268,6 +285,8 @@ class AccountsScreenTest {
                 ProvideSchemaAwareScope {
                     AccountsScreen(
                         accountRepository = repository,
+                        accountAttributeRepository = FakeAccountAttributeRepository(),
+                        attributeTypeRepository = FakeAttributeTypeRepository(),
                         categoryRepository = FakeCategoryRepository(),
                         transactionRepository = FakeTransactionRepository(),
                         personRepository = FakePersonRepository(),
@@ -302,6 +321,8 @@ class AccountsScreenTest {
                 ProvideSchemaAwareScope {
                     AccountsScreen(
                         accountRepository = repository,
+                        accountAttributeRepository = FakeAccountAttributeRepository(),
+                        attributeTypeRepository = FakeAttributeTypeRepository(),
                         categoryRepository = FakeCategoryRepository(),
                         transactionRepository = FakeTransactionRepository(),
                         personRepository = FakePersonRepository(),
@@ -344,6 +365,8 @@ class AccountsScreenTest {
                 ProvideSchemaAwareScope {
                     AccountsScreen(
                         accountRepository = repository,
+                        accountAttributeRepository = FakeAccountAttributeRepository(),
+                        attributeTypeRepository = FakeAttributeTypeRepository(),
                         categoryRepository = FakeCategoryRepository(),
                         transactionRepository = FakeTransactionRepository(),
                         personRepository = FakePersonRepository(),
@@ -398,6 +421,8 @@ class AccountsScreenTest {
                 ProvideSchemaAwareScope {
                     AccountsScreen(
                         accountRepository = repository,
+                        accountAttributeRepository = FakeAccountAttributeRepository(),
+                        attributeTypeRepository = FakeAttributeTypeRepository(),
                         categoryRepository = FakeCategoryRepository(),
                         transactionRepository = FakeTransactionRepository(),
                         personRepository = FakePersonRepository(),
@@ -443,6 +468,29 @@ class AccountsScreenTest {
                     if (it.id == account.id) account.copy(revisionId = account.revisionId + 1) else it
                 }
             return account.revisionId + 1
+        }
+
+        override suspend fun updateAccountWithAttributes(
+            account: Account?,
+            accountId: AccountId,
+            deletedAttributeIds: Set<Long>,
+            updatedAttributes: Map<Long, NewAttribute>,
+            newAttributes: List<NewAttribute>,
+        ): Long {
+            val current = accountsFlow.value.find { it.id == accountId } ?: return 1L
+            val newRevision = current.revisionId + 1
+            if (account != null) {
+                accountsFlow.value =
+                    accountsFlow.value.map {
+                        if (it.id == accountId) account.copy(revisionId = newRevision) else it
+                    }
+            } else {
+                accountsFlow.value =
+                    accountsFlow.value.map {
+                        if (it.id == accountId) it.copy(revisionId = newRevision) else it
+                    }
+            }
+            return newRevision
         }
 
         override suspend fun deleteAccount(id: AccountId) {
@@ -547,8 +595,6 @@ class AccountsScreenTest {
             transactionId: TransferId,
         ) {}
 
-        override suspend fun bumpRevisionOnly(id: TransferId): Long = 1L
-
         override suspend fun deleteTransaction(id: Long) {}
     }
 
@@ -618,6 +664,33 @@ class AccountsScreenTest {
         override suspend fun refreshMaterializedViews(): Duration = Duration.ZERO
 
         override suspend fun fullRefreshMaterializedViews(): Duration = Duration.ZERO
+    }
+
+    private class FakeAccountAttributeRepository : AccountAttributeRepository {
+        override fun getByAccount(accountId: AccountId): Flow<List<AccountAttribute>> = flowOf(emptyList())
+
+        override suspend fun insert(
+            accountId: AccountId,
+            attributeTypeId: AttributeTypeId,
+            value: String,
+        ): Long = 0L
+
+        override suspend fun updateValue(
+            id: Long,
+            newValue: String,
+        ) {}
+
+        override suspend fun delete(id: Long) {}
+    }
+
+    private class FakeAttributeTypeRepository : AttributeTypeRepository {
+        override fun getAll(): Flow<List<AttributeType>> = flowOf(emptyList())
+
+        override fun getById(id: AttributeTypeId): Flow<AttributeType?> = flowOf(null)
+
+        override fun getByName(name: String): Flow<AttributeType?> = flowOf(null)
+
+        override suspend fun getOrCreate(name: String): AttributeTypeId = AttributeTypeId(0L)
     }
 
     /**

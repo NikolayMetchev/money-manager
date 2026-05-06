@@ -29,4 +29,5 @@ data class AccountAuditEntry(
     val categoryId: Long,
     val categoryName: String?,
     val source: EntitySource? = null,
+    val attributeChanges: List<AccountAttributeAuditEntry> = emptyList(),
 )

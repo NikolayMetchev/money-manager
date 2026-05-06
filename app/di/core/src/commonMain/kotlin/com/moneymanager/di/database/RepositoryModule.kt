@@ -3,6 +3,7 @@ package com.moneymanager.di.database
 import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.database.DatabaseMaintenanceServiceImpl
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
+import com.moneymanager.database.repository.AccountAttributeRepositoryImpl
 import com.moneymanager.database.repository.AccountRepositoryImpl
 import com.moneymanager.database.repository.ApiSessionRepositoryImpl
 import com.moneymanager.database.repository.AttributeTypeRepositoryImpl
@@ -24,6 +25,7 @@ import com.moneymanager.database.sql.EntitySourceQueries
 import com.moneymanager.database.sql.TransferSourceQueries
 import com.moneymanager.di.DatabaseScope
 import com.moneymanager.domain.model.DeviceId
+import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.ApiSessionRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
@@ -56,6 +58,11 @@ interface RepositoryModule {
     @Provides
     @SingleIn(DatabaseScope::class)
     fun provideEntitySourceQueries(database: MoneyManagerDatabaseWrapper): EntitySourceQueries = database.entitySourceQueries
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideAccountAttributeRepository(database: MoneyManagerDatabaseWrapper): AccountAttributeRepository =
+        AccountAttributeRepositoryImpl(database)
 
     @Provides
     @SingleIn(DatabaseScope::class)

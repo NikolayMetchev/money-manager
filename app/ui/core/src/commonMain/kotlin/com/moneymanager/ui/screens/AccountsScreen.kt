@@ -25,7 +25,9 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.Transfer
+import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
+import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
@@ -44,6 +46,8 @@ private val logger = logging()
 @Composable
 fun AccountsScreen(
     accountRepository: AccountRepository,
+    accountAttributeRepository: AccountAttributeRepository,
+    attributeTypeRepository: AttributeTypeRepository,
     categoryRepository: CategoryRepository,
     transactionRepository: TransactionRepository,
     personRepository: PersonRepository,
@@ -160,6 +164,8 @@ fun AccountsScreen(
         EditAccountDialog(
             account = currentAccountToEdit,
             accountRepository = accountRepository,
+            accountAttributeRepository = accountAttributeRepository,
+            attributeTypeRepository = attributeTypeRepository,
             categoryRepository = categoryRepository,
             personRepository = personRepository,
             personAccountOwnershipRepository = personAccountOwnershipRepository,

@@ -52,6 +52,7 @@ import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.TransferSource
 import com.moneymanager.domain.model.csv.CsvImportId
+import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.ApiSourceRecord
 import com.moneymanager.domain.repository.AttributeTypeRepository
@@ -146,6 +147,7 @@ class AccountTransactionsScreenTest {
                         entitySourceQueries = stubEntitySourceQueries,
                         deviceRepository = deviceRepository,
                         accountRepository = accountRepository,
+                        accountAttributeRepository = FakeAccountAttributeRepository(),
                         categoryRepository = categoryRepository,
                         currencyRepository = currencyRepository,
                         attributeTypeRepository = attributeTypeRepository,
@@ -246,6 +248,7 @@ class AccountTransactionsScreenTest {
                         entitySourceQueries = stubEntitySourceQueries,
                         deviceRepository = deviceRepository,
                         accountRepository = accountRepository,
+                        accountAttributeRepository = FakeAccountAttributeRepository(),
                         categoryRepository = categoryRepository,
                         currencyRepository = currencyRepository,
                         attributeTypeRepository = attributeTypeRepository,
@@ -371,6 +374,7 @@ class AccountTransactionsScreenTest {
                                 entitySourceQueries = repositories.entitySourceQueries,
                                 deviceRepository = repositories.deviceRepository,
                                 accountRepository = repositories.accountRepository,
+                                accountAttributeRepository = repositories.accountAttributeRepository,
                                 categoryRepository = repositories.categoryRepository,
                                 currencyRepository = repositories.currencyRepository,
                                 attributeTypeRepository = repositories.attributeTypeRepository,
@@ -582,6 +586,7 @@ class AccountTransactionsScreenTest {
                                 entitySourceQueries = repositories.entitySourceQueries,
                                 deviceRepository = repositories.deviceRepository,
                                 accountRepository = repositories.accountRepository,
+                                accountAttributeRepository = repositories.accountAttributeRepository,
                                 categoryRepository = repositories.categoryRepository,
                                 currencyRepository = repositories.currencyRepository,
                                 attributeTypeRepository = repositories.attributeTypeRepository,
@@ -763,6 +768,7 @@ class AccountTransactionsScreenTest {
                                 entitySourceQueries = repositories.entitySourceQueries,
                                 deviceRepository = repositories.deviceRepository,
                                 accountRepository = repositories.accountRepository,
+                                accountAttributeRepository = repositories.accountAttributeRepository,
                                 categoryRepository = repositories.categoryRepository,
                                 currencyRepository = repositories.currencyRepository,
                                 attributeTypeRepository = repositories.attributeTypeRepository,
@@ -882,6 +888,22 @@ class AccountTransactionsScreenTest {
                     if (it.id == account.id) account.copy(revisionId = account.revisionId + 1) else it
                 }
             return account.revisionId + 1
+        }
+
+        override suspend fun updateAccountWithAttributes(
+            account: Account?,
+            accountId: AccountId,
+            deletedAttributeIds: Set<Long>,
+            updatedAttributes: Map<Long, com.moneymanager.domain.model.NewAttribute>,
+            newAttributes: List<com.moneymanager.domain.model.NewAttribute>,
+        ): Long {
+            val current = accountsFlow.value.find { it.id == accountId } ?: return 1L
+            val newRevision = current.revisionId + 1
+            accountsFlow.value =
+                accountsFlow.value.map {
+                    if (it.id == accountId) (account ?: it).copy(revisionId = newRevision) else it
+                }
+            return newRevision
         }
 
         override suspend fun deleteAccount(id: AccountId) {
@@ -1058,8 +1080,6 @@ class AccountTransactionsScreenTest {
             transactionId: TransferId,
         ) {}
 
-        override suspend fun bumpRevisionOnly(id: TransferId): Long = 1L
-
         override suspend fun deleteTransaction(id: Long) {}
     }
 
@@ -1235,6 +1255,23 @@ class AccountTransactionsScreenTest {
         }
 
         fun getCreatedTypes(): List<AttributeType> = types.toList()
+    }
+
+    private class FakeAccountAttributeRepository : AccountAttributeRepository {
+        override fun getByAccount(accountId: AccountId): Flow<List<com.moneymanager.domain.model.AccountAttribute>> = flowOf(emptyList())
+
+        override suspend fun insert(
+            accountId: AccountId,
+            attributeTypeId: AttributeTypeId,
+            value: String,
+        ): Long = 0L
+
+        override suspend fun updateValue(
+            id: Long,
+            newValue: String,
+        ) {}
+
+        override suspend fun delete(id: Long) {}
     }
 
     private class FakeDeviceRepository : com.moneymanager.domain.repository.DeviceRepository {

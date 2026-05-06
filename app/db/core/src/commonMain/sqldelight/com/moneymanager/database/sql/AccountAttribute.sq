@@ -1,0 +1,62 @@
+CREATE TABLE account_attribute (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id INTEGER NOT NULL,
+    attribute_type_id INTEGER NOT NULL,
+    attribute_value TEXT NOT NULL,
+    FOREIGN KEY (account_id) REFERENCES account(id) ON DELETE CASCADE,
+    FOREIGN KEY (attribute_type_id) REFERENCES attribute_type(id) ON DELETE RESTRICT,
+    UNIQUE (account_id, attribute_type_id)
+);
+
+CREATE INDEX idx_account_attribute_account ON account_attribute(account_id);
+CREATE INDEX idx_account_attribute_type ON account_attribute(attribute_type_id);
+
+selectByAccount:
+SELECT
+    account_attribute.id,
+    account_attribute.account_id,
+    account_attribute.attribute_type_id,
+    account_attribute.attribute_value,
+    attribute_type.name AS attribute_type_name
+FROM account_attribute
+JOIN attribute_type ON account_attribute.attribute_type_id = attribute_type.id
+WHERE account_attribute.account_id = ?
+ORDER BY attribute_type.name;
+
+selectById:
+SELECT
+    account_attribute.id,
+    account_attribute.account_id,
+    account_attribute.attribute_type_id,
+    account_attribute.attribute_value,
+    attribute_type.name AS attribute_type_name
+FROM account_attribute
+JOIN attribute_type ON account_attribute.attribute_type_id = attribute_type.id
+WHERE account_attribute.id = ?;
+
+insert:
+INSERT INTO account_attribute (account_id, attribute_type_id, attribute_value)
+VALUES (?, ?, ?);
+
+selectLastInsertedId:
+SELECT last_insert_rowid();
+
+updateValue:
+UPDATE account_attribute
+SET attribute_value = ?
+WHERE id = ?;
+
+deleteById:
+DELETE FROM account_attribute WHERE id = ?;
+
+selectByAccountIds:
+SELECT
+    account_attribute.id,
+    account_attribute.account_id,
+    account_attribute.attribute_type_id,
+    account_attribute.attribute_value,
+    attribute_type.name AS attribute_type_name
+FROM account_attribute
+JOIN attribute_type ON account_attribute.attribute_type_id = attribute_type.id
+WHERE account_attribute.account_id IN ?
+ORDER BY account_attribute.account_id, attribute_type.name;

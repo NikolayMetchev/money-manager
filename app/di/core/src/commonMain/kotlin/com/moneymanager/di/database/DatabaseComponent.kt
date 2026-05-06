@@ -7,6 +7,7 @@ import com.moneymanager.database.sql.EntitySourceQueries
 import com.moneymanager.database.sql.TransferSourceQueries
 import com.moneymanager.di.DatabaseScope
 import com.moneymanager.domain.model.DeviceId
+import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.ApiSessionRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
@@ -32,6 +33,7 @@ import dev.zacsweers.metro.Provides
  */
 @DependencyGraph(DatabaseScope::class)
 interface DatabaseComponent {
+    val accountAttributeRepository: AccountAttributeRepository
     val accountRepository: AccountRepository
     val apiSessionRepository: ApiSessionRepository
     val attributeTypeRepository: AttributeTypeRepository

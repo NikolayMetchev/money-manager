@@ -36,6 +36,7 @@ import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.DeviceId
+import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.ApiSessionRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
@@ -89,6 +90,7 @@ import kotlinx.coroutines.launch
 fun MoneyManagerApp(
     appVersion: AppVersion,
     databaseLocation: DbLocation,
+    accountAttributeRepository: AccountAttributeRepository,
     accountRepository: AccountRepository,
     apiSessionRepository: ApiSessionRepository,
     attributeTypeRepository: AttributeTypeRepository,
@@ -258,6 +260,8 @@ fun MoneyManagerApp(
                                 }
                                 AccountsScreen(
                                     accountRepository = accountRepository,
+                                    accountAttributeRepository = accountAttributeRepository,
+                                    attributeTypeRepository = attributeTypeRepository,
                                     categoryRepository = categoryRepository,
                                     transactionRepository = transactionRepository,
                                     personRepository = personRepository,
@@ -356,6 +360,7 @@ fun MoneyManagerApp(
                                     entitySourceQueries = entitySourceQueries,
                                     deviceRepository = deviceRepository,
                                     accountRepository = accountRepository,
+                                    accountAttributeRepository = accountAttributeRepository,
                                     categoryRepository = categoryRepository,
                                     currencyRepository = currencyRepository,
                                     attributeTypeRepository = attributeTypeRepository,

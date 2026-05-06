@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
@@ -19,42 +21,52 @@ import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.database.ManualEntitySourceRecorder
 import com.moneymanager.database.sql.EntitySourceQueries
 import com.moneymanager.domain.model.Account
+import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.EntityType
+import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.PersonId
+import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
+import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.screens.CreateCategoryDialog
+import com.moneymanager.ui.screens.transactions.AttributeTypeField
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
 
 private val logger = logging()
 
 /**
- * A dialog for editing an existing account with category and owner selection.
+ * A dialog for editing an existing account with category, owner, and attribute selection.
  */
 @Composable
 fun EditAccountDialog(
     account: Account,
     accountRepository: AccountRepository,
+    accountAttributeRepository: AccountAttributeRepository,
+    attributeTypeRepository: AttributeTypeRepository,
     categoryRepository: CategoryRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
@@ -85,6 +97,34 @@ fun EditAccountDialog(
         mutableStateOf(existingOwnerships.map { it.personId.id }.toSet())
     }
 
+    // Attribute state
+    var existingAttributeTypes by remember { mutableStateOf<List<AttributeType>>(emptyList()) }
+    var editableAttributes by remember { mutableStateOf<Map<Long, Pair<String, String>>>(emptyMap()) }
+    var originalAttributeList by remember { mutableStateOf<List<com.moneymanager.domain.model.AccountAttribute>>(emptyList()) }
+    var nextTempId by remember { mutableStateOf(-1L) }
+    var attributesLoaded by remember { mutableStateOf(false) }
+
+    // Load existing attribute types for autocomplete
+    LaunchedEffect(Unit) {
+        attributeTypeRepository.getAll().collect { types ->
+            existingAttributeTypes = types
+        }
+    }
+
+    // Load existing attributes for this account
+    LaunchedEffect(account.id) {
+        accountAttributeRepository.getByAccount(account.id).collect { attrs ->
+            if (!attributesLoaded) {
+                originalAttributeList = attrs
+                editableAttributes =
+                    attrs.associate { attr ->
+                        attr.id to Pair(attr.attributeType.name, attr.value)
+                    }
+                attributesLoaded = true
+            }
+        }
+    }
+
     val scope = rememberSchemaAwareCoroutineScope()
 
     AlertDialog(
@@ -95,6 +135,7 @@ fun EditAccountDialog(
                 modifier =
                     Modifier
                         .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
                         .padding(vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
@@ -164,7 +205,7 @@ fun EditAccountDialog(
                         people.forEach { person ->
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                                verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Checkbox(
                                     checked = selectedOwnerIds.contains(person.id.id),
@@ -193,6 +234,69 @@ fun EditAccountDialog(
                     }
                 }
 
+                // Attributes Section
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = "Attributes",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+
+                    editableAttributes.forEach { (id, pair) ->
+                        val (typeName, value) = pair
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            AttributeTypeField(
+                                value = typeName,
+                                onValueChange = { newTypeName ->
+                                    editableAttributes = editableAttributes + (id to Pair(newTypeName, value))
+                                },
+                                existingTypes = existingAttributeTypes,
+                                enabled = !isSaving,
+                                modifier = Modifier.weight(0.4f),
+                            )
+                            OutlinedTextField(
+                                value = value,
+                                onValueChange = { newValue ->
+                                    editableAttributes = editableAttributes + (id to Pair(typeName, newValue))
+                                },
+                                label = { Text("Value") },
+                                modifier = Modifier.weight(0.5f),
+                                singleLine = true,
+                                enabled = !isSaving,
+                            )
+                            IconButton(
+                                onClick = {
+                                    editableAttributes = editableAttributes - id
+                                },
+                                enabled = !isSaving,
+                            ) {
+                                Text(
+                                    text = "X",
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                )
+                            }
+                        }
+                    }
+
+                    TextButton(
+                        onClick = {
+                            editableAttributes = editableAttributes + (nextTempId to Pair("", ""))
+                            nextTempId--
+                        },
+                        enabled = !isSaving,
+                    ) {
+                        Text("+ Add Attribute")
+                    }
+                }
+
                 errorMessage?.let { error ->
                     Text(
                         text = error,
@@ -212,18 +316,60 @@ fun EditAccountDialog(
                         errorMessage = null
                         scope.launch {
                             try {
+                                // Determine if account fields actually changed
+                                val accountFieldsChanged =
+                                    name.trim() != account.name ||
+                                        selectedCategoryId != account.categoryId
                                 val updatedAccount =
-                                    account.copy(
-                                        name = name.trim(),
-                                        categoryId = selectedCategoryId,
-                                    )
-                                val newRevisionId = accountRepository.updateAccount(updatedAccount)
+                                    if (accountFieldsChanged) {
+                                        account.copy(name = name.trim(), categoryId = selectedCategoryId)
+                                    } else {
+                                        null
+                                    }
 
-                                // Record source for account update audit trail
+                                // Resolve attribute type IDs before the atomic update
+                                val originalIds = originalAttributeList.map { it.id }.toSet()
+                                val editableIds = editableAttributes.keys.filter { it > 0 }.toSet()
+                                val deletedAttributeIds = originalIds - editableIds
+
+                                val updatedAttributes = mutableMapOf<Long, NewAttribute>()
+                                editableAttributes.filter { (id, _) -> id > 0 }.forEach { (id, pair) ->
+                                    val (typeName, value) = pair
+                                    val original = originalAttributeList.find { it.id == id }
+                                    if (original != null) {
+                                        val typeChanged = original.attributeType.name != typeName
+                                        val valueChanged = original.value != value
+                                        if (typeChanged || valueChanged) {
+                                            val typeId = attributeTypeRepository.getOrCreate(typeName.trim())
+                                            updatedAttributes[id] = NewAttribute(typeId, value.trim())
+                                        }
+                                    }
+                                }
+
+                                val newAttributes = mutableListOf<NewAttribute>()
+                                editableAttributes.filter { (id, _) -> id < 0 }.forEach { (_, pair) ->
+                                    val (typeName, value) = pair
+                                    if (typeName.isNotBlank() && value.isNotBlank()) {
+                                        val typeId = attributeTypeRepository.getOrCreate(typeName.trim())
+                                        newAttributes.add(NewAttribute(typeId, value.trim()))
+                                    }
+                                }
+
+                                // Atomic update: one revision bump for account + all attribute changes
+                                val finalRevisionId =
+                                    accountRepository.updateAccountWithAttributes(
+                                        account = updatedAccount,
+                                        accountId = account.id,
+                                        deletedAttributeIds = deletedAttributeIds,
+                                        updatedAttributes = updatedAttributes,
+                                        newAttributes = newAttributes,
+                                    )
+
+                                // Record manual source for the single audit entry
                                 ManualEntitySourceRecorder(entitySourceQueries, deviceId).insert(
                                     EntityType.ACCOUNT,
                                     account.id.id,
-                                    newRevisionId,
+                                    finalRevisionId,
                                 )
 
                                 val existingOwnerIds = existingOwnerships.map { it.personId.id }.toSet()
@@ -243,7 +389,6 @@ fun EditAccountDialog(
                                             personId = PersonId(personId),
                                             accountId = account.id,
                                         )
-                                    // Record source for new ownership audit trail
                                     ManualEntitySourceRecorder(entitySourceQueries, deviceId).insert(
                                         EntityType.PERSON_ACCOUNT_OWNERSHIP,
                                         ownershipId,

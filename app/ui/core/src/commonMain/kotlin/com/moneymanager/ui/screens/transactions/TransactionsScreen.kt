@@ -51,6 +51,7 @@ import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CategoryRepository
@@ -78,6 +79,7 @@ fun AccountTransactionsScreen(
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
+    accountAttributeRepository: AccountAttributeRepository,
     attributeTypeRepository: AttributeTypeRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
@@ -967,6 +969,8 @@ fun AccountTransactionsScreen(
         EditAccountDialog(
             account = account,
             accountRepository = accountRepository,
+            accountAttributeRepository = accountAttributeRepository,
+            attributeTypeRepository = attributeTypeRepository,
             categoryRepository = categoryRepository,
             personRepository = personRepository,
             personAccountOwnershipRepository = personAccountOwnershipRepository,

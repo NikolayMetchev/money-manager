@@ -507,14 +507,6 @@ class TransactionRepositoryImpl(
             }
         }
 
-    override suspend fun bumpRevisionOnly(id: TransferId): Long =
-        withContext(Dispatchers.Default) {
-            transferQueries.transactionWithResult {
-                transferQueries.bumpRevisionOnly(id.id)
-                transferQueries.selectById(id.id).executeAsOne().revision_id
-            }
-        }
-
     override suspend fun deleteTransaction(id: Long): Unit =
         withContext(Dispatchers.Default) {
             transferQueries.delete(id)
