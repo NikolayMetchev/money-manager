@@ -53,6 +53,7 @@ kotlin {
                 implementation(libs.androidx.compose.ui.graphics)
                 implementation(libs.androidx.compose.ui.text)
                 implementation(libs.diamondedge.logging)
+                implementation(libs.kotlinx.serialization.core)
                 implementation(libs.ktor.client.core)
                 implementation(libs.ktor.http)
             }
@@ -79,7 +80,9 @@ kotlin {
                 implementation(libs.compose.material3.desktop)
                 implementation(libs.compose.ui.graphics.desktop)
                 implementation(libs.compose.ui.text.desktop)
+                implementation(libs.compose.ui.util.desktop)
                 implementation(libs.diamondedge.logging)
+                implementation(libs.kotlinx.serialization.core)
                 implementation(libs.ktor.client.core)
                 implementation(libs.ktor.http)
             }

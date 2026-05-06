@@ -100,6 +100,7 @@ Money Manager is a Kotlin Multiplatform personal finance app targeting JVM and A
 - Import types explicitly, never use fully qualified names in code
 - Comments should explain "why", not "what" - prefer self-documenting code
 - Never skip `buildHealth` checks
+- **Never use `@Suppress("DEPRECATION")`** to silence deprecated API warnings. Always migrate to the replacement API instead (e.g. use `LocalClipboard` instead of `LocalClipboardManager`).
 
 ### Testing
 

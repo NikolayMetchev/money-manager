@@ -22,7 +22,6 @@ CREATE TABLE api_session (
     device_id INTEGER NOT NULL,
     created_at INTEGER NOT NULL,
     expires_at INTEGER,
-    revoked_at INTEGER,
     credential_id INTEGER,
     kind TEXT,
     imported_at INTEGER,
@@ -98,10 +97,9 @@ SELECT * FROM api_session WHERE device_id = ? ORDER BY created_at DESC;
 selectByCredentialId:
 SELECT * FROM api_session WHERE credential_id = ? ORDER BY created_at DESC;
 
-selectActiveSessions:
+selectSessions:
 SELECT * FROM api_session
-WHERE revoked_at IS NULL
-AND (expires_at IS NULL OR expires_at > ?)
+WHERE (expires_at IS NULL OR expires_at > ?)
 ORDER BY created_at DESC;
 
 insert:
@@ -110,15 +108,6 @@ VALUES (?, ?, ?, ?, ?, ?, ?);
 
 insertSessionType:
 INSERT INTO api_session_type(id, name) VALUES (?, ?);
-
-revoke:
-UPDATE api_session SET revoked_at = ? WHERE id = ?;
-
-revokeByToken:
-UPDATE api_session SET revoked_at = ? WHERE token = ?;
-
-revokeAllForDevice:
-UPDATE api_session SET revoked_at = ? WHERE device_id = ? AND revoked_at IS NULL;
 
 insertRequest:
 INSERT INTO api_request(session_id, method, url)

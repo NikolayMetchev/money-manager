@@ -37,7 +37,6 @@ data class ApiSession(
     val deviceId: DeviceId,
     val createdAt: Instant,
     val expiresAt: Instant?,
-    val revokedAt: Instant?,
     val credentialId: MonzoCredentialId?,
     val kind: ApiSessionKind?,
 )
