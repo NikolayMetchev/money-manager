@@ -101,7 +101,10 @@ fun ApiStrategyEditDialog(
     var txCounterpartyNameField by remember { mutableStateOf(strategy?.transactionMappings?.counterpartyNameField ?: "") }
     var txDeclineReasonField by remember { mutableStateOf(strategy?.transactionMappings?.declineReasonField ?: "") }
 
-    val isValid = name.isNotBlank() && baseUrl.isNotBlank()
+    val isValid =
+        name.isNotBlank() &&
+            baseUrl.isNotBlank() &&
+            (!paginationEnabled || paginationLimitValue.toIntOrNull() != null)
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -233,6 +236,13 @@ fun ApiStrategyEditDialog(
                         placeholder = { Text("100") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
+                        isError = paginationLimitValue.toIntOrNull() == null,
+                        supportingText =
+                            if (paginationLimitValue.toIntOrNull() == null) {
+                                { Text("Must be a whole number") }
+                            } else {
+                                null
+                            },
                     )
                     OutlinedTextField(
                         value = paginationCursorParam,

@@ -713,7 +713,7 @@ object DatabaseConfig {
     }
 
     /** Fixed UUID for the built-in Monzo strategy so it can be referenced reliably. */
-    val MONZO_STRATEGY_ID: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000001")
+    val monzoStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000001")
 
     /**
      * Seeds the built-in Monzo API import strategy.
@@ -766,7 +766,7 @@ object DatabaseConfig {
             )
         val now = Clock.System.now().toEpochMilliseconds()
         database.apiImportStrategyQueries.insert(
-            id = MONZO_STRATEGY_ID.toString(),
+            id = monzoStrategyId.toString(),
             name = "Monzo",
             config_json = ApiStrategyJsonCodec.encode(config),
             created_at = now,
