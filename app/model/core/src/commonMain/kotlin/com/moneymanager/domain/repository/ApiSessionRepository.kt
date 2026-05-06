@@ -78,44 +78,11 @@ interface ApiSessionRepository {
     suspend fun getSessionsByDevice(deviceId: DeviceId): List<ApiSession>
 
     /**
-     * Returns all sessions that are currently active (not revoked and not expired).
+     * Returns all sessions that are not expired.
      *
      * @param now The current timestamp used to check expiry
      */
-    suspend fun getActiveSessions(now: Instant): List<ApiSession>
-
-    /**
-     * Revokes the session with the given ID.
-     *
-     * @param id The session ID to revoke
-     * @param revokedAt The revocation timestamp
-     */
-    suspend fun revokeSession(
-        id: ApiSessionId,
-        revokedAt: Instant,
-    )
-
-    /**
-     * Revokes the session identified by the given token.
-     *
-     * @param token The session token to revoke
-     * @param revokedAt The revocation timestamp
-     */
-    suspend fun revokeSessionByToken(
-        token: String,
-        revokedAt: Instant,
-    )
-
-    /**
-     * Revokes all active sessions for the given device.
-     *
-     * @param deviceId The device whose sessions should be revoked
-     * @param revokedAt The revocation timestamp
-     */
-    suspend fun revokeAllSessionsForDevice(
-        deviceId: DeviceId,
-        revokedAt: Instant,
-    )
+    suspend fun getSessions(now: Instant): List<ApiSession>
 
     /**
      * Stores one API request payload and its headers for the given session.

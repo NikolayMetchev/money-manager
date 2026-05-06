@@ -46,7 +46,6 @@ class ApiSessionRepositoryImplTest : DbTest() {
             assertEquals(deviceId, session.deviceId)
             assertEquals(now, session.createdAt)
             assertNull(session.expiresAt)
-            assertNull(session.revokedAt)
         }
 
     @Test
@@ -99,65 +98,7 @@ class ApiSessionRepositoryImplTest : DbTest() {
         }
 
     @Test
-    fun `revokeSession sets revokedAt`() =
-        runTest {
-            val deviceId = deviceId()
-            val id = repositories.apiSessionRepository.createSession(token, deviceId, now, null)
-
-            val revokedAt = now + 1.hours
-            repositories.apiSessionRepository.revokeSession(id, revokedAt)
-
-            val session = repositories.apiSessionRepository.getSessionById(id)
-            assertNotNull(session)
-            assertEquals(revokedAt, session.revokedAt)
-        }
-
-    @Test
-    fun `revokeSessionByToken sets revokedAt`() =
-        runTest {
-            val deviceId = deviceId()
-            val id = repositories.apiSessionRepository.createSession(token, deviceId, now, null)
-
-            val revokedAt = now + 1.hours
-            repositories.apiSessionRepository.revokeSessionByToken(token, revokedAt)
-
-            val session = repositories.apiSessionRepository.getSessionById(id)
-            assertNotNull(session)
-            assertEquals(revokedAt, session.revokedAt)
-        }
-
-    @Test
-    fun `revokeAllSessionsForDevice revokes all active sessions`() =
-        runTest {
-            val deviceId = deviceId()
-            val id1 = repositories.apiSessionRepository.createSession("token-1", deviceId, now, null)
-            val id2 = repositories.apiSessionRepository.createSession("token-2", deviceId, now, null)
-
-            val revokedAt = now + 1.hours
-            repositories.apiSessionRepository.revokeAllSessionsForDevice(deviceId, revokedAt)
-
-            val session1 = repositories.apiSessionRepository.getSessionById(id1)
-            val session2 = repositories.apiSessionRepository.getSessionById(id2)
-            assertNotNull(session1?.revokedAt)
-            assertNotNull(session2?.revokedAt)
-        }
-
-    @Test
-    fun `getActiveSessions excludes revoked sessions`() =
-        runTest {
-            val deviceId = deviceId()
-            val id1 = repositories.apiSessionRepository.createSession("token-1", deviceId, now, null)
-            repositories.apiSessionRepository.createSession("token-2", deviceId, now, null)
-
-            repositories.apiSessionRepository.revokeSession(id1, now + 1.hours)
-
-            val active = repositories.apiSessionRepository.getActiveSessions(now + 2.hours)
-            assertEquals(1, active.size)
-            assertEquals("token-2", active.first().token)
-        }
-
-    @Test
-    fun `getActiveSessions excludes expired sessions`() =
+    fun `getSessions excludes expired sessions`() =
         runTest {
             val deviceId = deviceId()
             // Session expires in 1 hour
@@ -165,7 +106,7 @@ class ApiSessionRepositoryImplTest : DbTest() {
             repositories.apiSessionRepository.createSession("valid-token", deviceId, now, now + 3.hours)
 
             // Check at now + 2 hours: first session is expired, second is not
-            val active = repositories.apiSessionRepository.getActiveSessions(now + 2.hours)
+            val active = repositories.apiSessionRepository.getSessions(now + 2.hours)
             assertEquals(1, active.size)
             assertEquals("valid-token", active.first().token)
         }
