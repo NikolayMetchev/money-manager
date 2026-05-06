@@ -595,8 +595,6 @@ class AccountsScreenTest {
             transactionId: TransferId,
         ) {}
 
-        override suspend fun bumpRevisionOnly(id: TransferId): Long = 1L
-
         override suspend fun deleteTransaction(id: Long) {}
     }
 
