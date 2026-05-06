@@ -25,6 +25,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -35,6 +36,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -42,8 +44,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.platform.Clipboard
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -80,7 +82,10 @@ import com.moneymanager.ui.monzo.MonzoImportResult
 import com.moneymanager.ui.monzo.downloadMonzoAccounts
 import com.moneymanager.ui.monzo.downloadMonzoTransactions
 import com.moneymanager.ui.monzo.importMonzoSessionTransactions
+import com.moneymanager.ui.util.ContentCopyIcon
 import com.moneymanager.ui.util.displayDateTime
+import com.moneymanager.ui.util.setPlainText
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -95,7 +100,6 @@ import kotlin.time.Instant
 private val logger = logging()
 
 @Composable
-@Suppress("DEPRECATION")
 fun ApiSessionsScreen(
     apiSessionRepository: ApiSessionRepository,
     accountRepository: AccountRepository,
@@ -113,7 +117,7 @@ fun ApiSessionsScreen(
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
     val backgroundTasks = LocalBackgroundTaskManager.current
-    val clipboardManager = LocalClipboardManager.current
+    val clipboard = LocalClipboard.current
 
     var credentials by remember { mutableStateOf<List<MonzoCredential>>(emptyList()) }
     var sessionsByCredential by remember { mutableStateOf<Map<MonzoCredentialId, List<ApiSession>>>(emptyMap()) }
@@ -361,7 +365,7 @@ fun ApiSessionsScreen(
                                 },
                                 onSessionClick = onSessionClick,
                                 onRevokeSession = { sessionToRevoke = it },
-                                onCopyError = { error -> clipboardManager.setText(AnnotatedString(error)) },
+                                onCopyError = { error -> scope.launch { clipboard.setPlainText(error) } },
                             )
                         }
                     }
@@ -907,6 +911,8 @@ private fun RequestTrafficItem(
     timestamp: String,
     body: String,
 ) {
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
     Column(
         modifier =
             Modifier
@@ -919,6 +925,7 @@ private fun RequestTrafficItem(
         TrafficItemHeader(
             title = title,
             timestamp = timestamp,
+            onCopy = { scope.launch { clipboard.setPlainText(body) } },
         )
         SelectionContainer {
             Text(
@@ -941,6 +948,15 @@ private fun ResponseTrafficItem(
     highlightJsonPath: String? = null,
     onHighlightPositioned: ((Float) -> Unit)? = null,
 ) {
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
+    val prettyJson =
+        remember(json) {
+            runCatching {
+                val element = Json.parseToJsonElement(json)
+                Json { prettyPrint = true }.encodeToString(element)
+            }.getOrDefault(json)
+        }
     Column(
         modifier =
             Modifier
@@ -953,6 +969,7 @@ private fun ResponseTrafficItem(
         TrafficItemHeader(
             title = title,
             timestamp = timestamp,
+            onCopy = { scope.launch { clipboard.setPlainText(prettyJson) } },
         )
         JsonViewer(
             json = json,
@@ -967,16 +984,31 @@ private fun ResponseTrafficItem(
 private fun TrafficItemHeader(
     title: String,
     timestamp: String,
+    onCopy: (() -> Unit)? = null,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.labelLarge,
-        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.weight(1f),
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelLarge,
+            )
+            if (onCopy != null) {
+                Icon(
+                    imageVector = ContentCopyIcon,
+                    contentDescription = "Copy",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(14.dp).clickable(onClick = onCopy),
+                )
+            }
+        }
         Text(
             text = timestamp,
             style = MaterialTheme.typography.labelSmall,
@@ -996,6 +1028,22 @@ private fun JsonViewer(
         remember(json) {
             runCatching { Json.parseToJsonElement(json) }.getOrNull()
         }
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
+    val prettyPrinter = remember { Json { prettyPrint = true } }
+    // Parse the highlight path into segments (e.g. "$.transactions[0]" → ["transactions", "0"])
+    val highlightSegments =
+        remember(highlightJsonPath) {
+            parseJsonPathSegments(highlightJsonPath)
+        }
+    val latestTransactionByJsonPath =
+        remember(responseTransactions) {
+            responseTransactions
+                .groupBy { it.jsonPath.value }
+                .mapValues { (_, transactions) ->
+                    transactions.maxBy { it.id.id }
+                }
+        }
 
     if (jsonElement == null) {
         SelectionContainer {
@@ -1008,19 +1056,6 @@ private fun JsonViewer(
             )
         }
     } else {
-        // Parse the highlight path into segments (e.g. "$.transactions[0]" → ["transactions", "0"])
-        val highlightSegments =
-            remember(highlightJsonPath) {
-                parseJsonPathSegments(highlightJsonPath)
-            }
-        val latestTransactionByJsonPath =
-            remember(responseTransactions) {
-                responseTransactions
-                    .groupBy { it.jsonPath.value }
-                    .mapValues { (_, transactions) ->
-                        transactions.maxBy { it.id.id }
-                    }
-            }
         Column {
             JsonTreeNode(
                 label = null,
@@ -1030,6 +1065,9 @@ private fun JsonViewer(
                 latestTransactionByJsonPath = latestTransactionByJsonPath,
                 remainingHighlightSegments = highlightSegments,
                 onHighlightPositioned = onHighlightPositioned,
+                clipboard = clipboard,
+                copyScope = scope,
+                prettyPrinter = prettyPrinter,
             )
         }
     }
@@ -1076,6 +1114,9 @@ private fun JsonTreeNode(
     element: JsonElement,
     jsonPath: String,
     depth: Int,
+    clipboard: Clipboard,
+    copyScope: CoroutineScope,
+    prettyPrinter: Json,
     latestTransactionByJsonPath: Map<String, ApiResponseTransaction> = emptyMap(),
     remainingHighlightSegments: List<String>? = null,
     forceExpandSubtree: Boolean = false,
@@ -1162,6 +1203,15 @@ private fun JsonTreeNode(
         nodeTransaction?.let { transaction ->
             JsonTransactionStatus(transaction = transaction)
         }
+        Icon(
+            imageVector = ContentCopyIcon,
+            contentDescription = "Copy",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier =
+                Modifier
+                    .size(14.dp)
+                    .clickable { copyScope.launch { clipboard.setPlainText(prettyPrinter.encodeToString<JsonElement>(element)) } },
+        )
     }
     if (expanded) {
         when (element) {
@@ -1179,6 +1229,9 @@ private fun JsonTreeNode(
                         element = value,
                         jsonPath = jsonObjectChildPath(jsonPath, key),
                         depth = depth + 1,
+                        clipboard = clipboard,
+                        copyScope = copyScope,
+                        prettyPrinter = prettyPrinter,
                         latestTransactionByJsonPath = latestTransactionByJsonPath,
                         remainingHighlightSegments = nextSegments,
                         forceExpandSubtree = forceExpandSubtree || isHighlightTarget,
@@ -1201,6 +1254,9 @@ private fun JsonTreeNode(
                         element = value,
                         jsonPath = "$jsonPath[$index]",
                         depth = depth + 1,
+                        clipboard = clipboard,
+                        copyScope = copyScope,
+                        prettyPrinter = prettyPrinter,
                         latestTransactionByJsonPath = latestTransactionByJsonPath,
                         remainingHighlightSegments = nextSegments,
                         forceExpandSubtree = forceExpandSubtree || isHighlightTarget,
