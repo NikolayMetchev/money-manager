@@ -2,8 +2,8 @@
 
 package com.moneymanager.domain.repository
 
-import com.moneymanager.domain.model.AccountAuditEntry
 import com.moneymanager.domain.model.AccountAttributeAuditEntry
+import com.moneymanager.domain.model.AccountAuditEntry
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CategoryAuditEntry
 import com.moneymanager.domain.model.CurrencyAuditEntry

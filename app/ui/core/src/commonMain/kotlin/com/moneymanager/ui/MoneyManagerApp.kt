@@ -360,6 +360,7 @@ fun MoneyManagerApp(
                                     entitySourceQueries = entitySourceQueries,
                                     deviceRepository = deviceRepository,
                                     accountRepository = accountRepository,
+                                    accountAttributeRepository = accountAttributeRepository,
                                     categoryRepository = categoryRepository,
                                     currencyRepository = currencyRepository,
                                     attributeTypeRepository = attributeTypeRepository,

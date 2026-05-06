@@ -470,6 +470,29 @@ class AccountsScreenTest {
             return account.revisionId + 1
         }
 
+        override suspend fun updateAccountWithAttributes(
+            account: Account?,
+            accountId: AccountId,
+            deletedAttributeIds: Set<Long>,
+            updatedAttributes: Map<Long, NewAttribute>,
+            newAttributes: List<NewAttribute>,
+        ): Long {
+            val current = accountsFlow.value.find { it.id == accountId } ?: return 1L
+            val newRevision = current.revisionId + 1
+            if (account != null) {
+                accountsFlow.value =
+                    accountsFlow.value.map {
+                        if (it.id == accountId) account.copy(revisionId = newRevision) else it
+                    }
+            } else {
+                accountsFlow.value =
+                    accountsFlow.value.map {
+                        if (it.id == accountId) it.copy(revisionId = newRevision) else it
+                    }
+            }
+            return newRevision
+        }
+
         override suspend fun deleteAccount(id: AccountId) {
             deletedAccounts.add(id)
             accountsFlow.value = accountsFlow.value.filter { it.id != id }

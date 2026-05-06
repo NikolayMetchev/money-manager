@@ -5,11 +5,12 @@ package com.moneymanager.database.repository
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
+import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.mapper.AccountMapper
 import com.moneymanager.database.mapper.TransferMapper
-import com.moneymanager.database.sql.MoneyManagerDatabase
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.repository.AccountRepository
 import kotlinx.coroutines.Dispatchers
@@ -18,10 +19,11 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
 class AccountRepositoryImpl(
-    private val database: MoneyManagerDatabase,
+    private val database: MoneyManagerDatabaseWrapper,
 ) : AccountRepository {
     private val queries = database.accountQueries
     private val transferQueries = database.transferQueries
+    private val attributeQueries = database.accountAttributeQueries
 
     override fun getAllAccounts(): Flow<List<Account>> =
         queries
@@ -75,6 +77,72 @@ class AccountRepositoryImpl(
                     id = account.id.id,
                 )
                 queries.selectRevisionById(account.id.id).executeAsOne()
+            }
+        }
+
+    override suspend fun updateAccountWithAttributes(
+        account: Account?,
+        accountId: AccountId,
+        deletedAttributeIds: Set<Long>,
+        updatedAttributes: Map<Long, NewAttribute>,
+        newAttributes: List<NewAttribute>,
+    ): Long =
+        withContext(Dispatchers.Default) {
+            val hasAttributeChanges =
+                deletedAttributeIds.isNotEmpty() ||
+                    updatedAttributes.isNotEmpty() ||
+                    newAttributes.isNotEmpty()
+
+            val effectiveAccountId = account?.id ?: accountId
+
+            queries.transactionWithResult {
+                // Step 1: Update account fields or bump revision for attribute-only changes
+                if (account != null) {
+                    queries.update(
+                        name = account.name,
+                        category_id = account.categoryId,
+                        id = account.id.id,
+                    )
+                } else if (hasAttributeChanges) {
+                    queries.bumpRevisionOnly(effectiveAccountId.id)
+                }
+
+                // Step 2: Apply attribute changes inside creation mode so triggers record
+                // audit entries at the current revision without bumping it further
+                if (hasAttributeChanges) {
+                    database.beginCreationMode()
+                    try {
+                        deletedAttributeIds.forEach { id ->
+                            attributeQueries.deleteById(id)
+                        }
+
+                        updatedAttributes.forEach { (id, attr) ->
+                            val current = attributeQueries.selectById(id).executeAsOneOrNull()
+                            if (current != null && current.attribute_type_id != attr.typeId.id) {
+                                attributeQueries.deleteById(id)
+                                attributeQueries.insert(
+                                    account_id = effectiveAccountId.id,
+                                    attribute_type_id = attr.typeId.id,
+                                    attribute_value = attr.value,
+                                )
+                            } else {
+                                attributeQueries.updateValue(attr.value, id)
+                            }
+                        }
+
+                        newAttributes.forEach { attr ->
+                            attributeQueries.insert(
+                                account_id = effectiveAccountId.id,
+                                attribute_type_id = attr.typeId.id,
+                                attribute_value = attr.value,
+                            )
+                        }
+                    } finally {
+                        database.endCreationMode()
+                    }
+                }
+
+                queries.selectRevisionById(effectiveAccountId.id).executeAsOne()
             }
         }
 

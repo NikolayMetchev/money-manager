@@ -2,6 +2,7 @@ package com.moneymanager.domain.repository
 
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Transfer
 import kotlinx.coroutines.flow.Flow
 
@@ -18,6 +19,19 @@ interface AccountRepository {
      * Updates the account and returns the new revision ID.
      */
     suspend fun updateAccount(account: Account): Long
+
+    /**
+     * Atomically updates account fields and/or attributes, producing a single revision bump.
+     * Pass [account] = null to skip updating account fields (attribute-only update).
+     * Returns the final revision ID after all changes.
+     */
+    suspend fun updateAccountWithAttributes(
+        account: Account?,
+        accountId: AccountId,
+        deletedAttributeIds: Set<Long>,
+        updatedAttributes: Map<Long, NewAttribute>,
+        newAttributes: List<NewAttribute>,
+    ): Long
 
     suspend fun deleteAccount(id: AccountId)
 

@@ -39,9 +39,9 @@ import com.moneymanager.database.ManualEntitySourceRecorder
 import com.moneymanager.database.sql.EntitySourceQueries
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AttributeType
-import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.EntityType
+import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
@@ -316,18 +316,60 @@ fun EditAccountDialog(
                         errorMessage = null
                         scope.launch {
                             try {
+                                // Determine if account fields actually changed
+                                val accountFieldsChanged =
+                                    name.trim() != account.name ||
+                                        selectedCategoryId != account.categoryId
                                 val updatedAccount =
-                                    account.copy(
-                                        name = name.trim(),
-                                        categoryId = selectedCategoryId,
-                                    )
-                                val newRevisionId = accountRepository.updateAccount(updatedAccount)
+                                    if (accountFieldsChanged) {
+                                        account.copy(name = name.trim(), categoryId = selectedCategoryId)
+                                    } else {
+                                        null
+                                    }
 
-                                // Record source for account update audit trail
+                                // Resolve attribute type IDs before the atomic update
+                                val originalIds = originalAttributeList.map { it.id }.toSet()
+                                val editableIds = editableAttributes.keys.filter { it > 0 }.toSet()
+                                val deletedAttributeIds = originalIds - editableIds
+
+                                val updatedAttributes = mutableMapOf<Long, NewAttribute>()
+                                editableAttributes.filter { (id, _) -> id > 0 }.forEach { (id, pair) ->
+                                    val (typeName, value) = pair
+                                    val original = originalAttributeList.find { it.id == id }
+                                    if (original != null) {
+                                        val typeChanged = original.attributeType.name != typeName
+                                        val valueChanged = original.value != value
+                                        if (typeChanged || valueChanged) {
+                                            val typeId = attributeTypeRepository.getOrCreate(typeName.trim())
+                                            updatedAttributes[id] = NewAttribute(typeId, value.trim())
+                                        }
+                                    }
+                                }
+
+                                val newAttributes = mutableListOf<NewAttribute>()
+                                editableAttributes.filter { (id, _) -> id < 0 }.forEach { (_, pair) ->
+                                    val (typeName, value) = pair
+                                    if (typeName.isNotBlank() && value.isNotBlank()) {
+                                        val typeId = attributeTypeRepository.getOrCreate(typeName.trim())
+                                        newAttributes.add(NewAttribute(typeId, value.trim()))
+                                    }
+                                }
+
+                                // Atomic update: one revision bump for account + all attribute changes
+                                val finalRevisionId =
+                                    accountRepository.updateAccountWithAttributes(
+                                        account = updatedAccount,
+                                        accountId = account.id,
+                                        deletedAttributeIds = deletedAttributeIds,
+                                        updatedAttributes = updatedAttributes,
+                                        newAttributes = newAttributes,
+                                    )
+
+                                // Record manual source for the single audit entry
                                 ManualEntitySourceRecorder(entitySourceQueries, deviceId).insert(
                                     EntityType.ACCOUNT,
                                     account.id.id,
-                                    newRevisionId,
+                                    finalRevisionId,
                                 )
 
                                 val existingOwnerIds = existingOwnerships.map { it.personId.id }.toSet()
@@ -347,52 +389,11 @@ fun EditAccountDialog(
                                             personId = PersonId(personId),
                                             accountId = account.id,
                                         )
-                                    // Record source for new ownership audit trail
                                     ManualEntitySourceRecorder(entitySourceQueries, deviceId).insert(
                                         EntityType.PERSON_ACCOUNT_OWNERSHIP,
                                         ownershipId,
                                         1L,
                                     )
-                                }
-
-                                // Save attribute changes
-                                val originalIds = originalAttributeList.map { it.id }.toSet()
-                                val editableIds = editableAttributes.keys.filter { it > 0 }.toSet()
-
-                                // Delete removed attributes
-                                val deletedIds = originalIds - editableIds
-                                deletedIds.forEach { id ->
-                                    accountAttributeRepository.delete(id)
-                                }
-
-                                // Update changed attributes
-                                editableAttributes.filter { (id, _) -> id > 0 }.forEach { (id, pair) ->
-                                    val (typeName, value) = pair
-                                    val original = originalAttributeList.find { it.id == id }
-                                    if (original != null) {
-                                        val typeChanged = original.attributeType.name != typeName
-                                        val valueChanged = original.value != value
-                                        if (typeChanged || valueChanged) {
-                                            val typeId = attributeTypeRepository.getOrCreate(typeName.trim())
-                                            if (typeChanged) {
-                                                // Type changed: delete and re-insert
-                                                accountAttributeRepository.delete(id)
-                                                accountAttributeRepository.insert(account.id, typeId, value.trim())
-                                            } else {
-                                                // Only value changed
-                                                accountAttributeRepository.updateValue(id, value.trim())
-                                            }
-                                        }
-                                    }
-                                }
-
-                                // Insert new attributes
-                                editableAttributes.filter { (id, _) -> id < 0 }.forEach { (_, pair) ->
-                                    val (typeName, value) = pair
-                                    if (typeName.isNotBlank() && value.isNotBlank()) {
-                                        val typeId = attributeTypeRepository.getOrCreate(typeName.trim())
-                                        accountAttributeRepository.insert(account.id, typeId, value.trim())
-                                    }
                                 }
 
                                 onDismiss()
@@ -448,4 +449,3 @@ fun EditAccountDialog(
         )
     }
 }
-
