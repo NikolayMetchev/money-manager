@@ -90,6 +90,7 @@ compose-ui-graphics-desktop = { module = "org.jetbrains.compose.ui:ui-graphics-d
 compose-ui-text-desktop = { module = "org.jetbrains.compose.ui:ui-text-desktop", version.ref = "compose-plugin" }
 compose-ui-test-desktop = { module = "org.jetbrains.compose.ui:ui-test-desktop", version.ref = "compose-plugin" }
 compose-ui-unit-desktop = { module = "org.jetbrains.compose.ui:ui-unit-desktop", version.ref = "compose-plugin" }
+compose-ui-util-desktop = { module = "org.jetbrains.compose.ui:ui-util-desktop", version.ref = "compose-plugin" }
 dependency-analysis-gradle-plugin = { module = "com.autonomousapps:dependency-analysis-gradle-plugin", version.ref = "dependency-analysis" }
 detekt-gradle-plugin = { module = "dev.detekt:dev.detekt.gradle.plugin", version.ref = "detekt" }
 develocity-gradle-plugin = { module = "com.gradle:develocity-gradle-plugin", version.ref = "develocity" }
