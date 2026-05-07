@@ -9,6 +9,11 @@ plugins:
   - id: com.squareup.sqldelight
 profile:
   path: .qodana/profile.xml
+exclude:
+  - name: KotlinNoActualForExpect
+  - name: XmlHighlighting
+excludedPaths:
+  - "**/build/**"
 include:
   - name: CheckDependencyLicenses
 failureConditions:

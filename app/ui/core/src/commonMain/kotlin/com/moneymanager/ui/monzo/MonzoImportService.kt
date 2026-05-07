@@ -267,8 +267,7 @@ suspend fun importMonzoSessionTransactions(
             },
         )
     val currencyCache = CurrencyCache(currencyRepository)
-    val pageResults =
-        coroutineScope {
+    coroutineScope {
             transactionResponses
                 .map { response ->
                     async {
@@ -731,7 +730,6 @@ private class AccountCache(
                         id = AccountId(0L),
                         name = normalizedName,
                         openingDate = now,
-                        categoryId = Category.UNCATEGORIZED_ID,
                     ),
                 )
             accountsByName =

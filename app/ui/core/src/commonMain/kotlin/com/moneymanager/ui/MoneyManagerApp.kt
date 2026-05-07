@@ -621,7 +621,6 @@ fun MoneyManagerApp(
 
                 if (showTransactionDialog) {
                     TransactionEditDialog(
-                        transaction = null,
                         transactionRepository = transactionRepository,
                         transferSourceRepository = transferSourceRepository,
                         transferSourceQueries = transferSourceQueries,

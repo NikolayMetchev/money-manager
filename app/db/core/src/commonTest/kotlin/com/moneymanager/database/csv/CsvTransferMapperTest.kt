@@ -42,7 +42,6 @@ class CsvTransferMapperTest {
             id = testCurrencyId,
             code = "GBP",
             name = "British Pound",
-            scaleFactor = 100,
         )
 
     private val testSourceAccountId = AccountId(1)

@@ -57,8 +57,8 @@ class CategoriesScreenTest {
             // Given
             val categories =
                 listOf(
-                    Category(id = 1L, name = "Food", parentId = null),
-                    Category(id = 2L, name = "Transport", parentId = null),
+                    Category(id = 1L, name = "Food"),
+                    Category(id = 2L, name = "Transport"),
                 )
             val repository = FakeCategoryRepository(categories)
 
@@ -103,8 +103,8 @@ class CategoriesScreenTest {
             // Given
             val categories =
                 listOf(
-                    Category(id = Category.UNCATEGORIZED_ID, name = "Uncategorized", parentId = null),
-                    Category(id = 1L, name = "Food", parentId = null),
+                    Category(id = Category.UNCATEGORIZED_ID, name = "Uncategorized"),
+                    Category(id = 1L, name = "Food"),
                 )
             val repository = FakeCategoryRepository(categories)
 
@@ -129,7 +129,7 @@ class CategoriesScreenTest {
             // Given
             val categories =
                 listOf(
-                    Category(id = 1L, name = "Food", parentId = null),
+                    Category(id = 1L, name = "Food"),
                     Category(id = 2L, name = "Groceries", parentId = 1L),
                     Category(id = 3L, name = "Restaurants", parentId = 1L),
                 )
@@ -155,7 +155,7 @@ class CategoriesScreenTest {
             // Given
             val categories =
                 listOf(
-                    Category(id = 1L, name = "Food", parentId = null),
+                    Category(id = 1L, name = "Food"),
                     Category(id = 2L, name = "Groceries", parentId = 1L),
                 )
             val repository = FakeCategoryRepository(categories)
@@ -299,9 +299,9 @@ class CategoriesScreenTest {
             // Given
             val categories =
                 listOf(
-                    Category(id = Category.UNCATEGORIZED_ID, name = "Uncategorized", parentId = null),
-                    Category(id = 1L, name = "Food", parentId = null),
-                    Category(id = 2L, name = "Transport", parentId = null),
+                    Category(id = Category.UNCATEGORIZED_ID, name = "Uncategorized"),
+                    Category(id = 1L, name = "Food"),
+                    Category(id = 2L, name = "Transport"),
                 )
             val repository = FakeCategoryRepository(categories)
 
@@ -337,7 +337,7 @@ class CategoriesScreenTest {
             // Given
             val categories =
                 listOf(
-                    Category(id = 1L, name = "Food", parentId = null),
+                    Category(id = 1L, name = "Food"),
                 )
             val repository = FakeCategoryRepository(categories)
 
@@ -364,7 +364,7 @@ class CategoriesScreenTest {
             // Given
             val categories =
                 listOf(
-                    Category(id = 1L, name = "Food", parentId = null),
+                    Category(id = 1L, name = "Food"),
                 )
             val repository = FakeCategoryRepository(categories)
 
@@ -400,7 +400,7 @@ class CategoriesScreenTest {
             // Given
             val categories =
                 listOf(
-                    Category(id = 1L, name = "Food", parentId = null),
+                    Category(id = 1L, name = "Food"),
                 )
             val repository = FakeCategoryRepository(categories)
 
@@ -432,7 +432,7 @@ class CategoriesScreenTest {
             // Given
             val categories =
                 listOf(
-                    Category(id = 1L, name = "Food", parentId = null),
+                    Category(id = 1L, name = "Food"),
                 )
             val repository = FakeCategoryRepository(categories)
 
@@ -463,7 +463,7 @@ class CategoriesScreenTest {
             // Given
             val categories =
                 listOf(
-                    Category(id = 1L, name = "Food", parentId = null),
+                    Category(id = 1L, name = "Food"),
                 )
             val repository = FakeCategoryRepository(categories)
 
@@ -490,7 +490,7 @@ class CategoriesScreenTest {
             // Given
             val categories =
                 listOf(
-                    Category(id = 1L, name = "Food", parentId = null),
+                    Category(id = 1L, name = "Food"),
                 )
             val repository = FakeCategoryRepository(categories)
 
@@ -521,7 +521,7 @@ class CategoriesScreenTest {
             // Given
             val categories =
                 listOf(
-                    Category(id = 1L, name = "Food", parentId = null),
+                    Category(id = 1L, name = "Food"),
                 )
             val repository = FakeCategoryRepository(categories)
 
@@ -556,7 +556,7 @@ class CategoriesScreenTest {
             // Given
             val categories =
                 listOf(
-                    Category(id = 1L, name = "Food", parentId = null),
+                    Category(id = 1L, name = "Food"),
                 )
             val repository = FakeCategoryRepository(categories)
 
@@ -597,7 +597,7 @@ class CategoriesScreenTest {
             // Given - only Uncategorized category
             val categories =
                 listOf(
-                    Category(id = Category.UNCATEGORIZED_ID, name = "Uncategorized", parentId = null),
+                    Category(id = Category.UNCATEGORIZED_ID, name = "Uncategorized"),
                 )
             val repository = FakeCategoryRepository(categories)
 
@@ -622,8 +622,8 @@ class CategoriesScreenTest {
             // Given - Uncategorized and another category
             val categories =
                 listOf(
-                    Category(id = Category.UNCATEGORIZED_ID, name = "Uncategorized", parentId = null),
-                    Category(id = 1L, name = "Food", parentId = null),
+                    Category(id = Category.UNCATEGORIZED_ID, name = "Uncategorized"),
+                    Category(id = 1L, name = "Food"),
                 )
             val repository = FakeCategoryRepository(categories)
 
@@ -654,8 +654,8 @@ class CategoriesScreenTest {
             // Given
             val categories =
                 listOf(
-                    Category(id = 1L, name = "Food", parentId = null),
-                    Category(id = 2L, name = "Transport", parentId = null),
+                    Category(id = 1L, name = "Food"),
+                    Category(id = 2L, name = "Transport"),
                 )
             val repository = FakeCategoryRepository(categories)
 
@@ -686,10 +686,10 @@ class CategoriesScreenTest {
             // Given - Food has child Groceries, which has child Organic
             val categories =
                 listOf(
-                    Category(id = 1L, name = "Food", parentId = null),
+                    Category(id = 1L, name = "Food"),
                     Category(id = 2L, name = "Groceries", parentId = 1L),
                     Category(id = 3L, name = "Organic", parentId = 2L),
-                    Category(id = 4L, name = "Transport", parentId = null),
+                    Category(id = 4L, name = "Transport"),
                 )
             val repository = FakeCategoryRepository(categories)
 
@@ -719,8 +719,8 @@ class CategoriesScreenTest {
             // Given
             val categories =
                 listOf(
-                    Category(id = 1L, name = "Food", parentId = null),
-                    Category(id = 2L, name = "Groceries", parentId = null),
+                    Category(id = 1L, name = "Food"),
+                    Category(id = 2L, name = "Groceries"),
                 )
             val repository = FakeCategoryRepository(categories)
 
@@ -763,9 +763,9 @@ class CategoriesScreenTest {
             // Given
             val categories =
                 listOf(
-                    Category(id = 1L, name = "Food", parentId = null),
-                    Category(id = 2L, name = "Transport", parentId = null),
-                    Category(id = 3L, name = "Entertainment", parentId = null),
+                    Category(id = 1L, name = "Food"),
+                    Category(id = 2L, name = "Transport"),
+                    Category(id = 3L, name = "Entertainment"),
                 )
             val repository = FakeCategoryRepository(categories)
 
@@ -802,10 +802,10 @@ class CategoriesScreenTest {
             // Given
             val categories =
                 listOf(
-                    Category(id = 1L, name = "Food", parentId = null),
-                    Category(id = 2L, name = "Transport", parentId = null),
-                    Category(id = 3L, name = "Entertainment", parentId = null),
-                    Category(id = 4L, name = "Utilities", parentId = null),
+                    Category(id = 1L, name = "Food"),
+                    Category(id = 2L, name = "Transport"),
+                    Category(id = 3L, name = "Entertainment"),
+                    Category(id = 4L, name = "Utilities"),
                 )
             val repository = FakeCategoryRepository(categories)
 
@@ -832,7 +832,7 @@ class CategoriesScreenTest {
             // Given
             val categories =
                 listOf(
-                    Category(id = 1L, name = "Food", parentId = null),
+                    Category(id = 1L, name = "Food"),
                     Category(id = 2L, name = "Groceries", parentId = 1L),
                     Category(id = 3L, name = "Organic", parentId = 2L),
                 )

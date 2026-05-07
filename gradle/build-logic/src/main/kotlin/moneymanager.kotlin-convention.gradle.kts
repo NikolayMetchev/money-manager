@@ -74,12 +74,12 @@ configure<KoverProjectExtension> {
         filters {
             excludes {
                 // Exclude generated code
-                classes("*_Factory", "*_Factory\$*")
-                classes("*_Impl", "*_Impl\$*")
+                classes("*_Factory", "*_Factory$*")
+                classes("*_Impl", "*_Impl$*")
                 classes("*MapperImpl")
                 // Exclude Metro DI generated code
-                classes("*Component\$*")
-                classes("*Module\$*")
+                classes("*Component$*")
+                classes("*Module$*")
                 // Exclude SQLDelight generated code
                 classes("com.moneymanager.database.sql.*")
             }

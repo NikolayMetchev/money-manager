@@ -1,5 +1,3 @@
-root = false
-
 [*.{kt,kts}]
 # Disable ktlint rules that conflict with Compose conventions
 ktlint_standard_no-wildcard-imports = disabled

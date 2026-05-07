@@ -558,7 +558,6 @@ fun CreateCsvStrategyDialog(
                     entitySourceQueries = entitySourceQueries,
                     deviceId = deviceId,
                     enabled = !isSaving,
-                    isError = false,
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -1519,7 +1518,6 @@ private fun AttributeMappingsEditor(
                                         AttributeColumnMapping(
                                             columnName = columnName,
                                             attributeTypeName = columnName,
-                                            isUniqueIdentifier = false,
                                         ),
                                 )
                             } else {

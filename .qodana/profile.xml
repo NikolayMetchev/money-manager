@@ -6,7 +6,6 @@
     <inspection_tool class="FunctionWithLambdaExpressionBody" enabled="true" level="ERROR" enabled_by_default="true"/>
     <inspection_tool class="RedundantConstructorKeyword" enabled="true" level="ERROR" enabled_by_default="true"/>
     <inspection_tool class="RedundantReturnKeyword" enabled="true" level="ERROR" enabled_by_default="true"/>
-    <inspection_tool class="RedundantReturnLabel" enabled="true" level="ERROR" enabled_by_default="true"/>
     <inspection_tool class="RedundantSuspendModifier" enabled="true" level="ERROR" enabled_by_default="true"/>
     <inspection_tool class="ComplexRedundantLet" enabled="true" level="ERROR" enabled_by_default="true"/>
     <inspection_tool class="RemoveRedundantBackticks" enabled="true" level="ERROR" enabled_by_default="true"/>
@@ -17,7 +16,6 @@
     <inspection_tool class="RedundantEnumConstructorInvocation" enabled="true" level="ERROR" enabled_by_default="true"/>
     <inspection_tool class="CanUnescapeDollarLiteral" enabled="true" level="ERROR" enabled_by_default="true"/>
     <inspection_tool class="RedundantInterpolationPrefix" enabled="true" level="ERROR" enabled_by_default="true"/>
-    <inspection_tool class="RedundantLabeledReturnOnLastExpressionInLambda" enabled="true" level="ERROR" enabled_by_default="true"/>
     <inspection_tool class="RedundantOverride" enabled="true" level="ERROR" enabled_by_default="true"/>
     <inspection_tool class="RedundantGetter" enabled="true" level="ERROR" enabled_by_default="true"/>
     <inspection_tool class="RedundantSetter" enabled="true" level="ERROR" enabled_by_default="true"/>
@@ -33,7 +31,6 @@
     <inspection_tool class="UnusedImport" enabled="true" level="ERROR" enabled_by_default="true"/>
     <inspection_tool class="UNUSED_PARAMETER" enabled="true" level="ERROR" enabled_by_default="true"/>
     <inspection_tool class="UnusedVariable" enabled="true" level="ERROR" enabled_by_default="true"/>
-    <inspection_tool class="VariableInitializerIsRedundant" enabled="true" level="ERROR" enabled_by_default="true"/>
     <inspection_tool class="VariableNeverRead" enabled="true" level="ERROR" enabled_by_default="true"/>
   </profile>
 </component>

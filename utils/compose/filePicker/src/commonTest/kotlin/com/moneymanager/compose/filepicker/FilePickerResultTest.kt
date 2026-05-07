@@ -92,7 +92,7 @@ class FilePickerResultTest {
         val timestamp = Instant.fromEpochMilliseconds(1700000000000L)
         val result1 = FilePickerResult(fileName = "test.csv", content = "data", lastModified = timestamp)
         val result2 = FilePickerResult(fileName = "test.csv", content = "data", lastModified = timestamp)
-        val result3 = FilePickerResult(fileName = "test.csv", content = "data", lastModified = null)
+        val result3 = FilePickerResult(fileName = "test.csv", content = "data")
 
         assertEquals(result1, result2)
         assertNotEquals(result1, result3)

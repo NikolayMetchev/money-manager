@@ -601,9 +601,9 @@ class AccountsScreenTest {
     private class FakeCategoryRepository : CategoryRepository {
         private val categories =
             listOf(
-                Category(id = -1L, name = "Uncategorized", parentId = null),
-                Category(id = 1L, name = "Food", parentId = null),
-                Category(id = 2L, name = "Transport", parentId = null),
+                Category(id = -1L, name = "Uncategorized"),
+                Category(id = 1L, name = "Food"),
+                Category(id = 2L, name = "Transport"),
             )
 
         override fun getAllCategories(): Flow<List<Category>> = flowOf(categories)
