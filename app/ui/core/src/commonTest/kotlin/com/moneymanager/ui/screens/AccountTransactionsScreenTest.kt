@@ -1274,8 +1274,7 @@ class AccountTransactionsScreenTest {
     }
 
     private class FakeDeviceRepository : DeviceRepository {
-        override fun getOrCreateDevice(deviceInfo: DeviceInfo): DeviceId =
-            DeviceId(1L)
+        override fun getOrCreateDevice(deviceInfo: DeviceInfo): DeviceId = DeviceId(1L)
 
         override suspend fun getDeviceById(id: DeviceId): DeviceInfo? = null
     }
