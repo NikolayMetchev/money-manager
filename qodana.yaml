@@ -14,7 +14,10 @@ exclude:
   - name: XmlHighlighting
   - name: All
     paths:
-      - "**/build/**"
+      - build
+      - "*/build"
+      - "*/*/build"
+      - "*/*/*/build"
 include:
   - name: CheckDependencyLicenses
 failureConditions:
