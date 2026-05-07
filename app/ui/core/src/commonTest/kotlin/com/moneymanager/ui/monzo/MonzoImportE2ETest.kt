@@ -9,6 +9,9 @@ import com.moneymanager.domain.model.SourceType
 import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.createApiClient
 import com.moneymanager.test.database.DbTest
+import com.moneymanager.ui.api.downloadApiSessionAccounts
+import com.moneymanager.ui.api.downloadApiSessionTransactions
+import com.moneymanager.ui.api.importApiSessionTransactions
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpHeaders
@@ -116,6 +119,62 @@ private val TRANSACTIONS_PAGE_1_JSON =
 
 private const val EMPTY_TRANSACTIONS_JSON = """{ "transactions": [] }"""
 
+private val TRANSACTIONS_WITH_COUNTERPARTY_IDS_JSON =
+    """
+{
+  "transactions": [
+    {
+      "id": "tx_00009TEST000000000020",
+      "account_id": "$ACCOUNT_ID",
+      "created": "2024-06-04T09:15:00.000Z",
+      "amount": -1250,
+      "currency": "GBP",
+      "description": "PAYMENT TO ALICE",
+      "merchant": null,
+      "counterparty": { "id": "cp_alice_001", "name": "Alice" }
+    },
+    {
+      "id": "tx_00009TEST000000000021",
+      "account_id": "$ACCOUNT_ID",
+      "created": "2024-06-05T09:15:00.000Z",
+      "amount": 2500,
+      "currency": "GBP",
+      "description": "PAYMENT FROM ALICE SMITH",
+      "merchant": null,
+      "counterparty": { "id": "cp_alice_001", "name": "Alice Smith" }
+    }
+  ]
+}
+    """.trimIndent()
+
+private val TRANSACTIONS_WITH_BANK_COUNTERPARTY_JSON =
+    """
+{
+  "transactions": [
+    {
+      "id": "tx_00009TEST000000000030",
+      "account_id": "$ACCOUNT_ID",
+      "created": "2024-06-04T09:15:00.000Z",
+      "amount": -1250,
+      "currency": "GBP",
+      "description": "PAYWARD LTD",
+      "merchant": null,
+      "counterparty": { "account_number": "29900313", "name": "PAYWARD LTD", "sort_code": "041307" }
+    },
+    {
+      "id": "tx_00009TEST000000000031",
+      "account_id": "$ACCOUNT_ID",
+      "created": "2024-06-05T09:15:00.000Z",
+      "amount": -2500,
+      "currency": "GBP",
+      "description": "Payward Ltd.",
+      "merchant": null,
+      "counterparty": { "account_number": "29900313", "name": "Payward Ltd.", "sort_code": "041307" }
+    }
+  ]
+}
+    """.trimIndent()
+
 /**
  * A page that contains only declined transactions — no settled tx at all.
  * Used to verify that an all-declined page does not prematurely stop pagination.
@@ -217,23 +276,26 @@ class MonzoImportE2ETest : DbTest() {
                         ),
                     engine = mockEngine,
                 )
+            val strategy = repositories.apiImportStrategyRepository.getAllStrategies().first().single()
 
             // WHEN — download then import
-            downloadMonzoAccounts(
+            downloadApiSessionAccounts(
                 token = "test-monzo-token",
                 apiClient = apiClient,
                 apiSessionRepository = repositories.apiSessionRepository,
                 sessionId = sessionId,
+                strategy = strategy,
             )
-            downloadMonzoTransactions(
+            downloadApiSessionTransactions(
                 token = "test-monzo-token",
                 apiClient = apiClient,
                 apiSessionRepository = repositories.apiSessionRepository,
                 sessionId = sessionId,
+                strategy = strategy,
             )
 
             val importResult =
-                importMonzoSessionTransactions(
+                importApiSessionTransactions(
                     apiSessionRepository = repositories.apiSessionRepository,
                     accountRepository = repositories.accountRepository,
                     currencyRepository = repositories.currencyRepository,
@@ -242,8 +304,11 @@ class MonzoImportE2ETest : DbTest() {
                     entitySourceQueries = repositories.entitySourceQueries,
                     personRepository = repositories.personRepository,
                     personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
+                    attributeTypeRepository = repositories.attributeTypeRepository,
+                    accountAttributeRepository = repositories.accountAttributeRepository,
                     deviceId = deviceId,
                     sessionId = sessionId,
+                    strategy = strategy,
                 )
 
             // THEN — import counts (declined tx5 is stored but marked excluded)
@@ -397,22 +462,25 @@ class MonzoImportE2ETest : DbTest() {
                         ),
                     engine = mockEngine,
                 )
+            val strategy = repositories.apiImportStrategyRepository.getAllStrategies().first().single()
 
-            downloadMonzoAccounts(
+            downloadApiSessionAccounts(
                 token = "test-monzo-token",
                 apiClient = apiClient,
                 apiSessionRepository = repositories.apiSessionRepository,
                 sessionId = sessionId,
+                strategy = strategy,
             )
-            downloadMonzoTransactions(
+            downloadApiSessionTransactions(
                 token = "test-monzo-token",
                 apiClient = apiClient,
                 apiSessionRepository = repositories.apiSessionRepository,
                 sessionId = sessionId,
+                strategy = strategy,
             )
 
             val importResult =
-                importMonzoSessionTransactions(
+                importApiSessionTransactions(
                     apiSessionRepository = repositories.apiSessionRepository,
                     accountRepository = repositories.accountRepository,
                     currencyRepository = repositories.currencyRepository,
@@ -421,8 +489,11 @@ class MonzoImportE2ETest : DbTest() {
                     entitySourceQueries = repositories.entitySourceQueries,
                     personRepository = repositories.personRepository,
                     personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
+                    attributeTypeRepository = repositories.attributeTypeRepository,
+                    accountAttributeRepository = repositories.accountAttributeRepository,
                     deviceId = deviceId,
                     sessionId = sessionId,
+                    strategy = strategy,
                 )
 
             // Pagination must have continued past the all-declined page to reach the settled tx
@@ -442,4 +513,189 @@ class MonzoImportE2ETest : DbTest() {
             val settledTransfer = transfers.single { it.attributes.none { attr -> attr.attributeType.name == "excluded" } }
             assertEquals(2500L, settledTransfer.amount.amount)
         }
+
+    @Test
+    fun `counterparty id creates one account attribute and prevents duplicate counterparty accounts`() =
+        runTest {
+            val deviceId =
+                repositories.deviceRepository.getOrCreateDevice(
+                    DeviceInfo.Jvm("test-machine", "Test OS"),
+                )
+            val sessionId =
+                repositories.apiSessionRepository.createSession(
+                    token = "test-monzo-token",
+                    deviceId = deviceId,
+                    createdAt = Instant.fromEpochMilliseconds(1_700_000_000_000L),
+                    expiresAt = null,
+                )
+            val mockEngine =
+                MockEngine { request ->
+                    val url = request.url.toString()
+                    val json =
+                        when {
+                            url.contains("/accounts") -> ACCOUNTS_JSON
+                            url.contains("/transactions") && !url.contains("before=") -> TRANSACTIONS_WITH_COUNTERPARTY_IDS_JSON
+                            url.contains("/transactions") && url.contains("before=") -> EMPTY_TRANSACTIONS_JSON
+                            else -> error("Unexpected request: $url")
+                        }
+                    respond(
+                        content = json,
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                    )
+                }
+            val apiClient =
+                createApiClient(
+                    trafficRecorder = ApiSessionTrafficRecorder(sessionId, repositories.apiSessionRepository),
+                    engine = mockEngine,
+                )
+            val strategy =
+                repositories.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .single()
+                    .let { strategy ->
+                        strategy.copy(
+                            transactionMappings =
+                                strategy.transactionMappings.copy(
+                                    counterpartyIdField = "counterparty.id",
+                                ),
+                        )
+                    }
+
+            downloadApiSessionAccounts(
+                token = "test-monzo-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+            downloadApiSessionTransactions(
+                token = "test-monzo-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+
+            val importResult =
+                importApiSessionTransactions(
+                    apiSessionRepository = repositories.apiSessionRepository,
+                    accountRepository = repositories.accountRepository,
+                    currencyRepository = repositories.currencyRepository,
+                    transactionRepository = repositories.transactionRepository,
+                    transferSourceQueries = transferSourceQueries,
+                    entitySourceQueries = repositories.entitySourceQueries,
+                    personRepository = repositories.personRepository,
+                    personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
+                    attributeTypeRepository = repositories.attributeTypeRepository,
+                    accountAttributeRepository = repositories.accountAttributeRepository,
+                    deviceId = deviceId,
+                    sessionId = sessionId,
+                    strategy = strategy,
+                )
+
+            assertEquals(2, importResult.transactionCount)
+            val allAccounts = repositories.accountRepository.getAllAccounts().first()
+            val counterpartyAccounts = allAccounts.filter { it.name.startsWith("Monzo Counterparty:") }
+            assertEquals(1, counterpartyAccounts.size, "The same counterparty.id should create one account")
+            val counterpartyAttributes =
+                counterpartyAccounts.flatMap { account ->
+                    repositories.accountAttributeRepository.getByAccount(account.id).first()
+                }.filter { it.attributeType.name == "counterparty.id" }
+            assertEquals(1, counterpartyAttributes.size, "counterparty.id should be stored once as an account attribute")
+            assertEquals("cp_alice_001", counterpartyAttributes.single().value)
+        }
+
+    @Test
+    fun `counterparty bank details are used when configured counterparty id is absent`() =
+        runTest {
+            val deviceId =
+                repositories.deviceRepository.getOrCreateDevice(
+                    DeviceInfo.Jvm("test-machine", "Test OS"),
+                )
+            val sessionId =
+                repositories.apiSessionRepository.createSession(
+                    token = "test-monzo-token",
+                    deviceId = deviceId,
+                    createdAt = Instant.fromEpochMilliseconds(1_700_000_000_000L),
+                    expiresAt = null,
+                )
+            val mockEngine =
+                MockEngine { request ->
+                    val url = request.url.toString()
+                    val json =
+                        when {
+                            url.contains("/accounts") -> ACCOUNTS_JSON
+                            url.contains("/transactions") && !url.contains("before=") -> TRANSACTIONS_WITH_BANK_COUNTERPARTY_JSON
+                            url.contains("/transactions") && url.contains("before=") -> EMPTY_TRANSACTIONS_JSON
+                            else -> error("Unexpected request: $url")
+                        }
+                    respond(
+                        content = json,
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                    )
+                }
+            val apiClient =
+                createApiClient(
+                    trafficRecorder = ApiSessionTrafficRecorder(sessionId, repositories.apiSessionRepository),
+                    engine = mockEngine,
+                )
+            val strategy =
+                repositories.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .single()
+                    .let { strategy ->
+                        strategy.copy(
+                            transactionMappings =
+                                strategy.transactionMappings.copy(
+                                    counterpartyIdField = "counterparty.account_id",
+                                ),
+                        )
+                    }
+
+            downloadApiSessionAccounts(
+                token = "test-monzo-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+            downloadApiSessionTransactions(
+                token = "test-monzo-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+
+            importApiSessionTransactions(
+                apiSessionRepository = repositories.apiSessionRepository,
+                accountRepository = repositories.accountRepository,
+                currencyRepository = repositories.currencyRepository,
+                transactionRepository = repositories.transactionRepository,
+                transferSourceQueries = transferSourceQueries,
+                entitySourceQueries = repositories.entitySourceQueries,
+                personRepository = repositories.personRepository,
+                personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
+                attributeTypeRepository = repositories.attributeTypeRepository,
+                accountAttributeRepository = repositories.accountAttributeRepository,
+                deviceId = deviceId,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+
+            val allAccounts = repositories.accountRepository.getAllAccounts().first()
+            val counterpartyAccounts = allAccounts.filter { it.name.startsWith("Monzo Counterparty:") }
+            assertEquals(1, counterpartyAccounts.size, "Matching bank details should create one counterparty account")
+            val counterpartyAttribute =
+                repositories.accountAttributeRepository
+                    .getByAccount(counterpartyAccounts.single().id)
+                    .first()
+                    .single { it.attributeType.name == "counterparty.id" }
+            assertEquals("bank:041307:29900313", counterpartyAttribute.value)
+        }
 }
+

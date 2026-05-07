@@ -17,8 +17,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -27,6 +29,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -64,8 +67,12 @@ import com.moneymanager.domain.model.ApiSessionKind
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.MonzoCredential
 import com.moneymanager.domain.model.MonzoCredentialId
+import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
+import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
+import com.moneymanager.domain.repository.ApiImportStrategyRepository
 import com.moneymanager.domain.repository.ApiSessionRepository
+import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
@@ -74,17 +81,20 @@ import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.createApiClient
 import com.moneymanager.ui.background.LocalBackgroundTaskManager
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
-import com.moneymanager.ui.monzo.MonzoAccountsDownloadResult
-import com.moneymanager.ui.monzo.MonzoDownloadProgress
-import com.moneymanager.ui.monzo.MonzoDownloadResult
-import com.moneymanager.ui.monzo.MonzoImportResult
-import com.moneymanager.ui.monzo.downloadMonzoAccounts
-import com.moneymanager.ui.monzo.downloadMonzoTransactions
-import com.moneymanager.ui.monzo.importMonzoSessionTransactions
+import com.moneymanager.ui.api.ApiAccountsDownloadResult
+import com.moneymanager.ui.api.ApiCounterpartySuggestion
+import com.moneymanager.ui.api.ApiSessionImportResult
+import com.moneymanager.ui.api.ApiTransactionsDownloadProgress
+import com.moneymanager.ui.api.ApiTransactionsDownloadResult
+import com.moneymanager.ui.api.discoverApiCounterpartiesToCreate
+import com.moneymanager.ui.api.downloadApiSessionAccounts
+import com.moneymanager.ui.api.downloadApiSessionTransactions
+import com.moneymanager.ui.api.importApiSessionTransactions
 import com.moneymanager.ui.util.ContentCopyIcon
 import com.moneymanager.ui.util.displayDateTime
 import com.moneymanager.ui.util.setPlainText
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -98,6 +108,9 @@ import kotlin.time.Instant
 @Composable
 fun ApiSessionsScreen(
     apiSessionRepository: ApiSessionRepository,
+    apiImportStrategyRepository: ApiImportStrategyRepository,
+    attributeTypeRepository: AttributeTypeRepository,
+    accountAttributeRepository: AccountAttributeRepository,
     accountRepository: AccountRepository,
     currencyRepository: CurrencyRepository,
     transactionRepository: TransactionRepository,
@@ -121,13 +134,19 @@ fun ApiSessionsScreen(
     var importedSessionIds by remember { mutableStateOf<Set<ApiSessionId>>(emptySet()) }
     var isLoading by remember { mutableStateOf(true) }
     // Per-session import state
-    var importResultBySession by remember { mutableStateOf<Map<ApiSessionId, MonzoImportResult>>(emptyMap()) }
+    var importResultBySession by remember { mutableStateOf<Map<ApiSessionId, ApiSessionImportResult>>(emptyMap()) }
     var importErrorBySession by remember { mutableStateOf<Map<ApiSessionId, String>>(emptyMap()) }
 
     // Per-credential download result state (cleared when a new download starts)
-    var accountsDownloadResultByCredential by remember { mutableStateOf<Map<MonzoCredentialId, MonzoAccountsDownloadResult>>(emptyMap()) }
-    var downloadResultByCredential by remember { mutableStateOf<Map<MonzoCredentialId, MonzoDownloadResult>>(emptyMap()) }
-    var downloadProgressByCredential by remember { mutableStateOf<Map<MonzoCredentialId, MonzoDownloadProgress?>>(emptyMap()) }
+    var accountsDownloadResultByCredential by remember { mutableStateOf<Map<MonzoCredentialId, ApiAccountsDownloadResult>>(emptyMap()) }
+    var downloadResultByCredential by remember { mutableStateOf<Map<MonzoCredentialId, ApiTransactionsDownloadResult>>(emptyMap()) }
+    var downloadProgressByCredential by remember { mutableStateOf<Map<MonzoCredentialId, ApiTransactionsDownloadProgress?>>(emptyMap()) }
+    var pendingImport by remember { mutableStateOf<PendingApiImport?>(null) }
+
+    suspend fun resolveStrategy(credential: MonzoCredential): ApiImportStrategy =
+        credential.strategyId
+            ?.let { apiImportStrategyRepository.getStrategyById(it).first() }
+            ?: apiImportStrategyRepository.getAllStrategies().first().first()
 
     fun refresh() {
         scope.launch {
@@ -143,6 +162,51 @@ fun ApiSessionsScreen(
             } finally {
                 isLoading = false
             }
+        }
+    }
+
+    fun startImport(
+        session: ApiSession,
+        accountsSession: ApiSession?,
+        strategy: ApiImportStrategy,
+        counterpartyAccountNames: Map<String, String>,
+    ) {
+        val importLabel =
+            if (session.kind == ApiSessionKind.ACCOUNTS) {
+                "Import Accounts"
+            } else {
+                "Import Transactions"
+            }
+        backgroundTasks.startTask(
+            key = monzoImportTaskKey(session.id),
+            title = importLabel,
+            initialDetail = "Starting $importLabel for session #${session.id}.",
+        ) {
+            val result =
+                importApiSessionTransactions(
+                    apiSessionRepository = apiSessionRepository,
+                    accountRepository = accountRepository,
+                    currencyRepository = currencyRepository,
+                    transactionRepository = transactionRepository,
+                    transferSourceQueries = transferSourceQueries,
+                    entitySourceQueries = entitySourceQueries,
+                    personRepository = personRepository,
+                    personAccountOwnershipRepository = personAccountOwnershipRepository,
+                    attributeTypeRepository = attributeTypeRepository,
+                    accountAttributeRepository = accountAttributeRepository,
+                    deviceId = deviceId,
+                    sessionId = session.id,
+                    accountsSessionId = accountsSession?.id,
+                    strategy = strategy,
+                    counterpartyAccountNames = counterpartyAccountNames,
+                    onProgress = ::update,
+                )
+            apiSessionRepository.markSessionImported(session.id, Clock.System.now())
+            maintenanceService.refreshMaterializedViews()
+            importResultBySession = importResultBySession + (session.id to result)
+            refresh()
+            onTransactionsImported()
+            result.displaySummary()
         }
     }
 
@@ -205,6 +269,7 @@ fun ApiSessionsScreen(
                                 onDownloadAccounts = {
                                     accountsDownloadResultByCredential = accountsDownloadResultByCredential - credential.id
                                     scope.launch {
+                                        val strategy = resolveStrategy(credential)
                                         val newSessionId =
                                             apiSessionRepository.createSession(
                                                 token = credential.token,
@@ -221,7 +286,7 @@ fun ApiSessionsScreen(
                                             initialDetail = "Starting accounts download for session #$newSessionId.",
                                         ) {
                                             val result =
-                                                downloadMonzoAccounts(
+                                                downloadApiSessionAccounts(
                                                     token = credential.token,
                                                     apiClient =
                                                         createApiClient(
@@ -234,6 +299,7 @@ fun ApiSessionsScreen(
                                                         ),
                                                     apiSessionRepository = apiSessionRepository,
                                                     sessionId = newSessionId,
+                                                    strategy = strategy,
                                                 )
                                             accountsDownloadResultByCredential =
                                                 accountsDownloadResultByCredential + (credential.id to result)
@@ -246,6 +312,7 @@ fun ApiSessionsScreen(
                                     downloadProgressByCredential = downloadProgressByCredential - credential.id
                                     val accountsSession = credentialSessions.firstOrNull { it.kind == ApiSessionKind.ACCOUNTS }
                                     scope.launch {
+                                        val strategy = resolveStrategy(credential)
                                         val newSessionId =
                                             apiSessionRepository.createSession(
                                                 token = credential.token,
@@ -262,7 +329,7 @@ fun ApiSessionsScreen(
                                             initialDetail = "Starting transactions download for session #$newSessionId.",
                                         ) {
                                             val result =
-                                                downloadMonzoTransactions(
+                                                downloadApiSessionTransactions(
                                                     token = credential.token,
                                                     apiClient =
                                                         createApiClient(
@@ -275,6 +342,7 @@ fun ApiSessionsScreen(
                                                         ),
                                                     apiSessionRepository = apiSessionRepository,
                                                     sessionId = newSessionId,
+                                                    strategy = strategy,
                                                     accountsSessionId = accountsSession?.id,
                                                     onProgress = { progress ->
                                                         downloadProgressByCredential =
@@ -297,40 +365,31 @@ fun ApiSessionsScreen(
                                         } else {
                                             null
                                         }
-                                    val importLabel =
-                                        if (session.kind ==
-                                            ApiSessionKind.ACCOUNTS
-                                        ) {
-                                            "Import Accounts"
+                                    scope.launch {
+                                        val strategy = resolveStrategy(credential)
+                                        val suggestions =
+                                            if (session.kind == ApiSessionKind.TRANSACTIONS) {
+                                                discoverApiCounterpartiesToCreate(
+                                                    apiSessionRepository = apiSessionRepository,
+                                                    accountRepository = accountRepository,
+                                                    accountAttributeRepository = accountAttributeRepository,
+                                                    sessionId = session.id,
+                                                    strategy = strategy,
+                                                )
+                                            } else {
+                                                emptyList()
+                                            }
+                                        if (suggestions.isEmpty()) {
+                                            startImport(session, accountsSession, strategy, emptyMap())
                                         } else {
-                                            "Import Transactions"
+                                            pendingImport =
+                                                PendingApiImport(
+                                                    session = session,
+                                                    accountsSession = accountsSession,
+                                                    strategy = strategy,
+                                                    counterparties = suggestions,
+                                                )
                                         }
-                                    backgroundTasks.startTask(
-                                        key = monzoImportTaskKey(session.id),
-                                        title = importLabel,
-                                        initialDetail = "Starting $importLabel for session #${session.id}.",
-                                    ) {
-                                        val result =
-                                            importMonzoSessionTransactions(
-                                                apiSessionRepository = apiSessionRepository,
-                                                accountRepository = accountRepository,
-                                                currencyRepository = currencyRepository,
-                                                transactionRepository = transactionRepository,
-                                                transferSourceQueries = transferSourceQueries,
-                                                entitySourceQueries = entitySourceQueries,
-                                                personRepository = personRepository,
-                                                personAccountOwnershipRepository = personAccountOwnershipRepository,
-                                                deviceId = deviceId,
-                                                sessionId = session.id,
-                                                accountsSessionId = accountsSession?.id,
-                                                onProgress = ::update,
-                                            )
-                                        apiSessionRepository.markSessionImported(session.id, Clock.System.now())
-                                        maintenanceService.refreshMaterializedViews()
-                                        importResultBySession = importResultBySession + (session.id to result)
-                                        refresh()
-                                        onTransactionsImported()
-                                        result.displaySummary()
                                     }
                                 },
                                 onSessionClick = onSessionClick,
@@ -346,6 +405,98 @@ fun ApiSessionsScreen(
             }
         }
     }
+
+    pendingImport?.let { import ->
+        CounterpartyConfirmationDialog(
+            counterparties = import.counterparties,
+            onDismiss = { pendingImport = null },
+            onConfirm = { namesByCounterpartyId ->
+                pendingImport = null
+                startImport(
+                    session = import.session,
+                    accountsSession = import.accountsSession,
+                    strategy = import.strategy,
+                    counterpartyAccountNames = namesByCounterpartyId,
+                )
+            },
+        )
+    }
+}
+
+private data class PendingApiImport(
+    val session: ApiSession,
+    val accountsSession: ApiSession?,
+    val strategy: ApiImportStrategy,
+    val counterparties: List<ApiCounterpartySuggestion>,
+)
+
+@Composable
+private fun CounterpartyConfirmationDialog(
+    counterparties: List<ApiCounterpartySuggestion>,
+    onDismiss: () -> Unit,
+    onConfirm: (Map<String, String>) -> Unit,
+) {
+    var names by remember(counterparties) {
+        mutableStateOf(counterparties.map { it.suggestedAccountName })
+    }
+    val hasBlankName = names.any { it.isBlank() }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Confirm Counterparties") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = "These counterparties will be created before importing transactions.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth().height(420.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    itemsIndexed(counterparties) { index, suggestion ->
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            OutlinedTextField(
+                                value = names[index],
+                                onValueChange = { value ->
+                                    names = names.toMutableList().also { it[index] = value }
+                                },
+                                label = { Text("Account name") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            Text(
+                                text = "Counterparty ID: ${suggestion.counterpartyId}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Text(
+                                text = "Downloaded names: ${suggestion.downloadedNames.joinToString()}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                enabled = !hasBlankName,
+                onClick = {
+                    onConfirm(counterparties.mapIndexed { index, suggestion -> suggestion.counterpartyId to names[index].trim() }.toMap())
+                },
+            ) {
+                Text("Create and Import")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+    )
 }
 
 @Composable
@@ -354,10 +505,10 @@ private fun CredentialCard(
     sessions: List<ApiSession>,
     isDownloadingAccounts: Boolean,
     isDownloadingTransactions: Boolean,
-    accountsDownloadResult: MonzoAccountsDownloadResult?,
-    downloadResult: MonzoDownloadResult?,
-    downloadProgress: MonzoDownloadProgress?,
-    importResultBySession: Map<ApiSessionId, MonzoImportResult>,
+    accountsDownloadResult: ApiAccountsDownloadResult?,
+    downloadResult: ApiTransactionsDownloadResult?,
+    downloadProgress: ApiTransactionsDownloadProgress?,
+    importResultBySession: Map<ApiSessionId, ApiSessionImportResult>,
     importErrorBySession: Map<ApiSessionId, String>,
     importedSessionIds: Set<ApiSessionId>,
     isImportingSession: (ApiSessionId) -> Boolean,
@@ -465,7 +616,7 @@ private fun SessionRow(
     session: ApiSession,
     isImporting: Boolean,
     isAlreadyImported: Boolean,
-    importResult: MonzoImportResult?,
+    importResult: ApiSessionImportResult?,
     importError: String?,
     onImport: () -> Unit,
     onOpenTraffic: () -> Unit,
@@ -1301,20 +1452,20 @@ private fun ApiRequest.displayBody(): String =
         }
     }.trimEnd()
 
-private fun MonzoAccountsDownloadResult.displaySummary(): String =
+private fun ApiAccountsDownloadResult.displaySummary(): String =
     if (skipped) {
         "Accounts already downloaded: $accountCount account(s) (skipped)."
     } else {
         "Accounts downloaded: $accountCount account(s)."
     }
 
-private fun MonzoDownloadResult.displaySummary(): String =
+private fun ApiTransactionsDownloadResult.displaySummary(): String =
     "Transactions downloaded: $accountCount account(s), $transactionResponseCount new response page(s)."
 
-private fun MonzoDownloadProgress.downloadDetail(): String =
+private fun ApiTransactionsDownloadProgress.downloadDetail(): String =
     "Downloading account $accountIndex/$accountCount, page $page. $downloadedResponsePageCount response page(s) downloaded so far."
 
-private fun MonzoImportResult.displaySummary(): String =
+private fun ApiSessionImportResult.displaySummary(): String =
     buildString {
         append("Import complete: ")
         append(accountCount)
@@ -1360,3 +1511,4 @@ private fun JsonElement.summary(expanded: Boolean): String =
         JsonNull -> "null"
         is JsonPrimitive -> toString()
     }
+

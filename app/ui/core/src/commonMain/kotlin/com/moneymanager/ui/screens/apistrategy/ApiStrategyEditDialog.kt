@@ -5,6 +5,7 @@
 
 package com.moneymanager.ui.screens.apistrategy
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,16 +14,27 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -30,6 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.moneymanager.domain.model.ApiSessionKind
 import com.moneymanager.domain.model.apistrategy.ApiAccountMappings
 import com.moneymanager.domain.model.apistrategy.ApiAuthType
 import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
@@ -38,19 +51,14 @@ import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
 import com.moneymanager.domain.model.apistrategy.ApiPaginationConfig
 import com.moneymanager.domain.model.apistrategy.ApiQueryParam
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
+import com.moneymanager.domain.repository.ApiSessionRepository
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
 
-/**
- * Dialog for creating or editing an [ApiImportStrategy].
- *
- * @param strategy Existing strategy to edit, or null when creating a new one.
- * @param onSave Called with the new/updated strategy when the user confirms.
- * @param onDismiss Called when the dialog is cancelled.
- */
 @Composable
 fun ApiStrategyEditDialog(
     strategy: ApiImportStrategy?,
+    apiSessionRepository: ApiSessionRepository,
     onSave: (ApiImportStrategy) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -78,9 +86,7 @@ fun ApiStrategyEditDialog(
     }
 
     // Pagination
-    var paginationEnabled by remember {
-        mutableStateOf(strategy?.transactionsEndpoint?.pagination != null)
-    }
+    var paginationEnabled by remember { mutableStateOf(strategy?.transactionsEndpoint?.pagination != null) }
     val defaultPagination = strategy?.transactionsEndpoint?.pagination ?: ApiPaginationConfig()
     var paginationLimitParam by remember { mutableStateOf(defaultPagination.limitParam) }
     var paginationLimitValue by remember { mutableStateOf(defaultPagination.limitValue.toString()) }
@@ -91,6 +97,13 @@ fun ApiStrategyEditDialog(
     var accountIdField by remember { mutableStateOf(strategy?.accountMappings?.idField ?: "id") }
     var accountDescriptionField by remember { mutableStateOf(strategy?.accountMappings?.descriptionField ?: "description") }
     var accountOwnerNameField by remember { mutableStateOf(strategy?.accountMappings?.ownerNameField ?: "") }
+    var customAccountFields by remember {
+        mutableStateOf<List<CustomFieldState>>(
+            strategy?.accountMappings?.customFields?.map { (k, v) ->
+                CustomFieldState(k, v, k in (strategy.accountMappings.uniqueIdentifierFields))
+            } ?: emptyList(),
+        )
+    }
 
     // Transaction field mappings
     var txAmountField by remember { mutableStateOf(strategy?.transactionMappings?.amountField ?: "amount") }
@@ -99,12 +112,85 @@ fun ApiStrategyEditDialog(
     var txDescriptionField by remember { mutableStateOf(strategy?.transactionMappings?.descriptionField ?: "description") }
     var txMerchantNameField by remember { mutableStateOf(strategy?.transactionMappings?.merchantNameField ?: "") }
     var txCounterpartyNameField by remember { mutableStateOf(strategy?.transactionMappings?.counterpartyNameField ?: "") }
+    var txCounterpartyIdField by remember { mutableStateOf(strategy?.transactionMappings?.counterpartyIdField ?: "") }
     var txDeclineReasonField by remember { mutableStateOf(strategy?.transactionMappings?.declineReasonField ?: "") }
+    var customTxFields by remember {
+        mutableStateOf<List<CustomFieldState>>(
+            strategy?.transactionMappings?.customFields?.map { (k, v) ->
+                CustomFieldState(k, v, k in (strategy.transactionMappings.uniqueIdentifierFields))
+            } ?: emptyList(),
+        )
+    }
+
+    // Sample JSON items loaded from past sessions — null = not loaded yet, empty = none found
+    var accountSampleItem by remember { mutableStateOf<String?>(null) }
+    var txSampleItem by remember { mutableStateOf<String?>(null) }
+
+    val accountJsonPaths = remember(accountSampleItem) {
+        accountSampleItem?.let { extractJsonPaths(it) } ?: emptyList()
+    }
+    val txJsonPaths = remember(txSampleItem) {
+        txSampleItem?.let { extractJsonPaths(it) } ?: emptyList()
+    }
+
+    // Load sample JSON from the most recent session responses.
+    // Prefer credentials linked to this strategy; fall back to all credentials so
+    // existing Monzo credentials (created before the strategy was linked) still work.
+    LaunchedEffect(strategy?.id) {
+        val allCredentials = apiSessionRepository.getAllCredentials()
+        val credentials = if (strategy != null) {
+            allCredentials.filter { it.strategyId == strategy.id }.ifEmpty { allCredentials }
+        } else {
+            allCredentials
+        }
+        for (credential in credentials) {
+            val sessions = apiSessionRepository.getSessionsByCredential(credential.id)
+            if (accountSampleItem == null) {
+                sessions.filter { it.kind == ApiSessionKind.ACCOUNTS }
+                    .maxByOrNull { it.createdAt }
+                    ?.let { session ->
+                        for (response in apiSessionRepository.getResponsesBySession(session.id)) {
+                            val item = extractFirstArrayItem(response.json, accountsResponseArrayKey)
+                            if (item != null) { accountSampleItem = item; break }
+                        }
+                    }
+            }
+            if (txSampleItem == null) {
+                sessions.filter { it.kind == ApiSessionKind.TRANSACTIONS }
+                    .maxByOrNull { it.createdAt }
+                    ?.let { session ->
+                        for (response in apiSessionRepository.getResponsesBySession(session.id)) {
+                            val item = extractFirstArrayItem(response.json, transactionsResponseArrayKey)
+                            if (item != null) { txSampleItem = item; break }
+                        }
+                    }
+            }
+            if (accountSampleItem != null && txSampleItem != null) break
+        }
+        // Mark as "searched but nothing found" so we don't show a loading state forever
+        if (accountSampleItem == null) accountSampleItem = ""
+        if (txSampleItem == null) txSampleItem = ""
+    }
+
+    // Which field's setter is currently awaiting a path pick
+    var pickingForSetter by remember { mutableStateOf<((String) -> Unit)?>(null) }
+    var pickingPaths by remember { mutableStateOf<List<JsonPathEntry>>(emptyList()) }
 
     val isValid =
         name.isNotBlank() &&
             baseUrl.isNotBlank() &&
             (!paginationEnabled || paginationLimitValue.toIntOrNull() != null)
+
+    pickingForSetter?.let { setter ->
+        JsonNodePickerDialog(
+            paths = pickingPaths,
+            onPick = { path ->
+                setter(path)
+                pickingForSetter = null
+            },
+            onDismiss = { pickingForSetter = null },
+        )
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -114,11 +200,10 @@ fun ApiStrategyEditDialog(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 500.dp)
+                        .heightIn(max = 560.dp)
                         .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                // General settings
                 SectionHeader("General")
                 OutlinedTextField(
                     value = name,
@@ -155,7 +240,6 @@ fun ApiStrategyEditDialog(
                 Spacer(Modifier.height(4.dp))
                 HorizontalDivider()
 
-                // Accounts endpoint
                 SectionHeader("Accounts Endpoint")
                 OutlinedTextField(
                     value = accountsPath,
@@ -177,7 +261,6 @@ fun ApiStrategyEditDialog(
                 Spacer(Modifier.height(4.dp))
                 HorizontalDivider()
 
-                // Transactions endpoint
                 SectionHeader("Transactions Endpoint")
                 OutlinedTextField(
                     value = transactionsPath,
@@ -204,15 +287,11 @@ fun ApiStrategyEditDialog(
                     singleLine = true,
                 )
 
-                // Pagination
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Switch(
-                        checked = paginationEnabled,
-                        onCheckedChange = { paginationEnabled = it },
-                    )
+                    Switch(checked = paginationEnabled, onCheckedChange = { paginationEnabled = it })
                     Text(
                         text = "Enable Pagination",
                         modifier = Modifier.padding(start = 8.dp),
@@ -265,87 +344,102 @@ fun ApiStrategyEditDialog(
                 Spacer(Modifier.height(4.dp))
                 HorizontalDivider()
 
-                // Account field mappings
                 SectionHeader("Account Field Mappings")
-                OutlinedTextField(
+                SessionDataStatus(paths = accountJsonPaths, loaded = accountSampleItem != null)
+                FieldMappingRow(
+                    label = "Account ID",
                     value = accountIdField,
                     onValueChange = { accountIdField = it },
-                    label = { Text("Account ID Field") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
+                    paths = accountJsonPaths,
+                    onPickRequest = { setter -> pickingPaths = accountJsonPaths; pickingForSetter = setter },
                 )
-                OutlinedTextField(
+                FieldMappingRow(
+                    label = "Description",
                     value = accountDescriptionField,
                     onValueChange = { accountDescriptionField = it },
-                    label = { Text("Account Description Field") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
+                    paths = accountJsonPaths,
+                    onPickRequest = { setter -> pickingPaths = accountJsonPaths; pickingForSetter = setter },
                 )
-                OutlinedTextField(
+                FieldMappingRow(
+                    label = "Owner Name (optional)",
                     value = accountOwnerNameField,
                     onValueChange = { accountOwnerNameField = it },
-                    label = { Text("Owner Name Field (optional)") },
-                    placeholder = { Text("preferred_name") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
+                    paths = accountJsonPaths,
+                    onPickRequest = { setter -> pickingPaths = accountJsonPaths; pickingForSetter = setter },
+                )
+                CustomFieldsSection(
+                    fields = customAccountFields,
+                    onFieldsChange = { customAccountFields = it },
+                    paths = accountJsonPaths,
+                    onPickRequest = { setter -> pickingPaths = accountJsonPaths; pickingForSetter = setter },
                 )
 
                 Spacer(Modifier.height(4.dp))
                 HorizontalDivider()
 
-                // Transaction field mappings
                 SectionHeader("Transaction Field Mappings")
-                OutlinedTextField(
+                SessionDataStatus(paths = txJsonPaths, loaded = txSampleItem != null)
+                FieldMappingRow(
+                    label = "Amount (minor units)",
                     value = txAmountField,
                     onValueChange = { txAmountField = it },
-                    label = { Text("Amount Field (minor units)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
+                    paths = txJsonPaths,
+                    onPickRequest = { setter -> pickingPaths = txJsonPaths; pickingForSetter = setter },
                 )
-                OutlinedTextField(
+                FieldMappingRow(
+                    label = "Timestamp (ISO 8601)",
                     value = txTimestampField,
                     onValueChange = { txTimestampField = it },
-                    label = { Text("Timestamp Field (ISO 8601)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
+                    paths = txJsonPaths,
+                    onPickRequest = { setter -> pickingPaths = txJsonPaths; pickingForSetter = setter },
                 )
-                OutlinedTextField(
+                FieldMappingRow(
+                    label = "Currency (ISO 4217)",
                     value = txCurrencyField,
                     onValueChange = { txCurrencyField = it },
-                    label = { Text("Currency Field (ISO 4217 code)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
+                    paths = txJsonPaths,
+                    onPickRequest = { setter -> pickingPaths = txJsonPaths; pickingForSetter = setter },
                 )
-                OutlinedTextField(
+                FieldMappingRow(
+                    label = "Description",
                     value = txDescriptionField,
                     onValueChange = { txDescriptionField = it },
-                    label = { Text("Description Field") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
+                    paths = txJsonPaths,
+                    onPickRequest = { setter -> pickingPaths = txJsonPaths; pickingForSetter = setter },
                 )
-                OutlinedTextField(
+                FieldMappingRow(
+                    label = "Merchant Name (optional, dot-notation)",
                     value = txMerchantNameField,
                     onValueChange = { txMerchantNameField = it },
-                    label = { Text("Merchant Name Field (optional, dot-notation)") },
-                    placeholder = { Text("merchant.name") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
+                    paths = txJsonPaths,
+                    onPickRequest = { setter -> pickingPaths = txJsonPaths; pickingForSetter = setter },
                 )
-                OutlinedTextField(
+                FieldMappingRow(
+                    label = "Counterparty Name (optional, dot-notation)",
                     value = txCounterpartyNameField,
                     onValueChange = { txCounterpartyNameField = it },
-                    label = { Text("Counterparty Name Field (optional, dot-notation)") },
-                    placeholder = { Text("counterparty.name") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
+                    paths = txJsonPaths,
+                    onPickRequest = { setter -> pickingPaths = txJsonPaths; pickingForSetter = setter },
                 )
-                OutlinedTextField(
+                FieldMappingRow(
+                    label = "Counterparty ID (optional, dot-notation)",
+                    value = txCounterpartyIdField,
+                    onValueChange = { txCounterpartyIdField = it },
+                    paths = txJsonPaths,
+                    onPickRequest = { setter -> pickingPaths = txJsonPaths; pickingForSetter = setter },
+                )
+                FieldMappingRow(
+                    label = "Decline Reason (optional)",
                     value = txDeclineReasonField,
                     onValueChange = { txDeclineReasonField = it },
-                    label = { Text("Decline Reason Field (optional)") },
-                    placeholder = { Text("decline_reason") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
+                    paths = txJsonPaths,
+                    onPickRequest = { setter -> pickingPaths = txJsonPaths; pickingForSetter = setter },
+                )
+                CustomFieldsSection(
+                    fields = customTxFields,
+                    onFieldsChange = { customTxFields = it },
+                    paths = txJsonPaths,
+                    onPickRequest = { setter -> pickingPaths = txJsonPaths; pickingForSetter = setter },
                 )
             }
         },
@@ -393,6 +487,12 @@ fun ApiStrategyEditDialog(
                                     idField = accountIdField.trim(),
                                     descriptionField = accountDescriptionField.trim(),
                                     ownerNameField = accountOwnerNameField.trim().ifBlank { null },
+                                    customFields = customAccountFields
+                                        .filter { f -> f.name.isNotBlank() }
+                                        .associate { f -> f.name.trim() to f.path.trim() },
+                                    uniqueIdentifierFields = customAccountFields
+                                        .filter { f -> f.name.isNotBlank() && f.isUniqueId }
+                                        .map { f -> f.name.trim() }.toSet(),
                                 ),
                             transactionMappings =
                                 ApiTransactionMappings(
@@ -402,7 +502,14 @@ fun ApiStrategyEditDialog(
                                     descriptionField = txDescriptionField.trim(),
                                     merchantNameField = txMerchantNameField.trim().ifBlank { null },
                                     counterpartyNameField = txCounterpartyNameField.trim().ifBlank { null },
+                                    counterpartyIdField = txCounterpartyIdField.trim().ifBlank { null },
                                     declineReasonField = txDeclineReasonField.trim().ifBlank { null },
+                                    customFields = customTxFields
+                                        .filter { it.name.isNotBlank() }
+                                        .associate { it.name.trim() to it.path.trim() },
+                                    uniqueIdentifierFields = customTxFields
+                                        .filter { it.name.isNotBlank() && it.isUniqueId }
+                                        .map { it.name.trim() }.toSet(),
                                 ),
                             accountNamePrefix = accountNamePrefix.trim(),
                             counterpartyPrefix = counterpartyPrefix.trim(),
@@ -422,6 +529,8 @@ fun ApiStrategyEditDialog(
     )
 }
 
+// ── Sub-composables ────────────────────────────────────────────────────────────
+
 @Composable
 private fun SectionHeader(text: String) {
     Text(
@@ -429,5 +538,196 @@ private fun SectionHeader(text: String) {
         style = MaterialTheme.typography.titleSmall,
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier.padding(top = 4.dp),
+    )
+}
+
+/** Small status line indicating whether session data is available for path picking. */
+@Composable
+private fun SessionDataStatus(paths: List<JsonPathEntry>, loaded: Boolean) {
+    val text = when {
+        !loaded -> "Loading session data…"
+        paths.isNotEmpty() -> "${paths.size} paths available from last session — tap ⊞ to pick"
+        else -> "No session data yet — type paths manually"
+    }
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(bottom = 4.dp),
+    )
+}
+
+/**
+ * A single standard field mapping row. When session paths are available the ⊞ icon opens
+ * the [JsonNodePickerDialog] so the user can click a node instead of typing the path.
+ */
+@Composable
+private fun FieldMappingRow(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    paths: List<JsonPathEntry>,
+    onPickRequest: (setter: (String) -> Unit) -> Unit,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            label = { Text(label) },
+            modifier = Modifier.weight(1f),
+            singleLine = true,
+        )
+        if (paths.isNotEmpty()) {
+            IconButton(onClick = { onPickRequest(onValueChange) }) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.List,
+                    contentDescription = "Pick from session JSON",
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Expandable list of user-defined custom field mappings with add and remove controls.
+ */
+@Composable
+private fun CustomFieldsSection(
+    fields: List<CustomFieldState>,
+    onFieldsChange: (List<CustomFieldState>) -> Unit,
+    paths: List<JsonPathEntry>,
+    onPickRequest: (setter: (String) -> Unit) -> Unit,
+) {
+    Text(
+        text = "Custom Fields",
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = 4.dp),
+    )
+    fields.forEachIndexed { index, field ->
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                OutlinedTextField(
+                    value = field.name,
+                    onValueChange = { updated ->
+                        onFieldsChange(fields.toMutableList().also { it[index] = field.copy(name = updated) })
+                    },
+                    label = { Text("Field name") },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                )
+                OutlinedTextField(
+                    value = field.path,
+                    onValueChange = { updated ->
+                        onFieldsChange(fields.toMutableList().also { it[index] = field.copy(path = updated) })
+                    },
+                    label = { Text("JSON path") },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                )
+                if (paths.isNotEmpty()) {
+                    IconButton(onClick = {
+                        onPickRequest { selected ->
+                            onFieldsChange(fields.toMutableList().also { it[index] = field.copy(path = selected) })
+                        }
+                    }) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.List,
+                            contentDescription = "Pick from session JSON",
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
+                IconButton(onClick = {
+                    onFieldsChange(fields.toMutableList().also { it.removeAt(index) })
+                }) {
+                    Icon(Icons.Default.Close, contentDescription = "Remove field", tint = MaterialTheme.colorScheme.error)
+                }
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(start = 4.dp),
+            ) {
+                Checkbox(
+                    checked = field.isUniqueId,
+                    onCheckedChange = { checked ->
+                        onFieldsChange(fields.toMutableList().also { it[index] = field.copy(isUniqueId = checked) })
+                    },
+                )
+                Text(
+                    text = "Use as unique identifier for duplicate detection",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+    TextButton(
+        onClick = { onFieldsChange(fields + CustomFieldState("", "")) },
+        modifier = Modifier.padding(top = 2.dp),
+    ) {
+        Icon(Icons.Default.Add, contentDescription = null)
+        Spacer(Modifier.width(4.dp))
+        Text("Add Custom Field")
+    }
+}
+
+/** Holds the editable state for a single custom field mapping row. */
+private data class CustomFieldState(
+    val name: String,
+    val path: String,
+    val isUniqueId: Boolean = false,
+)
+
+/**
+ * Dialog showing JSON paths extracted from a real session response.
+ * Each row shows the dot-notation path and a sample value from the data.
+ * Tapping a row selects that path for the field being edited.
+ */
+@Composable
+private fun JsonNodePickerDialog(
+    paths: List<JsonPathEntry>,
+    onPick: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Select JSON field") },
+        text = {
+            LazyColumn(modifier = Modifier.heightIn(max = 400.dp)) {
+                items(paths) { entry ->
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onPick(entry.path) }
+                            .padding(vertical = 10.dp, horizontal = 4.dp),
+                    ) {
+                        Text(
+                            text = entry.path,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        if (entry.preview.isNotEmpty()) {
+                            Text(
+                                text = entry.preview,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                    HorizontalDivider()
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
     )
 }

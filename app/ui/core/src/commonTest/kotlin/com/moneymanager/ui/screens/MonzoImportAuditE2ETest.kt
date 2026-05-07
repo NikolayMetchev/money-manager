@@ -21,9 +21,9 @@ import com.moneymanager.rest.createApiClient
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
-import com.moneymanager.ui.monzo.downloadMonzoAccounts
-import com.moneymanager.ui.monzo.downloadMonzoTransactions
-import com.moneymanager.ui.monzo.importMonzoSessionTransactions
+import com.moneymanager.ui.api.downloadApiSessionAccounts
+import com.moneymanager.ui.api.downloadApiSessionTransactions
+import com.moneymanager.ui.api.importApiSessionTransactions
 import com.moneymanager.ui.test.TestMoneyManagerApp
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import io.ktor.client.engine.mock.MockEngine
@@ -31,6 +31,7 @@ import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlin.test.AfterTest
 import kotlin.test.Test
@@ -172,20 +173,23 @@ class MonzoImportAuditE2ETest {
                         trafficRecorder = ApiSessionTrafficRecorder(sessionId, dc.apiSessionRepository),
                         engine = mockEngine,
                     )
+                val strategy = dc.apiImportStrategyRepository.getAllStrategies().first().single()
 
-                downloadMonzoAccounts(
+                downloadApiSessionAccounts(
                     token = "test-monzo-token",
                     apiClient = apiClient,
                     apiSessionRepository = dc.apiSessionRepository,
                     sessionId = sessionId,
+                    strategy = strategy,
                 )
-                downloadMonzoTransactions(
+                downloadApiSessionTransactions(
                     token = "test-monzo-token",
                     apiClient = apiClient,
                     apiSessionRepository = dc.apiSessionRepository,
                     sessionId = sessionId,
+                    strategy = strategy,
                 )
-                importMonzoSessionTransactions(
+                importApiSessionTransactions(
                     apiSessionRepository = dc.apiSessionRepository,
                     accountRepository = dc.accountRepository,
                     currencyRepository = dc.currencyRepository,
@@ -194,8 +198,11 @@ class MonzoImportAuditE2ETest {
                     entitySourceQueries = db.entitySourceQueries,
                     personRepository = dc.personRepository,
                     personAccountOwnershipRepository = dc.personAccountOwnershipRepository,
+                    attributeTypeRepository = dc.attributeTypeRepository,
+                    accountAttributeRepository = dc.accountAttributeRepository,
                     deviceId = deviceId,
                     sessionId = sessionId,
+                    strategy = strategy,
                 )
             }
 
@@ -250,3 +257,4 @@ class MonzoImportAuditE2ETest {
             waitUntilDoesNotExist(hasText("Source data missing"), timeoutMillis = 3000)
         }
 }
+

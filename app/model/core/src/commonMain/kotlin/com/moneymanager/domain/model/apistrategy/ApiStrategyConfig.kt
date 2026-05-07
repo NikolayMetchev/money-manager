@@ -80,6 +80,8 @@ data class ApiAccountMappings(
     val idField: String = "id",
     val descriptionField: String = "description",
     val ownerNameField: String? = null,
+    val customFields: Map<String, String> = emptyMap(),
+    val uniqueIdentifierFields: Set<String> = emptySet(),
 )
 
 /**
@@ -104,5 +106,8 @@ data class ApiTransactionMappings(
     val descriptionField: String = "description",
     val merchantNameField: String? = null,
     val counterpartyNameField: String? = null,
+    val counterpartyIdField: String? = null,
     val declineReasonField: String? = null,
+    val customFields: Map<String, String> = emptyMap(),
+    val uniqueIdentifierFields: Set<String> = emptySet(),
 )

@@ -409,6 +409,9 @@ fun MoneyManagerApp(
                                     },
                                     csvImportRepository = csvImportRepository,
                                     apiSessionRepository = apiSessionRepository,
+                                    apiImportStrategyRepository = apiImportStrategyRepository,
+                                    attributeTypeRepository = attributeTypeRepository,
+                                    accountAttributeRepository = accountAttributeRepository,
                                     accountRepository = accountRepository,
                                     currencyRepository = currencyRepository,
                                     transactionRepository = transactionRepository,
@@ -445,6 +448,7 @@ fun MoneyManagerApp(
                                 }
                                 ApiStrategiesScreen(
                                     apiImportStrategyRepository = apiImportStrategyRepository,
+                                    apiSessionRepository = apiSessionRepository,
                                     onBack = { navigationHistory.navigateBack() },
                                 )
                             }

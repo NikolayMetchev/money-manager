@@ -37,12 +37,14 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.repository.ApiImportStrategyRepository
+import com.moneymanager.domain.repository.ApiSessionRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import kotlinx.coroutines.launch
 
 @Composable
 fun ApiStrategiesScreen(
     apiImportStrategyRepository: ApiImportStrategyRepository,
+    apiSessionRepository: ApiSessionRepository,
     onBack: () -> Unit = {},
 ) {
     val strategies by apiImportStrategyRepository
@@ -135,6 +137,7 @@ fun ApiStrategiesScreen(
     if (showCreateDialog) {
         ApiStrategyEditDialog(
             strategy = null,
+            apiSessionRepository = apiSessionRepository,
             onSave = { newStrategy ->
                 scope.launch {
                     apiImportStrategyRepository.createStrategy(newStrategy)
@@ -148,6 +151,7 @@ fun ApiStrategiesScreen(
     strategyToEdit?.let { strategy ->
         ApiStrategyEditDialog(
             strategy = strategy,
+            apiSessionRepository = apiSessionRepository,
             onSave = { updated ->
                 scope.launch {
                     apiImportStrategyRepository.updateStrategy(updated)

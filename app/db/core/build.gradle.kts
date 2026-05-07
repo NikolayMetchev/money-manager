@@ -3,6 +3,7 @@ plugins {
     id("moneymanager.mappie-convention")
     id("moneymanager.kotlin-multiplatform-convention")
     alias(libs.plugins.sqldelight)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 kotlin {
