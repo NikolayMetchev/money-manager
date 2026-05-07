@@ -79,7 +79,9 @@ fun ApiStrategyEditDialog(
     var transactionsResponseArrayKey by remember { mutableStateOf(strategy?.transactionsEndpoint?.responseArrayKey ?: "transactions") }
     var transactionsAccountIdParam by remember {
         mutableStateOf(
-            strategy?.transactionsEndpoint?.queryParams
+            strategy
+                ?.transactionsEndpoint
+                ?.queryParams
                 ?.firstOrNull { it.dynamicSource == "account.id" }
                 ?.name ?: "account_id",
         )
@@ -126,42 +128,53 @@ fun ApiStrategyEditDialog(
     var accountSampleItem by remember { mutableStateOf<String?>(null) }
     var txSampleItem by remember { mutableStateOf<String?>(null) }
 
-    val accountJsonPaths = remember(accountSampleItem) {
-        accountSampleItem?.let { extractJsonPaths(it) } ?: emptyList()
-    }
-    val txJsonPaths = remember(txSampleItem) {
-        txSampleItem?.let { extractJsonPaths(it) } ?: emptyList()
-    }
+    val accountJsonPaths =
+        remember(accountSampleItem) {
+            accountSampleItem?.let { extractJsonPaths(it) } ?: emptyList()
+        }
+    val txJsonPaths =
+        remember(txSampleItem) {
+            txSampleItem?.let { extractJsonPaths(it) } ?: emptyList()
+        }
 
     // Load sample JSON from the most recent session responses.
     // Prefer credentials linked to this strategy; fall back to all credentials so
     // existing Monzo credentials (created before the strategy was linked) still work.
     LaunchedEffect(strategy?.id) {
         val allCredentials = apiSessionRepository.getAllCredentials()
-        val credentials = if (strategy != null) {
-            allCredentials.filter { it.strategyId == strategy.id }.ifEmpty { allCredentials }
-        } else {
-            allCredentials
-        }
+        val credentials =
+            if (strategy != null) {
+                allCredentials.filter { it.strategyId == strategy.id }.ifEmpty { allCredentials }
+            } else {
+                allCredentials
+            }
         for (credential in credentials) {
             val sessions = apiSessionRepository.getSessionsByCredential(credential.id)
             if (accountSampleItem == null) {
-                sessions.filter { it.kind == ApiSessionKind.ACCOUNTS }
+                sessions
+                    .filter { it.kind == ApiSessionKind.ACCOUNTS }
                     .maxByOrNull { it.createdAt }
                     ?.let { session ->
                         for (response in apiSessionRepository.getResponsesBySession(session.id)) {
                             val item = extractFirstArrayItem(response.json, accountsResponseArrayKey)
-                            if (item != null) { accountSampleItem = item; break }
+                            if (item != null) {
+                                accountSampleItem = item
+                                break
+                            }
                         }
                     }
             }
             if (txSampleItem == null) {
-                sessions.filter { it.kind == ApiSessionKind.TRANSACTIONS }
+                sessions
+                    .filter { it.kind == ApiSessionKind.TRANSACTIONS }
                     .maxByOrNull { it.createdAt }
                     ?.let { session ->
                         for (response in apiSessionRepository.getResponsesBySession(session.id)) {
                             val item = extractFirstArrayItem(response.json, transactionsResponseArrayKey)
-                            if (item != null) { txSampleItem = item; break }
+                            if (item != null) {
+                                txSampleItem = item
+                                break
+                            }
                         }
                     }
             }
@@ -351,27 +364,39 @@ fun ApiStrategyEditDialog(
                     value = accountIdField,
                     onValueChange = { accountIdField = it },
                     paths = accountJsonPaths,
-                    onPickRequest = { setter -> pickingPaths = accountJsonPaths; pickingForSetter = setter },
+                    onPickRequest = { setter ->
+                        pickingPaths = accountJsonPaths
+                        pickingForSetter = setter
+                    },
                 )
                 FieldMappingRow(
                     label = "Description",
                     value = accountDescriptionField,
                     onValueChange = { accountDescriptionField = it },
                     paths = accountJsonPaths,
-                    onPickRequest = { setter -> pickingPaths = accountJsonPaths; pickingForSetter = setter },
+                    onPickRequest = { setter ->
+                        pickingPaths = accountJsonPaths
+                        pickingForSetter = setter
+                    },
                 )
                 FieldMappingRow(
                     label = "Owner Name (optional)",
                     value = accountOwnerNameField,
                     onValueChange = { accountOwnerNameField = it },
                     paths = accountJsonPaths,
-                    onPickRequest = { setter -> pickingPaths = accountJsonPaths; pickingForSetter = setter },
+                    onPickRequest = { setter ->
+                        pickingPaths = accountJsonPaths
+                        pickingForSetter = setter
+                    },
                 )
                 CustomFieldsSection(
                     fields = customAccountFields,
                     onFieldsChange = { customAccountFields = it },
                     paths = accountJsonPaths,
-                    onPickRequest = { setter -> pickingPaths = accountJsonPaths; pickingForSetter = setter },
+                    onPickRequest = { setter ->
+                        pickingPaths = accountJsonPaths
+                        pickingForSetter = setter
+                    },
                 )
 
                 Spacer(Modifier.height(4.dp))
@@ -384,62 +409,89 @@ fun ApiStrategyEditDialog(
                     value = txAmountField,
                     onValueChange = { txAmountField = it },
                     paths = txJsonPaths,
-                    onPickRequest = { setter -> pickingPaths = txJsonPaths; pickingForSetter = setter },
+                    onPickRequest = { setter ->
+                        pickingPaths = txJsonPaths
+                        pickingForSetter = setter
+                    },
                 )
                 FieldMappingRow(
                     label = "Timestamp (ISO 8601)",
                     value = txTimestampField,
                     onValueChange = { txTimestampField = it },
                     paths = txJsonPaths,
-                    onPickRequest = { setter -> pickingPaths = txJsonPaths; pickingForSetter = setter },
+                    onPickRequest = { setter ->
+                        pickingPaths = txJsonPaths
+                        pickingForSetter = setter
+                    },
                 )
                 FieldMappingRow(
                     label = "Currency (ISO 4217)",
                     value = txCurrencyField,
                     onValueChange = { txCurrencyField = it },
                     paths = txJsonPaths,
-                    onPickRequest = { setter -> pickingPaths = txJsonPaths; pickingForSetter = setter },
+                    onPickRequest = { setter ->
+                        pickingPaths = txJsonPaths
+                        pickingForSetter = setter
+                    },
                 )
                 FieldMappingRow(
                     label = "Description",
                     value = txDescriptionField,
                     onValueChange = { txDescriptionField = it },
                     paths = txJsonPaths,
-                    onPickRequest = { setter -> pickingPaths = txJsonPaths; pickingForSetter = setter },
+                    onPickRequest = { setter ->
+                        pickingPaths = txJsonPaths
+                        pickingForSetter = setter
+                    },
                 )
                 FieldMappingRow(
                     label = "Merchant Name (optional, dot-notation)",
                     value = txMerchantNameField,
                     onValueChange = { txMerchantNameField = it },
                     paths = txJsonPaths,
-                    onPickRequest = { setter -> pickingPaths = txJsonPaths; pickingForSetter = setter },
+                    onPickRequest = { setter ->
+                        pickingPaths = txJsonPaths
+                        pickingForSetter = setter
+                    },
                 )
                 FieldMappingRow(
                     label = "Counterparty Name (optional, dot-notation)",
                     value = txCounterpartyNameField,
                     onValueChange = { txCounterpartyNameField = it },
                     paths = txJsonPaths,
-                    onPickRequest = { setter -> pickingPaths = txJsonPaths; pickingForSetter = setter },
+                    onPickRequest = { setter ->
+                        pickingPaths = txJsonPaths
+                        pickingForSetter = setter
+                    },
                 )
                 FieldMappingRow(
                     label = "Counterparty ID (optional, dot-notation)",
                     value = txCounterpartyIdField,
                     onValueChange = { txCounterpartyIdField = it },
                     paths = txJsonPaths,
-                    onPickRequest = { setter -> pickingPaths = txJsonPaths; pickingForSetter = setter },
+                    onPickRequest = { setter ->
+                        pickingPaths = txJsonPaths
+                        pickingForSetter = setter
+                    },
                 )
                 FieldMappingRow(
                     label = "Decline Reason (optional)",
                     value = txDeclineReasonField,
                     onValueChange = { txDeclineReasonField = it },
                     paths = txJsonPaths,
-                    onPickRequest = { setter -> pickingPaths = txJsonPaths; pickingForSetter = setter },
+                    onPickRequest = { setter ->
+                        pickingPaths = txJsonPaths
+                        pickingForSetter = setter
+                    },
                 )
                 CustomFieldsSection(
                     fields = customTxFields,
                     onFieldsChange = { customTxFields = it },
                     paths = txJsonPaths,
-                    onPickRequest = { setter -> pickingPaths = txJsonPaths; pickingForSetter = setter },
+                    onPickRequest = { setter ->
+                        pickingPaths = txJsonPaths
+                        pickingForSetter = setter
+                    },
                 )
             }
         },
@@ -487,12 +539,15 @@ fun ApiStrategyEditDialog(
                                     idField = accountIdField.trim(),
                                     descriptionField = accountDescriptionField.trim(),
                                     ownerNameField = accountOwnerNameField.trim().ifBlank { null },
-                                    customFields = customAccountFields
-                                        .filter { f -> f.name.isNotBlank() }
-                                        .associate { f -> f.name.trim() to f.path.trim() },
-                                    uniqueIdentifierFields = customAccountFields
-                                        .filter { f -> f.name.isNotBlank() && f.isUniqueId }
-                                        .map { f -> f.name.trim() }.toSet(),
+                                    customFields =
+                                        customAccountFields
+                                            .filter { f -> f.name.isNotBlank() }
+                                            .associate { f -> f.name.trim() to f.path.trim() },
+                                    uniqueIdentifierFields =
+                                        customAccountFields
+                                            .filter { f -> f.name.isNotBlank() && f.isUniqueId }
+                                            .map { f -> f.name.trim() }
+                                            .toSet(),
                                 ),
                             transactionMappings =
                                 ApiTransactionMappings(
@@ -504,12 +559,15 @@ fun ApiStrategyEditDialog(
                                     counterpartyNameField = txCounterpartyNameField.trim().ifBlank { null },
                                     counterpartyIdField = txCounterpartyIdField.trim().ifBlank { null },
                                     declineReasonField = txDeclineReasonField.trim().ifBlank { null },
-                                    customFields = customTxFields
-                                        .filter { it.name.isNotBlank() }
-                                        .associate { it.name.trim() to it.path.trim() },
-                                    uniqueIdentifierFields = customTxFields
-                                        .filter { it.name.isNotBlank() && it.isUniqueId }
-                                        .map { it.name.trim() }.toSet(),
+                                    customFields =
+                                        customTxFields
+                                            .filter { it.name.isNotBlank() }
+                                            .associate { it.name.trim() to it.path.trim() },
+                                    uniqueIdentifierFields =
+                                        customTxFields
+                                            .filter { it.name.isNotBlank() && it.isUniqueId }
+                                            .map { it.name.trim() }
+                                            .toSet(),
                                 ),
                             accountNamePrefix = accountNamePrefix.trim(),
                             counterpartyPrefix = counterpartyPrefix.trim(),
@@ -543,12 +601,16 @@ private fun SectionHeader(text: String) {
 
 /** Small status line indicating whether session data is available for path picking. */
 @Composable
-private fun SessionDataStatus(paths: List<JsonPathEntry>, loaded: Boolean) {
-    val text = when {
-        !loaded -> "Loading session data…"
-        paths.isNotEmpty() -> "${paths.size} paths available from last session — tap ⊞ to pick"
-        else -> "No session data yet — type paths manually"
-    }
+private fun SessionDataStatus(
+    paths: List<JsonPathEntry>,
+    loaded: Boolean,
+) {
+    val text =
+        when {
+            !loaded -> "Loading session data…"
+            paths.isNotEmpty() -> "${paths.size} paths available from last session — tap ⊞ to pick"
+            else -> "No session data yet — type paths manually"
+        }
     Text(
         text = text,
         style = MaterialTheme.typography.labelSmall,
@@ -705,10 +767,11 @@ private fun JsonNodePickerDialog(
             LazyColumn(modifier = Modifier.heightIn(max = 400.dp)) {
                 items(paths) { entry ->
                     Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onPick(entry.path) }
-                            .padding(vertical = 10.dp, horizontal = 4.dp),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable { onPick(entry.path) }
+                                .padding(vertical = 10.dp, horizontal = 4.dp),
                     ) {
                         Text(
                             text = entry.path,

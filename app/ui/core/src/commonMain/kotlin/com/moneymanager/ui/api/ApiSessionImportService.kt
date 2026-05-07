@@ -389,8 +389,11 @@ suspend fun importApiSessionTransactions(
             val rawJson = monzoAccount.rawJson ?: continue
             val accountId = accountCache.getOrCreateAccountId(monzoAccount.id, monzoAccount.localAccountName(strategy))
             val existingAttrTypes =
-                accountAttributeRepository.getByAccount(accountId).first()
-                    .map { it.attributeType.name }.toSet()
+                accountAttributeRepository
+                    .getByAccount(accountId)
+                    .first()
+                    .map { it.attributeType.name }
+                    .toSet()
             for ((fieldName, jsonPath) in customAccountFields) {
                 val value = rawJson.resolveJsonPath(jsonPath) ?: continue
                 if (fieldName in existingAttrTypes) continue
@@ -457,19 +460,21 @@ private suspend fun precreateCounterparties(
     if (counterpartyIdField == null) return
 
     val counterparties =
-        transactionResponses.flatMap { response ->
-            val request = requestsById[response.requestId] ?: return@flatMap emptyList()
-            parseTransactionsWithPath(response.json, strategy).mapNotNull { item ->
-                val counterpartyId = item.rawJson?.resolveCounterpartyIdentity(counterpartyIdField)
-                    ?: return@mapNotNull null
-                val downloadedName = item.counterpartyName(nameMappings)
-                CounterpartyImportCandidate(
-                    counterpartyId = counterpartyId,
-                    downloadedName = downloadedName,
-                    apiSource = AccountApiSource(sessionId, request.id, JsonPath("${item.jsonPath.value}.counterparty")),
-                )
-            }
-        }.groupBy { it.counterpartyId }
+        transactionResponses
+            .flatMap { response ->
+                val request = requestsById[response.requestId] ?: return@flatMap emptyList()
+                parseTransactionsWithPath(response.json, strategy).mapNotNull { item ->
+                    val counterpartyId =
+                        item.rawJson?.resolveCounterpartyIdentity(counterpartyIdField)
+                            ?: return@mapNotNull null
+                    val downloadedName = item.counterpartyName(nameMappings)
+                    CounterpartyImportCandidate(
+                        counterpartyId = counterpartyId,
+                        downloadedName = downloadedName,
+                        apiSource = AccountApiSource(sessionId, request.id, JsonPath("${item.jsonPath.value}.counterparty")),
+                    )
+                }
+            }.groupBy { it.counterpartyId }
 
     for ((counterpartyId, candidates) in counterparties) {
         val accountName =
@@ -494,8 +499,9 @@ private fun collectCounterpartiesFromResponses(
     responses
         .flatMap { response ->
             parseTransactionsWithPath(response.json, strategy).mapNotNull { item ->
-                val counterpartyId = item.rawJson?.resolveCounterpartyIdentity(counterpartyIdField)
-                    ?: return@mapNotNull null
+                val counterpartyId =
+                    item.rawJson?.resolveCounterpartyIdentity(counterpartyIdField)
+                        ?: return@mapNotNull null
                 counterpartyId to item.counterpartyName(nameMappings)
             }
         }.groupBy(
@@ -509,7 +515,9 @@ private suspend fun loadCounterpartyIdIndex(
 ): Map<String, AccountId> {
     val index = mutableMapOf<String, AccountId>()
     for (account in accountRepository.getAllAccounts().first()) {
-        accountAttributeRepository.getByAccount(account.id).first()
+        accountAttributeRepository
+            .getByAccount(account.id)
+            .first()
             .firstOrNull { it.attributeType.name == COUNTERPARTY_ID_ATTR }
             ?.let { index[it.value] = account.id }
     }
@@ -755,12 +763,14 @@ private suspend fun importTransactionPage(
     // Index existing transfers by their unique-identifier attribute values for O(1) lookup
     val existingByUniqueId: Map<Map<String, String>, TransferId> =
         if (uniqueIdTxFields.isNotEmpty()) {
-            existingTransfers.mapNotNull { t ->
-                val key = uniqueIdTxFields.associateWith { fieldName ->
-                    t.attributes.firstOrNull { it.attributeType.name == fieldName }?.value ?: return@mapNotNull null
-                }
-                key to t.id
-            }.toMap()
+            existingTransfers
+                .mapNotNull { t ->
+                    val key =
+                        uniqueIdTxFields.associateWith { fieldName ->
+                            t.attributes.firstOrNull { it.attributeType.name == fieldName }?.value ?: return@mapNotNull null
+                        }
+                    key to t.id
+                }.toMap()
         } else {
             emptyMap()
         }
@@ -903,9 +913,10 @@ private suspend fun importValidTransactionItem(
     // Prefer unique-identifier lookup when configured; fall back to full-field match
     val duplicateTransferId: TransferId? =
         if (uniqueIdTxFields.isNotEmpty() && item.rawJson != null) {
-            val key = uniqueIdTxFields.associateWith { fieldName ->
-                customTxFields[fieldName]?.let { item.rawJson.resolveJsonPath(it) } ?: ""
-            }
+            val key =
+                uniqueIdTxFields.associateWith { fieldName ->
+                    customTxFields[fieldName]?.let { item.rawJson.resolveJsonPath(it) } ?: ""
+                }
             existingByUniqueId[key]
         } else {
             existingTransfers.firstOrNull { it.matches(transfer) }?.id
@@ -930,17 +941,18 @@ private suspend fun importValidTransactionItem(
             requestId = requestId,
             jsonPath = item.jsonPath,
         )
-    val attributes = buildList {
-        if (!declineReason.isNullOrBlank()) {
-            add(NewAttribute(typeId = AttributeTypeId(-1), value = "declined: $declineReason"))
-        }
-        if (customTxFields.isNotEmpty() && item.rawJson != null) {
-            for ((fieldName, jsonPath) in customTxFields) {
-                val value = item.rawJson.resolveJsonPath(jsonPath) ?: continue
-                add(NewAttribute(typeId = attributeTypeCache.getOrCreate(fieldName), value = value))
+    val attributes =
+        buildList {
+            if (!declineReason.isNullOrBlank()) {
+                add(NewAttribute(typeId = AttributeTypeId(-1), value = "declined: $declineReason"))
+            }
+            if (customTxFields.isNotEmpty() && item.rawJson != null) {
+                for ((fieldName, jsonPath) in customTxFields) {
+                    val value = item.rawJson.resolveJsonPath(jsonPath) ?: continue
+                    add(NewAttribute(typeId = attributeTypeCache.getOrCreate(fieldName), value = value))
+                }
             }
         }
-    }
     transactionRepository.createTransfers(
         transfers = listOf(transfer),
         newAttributes = if (attributes.isNotEmpty()) mapOf(transfer.id to attributes) else emptyMap(),
@@ -1027,8 +1039,7 @@ private fun buildTransactionUrl(
 private fun buildEndpointUrl(
     baseUrl: String,
     path: String,
-): String =
-    baseUrl.trimEnd('/') + "/" + path.trimStart('/')
+): String = baseUrl.trimEnd('/') + "/" + path.trimStart('/')
 
 private fun ApiResponse.toApiHttpResponse(): ApiHttpResponse =
     ApiHttpResponse(
@@ -1146,7 +1157,11 @@ private class AccountCache(
 
     private suspend fun loadAccounts(): Map<String, Account> {
         accountsByName?.let { return it }
-        return accountRepository.getAllAccounts().first().associateBy { it.name }.also { accountsByName = it }
+        return accountRepository
+            .getAllAccounts()
+            .first()
+            .associateBy { it.name }
+            .also { accountsByName = it }
     }
 }
 
@@ -1193,7 +1208,11 @@ private fun ApiTransactionPageItem.toTransfer(
     return Transfer(
         id = TransferId(0L),
         timestamp = created,
-        description = description.ifBlank { merchantName?.takeIf { it.isNotBlank() } ?: counterpartyName?.takeIf { it.isNotBlank() } ?: "Unknown" },
+        description =
+            description.ifBlank {
+                merchantName?.takeIf { it.isNotBlank() } ?: counterpartyName?.takeIf { it.isNotBlank() }
+                    ?: "Unknown"
+            },
         sourceAccountId = if (isIncoming) counterpartyAccountId else monzoAccountId,
         targetAccountId = if (isIncoming) monzoAccountId else counterpartyAccountId,
         amount = money,
@@ -1281,7 +1300,5 @@ private class AttributeTypeCache(
     private val mutex = Mutex()
     private val cache = mutableMapOf<String, AttributeTypeId>()
 
-    suspend fun getOrCreate(name: String): AttributeTypeId =
-        mutex.withLock { cache.getOrPut(name) { repo.getOrCreate(name) } }
+    suspend fun getOrCreate(name: String): AttributeTypeId = mutex.withLock { cache.getOrPut(name) { repo.getOrCreate(name) } }
 }
-

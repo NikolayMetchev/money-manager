@@ -79,8 +79,6 @@ import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.createApiClient
-import com.moneymanager.ui.background.LocalBackgroundTaskManager
-import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.api.ApiAccountsDownloadResult
 import com.moneymanager.ui.api.ApiCounterpartySuggestion
 import com.moneymanager.ui.api.ApiSessionImportResult
@@ -90,6 +88,8 @@ import com.moneymanager.ui.api.discoverApiCounterpartiesToCreate
 import com.moneymanager.ui.api.downloadApiSessionAccounts
 import com.moneymanager.ui.api.downloadApiSessionTransactions
 import com.moneymanager.ui.api.importApiSessionTransactions
+import com.moneymanager.ui.background.LocalBackgroundTaskManager
+import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.util.ContentCopyIcon
 import com.moneymanager.ui.util.displayDateTime
 import com.moneymanager.ui.util.setPlainText
@@ -1511,4 +1511,3 @@ private fun JsonElement.summary(expanded: Boolean): String =
         JsonNull -> "null"
         is JsonPrimitive -> toString()
     }
-

@@ -173,7 +173,11 @@ class MonzoImportAuditE2ETest {
                         trafficRecorder = ApiSessionTrafficRecorder(sessionId, dc.apiSessionRepository),
                         engine = mockEngine,
                     )
-                val strategy = dc.apiImportStrategyRepository.getAllStrategies().first().single()
+                val strategy =
+                    dc.apiImportStrategyRepository
+                        .getAllStrategies()
+                        .first()
+                        .single()
 
                 downloadApiSessionAccounts(
                     token = "test-monzo-token",
@@ -257,4 +261,3 @@ class MonzoImportAuditE2ETest {
             waitUntilDoesNotExist(hasText("Source data missing"), timeoutMillis = 3000)
         }
 }
-

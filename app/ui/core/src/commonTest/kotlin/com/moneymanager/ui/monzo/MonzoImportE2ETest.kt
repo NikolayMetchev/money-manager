@@ -276,7 +276,11 @@ class MonzoImportE2ETest : DbTest() {
                         ),
                     engine = mockEngine,
                 )
-            val strategy = repositories.apiImportStrategyRepository.getAllStrategies().first().single()
+            val strategy =
+                repositories.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .single()
 
             // WHEN — download then import
             downloadApiSessionAccounts(
@@ -462,7 +466,11 @@ class MonzoImportE2ETest : DbTest() {
                         ),
                     engine = mockEngine,
                 )
-            val strategy = repositories.apiImportStrategyRepository.getAllStrategies().first().single()
+            val strategy =
+                repositories.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .single()
 
             downloadApiSessionAccounts(
                 token = "test-monzo-token",
@@ -600,9 +608,10 @@ class MonzoImportE2ETest : DbTest() {
             val counterpartyAccounts = allAccounts.filter { it.name.startsWith("Monzo Counterparty:") }
             assertEquals(1, counterpartyAccounts.size, "The same counterparty.id should create one account")
             val counterpartyAttributes =
-                counterpartyAccounts.flatMap { account ->
-                    repositories.accountAttributeRepository.getByAccount(account.id).first()
-                }.filter { it.attributeType.name == "counterparty.id" }
+                counterpartyAccounts
+                    .flatMap { account ->
+                        repositories.accountAttributeRepository.getByAccount(account.id).first()
+                    }.filter { it.attributeType.name == "counterparty.id" }
             assertEquals(1, counterpartyAttributes.size, "counterparty.id should be stored once as an account attribute")
             assertEquals("cp_alice_001", counterpartyAttributes.single().value)
         }
@@ -698,4 +707,3 @@ class MonzoImportE2ETest : DbTest() {
             assertEquals("bank:041307:29900313", counterpartyAttribute.value)
         }
 }
-
