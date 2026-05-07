@@ -18,6 +18,7 @@ exclude:
       - "*/build"
       - "*/*/build"
       - "*/*/*/build"
+      - gradle/build-logic/build
 include:
   - name: CheckDependencyLicenses
 failureConditions:
