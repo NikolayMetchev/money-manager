@@ -101,7 +101,7 @@ dependencyAnalysis {
 
 kover {
     currentProject { sources { excludeJava = true } }
-    if (path.startsWith(":test") || project.file("src/test").exists().not()) {
+    if (path.startsWith(":test") || (path != ":" && project.file("src/test").exists().not())) {
         disable()
     }
     reports {
