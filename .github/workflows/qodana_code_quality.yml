@@ -42,6 +42,7 @@ jobs:
         with:
           pr-mode: false
           use-caches: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/releases/') }}
+          push-fixes: branch
         env:
           QODANA_TOKEN: ${{ secrets.QODANA_TOKEN_1874207222 }}
           QODANA_ENDPOINT: 'https://qodana.cloud'
