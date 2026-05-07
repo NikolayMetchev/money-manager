@@ -4,7 +4,7 @@
 
 version: "1.0"
 linter: jetbrains/qodana-jvm-community:2026.1
-bootstrap: mkdir -p .gradle && echo "java.home=$JAVA_HOME" > .gradle/config.properties && printf "qodana=true\norg.gradle.java.installations.auto-download=false\norg.gradle.java.installations.fromEnv=JAVA_HOME\n" >> gradle.properties
+bootstrap: mkdir -p .gradle && echo "java.home=$JAVA_HOME" > .gradle/config.properties && sed -i '/toolchainVendor/d' gradle/gradle-daemon-jvm.properties && printf "qodana=true\norg.gradle.java.installations.auto-download=false\norg.gradle.java.installations.fromEnv=JAVA_HOME\n" >> gradle.properties
 plugins:
   - id: com.squareup.sqldelight
 profile:
