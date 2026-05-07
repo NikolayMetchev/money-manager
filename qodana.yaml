@@ -3,7 +3,6 @@
 ####################################################################################################################
 
 version: "1.0"
-linter: jetbrains/qodana-jvm-community:2026.1
 bootstrap: echo "qodana=true" >> gradle.properties
 profile:
   name: qodana.recommended
