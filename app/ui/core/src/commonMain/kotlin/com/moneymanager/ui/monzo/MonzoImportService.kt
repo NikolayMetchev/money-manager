@@ -268,38 +268,38 @@ suspend fun importMonzoSessionTransactions(
         )
     val currencyCache = CurrencyCache(currencyRepository)
     coroutineScope {
-            transactionResponses
-                .map { response ->
-                    async {
-                        val request = requestsById[response.requestId] ?: return@async null
-                        val monzoAccount = monzoAccountsById[request.accountIdParameter()] ?: return@async null
-                        val monzoAccountId = accountCache.getOrCreateAccountId(monzoAccount.id, monzoAccount.localAccountName())
-                        val pageResult =
-                            importTransactionPage(
-                                response = response.toApiHttpResponse(),
-                                monzoAccountId = monzoAccountId,
-                                sessionId = sessionId,
-                                deviceId = deviceId,
-                                accountCache = accountCache,
-                                currencyCache = currencyCache,
-                                apiSessionRepository = apiSessionRepository,
-                                transactionRepository = transactionRepository,
-                                transferSourceQueries = transferSourceQueries,
-                            )
-                        val progressMessage =
-                            progressMutex.withLock {
-                                totalImported += pageResult.importedCount
-                                totalDuplicates += pageResult.duplicateCount
-                                totalErrors += pageResult.errorCount
-                                totalExcluded += pageResult.excludedCount
-                                ++completedCount
-                                progressMessage()
-                            }
-                        onProgress(progressMessage)
-                        pageResult
-                    }
-                }.awaitAll()
-        }
+        transactionResponses
+            .map { response ->
+                async {
+                    val request = requestsById[response.requestId] ?: return@async null
+                    val monzoAccount = monzoAccountsById[request.accountIdParameter()] ?: return@async null
+                    val monzoAccountId = accountCache.getOrCreateAccountId(monzoAccount.id, monzoAccount.localAccountName())
+                    val pageResult =
+                        importTransactionPage(
+                            response = response.toApiHttpResponse(),
+                            monzoAccountId = monzoAccountId,
+                            sessionId = sessionId,
+                            deviceId = deviceId,
+                            accountCache = accountCache,
+                            currencyCache = currencyCache,
+                            apiSessionRepository = apiSessionRepository,
+                            transactionRepository = transactionRepository,
+                            transferSourceQueries = transferSourceQueries,
+                        )
+                    val progressMessage =
+                        progressMutex.withLock {
+                            totalImported += pageResult.importedCount
+                            totalDuplicates += pageResult.duplicateCount
+                            totalErrors += pageResult.errorCount
+                            totalExcluded += pageResult.excludedCount
+                            ++completedCount
+                            progressMessage()
+                        }
+                    onProgress(progressMessage)
+                    pageResult
+                }
+            }.awaitAll()
+    }
 
     val totalPeople =
         importPeopleFromAccounts(

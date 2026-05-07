@@ -3,7 +3,6 @@
 package com.moneymanager.database.json
 
 import com.moneymanager.domain.model.AccountId
-import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode

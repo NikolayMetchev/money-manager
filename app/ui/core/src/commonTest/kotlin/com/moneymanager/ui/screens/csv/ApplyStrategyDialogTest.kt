@@ -193,7 +193,7 @@ class ApplyStrategyDialogTest {
                 ),
             attributes = emptyList(),
             importStatus = ImportStatus.IMPORTED,
-                rowIndex = 0,
+            rowIndex = 0,
             discoveredMapping = discoveredMapping,
         )
 }
