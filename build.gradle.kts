@@ -3,6 +3,13 @@ plugins {
     alias(libs.plugins.kover)
 }
 
+doctor {
+    javaHome {
+        val isQodana = providers.gradleProperty("qodana").map(String::toBoolean).orElse(false)
+        ensureJavaHomeMatches.set(isQodana.get().not())
+    }
+}
+
 // Read version from system property, project property, or VERSION file
 // Priority: -Dversion=X > -Pversion=X > VERSION file > "unspecified"
 val versionFile = rootProject.file("VERSION")
