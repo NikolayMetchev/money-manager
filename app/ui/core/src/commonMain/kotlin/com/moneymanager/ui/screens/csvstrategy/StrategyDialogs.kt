@@ -196,9 +196,9 @@ fun SelectCsvImportDialog(
                         Modifier
                             .fillMaxWidth()
                             .heightIn(min = 100.dp),
-                    contentAlignment = androidx.compose.ui.Alignment.Center,
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
                             text = "No CSV files available",
                             style = MaterialTheme.typography.bodyLarge,

@@ -74,7 +74,7 @@ private data class AccountAuditDiff(
     val categoryName: FieldChange<String?>,
     val ownersAdded: List<String>,
     val ownersRemoved: List<String>,
-    val attributeChanges: List<com.moneymanager.domain.model.AccountAttributeAuditEntry>,
+    val attributeChanges: List<AccountAttributeAuditEntry>,
     val source: EntitySource?,
 ) {
     val hasFieldChanges: Boolean
