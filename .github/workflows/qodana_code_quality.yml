@@ -19,6 +19,7 @@ jobs:
       contents: write
       pull-requests: write
       checks: write
+      security-events: write
     steps:
       - uses: actions/checkout@v3
         with:
@@ -38,3 +39,8 @@ jobs:
         env:
           QODANA_TOKEN: ${{ secrets.QODANA_TOKEN_1874207222 }}
           QODANA_ENDPOINT: 'https://qodana.cloud'
+      - name: Upload SARIF to GitHub Code Scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: ${{ runner.temp }}/qodana/results/qodana.sarif.json
