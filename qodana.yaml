@@ -4,7 +4,7 @@
 
 version: "1.0"
 linter: jetbrains/qodana-jvm-community:2026.1
-bootstrap: rm -f gradle/gradle-daemon-jvm.properties && echo "qodana=true" >> gradle.properties && echo "sdk.dir=/tmp/android-sdk" >> local.properties && mkdir -p /tmp/android-sdk && ./gradlew koverXmlReport --continue --no-daemon --console=plain ; mkdir -p .qodana/code-coverage && cp build/reports/kover/report.xml .qodana/code-coverage/
+bootstrap: rm -f gradle/gradle-daemon-jvm.properties && printf "qodana=true\nandroid.builder.sdkDownload=false\n" >> gradle.properties && echo "sdk.dir=/tmp/android-sdk" >> local.properties && mkdir -p /tmp/android-sdk && ./gradlew koverXmlReport --continue --no-daemon --console=plain ; mkdir -p .qodana/code-coverage && cp build/reports/kover/report.xml .qodana/code-coverage/
 plugins:
   - id: com.squareup.sqldelight
 profile:
