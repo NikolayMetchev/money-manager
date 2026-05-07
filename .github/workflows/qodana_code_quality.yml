@@ -32,6 +32,13 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
       - name: Copy coverage report for Qodana
         run: mkdir -p .qodana/code-coverage && cp build/reports/kover/report.xml .qodana/code-coverage/
+      - name: Restore Qodana cache (read-only on PRs)
+        if: github.event_name == 'pull_request'
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/qodana/caches
+          key: qodana-2026.1-refs/heads/main
+          restore-keys: qodana-2026.1-
       - name: 'Qodana Scan'
         uses: JetBrains/qodana-action@v2026.1
         with:
