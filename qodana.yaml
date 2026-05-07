@@ -8,7 +8,7 @@ bootstrap: echo "qodana=true" >> gradle.properties
 plugins:
   - id: com.squareup.sqldelight
 profile:
-  name: qodana.recommended
+  path: .qodana/profile.xml
 include:
   - name: CheckDependencyLicenses
 failureConditions:
