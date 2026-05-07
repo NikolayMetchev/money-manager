@@ -12,9 +12,6 @@ profile:
 exclude:
   - name: KotlinNoActualForExpect
   - name: XmlHighlighting
-  - name: All
-    paths:
-      - "**/build/**"
 include:
   - name: CheckDependencyLicenses
 failureConditions:
