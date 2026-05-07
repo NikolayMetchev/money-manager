@@ -4,6 +4,9 @@
 
 version: "1.0"
 linter: jetbrains/qodana-jvm-community:2026.1
+env:
+  - name: GRADLE_OPTS
+    value: "-Dorg.gradle.java.installations.auto-download=false"
 profile:
   name: qodana.recommended
 include:
