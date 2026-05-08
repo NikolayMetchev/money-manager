@@ -35,7 +35,7 @@ kotlin {
             dependencies {
                 api(projects.utils.currency)
 
-                implementation(libs.kotlinx.serialization.core)
+                api(libs.kotlinx.serialization.core)
                 implementation(libs.sqldelight.sqlite.driver)
             }
         }
@@ -50,7 +50,7 @@ kotlin {
         val androidMain by getting {
             dependencies {
                 implementation(libs.androidx.sqlite)
-                implementation(libs.kotlinx.serialization.core)
+                api(libs.kotlinx.serialization.core)
                 implementation(libs.sqldelight.android.driver)
             }
         }
