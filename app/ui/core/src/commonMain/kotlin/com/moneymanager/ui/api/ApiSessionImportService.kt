@@ -226,7 +226,7 @@ suspend fun importApiSessionTransactions(
             sessionId,
             accountsSessionId,
             strategy,
-            onProgress
+            onProgress,
         )
     precreateAndFlushCounterparties(setup, counterpartyAccountNames)
     importTransactionsConcurrently(setup)
@@ -243,7 +243,9 @@ suspend fun importApiSessionTransactions(
 }
 
 /** Mutable progress counters shared between the setup, parallel import, and progress callback. */
-private class ImportCounts(val totalResponses: Int) {
+private class ImportCounts(
+    val totalResponses: Int,
+) {
     var completedCount = 0
     var totalImported = 0
     var totalDuplicates = 0
