@@ -696,8 +696,8 @@ class MonzoImportE2ETest : DbTest() {
                 counterpartyAccounts
                     .flatMap { account ->
                         repositories.accountAttributeRepository.getByAccount(account.id).first()
-                    }.filter { it.attributeType.name == "counterparty.id" }
-            assertEquals(1, counterpartyAttributes.size, "counterparty.id should be stored once as an account attribute")
+                    }.filter { it.attributeType.name == "account-external-id" }
+            assertEquals(1, counterpartyAttributes.size, "account-external-id should be stored once as an account attribute")
             assertEquals("cp_alice_001", counterpartyAttributes.single().value)
         }
 
@@ -788,7 +788,7 @@ class MonzoImportE2ETest : DbTest() {
                 repositories.accountAttributeRepository
                     .getByAccount(counterpartyAccounts.single().id)
                     .first()
-                    .single { it.attributeType.name == "counterparty.id" }
+                    .single { it.attributeType.name == "account-external-id" }
             assertEquals("bank:041307:29900313", counterpartyAttribute.value)
         }
 

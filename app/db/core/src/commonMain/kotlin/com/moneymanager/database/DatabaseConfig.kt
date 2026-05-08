@@ -22,6 +22,15 @@ import kotlin.uuid.Uuid
  * These settings are applied per-connection (not persisted to the database file).
  */
 object DatabaseConfig {
+    /** Stable ID for the "excluded" attribute type. Excluded transactions are hidden from balances. */
+    const val EXCLUDED_ATTR_TYPE_ID: Long = -1
+
+    /** Stable ID for the "account-external-id" attribute type (e.g. counterparty.id value). */
+    const val ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID: Long = -2
+
+    /** Stable ID for the "built-in type" attribute type used by built-in counterparty accounts. */
+    const val BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID: Long = -3
+
     /**
      * SQL statements to execute when opening a database connection.
      * Applied to all database connections (JVM, Android, etc.)
@@ -686,12 +695,11 @@ object DatabaseConfig {
                 parent_id = null,
             )
 
-            // Seed well-known "excluded" attribute type (id=-1).
-            // Transactions carrying this attribute are excluded from all balance calculations
-            // but remain visible in the UI (highlighted as excluded).
-            attributeTypeQueries.insertWithId(id = -1, name = "excluded")
-            // Seed built-in account attribute type used by importer-defined counterparties.
-            attributeTypeQueries.insert(name = "built-in type")
+            // Seed well-known attribute types with stable negative IDs so importers can
+            // reference them without a DB lookup.
+            attributeTypeQueries.insertWithId(id = EXCLUDED_ATTR_TYPE_ID, name = "excluded")
+            attributeTypeQueries.insertWithId(id = ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID, name = "account-external-id")
+            attributeTypeQueries.insertWithId(id = BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID, name = "built-in type")
 
             // Create system device for system-generated source tracking
             // Platform 0 = SYSTEM, no os/machine/make/model needed
