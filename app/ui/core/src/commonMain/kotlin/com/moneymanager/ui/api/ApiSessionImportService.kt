@@ -535,7 +535,7 @@ private suspend fun flushPendingCounterpartyAttributes(
         if (seen.add(counterpartyId)) {
             // runCatching handles the UNIQUE constraint for counterparties already
             // having this attribute from a previous import where index was stale.
-            runCatching { accountAttributeRepository.insert(accountId, counterpartyIdAttrTypeId, counterpartyId) }
+            runCatching { accountAttributeRepository.insertInCreationMode(accountId, counterpartyIdAttrTypeId, counterpartyId) }
         }
     }
 }

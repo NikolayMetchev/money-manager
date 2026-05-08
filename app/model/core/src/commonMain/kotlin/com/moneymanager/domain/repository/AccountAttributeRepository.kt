@@ -23,6 +23,17 @@ interface AccountAttributeRepository {
     ): Long
 
     /**
+     * Inserts a new attribute in creation mode: the attribute is recorded in the audit log
+     * at the current revision without bumping the revision. Use this when the attribute is
+     * part of the initial creation of the account (e.g. counterparty.id on import).
+     */
+    suspend fun insertInCreationMode(
+        accountId: AccountId,
+        attributeTypeId: AttributeTypeId,
+        value: String,
+    ): Long
+
+    /**
      * Updates an attribute's value. This will trigger the attribute UPDATE trigger
      * which bumps the account revision and records to audit.
      */
