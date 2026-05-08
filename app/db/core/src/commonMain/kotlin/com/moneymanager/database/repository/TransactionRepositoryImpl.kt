@@ -130,37 +130,8 @@ class TransactionRepositoryImpl(
                         pagingInfo?.lastTimestamp?.toEpochMilliseconds(),
                         pagingInfo?.lastId?.id,
                         (pageSize + 1).toLong(),
-                    ) {
-                        id,
-                        timestamp,
-                        description,
-                        accountId,
-                        transactionAmount,
-                        runningBalance,
-                        currencyId,
-                        currencyCode,
-                        currencyName,
-                        currencyScaleFactor,
-                        sourceAccountId,
-                        targetAccountId,
-                        isExcluded,
-                        ->
-                        AccountRowMapper.mapRaw(
-                            id,
-                            timestamp,
-                            description,
-                            accountId,
-                            transactionAmount,
-                            runningBalance,
-                            currencyId,
-                            currencyCode,
-                            currencyName,
-                            currencyScaleFactor,
-                            sourceAccountId,
-                            targetAccountId,
-                            isExcluded,
-                        )
-                    }.executeAsList()
+                        AccountRowMapper::mapRaw,
+                    ).executeAsList()
 
             val hasMore = items.size > pageSize
             val pageItems = if (hasMore) items.take(pageSize) else items
@@ -201,37 +172,8 @@ class TransactionRepositoryImpl(
                         firstTimestamp.toEpochMilliseconds(),
                         firstId.id,
                         (pageSize + 1).toLong(),
-                    ) {
-                        id,
-                        timestamp,
-                        description,
-                        accountId,
-                        transactionAmount,
-                        runningBalance,
-                        currencyId,
-                        currencyCode,
-                        currencyName,
-                        currencyScaleFactor,
-                        sourceAccountId,
-                        targetAccountId,
-                        isExcluded,
-                        ->
-                        AccountRowMapper.mapRaw(
-                            id,
-                            timestamp,
-                            description,
-                            accountId,
-                            transactionAmount,
-                            runningBalance,
-                            currencyId,
-                            currencyCode,
-                            currencyName,
-                            currencyScaleFactor,
-                            sourceAccountId,
-                            targetAccountId,
-                            isExcluded,
-                        )
-                    }.executeAsList()
+                        AccountRowMapper::mapRaw,
+                    ).executeAsList()
                     // Reverse to get correct display order (newest first)
                     .reversed()
 
@@ -304,37 +246,8 @@ class TransactionRepositoryImpl(
                         accountId = accountId.id,
                         limit = pageSize.toLong(),
                         offset = offset,
-                    ) {
-                        id,
-                        timestamp,
-                        description,
-                        accountId,
-                        transactionAmount,
-                        runningBalance,
-                        currencyId,
-                        currencyCode,
-                        currencyName,
-                        currencyScaleFactor,
-                        sourceAccountId,
-                        targetAccountId,
-                        isExcluded,
-                        ->
-                        AccountRowMapper.mapRaw(
-                            id,
-                            timestamp,
-                            description,
-                            accountId,
-                            transactionAmount,
-                            runningBalance,
-                            currencyId,
-                            currencyCode,
-                            currencyName,
-                            currencyScaleFactor,
-                            sourceAccountId,
-                            targetAccountId,
-                            isExcluded,
-                        )
-                    }.executeAsList()
+                        mapper = AccountRowMapper::mapRaw,
+                    ).executeAsList()
 
             // Find the target transaction's index within the loaded page
             val targetIndex =
