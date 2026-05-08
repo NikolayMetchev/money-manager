@@ -9,6 +9,9 @@ plugins:
 profile:
   path: .qodana/profile.xml
 exclude:
+  - name: UnusedSymbol
+    paths:
+      - app/di/core/src
   - name: KotlinNoActualForExpect
   - name: XmlHighlighting
   - name: FunctionName
