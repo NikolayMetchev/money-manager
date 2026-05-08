@@ -86,7 +86,6 @@ Use Mokkery mocks for isolated testing:
 ```kotlin
 val repository = mock<MyRepository>(MockMode.autoUnit) {
     every { getData() } returns flowOf(emptyList())
-    everySuspend { create(any()) } returns Unit
 }
 ```
 
