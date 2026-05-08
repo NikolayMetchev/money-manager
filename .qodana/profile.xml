@@ -1,10 +1,7 @@
 <component name="InspectionProjectProfileManager">
   <profile version="1.0">
     <option name="myName" value="Money Manager"/>
-    <inspection_tool class="FunctionNamingConvention" enabled="true" level="WARNING" enabled_by_default="true">
-      <option name="exclusionAnnotations" value="Composable,androidx.compose.runtime.Composable" />
-    </inspection_tool>
-    <inspection_tool class="ConstantConditionIf" enabled="true" level="ERROR" enabled_by_default="true"/>
+<inspection_tool class="ConstantConditionIf" enabled="true" level="ERROR" enabled_by_default="true"/>
     <inspection_tool class="ControlFlowWithEmptyBody" enabled="true" level="ERROR" enabled_by_default="true"/>
     <inspection_tool class="FunctionWithLambdaExpressionBody" enabled="true" level="ERROR" enabled_by_default="true"/>
     <inspection_tool class="RedundantConstructorKeyword" enabled="true" level="ERROR" enabled_by_default="true"/>

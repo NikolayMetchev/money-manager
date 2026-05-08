@@ -12,6 +12,11 @@ profile:
 exclude:
   - name: KotlinNoActualForExpect
   - name: XmlHighlighting
+  - name: FunctionName
+    paths:
+      - app/ui/core/src
+      - app/main/jvm/src
+      - app/main/android/src
   - name: All
     paths:
       - build
