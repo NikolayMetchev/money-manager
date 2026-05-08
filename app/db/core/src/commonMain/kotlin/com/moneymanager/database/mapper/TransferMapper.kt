@@ -14,31 +14,31 @@ object TransferMapper {
     @Suppress("LongParameterList")
     fun mapRaw(
         id: Long,
-        revision_id: Long,
+        revisionId: Long,
         timestamp: Long,
         description: String,
-        source_account_id: Long,
-        target_account_id: Long,
+        sourceAccountId: Long,
+        targetAccountId: Long,
         amount: Long,
-        currency_id: Long,
-        currency_code: String,
-        currency_name: String,
-        currency_scale_factor: Long,
+        currencyId: Long,
+        currencyCode: String,
+        currencyName: String,
+        currencyScaleFactor: Long,
     ): Transfer {
         val currency =
             Currency(
-                id = CurrencyId(currency_id),
-                code = currency_code,
-                name = currency_name,
-                scaleFactor = currency_scale_factor,
+                id = CurrencyId(currencyId),
+                code = currencyCode,
+                name = currencyName,
+                scaleFactor = currencyScaleFactor,
             )
         return Transfer(
             id = TransferId(id),
-            revisionId = revision_id,
+            revisionId = revisionId,
             timestamp = fromEpochMilliseconds(timestamp),
             description = description,
-            sourceAccountId = AccountId(source_account_id),
-            targetAccountId = AccountId(target_account_id),
+            sourceAccountId = AccountId(sourceAccountId),
+            targetAccountId = AccountId(targetAccountId),
             amount = Money(amount, currency),
             attributes = emptyList(),
         )
