@@ -9,6 +9,7 @@ import com.moneymanager.domain.model.SourceType
 import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.createApiClient
 import com.moneymanager.test.database.DbTest
+import com.moneymanager.ui.api.discoverApiCounterpartiesToCreate
 import com.moneymanager.ui.api.downloadApiSessionAccounts
 import com.moneymanager.ui.api.downloadApiSessionTransactions
 import com.moneymanager.ui.api.importApiSessionTransactions
@@ -222,6 +223,38 @@ private val TRANSACTIONS_WITH_ATM_WITHDRAWALS_FOLLOW_UP_JSON =
       "merchant": null,
       "counterparty": {},
       "metadata": { "mcc": "6011" }
+    }
+  ]
+}
+    """.trimIndent()
+
+private val TRANSACTIONS_WITH_ATM_AND_COUNTERPARTY_IDS_JSON =
+    """
+{
+  "transactions": [
+    {
+      "id": "tx_00009TEST000000000050",
+      "account_id": "$ACCOUNT_ID",
+      "created": "2024-06-06T09:15:00.000Z",
+      "amount": -20000,
+      "currency": "GBP",
+      "description": "BARCLAYS ATM LONDON",
+      "category": "cash",
+      "merchant": null,
+      "counterparty": { "id": "atm_barclays_001" },
+      "atm_fees_detailed": { "fee_amount": 0, "withdrawal_amount": -20000, "withdrawal_currency": "GBP" }
+    },
+    {
+      "id": "tx_00009TEST000000000051",
+      "account_id": "$ACCOUNT_ID",
+      "created": "2024-06-07T10:00:00.000Z",
+      "amount": -10000,
+      "currency": "GBP",
+      "description": "NATWEST ATM MANCHESTER",
+      "category": "cash",
+      "merchant": null,
+      "counterparty": { "id": "atm_natwest_001" },
+      "labels": ["withdrawal.atm.domestic-eea"]
     }
   ]
 }
@@ -757,6 +790,108 @@ class MonzoImportE2ETest : DbTest() {
                     .first()
                     .single { it.attributeType.name == "counterparty.id" }
             assertEquals("bank:041307:29900313", counterpartyAttribute.value)
+        }
+
+    @Test
+    fun `atm withdrawals with counterparty ids consolidate into one account and are excluded from discovery`() =
+        runTest {
+            val deviceId =
+                repositories.deviceRepository.getOrCreateDevice(
+                    DeviceInfo.Jvm("test-machine", "Test OS"),
+                )
+            val strategy =
+                repositories.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .single()
+                    .let { strategy ->
+                        strategy.copy(
+                            transactionMappings =
+                                strategy.transactionMappings.copy(
+                                    counterpartyIdField = "counterparty.id",
+                                ),
+                        )
+                    }
+            val sessionId =
+                repositories.apiSessionRepository.createSession(
+                    token = "test-monzo-token",
+                    deviceId = deviceId,
+                    createdAt = Instant.fromEpochMilliseconds(1_700_000_000_000L),
+                    expiresAt = null,
+                )
+            val mockEngine =
+                MockEngine { request ->
+                    val url = request.url.toString()
+                    val json =
+                        when {
+                            url.contains("/accounts") -> ACCOUNTS_JSON
+                            url.contains("/transactions") && !url.contains("before=") ->
+                                TRANSACTIONS_WITH_ATM_AND_COUNTERPARTY_IDS_JSON
+                            url.contains("/transactions") && url.contains("before=") -> EMPTY_TRANSACTIONS_JSON
+                            else -> error("Unexpected request: $url")
+                        }
+                    respond(
+                        content = json,
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                    )
+                }
+            val apiClient =
+                createApiClient(
+                    trafficRecorder = ApiSessionTrafficRecorder(sessionId, repositories.apiSessionRepository),
+                    engine = mockEngine,
+                )
+
+            downloadApiSessionAccounts(
+                token = "test-monzo-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+            downloadApiSessionTransactions(
+                token = "test-monzo-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+
+            val suggestions =
+                discoverApiCounterpartiesToCreate(
+                    apiSessionRepository = repositories.apiSessionRepository,
+                    accountRepository = repositories.accountRepository,
+                    accountAttributeRepository = repositories.accountAttributeRepository,
+                    sessionId = sessionId,
+                    strategy = strategy,
+                )
+            assertEquals(0, suggestions.size, "ATM counterpartyIds must not appear in counterparty discovery")
+
+            importApiSessionTransactions(
+                apiSessionRepository = repositories.apiSessionRepository,
+                accountRepository = repositories.accountRepository,
+                currencyRepository = repositories.currencyRepository,
+                transactionRepository = repositories.transactionRepository,
+                transferSourceQueries = transferSourceQueries,
+                entitySourceQueries = repositories.entitySourceQueries,
+                personRepository = repositories.personRepository,
+                personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
+                attributeTypeRepository = repositories.attributeTypeRepository,
+                accountAttributeRepository = repositories.accountAttributeRepository,
+                deviceId = deviceId,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+
+            val allAccounts = repositories.accountRepository.getAllAccounts().first()
+            val atmAccounts =
+                allAccounts.filter { account ->
+                    repositories.accountAttributeRepository
+                        .getByAccount(account.id)
+                        .first()
+                        .any { it.attributeType.name == "built-in type" && it.value == "ATM" }
+                }
+            assertEquals(1, atmAccounts.size, "All ATM withdrawals must consolidate into one built-in ATM account")
         }
 
     @Test

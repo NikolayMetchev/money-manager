@@ -485,7 +485,7 @@ private suspend fun precreateCounterparties(
                     val counterpartyId =
                         item.rawJson?.resolveCounterpartyIdentity(counterpartyIdField)
                             ?: return@mapNotNull null
-                    val downloadedName = item.counterpartyName(nameMappings)
+                    val downloadedName = item.cleanCounterpartyName(nameMappings) ?: item.counterpartyName(nameMappings)
                     CounterpartyImportCandidate(
                         counterpartyId = counterpartyId,
                         downloadedName = downloadedName,
@@ -518,15 +518,24 @@ private fun collectCounterpartiesFromResponses(
     responses
         .flatMap { response ->
             parseTransactionsWithPath(response.json, strategy).mapNotNull { item ->
+                // Skip transactions handled by built-in type logic — their counterpartyId is
+                // irrelevant because they all route to a single built-in account.
+                if (item.rawJson?.resolveBuiltInCounterpartyType(item.amountMinorUnits) != null) {
+                    return@mapNotNull null
+                }
                 val counterpartyId =
                     item.rawJson?.resolveCounterpartyIdentity(counterpartyIdField)
                         ?: return@mapNotNull null
-                counterpartyId to item.counterpartyName(nameMappings)
+                // Use only the proper name (merchant/counterparty name field), not the
+                // description fallback. Description-based names are per-transaction references
+                // that would corrupt the name suggestion when the same counterpartyId appears
+                // in transactions with and without a proper name.
+                counterpartyId to item.cleanCounterpartyName(nameMappings)
             }
         }.groupBy(
             keySelector = { it.first },
             valueTransform = { it.second },
-        )
+        ).mapValues { (_, names) -> names.filterNotNull() }
 
 private suspend fun loadCounterpartyIdIndex(
     accountRepository: AccountRepository,
@@ -1184,17 +1193,20 @@ private class AccountCache(
     ): AccountId =
         mutex.withLock {
             if (builtInType != null) {
+                // Built-in type transactions all share one account; counterpartyId is ignored so
+                // that ATM withdrawals from different locations always consolidate into one account.
                 builtInTypeIndex[builtInType]?.let { return@withLock it }
+                val normalizedName = name.ifBlank { "Unknown" }
+                val accountId = loadAccounts()[normalizedName]?.id ?: createAccount(null, normalizedName, apiSource)
+                builtInTypeIndex[builtInType] = accountId
+                pendingBuiltInTypeAttributes.add(accountId to builtInType)
+                return@withLock accountId
             }
             if (counterpartyId != null) {
                 counterpartyIdIndex[counterpartyId]?.let { return@withLock it }
             }
             val normalizedName = name.ifBlank { "Unknown" }
             val accountId = loadAccounts()[normalizedName]?.id ?: createAccount(null, normalizedName, apiSource)
-            if (builtInType != null) {
-                builtInTypeIndex[builtInType] = accountId
-                pendingBuiltInTypeAttributes.add(accountId to builtInType)
-            }
             if (counterpartyId != null) {
                 counterpartyIdIndex[counterpartyId] = accountId
                 pendingCounterpartyAttributes.add(accountId to counterpartyId)
@@ -1264,6 +1276,16 @@ private class CurrencyCache(
 private fun ApiImportAccount.displayName(strategy: ApiImportStrategy): String = strategy.accountNamePrefix + description.ifBlank { id }
 
 private fun ApiTransactionPageItem.counterpartyName(nameMappings: CounterpartyNameMappings): String =
+    cleanCounterpartyName(nameMappings) ?: description.ifBlank { "Unknown" }
+
+/**
+ * Returns the counterparty's proper name (merchant or counterparty field), or null if no
+ * configured name field has a value. Unlike [counterpartyName], this never falls back to the
+ * transaction description, so it is safe to use when building name suggestions for the
+ * counterparty-confirmation dialog — description-based fallbacks are often per-transaction
+ * references that should not be used as account names.
+ */
+private fun ApiTransactionPageItem.cleanCounterpartyName(nameMappings: CounterpartyNameMappings): String? =
     rawJson?.let { rawJson ->
         nameMappings.merchantNameField
             ?.let { rawJson.resolveJsonPath(it) }
@@ -1273,7 +1295,6 @@ private fun ApiTransactionPageItem.counterpartyName(nameMappings: CounterpartyNa
                 ?.takeIf { it.isNotBlank() }
     } ?: merchantName?.takeIf { it.isNotBlank() }
         ?: counterpartyName?.takeIf { it.isNotBlank() }
-        ?: description.ifBlank { "Unknown" }
 
 private fun ApiTransactionPageItem.toTransfer(
     ownAccountId: AccountId,

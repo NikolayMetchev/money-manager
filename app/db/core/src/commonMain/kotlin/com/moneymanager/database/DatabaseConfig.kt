@@ -749,6 +749,7 @@ object DatabaseConfig {
                     ApiTransactionMappings(
                         merchantNameField = "merchant.name",
                         counterpartyNameField = "counterparty.name",
+                        counterpartyIdField = "counterparty.id",
                         declineReasonField = "decline_reason",
                     ),
                 accountNamePrefix = "Monzo: ",
