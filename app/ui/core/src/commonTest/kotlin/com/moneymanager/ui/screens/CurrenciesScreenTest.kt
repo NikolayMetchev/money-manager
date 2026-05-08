@@ -19,8 +19,13 @@ import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
+import dev.mokkery.MockMode
+import dev.mokkery.answering.returns
+import dev.mokkery.every
+import dev.mokkery.everySuspend
+import dev.mokkery.matcher.any
+import dev.mokkery.mock
+import kotlinx.coroutines.flow.flowOf
 import kotlin.test.Test
 
 @OptIn(ExperimentalTestApi::class)
@@ -28,41 +33,18 @@ class CurrenciesScreenTest {
     private val testDeviceId = DeviceId(1L)
     private val stubEntitySourceQueries = createStubEntitySourceQueries()
 
-    private class FakeCurrencyRepository(
-        private val currencies: List<Currency>,
-    ) : CurrencyRepository {
-        private val currenciesFlow = MutableStateFlow(currencies)
-
-        override fun getAllCurrencies(): Flow<List<Currency>> = currenciesFlow
-
-        override fun getCurrencyById(id: CurrencyId): Flow<Currency?> {
-            TODO("Not needed for this test")
+    private fun createCurrencyRepository(currencies: List<Currency>): CurrencyRepository =
+        mock<CurrencyRepository>(MockMode.autoUnit) {
+            every { getAllCurrencies() } returns flowOf(currencies)
+            every { getCurrencyById(any()) } returns flowOf(null)
+            every { getCurrencyByCode(any()) } returns flowOf(null)
+            everySuspend { upsertCurrencyByCode(any(), any()) } returns CurrencyId(999L)
         }
-
-        override fun getCurrencyByCode(code: String): Flow<Currency?> {
-            TODO("Not needed for this test")
-        }
-
-        override suspend fun upsertCurrencyByCode(
-            code: String,
-            name: String,
-        ): CurrencyId {
-            TODO("Not needed for this test")
-        }
-
-        override suspend fun updateCurrency(currency: Currency) {
-            TODO("Not needed for this test")
-        }
-
-        override suspend fun deleteCurrency(id: CurrencyId) {
-            TODO("Not needed for this test")
-        }
-    }
 
     @Test
     fun currenciesScreen_displaysEmptyState_whenNoCurrencies() =
         runMoneyManagerComposeUiTest {
-            val repository = FakeCurrencyRepository(emptyList())
+            val repository = createCurrencyRepository(emptyList())
 
             setContent {
                 ProvideSchemaAwareScope {
@@ -86,7 +68,7 @@ class CurrenciesScreenTest {
                     code = "USD",
                     name = "US Dollar",
                 )
-            val repository = FakeCurrencyRepository(listOf(testCurrency))
+            val repository = createCurrencyRepository(listOf(testCurrency))
 
             setContent {
                 ProvideSchemaAwareScope {
@@ -111,7 +93,7 @@ class CurrenciesScreenTest {
                     Currency(id = CurrencyId(2L), code = "EUR", name = "Euro"),
                     Currency(id = CurrencyId(3L), code = "GBP", name = "British Pound"),
                 )
-            val repository = FakeCurrencyRepository(currencies)
+            val repository = createCurrencyRepository(currencies)
 
             setContent {
                 ProvideSchemaAwareScope {
@@ -134,7 +116,7 @@ class CurrenciesScreenTest {
     @Test
     fun currenciesScreen_opensCreateDialog_whenFabClicked() =
         runMoneyManagerComposeUiTest {
-            val repository = FakeCurrencyRepository(emptyList())
+            val repository = createCurrencyRepository(emptyList())
 
             setContent {
                 ProvideSchemaAwareScope {
@@ -154,7 +136,7 @@ class CurrenciesScreenTest {
     @Test
     fun createCurrencyDialog_showsValidationError_whenCodeIsEmpty() =
         runMoneyManagerComposeUiTest {
-            val repository = FakeCurrencyRepository(emptyList())
+            val repository = createCurrencyRepository(emptyList())
 
             setContent {
                 ProvideSchemaAwareScope {

@@ -11,22 +11,35 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import com.moneymanager.domain.model.Category
-import com.moneymanager.domain.model.CategoryBalance
-import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
-import kotlinx.coroutines.flow.Flow
+import dev.mokkery.MockMode
+import dev.mokkery.answering.calls
+import dev.mokkery.answering.returns
+import dev.mokkery.every
+import dev.mokkery.everySuspend
+import dev.mokkery.matcher.any
+import dev.mokkery.matcher.matches
+import dev.mokkery.mock
+import dev.mokkery.verify.VerifyMode
+import dev.mokkery.verifySuspend
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlin.test.Test
-import kotlin.test.assertEquals
 
 @OptIn(ExperimentalTestApi::class)
 class CategoriesScreenTest {
-    private val fakeCurrencyRepository = FakeCurrencyRepository()
+    private val fakeCurrencyRepository: CurrencyRepository =
+        mock(MockMode.autoUnit) {
+            every { getAllCurrencies() } returns flowOf(emptyList())
+            every { getCurrencyById(any()) } returns flowOf(null)
+            every { getCurrencyByCode(any()) } returns flowOf(null)
+            everySuspend { upsertCurrencyByCode(any(), any()) } returns CurrencyId(1L)
+        }
 
     // region Display Tests
 
@@ -34,7 +47,7 @@ class CategoriesScreenTest {
     fun categoriesScreen_displaysEmptyState_whenNoCategories() =
         runMoneyManagerComposeUiTest {
             // Given
-            val repository = FakeCategoryRepository(emptyList())
+            val repository = createCategoryRepository(emptyList())
 
             // When
             setContent {
@@ -60,7 +73,7 @@ class CategoriesScreenTest {
                     Category(id = 1L, name = "Food"),
                     Category(id = 2L, name = "Transport"),
                 )
-            val repository = FakeCategoryRepository(categories)
+            val repository = createCategoryRepository(categories)
 
             // When
             setContent {
@@ -81,7 +94,7 @@ class CategoriesScreenTest {
     fun categoriesScreen_displaysAddCategoryButton() =
         runMoneyManagerComposeUiTest {
             // Given
-            val repository = FakeCategoryRepository(emptyList())
+            val repository = createCategoryRepository(emptyList())
 
             // When
             setContent {
@@ -106,7 +119,7 @@ class CategoriesScreenTest {
                     Category(id = Category.UNCATEGORIZED_ID, name = "Uncategorized"),
                     Category(id = 1L, name = "Food"),
                 )
-            val repository = FakeCategoryRepository(categories)
+            val repository = createCategoryRepository(categories)
 
             // When
             setContent {
@@ -133,7 +146,7 @@ class CategoriesScreenTest {
                     Category(id = 2L, name = "Groceries", parentId = 1L),
                     Category(id = 3L, name = "Restaurants", parentId = 1L),
                 )
-            val repository = FakeCategoryRepository(categories)
+            val repository = createCategoryRepository(categories)
 
             // When
             setContent {
@@ -158,7 +171,7 @@ class CategoriesScreenTest {
                     Category(id = 1L, name = "Food"),
                     Category(id = 2L, name = "Groceries", parentId = 1L),
                 )
-            val repository = FakeCategoryRepository(categories)
+            val repository = createCategoryRepository(categories)
 
             // When
             setContent {
@@ -188,7 +201,7 @@ class CategoriesScreenTest {
     fun categoriesScreen_opensCreateDialog_whenAddCategoryClicked() =
         runMoneyManagerComposeUiTest {
             // Given
-            val repository = FakeCategoryRepository(emptyList())
+            val repository = createCategoryRepository(emptyList())
 
             // When
             setContent {
@@ -212,7 +225,7 @@ class CategoriesScreenTest {
     fun createCategoryDialog_validatesRequiredFields() =
         runMoneyManagerComposeUiTest {
             // Given
-            val repository = FakeCategoryRepository(emptyList())
+            val repository = createCategoryRepository(emptyList())
 
             // When
             setContent {
@@ -238,7 +251,7 @@ class CategoriesScreenTest {
     fun createCategoryDialog_canBeDismissed() =
         runMoneyManagerComposeUiTest {
             // Given
-            val repository = FakeCategoryRepository(emptyList())
+            val repository = createCategoryRepository(emptyList())
 
             // When
             setContent {
@@ -265,7 +278,7 @@ class CategoriesScreenTest {
     fun createCategoryDialog_createsCategory_whenValidInput() =
         runMoneyManagerComposeUiTest {
             // Given
-            val repository = FakeCategoryRepository(emptyList())
+            val repository = createCategoryRepository(emptyList())
 
             // When
             setContent {
@@ -289,8 +302,7 @@ class CategoriesScreenTest {
 
             // Then - dialog should be dismissed and category created
             onNodeWithText("Create New Category").assertDoesNotExist()
-            assertEquals(1, repository.createdCategories.size)
-            assertEquals("Entertainment", repository.createdCategories.first().name)
+            verifySuspend { repository.createCategory(matches { it.name == "Entertainment" }) }
         }
 
     @Test
@@ -303,7 +315,7 @@ class CategoriesScreenTest {
                     Category(id = 1L, name = "Food"),
                     Category(id = 2L, name = "Transport"),
                 )
-            val repository = FakeCategoryRepository(categories)
+            val repository = createCategoryRepository(categories)
 
             // When
             setContent {
@@ -339,7 +351,7 @@ class CategoriesScreenTest {
                 listOf(
                     Category(id = 1L, name = "Food"),
                 )
-            val repository = FakeCategoryRepository(categories)
+            val repository = createCategoryRepository(categories)
 
             // When
             setContent {
@@ -366,7 +378,7 @@ class CategoriesScreenTest {
                 listOf(
                     Category(id = 1L, name = "Food"),
                 )
-            val repository = FakeCategoryRepository(categories)
+            val repository = createCategoryRepository(categories)
 
             // When
             setContent {
@@ -390,8 +402,7 @@ class CategoriesScreenTest {
 
             // Then - dialog should be dismissed
             onNodeWithText("Edit Category").assertDoesNotExist()
-            assertEquals(1, repository.updatedCategories.size)
-            assertEquals("Food", repository.updatedCategories.first().name)
+            verifySuspend { repository.updateCategory(matches { it.name == "Food" }) }
         }
 
     @Test
@@ -402,7 +413,7 @@ class CategoriesScreenTest {
                 listOf(
                     Category(id = 1L, name = "Food"),
                 )
-            val repository = FakeCategoryRepository(categories)
+            val repository = createCategoryRepository(categories)
 
             // When
             setContent {
@@ -434,7 +445,7 @@ class CategoriesScreenTest {
                 listOf(
                     Category(id = 1L, name = "Food"),
                 )
-            val repository = FakeCategoryRepository(categories)
+            val repository = createCategoryRepository(categories)
 
             // When
             setContent {
@@ -465,7 +476,7 @@ class CategoriesScreenTest {
                 listOf(
                     Category(id = 1L, name = "Food"),
                 )
-            val repository = FakeCategoryRepository(categories)
+            val repository = createCategoryRepository(categories)
 
             // When
             setContent {
@@ -492,7 +503,7 @@ class CategoriesScreenTest {
                 listOf(
                     Category(id = 1L, name = "Food"),
                 )
-            val repository = FakeCategoryRepository(categories)
+            val repository = createCategoryRepository(categories)
 
             // When
             setContent {
@@ -523,7 +534,7 @@ class CategoriesScreenTest {
                 listOf(
                     Category(id = 1L, name = "Food"),
                 )
-            val repository = FakeCategoryRepository(categories)
+            val repository = createCategoryRepository(categories)
 
             // When
             setContent {
@@ -546,8 +557,7 @@ class CategoriesScreenTest {
             waitForIdle()
 
             // Then
-            assertEquals(1, repository.deletedCategoryIds.size)
-            assertEquals(1L, repository.deletedCategoryIds.first())
+            verifySuspend { repository.deleteCategory(1L) }
         }
 
     @Test
@@ -558,7 +568,7 @@ class CategoriesScreenTest {
                 listOf(
                     Category(id = 1L, name = "Food"),
                 )
-            val repository = FakeCategoryRepository(categories)
+            val repository = createCategoryRepository(categories)
 
             // When
             setContent {
@@ -584,7 +594,7 @@ class CategoriesScreenTest {
             // Then - confirmation dialog should be dismissed
             onNodeWithText("Delete Category?").assertDoesNotExist()
             // Verify no deletion occurred
-            assertEquals(0, repository.deletedCategoryIds.size)
+            verifySuspend(VerifyMode.not) { repository.deleteCategory(any()) }
         }
 
     // endregion
@@ -599,7 +609,7 @@ class CategoriesScreenTest {
                 listOf(
                     Category(id = Category.UNCATEGORIZED_ID, name = "Uncategorized"),
                 )
-            val repository = FakeCategoryRepository(categories)
+            val repository = createCategoryRepository(categories)
 
             // When
             setContent {
@@ -625,7 +635,7 @@ class CategoriesScreenTest {
                     Category(id = Category.UNCATEGORIZED_ID, name = "Uncategorized"),
                     Category(id = 1L, name = "Food"),
                 )
-            val repository = FakeCategoryRepository(categories)
+            val repository = createCategoryRepository(categories)
 
             // When
             setContent {
@@ -657,7 +667,7 @@ class CategoriesScreenTest {
                     Category(id = 1L, name = "Food"),
                     Category(id = 2L, name = "Transport"),
                 )
-            val repository = FakeCategoryRepository(categories)
+            val repository = createCategoryRepository(categories)
 
             // When
             setContent {
@@ -691,7 +701,7 @@ class CategoriesScreenTest {
                     Category(id = 3L, name = "Organic", parentId = 2L),
                     Category(id = 4L, name = "Transport"),
                 )
-            val repository = FakeCategoryRepository(categories)
+            val repository = createCategoryRepository(categories)
 
             // When
             setContent {
@@ -722,7 +732,7 @@ class CategoriesScreenTest {
                     Category(id = 1L, name = "Food"),
                     Category(id = 2L, name = "Groceries"),
                 )
-            val repository = FakeCategoryRepository(categories)
+            val repository = createCategoryRepository(categories)
 
             // When
             setContent {
@@ -749,8 +759,7 @@ class CategoriesScreenTest {
             waitForIdle()
 
             // Then
-            assertEquals(1, repository.updatedCategories.size)
-            assertEquals(1L, repository.updatedCategories.first().parentId)
+            verifySuspend { repository.updateCategory(matches { it.parentId == 1L }) }
         }
 
     // endregion
@@ -767,7 +776,7 @@ class CategoriesScreenTest {
                     Category(id = 2L, name = "Transport"),
                     Category(id = 3L, name = "Entertainment"),
                 )
-            val repository = FakeCategoryRepository(categories)
+            val repository = createCategoryRepository(categories)
 
             // When
             setContent {
@@ -807,7 +816,7 @@ class CategoriesScreenTest {
                     Category(id = 3L, name = "Entertainment"),
                     Category(id = 4L, name = "Utilities"),
                 )
-            val repository = FakeCategoryRepository(categories)
+            val repository = createCategoryRepository(categories)
 
             // When
             setContent {
@@ -836,7 +845,7 @@ class CategoriesScreenTest {
                     Category(id = 2L, name = "Groceries", parentId = 1L),
                     Category(id = 3L, name = "Organic", parentId = 2L),
                 )
-            val repository = FakeCategoryRepository(categories)
+            val repository = createCategoryRepository(categories)
 
             // When
             setContent {
@@ -865,84 +874,27 @@ class CategoriesScreenTest {
 
     // endregion
 
-    // Fake repository for testing
-    class FakeCategoryRepository(
-        initialCategories: List<Category>,
-    ) : CategoryRepository {
-        private val categoriesFlow = MutableStateFlow(initialCategories)
-        private val categoryBalancesFlow = MutableStateFlow<List<CategoryBalance>>(emptyList())
-
-        val createdCategories = mutableListOf<Category>()
-        val updatedCategories = mutableListOf<Category>()
-        val deletedCategoryIds = mutableListOf<Long>()
-
-        override fun getAllCategories(): Flow<List<Category>> = categoriesFlow
-
-        override fun getCategoryBalances(): Flow<List<CategoryBalance>> = categoryBalancesFlow
-
-        override fun getCategoryById(id: Long): Flow<Category?> = categoriesFlow.map { categories -> categories.find { it.id == id } }
-
-        override fun getTopLevelCategories(): Flow<List<Category>> =
-            categoriesFlow.map { categories -> categories.filter { it.parentId == null } }
-
-        override fun getCategoriesByParent(parentId: Long): Flow<List<Category>> =
-            categoriesFlow.map { categories -> categories.filter { it.parentId == parentId } }
-
-        override suspend fun createCategory(category: Category): Long {
-            val newId = (categoriesFlow.value.maxOfOrNull { it.id } ?: 0L) + 1
-            val newCategory = category.copy(id = newId)
-            createdCategories.add(newCategory)
-            categoriesFlow.value = categoriesFlow.value + newCategory
-            return newId
-        }
-
-        override suspend fun updateCategory(category: Category) {
-            updatedCategories.add(category)
-            categoriesFlow.value =
-                categoriesFlow.value.map {
-                    if (it.id == category.id) category else it
-                }
-        }
-
-        override suspend fun deleteCategory(id: Long) {
-            deletedCategoryIds.add(id)
-            categoriesFlow.value = categoriesFlow.value.filter { it.id != id }
-        }
-    }
-
-    // Fake currency repository for testing
-    class FakeCurrencyRepository : CurrencyRepository {
-        private val currenciesFlow = MutableStateFlow<List<Currency>>(emptyList())
-
-        override fun getAllCurrencies(): Flow<List<Currency>> = currenciesFlow
-
-        override fun getCurrencyById(id: CurrencyId): Flow<Currency?> = currenciesFlow.map { currencies -> currencies.find { it.id == id } }
-
-        override fun getCurrencyByCode(code: String): Flow<Currency?> =
-            currenciesFlow.map { currencies -> currencies.find { it.code == code } }
-
-        override suspend fun upsertCurrencyByCode(
-            code: String,
-            name: String,
-        ): CurrencyId {
-            val existing = currenciesFlow.value.find { it.code == code }
-            if (existing != null) return existing.id
-
-            val newId = CurrencyId((currenciesFlow.value.maxOfOrNull { it.id.id } ?: 0L) + 1L)
-            val newCurrency = Currency(id = newId, code = code, name = name)
-            currenciesFlow.value = currenciesFlow.value + newCurrency
-            return newId
-        }
-
-        override suspend fun updateCurrency(currency: Currency) {
-            currenciesFlow.value =
-                currenciesFlow.value.map {
-                    if (it.id == currency.id) currency else it
-                }
-        }
-
-        override suspend fun deleteCurrency(id: CurrencyId) {
-            currenciesFlow.value = currenciesFlow.value.filter { it.id != id }
+    private fun createCategoryRepository(initialCategories: List<Category>): CategoryRepository {
+        val flow = MutableStateFlow(initialCategories)
+        return mock(MockMode.autoUnit) {
+            every { getAllCategories() } returns flow
+            every { getCategoryBalances() } returns flowOf(emptyList())
+            every { getCategoryById(any()) } calls { (id: Long) -> flow.map { cats -> cats.find { it.id == id } } }
+            every { getTopLevelCategories() } returns flow.map { cats -> cats.filter { it.parentId == null } }
+            every { getCategoriesByParent(any()) } calls
+                { (parentId: Long) -> flow.map { cats -> cats.filter { it.parentId == parentId } } }
+            everySuspend { createCategory(any()) } calls { (cat: Category) ->
+                val newId = (flow.value.maxOfOrNull { it.id } ?: 0L) + 1
+                val newCat = cat.copy(id = newId)
+                flow.value += newCat
+                newId
+            }
+            everySuspend { updateCategory(any()) } calls { (cat: Category) ->
+                flow.value = flow.value.map { if (it.id == cat.id) cat else it }
+            }
+            everySuspend { deleteCategory(any()) } calls { (id: Long) ->
+                flow.value = flow.value.filter { it.id != id }
+            }
         }
     }
 }

@@ -1,6 +1,7 @@
 plugins {
     id("moneymanager.compose-multiplatform-convention")
     alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.mokkery)
 }
 
 kotlin {
@@ -32,6 +33,7 @@ kotlin {
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)
                 implementation(libs.ktor.client.mock)
+                implementation(libs.mokkery.runtime)
                 implementation(projects.test.app.db)
             }
         }
@@ -94,6 +96,7 @@ kotlin {
                 implementation(compose.desktop.currentOs)
                 implementation(libs.androidx.compose.runtime.desktop)
                 implementation(libs.compose.ui.test.desktop)
+                implementation(libs.mokkery.core)
                 implementation(libs.sqldelight.runtime)
                 implementation(projects.app.di.core)
             }
@@ -107,6 +110,7 @@ kotlin {
                 implementation(libs.androidx.compose.ui.test)
                 implementation(libs.kotlinx.coroutines.test)
                 implementation(libs.ktor.client.mock)
+                implementation(libs.mokkery.core)
                 implementation(libs.sqldelight.runtime)
                 implementation(projects.app.di.core)
                 implementation(projects.test.app.db)
@@ -120,6 +124,7 @@ kotlin {
                 implementation(libs.androidx.compose.runtime)
                 implementation(libs.androidx.compose.ui.test)
                 implementation(libs.kotlinx.coroutines.test)
+                implementation(libs.mokkery.core)
                 implementation(libs.sqldelight.runtime)
                 implementation(projects.app.di.core)
                 implementation(projects.test.app.db)
