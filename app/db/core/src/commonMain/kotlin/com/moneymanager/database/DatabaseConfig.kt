@@ -737,26 +737,14 @@ object DatabaseConfig {
                             listOf(
                                 ApiQueryParam(name = "account_id", dynamicSource = "account.id"),
                             ),
-                        pagination =
-                            ApiPaginationConfig(
-                                limitParam = "limit",
-                                limitValue = 100,
-                                cursorParam = "before",
-                                cursorResponseField = "created",
-                            ),
+                        pagination = ApiPaginationConfig(),
                     ),
                 accountMappings =
                     ApiAccountMappings(
-                        idField = "id",
-                        descriptionField = "description",
                         ownerNameField = "preferred_name",
                     ),
                 transactionMappings =
                     ApiTransactionMappings(
-                        amountField = "amount",
-                        timestampField = "created",
-                        currencyField = "currency",
-                        descriptionField = "description",
                         merchantNameField = "merchant.name",
                         counterpartyNameField = "counterparty.name",
                         declineReasonField = "decline_reason",

@@ -169,7 +169,7 @@ suspend fun downloadApiSessionTransactions(
                     parseTransactionsWithPath(response.body, strategy)
                 }
 
-            before = transactions.map { it.created }.minOrNull()
+            before = transactions.minOfOrNull { it.created }
             hasTransactions = transactions.isNotEmpty()
             onProgress(
                 ApiTransactionsDownloadProgress(
@@ -322,46 +322,45 @@ suspend fun importApiSessionTransactions(
         )
     }
 
-    val pageResults =
-        coroutineScope {
-            transactionResponses
-                .map { response ->
-                    async {
-                        val request = requestsById[response.requestId] ?: return@async null
-                        val monzoAccount = monzoAccountsById[request.accountIdParameter(strategy)] ?: return@async null
-                        val monzoAccountId = accountCache.getOrCreateAccountId(monzoAccount.id, monzoAccount.localAccountName(strategy))
-                        val pageResult =
-                            importTransactionPage(
-                                response = response.toApiHttpResponse(),
-                                strategy = strategy,
-                                monzoAccountId = monzoAccountId,
-                                sessionId = sessionId,
-                                deviceId = deviceId,
-                                accountCache = accountCache,
-                                currencyCache = currencyCache,
-                                attributeTypeCache = attributeTypeCache,
-                                customTxFields = customTxFields,
-                                uniqueIdTxFields = uniqueIdTxFields,
-                                counterpartyIdField = counterpartyIdField,
-                                nameMappings = nameMappings,
-                                apiSessionRepository = apiSessionRepository,
-                                transactionRepository = transactionRepository,
-                                transferSourceQueries = transferSourceQueries,
-                            )
-                        val progressMessage =
-                            progressMutex.withLock {
-                                totalImported += pageResult.importedCount
-                                totalDuplicates += pageResult.duplicateCount
-                                totalErrors += pageResult.errorCount
-                                totalExcluded += pageResult.excludedCount
-                                ++completedCount
-                                progressMessage()
-                            }
-                        onProgress(progressMessage)
-                        pageResult
-                    }
-                }.awaitAll()
-        }
+    coroutineScope {
+        transactionResponses
+            .map { response ->
+                async {
+                    val request = requestsById[response.requestId] ?: return@async null
+                    val monzoAccount = monzoAccountsById[request.accountIdParameter(strategy)] ?: return@async null
+                    val monzoAccountId = accountCache.getOrCreateAccountId(monzoAccount.id, monzoAccount.localAccountName(strategy))
+                    val pageResult =
+                        importTransactionPage(
+                            response = response.toApiHttpResponse(),
+                            strategy = strategy,
+                            monzoAccountId = monzoAccountId,
+                            sessionId = sessionId,
+                            deviceId = deviceId,
+                            accountCache = accountCache,
+                            currencyCache = currencyCache,
+                            attributeTypeCache = attributeTypeCache,
+                            customTxFields = customTxFields,
+                            uniqueIdTxFields = uniqueIdTxFields,
+                            counterpartyIdField = counterpartyIdField,
+                            nameMappings = nameMappings,
+                            apiSessionRepository = apiSessionRepository,
+                            transactionRepository = transactionRepository,
+                            transferSourceQueries = transferSourceQueries,
+                        )
+                    val progressMessage =
+                        progressMutex.withLock {
+                            totalImported += pageResult.importedCount
+                            totalDuplicates += pageResult.duplicateCount
+                            totalErrors += pageResult.errorCount
+                            totalExcluded += pageResult.excludedCount
+                            ++completedCount
+                            progressMessage()
+                        }
+                    onProgress(progressMessage)
+                    pageResult
+                }
+            }.awaitAll()
+    }
 
     val totalPeople =
         importPeopleFromAccounts(
@@ -481,7 +480,7 @@ private suspend fun precreateCounterparties(
             counterpartyAccountNames[counterpartyId]
                 ?.trim()
                 ?.takeIf { it.isNotBlank() }
-                ?: strategy.counterpartyPrefix + suggestCounterpartyName(candidates.map { it.downloadedName })
+                ?: (strategy.counterpartyPrefix + suggestCounterpartyName(candidates.map { it.downloadedName }))
         accountCache.getOrCreateCounterpartyAccountId(
             counterpartyId = counterpartyId,
             name = accountName,
@@ -807,7 +806,7 @@ private suspend fun importTransactionPage(
             transactions.zip(states).count { (item, state) ->
                 state == ApiResponseTransactionState.IMPORTED && !item.declineReason.isNullOrBlank()
             },
-        before = transactions.map { it.created }.minOrNull(),
+        before = transactions.minOfOrNull { it.created },
         hasTransactions = transactions.isNotEmpty(),
     )
 }
@@ -1138,7 +1137,7 @@ private class AccountCache(
         val now = Clock.System.now()
         val newId =
             accountRepository.createAccount(
-                Account(id = AccountId(0L), name = normalizedName, openingDate = now, categoryId = Category.UNCATEGORIZED_ID),
+                Account(id = AccountId(0L), name = normalizedName, openingDate = now),
             )
         accountsByName = (accountsByName ?: emptyMap()) + (normalizedName to Account(id = newId, name = normalizedName, openingDate = now))
         onAccountCreated(monzoAccountId != null)
@@ -1239,8 +1238,6 @@ private suspend fun ApiSessionRepository.recordTransactionError(
         errorMessage = message,
     )
 }
-
-private fun JsonObject.jsonObjectOrNull(key: String): JsonObject? = this[key]?.let { element -> element as? JsonObject }
 
 private fun JsonObject.stringOrNull(key: String): String? = this[key]?.jsonPrimitive?.contentOrNull
 
