@@ -330,11 +330,6 @@ suspend fun importApiSessionTransactions(
             counterpartyIdAttrTypeId = counterpartyIdAttrTypeId,
         )
     }
-    flushPendingBuiltInTypeAttributes(
-        accountCache = accountCache,
-        accountAttributeRepository = accountAttributeRepository,
-        builtInTypeAttrTypeId = builtInTypeAttrTypeId,
-    )
 
     coroutineScope {
         transactionResponses
