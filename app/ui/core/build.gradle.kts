@@ -1,6 +1,7 @@
 plugins {
     id("moneymanager.compose-multiplatform-convention")
     alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.mokkery)
 }
 
 kotlin {
@@ -31,6 +32,7 @@ kotlin {
             dependencies {
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)
+                implementation(libs.mokkery.runtime)
                 implementation(libs.ktor.client.mock)
                 implementation(projects.test.app.db)
             }
