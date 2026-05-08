@@ -886,7 +886,7 @@ class CategoriesScreenTest {
             everySuspend { createCategory(any()) } calls { (cat: Category) ->
                 val newId = (flow.value.maxOfOrNull { it.id } ?: 0L) + 1
                 val newCat = cat.copy(id = newId)
-                flow.value = flow.value + newCat
+                flow.value += newCat
                 newId
             }
             everySuspend { updateCategory(any()) } calls { (cat: Category) ->
