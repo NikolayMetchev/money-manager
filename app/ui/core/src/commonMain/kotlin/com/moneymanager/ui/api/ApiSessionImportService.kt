@@ -33,6 +33,7 @@ import kotlin.time.Clock
 import kotlin.time.Instant
 
 private const val COUNTERPARTY_ID_ATTR = "counterparty.id"
+private const val BUILT_IN_TYPE_ATTR = "built-in type"
 
 data class ApiSessionImportResult(
     val accountCount: Int,
@@ -274,6 +275,7 @@ suspend fun importApiSessionTransactions(
     // no two coroutines race to write the same type, which causes SQLITE_BUSY.
     val counterpartyIdAttrTypeId: AttributeTypeId? =
         if (counterpartyIdField != null) attributeTypeCache.getOrCreate(COUNTERPARTY_ID_ATTR) else null
+    val builtInTypeAttrTypeId = attributeTypeCache.getOrCreate(BUILT_IN_TYPE_ATTR)
     for (fieldName in customTxFields.keys) attributeTypeCache.getOrCreate(fieldName)
 
     // Build the counterparty ID index (externalId → AccountId) from existing account attributes
@@ -287,6 +289,11 @@ suspend fun importApiSessionTransactions(
         } else {
             mutableMapOf()
         }
+    val builtInTypeIndex: MutableMap<BuiltInCounterpartyType, AccountId> =
+        loadBuiltInTypeIndex(
+            accountRepository = accountRepository,
+            accountAttributeRepository = accountAttributeRepository,
+        ).toMutableMap()
 
     val accountCache =
         AccountCache(
@@ -295,6 +302,7 @@ suspend fun importApiSessionTransactions(
             deviceId = deviceId,
             accountApiSourceByExternalId = accountApiSourceByExternalId,
             counterpartyIdIndex = counterpartyIdIndex,
+            builtInTypeIndex = builtInTypeIndex,
             onAccountCreated = { isSourceAccount ->
                 val message =
                     progressMutex.withLock {
@@ -322,6 +330,11 @@ suspend fun importApiSessionTransactions(
             counterpartyIdAttrTypeId = counterpartyIdAttrTypeId,
         )
     }
+    flushPendingBuiltInTypeAttributes(
+        accountCache = accountCache,
+        accountAttributeRepository = accountAttributeRepository,
+        builtInTypeAttrTypeId = builtInTypeAttrTypeId,
+    )
 
     coroutineScope {
         transactionResponses
@@ -381,6 +394,11 @@ suspend fun importApiSessionTransactions(
             counterpartyIdAttrTypeId = counterpartyIdAttrTypeId,
         )
     }
+    flushPendingBuiltInTypeAttributes(
+        accountCache = accountCache,
+        accountAttributeRepository = accountAttributeRepository,
+        builtInTypeAttrTypeId = builtInTypeAttrTypeId,
+    )
 
     // Store custom account field values as attributes
     val customAccountFields = strategy.accountMappings.customFields
@@ -484,6 +502,7 @@ private suspend fun precreateCounterparties(
                 ?: (strategy.counterpartyPrefix + suggestCounterpartyName(candidates.map { it.downloadedName }))
         accountCache.getOrCreateCounterpartyAccountId(
             counterpartyId = counterpartyId,
+            builtInType = null,
             name = accountName,
             apiSource = candidates.first().apiSource,
         )
@@ -524,6 +543,23 @@ private suspend fun loadCounterpartyIdIndex(
     return index
 }
 
+private suspend fun loadBuiltInTypeIndex(
+    accountRepository: AccountRepository,
+    accountAttributeRepository: AccountAttributeRepository,
+): Map<BuiltInCounterpartyType, AccountId> {
+    val index = mutableMapOf<BuiltInCounterpartyType, AccountId>()
+    for (account in accountRepository.getAllAccounts().first()) {
+        accountAttributeRepository
+            .getByAccount(account.id)
+            .first()
+            .firstOrNull { it.attributeType.name == BUILT_IN_TYPE_ATTR }
+            ?.let { attribute ->
+                BuiltInCounterpartyType.fromAttributeValue(attribute.value)?.let { index[it] = account.id }
+            }
+    }
+    return index
+}
+
 private suspend fun flushPendingCounterpartyAttributes(
     accountCache: AccountCache,
     accountAttributeRepository: AccountAttributeRepository,
@@ -536,6 +572,26 @@ private suspend fun flushPendingCounterpartyAttributes(
             // runCatching handles the UNIQUE constraint for counterparties already
             // having this attribute from a previous import where index was stale.
             runCatching { accountAttributeRepository.insertInCreationMode(accountId, counterpartyIdAttrTypeId, counterpartyId) }
+        }
+    }
+}
+
+private suspend fun flushPendingBuiltInTypeAttributes(
+    accountCache: AccountCache,
+    accountAttributeRepository: AccountAttributeRepository,
+    builtInTypeAttrTypeId: AttributeTypeId,
+) {
+    val pending = accountCache.drainPendingBuiltInTypeAttributes()
+    val seen = mutableSetOf<BuiltInCounterpartyType>()
+    for ((accountId, builtInType) in pending) {
+        if (seen.add(builtInType)) {
+            runCatching {
+                accountAttributeRepository.insertInCreationMode(
+                    accountId = accountId,
+                    attributeTypeId = builtInTypeAttrTypeId,
+                    value = builtInType.attributeValue,
+                )
+            }
         }
     }
 }
@@ -902,10 +958,14 @@ private suspend fun importValidTransactionItem(
         if (item.amountMinorUnits == 0L) {
             accountCache.getOrCreateAccountId(name = nameMappings.counterpartyPrefix + "Void", transactionApiSource = counterpartyApiSource)
         } else {
+            val builtInCounterpartyType = item.rawJson?.resolveBuiltInCounterpartyType(item.amountMinorUnits)
             val counterpartyId = item.rawJson?.resolveCounterpartyIdentity(counterpartyIdField)
             accountCache.getOrCreateCounterpartyAccountId(
                 counterpartyId = counterpartyId,
-                name = nameMappings.counterpartyPrefix + item.counterpartyName(nameMappings),
+                builtInType = builtInCounterpartyType,
+                name =
+                    nameMappings.counterpartyPrefix +
+                        (builtInCounterpartyType?.defaultCounterpartyName ?: item.counterpartyName(nameMappings)),
                 apiSource = counterpartyApiSource,
             )
         }
@@ -1073,6 +1133,7 @@ private class AccountCache(
     private val accountApiSourceByExternalId: Map<String, AccountApiSource>,
     // Pre-built by the caller in the serial section before concurrent import starts
     private val counterpartyIdIndex: MutableMap<String, AccountId>,
+    private val builtInTypeIndex: MutableMap<BuiltInCounterpartyType, AccountId>,
     private val onAccountCreated: suspend (isSourceAccount: Boolean) -> Unit = {},
 ) {
     private val mutex = Mutex()
@@ -1084,10 +1145,16 @@ private class AccountCache(
      * serial section afterwards to avoid concurrent DB writes that cause SQLITE_BUSY.
      */
     private val pendingCounterpartyAttributes: MutableList<Pair<AccountId, String>> = mutableListOf()
+    private val pendingBuiltInTypeAttributes: MutableList<Pair<AccountId, BuiltInCounterpartyType>> = mutableListOf()
 
     suspend fun drainPendingCounterpartyAttributes(): List<Pair<AccountId, String>> =
         mutex.withLock {
             pendingCounterpartyAttributes.toList().also { pendingCounterpartyAttributes.clear() }
+        }
+
+    suspend fun drainPendingBuiltInTypeAttributes(): List<Pair<AccountId, BuiltInCounterpartyType>> =
+        mutex.withLock {
+            pendingBuiltInTypeAttributes.toList().also { pendingBuiltInTypeAttributes.clear() }
         }
 
     suspend fun getOrCreateAccountId(
@@ -1111,15 +1178,23 @@ private class AccountCache(
      */
     suspend fun getOrCreateCounterpartyAccountId(
         counterpartyId: String?,
+        builtInType: BuiltInCounterpartyType?,
         name: String,
         apiSource: AccountApiSource,
     ): AccountId =
         mutex.withLock {
+            if (builtInType != null) {
+                builtInTypeIndex[builtInType]?.let { return@withLock it }
+            }
             if (counterpartyId != null) {
                 counterpartyIdIndex[counterpartyId]?.let { return@withLock it }
             }
             val normalizedName = name.ifBlank { "Unknown" }
             val accountId = loadAccounts()[normalizedName]?.id ?: createAccount(null, normalizedName, apiSource)
+            if (builtInType != null) {
+                builtInTypeIndex[builtInType] = accountId
+                pendingBuiltInTypeAttributes.add(accountId to builtInType)
+            }
             if (counterpartyId != null) {
                 counterpartyIdIndex[counterpartyId] = accountId
                 pendingCounterpartyAttributes.add(accountId to counterpartyId)
@@ -1292,6 +1367,40 @@ private fun JsonObject.counterpartyObject(counterpartyIdField: String): JsonObje
         current = (current as? JsonObject)?.get(part) ?: return null
     }
     return current as? JsonObject
+}
+
+private enum class BuiltInCounterpartyType(
+    val attributeValue: String,
+    val defaultCounterpartyName: String,
+) {
+    ATM(
+        attributeValue = "ATM",
+        defaultCounterpartyName = "ATM",
+    ),
+    ;
+
+    companion object {
+        fun fromAttributeValue(value: String): BuiltInCounterpartyType? = entries.firstOrNull { it.attributeValue == value }
+    }
+}
+
+private fun JsonObject.resolveBuiltInCounterpartyType(amountMinorUnits: Long): BuiltInCounterpartyType? {
+    if (amountMinorUnits >= 0L) return null
+    if (this["atm_fees_detailed"] is JsonObject) return BuiltInCounterpartyType.ATM
+    if (stringOrNull("category")?.equals("cash", ignoreCase = true) == true) return BuiltInCounterpartyType.ATM
+    val hasAtmLabel =
+        this["labels"]
+            ?.let { it as? JsonArray }
+            ?.any { label ->
+                label
+                    .jsonPrimitive
+                    .contentOrNull
+                    ?.startsWith("withdrawal.atm", ignoreCase = true) == true
+            } == true
+    if (hasAtmLabel) return BuiltInCounterpartyType.ATM
+    val mcc = (this["metadata"] as? JsonObject)?.stringOrNull("mcc")
+    if (mcc == "6011") return BuiltInCounterpartyType.ATM
+    return null
 }
 
 private class AttributeTypeCache(

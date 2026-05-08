@@ -175,6 +175,58 @@ private val TRANSACTIONS_WITH_BANK_COUNTERPARTY_JSON =
 }
     """.trimIndent()
 
+private val TRANSACTIONS_WITH_ATM_WITHDRAWALS_JSON =
+    """
+{
+  "transactions": [
+    {
+      "id": "tx_00009TEST000000000040",
+      "account_id": "$ACCOUNT_ID",
+      "created": "2024-06-06T09:15:00.000Z",
+      "amount": -20000,
+      "currency": "GBP",
+      "description": "3-5 QUEENS ROAD LONDON GBR",
+      "category": "cash",
+      "merchant": null,
+      "counterparty": {},
+      "atm_fees_detailed": { "fee_amount": 0, "withdrawal_amount": -20000, "withdrawal_currency": "GBP" }
+    },
+    {
+      "id": "tx_00009TEST000000000041",
+      "account_id": "$ACCOUNT_ID",
+      "created": "2024-06-07T10:00:00.000Z",
+      "amount": -10000,
+      "currency": "GBP",
+      "description": "123 HIGH STREET LONDON GBR",
+      "category": "cash",
+      "merchant": null,
+      "counterparty": {},
+      "labels": ["withdrawal.atm.domestic-eea"]
+    }
+  ]
+}
+    """.trimIndent()
+
+private val TRANSACTIONS_WITH_ATM_WITHDRAWALS_FOLLOW_UP_JSON =
+    """
+{
+  "transactions": [
+    {
+      "id": "tx_00009TEST000000000042",
+      "account_id": "$ACCOUNT_ID",
+      "created": "2024-06-08T11:00:00.000Z",
+      "amount": -5000,
+      "currency": "GBP",
+      "description": "ATM CASH WITHDRAWAL",
+      "category": "cash",
+      "merchant": null,
+      "counterparty": {},
+      "metadata": { "mcc": "6011" }
+    }
+  ]
+}
+    """.trimIndent()
+
 /**
  * A page that contains only declined transactions — no settled tx at all.
  * Used to verify that an all-declined page does not prematurely stop pagination.
@@ -705,5 +757,121 @@ class MonzoImportE2ETest : DbTest() {
                     .first()
                     .single { it.attributeType.name == "counterparty.id" }
             assertEquals("bank:041307:29900313", counterpartyAttribute.value)
+        }
+
+    @Test
+    fun `atm withdrawals reuse one built-in ATM counterparty account even after rename`() =
+        runTest {
+            val deviceId =
+                repositories.deviceRepository.getOrCreateDevice(
+                    DeviceInfo.Jvm("test-machine", "Test OS"),
+                )
+            val strategy =
+                repositories.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .single()
+
+            suspend fun importAtmTransactions(
+                sessionToken: String,
+                transactionsJson: String,
+            ) {
+                val sessionId =
+                    repositories.apiSessionRepository.createSession(
+                        token = sessionToken,
+                        deviceId = deviceId,
+                        createdAt = Instant.fromEpochMilliseconds(1_700_000_000_000L),
+                        expiresAt = null,
+                    )
+                val mockEngine =
+                    MockEngine { request ->
+                        val url = request.url.toString()
+                        val json =
+                            when {
+                                url.contains("/accounts") -> ACCOUNTS_JSON
+                                url.contains("/transactions") && !url.contains("before=") -> transactionsJson
+                                url.contains("/transactions") && url.contains("before=") -> EMPTY_TRANSACTIONS_JSON
+                                else -> error("Unexpected request: $url")
+                            }
+                        respond(
+                            content = json,
+                            status = HttpStatusCode.OK,
+                            headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                        )
+                    }
+                val apiClient =
+                    createApiClient(
+                        trafficRecorder = ApiSessionTrafficRecorder(sessionId, repositories.apiSessionRepository),
+                        engine = mockEngine,
+                    )
+
+                downloadApiSessionAccounts(
+                    token = sessionToken,
+                    apiClient = apiClient,
+                    apiSessionRepository = repositories.apiSessionRepository,
+                    sessionId = sessionId,
+                    strategy = strategy,
+                )
+                downloadApiSessionTransactions(
+                    token = sessionToken,
+                    apiClient = apiClient,
+                    apiSessionRepository = repositories.apiSessionRepository,
+                    sessionId = sessionId,
+                    strategy = strategy,
+                )
+                importApiSessionTransactions(
+                    apiSessionRepository = repositories.apiSessionRepository,
+                    accountRepository = repositories.accountRepository,
+                    currencyRepository = repositories.currencyRepository,
+                    transactionRepository = repositories.transactionRepository,
+                    transferSourceQueries = transferSourceQueries,
+                    entitySourceQueries = repositories.entitySourceQueries,
+                    personRepository = repositories.personRepository,
+                    personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
+                    attributeTypeRepository = repositories.attributeTypeRepository,
+                    accountAttributeRepository = repositories.accountAttributeRepository,
+                    deviceId = deviceId,
+                    sessionId = sessionId,
+                    strategy = strategy,
+                )
+            }
+
+            importAtmTransactions(
+                sessionToken = "test-monzo-token-1",
+                transactionsJson = TRANSACTIONS_WITH_ATM_WITHDRAWALS_JSON,
+            )
+
+            val initialAtmAccount =
+                repositories.accountRepository
+                    .getAllAccounts()
+                    .first()
+                    .single { it.name == "Monzo Counterparty: ATM" }
+            val initialAtmAttributes = repositories.accountAttributeRepository.getByAccount(initialAtmAccount.id).first()
+            assertEquals(
+                "ATM",
+                initialAtmAttributes.single { it.attributeType.name == "built-in type" }.value,
+            )
+
+            repositories.accountRepository.updateAccount(
+                initialAtmAccount.copy(
+                    name = "Monzo Counterparty: Renamed ATM",
+                ),
+            )
+
+            importAtmTransactions(
+                sessionToken = "test-monzo-token-2",
+                transactionsJson = TRANSACTIONS_WITH_ATM_WITHDRAWALS_FOLLOW_UP_JSON,
+            )
+
+            val allAccounts = repositories.accountRepository.getAllAccounts().first()
+            val atmAccounts =
+                allAccounts.filter { account ->
+                    repositories.accountAttributeRepository
+                        .getByAccount(account.id)
+                        .first()
+                        .any { it.attributeType.name == "built-in type" && it.value == "ATM" }
+                }
+            assertEquals(1, atmAccounts.size, "ATM built-in type should map withdrawals to one counterparty account")
+            assertEquals("Monzo Counterparty: Renamed ATM", atmAccounts.single().name)
         }
 }

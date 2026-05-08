@@ -690,6 +690,8 @@ object DatabaseConfig {
             // Transactions carrying this attribute are excluded from all balance calculations
             // but remain visible in the UI (highlighted as excluded).
             attributeTypeQueries.insertWithId(id = -1, name = "excluded")
+            // Seed built-in account attribute type used by importer-defined counterparties.
+            attributeTypeQueries.insert(name = "built-in type")
 
             // Create system device for system-generated source tracking
             // Platform 0 = SYSTEM, no os/machine/make/model needed
