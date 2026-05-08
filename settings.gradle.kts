@@ -36,9 +36,6 @@ plugins {
     // Kotlin plugins declared here for classloader compatibility with DAGP
     id("org.jetbrains.kotlin.multiplatform") version "2.3.21" apply false
     id("org.jetbrains.kotlin.jvm") version "2.3.21" apply false
-    if (providers.gradleProperty("qodana").map(String::toBoolean).orElse(false).get().not()) {
-        id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
-    }
 }
 
 develocity {

@@ -4,7 +4,6 @@
 
 version: "1.0"
 linter: jetbrains/qodana-jvm-community:2026.1
-bootstrap: rm -f gradle/gradle-daemon-jvm.properties && echo "qodana=true" >> gradle.properties
 plugins:
   - id: com.squareup.sqldelight
 profile:
