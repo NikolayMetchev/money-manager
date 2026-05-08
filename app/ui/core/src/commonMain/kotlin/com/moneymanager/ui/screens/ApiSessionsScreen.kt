@@ -252,8 +252,6 @@ fun ApiSessionsScreen(
                             val credentialSessions = sessionsByCredential[credential.id].orEmpty()
                             val isDownloadingAccounts = backgroundTasks.isRunning(monzoAccountsDownloadTaskKey(credential.id))
                             val isDownloadingTransactions = backgroundTasks.isRunning(monzoTransactionsDownloadTaskKey(credential.id))
-                            val isCredentialBusy = isDownloadingAccounts || isDownloadingTransactions
-
                             CredentialCard(
                                 credential = credential,
                                 sessions = credentialSessions,
@@ -899,7 +897,6 @@ fun ApiSessionTrafficScreen(
                                     val nodeOffsetInViewport = nodeY - listStartY
                                     val delta = nodeOffsetInViewport - viewportHeight / 2f
                                     lazyListState.scroll { scrollBy(delta) }
-                                    return@collect
                                 }
                             }
                     }

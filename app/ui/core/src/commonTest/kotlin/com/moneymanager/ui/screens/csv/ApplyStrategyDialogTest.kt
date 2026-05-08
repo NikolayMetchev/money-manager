@@ -188,13 +188,11 @@ class ApplyStrategyDialogTest {
                                     id = CurrencyId(1),
                                     code = "GBP",
                                     name = "British Pound",
-                                    scaleFactor = 100,
                                 ),
                         ),
                 ),
             attributes = emptyList(),
             importStatus = ImportStatus.IMPORTED,
-            existingTransferId = null,
             rowIndex = 0,
             discoveredMapping = discoveredMapping,
         )

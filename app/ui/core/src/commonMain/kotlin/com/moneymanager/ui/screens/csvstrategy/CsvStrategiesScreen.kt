@@ -108,7 +108,6 @@ fun CsvStrategiesScreen(
     // File saver for export
     val fileSaver =
         rememberFileSaver(
-            mimeType = "application/json",
             onResult = {
                 strategyToExport = null
                 includeAccountMappingsInExport = null

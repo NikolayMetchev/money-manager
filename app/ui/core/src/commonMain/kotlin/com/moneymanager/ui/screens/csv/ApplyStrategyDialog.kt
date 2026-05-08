@@ -594,7 +594,6 @@ fun ApplyStrategyDialog(
                                     csvImport.id,
                                     errorRow.rowIndex,
                                     ImportStatus.ERROR.name,
-                                    null,
                                 )
                                 csvImportRepository.saveError(
                                     csvImport.id,
@@ -718,7 +717,6 @@ fun ApplyStrategyDialog(
                                         csvImport.id,
                                         originalRowIndex,
                                         ImportStatus.ERROR.name,
-                                        null,
                                     )
                                     // Log the error and continue with remaining rows
                                     val errorMsg = expected.message ?: "Unknown error"

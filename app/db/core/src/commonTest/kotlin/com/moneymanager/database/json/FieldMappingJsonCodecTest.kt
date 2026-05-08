@@ -3,7 +3,6 @@
 package com.moneymanager.database.json
 
 import com.moneymanager.domain.model.AccountId
-import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
@@ -53,7 +52,6 @@ class FieldMappingJsonCodecTest {
                 id = FieldMappingId(Uuid.random()),
                 fieldType = TransferField.TARGET_ACCOUNT,
                 columnName = "Payee",
-                defaultCategoryId = Category.UNCATEGORIZED_ID,
             )
         val mappings = mapOf(TransferField.TARGET_ACCOUNT to mapping)
 
@@ -78,7 +76,6 @@ class FieldMappingJsonCodecTest {
                         RegexRule(pattern = ".*crypto\\.com.*", accountName = "Crypto.com"),
                     ),
                 fallbackColumns = listOf("Type"),
-                defaultCategoryId = Category.UNCATEGORIZED_ID,
             )
         val mappings = mapOf(TransferField.TARGET_ACCOUNT to mapping)
 
@@ -106,7 +103,6 @@ class FieldMappingJsonCodecTest {
                 dateFormat = "dd/MM/yyyy",
                 timeColumnName = "Time",
                 timeFormat = "HH:mm:ss",
-                defaultTime = "12:00:00",
             )
         val mappings = mapOf(TransferField.TIMESTAMP to mapping)
 

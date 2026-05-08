@@ -101,19 +101,19 @@ dependencyAnalysis {
 
 kover {
     currentProject { sources { excludeJava = true } }
-    if (path.startsWith(":test") || project.file("src/test").exists().not()) {
+    if (path.startsWith(":test") || (path != ":" && project.file("src/test").exists().not())) {
         disable()
     }
     reports {
         filters {
             excludes {
                 // Exclude generated code
-                classes("*_Factory", "*_Factory\$*")
-                classes("*_Impl", "*_Impl\$*")
+                classes("*_Factory", "*_Factory$*")
+                classes("*_Impl", "*_Impl$*")
                 classes("*MapperImpl")
                 // Exclude Metro DI generated code
-                classes("*Component\$*")
-                classes("*Module\$*")
+                classes("*Component$*")
+                classes("*Module$*")
                 // Exclude SQLDelight generated code
                 classes("com.moneymanager.database.*")
             }

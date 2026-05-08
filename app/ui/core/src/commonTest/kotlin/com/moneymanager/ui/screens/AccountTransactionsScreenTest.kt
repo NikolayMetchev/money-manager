@@ -59,6 +59,7 @@ import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CsvImportSourceRecord
 import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.domain.repository.DeviceRepository
 import com.moneymanager.domain.repository.SampleGeneratorSourceRecord
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.domain.repository.TransferSourceRepository
@@ -96,7 +97,6 @@ class AccountTransactionsScreenTest {
                     id = CurrencyId(1L),
                     code = "USD",
                     name = "US Dollar",
-                    scaleFactor = 100,
                 )
 
             val checking =
@@ -198,7 +198,6 @@ class AccountTransactionsScreenTest {
                     id = CurrencyId(1L),
                     code = "USD",
                     name = "US Dollar",
-                    scaleFactor = 100,
                 )
 
             val checking =
@@ -894,8 +893,8 @@ class AccountTransactionsScreenTest {
             account: Account?,
             accountId: AccountId,
             deletedAttributeIds: Set<Long>,
-            updatedAttributes: Map<Long, com.moneymanager.domain.model.NewAttribute>,
-            newAttributes: List<com.moneymanager.domain.model.NewAttribute>,
+            updatedAttributes: Map<Long, NewAttribute>,
+            newAttributes: List<NewAttribute>,
         ): Long {
             val current = accountsFlow.value.find { it.id == accountId } ?: return 1L
             val newRevision = current.revisionId + 1
@@ -1105,9 +1104,9 @@ class AccountTransactionsScreenTest {
     private class FakeCategoryRepository : CategoryRepository {
         private val categories =
             listOf(
-                Category(id = -1L, name = "Uncategorized", parentId = null),
-                Category(id = 1L, name = "Food", parentId = null),
-                Category(id = 2L, name = "Transport", parentId = null),
+                Category(id = -1L, name = "Uncategorized"),
+                Category(id = 1L, name = "Food"),
+                Category(id = 2L, name = "Transport"),
             )
 
         override fun getAllCategories(): Flow<List<Category>> = flowOf(categories)
@@ -1274,12 +1273,10 @@ class AccountTransactionsScreenTest {
         override suspend fun delete(id: Long) {}
     }
 
-    private class FakeDeviceRepository : com.moneymanager.domain.repository.DeviceRepository {
-        override fun getOrCreateDevice(deviceInfo: DeviceInfo): com.moneymanager.domain.model.DeviceId =
-            com.moneymanager.domain.model
-                .DeviceId(1L)
+    private class FakeDeviceRepository : DeviceRepository {
+        override fun getOrCreateDevice(deviceInfo: DeviceInfo): DeviceId = DeviceId(1L)
 
-        override suspend fun getDeviceById(id: com.moneymanager.domain.model.DeviceId): DeviceInfo? = null
+        override suspend fun getDeviceById(id: DeviceId): DeviceInfo? = null
     }
 
     private class FakePersonRepository : com.moneymanager.domain.repository.PersonRepository {

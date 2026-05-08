@@ -355,9 +355,7 @@ class AuditFunctionalTest : DbTest() {
         runTest {
             val category =
                 Category(
-                    id = 0,
                     name = "Test Category",
-                    parentId = null,
                 )
 
             val categoryId = repositories.categoryRepository.createCategory(category)
@@ -374,9 +372,7 @@ class AuditFunctionalTest : DbTest() {
         runTest {
             val category =
                 Category(
-                    id = 0,
                     name = "Original Category",
-                    parentId = null,
                 )
 
             val categoryId = repositories.categoryRepository.createCategory(category)
@@ -385,7 +381,6 @@ class AuditFunctionalTest : DbTest() {
                 Category(
                     id = categoryId,
                     name = "Updated Category",
-                    parentId = null,
                 ),
             )
 
@@ -402,9 +397,7 @@ class AuditFunctionalTest : DbTest() {
         runTest {
             val category =
                 Category(
-                    id = 0,
                     name = "To Be Deleted",
-                    parentId = null,
                 )
 
             val categoryId = repositories.categoryRepository.createCategory(category)
