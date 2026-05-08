@@ -15,26 +15,14 @@ import app.cash.sqldelight.db.SqlPreparedStatement
 import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.database.sql.EntitySourceQueries
 import com.moneymanager.domain.model.Account
-import com.moneymanager.domain.model.AccountAttribute
-import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
-import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.AttributeTypeId
-import com.moneymanager.domain.model.Category
-import com.moneymanager.domain.model.CategoryBalance
 import com.moneymanager.domain.model.DeviceId
-import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.PageWithTargetIndex
 import com.moneymanager.domain.model.PagingInfo
 import com.moneymanager.domain.model.PagingResult
-import com.moneymanager.domain.model.Person
-import com.moneymanager.domain.model.PersonAccountOwnership
 import com.moneymanager.domain.model.PersonId
-import com.moneymanager.domain.model.SourceRecorder
-import com.moneymanager.domain.model.TransactionId
-import com.moneymanager.domain.model.Transfer
-import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
@@ -44,13 +32,16 @@ import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
+import dev.mokkery.MockMode
+import dev.mokkery.answering.returns
+import dev.mokkery.every
+import dev.mokkery.everySuspend
+import dev.mokkery.matcher.any
+import dev.mokkery.mock
 import kotlinx.coroutines.flow.flowOf
 import kotlin.test.Test
 import kotlin.time.Clock
 import kotlin.time.Duration
-import kotlin.time.Instant
 
 @OptIn(ExperimentalTestApi::class)
 class AccountsScreenTest {
@@ -61,20 +52,20 @@ class AccountsScreenTest {
     fun accountsScreen_displaysEmptyState_whenNoAccounts() =
         runMoneyManagerComposeUiTest {
             // Given
-            val repository = FakeAccountRepository(emptyList())
+            val repository = createAccountRepository(emptyList())
 
             // When
             setContent {
                 ProvideSchemaAwareScope {
                     AccountsScreen(
                         accountRepository = repository,
-                        accountAttributeRepository = FakeAccountAttributeRepository(),
-                        attributeTypeRepository = FakeAttributeTypeRepository(),
-                        categoryRepository = FakeCategoryRepository(),
-                        transactionRepository = FakeTransactionRepository(),
-                        personRepository = FakePersonRepository(),
-                        personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
-                        maintenanceService = FakeDatabaseMaintenanceService(),
+                        accountAttributeRepository = createAccountAttributeRepository(),
+                        attributeTypeRepository = createAttributeTypeRepository(),
+                        categoryRepository = createCategoryRepository(),
+                        transactionRepository = createTransactionRepository(),
+                        personRepository = createPersonRepository(),
+                        personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
+                        maintenanceService = createMaintenanceService(),
                         entitySourceQueries = stubEntitySourceQueries,
                         deviceId = testDeviceId,
                         scrollToAccountId = null,
@@ -106,20 +97,20 @@ class AccountsScreenTest {
                         openingDate = now,
                     ),
                 )
-            val repository = FakeAccountRepository(accounts)
+            val repository = createAccountRepository(accounts)
 
             // When
             setContent {
                 ProvideSchemaAwareScope {
                     AccountsScreen(
                         accountRepository = repository,
-                        accountAttributeRepository = FakeAccountAttributeRepository(),
-                        attributeTypeRepository = FakeAttributeTypeRepository(),
-                        categoryRepository = FakeCategoryRepository(),
-                        transactionRepository = FakeTransactionRepository(),
-                        personRepository = FakePersonRepository(),
-                        personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
-                        maintenanceService = FakeDatabaseMaintenanceService(),
+                        accountAttributeRepository = createAccountAttributeRepository(),
+                        attributeTypeRepository = createAttributeTypeRepository(),
+                        categoryRepository = createCategoryRepository(),
+                        transactionRepository = createTransactionRepository(),
+                        personRepository = createPersonRepository(),
+                        personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
+                        maintenanceService = createMaintenanceService(),
                         entitySourceQueries = stubEntitySourceQueries,
                         deviceId = testDeviceId,
                         scrollToAccountId = null,
@@ -137,20 +128,20 @@ class AccountsScreenTest {
     fun accountsScreen_displaysAddAccountButton() =
         runMoneyManagerComposeUiTest {
             // Given
-            val repository = FakeAccountRepository(emptyList())
+            val repository = createAccountRepository(emptyList())
 
             // When
             setContent {
                 ProvideSchemaAwareScope {
                     AccountsScreen(
                         accountRepository = repository,
-                        accountAttributeRepository = FakeAccountAttributeRepository(),
-                        attributeTypeRepository = FakeAttributeTypeRepository(),
-                        categoryRepository = FakeCategoryRepository(),
-                        transactionRepository = FakeTransactionRepository(),
-                        personRepository = FakePersonRepository(),
-                        personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
-                        maintenanceService = FakeDatabaseMaintenanceService(),
+                        accountAttributeRepository = createAccountAttributeRepository(),
+                        attributeTypeRepository = createAttributeTypeRepository(),
+                        categoryRepository = createCategoryRepository(),
+                        transactionRepository = createTransactionRepository(),
+                        personRepository = createPersonRepository(),
+                        personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
+                        maintenanceService = createMaintenanceService(),
                         entitySourceQueries = stubEntitySourceQueries,
                         deviceId = testDeviceId,
                         scrollToAccountId = null,
@@ -167,20 +158,20 @@ class AccountsScreenTest {
     fun accountsScreen_opensCreateDialog_whenAddAccountClicked() =
         runMoneyManagerComposeUiTest {
             // Given
-            val repository = FakeAccountRepository(emptyList())
+            val repository = createAccountRepository(emptyList())
 
             // When
             setContent {
                 ProvideSchemaAwareScope {
                     AccountsScreen(
                         accountRepository = repository,
-                        accountAttributeRepository = FakeAccountAttributeRepository(),
-                        attributeTypeRepository = FakeAttributeTypeRepository(),
-                        categoryRepository = FakeCategoryRepository(),
-                        transactionRepository = FakeTransactionRepository(),
-                        personRepository = FakePersonRepository(),
-                        personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
-                        maintenanceService = FakeDatabaseMaintenanceService(),
+                        accountAttributeRepository = createAccountAttributeRepository(),
+                        attributeTypeRepository = createAttributeTypeRepository(),
+                        categoryRepository = createCategoryRepository(),
+                        transactionRepository = createTransactionRepository(),
+                        personRepository = createPersonRepository(),
+                        personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
+                        maintenanceService = createMaintenanceService(),
                         entitySourceQueries = stubEntitySourceQueries,
                         deviceId = testDeviceId,
                         scrollToAccountId = null,
@@ -207,20 +198,20 @@ class AccountsScreenTest {
                     name = "My Checking",
                     openingDate = now,
                 )
-            val repository = FakeAccountRepository(listOf(account))
+            val repository = createAccountRepository(listOf(account))
 
             // When
             setContent {
                 ProvideSchemaAwareScope {
                     AccountsScreen(
                         accountRepository = repository,
-                        accountAttributeRepository = FakeAccountAttributeRepository(),
-                        attributeTypeRepository = FakeAttributeTypeRepository(),
-                        categoryRepository = FakeCategoryRepository(),
-                        transactionRepository = FakeTransactionRepository(),
-                        personRepository = FakePersonRepository(),
-                        personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
-                        maintenanceService = FakeDatabaseMaintenanceService(),
+                        accountAttributeRepository = createAccountAttributeRepository(),
+                        attributeTypeRepository = createAttributeTypeRepository(),
+                        categoryRepository = createCategoryRepository(),
+                        transactionRepository = createTransactionRepository(),
+                        personRepository = createPersonRepository(),
+                        personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
+                        maintenanceService = createMaintenanceService(),
                         entitySourceQueries = stubEntitySourceQueries,
                         deviceId = testDeviceId,
                         scrollToAccountId = null,
@@ -244,20 +235,20 @@ class AccountsScreenTest {
                     name = "Test Account",
                     openingDate = now,
                 )
-            val repository = FakeAccountRepository(listOf(account))
+            val repository = createAccountRepository(listOf(account))
 
             // When
             setContent {
                 ProvideSchemaAwareScope {
                     AccountsScreen(
                         accountRepository = repository,
-                        accountAttributeRepository = FakeAccountAttributeRepository(),
-                        attributeTypeRepository = FakeAttributeTypeRepository(),
-                        categoryRepository = FakeCategoryRepository(),
-                        transactionRepository = FakeTransactionRepository(),
-                        personRepository = FakePersonRepository(),
-                        personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
-                        maintenanceService = FakeDatabaseMaintenanceService(),
+                        accountAttributeRepository = createAccountAttributeRepository(),
+                        attributeTypeRepository = createAttributeTypeRepository(),
+                        categoryRepository = createCategoryRepository(),
+                        transactionRepository = createTransactionRepository(),
+                        personRepository = createPersonRepository(),
+                        personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
+                        maintenanceService = createMaintenanceService(),
                         entitySourceQueries = stubEntitySourceQueries,
                         deviceId = testDeviceId,
                         scrollToAccountId = null,
@@ -278,20 +269,20 @@ class AccountsScreenTest {
     fun createAccountDialog_validatesRequiredFields() =
         runMoneyManagerComposeUiTest {
             // Given
-            val repository = FakeAccountRepository(emptyList())
+            val repository = createAccountRepository(emptyList())
 
             // When
             setContent {
                 ProvideSchemaAwareScope {
                     AccountsScreen(
                         accountRepository = repository,
-                        accountAttributeRepository = FakeAccountAttributeRepository(),
-                        attributeTypeRepository = FakeAttributeTypeRepository(),
-                        categoryRepository = FakeCategoryRepository(),
-                        transactionRepository = FakeTransactionRepository(),
-                        personRepository = FakePersonRepository(),
-                        personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
-                        maintenanceService = FakeDatabaseMaintenanceService(),
+                        accountAttributeRepository = createAccountAttributeRepository(),
+                        attributeTypeRepository = createAttributeTypeRepository(),
+                        categoryRepository = createCategoryRepository(),
+                        transactionRepository = createTransactionRepository(),
+                        personRepository = createPersonRepository(),
+                        personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
+                        maintenanceService = createMaintenanceService(),
                         entitySourceQueries = stubEntitySourceQueries,
                         deviceId = testDeviceId,
                         scrollToAccountId = null,
@@ -314,20 +305,20 @@ class AccountsScreenTest {
     fun createAccountDialog_canBeDismissed() =
         runMoneyManagerComposeUiTest {
             // Given
-            val repository = FakeAccountRepository(emptyList())
+            val repository = createAccountRepository(emptyList())
 
             // When
             setContent {
                 ProvideSchemaAwareScope {
                     AccountsScreen(
                         accountRepository = repository,
-                        accountAttributeRepository = FakeAccountAttributeRepository(),
-                        attributeTypeRepository = FakeAttributeTypeRepository(),
-                        categoryRepository = FakeCategoryRepository(),
-                        transactionRepository = FakeTransactionRepository(),
-                        personRepository = FakePersonRepository(),
-                        personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
-                        maintenanceService = FakeDatabaseMaintenanceService(),
+                        accountAttributeRepository = createAccountAttributeRepository(),
+                        attributeTypeRepository = createAttributeTypeRepository(),
+                        categoryRepository = createCategoryRepository(),
+                        transactionRepository = createTransactionRepository(),
+                        personRepository = createPersonRepository(),
+                        personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
+                        maintenanceService = createMaintenanceService(),
                         entitySourceQueries = stubEntitySourceQueries,
                         deviceId = testDeviceId,
                         scrollToAccountId = null,
@@ -358,20 +349,20 @@ class AccountsScreenTest {
                     name = "Test Account",
                     openingDate = now,
                 )
-            val repository = FakeAccountRepository(listOf(account))
+            val repository = createAccountRepository(listOf(account))
 
             // When
             setContent {
                 ProvideSchemaAwareScope {
                     AccountsScreen(
                         accountRepository = repository,
-                        accountAttributeRepository = FakeAccountAttributeRepository(),
-                        attributeTypeRepository = FakeAttributeTypeRepository(),
-                        categoryRepository = FakeCategoryRepository(),
-                        transactionRepository = FakeTransactionRepository(),
-                        personRepository = FakePersonRepository(),
-                        personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
-                        maintenanceService = FakeDatabaseMaintenanceService(),
+                        accountAttributeRepository = createAccountAttributeRepository(),
+                        attributeTypeRepository = createAttributeTypeRepository(),
+                        categoryRepository = createCategoryRepository(),
+                        transactionRepository = createTransactionRepository(),
+                        personRepository = createPersonRepository(),
+                        personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
+                        maintenanceService = createMaintenanceService(),
                         entitySourceQueries = stubEntitySourceQueries,
                         deviceId = testDeviceId,
                         scrollToAccountId = null,
@@ -414,20 +405,20 @@ class AccountsScreenTest {
                         openingDate = now,
                     ),
                 )
-            val repository = FakeAccountRepository(accounts)
+            val repository = createAccountRepository(accounts)
 
             // When
             setContent {
                 ProvideSchemaAwareScope {
                     AccountsScreen(
                         accountRepository = repository,
-                        accountAttributeRepository = FakeAccountAttributeRepository(),
-                        attributeTypeRepository = FakeAttributeTypeRepository(),
-                        categoryRepository = FakeCategoryRepository(),
-                        transactionRepository = FakeTransactionRepository(),
-                        personRepository = FakePersonRepository(),
-                        personAccountOwnershipRepository = FakePersonAccountOwnershipRepository(),
-                        maintenanceService = FakeDatabaseMaintenanceService(),
+                        accountAttributeRepository = createAccountAttributeRepository(),
+                        attributeTypeRepository = createAttributeTypeRepository(),
+                        categoryRepository = createCategoryRepository(),
+                        transactionRepository = createTransactionRepository(),
+                        personRepository = createPersonRepository(),
+                        personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
+                        maintenanceService = createMaintenanceService(),
                         entitySourceQueries = stubEntitySourceQueries,
                         deviceId = testDeviceId,
                         scrollToAccountId = null,
@@ -442,262 +433,81 @@ class AccountsScreenTest {
             onNodeWithText("Account 3").assertIsDisplayed()
         }
 
-    // Fake repositories for testing
-    private class FakeAccountRepository(
-        private val accounts: List<Account>,
-    ) : AccountRepository {
-        private val accountsFlow = MutableStateFlow(accounts)
-        private val deletedAccounts = mutableListOf<AccountId>()
-
-        override fun getAllAccounts(): Flow<List<Account>> = accountsFlow
-
-        override fun getAccountById(id: AccountId): Flow<Account?> = flowOf(accounts.find { it.id == id })
-
-        override suspend fun createAccount(account: Account): AccountId {
-            val newId = AccountId((accounts.maxOfOrNull { it.id.id } ?: 0L) + 1)
-            val newAccount = account.copy(id = newId)
-            accountsFlow.value = accountsFlow.value + newAccount
-            return newId
+    private fun createAccountRepository(accounts: List<Account>): AccountRepository =
+        mock(MockMode.autoUnit) {
+            every { getAllAccounts() } returns flowOf(accounts)
+            every { getAccountById(any()) } returns flowOf(null)
+            everySuspend { createAccount(any()) } returns AccountId(999L)
+            everySuspend { createAccountsBatch(any()) } returns emptyList()
+            everySuspend { updateAccount(any()) } returns 1L
+            everySuspend { updateAccountWithAttributes(any(), any(), any(), any(), any()) } returns 1L
+            everySuspend { countTransfersByAccount(any()) } returns 0L
+            everySuspend { getTransfersBetweenAccounts(any(), any()) } returns emptyList()
         }
 
-        override suspend fun createAccountsBatch(accounts: List<Account>): List<AccountId> = accounts.map { createAccount(it) }
-
-        override suspend fun updateAccount(account: Account): Long {
-            accountsFlow.value =
-                accountsFlow.value.map {
-                    if (it.id == account.id) account.copy(revisionId = account.revisionId + 1) else it
-                }
-            return account.revisionId + 1
+    private fun createTransactionRepository(): TransactionRepository =
+        mock(MockMode.autoUnit) {
+            every { getTransactionById(any()) } returns flowOf(null)
+            every { getTransactionsByAccount(any()) } returns flowOf(emptyList())
+            every { getTransactionsByDateRange(any(), any()) } returns flowOf(emptyList())
+            every { getTransactionsByAccountAndDateRange(any(), any(), any()) } returns flowOf(emptyList())
+            every { getAccountBalances() } returns flowOf(emptyList())
+            everySuspend { getRunningBalanceByAccountPaginated(any(), any(), any()) } returns
+                PagingResult(emptyList<AccountRow>(), PagingInfo(null, null, false))
+            everySuspend { getRunningBalanceByAccountPaginatedBackward(any(), any(), any(), any()) } returns
+                PagingResult(emptyList<AccountRow>(), PagingInfo(null, null, false))
+            everySuspend { getPageContainingTransaction(any(), any(), any()) } returns
+                PageWithTargetIndex(emptyList<AccountRow>(), -1, PagingInfo(null, null, false), false)
         }
 
-        override suspend fun updateAccountWithAttributes(
-            account: Account?,
-            accountId: AccountId,
-            deletedAttributeIds: Set<Long>,
-            updatedAttributes: Map<Long, NewAttribute>,
-            newAttributes: List<NewAttribute>,
-        ): Long {
-            val current = accountsFlow.value.find { it.id == accountId } ?: return 1L
-            val newRevision = current.revisionId + 1
-            if (account != null) {
-                accountsFlow.value =
-                    accountsFlow.value.map {
-                        if (it.id == accountId) account.copy(revisionId = newRevision) else it
-                    }
-            } else {
-                accountsFlow.value =
-                    accountsFlow.value.map {
-                        if (it.id == accountId) it.copy(revisionId = newRevision) else it
-                    }
-            }
-            return newRevision
+    private fun createCategoryRepository(): CategoryRepository =
+        mock(MockMode.autoUnit) {
+            every { getAllCategories() } returns flowOf(emptyList())
+            every { getCategoryBalances() } returns flowOf(emptyList())
+            every { getCategoryById(any()) } returns flowOf(null)
+            every { getTopLevelCategories() } returns flowOf(emptyList())
+            every { getCategoriesByParent(any()) } returns flowOf(emptyList())
+            everySuspend { createCategory(any()) } returns 0L
         }
 
-        override suspend fun deleteAccount(id: AccountId) {
-            deletedAccounts.add(id)
-            accountsFlow.value = accountsFlow.value.filter { it.id != id }
+    private fun createPersonRepository(): PersonRepository =
+        mock(MockMode.autoUnit) {
+            every { getAllPeople() } returns flowOf(emptyList())
+            every { getPersonById(any()) } returns flowOf(null)
+            everySuspend { createPerson(any()) } returns PersonId(0L)
         }
 
-        override suspend fun countTransfersByAccount(accountId: AccountId): Long = 0L
-
-        override suspend fun getTransfersBetweenAccounts(
-            accountA: AccountId,
-            accountB: AccountId,
-        ): List<Transfer> = emptyList()
-
-        override suspend fun deleteAccountAndMoveTransactions(
-            accountToDelete: AccountId,
-            targetAccount: AccountId,
-        ) {
-            deletedAccounts.add(accountToDelete)
-            accountsFlow.value = accountsFlow.value.filter { it.id != accountToDelete }
+    private fun createPersonAccountOwnershipRepository(): PersonAccountOwnershipRepository =
+        mock(MockMode.autoUnit) {
+            every { getOwnershipsByPerson(any()) } returns flowOf(emptyList())
+            every { getOwnershipsByAccount(any()) } returns flowOf(emptyList())
+            every { getOwnershipById(any()) } returns flowOf(null)
+            everySuspend { createOwnership(any(), any()) } returns 0L
         }
-    }
 
-    private class FakeTransactionRepository : TransactionRepository {
-        override fun getTransactionById(id: Long): Flow<Transfer?> = flowOf(null)
+    private fun createMaintenanceService(): DatabaseMaintenanceService =
+        mock(MockMode.autoUnit) {
+            everySuspend { reindex() } returns Duration.ZERO
+            everySuspend { vacuum() } returns Duration.ZERO
+            everySuspend { analyze() } returns Duration.ZERO
+            everySuspend { refreshMaterializedViews() } returns Duration.ZERO
+            everySuspend { fullRefreshMaterializedViews() } returns Duration.ZERO
+        }
 
-        override fun getTransactionsByAccount(accountId: AccountId): Flow<List<Transfer>> = flowOf(emptyList())
+    private fun createAccountAttributeRepository(): AccountAttributeRepository =
+        mock(MockMode.autoUnit) {
+            every { getByAccount(any()) } returns flowOf(emptyList())
+            everySuspend { insert(any(), any(), any()) } returns 0L
+            everySuspend { insertInCreationMode(any(), any(), any()) } returns 0L
+        }
 
-        override fun getTransactionsByDateRange(
-            startDate: Instant,
-            endDate: Instant,
-        ): Flow<List<Transfer>> = flowOf(emptyList())
-
-        override fun getTransactionsByAccountAndDateRange(
-            accountId: AccountId,
-            startDate: Instant,
-            endDate: Instant,
-        ): Flow<List<Transfer>> = flowOf(emptyList())
-
-        override fun getAccountBalances(): Flow<List<AccountBalance>> = flowOf(emptyList())
-
-        override suspend fun getRunningBalanceByAccountPaginated(
-            accountId: AccountId,
-            pageSize: Int,
-            pagingInfo: PagingInfo?,
-        ): PagingResult<AccountRow> =
-            PagingResult(
-                items = emptyList(),
-                pagingInfo =
-                    PagingInfo(
-                        lastTimestamp = null,
-                        lastId = null,
-                        hasMore = false,
-                    ),
-            )
-
-        override suspend fun getRunningBalanceByAccountPaginatedBackward(
-            accountId: AccountId,
-            pageSize: Int,
-            firstTimestamp: Instant,
-            firstId: TransactionId,
-        ): PagingResult<AccountRow> =
-            PagingResult(
-                items = emptyList(),
-                pagingInfo =
-                    PagingInfo(
-                        lastTimestamp = null,
-                        lastId = null,
-                        hasMore = false,
-                    ),
-            )
-
-        override suspend fun getPageContainingTransaction(
-            accountId: AccountId,
-            transactionId: TransferId,
-            pageSize: Int,
-        ): PageWithTargetIndex<AccountRow> =
-            PageWithTargetIndex(
-                items = emptyList(),
-                targetIndex = -1,
-                pagingInfo =
-                    PagingInfo(
-                        lastTimestamp = null,
-                        lastId = null,
-                        hasMore = false,
-                    ),
-                hasPrevious = false,
-            )
-
-        override suspend fun createTransfers(
-            transfers: List<Transfer>,
-            newAttributes: Map<TransferId, List<NewAttribute>>,
-            sourceRecorder: SourceRecorder,
-            onProgress: (suspend (Int, Int) -> Unit)?,
-        ) {}
-
-        override suspend fun updateTransfer(
-            transfer: Transfer?,
-            deletedAttributeIds: Set<Long>,
-            updatedAttributes: Map<Long, NewAttribute>,
-            newAttributes: List<NewAttribute>,
-            transactionId: TransferId,
-        ) {}
-
-        override suspend fun deleteTransaction(id: Long) {}
-    }
-
-    private class FakeCategoryRepository : CategoryRepository {
-        private val categories =
-            listOf(
-                Category(id = -1L, name = "Uncategorized"),
-                Category(id = 1L, name = "Food"),
-                Category(id = 2L, name = "Transport"),
-            )
-
-        override fun getAllCategories(): Flow<List<Category>> = flowOf(categories)
-
-        override fun getCategoryBalances(): Flow<List<CategoryBalance>> = flowOf(emptyList())
-
-        override fun getCategoryById(id: Long): Flow<Category?> = flowOf(categories.find { it.id == id })
-
-        override fun getTopLevelCategories(): Flow<List<Category>> = flowOf(categories.filter { it.parentId == null })
-
-        override fun getCategoriesByParent(parentId: Long): Flow<List<Category>> = flowOf(categories.filter { it.parentId == parentId })
-
-        override suspend fun createCategory(category: Category): Long = 0L
-
-        override suspend fun updateCategory(category: Category) {}
-
-        override suspend fun deleteCategory(id: Long) {}
-    }
-
-    private class FakePersonRepository : PersonRepository {
-        override fun getAllPeople() = flowOf(emptyList<Person>())
-
-        override fun getPersonById(id: PersonId) = flowOf(null as Person?)
-
-        override suspend fun createPerson(person: Person) = PersonId(0)
-
-        override suspend fun updatePerson(person: Person) {}
-
-        override suspend fun deletePerson(id: PersonId) {}
-    }
-
-    private class FakePersonAccountOwnershipRepository : PersonAccountOwnershipRepository {
-        override fun getOwnershipsByPerson(personId: PersonId) = flowOf(emptyList<PersonAccountOwnership>())
-
-        override fun getOwnershipsByAccount(accountId: AccountId) = flowOf(emptyList<PersonAccountOwnership>())
-
-        override fun getOwnershipById(id: Long) = flowOf(null as PersonAccountOwnership?)
-
-        override suspend fun createOwnership(
-            personId: PersonId,
-            accountId: AccountId,
-        ) = 0L
-
-        override suspend fun deleteOwnership(id: Long) {}
-
-        override suspend fun deleteOwnershipsByPerson(personId: PersonId) {}
-
-        override suspend fun deleteOwnershipsByAccount(accountId: AccountId) {}
-    }
-
-    private class FakeDatabaseMaintenanceService : DatabaseMaintenanceService {
-        override suspend fun reindex(): Duration = Duration.ZERO
-
-        override suspend fun vacuum(): Duration = Duration.ZERO
-
-        override suspend fun analyze(): Duration = Duration.ZERO
-
-        override suspend fun refreshMaterializedViews(): Duration = Duration.ZERO
-
-        override suspend fun fullRefreshMaterializedViews(): Duration = Duration.ZERO
-    }
-
-    private class FakeAccountAttributeRepository : AccountAttributeRepository {
-        override fun getByAccount(accountId: AccountId): Flow<List<AccountAttribute>> = flowOf(emptyList())
-
-        override suspend fun insert(
-            accountId: AccountId,
-            attributeTypeId: AttributeTypeId,
-            value: String,
-        ): Long = 0L
-
-        override suspend fun insertInCreationMode(
-            accountId: AccountId,
-            attributeTypeId: AttributeTypeId,
-            value: String,
-        ): Long = 0L
-
-        override suspend fun updateValue(
-            id: Long,
-            newValue: String,
-        ) {}
-
-        override suspend fun delete(id: Long) {}
-    }
-
-    private class FakeAttributeTypeRepository : AttributeTypeRepository {
-        override fun getAll(): Flow<List<AttributeType>> = flowOf(emptyList())
-
-        override fun getById(id: AttributeTypeId): Flow<AttributeType?> = flowOf(null)
-
-        override fun getByName(name: String): Flow<AttributeType?> = flowOf(null)
-
-        override suspend fun getOrCreate(name: String): AttributeTypeId = AttributeTypeId(0L)
-    }
+    private fun createAttributeTypeRepository(): AttributeTypeRepository =
+        mock(MockMode.autoUnit) {
+            every { getAll() } returns flowOf(emptyList())
+            every { getById(any()) } returns flowOf(null)
+            every { getByName(any()) } returns flowOf(null)
+            everySuspend { getOrCreate(any()) } returns AttributeTypeId(0L)
+        }
 
     /**
      * Creates a stub EntitySourceQueries for tests that don't actually query entity sources.
