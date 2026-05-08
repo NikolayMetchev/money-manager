@@ -1,4 +1,4 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
+﻿@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
 
 package com.moneymanager.ui.screens
 
@@ -23,44 +23,29 @@ import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.SampleGeneratorSourceRecorder
 import com.moneymanager.di.database.DatabaseComponent
 import com.moneymanager.domain.model.Account
-import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
-import com.moneymanager.domain.model.ApiRequestId
-import com.moneymanager.domain.model.ApiSessionId
-import com.moneymanager.domain.model.ApiSourceDetails
-import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.AttributeTypeId
-import com.moneymanager.domain.model.Category
-import com.moneymanager.domain.model.CategoryBalance
-import com.moneymanager.domain.model.CsvSourceDetails
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.DeviceInfo
-import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.Money
-import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.PageWithTargetIndex
 import com.moneymanager.domain.model.PagingInfo
 import com.moneymanager.domain.model.PagingResult
-import com.moneymanager.domain.model.SourceRecorder
-import com.moneymanager.domain.model.SourceType
-import com.moneymanager.domain.model.TransactionId
+import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
-import com.moneymanager.domain.model.TransferSource
-import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
-import com.moneymanager.domain.repository.ApiSourceRecord
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CategoryRepository
-import com.moneymanager.domain.repository.CsvImportSourceRecord
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.DeviceRepository
-import com.moneymanager.domain.repository.SampleGeneratorSourceRecord
+import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
+import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.domain.repository.TransferSourceRepository
 import com.moneymanager.test.database.createTestDatabaseLocation
@@ -70,8 +55,13 @@ import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import com.moneymanager.ui.screens.transactions.AccountTransactionsScreen
 import com.moneymanager.ui.screens.transactions.TransactionAuditScreen
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
+import dev.mokkery.MockMode
+import dev.mokkery.answering.calls
+import dev.mokkery.answering.returns
+import dev.mokkery.every
+import dev.mokkery.everySuspend
+import dev.mokkery.matcher.any
+import dev.mokkery.mock
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
@@ -80,7 +70,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.Duration
-import kotlin.time.Instant
 
 @OptIn(ExperimentalTestApi::class)
 class AccountTransactionsScreenTest {
@@ -122,17 +111,17 @@ class AccountTransactionsScreenTest {
                     amount = Money.fromDisplayValue("100", usdCurrency),
                 )
 
-            val accountRepository = FakeAccountRepository(listOf(checking, savings))
-            val transactionRepository = FakeTransactionRepository(listOf(transfer))
-            val transferSourceRepository = FakeTransferSourceRepository()
+            val accountRepository = createAccountRepository(listOf(checking, savings))
+            val transactionRepository = createTransactionRepository(listOf(transfer))
+            val transferSourceRepository = createTransferSourceRepository()
             val transferSourceQueries = createStubTransferSourceQueries()
-            val deviceRepository = FakeDeviceRepository()
-            val currencyRepository = FakeCurrencyRepository(listOf(usdCurrency))
-            val categoryRepository = FakeCategoryRepository()
-            val attributeTypeRepository = FakeAttributeTypeRepository()
-            val personRepository = FakePersonRepository()
-            val personAccountOwnershipRepository = FakePersonAccountOwnershipRepository()
-            val maintenanceService = FakeDatabaseMaintenanceService()
+            val deviceRepository = createDeviceRepository()
+            val currencyRepository = createCurrencyRepository(listOf(usdCurrency))
+            val categoryRepository = createCategoryRepository()
+            val attributeTypeRepository = createAttributeTypeRepository()
+            val personRepository = createPersonRepository()
+            val personAccountOwnershipRepository = createPersonAccountOwnershipRepository()
+            val maintenanceService = createMaintenanceService()
 
             // When: Viewing from Checking account's perspective
             setContent {
@@ -147,7 +136,7 @@ class AccountTransactionsScreenTest {
                         entitySourceQueries = stubEntitySourceQueries,
                         deviceRepository = deviceRepository,
                         accountRepository = accountRepository,
-                        accountAttributeRepository = FakeAccountAttributeRepository(),
+                        accountAttributeRepository = createAccountAttributeRepository(),
                         categoryRepository = categoryRepository,
                         currencyRepository = currencyRepository,
                         attributeTypeRepository = attributeTypeRepository,
@@ -223,17 +212,17 @@ class AccountTransactionsScreenTest {
                     amount = Money.fromDisplayValue("100", usdCurrency),
                 )
 
-            val accountRepository = FakeAccountRepository(listOf(checking, savings))
-            val transactionRepository = FakeTransactionRepository(listOf(transfer))
-            val transferSourceRepository = FakeTransferSourceRepository()
+            val accountRepository = createAccountRepository(listOf(checking, savings))
+            val transactionRepository = createTransactionRepository(listOf(transfer))
+            val transferSourceRepository = createTransferSourceRepository()
             val transferSourceQueries = createStubTransferSourceQueries()
-            val deviceRepository = FakeDeviceRepository()
-            val currencyRepository = FakeCurrencyRepository(listOf(usdCurrency))
-            val categoryRepository = FakeCategoryRepository()
-            val attributeTypeRepository = FakeAttributeTypeRepository()
-            val personRepository = FakePersonRepository()
-            val personAccountOwnershipRepository = FakePersonAccountOwnershipRepository()
-            val maintenanceService = FakeDatabaseMaintenanceService()
+            val deviceRepository = createDeviceRepository()
+            val currencyRepository = createCurrencyRepository(listOf(usdCurrency))
+            val categoryRepository = createCategoryRepository()
+            val attributeTypeRepository = createAttributeTypeRepository()
+            val personRepository = createPersonRepository()
+            val personAccountOwnershipRepository = createPersonAccountOwnershipRepository()
+            val maintenanceService = createMaintenanceService()
 
             setContent {
                 ProvideSchemaAwareScope {
@@ -247,7 +236,7 @@ class AccountTransactionsScreenTest {
                         entitySourceQueries = stubEntitySourceQueries,
                         deviceRepository = deviceRepository,
                         accountRepository = accountRepository,
-                        accountAttributeRepository = FakeAccountAttributeRepository(),
+                        accountAttributeRepository = createAccountAttributeRepository(),
                         categoryRepository = categoryRepository,
                         currencyRepository = currencyRepository,
                         attributeTypeRepository = attributeTypeRepository,
@@ -468,7 +457,7 @@ class AccountTransactionsScreenTest {
                 // Wait for audit button to be visible (indicates UI has refreshed)
                 waitUntilExactlyOneExists(hasText("\uD83D\uDCDC"), timeoutMillis = 10000)
 
-                // Now click the Audit History button (📜) and verify it shows the new attribute
+                // Now click the Audit History button (ðŸ“œ) and verify it shows the new attribute
                 onNodeWithText("\uD83D\uDCDC").performClick()
 
                 // Wait for audit history dialog to appear
@@ -863,468 +852,171 @@ class AccountTransactionsScreenTest {
         }
     }
 
-    private class FakeAccountRepository(
-        private val accounts: List<Account>,
-    ) : AccountRepository {
-        private val accountsFlow = MutableStateFlow(accounts)
-
-        override fun getAllAccounts(): Flow<List<Account>> = accountsFlow
-
-        override fun getAccountById(id: AccountId): Flow<Account?> = flowOf(accounts.find { it.id == id })
-
-        override suspend fun createAccount(account: Account): AccountId {
-            val newId = AccountId((accounts.maxOfOrNull { it.id.id } ?: 0L) + 1)
-            val newAccount = account.copy(id = newId)
-            accountsFlow.value = accountsFlow.value + newAccount
-            return newId
+    private fun createAccountRepository(accounts: List<Account>): AccountRepository =
+        mock(MockMode.autoUnit) {
+            every { getAllAccounts() } returns flowOf(accounts)
+            every { getAccountById(any()) } calls { (id: AccountId) -> flowOf(accounts.find { it.id == id }) }
+            everySuspend { createAccount(any()) } returns AccountId(999L)
+            everySuspend { createAccountsBatch(any()) } returns emptyList()
+            everySuspend { updateAccount(any()) } returns 1L
+            everySuspend { updateAccountWithAttributes(any(), any(), any(), any(), any()) } returns 1L
+            everySuspend { countTransfersByAccount(any()) } returns 0L
+            everySuspend { getTransfersBetweenAccounts(any(), any()) } returns emptyList()
         }
 
-        override suspend fun createAccountsBatch(accounts: List<Account>): List<AccountId> = accounts.map { createAccount(it) }
-
-        override suspend fun updateAccount(account: Account): Long {
-            accountsFlow.value =
-                accountsFlow.value.map {
-                    if (it.id == account.id) account.copy(revisionId = account.revisionId + 1) else it
+    private fun createTransactionRepository(transfers: List<Transfer>): TransactionRepository =
+        mock(MockMode.autoUnit) {
+            every { getTransactionById(any()) } calls { (id: Long) -> flowOf(transfers.find { it.id.id == id }) }
+            every { getTransactionsByAccount(any()) } calls { (accountId: AccountId) ->
+                flowOf(transfers.filter { it.sourceAccountId == accountId || it.targetAccountId == accountId })
+            }
+            every { getTransactionsByDateRange(any(), any()) } returns flowOf(emptyList())
+            every { getTransactionsByAccountAndDateRange(any(), any(), any()) } returns flowOf(emptyList())
+            every { getAccountBalances() } returns flowOf(emptyList())
+            everySuspend { getRunningBalanceByAccountPaginated(any(), any(), any()) } calls
+                { (accountId: AccountId, pageSize: Int, _: PagingInfo?) ->
+                    val allRows = buildAccountRows(transfers, accountId)
+                    val items = allRows.take(pageSize)
+                    PagingResult(
+                        items = items,
+                        pagingInfo =
+                            PagingInfo(
+                                lastTimestamp = items.lastOrNull()?.timestamp,
+                                lastId = items.lastOrNull()?.transactionId,
+                                hasMore = allRows.size > pageSize,
+                            ),
+                    )
                 }
-            return account.revisionId + 1
-        }
-
-        override suspend fun updateAccountWithAttributes(
-            account: Account?,
-            accountId: AccountId,
-            deletedAttributeIds: Set<Long>,
-            updatedAttributes: Map<Long, NewAttribute>,
-            newAttributes: List<NewAttribute>,
-        ): Long {
-            val current = accountsFlow.value.find { it.id == accountId } ?: return 1L
-            val newRevision = current.revisionId + 1
-            accountsFlow.value =
-                accountsFlow.value.map {
-                    if (it.id == accountId) (account ?: it).copy(revisionId = newRevision) else it
+            everySuspend { getRunningBalanceByAccountPaginatedBackward(any(), any(), any(), any()) } returns
+                PagingResult(emptyList<AccountRow>(), PagingInfo(null, null, false))
+            everySuspend { getPageContainingTransaction(any(), any(), any()) } calls
+                { (accountId: AccountId, transactionId: TransferId, pageSize: Int) ->
+                    val allRows = buildAccountRows(transfers, accountId)
+                    val targetIndex = allRows.indexOfFirst { it.transactionId.id == transactionId.id }
+                    val items = allRows.take(pageSize)
+                    PageWithTargetIndex(
+                        items = items,
+                        targetIndex = targetIndex,
+                        pagingInfo =
+                            PagingInfo(
+                                lastTimestamp = items.lastOrNull()?.timestamp,
+                                lastId = items.lastOrNull()?.transactionId,
+                                hasMore = allRows.size > pageSize,
+                            ),
+                        hasPrevious = false,
+                    )
                 }
-            return newRevision
         }
 
-        override suspend fun deleteAccount(id: AccountId) {
-            accountsFlow.value = accountsFlow.value.filter { it.id != id }
-        }
-
-        override suspend fun countTransfersByAccount(accountId: AccountId): Long = 0L
-
-        override suspend fun getTransfersBetweenAccounts(
-            accountA: AccountId,
-            accountB: AccountId,
-        ): List<Transfer> = emptyList()
-
-        override suspend fun deleteAccountAndMoveTransactions(
-            accountToDelete: AccountId,
-            targetAccount: AccountId,
-        ) {
-            accountsFlow.value = accountsFlow.value.filter { it.id != accountToDelete }
-        }
-    }
-
-    private class FakeTransactionRepository(
-        private val transfers: List<Transfer>,
-    ) : TransactionRepository {
-        override fun getTransactionById(id: Long): Flow<Transfer?> = flowOf(transfers.find { it.id.id == id })
-
-        override fun getTransactionsByAccount(accountId: AccountId): Flow<List<Transfer>> =
-            flowOf(transfers.filter { it.sourceAccountId == accountId || it.targetAccountId == accountId })
-
-        override fun getTransactionsByDateRange(
-            startDate: Instant,
-            endDate: Instant,
-        ): Flow<List<Transfer>> = flowOf(emptyList())
-
-        override fun getTransactionsByAccountAndDateRange(
-            accountId: AccountId,
-            startDate: Instant,
-            endDate: Instant,
-        ): Flow<List<Transfer>> = flowOf(emptyList())
-
-        override fun getAccountBalances(): Flow<List<AccountBalance>> = flowOf(emptyList())
-
-        override suspend fun getRunningBalanceByAccountPaginated(
-            accountId: AccountId,
-            pageSize: Int,
-            pagingInfo: PagingInfo?,
-        ): PagingResult<AccountRow> {
-            // Simulate the materialized view logic: create TWO AccountRow entries per transfer
-            // One from the source account's perspective (outgoing = negative)
-            // One from the target account's perspective (incoming = positive)
-            val allRows =
-                transfers
-                    .flatMap { transfer ->
-                        listOf(
-                            // Source account's perspective (outgoing = negative)
-                            AccountRow(
-                                transactionId = transfer.id,
-                                timestamp = transfer.timestamp,
-                                description = transfer.description,
-                                accountId = transfer.sourceAccountId,
-                                transactionAmount = Money(-transfer.amount.amount, transfer.amount.currency),
-                                runningBalance = transfer.amount,
-                                sourceAccountId = transfer.sourceAccountId,
-                                targetAccountId = transfer.targetAccountId,
-                            ),
-                            // Target account's perspective (incoming = positive)
-                            AccountRow(
-                                transactionId = transfer.id,
-                                timestamp = transfer.timestamp,
-                                description = transfer.description,
-                                accountId = transfer.targetAccountId,
-                                transactionAmount = transfer.amount,
-                                runningBalance = transfer.amount,
-                                sourceAccountId = transfer.sourceAccountId,
-                                targetAccountId = transfer.targetAccountId,
-                            ),
-                        )
-                    }.filter { it.accountId == accountId }
-                    .sortedByDescending { it.timestamp }
-
-            // Simple pagination for testing
-            val items = allRows.take(pageSize)
-            val hasMore = allRows.size > pageSize
-
-            return PagingResult(
-                items = items,
-                pagingInfo =
-                    PagingInfo(
-                        lastTimestamp = items.lastOrNull()?.timestamp,
-                        lastId = items.lastOrNull()?.transactionId,
-                        hasMore = hasMore,
+    private fun buildAccountRows(
+        transfers: List<Transfer>,
+        accountId: AccountId,
+    ): List<AccountRow> =
+        transfers
+            .flatMap { transfer ->
+                listOf(
+                    AccountRow(
+                        transactionId = transfer.id,
+                        timestamp = transfer.timestamp,
+                        description = transfer.description,
+                        accountId = transfer.sourceAccountId,
+                        transactionAmount = Money(-transfer.amount.amount, transfer.amount.currency),
+                        runningBalance = transfer.amount,
+                        sourceAccountId = transfer.sourceAccountId,
+                        targetAccountId = transfer.targetAccountId,
                     ),
-            )
-        }
-
-        override suspend fun getRunningBalanceByAccountPaginatedBackward(
-            accountId: AccountId,
-            pageSize: Int,
-            firstTimestamp: Instant,
-            firstId: TransactionId,
-        ): PagingResult<AccountRow> =
-            PagingResult(
-                items = emptyList(),
-                pagingInfo =
-                    PagingInfo(
-                        lastTimestamp = null,
-                        lastId = null,
-                        hasMore = false,
+                    AccountRow(
+                        transactionId = transfer.id,
+                        timestamp = transfer.timestamp,
+                        description = transfer.description,
+                        accountId = transfer.targetAccountId,
+                        transactionAmount = transfer.amount,
+                        runningBalance = transfer.amount,
+                        sourceAccountId = transfer.sourceAccountId,
+                        targetAccountId = transfer.targetAccountId,
                     ),
-            )
-
-        override suspend fun getPageContainingTransaction(
-            accountId: AccountId,
-            transactionId: TransferId,
-            pageSize: Int,
-        ): PageWithTargetIndex<AccountRow> {
-            val allRows =
-                transfers
-                    .flatMap { transfer ->
-                        listOf(
-                            AccountRow(
-                                transactionId = transfer.id,
-                                timestamp = transfer.timestamp,
-                                description = transfer.description,
-                                accountId = transfer.sourceAccountId,
-                                transactionAmount = Money(-transfer.amount.amount, transfer.amount.currency),
-                                runningBalance = transfer.amount,
-                                sourceAccountId = transfer.sourceAccountId,
-                                targetAccountId = transfer.targetAccountId,
-                            ),
-                            AccountRow(
-                                transactionId = transfer.id,
-                                timestamp = transfer.timestamp,
-                                description = transfer.description,
-                                accountId = transfer.targetAccountId,
-                                transactionAmount = transfer.amount,
-                                runningBalance = transfer.amount,
-                                sourceAccountId = transfer.sourceAccountId,
-                                targetAccountId = transfer.targetAccountId,
-                            ),
-                        )
-                    }.filter { it.accountId == accountId }
-                    .sortedByDescending { it.timestamp }
-
-            val targetIndex = allRows.indexOfFirst { it.transactionId.id == transactionId.id }
-            val items = allRows.take(pageSize)
-            val hasMore = allRows.size > pageSize
-
-            return PageWithTargetIndex(
-                items = items,
-                targetIndex = targetIndex,
-                pagingInfo =
-                    PagingInfo(
-                        lastTimestamp = items.lastOrNull()?.timestamp,
-                        lastId = items.lastOrNull()?.transactionId,
-                        hasMore = hasMore,
-                    ),
-                hasPrevious = false,
-            )
-        }
-
-        override suspend fun createTransfers(
-            transfers: List<Transfer>,
-            newAttributes: Map<TransferId, List<NewAttribute>>,
-            sourceRecorder: SourceRecorder,
-            onProgress: (suspend (Int, Int) -> Unit)?,
-        ) {}
-
-        override suspend fun updateTransfer(
-            transfer: Transfer?,
-            deletedAttributeIds: Set<Long>,
-            updatedAttributes: Map<Long, NewAttribute>,
-            newAttributes: List<NewAttribute>,
-            transactionId: TransferId,
-        ) {}
-
-        override suspend fun deleteTransaction(id: Long) {}
-    }
-
-    private class FakeCurrencyRepository(
-        private val currencies: List<Currency>,
-    ) : CurrencyRepository {
-        override fun getAllCurrencies(): Flow<List<Currency>> = flowOf(currencies)
-
-        override fun getCurrencyById(id: CurrencyId): Flow<Currency?> = flowOf(currencies.find { it.id == id })
-
-        override fun getCurrencyByCode(code: String): Flow<Currency?> = flowOf(currencies.find { it.code == code })
-
-        override suspend fun upsertCurrencyByCode(
-            code: String,
-            name: String,
-        ): CurrencyId = CurrencyId(1L)
-
-        override suspend fun updateCurrency(currency: Currency) {}
-
-        override suspend fun deleteCurrency(id: CurrencyId) {}
-    }
-
-    private class FakeCategoryRepository : CategoryRepository {
-        private val categories =
-            listOf(
-                Category(id = -1L, name = "Uncategorized"),
-                Category(id = 1L, name = "Food"),
-                Category(id = 2L, name = "Transport"),
-            )
-
-        override fun getAllCategories(): Flow<List<Category>> = flowOf(categories)
-
-        override fun getCategoryBalances(): Flow<List<CategoryBalance>> = flowOf(emptyList())
-
-        override fun getCategoryById(id: Long): Flow<Category?> = flowOf(categories.find { it.id == id })
-
-        override fun getTopLevelCategories(): Flow<List<Category>> = flowOf(categories.filter { it.parentId == null })
-
-        override fun getCategoriesByParent(parentId: Long): Flow<List<Category>> = flowOf(categories.filter { it.parentId == parentId })
-
-        override suspend fun createCategory(category: Category): Long = 0L
-
-        override suspend fun updateCategory(category: Category) {}
-
-        override suspend fun deleteCategory(id: Long) {}
-    }
-
-    private class FakeDatabaseMaintenanceService : DatabaseMaintenanceService {
-        override suspend fun reindex(): Duration = Duration.ZERO
-
-        override suspend fun vacuum(): Duration = Duration.ZERO
-
-        override suspend fun analyze(): Duration = Duration.ZERO
-
-        override suspend fun refreshMaterializedViews(): Duration = Duration.ZERO
-
-        override suspend fun fullRefreshMaterializedViews(): Duration = Duration.ZERO
-    }
-
-    private class FakeTransferSourceRepository : TransferSourceRepository {
-        private var sourceIdCounter = 1L
-        private val sources = mutableListOf<TransferSource>()
-
-        override suspend fun recordManualSource(
-            transactionId: TransferId,
-            revisionId: Long,
-            deviceInfo: DeviceInfo,
-        ): TransferSource {
-            val source =
-                TransferSource(
-                    id = sourceIdCounter++,
-                    transactionId = transactionId,
-                    revisionId = revisionId,
-                    sourceType = SourceType.MANUAL,
-                    deviceId = 1L,
-                    deviceInfo = deviceInfo,
-                    csvSource = null,
-                    apiSource = null,
-                    createdAt = Clock.System.now(),
                 )
-            sources.add(source)
-            return source
+            }.filter { it.accountId == accountId }
+            .sortedByDescending { it.timestamp }
+
+    private fun createCurrencyRepository(currencies: List<Currency>): CurrencyRepository =
+        mock(MockMode.autoUnit) {
+            every { getAllCurrencies() } returns flowOf(currencies)
+            every { getCurrencyById(any()) } calls { (id: CurrencyId) -> flowOf(currencies.find { it.id == id }) }
+            every { getCurrencyByCode(any()) } calls { (code: String) -> flowOf(currencies.find { it.code == code }) }
+            everySuspend { upsertCurrencyByCode(any(), any()) } returns CurrencyId(1L)
         }
 
-        override suspend fun recordCsvImportSource(
-            transactionId: TransferId,
-            revisionId: Long,
-            csvImportId: CsvImportId,
-            rowIndex: Long,
-        ): TransferSource {
-            val source =
-                TransferSource(
-                    id = sourceIdCounter++,
-                    transactionId = transactionId,
-                    revisionId = revisionId,
-                    sourceType = SourceType.CSV_IMPORT,
-                    deviceId = 1L,
-                    deviceInfo = DeviceInfo.Jvm(osName = "Test", machineName = "Test"),
-                    csvSource = CsvSourceDetails(importId = csvImportId, rowIndex = rowIndex, fileName = "test.csv"),
-                    apiSource = null,
-                    createdAt = Clock.System.now(),
+    private fun createCategoryRepository(): CategoryRepository =
+        mock(MockMode.autoUnit) {
+            val categories =
+                listOf(
+                    com.moneymanager.domain.model
+                        .Category(id = -1L, name = "Uncategorized"),
+                    com.moneymanager.domain.model
+                        .Category(id = 1L, name = "Food"),
+                    com.moneymanager.domain.model
+                        .Category(id = 2L, name = "Transport"),
                 )
-            sources.add(source)
-            return source
+            every { getAllCategories() } returns flowOf(categories)
+            every { getCategoryBalances() } returns flowOf(emptyList())
+            every { getCategoryById(any()) } calls { (id: Long) -> flowOf(categories.find { it.id == id }) }
+            every { getTopLevelCategories() } returns flowOf(categories.filter { it.parentId == null })
+            every { getCategoriesByParent(any()) } calls { (parentId: Long) -> flowOf(categories.filter { it.parentId == parentId }) }
+            everySuspend { createCategory(any()) } returns 0L
         }
 
-        override suspend fun recordCsvImportSourcesBatch(
-            csvImportId: CsvImportId,
-            sources: List<CsvImportSourceRecord>,
-        ) {}
-
-        override suspend fun recordSampleGeneratorSourcesBatch(
-            deviceInfo: DeviceInfo,
-            sources: List<SampleGeneratorSourceRecord>,
-        ) {}
-
-        override suspend fun recordApiSource(
-            transactionId: TransferId,
-            revisionId: Long,
-            sessionId: ApiSessionId,
-            requestId: ApiRequestId,
-            deviceInfo: DeviceInfo,
-            jsonPath: JsonPath,
-        ): TransferSource {
-            val source =
-                TransferSource(
-                    id = sourceIdCounter++,
-                    transactionId = transactionId,
-                    revisionId = revisionId,
-                    sourceType = SourceType.API,
-                    deviceId = 1L,
-                    deviceInfo = deviceInfo,
-                    csvSource = null,
-                    apiSource = ApiSourceDetails(sessionId = sessionId, requestId = requestId, jsonPath = jsonPath),
-                    createdAt = Clock.System.now(),
-                )
-            sources.add(source)
-            return source
+    private fun createTransferSourceRepository(): TransferSourceRepository =
+        mock(MockMode.autoUnit) {
+            everySuspend { getSourcesForTransaction(any()) } returns emptyList()
+            everySuspend { getSourceByRevision(any(), any()) } returns null
         }
 
-        override suspend fun recordApiSourcesBatch(
-            sessionId: ApiSessionId,
-            requestId: ApiRequestId,
-            deviceInfo: DeviceInfo,
-            sources: List<ApiSourceRecord>,
-        ) {}
-
-        override suspend fun getSourcesForTransaction(transactionId: TransferId): List<TransferSource> =
-            sources.filter { it.transactionId == transactionId }
-
-        override suspend fun getSourceByRevision(
-            transactionId: TransferId,
-            revisionId: Long,
-        ): TransferSource? = sources.find { it.transactionId == transactionId && it.revisionId == revisionId }
-    }
-
-    private class FakeAttributeTypeRepository : AttributeTypeRepository {
-        private val types = mutableListOf<AttributeType>()
-        private var nextId = 1L
-
-        override fun getAll(): Flow<List<AttributeType>> = flowOf(types.toList())
-
-        override fun getById(id: AttributeTypeId): Flow<AttributeType?> = flowOf(types.find { it.id == id })
-
-        override fun getByName(name: String): Flow<AttributeType?> = flowOf(types.find { it.name == name })
-
-        override suspend fun getOrCreate(name: String): AttributeTypeId {
-            val existing = types.find { it.name == name }
-            if (existing != null) return existing.id
-            val newType = AttributeType(id = AttributeTypeId(nextId++), name = name)
-            types.add(newType)
-            return newType.id
+    private fun createAttributeTypeRepository(): AttributeTypeRepository =
+        mock(MockMode.autoUnit) {
+            every { getAll() } returns flowOf(emptyList())
+            every { getById(any()) } returns flowOf(null)
+            every { getByName(any()) } returns flowOf(null)
+            everySuspend { getOrCreate(any()) } returns AttributeTypeId(0L)
         }
 
-        fun getCreatedTypes(): List<AttributeType> = types.toList()
-    }
+    private fun createAccountAttributeRepository(): AccountAttributeRepository =
+        mock(MockMode.autoUnit) {
+            every { getByAccount(any()) } returns flowOf(emptyList())
+            everySuspend { insert(any(), any(), any()) } returns 0L
+            everySuspend { insertInCreationMode(any(), any(), any()) } returns 0L
+        }
 
-    private class FakeAccountAttributeRepository : AccountAttributeRepository {
-        override fun getByAccount(accountId: AccountId): Flow<List<com.moneymanager.domain.model.AccountAttribute>> = flowOf(emptyList())
+    private fun createDeviceRepository(): DeviceRepository =
+        mock(MockMode.autoUnit) {
+            every { getOrCreateDevice(any()) } returns DeviceId(1L)
+            everySuspend { getDeviceById(any()) } returns null
+        }
 
-        override suspend fun insert(
-            accountId: AccountId,
-            attributeTypeId: AttributeTypeId,
-            value: String,
-        ): Long = 0L
+    private fun createPersonRepository(): PersonRepository =
+        mock(MockMode.autoUnit) {
+            every { getAllPeople() } returns flowOf(emptyList())
+            every { getPersonById(any()) } returns flowOf(null)
+            everySuspend { createPerson(any()) } returns PersonId(0L)
+        }
 
-        override suspend fun insertInCreationMode(
-            accountId: AccountId,
-            attributeTypeId: AttributeTypeId,
-            value: String,
-        ): Long = 0L
+    private fun createPersonAccountOwnershipRepository(): PersonAccountOwnershipRepository =
+        mock(MockMode.autoUnit) {
+            every { getOwnershipsByPerson(any()) } returns flowOf(emptyList())
+            every { getOwnershipsByAccount(any()) } returns flowOf(emptyList())
+            every { getOwnershipById(any()) } returns flowOf(null)
+            everySuspend { createOwnership(any(), any()) } returns 0L
+        }
 
-        override suspend fun updateValue(
-            id: Long,
-            newValue: String,
-        ) {}
+    private fun createMaintenanceService(): com.moneymanager.database.DatabaseMaintenanceService =
+        mock(MockMode.autoUnit) {
+            everySuspend { reindex() } returns Duration.ZERO
+            everySuspend { vacuum() } returns Duration.ZERO
+            everySuspend { analyze() } returns Duration.ZERO
+            everySuspend { refreshMaterializedViews() } returns Duration.ZERO
+            everySuspend { fullRefreshMaterializedViews() } returns Duration.ZERO
+        }
 
-        override suspend fun delete(id: Long) {}
-    }
-
-    private class FakeDeviceRepository : DeviceRepository {
-        override fun getOrCreateDevice(deviceInfo: DeviceInfo): DeviceId = DeviceId(1L)
-
-        override suspend fun getDeviceById(id: DeviceId): DeviceInfo? = null
-    }
-
-    private class FakePersonRepository : com.moneymanager.domain.repository.PersonRepository {
-        override fun getAllPeople(): Flow<List<com.moneymanager.domain.model.Person>> = flowOf(emptyList())
-
-        override fun getPersonById(id: com.moneymanager.domain.model.PersonId): Flow<com.moneymanager.domain.model.Person?> = flowOf(null)
-
-        override suspend fun createPerson(person: com.moneymanager.domain.model.Person): com.moneymanager.domain.model.PersonId =
-            com.moneymanager.domain.model
-                .PersonId(1L)
-
-        override suspend fun updatePerson(person: com.moneymanager.domain.model.Person) = Unit
-
-        override suspend fun deletePerson(id: com.moneymanager.domain.model.PersonId) = Unit
-    }
-
-    private class FakePersonAccountOwnershipRepository : com.moneymanager.domain.repository.PersonAccountOwnershipRepository {
-        override fun getOwnershipsByPerson(
-            personId: com.moneymanager.domain.model.PersonId,
-        ): Flow<List<com.moneymanager.domain.model.PersonAccountOwnership>> = flowOf(emptyList())
-
-        override fun getOwnershipsByAccount(accountId: AccountId): Flow<List<com.moneymanager.domain.model.PersonAccountOwnership>> =
-            flowOf(emptyList())
-
-        override fun getOwnershipById(id: Long): Flow<com.moneymanager.domain.model.PersonAccountOwnership?> = flowOf(null)
-
-        override suspend fun createOwnership(
-            personId: com.moneymanager.domain.model.PersonId,
-            accountId: AccountId,
-        ): Long = 1L
-
-        override suspend fun deleteOwnership(id: Long) = Unit
-
-        override suspend fun deleteOwnershipsByPerson(personId: com.moneymanager.domain.model.PersonId) = Unit
-
-        override suspend fun deleteOwnershipsByAccount(accountId: AccountId) = Unit
-    }
-
-    /**
-     * Creates a stub TransferSourceQueries for tests that don't actually query transfer sources.
-     * Uses a minimal SqlDriver stub that throws NotImplementedError if actually invoked.
-     */
     private fun createStubTransferSourceQueries(): com.moneymanager.database.sql.TransferSourceQueries {
         val stubDriver =
             object : app.cash.sqldelight.db.SqlDriver {

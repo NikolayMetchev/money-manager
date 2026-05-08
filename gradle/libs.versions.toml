@@ -40,6 +40,7 @@ log4j = "2.25.4"
 mappie = "2.3.20-2.4.1"
 proguard = "7.8.2"
 metro = "1.0.0"
+mokkery = "3.3.0"
 schemaspy = "7.0.2"
 slf4j = "2.0.17"
 sort-dependencies = "0.17.1"
@@ -118,6 +119,8 @@ mappie-api = { module = "tech.mappie:mappie-api", version.ref = "mappie" }
 mappie-gradle-plugin = { module = "tech.mappie.plugin:tech.mappie.plugin.gradle.plugin", version.ref = "mappie" }
 metro-gradle-plugin = { module = "dev.zacsweers.metro:dev.zacsweers.metro.gradle.plugin", version.ref = "metro" }
 metro-runtime = { module = "dev.zacsweers.metro:runtime", version.ref = "metro" }
+mokkery-core = { module = "dev.mokkery:mokkery-core", version.ref = "mokkery" }
+mokkery-runtime = { module = "dev.mokkery:mokkery-runtime", version.ref = "mokkery" }
 schemaspy = { module = "org.schemaspy:schemaspy", version.ref = "schemaspy" }
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
 sort-dependencies-gradle-plugin = { module = "com.squareup.sort-dependencies:com.squareup.sort-dependencies.gradle.plugin", version.ref = "sort-dependencies" }
@@ -144,5 +147,6 @@ kover = { id = "org.jetbrains.kotlinx.kover", version.ref = "kover" }
 ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlint" }
 mappie = { id = "tech.mappie.plugin", version.ref = "mappie" }
 metro = { id = "dev.zacsweers.metro", version.ref = "metro" }
+mokkery = { id = "dev.mokkery", version.ref = "mokkery" }
 sort-dependencies = { id = "com.squareup.sort-dependencies", version.ref = "sort-dependencies" }
 sqldelight = { id = "app.cash.sqldelight", version.ref = "sqldelight" }

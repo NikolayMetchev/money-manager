@@ -80,27 +80,23 @@ class MyComponentTest {
 - `.performClick()` - Simulate click
 - `.performTextInput("text")` - Type text into field
 
-### Fake Repositories
-Use fake implementations for isolated testing:
+### Mocking Repositories (Mokkery)
+Use Mokkery mocks for isolated testing:
 
 ```kotlin
-private class FakeRepository : MyRepository {
-    private val data = MutableStateFlow<List<Item>>(emptyList())
-
-    override fun getData(): Flow<List<Item>> = data
-
-    override suspend fun create(item: Item) {
-        data.value = data.value + item
-    }
+val repository = mock<MyRepository>(MockMode.autoUnit) {
+    every { getData() } returns flowOf(emptyList())
 }
 ```
+
+For tests that need mutable state, keep the state in the test and update mocked answers accordingly.
 
 ## Best Practices
 
 1. **Test behavior, not implementation**: Focus on what users see and do
 2. **Use semantic finders**: Prefer `onNodeWithText()` over `onNodeWithTag()`
 3. **Keep tests isolated**: Each test should be independent
-4. **Use fake dependencies**: Mock repositories/services for predictable results
+4. **Use mocked dependencies**: Mock repositories/services for predictable results
 5. **Test user flows**: Simulate actual user interactions
 
 ## Platform-Specific Tests
