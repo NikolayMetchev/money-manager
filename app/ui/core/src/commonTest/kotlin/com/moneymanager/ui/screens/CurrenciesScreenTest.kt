@@ -39,6 +39,8 @@ class CurrenciesScreenTest {
             every { getCurrencyById(any()) } returns flowOf(null)
             every { getCurrencyByCode(any()) } returns flowOf(null)
             everySuspend { upsertCurrencyByCode(any(), any()) } returns CurrencyId(999L)
+            everySuspend { updateCurrency(any()) } returns Unit
+            everySuspend { deleteCurrency(any()) } returns Unit
         }
 
     @Test
