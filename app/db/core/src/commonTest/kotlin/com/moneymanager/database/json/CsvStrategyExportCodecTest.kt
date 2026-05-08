@@ -77,7 +77,6 @@ class CsvStrategyExportCodecTest {
                                 dateFormat = "dd/MM/yyyy",
                                 timeColumnName = "Time",
                                 timeFormat = "HH:mm",
-                                defaultTime = "12:00:00",
                             ),
                         TransferField.DESCRIPTION to
                             DirectColumnExport(

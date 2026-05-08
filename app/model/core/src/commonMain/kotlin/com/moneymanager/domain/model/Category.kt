@@ -13,7 +13,6 @@ data class Category(
             Category(
                 id = UNCATEGORIZED_ID,
                 name = UNCATEGORIZED_NAME,
-                parentId = null,
             )
     }
 }

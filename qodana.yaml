@@ -1,0 +1,33 @@
+####################################################################################################################
+# WARNING: Do not store sensitive information in this file, as its contents will be included in the Qodana report. #
+####################################################################################################################
+
+version: "1.0"
+linter: jetbrains/qodana-jvm-community:2026.1
+plugins:
+  - id: com.squareup.sqldelight
+profile:
+  path: .qodana/profile.xml
+exclude:
+  - name: UnusedSymbol
+    paths:
+      - app/di/core/src
+  - name: KotlinNoActualForExpect
+  - name: XmlHighlighting
+  - name: FunctionName
+    paths:
+      - app/ui/core/src
+      - app/main/android/src
+  - name: All
+    paths:
+      - build
+      - "*/build"
+      - "*/*/build"
+      - "*/*/*/build"
+      - gradle/build-logic/build
+      - app/db/core/build
+include:
+  - name: CheckDependencyLicenses
+failureConditions:
+  severityThresholds:
+    critical: 0

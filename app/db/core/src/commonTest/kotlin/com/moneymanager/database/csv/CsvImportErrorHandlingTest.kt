@@ -42,7 +42,6 @@ class CsvImportErrorHandlingTest {
             id = testCurrencyId,
             code = "GBP",
             name = "British Pound",
-            scaleFactor = 100,
         )
 
     private val testSourceAccountId = AccountId(1)
@@ -142,7 +141,7 @@ class CsvImportErrorHandlingTest {
                 CsvRow(rowIndex = 0, values = listOf(), importStatus = ImportStatus.IMPORTED),
                 CsvRow(rowIndex = 1, values = listOf(), importStatus = ImportStatus.ERROR),
                 CsvRow(rowIndex = 2, values = listOf(), importStatus = ImportStatus.DUPLICATE),
-                CsvRow(rowIndex = 3, values = listOf(), importStatus = null),
+                CsvRow(rowIndex = 3, values = listOf()),
                 CsvRow(rowIndex = 4, values = listOf(), importStatus = ImportStatus.UPDATED),
             )
 

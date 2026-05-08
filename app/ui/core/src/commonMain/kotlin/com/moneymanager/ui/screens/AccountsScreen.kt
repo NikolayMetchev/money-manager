@@ -755,7 +755,6 @@ fun CreateCategoryDialog(
                             try {
                                 val newCategory =
                                     Category(
-                                        id = 0,
                                         name = name.trim(),
                                         parentId = selectedParentId,
                                     )
