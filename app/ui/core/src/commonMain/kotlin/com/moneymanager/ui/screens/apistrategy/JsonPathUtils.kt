@@ -6,11 +6,6 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
-data class JsonPathEntry(
-    val path: String,
-    val preview: String,
-)
-
 fun extractJsonPaths(jsonText: String): List<JsonPathEntry> =
     try {
         val results = mutableListOf<JsonPathEntry>()

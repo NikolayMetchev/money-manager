@@ -394,8 +394,8 @@ suspend fun importApiSessionTransactions(
                     .map { it.attributeType.name }
                     .toSet()
             for ((fieldName, jsonPath) in customAccountFields) {
-                val value = rawJson.resolveJsonPath(jsonPath) ?: continue
-                if (fieldName in existingAttrTypes) continue
+                val value = rawJson.resolveJsonPath(jsonPath)
+                if (value == null || fieldName in existingAttrTypes) continue
                 val typeId = attributeTypeCache.getOrCreate(fieldName)
                 accountAttributeRepository.insert(accountId, typeId, value)
             }
