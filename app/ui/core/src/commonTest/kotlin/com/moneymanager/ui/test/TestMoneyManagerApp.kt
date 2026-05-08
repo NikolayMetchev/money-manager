@@ -82,6 +82,7 @@ fun TestMoneyManagerApp(
                 databaseLocation = state.location,
                 accountAttributeRepository = dc.accountAttributeRepository,
                 accountRepository = dc.accountRepository,
+                apiImportStrategyRepository = dc.apiImportStrategyRepository,
                 apiSessionRepository = dc.apiSessionRepository,
                 attributeTypeRepository = dc.attributeTypeRepository,
                 auditRepository = dc.auditRepository,

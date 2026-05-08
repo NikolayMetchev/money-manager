@@ -54,6 +54,27 @@ class AccountAttributeRepositoryImpl(
             }
         }
 
+    override suspend fun insertInCreationMode(
+        accountId: AccountId,
+        attributeTypeId: AttributeTypeId,
+        value: String,
+    ): Long =
+        withContext(Dispatchers.Default) {
+            queries.transactionWithResult {
+                database.beginCreationMode()
+                try {
+                    queries.insert(
+                        accountId.id,
+                        attributeTypeId.id,
+                        value,
+                    )
+                    queries.selectLastInsertedId().executeAsOne()
+                } finally {
+                    database.endCreationMode()
+                }
+            }
+        }
+
     override suspend fun updateValue(
         id: Long,
         newValue: String,

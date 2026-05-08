@@ -13,8 +13,11 @@ import com.moneymanager.database.sql.TransferSourceQueries
 import com.moneymanager.domain.model.ApiSession
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.csv.CsvImportId
+import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
+import com.moneymanager.domain.repository.ApiImportStrategyRepository
 import com.moneymanager.domain.repository.ApiSessionRepository
+import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CsvImportRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
@@ -28,6 +31,9 @@ fun ImportsScreen(
     onTabSelected: (ImportTab) -> Unit,
     csvImportRepository: CsvImportRepository,
     apiSessionRepository: ApiSessionRepository,
+    apiImportStrategyRepository: ApiImportStrategyRepository,
+    attributeTypeRepository: AttributeTypeRepository,
+    accountAttributeRepository: AccountAttributeRepository,
     accountRepository: AccountRepository,
     currencyRepository: CurrencyRepository,
     transactionRepository: TransactionRepository,
@@ -40,6 +46,7 @@ fun ImportsScreen(
     onCsvImportClick: (CsvImportId) -> Unit,
     onCsvStrategiesClick: () -> Unit,
     onAddCredentialClick: () -> Unit,
+    onApiStrategiesClick: () -> Unit,
     onSessionClick: (ApiSession) -> Unit,
     onTransactionsImported: () -> Unit,
 ) {
@@ -67,6 +74,9 @@ fun ImportsScreen(
             ImportTab.API ->
                 ApiSessionsScreen(
                     apiSessionRepository = apiSessionRepository,
+                    apiImportStrategyRepository = apiImportStrategyRepository,
+                    attributeTypeRepository = attributeTypeRepository,
+                    accountAttributeRepository = accountAttributeRepository,
                     accountRepository = accountRepository,
                     currencyRepository = currencyRepository,
                     transactionRepository = transactionRepository,
@@ -77,6 +87,7 @@ fun ImportsScreen(
                     personAccountOwnershipRepository = personAccountOwnershipRepository,
                     deviceId = deviceId,
                     onMonzoConnectClick = onAddCredentialClick,
+                    onApiStrategiesClick = onApiStrategiesClick,
                     onSessionClick = onSessionClick,
                     onTransactionsImported = onTransactionsImported,
                 )

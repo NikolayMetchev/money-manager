@@ -1265,6 +1265,12 @@ class AccountTransactionsScreenTest {
             value: String,
         ): Long = 0L
 
+        override suspend fun insertInCreationMode(
+            accountId: AccountId,
+            attributeTypeId: AttributeTypeId,
+            value: String,
+        ): Long = 0L
+
         override suspend fun updateValue(
             id: Long,
             newValue: String,

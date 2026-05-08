@@ -1,4 +1,4 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
+@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
 
 package com.moneymanager.database.repository
 
@@ -21,10 +21,12 @@ import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.MonzoCredential
 import com.moneymanager.domain.model.MonzoCredentialId
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
 import com.moneymanager.domain.repository.ApiSessionRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 class ApiSessionRepositoryImpl(
     database: MoneyManagerDatabase,
@@ -35,6 +37,7 @@ class ApiSessionRepositoryImpl(
         token: String,
         createdAt: Instant,
         type: ApiSessionType,
+        strategyId: ApiImportStrategyId?,
     ): MonzoCredentialId =
         withContext(Dispatchers.Default) {
             val id =
@@ -43,10 +46,22 @@ class ApiSessionRepositoryImpl(
                         type_id = type.id,
                         token = token,
                         created_at = createdAt.toEpochMilliseconds(),
+                        strategy_id = strategyId?.id?.toString(),
                     )
                     queries.lastInsertCredentialRowId().executeAsOne()
                 }
             MonzoCredentialId(id)
+        }
+
+    override suspend fun updateCredentialStrategy(
+        credentialId: MonzoCredentialId,
+        strategyId: ApiImportStrategyId?,
+    ): Unit =
+        withContext(Dispatchers.Default) {
+            queries.updateCredentialStrategy(
+                strategy_id = strategyId?.id?.toString(),
+                id = credentialId.id,
+            )
         }
 
     override suspend fun getAllCredentials(): List<MonzoCredential> =
@@ -283,6 +298,7 @@ class ApiSessionRepositoryImpl(
             type = ApiSessionType.fromId(type_id),
             token = token,
             createdAt = Instant.fromEpochMilliseconds(created_at),
+            strategyId = strategy_id?.let { ApiImportStrategyId(Uuid.parse(it)) },
         )
 
     private fun com.moneymanager.database.sql.Api_session.toApiSession(): ApiSession =

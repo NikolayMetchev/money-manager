@@ -1,14 +1,18 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
+@file:OptIn(ExperimentalTime::class, ExperimentalUuidApi::class)
 
 package com.moneymanager.domain.model
 
+import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
+import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
+import kotlin.uuid.ExperimentalUuidApi
 
 data class MonzoCredential(
     val id: MonzoCredentialId,
     val type: ApiSessionType,
     val token: String,
     val createdAt: Instant,
+    val strategyId: ApiImportStrategyId? = null,
 )
 
 @JvmInline

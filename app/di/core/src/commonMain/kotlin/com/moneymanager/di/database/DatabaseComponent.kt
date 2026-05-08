@@ -9,6 +9,7 @@ import com.moneymanager.di.DatabaseScope
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
+import com.moneymanager.domain.repository.ApiImportStrategyRepository
 import com.moneymanager.domain.repository.ApiSessionRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.AuditRepository
@@ -35,6 +36,7 @@ import dev.zacsweers.metro.Provides
 interface DatabaseComponent {
     val accountAttributeRepository: AccountAttributeRepository
     val accountRepository: AccountRepository
+    val apiImportStrategyRepository: ApiImportStrategyRepository
     val apiSessionRepository: ApiSessionRepository
     val attributeTypeRepository: AttributeTypeRepository
     val auditRepository: AuditRepository

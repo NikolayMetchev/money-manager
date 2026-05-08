@@ -3,6 +3,7 @@ plugins {
     id("moneymanager.mappie-convention")
     id("moneymanager.kotlin-multiplatform-convention")
     alias(libs.plugins.sqldelight)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 kotlin {
@@ -32,9 +33,9 @@ kotlin {
 
         val jvmMain by getting {
             dependencies {
+                api(libs.kotlinx.serialization.core)
                 api(projects.utils.currency)
 
-                implementation(libs.kotlinx.serialization.core)
                 implementation(libs.sqldelight.sqlite.driver)
             }
         }
@@ -48,8 +49,9 @@ kotlin {
 
         val androidMain by getting {
             dependencies {
+                api(libs.kotlinx.serialization.core)
+
                 implementation(libs.androidx.sqlite)
-                implementation(libs.kotlinx.serialization.core)
                 implementation(libs.sqldelight.android.driver)
             }
         }
@@ -69,6 +71,7 @@ kotlin {
                 implementation(libs.kotlinx.coroutines.test)
                 implementation(projects.app.di.core)
                 implementation(projects.test.app.db)
+
                 runtimeOnly(libs.androidx.test.runner)
             }
             // Include repository tests from commonTest (not the expect declarations file)

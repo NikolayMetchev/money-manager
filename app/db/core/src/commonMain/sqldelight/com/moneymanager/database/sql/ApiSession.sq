@@ -4,15 +4,20 @@ CREATE TABLE api_session_type (
 );
 
 -- Stores a saved token/credential. One credential can produce many download sessions.
+-- strategy_id links this credential to an api_import_strategy, determining how data is
+-- fetched and mapped. NULL means use the legacy type-specific (Monzo) behaviour.
 CREATE TABLE api_credential (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     type_id INTEGER NOT NULL,
     token TEXT NOT NULL UNIQUE CHECK(length(trim(token)) > 0),
     created_at INTEGER NOT NULL,
-    FOREIGN KEY (type_id) REFERENCES api_session_type(id)
+    strategy_id TEXT,
+    FOREIGN KEY (type_id) REFERENCES api_session_type(id),
+    FOREIGN KEY (strategy_id) REFERENCES api_import_strategy(id) ON DELETE SET NULL
 );
 
 CREATE INDEX idx_api_credential_token ON api_credential(token);
+CREATE INDEX idx_api_credential_strategy_id ON api_credential(strategy_id);
 
 -- kind: 'ACCOUNTS' for account-download sessions, 'TRANSACTIONS' for transaction-download sessions
 CREATE TABLE api_session (
@@ -70,11 +75,14 @@ CREATE INDEX idx_api_response_session ON api_response(session_id);
 CREATE INDEX idx_api_response_responded_at ON api_response(responded_at);
 
 insertCredential:
-INSERT INTO api_credential(type_id, token, created_at)
-VALUES (?, ?, ?);
+INSERT INTO api_credential(type_id, token, created_at, strategy_id)
+VALUES (?, ?, ?, ?);
 
 lastInsertCredentialRowId:
 SELECT last_insert_rowid();
+
+updateCredentialStrategy:
+UPDATE api_credential SET strategy_id = ? WHERE id = ?;
 
 selectAllCredentials:
 SELECT * FROM api_credential ORDER BY created_at DESC;

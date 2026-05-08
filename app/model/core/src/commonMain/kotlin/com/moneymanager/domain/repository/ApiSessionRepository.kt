@@ -1,4 +1,4 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
+@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
 
 package com.moneymanager.domain.repository
 
@@ -18,18 +18,30 @@ import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.MonzoCredential
 import com.moneymanager.domain.model.MonzoCredentialId
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
 import kotlin.time.Instant
 
 interface ApiSessionRepository {
     /**
      * Creates a new credential (saved token). Returns the existing credential ID if the token
      * is already saved.
+     *
+     * @param strategyId Optional link to the API import strategy this credential uses.
      */
     suspend fun createCredential(
         token: String,
         createdAt: Instant,
         type: ApiSessionType = ApiSessionType.MONZO,
+        strategyId: ApiImportStrategyId? = null,
     ): MonzoCredentialId
+
+    /**
+     * Updates the strategy associated with a credential.
+     */
+    suspend fun updateCredentialStrategy(
+        credentialId: MonzoCredentialId,
+        strategyId: ApiImportStrategyId?,
+    )
 
     /**
      * Returns all credentials, newest first.
