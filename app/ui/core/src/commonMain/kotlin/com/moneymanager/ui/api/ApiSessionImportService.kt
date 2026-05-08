@@ -1387,7 +1387,6 @@ private enum class BuiltInCounterpartyType(
 private fun JsonObject.resolveBuiltInCounterpartyType(amountMinorUnits: Long): BuiltInCounterpartyType? {
     if (amountMinorUnits >= 0L) return null
     if (this["atm_fees_detailed"] is JsonObject) return BuiltInCounterpartyType.ATM
-    if (stringOrNull("category")?.equals("cash", ignoreCase = true) == true) return BuiltInCounterpartyType.ATM
     val hasAtmLabel =
         this["labels"]
             ?.let { it as? JsonArray }
@@ -1400,6 +1399,13 @@ private fun JsonObject.resolveBuiltInCounterpartyType(amountMinorUnits: Long): B
     if (hasAtmLabel) return BuiltInCounterpartyType.ATM
     val mcc = (this["metadata"] as? JsonObject)?.stringOrNull("mcc")
     if (mcc == "6011") return BuiltInCounterpartyType.ATM
+    if (stringOrNull("category")?.equals("cash", ignoreCase = true) == true) {
+        val hasMerchant = (this["merchant"] as? JsonObject)?.isNotEmpty() == true
+        val hasCounterpartyDetails = (this["counterparty"] as? JsonObject)?.isNotEmpty() == true
+        if (!hasMerchant && !hasCounterpartyDetails) {
+            return BuiltInCounterpartyType.ATM
+        }
+    }
     return null
 }
 
