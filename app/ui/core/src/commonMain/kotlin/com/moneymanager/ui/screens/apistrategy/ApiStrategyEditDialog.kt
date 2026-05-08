@@ -100,7 +100,7 @@ fun ApiStrategyEditDialog(
     var accountDescriptionField by remember { mutableStateOf(strategy?.accountMappings?.descriptionField ?: "description") }
     var accountOwnerNameField by remember { mutableStateOf(strategy?.accountMappings?.ownerNameField ?: "") }
     var customAccountFields by remember {
-        mutableStateOf(
+        mutableStateOf<List<CustomFieldState>>(
             strategy?.accountMappings?.customFields?.map { (k, v) ->
                 CustomFieldState(k, v, k in (strategy.accountMappings.uniqueIdentifierFields))
             } ?: emptyList(),
@@ -117,7 +117,7 @@ fun ApiStrategyEditDialog(
     var txCounterpartyIdField by remember { mutableStateOf(strategy?.transactionMappings?.counterpartyIdField ?: "") }
     var txDeclineReasonField by remember { mutableStateOf(strategy?.transactionMappings?.declineReasonField ?: "") }
     var customTxFields by remember {
-        mutableStateOf(
+        mutableStateOf<List<CustomFieldState>>(
             strategy?.transactionMappings?.customFields?.map { (k, v) ->
                 CustomFieldState(k, v, k in (strategy.transactionMappings.uniqueIdentifierFields))
             } ?: emptyList(),
