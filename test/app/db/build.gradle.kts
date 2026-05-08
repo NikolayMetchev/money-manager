@@ -3,6 +3,10 @@ plugins {
     id("moneymanager.android-convention")
 }
 
+kover {
+    disable()
+}
+
 kotlin {
     sourceSets {
         val commonMain by getting {
