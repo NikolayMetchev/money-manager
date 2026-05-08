@@ -1,4 +1,4 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
+@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
 
 package com.moneymanager.database
 
@@ -649,7 +649,7 @@ object DatabaseConfig {
             apiSessionQueries.insertSessionType(id = 1, name = "Monzo")
 
             // Seed the built-in Monzo API import strategy
-            seedMonzoStrategy(database)
+            seedMonzoStrategy()
 
             // Seed Platform lookup table
             platformQueries.insert(id = 0, name = "SYSTEM")
@@ -719,7 +719,7 @@ object DatabaseConfig {
      * Seeds the built-in Monzo API import strategy.
      * Called once during new-database initialisation.
      */
-    private fun seedMonzoStrategy(database: MoneyManagerDatabaseWrapper) {
+    private fun MoneyManagerDatabaseWrapper.seedMonzoStrategy() {
         val config =
             ApiStrategyConfigJson(
                 baseUrl = "https://api.monzo.com",
@@ -753,7 +753,7 @@ object DatabaseConfig {
                 counterpartyPrefix = "Monzo Counterparty: ",
             )
         val now = Clock.System.now().toEpochMilliseconds()
-        database.apiImportStrategyQueries.insert(
+        apiImportStrategyQueries.insert(
             id = monzoStrategyId.toString(),
             name = "Monzo",
             config_json = ApiStrategyJsonCodec.encode(config),

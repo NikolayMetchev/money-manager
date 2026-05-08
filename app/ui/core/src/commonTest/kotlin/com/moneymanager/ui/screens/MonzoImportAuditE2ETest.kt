@@ -175,9 +175,9 @@ class MonzoImportAuditE2ETest {
                     )
                 val strategy =
                     dc.apiImportStrategyRepository
-                        .getAllStrategies()
+                        .getStrategyByName("Monzo")
                         .first()
-                        .single()
+                        ?: error("Monzo strategy not found")
 
                 downloadApiSessionAccounts(
                     token = "test-monzo-token",

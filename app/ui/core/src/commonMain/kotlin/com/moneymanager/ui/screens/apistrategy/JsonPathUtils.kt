@@ -1,5 +1,6 @@
 package com.moneymanager.ui.screens.apistrategy
 
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -11,7 +12,7 @@ fun extractJsonPaths(jsonText: String): List<JsonPathEntry> =
         val results = mutableListOf<JsonPathEntry>()
         walkElement(Json.parseToJsonElement(jsonText), "", results)
         results
-    } catch (_: Exception) {
+    } catch (_: SerializationException) {
         emptyList()
     }
 
@@ -26,7 +27,7 @@ fun extractFirstArrayItem(
     try {
         val root = Json.parseToJsonElement(responseJson)
         ((root as? JsonObject)?.get(arrayKey) as? JsonArray)?.firstOrNull()?.toString()
-    } catch (_: Exception) {
+    } catch (_: SerializationException) {
         null
     }
 

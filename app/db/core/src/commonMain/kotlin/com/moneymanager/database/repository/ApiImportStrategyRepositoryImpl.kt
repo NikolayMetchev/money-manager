@@ -1,4 +1,4 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
+@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
 
 package com.moneymanager.database.repository
 
@@ -8,6 +8,7 @@ import app.cash.sqldelight.coroutines.mapToOneOrNull
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.json.ApiStrategyConfigJson
 import com.moneymanager.database.json.ApiStrategyJsonCodec
+import com.moneymanager.database.sql.Api_import_strategy
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
 import com.moneymanager.domain.repository.ApiImportStrategyRepository
@@ -79,7 +80,7 @@ class ApiImportStrategyRepositoryImpl(
             queries.deleteById(id.id.toString())
         }
 
-    private fun toDomain(entity: com.moneymanager.database.sql.Api_import_strategy): ApiImportStrategy {
+    private fun toDomain(entity: Api_import_strategy): ApiImportStrategy {
         val config = ApiStrategyJsonCodec.decode(entity.config_json)
         return ApiImportStrategy(
             id = ApiImportStrategyId(Uuid.parse(entity.id)),

@@ -140,7 +140,7 @@ fun ApiStrategyEditDialog(
     // Load sample JSON from the most recent session responses.
     // Prefer credentials linked to this strategy; fall back to all credentials so
     // existing Monzo credentials (created before the strategy was linked) still work.
-    LaunchedEffect(strategy?.id) {
+    LaunchedEffect(strategy?.id, accountsResponseArrayKey, transactionsResponseArrayKey) {
         val allCredentials = apiSessionRepository.getAllCredentials()
         val credentials =
             if (strategy != null) {
@@ -192,7 +192,7 @@ fun ApiStrategyEditDialog(
     val isValid =
         name.isNotBlank() &&
             baseUrl.isNotBlank() &&
-            (!paginationEnabled || paginationLimitValue.toIntOrNull() != null)
+            (!paginationEnabled || paginationLimitValue.toIntOrNull()?.let { it > 0 } == true)
 
     pickingForSetter?.let { setter ->
         JsonNodePickerDialog(

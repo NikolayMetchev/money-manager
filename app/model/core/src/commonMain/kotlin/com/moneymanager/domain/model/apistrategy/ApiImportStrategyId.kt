@@ -1,7 +1,8 @@
-@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
+@file:OptIn(ExperimentalUuidApi::class)
 
 package com.moneymanager.domain.model.apistrategy
 
+import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 @JvmInline

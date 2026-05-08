@@ -26,6 +26,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.*
 import kotlin.math.absoluteValue
 import kotlin.time.Clock
@@ -134,14 +135,14 @@ suspend fun downloadApiSessionTransactions(
             existingResponses
         }
     val accountsRequestIds = accountsRequests.filter { it.url == accountsUrl }.map { it.id }.toSet()
-    val monzoAccounts =
+    val apiAccounts =
         accountsResponses
             .filter { it.requestId in accountsRequestIds }
             .flatMap { response -> parseAccounts(response.json, strategy) }
 
     var transactionResponseCount = 0
 
-    for ((index, monzoAccount) in monzoAccounts.withIndex()) {
+    for ((index, account) in apiAccounts.withIndex()) {
         var before: Instant? = null
         var page = 1
         var hasTransactions: Boolean
@@ -149,12 +150,12 @@ suspend fun downloadApiSessionTransactions(
             onProgress(
                 ApiTransactionsDownloadProgress(
                     accountIndex = index + 1,
-                    accountCount = monzoAccounts.size,
+                    accountCount = apiAccounts.size,
                     page = page,
                     downloadedResponsePageCount = transactionResponseCount,
                 ),
             )
-            val url = buildTransactionUrl(strategy, monzoAccount.id, before)
+            val url = buildTransactionUrl(strategy, account.id, before)
 
             // Incremental: reuse a stored response only when both request and response are present.
             // An orphan request (response missing from an interrupted prior run) is treated as a
@@ -174,7 +175,7 @@ suspend fun downloadApiSessionTransactions(
             onProgress(
                 ApiTransactionsDownloadProgress(
                     accountIndex = index + 1,
-                    accountCount = monzoAccounts.size,
+                    accountCount = apiAccounts.size,
                     page = page,
                     downloadedResponsePageCount = transactionResponseCount,
                 ),
@@ -184,7 +185,7 @@ suspend fun downloadApiSessionTransactions(
     }
 
     return ApiTransactionsDownloadResult(
-        accountCount = monzoAccounts.size,
+        accountCount = apiAccounts.size,
         transactionResponseCount = transactionResponseCount,
     )
 }
@@ -227,7 +228,7 @@ suspend fun importApiSessionTransactions(
 
     // Build a map from external account ID to the accounts-list source (request + jsonPath)
     // so newly created accounts can be linked back to their API origin.
-    val accountApiSourceByMonzoId =
+    val accountApiSourceByExternalId =
         accountsResponses
             .flatMap { response ->
                 val requestId = accountsRequestsById[response.requestId]?.id ?: return@flatMap emptyList()
@@ -236,8 +237,8 @@ suspend fun importApiSessionTransactions(
                 }
             }.toMap()
 
-    val monzoAccounts = accountsResponses.flatMap { response -> parseAccounts(response.json, strategy) }
-    val monzoAccountsById = monzoAccounts.associateBy { it.id }
+    val apiAccounts = accountsResponses.flatMap { response -> parseAccounts(response.json, strategy) }
+    val accountsById = apiAccounts.associateBy { it.id }
 
     val transactionResponses = responses.filter { requestsById[it.requestId]?.accountIdParameter(strategy) != null }
     var completedCount = 0
@@ -292,7 +293,7 @@ suspend fun importApiSessionTransactions(
             accountRepository = accountRepository,
             entitySourceQueries = entitySourceQueries,
             deviceId = deviceId,
-            accountApiSourceByMonzoId = accountApiSourceByMonzoId,
+            accountApiSourceByExternalId = accountApiSourceByExternalId,
             counterpartyIdIndex = counterpartyIdIndex,
             onAccountCreated = { isSourceAccount ->
                 val message =
@@ -327,13 +328,13 @@ suspend fun importApiSessionTransactions(
             .map { response ->
                 async {
                     val request = requestsById[response.requestId] ?: return@async null
-                    val monzoAccount = monzoAccountsById[request.accountIdParameter(strategy)] ?: return@async null
-                    val monzoAccountId = accountCache.getOrCreateAccountId(monzoAccount.id, monzoAccount.localAccountName(strategy))
+                    val account = accountsById[request.accountIdParameter(strategy)] ?: return@async null
+                    val ownAccountId = accountCache.getOrCreateAccountId(account.id, account.displayName(strategy))
                     val pageResult =
                         importTransactionPage(
                             response = response.toApiHttpResponse(),
                             strategy = strategy,
-                            monzoAccountId = monzoAccountId,
+                            ownAccountId = ownAccountId,
                             sessionId = sessionId,
                             deviceId = deviceId,
                             accountCache = accountCache,
@@ -364,7 +365,7 @@ suspend fun importApiSessionTransactions(
 
     val totalPeople =
         importPeopleFromAccounts(
-            monzoAccountsById = monzoAccountsById,
+            accountsById = accountsById,
             accountCache = accountCache,
             strategy = strategy,
             personRepository = personRepository,
@@ -384,9 +385,9 @@ suspend fun importApiSessionTransactions(
     // Store custom account field values as attributes
     val customAccountFields = strategy.accountMappings.customFields
     if (customAccountFields.isNotEmpty()) {
-        for (monzoAccount in monzoAccountsById.values) {
-            val rawJson = monzoAccount.rawJson ?: continue
-            val accountId = accountCache.getOrCreateAccountId(monzoAccount.id, monzoAccount.localAccountName(strategy))
+        for (account in accountsById.values) {
+            val rawJson = account.rawJson ?: continue
+            val accountId = accountCache.getOrCreateAccountId(account.id, account.displayName(strategy))
             val existingAttrTypes =
                 accountAttributeRepository
                     .getByAccount(accountId)
@@ -403,7 +404,7 @@ suspend fun importApiSessionTransactions(
     }
 
     return ApiSessionImportResult(
-        accountCount = monzoAccountsById.size,
+        accountCount = accountsById.size,
         transactionCount = totalImported,
         personCount = totalPeople,
         duplicateCount = totalDuplicates,
@@ -555,7 +556,7 @@ private data class CounterpartyImportCandidate(
 )
 
 private suspend fun importPeopleFromAccounts(
-    monzoAccountsById: Map<String, ApiImportAccount>,
+    accountsById: Map<String, ApiImportAccount>,
     accountCache: AccountCache,
     strategy: ApiImportStrategy,
     personRepository: PersonRepository,
@@ -569,10 +570,10 @@ private suspend fun importPeopleFromAccounts(
             .toMutableMap()
     var newPeopleCount = 0
 
-    for (monzoAccount in monzoAccountsById.values) {
-        if (monzoAccount.owners.isEmpty()) continue
+    for (account in accountsById.values) {
+        if (account.owners.isEmpty()) continue
 
-        val accountId = accountCache.getOrCreateAccountId(monzoAccount.id, monzoAccount.localAccountName(strategy))
+        val accountId = accountCache.getOrCreateAccountId(account.id, account.displayName(strategy))
         val existingOwnerPersonIds =
             personAccountOwnershipRepository
                 .getOwnershipsByAccount(accountId)
@@ -580,7 +581,7 @@ private suspend fun importPeopleFromAccounts(
                 .map { it.personId }
                 .toSet()
 
-        for (owner in monzoAccount.owners) {
+        for (owner in account.owners) {
             val name = owner.preferredName.trim()
             if (name.isBlank()) continue
 
@@ -661,7 +662,8 @@ private fun parseAccounts(
                 )
             }
             ?: emptyList()
-    } catch (_: Exception) {
+    } catch (e: SerializationException) {
+        logger.error(e) { "Failed to parse accounts response for strategy '${strategy.name}'" }
         emptyList()
     }
 
@@ -740,7 +742,7 @@ private data class CounterpartyNameMappings(
 private suspend fun importTransactionPage(
     response: ApiHttpResponse,
     strategy: ApiImportStrategy,
-    monzoAccountId: AccountId,
+    ownAccountId: AccountId,
     sessionId: ApiSessionId,
     deviceId: DeviceId,
     accountCache: AccountCache,
@@ -757,7 +759,7 @@ private suspend fun importTransactionPage(
     val transactions = parseTransactionsWithPath(response.body, strategy)
     val responseId = ApiResponseId(response.responseId)
     val requestId = ApiRequestId(response.requestId)
-    val existingTransfers = transactionRepository.getTransactionsByAccount(monzoAccountId).first().toMutableList()
+    val existingTransfers = transactionRepository.getTransactionsByAccount(ownAccountId).first().toMutableList()
 
     // Index existing transfers by their unique-identifier attribute values for O(1) lookup
     val existingByUniqueId: Map<Map<String, String>, TransferId> =
@@ -778,7 +780,7 @@ private suspend fun importTransactionPage(
         transactions.map { item ->
             importTransactionItem(
                 item = item,
-                monzoAccountId = monzoAccountId,
+                ownAccountId = ownAccountId,
                 responseId = responseId,
                 requestId = requestId,
                 sessionId = sessionId,
@@ -813,7 +815,7 @@ private suspend fun importTransactionPage(
 
 private suspend fun importTransactionItem(
     item: ApiTransactionPageItem,
-    monzoAccountId: AccountId,
+    ownAccountId: AccountId,
     responseId: ApiResponseId,
     requestId: ApiRequestId,
     sessionId: ApiSessionId,
@@ -844,7 +846,7 @@ private suspend fun importTransactionItem(
     return try {
         importValidTransactionItem(
             item = item,
-            monzoAccountId = monzoAccountId,
+            ownAccountId = ownAccountId,
             currency = currency,
             responseId = responseId,
             requestId = requestId,
@@ -876,7 +878,7 @@ private suspend fun importTransactionItem(
 
 private suspend fun importValidTransactionItem(
     item: ApiTransactionPageItem,
-    monzoAccountId: AccountId,
+    ownAccountId: AccountId,
     currency: Currency,
     responseId: ApiResponseId,
     requestId: ApiRequestId,
@@ -907,7 +909,7 @@ private suspend fun importValidTransactionItem(
                 apiSource = counterpartyApiSource,
             )
         }
-    val transfer = item.toTransfer(monzoAccountId, counterpartyAccountId, currency)
+    val transfer = item.toTransfer(ownAccountId, counterpartyAccountId, currency)
 
     // Prefer unique-identifier lookup when configured; fall back to full-field match
     val duplicateTransferId: TransferId? =
@@ -1005,7 +1007,8 @@ private fun parseTransactionsWithPath(
                 }
             }
             ?: emptyList()
-    } catch (_: Exception) {
+    } catch (e: SerializationException) {
+        logger.error(e) { "Failed to parse transactions response for strategy '${strategy.name}'" }
         emptyList()
     }
 
@@ -1067,7 +1070,7 @@ private class AccountCache(
     private val accountRepository: AccountRepository,
     private val entitySourceQueries: EntitySourceQueries,
     private val deviceId: DeviceId,
-    private val accountApiSourceByMonzoId: Map<String, AccountApiSource>,
+    private val accountApiSourceByExternalId: Map<String, AccountApiSource>,
     // Pre-built by the caller in the serial section before concurrent import starts
     private val counterpartyIdIndex: MutableMap<String, AccountId>,
     private val onAccountCreated: suspend (isSourceAccount: Boolean) -> Unit = {},
@@ -1088,14 +1091,14 @@ private class AccountCache(
         }
 
     suspend fun getOrCreateAccountId(
-        monzoAccountId: String?,
+        externalId: String?,
         name: String,
         explicitApiSource: AccountApiSource? = null,
     ): AccountId =
         mutex.withLock {
             val normalizedName = name.ifBlank { "Unknown" }
             loadAccounts()[normalizedName]?.let { return@withLock it.id }
-            createAccount(monzoAccountId, normalizedName, explicitApiSource)
+            createAccount(externalId, normalizedName, explicitApiSource)
         }
 
     /**
@@ -1130,7 +1133,7 @@ private class AccountCache(
     ): AccountId = getOrCreateAccountId(null, name, explicitApiSource = transactionApiSource)
 
     private suspend fun createAccount(
-        monzoAccountId: String?,
+        externalId: String?,
         normalizedName: String,
         apiSource: AccountApiSource?,
     ): AccountId {
@@ -1140,8 +1143,8 @@ private class AccountCache(
                 Account(id = AccountId(0L), name = normalizedName, openingDate = now),
             )
         accountsByName = (accountsByName ?: emptyMap()) + (normalizedName to Account(id = newId, name = normalizedName, openingDate = now))
-        onAccountCreated(monzoAccountId != null)
-        val resolvedSource = monzoAccountId?.let { accountApiSourceByMonzoId[it] } ?: apiSource
+        onAccountCreated(externalId != null)
+        val resolvedSource = externalId?.let { accountApiSourceByExternalId[it] } ?: apiSource
         if (resolvedSource != null) {
             ApiEntitySourceRecorder(
                 queries = entitySourceQueries,
@@ -1183,7 +1186,7 @@ private class CurrencyCache(
         }
 }
 
-private fun ApiImportAccount.localAccountName(strategy: ApiImportStrategy): String = strategy.accountNamePrefix + description.ifBlank { id }
+private fun ApiImportAccount.displayName(strategy: ApiImportStrategy): String = strategy.accountNamePrefix + description.ifBlank { id }
 
 private fun ApiTransactionPageItem.counterpartyName(nameMappings: CounterpartyNameMappings): String =
     rawJson?.let { rawJson ->
@@ -1198,7 +1201,7 @@ private fun ApiTransactionPageItem.counterpartyName(nameMappings: CounterpartyNa
         ?: description.ifBlank { "Unknown" }
 
 private fun ApiTransactionPageItem.toTransfer(
-    monzoAccountId: AccountId,
+    ownAccountId: AccountId,
     counterpartyAccountId: AccountId,
     currency: Currency,
 ): Transfer {
@@ -1212,8 +1215,8 @@ private fun ApiTransactionPageItem.toTransfer(
                 merchantName?.takeIf { it.isNotBlank() } ?: counterpartyName?.takeIf { it.isNotBlank() }
                     ?: "Unknown"
             },
-        sourceAccountId = if (isIncoming) counterpartyAccountId else monzoAccountId,
-        targetAccountId = if (isIncoming) monzoAccountId else counterpartyAccountId,
+        sourceAccountId = if (isIncoming) counterpartyAccountId else ownAccountId,
+        targetAccountId = if (isIncoming) ownAccountId else counterpartyAccountId,
         amount = money,
     )
 }

@@ -143,10 +143,10 @@ fun ApiSessionsScreen(
     var downloadProgressByCredential by remember { mutableStateOf<Map<MonzoCredentialId, ApiTransactionsDownloadProgress?>>(emptyMap()) }
     var pendingImport by remember { mutableStateOf<PendingApiImport?>(null) }
 
-    suspend fun resolveStrategy(credential: MonzoCredential): ApiImportStrategy =
+    suspend fun resolveStrategy(credential: MonzoCredential): ApiImportStrategy? =
         credential.strategyId
             ?.let { apiImportStrategyRepository.getStrategyById(it).first() }
-            ?: apiImportStrategyRepository.getAllStrategies().first().first()
+            ?: apiImportStrategyRepository.getAllStrategies().first().firstOrNull()
 
     fun refresh() {
         scope.launch {
@@ -267,7 +267,7 @@ fun ApiSessionsScreen(
                                 onDownloadAccounts = {
                                     accountsDownloadResultByCredential = accountsDownloadResultByCredential - credential.id
                                     scope.launch {
-                                        val strategy = resolveStrategy(credential)
+                                        val strategy = resolveStrategy(credential) ?: return@launch
                                         val newSessionId =
                                             apiSessionRepository.createSession(
                                                 token = credential.token,
@@ -310,7 +310,7 @@ fun ApiSessionsScreen(
                                     downloadProgressByCredential = downloadProgressByCredential - credential.id
                                     val accountsSession = credentialSessions.firstOrNull { it.kind == ApiSessionKind.ACCOUNTS }
                                     scope.launch {
-                                        val strategy = resolveStrategy(credential)
+                                        val strategy = resolveStrategy(credential) ?: return@launch
                                         val newSessionId =
                                             apiSessionRepository.createSession(
                                                 token = credential.token,
@@ -364,7 +364,12 @@ fun ApiSessionsScreen(
                                             null
                                         }
                                     scope.launch {
-                                        val strategy = resolveStrategy(credential)
+                                        val strategy =
+                                            resolveStrategy(credential) ?: run {
+                                                importErrorBySession =
+                                                    importErrorBySession + (session.id to "No import strategy configured")
+                                                return@launch
+                                            }
                                         val suggestions =
                                             if (session.kind == ApiSessionKind.TRANSACTIONS) {
                                                 discoverApiCounterpartiesToCreate(

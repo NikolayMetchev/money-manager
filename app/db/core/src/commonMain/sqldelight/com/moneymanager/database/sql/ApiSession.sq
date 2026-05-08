@@ -17,6 +17,7 @@ CREATE TABLE api_credential (
 );
 
 CREATE INDEX idx_api_credential_token ON api_credential(token);
+CREATE INDEX idx_api_credential_strategy_id ON api_credential(strategy_id);
 
 -- kind: 'ACCOUNTS' for account-download sessions, 'TRANSACTIONS' for transaction-download sessions
 CREATE TABLE api_session (

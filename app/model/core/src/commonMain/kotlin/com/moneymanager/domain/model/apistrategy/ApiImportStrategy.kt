@@ -1,5 +1,3 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
-
 package com.moneymanager.domain.model.apistrategy
 
 import kotlin.time.Instant
