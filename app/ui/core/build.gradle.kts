@@ -91,41 +91,44 @@ kotlin {
         }
         val jvmTest by getting {
             dependencies {
-                implementation(kotlin("test"))
-                // Skiko native libraries for desktop UI tests
-                implementation(compose.desktop.currentOs)
-                implementation(libs.androidx.compose.runtime.desktop)
-                implementation(libs.compose.ui.test.desktop)
-                implementation(libs.sqldelight.runtime)
-                implementation(projects.app.di.core)
-            }
+            implementation(kotlin("test"))
+            // Skiko native libraries for desktop UI tests
+            implementation(compose.desktop.currentOs)
+            implementation(libs.androidx.compose.runtime.desktop)
+            implementation(libs.compose.ui.test.desktop)
+            implementation(libs.mokkery.core)
+            implementation(libs.sqldelight.runtime)
+            implementation(projects.app.di.core)
+        }
         }
         val androidDeviceTest by getting {
             // Note: Cannot use dependsOn(commonTest) due to source set tree restrictions
             // Tests are shared via kotlin.srcDir() below
             dependencies {
-                implementation(kotlin("test"))
-                implementation(libs.androidx.compose.runtime)
-                implementation(libs.androidx.compose.ui.test)
-                implementation(libs.kotlinx.coroutines.test)
-                implementation(libs.ktor.client.mock)
-                implementation(libs.sqldelight.runtime)
-                implementation(projects.app.di.core)
-                implementation(projects.test.app.db)
-            }
+            implementation(kotlin("test"))
+            implementation(libs.androidx.compose.runtime)
+            implementation(libs.androidx.compose.ui.test)
+            implementation(libs.kotlinx.coroutines.test)
+            implementation(libs.ktor.client.mock)
+            implementation(libs.mokkery.core)
+            implementation(libs.sqldelight.runtime)
+            implementation(projects.app.di.core)
+            implementation(projects.test.app.db)
+        }
             kotlin.srcDir("src/commonTest/kotlin")
             // Include commonTest resources for test database files
             resources.srcDir("src/commonTest/resources")
         }
         val androidHostTest by getting {
             dependencies {
-                implementation(libs.androidx.compose.runtime)
-                implementation(libs.androidx.compose.ui.test)
-                implementation(libs.kotlinx.coroutines.test)
-                implementation(libs.sqldelight.runtime)
-                implementation(projects.app.di.core)
-                implementation(projects.test.app.db)
-            }
+            implementation(libs.androidx.compose.runtime)
+            implementation(libs.androidx.compose.ui.test)
+            implementation(libs.kotlinx.coroutines.test)
+            implementation(libs.mokkery.core)
+            implementation(libs.sqldelight.runtime)
+            implementation(projects.app.di.core)
+            implementation(projects.test.app.db)
+        }
         }
     }
 }
