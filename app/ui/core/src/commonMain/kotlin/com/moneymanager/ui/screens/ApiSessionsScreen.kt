@@ -75,6 +75,7 @@ import com.moneymanager.domain.repository.ApiSessionRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
+import com.moneymanager.domain.repository.PersonAttributeRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.rest.ApiSessionTrafficRecorder
@@ -119,6 +120,7 @@ fun ApiSessionsScreen(
     maintenanceService: DatabaseMaintenanceService,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
+    personAttributeRepository: PersonAttributeRepository,
     deviceId: DeviceId,
     onMonzoConnectClick: () -> Unit = {},
     onApiStrategiesClick: () -> Unit = {},
@@ -192,6 +194,7 @@ fun ApiSessionsScreen(
                     entitySourceQueries = entitySourceQueries,
                     personRepository = personRepository,
                     personAccountOwnershipRepository = personAccountOwnershipRepository,
+                    personAttributeRepository = personAttributeRepository,
                     attributeTypeRepository = attributeTypeRepository,
                     accountAttributeRepository = accountAttributeRepository,
                     deviceId = deviceId,

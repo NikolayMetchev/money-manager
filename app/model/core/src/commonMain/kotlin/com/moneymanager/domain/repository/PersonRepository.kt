@@ -1,5 +1,6 @@
 package com.moneymanager.domain.repository
 
+import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonId
 import kotlinx.coroutines.flow.Flow
@@ -12,6 +13,19 @@ interface PersonRepository {
     suspend fun createPerson(person: Person): PersonId
 
     suspend fun updatePerson(person: Person)
+
+    /**
+     * Atomically updates person fields and/or attributes, producing a single revision bump.
+     * Pass [person] = null to skip updating person fields (attribute-only update).
+     * Returns the final revision ID after all changes.
+     */
+    suspend fun updatePersonWithAttributes(
+        person: Person?,
+        personId: PersonId,
+        deletedAttributeIds: Set<Long>,
+        updatedAttributes: Map<Long, NewAttribute>,
+        newAttributes: List<NewAttribute>,
+    ): Long
 
     suspend fun deletePerson(id: PersonId)
 }

@@ -3,8 +3,9 @@ package com.moneymanager.database.repository
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
+import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.mapper.PersonMapper
-import com.moneymanager.database.sql.MoneyManagerDatabase
+import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.repository.PersonRepository
@@ -14,9 +15,10 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
 class PersonRepositoryImpl(
-    database: MoneyManagerDatabase,
+    private val database: MoneyManagerDatabaseWrapper,
 ) : PersonRepository {
     private val queries = database.personQueries
+    private val attributeQueries = database.personAttributeQueries
 
     override fun getAllPeople(): Flow<List<Person>> =
         queries
@@ -54,6 +56,69 @@ class PersonRepositoryImpl(
                 last_name = person.lastName,
                 id = person.id.id,
             )
+        }
+
+    override suspend fun updatePersonWithAttributes(
+        person: Person?,
+        personId: PersonId,
+        deletedAttributeIds: Set<Long>,
+        updatedAttributes: Map<Long, NewAttribute>,
+        newAttributes: List<NewAttribute>,
+    ): Long =
+        withContext(Dispatchers.Default) {
+            val hasAttributeChanges =
+                deletedAttributeIds.isNotEmpty() ||
+                    updatedAttributes.isNotEmpty() ||
+                    newAttributes.isNotEmpty()
+            val effectivePersonId = person?.id ?: personId
+
+            queries.transactionWithResult {
+                if (person != null) {
+                    queries.update(
+                        first_name = person.firstName,
+                        middle_name = person.middleName,
+                        last_name = person.lastName,
+                        id = person.id.id,
+                    )
+                } else if (hasAttributeChanges) {
+                    queries.bumpRevisionOnly(effectivePersonId.id)
+                }
+
+                if (hasAttributeChanges) {
+                    database.beginCreationMode()
+                    try {
+                        deletedAttributeIds.forEach { id ->
+                            attributeQueries.deleteById(id)
+                        }
+
+                        updatedAttributes.forEach { (id, attr) ->
+                            val current = attributeQueries.selectById(id).executeAsOneOrNull()
+                            if (current != null && current.attribute_type_id != attr.typeId.id) {
+                                attributeQueries.deleteById(id)
+                                attributeQueries.insert(
+                                    person_id = effectivePersonId.id,
+                                    attribute_type_id = attr.typeId.id,
+                                    attribute_value = attr.value,
+                                )
+                            } else {
+                                attributeQueries.updateValue(attr.value, id)
+                            }
+                        }
+
+                        newAttributes.forEach { attr ->
+                            attributeQueries.insert(
+                                person_id = effectivePersonId.id,
+                                attribute_type_id = attr.typeId.id,
+                                attribute_value = attr.value,
+                            )
+                        }
+                    } finally {
+                        database.endCreationMode()
+                    }
+                }
+
+                queries.selectRevisionById(effectivePersonId.id).executeAsOne()
+            }
         }
 
     override suspend fun deletePerson(id: PersonId): Unit =

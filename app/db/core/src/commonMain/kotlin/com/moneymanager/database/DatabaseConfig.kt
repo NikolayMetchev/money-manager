@@ -31,6 +31,9 @@ object DatabaseConfig {
     /** Stable ID for the "built-in type" attribute type used by built-in counterparty accounts. */
     const val BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID: Long = -3
 
+    /** Stable ID for the "person-external-id" attribute type (e.g. owner.user_id value). */
+    const val PERSON_EXTERNAL_ID_ATTR_TYPE_ID: Long = -4
+
     /**
      * SQL statements to execute when opening a database connection.
      * Applied to all database connections (JVM, Android, etc.)
@@ -550,6 +553,88 @@ object DatabaseConfig {
     }
 
     /**
+     * Creates triggers for person attribute auditing.
+     *
+     * Each attribute change (INSERT/UPDATE/DELETE) bumps the person revision
+     * and records the change in PersonAttributeAudit.
+     *
+     * Storage pattern:
+     * - INSERT: stores NEW value (attribute that was added)
+     * - UPDATE: stores OLD value (value before the change)
+     * - DELETE: stores OLD value (value that was removed)
+     *
+     * Flag tables control trigger behavior:
+     * - _import_batch: skip trigger entirely (CSV import - no audit)
+     * - _creation_mode: record audit but don't bump revision (initial creation)
+     * - neither: bump revision, then record audit (later modification)
+     */
+    private fun MoneyManagerDatabaseWrapper.createPersonAttributeTriggers() {
+        execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_person_attribute_insert_audit
+            AFTER INSERT ON person_attribute
+            FOR EACH ROW
+            WHEN NOT EXISTS (SELECT 1 FROM _import_batch)
+            BEGIN
+                UPDATE person
+                SET revision_id = revision_id + 1
+                WHERE id = NEW.person_id
+                  AND NOT EXISTS (SELECT 1 FROM _creation_mode);
+
+                INSERT INTO person_attribute_audit (audit_timestamp, audit_type_id, person_id, revision_id, attribute_type_id, attribute_value)
+                SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, NEW.person_id, revision_id, NEW.attribute_type_id, NEW.attribute_value
+                FROM person WHERE id = NEW.person_id;
+            END
+            """.trimIndent(),
+            0,
+        )
+
+        execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_person_attribute_update_audit
+            AFTER UPDATE ON person_attribute
+            FOR EACH ROW
+            WHEN NOT EXISTS (SELECT 1 FROM _import_batch)
+              AND OLD.attribute_value != NEW.attribute_value
+            BEGIN
+                UPDATE person
+                SET revision_id = revision_id + 1
+                WHERE id = NEW.person_id
+                  AND NOT EXISTS (SELECT 1 FROM _creation_mode);
+
+                INSERT INTO person_attribute_audit (audit_timestamp, audit_type_id, person_id, revision_id, attribute_type_id, attribute_value)
+                SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, NEW.person_id, revision_id, NEW.attribute_type_id, OLD.attribute_value
+                FROM person WHERE id = NEW.person_id;
+            END
+            """.trimIndent(),
+            0,
+        )
+
+        execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_person_attribute_delete_audit
+            AFTER DELETE ON person_attribute
+            FOR EACH ROW
+            WHEN NOT EXISTS (SELECT 1 FROM _import_batch)
+            BEGIN
+                UPDATE person
+                SET revision_id = revision_id + 1
+                WHERE id = OLD.person_id
+                  AND NOT EXISTS (SELECT 1 FROM _creation_mode);
+
+                INSERT INTO person_attribute_audit (audit_timestamp, audit_type_id, person_id, revision_id, attribute_type_id, attribute_value)
+                SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, OLD.person_id, revision_id, OLD.attribute_type_id, OLD.attribute_value
+                FROM person WHERE id = OLD.person_id;
+            END
+            """.trimIndent(),
+            0,
+        )
+    }
+
+    /**
      * Creates audit triggers dynamically for all main tables.
      * Queries sqlite_master to discover tables and their columns, then generates triggers.
      *
@@ -679,6 +764,7 @@ object DatabaseConfig {
             createCreationModeTable()
             createAttributeTriggers()
             createAccountAttributeTriggers()
+            createPersonAttributeTriggers()
 
             // Create custom category audit triggers (must be before generic ones)
             // These include parent_name denormalization via subquery
@@ -700,6 +786,7 @@ object DatabaseConfig {
             attributeTypeQueries.insertWithId(id = EXCLUDED_ATTR_TYPE_ID, name = "excluded")
             attributeTypeQueries.insertWithId(id = ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID, name = "account-external-id")
             attributeTypeQueries.insertWithId(id = BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID, name = "built-in type")
+            attributeTypeQueries.insertWithId(id = PERSON_EXTERNAL_ID_ATTR_TYPE_ID, name = "person-external-id")
 
             // Create system device for system-generated source tracking
             // Platform 0 = SYSTEM, no os/machine/make/model needed

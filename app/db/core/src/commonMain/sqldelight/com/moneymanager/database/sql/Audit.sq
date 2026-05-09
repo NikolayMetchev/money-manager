@@ -108,6 +108,22 @@ CREATE TABLE account_attribute_audit (
 CREATE INDEX IF NOT EXISTS idx_account_attribute_audit_account_id ON account_attribute_audit(account_id);
 CREATE INDEX IF NOT EXISTS idx_account_attribute_audit_revision ON account_attribute_audit(account_id, revision_id);
 
+-- person_attribute_audit: Audit trail for person attributes
+CREATE TABLE person_attribute_audit (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    audit_timestamp INTEGER NOT NULL,
+    audit_type_id INTEGER NOT NULL,
+    person_id INTEGER NOT NULL,
+    revision_id INTEGER NOT NULL,
+    attribute_type_id INTEGER NOT NULL,
+    attribute_value TEXT NOT NULL,
+    FOREIGN KEY (audit_type_id) REFERENCES audit_type(id),
+    FOREIGN KEY (attribute_type_id) REFERENCES attribute_type(id) ON DELETE RESTRICT
+);
+
+CREATE INDEX IF NOT EXISTS idx_person_attribute_audit_person_id ON person_attribute_audit(person_id);
+CREATE INDEX IF NOT EXISTS idx_person_attribute_audit_revision ON person_attribute_audit(person_id, revision_id);
+
 -- Queries to retrieve audit history for each table
 
 selectAuditHistoryForTransfer:
@@ -189,6 +205,23 @@ JOIN audit_type ON account_attribute_audit.audit_type_id = audit_type.id
 JOIN attribute_type ON account_attribute_audit.attribute_type_id = attribute_type.id
 WHERE account_attribute_audit.account_id = ?
 ORDER BY account_attribute_audit.revision_id DESC, attribute_type.name;
+
+-- Get all attribute audit records for a person
+selectAttributeAuditByPerson:
+SELECT
+    person_attribute_audit.id,
+    person_attribute_audit.audit_timestamp,
+    audit_type.name AS audit_type,
+    person_attribute_audit.person_id,
+    person_attribute_audit.revision_id,
+    person_attribute_audit.attribute_type_id,
+    person_attribute_audit.attribute_value,
+    attribute_type.name AS attribute_type_name
+FROM person_attribute_audit
+JOIN audit_type ON person_attribute_audit.audit_type_id = audit_type.id
+JOIN attribute_type ON person_attribute_audit.attribute_type_id = attribute_type.id
+WHERE person_attribute_audit.person_id = ?
+ORDER BY person_attribute_audit.revision_id DESC, attribute_type.name;
 
 -- person_audit: Audit trail for person table
 CREATE TABLE person_audit (
@@ -349,7 +382,10 @@ SELECT
     device_view.machine_name AS source_machine_name,
     device_view.device_make AS source_device_make,
     device_view.device_model AS source_device_model,
-    entity_source.created_at AS source_created_at
+    entity_source.created_at AS source_created_at,
+    api_entity_source.api_session_id AS source_api_session_id,
+    api_entity_source.api_request_id AS source_api_request_id,
+    api_entity_source.json_path AS source_api_json_path
 FROM person_audit
 JOIN audit_type ON person_audit.audit_type_id = audit_type.id
 LEFT JOIN entity_source ON person_audit.person_id = entity_source.entity_id
@@ -357,6 +393,7 @@ LEFT JOIN entity_source ON person_audit.person_id = entity_source.entity_id
     AND entity_source.entity_type_id = 2
 LEFT JOIN source_type ON entity_source.source_type_id = source_type.id
 LEFT JOIN device_view ON entity_source.device_id = device_view.id
+LEFT JOIN api_entity_source ON entity_source.id = api_entity_source.id
 WHERE person_audit.person_id = ?
 ORDER BY person_audit.audit_timestamp DESC, person_audit.id DESC;
 

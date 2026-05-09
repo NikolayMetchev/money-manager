@@ -9,6 +9,7 @@ import com.moneymanager.domain.model.CategoryAuditEntry
 import com.moneymanager.domain.model.CurrencyAuditEntry
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.PersonAccountOwnershipAuditEntry
+import com.moneymanager.domain.model.PersonAttributeAuditEntry
 import com.moneymanager.domain.model.PersonAuditEntry
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.TransferAuditEntry
@@ -94,4 +95,14 @@ interface AuditRepository {
      * @return List of attribute audit entries
      */
     suspend fun getAttributeAuditByAccount(accountId: AccountId): List<AccountAttributeAuditEntry>
+
+    /**
+     * Gets the attribute audit history for a specific person.
+     * Returns all attribute changes (adds/updates/removes) for the given person.
+     * Results are ordered by revision descending, then attribute type name.
+     *
+     * @param personId The ID of the person to get attribute audit history for
+     * @return List of attribute audit entries
+     */
+    suspend fun getAttributeAuditByPerson(personId: PersonId): List<PersonAttributeAuditEntry>
 }

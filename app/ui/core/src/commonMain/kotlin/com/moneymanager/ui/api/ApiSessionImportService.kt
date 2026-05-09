@@ -15,6 +15,7 @@ import com.moneymanager.domain.repository.ApiSessionRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
+import com.moneymanager.domain.repository.PersonAttributeRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.rest.ApiClient
@@ -35,6 +36,7 @@ import kotlin.time.Instant
 
 private val ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID = AttributeTypeId(DatabaseConfig.ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID)
 private val BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID = AttributeTypeId(DatabaseConfig.BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID)
+private val PERSON_EXTERNAL_ID_ATTR_TYPE_ID = AttributeTypeId(DatabaseConfig.PERSON_EXTERNAL_ID_ATTR_TYPE_ID)
 
 data class ApiSessionImportResult(
     val accountCount: Int,
@@ -201,6 +203,7 @@ suspend fun importApiSessionTransactions(
     entitySourceQueries: EntitySourceQueries,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
+    personAttributeRepository: PersonAttributeRepository,
     attributeTypeRepository: AttributeTypeRepository,
     accountAttributeRepository: AccountAttributeRepository,
     deviceId: DeviceId,
@@ -220,6 +223,7 @@ suspend fun importApiSessionTransactions(
             entitySourceQueries,
             personRepository,
             personAccountOwnershipRepository,
+            personAttributeRepository,
             attributeTypeRepository,
             accountAttributeRepository,
             deviceId,
@@ -290,6 +294,8 @@ private data class ImportSetup(
     val transferSourceQueries: TransferSourceQueries,
     val personRepository: PersonRepository,
     val personAccountOwnershipRepository: PersonAccountOwnershipRepository,
+    val personAttributeRepository: PersonAttributeRepository,
+    val entitySourceQueries: EntitySourceQueries,
 )
 
 private suspend fun setupImportSession(
@@ -301,6 +307,7 @@ private suspend fun setupImportSession(
     entitySourceQueries: EntitySourceQueries,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
+    personAttributeRepository: PersonAttributeRepository,
     attributeTypeRepository: AttributeTypeRepository,
     accountAttributeRepository: AccountAttributeRepository,
     deviceId: DeviceId,
@@ -419,6 +426,8 @@ private suspend fun setupImportSession(
         transferSourceQueries = transferSourceQueries,
         personRepository = personRepository,
         personAccountOwnershipRepository = personAccountOwnershipRepository,
+        personAttributeRepository = personAttributeRepository,
+        entitySourceQueries = entitySourceQueries,
     )
 }
 
@@ -493,6 +502,9 @@ private suspend fun importPeopleFromSession(setup: ImportSetup): Int =
         strategy = setup.strategy,
         personRepository = setup.personRepository,
         personAccountOwnershipRepository = setup.personAccountOwnershipRepository,
+        personAttributeRepository = setup.personAttributeRepository,
+        entitySourceQueries = setup.entitySourceQueries,
+        deviceId = setup.deviceId,
     )
 
 private suspend fun flushPostImportAttributes(setup: ImportSetup) {
@@ -726,12 +738,31 @@ private suspend fun importPeopleFromAccounts(
     strategy: ApiImportStrategy,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
+    personAttributeRepository: PersonAttributeRepository,
+    entitySourceQueries: EntitySourceQueries,
+    deviceId: DeviceId,
 ): Int {
-    val peopleByFullName =
-        personRepository
-            .getAllPeople()
-            .first()
-            .associateBy { it.fullName }
+    fun normalizeExternalId(value: String?): String? = value?.trim()?.ifBlank { null }
+
+    val existingPeople = personRepository.getAllPeople().first()
+    val peopleByFullName = existingPeople.associateBy { it.fullName }.toMutableMap()
+    val backfilledPersonIds = mutableSetOf<PersonId>()
+    val peopleByExternalId =
+        existingPeople
+            .mapNotNull { person ->
+                val externalId =
+                    personAttributeRepository
+                        .getByPerson(person.id)
+                        .first()
+                        .firstOrNull { it.attributeType.id == PERSON_EXTERNAL_ID_ATTR_TYPE_ID }
+                        ?.value
+                        .let(::normalizeExternalId)
+                if (externalId != null) {
+                    externalId to person
+                } else {
+                    null
+                }
+            }.toMap()
             .toMutableMap()
     var newPeopleCount = 0
 
@@ -746,12 +777,17 @@ private suspend fun importPeopleFromAccounts(
                 .map { it.personId }
                 .toSet()
 
-        for (owner in account.owners) {
+        for ((ownerIndex, owner) in account.owners.withIndex()) {
+            val externalId = normalizeExternalId(owner.userId)
             val name = owner.preferredName.trim()
             if (name.isBlank()) continue
 
+            val matchedPerson =
+                externalId
+                    ?.let { peopleByExternalId[it] }
+                    ?: peopleByFullName[name]
             val personId =
-                peopleByFullName[name]?.id
+                matchedPerson?.id
                     ?: run {
                         // Split on first space: "John Doe" → firstName="John", lastName="Doe".
                         // For single-word names the lastName is null.
@@ -765,10 +801,45 @@ private suspend fun importPeopleFromAccounts(
                                 lastName = nameParts.getOrNull(1)?.ifBlank { null },
                             )
                         val newId = personRepository.createPerson(person)
-                        peopleByFullName[name] = person.copy(id = newId)
+                        val storedPerson = person.copy(id = newId)
+                        peopleByFullName[name] = storedPerson
+                        val apiSource = accountCache.getApiSource(account.id)
+                        if (apiSource != null) {
+                            ApiEntitySourceRecorder(
+                                queries = entitySourceQueries,
+                                deviceId = deviceId,
+                                sessionId = apiSource.sessionId,
+                                requestId = apiSource.requestId,
+                                jsonPath = JsonPath("${apiSource.jsonPath.value}.owners[$ownerIndex]"),
+                            ).insert(EntityType.PERSON, newId.id, 1L)
+                        }
+                        if (externalId != null) {
+                            personAttributeRepository.insertInCreationMode(
+                                personId = newId,
+                                attributeTypeId = PERSON_EXTERNAL_ID_ATTR_TYPE_ID,
+                                value = externalId,
+                            )
+                            peopleByExternalId[externalId] = storedPerson
+                        }
                         newPeopleCount++
                         newId
                     }
+
+            if (externalId != null && externalId !in peopleByExternalId && personId !in backfilledPersonIds) {
+                // Existing person matched by name but without external-id attribute yet:
+                // backfill it so future imports dedupe by stable user_id instead of display name.
+                personAttributeRepository.insertInCreationMode(
+                    personId = personId,
+                    attributeTypeId = PERSON_EXTERNAL_ID_ATTR_TYPE_ID,
+                    value = externalId,
+                )
+                val existingPerson =
+                    requireNotNull(matchedPerson) {
+                        "Expected matched person when backfilling external ID attribute for personId=${personId.id}"
+                    }
+                peopleByExternalId[externalId] = existingPerson
+                backfilledPersonIds += personId
+            }
 
             if (personId !in existingOwnerPersonIds) {
                 personAccountOwnershipRepository.createOwnership(personId, accountId)
@@ -1255,6 +1326,8 @@ private class AccountCache(
      */
     private val pendingCounterpartyAttributes: MutableList<Pair<AccountId, String>> = mutableListOf()
     private val pendingBuiltInTypeAttributes: MutableList<Pair<AccountId, BuiltInCounterpartyType>> = mutableListOf()
+
+    fun getApiSource(accountExternalId: String): AccountApiSource? = accountApiSourceByExternalId[accountExternalId]
 
     suspend fun drainPendingCounterpartyAttributes(): List<Pair<AccountId, String>> =
         mutex.withLock {
