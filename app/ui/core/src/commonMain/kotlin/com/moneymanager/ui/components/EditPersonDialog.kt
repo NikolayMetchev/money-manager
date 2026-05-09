@@ -218,9 +218,7 @@ fun EditPersonDialog(
                                             middleName = middleName.trim().ifBlank { null },
                                             lastName = lastName.trim().ifBlank { null },
                                         )
-                                    val attrTypeRepo = attributeTypeRepository
-                                    val personAttrRepo = personAttributeRepository
-                                    if (attrTypeRepo != null && personAttrRepo != null) {
+                                    if (attributeTypeRepository != null && personAttributeRepository != null) {
                                         val originalIds = originalAttributeList.map { it.id }.toSet()
                                         val editableIds = editableAttributes.keys.filter { it > 0 }.toSet()
                                         val deletedAttributeIds = originalIds - editableIds
@@ -231,7 +229,7 @@ fun EditPersonDialog(
                                             val original = originalAttributeList.find { it.id == id }
                                             if (original != null) {
                                                 if (original.attributeType.name != typeName || original.value != value) {
-                                                    val typeId = attrTypeRepo.getOrCreate(typeName.trim())
+                                                    val typeId = attributeTypeRepository.getOrCreate(typeName.trim())
                                                     updatedAttributes[id] = NewAttribute(typeId, value.trim())
                                                 }
                                             }
@@ -241,7 +239,7 @@ fun EditPersonDialog(
                                         editableAttributes.filter { (id, _) -> id < 0 }.forEach { (_, pair) ->
                                             val (typeName, value) = pair
                                             if (typeName.isNotBlank() && value.isNotBlank()) {
-                                                val typeId = attrTypeRepo.getOrCreate(typeName.trim())
+                                                val typeId = attributeTypeRepository.getOrCreate(typeName.trim())
                                                 newAttributes.add(NewAttribute(typeId, value.trim()))
                                             }
                                         }
