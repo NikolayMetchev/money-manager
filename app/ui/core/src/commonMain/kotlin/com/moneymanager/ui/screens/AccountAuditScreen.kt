@@ -7,11 +7,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.clickable
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -330,17 +329,17 @@ private fun OwnershipLinkRow(
             modifier = Modifier.width(100.dp),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            ownerships.forEachIndexed { index, ownership ->
+            ownerships.forEachIndexed { index, ownership -> 
                 if (index > 0) {
                     Text(text = ", ", style = MaterialTheme.typography.bodyMedium, color = color)
                 }
                 val ownerLabel = ownership.personFullName ?: "Unknown (ID: ${ownership.personId.id})"
-                TextButton(
-                    onClick = { onOwnerClick(ownership.personId) },
-                    contentPadding = PaddingValues(0.dp),
-                ) {
-                    Text(text = ownerLabel, style = MaterialTheme.typography.bodyMedium, color = color)
-                }
+                Text(
+                    text = ownerLabel,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = color,
+                    modifier = Modifier.clickable { onOwnerClick(ownership.personId) },
+                )
             }
         }
     }
