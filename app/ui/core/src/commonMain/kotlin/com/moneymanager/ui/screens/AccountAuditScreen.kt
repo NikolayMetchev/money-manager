@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -298,7 +299,7 @@ private fun OwnershipChangesSection(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    text = "Owners added:",
+                    text = "Owners:",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.width(100.dp),
@@ -312,7 +313,7 @@ private fun OwnershipChangesSection(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    text = "Owners removed:",
+                    text = "Owners:",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.width(100.dp),
@@ -329,13 +330,19 @@ private fun OwnershipNamesRow(
     color: Color,
     onOwnerClick: (PersonId) -> Unit,
 ) {
-    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+    Row(
+        modifier = Modifier.padding(top = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
         ownerships.forEachIndexed { index, ownership ->
             if (index > 0) {
                 Text(text = ", ", style = MaterialTheme.typography.bodyMedium, color = color)
             }
             val label = ownership.personFullName ?: "Unknown (ID: ${ownership.personId.id})"
-            TextButton(onClick = { onOwnerClick(ownership.personId) }) {
+            TextButton(
+                onClick = { onOwnerClick(ownership.personId) },
+                contentPadding = PaddingValues(0.dp),
+            ) {
                 Text(text = label, style = MaterialTheme.typography.bodyMedium, color = color)
             }
         }
