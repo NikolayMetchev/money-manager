@@ -584,6 +584,15 @@ fun MoneyManagerApp(
                                     personId = screen.personId,
                                     auditRepository = auditRepository,
                                     personRepository = personRepository,
+                                    onApiSourceClick = { sessionId, requestId, jsonPath ->
+                                        navigationHistory.navigateTo(
+                                            Screen.ApiSessionTraffic(
+                                                sessionId = sessionId,
+                                                highlightRequestId = requestId,
+                                                highlightJsonPath = jsonPath,
+                                            ),
+                                        )
+                                    },
                                     onBack = { navigationHistory.navigateBack() },
                                 )
                             }

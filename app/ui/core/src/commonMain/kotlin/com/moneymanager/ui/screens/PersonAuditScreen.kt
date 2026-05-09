@@ -6,6 +6,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import com.moneymanager.domain.model.ApiRequestId
+import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.EntitySource
 import com.moneymanager.domain.model.Person
@@ -29,6 +31,7 @@ fun PersonAuditScreen(
     personId: PersonId,
     auditRepository: AuditRepository,
     personRepository: PersonRepository,
+    onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
     onBack: () -> Unit,
 ) {
     AuditScreen(
@@ -46,7 +49,7 @@ fun PersonAuditScreen(
         },
         diffKey = { it.id },
         onBack = onBack,
-        diffCard = { diff -> PersonAuditDiffCard(diff) },
+        diffCard = { diff -> PersonAuditDiffCard(diff, onApiSourceClick) },
     )
 }
 
@@ -152,7 +155,10 @@ private fun computePersonAuditDiffs(
     }
 
 @Composable
-private fun PersonAuditDiffCard(diff: PersonAuditDiff) {
+private fun PersonAuditDiffCard(
+    diff: PersonAuditDiff,
+    onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit,
+) {
     AuditDiffCard(
         auditType = diff.auditType,
         auditTimestamp = diff.auditTimestamp,
@@ -169,7 +175,7 @@ private fun PersonAuditDiffCard(diff: PersonAuditDiff) {
                 FieldValueRow("Middle Name", diff.middleName.value() ?: "(none)")
                 FieldValueRow("Last Name", diff.lastName.value() ?: "(none)")
                 PersonAttributeChangesSection(diff.attributeChanges)
-                SourceInfoSection(diff.source)
+                SourceInfoSection(diff.source, onApiSourceClick = onApiSourceClick)
             }
             AuditType.UPDATE -> {
                 if (!diff.hasChanges) {
@@ -206,7 +212,7 @@ private fun PersonAuditDiffCard(diff: PersonAuditDiff) {
                     }
                     PersonAttributeChangesSection(diff.attributeChanges)
                 }
-                SourceInfoSection(diff.source)
+                SourceInfoSection(diff.source, onApiSourceClick = onApiSourceClick)
             }
             AuditType.DELETE -> {
                 val errorColor = MaterialTheme.colorScheme.error
@@ -219,7 +225,7 @@ private fun PersonAuditDiffCard(diff: PersonAuditDiff) {
                 FieldValueRow("Middle Name", diff.middleName.value() ?: "(none)", errorColor)
                 FieldValueRow("Last Name", diff.lastName.value() ?: "(none)", errorColor)
                 PersonAttributeChangesSection(diff.attributeChanges, errorColor)
-                SourceInfoSection(diff.source, labelColor = errorColor.copy(alpha = 0.8f))
+                SourceInfoSection(diff.source, labelColor = errorColor.copy(alpha = 0.8f), onApiSourceClick = onApiSourceClick)
             }
         }
     }
