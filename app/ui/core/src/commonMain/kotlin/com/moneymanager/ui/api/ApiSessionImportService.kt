@@ -493,7 +493,18 @@ private suspend fun importPeopleFromSession(setup: ImportSetup): Int =
         strategy = setup.strategy,
         personRepository = setup.personRepository,
         personAccountOwnershipRepository = setup.personAccountOwnershipRepository,
-    )
+    ) +
+        importPeopleFromCounterparties(
+            transactionResponses = setup.transactionResponses,
+            sessionId = setup.sessionId,
+            requestsById = setup.requestsById,
+            strategy = setup.strategy,
+            accountCache = setup.accountCache,
+            counterpartyIdField = setup.counterpartyIdField,
+            nameMappings = setup.nameMappings,
+            personRepository = setup.personRepository,
+            personAccountOwnershipRepository = setup.personAccountOwnershipRepository,
+        )
 
 private suspend fun flushPostImportAttributes(setup: ImportSetup) {
     // Flush deferred account attributes now that all concurrent writes are done.
@@ -727,56 +738,180 @@ private suspend fun importPeopleFromAccounts(
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
 ): Int {
-    val peopleByFullName =
-        personRepository
-            .getAllPeople()
-            .first()
-            .associateBy { it.fullName }
-            .toMutableMap()
+    val peopleIndex = MutablePeopleIndex.from(personRepository.getAllPeople().first())
     var newPeopleCount = 0
 
     for (account in accountsById.values) {
         if (account.owners.isEmpty()) continue
 
         val accountId = accountCache.getOrCreateAccountId(account.id, account.displayName(strategy))
-        val existingOwnerPersonIds =
-            personAccountOwnershipRepository
-                .getOwnershipsByAccount(accountId)
-                .first()
-                .map { it.personId }
-                .toSet()
+        newPeopleCount +=
+            importOwnersForAccount(
+                owners = account.owners,
+                accountId = accountId,
+                peopleIndex = peopleIndex,
+                personRepository = personRepository,
+                personAccountOwnershipRepository = personAccountOwnershipRepository,
+            )
+    }
 
-        for (owner in account.owners) {
-            val name = owner.preferredName.trim()
-            if (name.isBlank()) continue
+    return newPeopleCount
+}
 
-            val personId =
-                peopleByFullName[name]?.id
-                    ?: run {
-                        // Split on first space: "John Doe" → firstName="John", lastName="Doe".
-                        // For single-word names the lastName is null.
-                        // Note: this is a simplified Western-centric split; users can edit names after import.
-                        val nameParts = name.split(" ", limit = 2)
-                        val person =
-                            Person(
-                                id = PersonId(0L),
-                                firstName = nameParts[0],
-                                middleName = null,
-                                lastName = nameParts.getOrNull(1)?.ifBlank { null },
-                            )
-                        val newId = personRepository.createPerson(person)
-                        peopleByFullName[name] = person.copy(id = newId)
-                        newPeopleCount++
-                        newId
-                    }
+private suspend fun importPeopleFromCounterparties(
+    transactionResponses: List<ApiResponse>,
+    sessionId: ApiSessionId,
+    requestsById: Map<ApiRequestId, ApiRequest>,
+    strategy: ApiImportStrategy,
+    accountCache: AccountCache,
+    counterpartyIdField: String?,
+    nameMappings: CounterpartyNameMappings,
+    personRepository: PersonRepository,
+    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
+): Int {
+    val peopleIndex = MutablePeopleIndex.from(personRepository.getAllPeople().first())
+    var newPeopleCount = 0
 
-            if (personId !in existingOwnerPersonIds) {
-                personAccountOwnershipRepository.createOwnership(personId, accountId)
-            }
+    for (response in transactionResponses) {
+        val request = requestsById[response.requestId] ?: continue
+        for (item in parseTransactionsWithPath(response.json, strategy)) {
+            val owner = item.personalCounterpartyOwner() ?: continue
+            if (item.amountMinorUnits == 0L) continue
+
+            val builtInCounterpartyType = item.rawJson?.resolveBuiltInCounterpartyType(item.amountMinorUnits)
+            if (builtInCounterpartyType != null) continue
+
+            val counterpartyAccountId =
+                accountCache.getOrCreateCounterpartyAccountId(
+                    counterpartyId = item.rawJson?.resolveCounterpartyIdentity(counterpartyIdField),
+                    builtInType = null,
+                    name = nameMappings.counterpartyPrefix + item.counterpartyName(nameMappings),
+                    apiSource = AccountApiSource(sessionId, request.id, JsonPath("${item.jsonPath.value}.counterparty")),
+                )
+            newPeopleCount +=
+                importOwnersForAccount(
+                    owners = listOf(owner),
+                    accountId = counterpartyAccountId,
+                    peopleIndex = peopleIndex,
+                    personRepository = personRepository,
+                    personAccountOwnershipRepository = personAccountOwnershipRepository,
+                )
         }
     }
 
     return newPeopleCount
+}
+
+private suspend fun importOwnersForAccount(
+    owners: List<ApiImportAccountOwner>,
+    accountId: AccountId,
+    peopleIndex: MutablePeopleIndex,
+    personRepository: PersonRepository,
+    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
+): Int {
+    val existingOwnerPersonIds =
+        personAccountOwnershipRepository
+            .getOwnershipsByAccount(accountId)
+            .first()
+            .map { it.personId }
+            .toMutableSet()
+    var newPeopleCount = 0
+
+    for (owner in owners) {
+        val (person, wasCreated) =
+            resolveOrCreatePerson(
+                owner = owner,
+                peopleIndex = peopleIndex,
+                personRepository = personRepository,
+            ) ?: continue
+
+        if (existingOwnerPersonIds.add(person.id)) {
+            personAccountOwnershipRepository.createOwnership(person.id, accountId)
+        }
+        if (wasCreated) {
+            newPeopleCount++
+        }
+    }
+
+    return newPeopleCount
+}
+
+private suspend fun resolveOrCreatePerson(
+    owner: ApiImportAccountOwner,
+    peopleIndex: MutablePeopleIndex,
+    personRepository: PersonRepository,
+): Pair<Person, Boolean>? {
+    val name = owner.preferredName.trim()
+    val externalId = owner.userId.trim().ifBlank { null }
+    if (name.isBlank()) return null
+
+    peopleIndex.find(externalId = externalId, fullName = name)?.let { existing ->
+        if (externalId != null && existing.externalId.isNullOrBlank()) {
+            val updated = existing.copy(externalId = externalId)
+            personRepository.updatePerson(updated)
+            peopleIndex.replace(updated)
+            return updated to false
+        }
+        return existing to false
+    }
+
+    val nameParts = name.split(" ", limit = 2)
+    val person =
+        Person(
+            id = PersonId(0L),
+            firstName = nameParts[0],
+            middleName = null,
+            lastName = nameParts.getOrNull(1)?.ifBlank { null },
+            externalId = externalId,
+        )
+    val newId = personRepository.createPerson(person)
+    return person.copy(id = newId).also(peopleIndex::add) to true
+}
+
+private class MutablePeopleIndex private constructor(
+    private val peopleByExternalId: MutableMap<String, Person>,
+    private val peopleByFullName: MutableMap<String, MutableList<Person>>,
+) {
+    fun find(
+        externalId: String?,
+        fullName: String,
+    ): Person? =
+        externalId?.let { peopleByExternalId[it] }
+            ?: if (externalId == null) {
+                peopleByFullName[fullName]?.firstOrNull()
+            } else {
+                peopleByFullName[fullName]?.firstOrNull { it.externalId.isNullOrBlank() }
+            }
+
+    fun add(person: Person) {
+        person.externalId?.let { peopleByExternalId[it] = person }
+        peopleByFullName.getOrPut(person.fullName) { mutableListOf() }.add(person)
+    }
+
+    fun replace(person: Person) {
+        person.externalId?.let { peopleByExternalId[it] = person }
+        val people = peopleByFullName[person.fullName] ?: return
+        val index = people.indexOfFirst { it.id == person.id }
+        if (index >= 0) {
+            people[index] = person
+        }
+    }
+
+    companion object {
+        fun from(people: List<Person>): MutablePeopleIndex {
+            val byExternalId =
+                mutableMapOf<String, Person>().apply {
+                    people.forEach { person ->
+                        person.externalId?.let { put(it, person) }
+                    }
+                }
+            val byFullName =
+                people
+                    .groupByTo(mutableMapOf()) { it.fullName }
+                    .mapValuesTo(mutableMapOf()) { (_, group) -> group.toMutableList() }
+            return MutablePeopleIndex(byExternalId, byFullName)
+        }
+    }
 }
 
 private suspend fun fetchResponse(
@@ -806,6 +941,16 @@ private data class ApiImportAccountOwner(
     val userId: String,
     val preferredName: String,
 )
+
+private fun ApiTransactionPageItem.personalCounterpartyOwner(): ApiImportAccountOwner? {
+    val counterparty = rawJson?.get("counterparty") as? JsonObject ?: return null
+    val beneficiaryAccountType = counterparty.stringOrNull("beneficiary_account_type")
+    if (!beneficiaryAccountType.equals("Personal", ignoreCase = true)) return null
+
+    val userId = counterparty.stringOrNull("user_id")?.takeIf { it.isNotBlank() } ?: return null
+    val name = counterparty.stringOrNull("name")?.takeIf { it.isNotBlank() } ?: return null
+    return ApiImportAccountOwner(userId = userId, preferredName = name)
+}
 
 private fun parseAccounts(
     json: String,

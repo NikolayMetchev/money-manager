@@ -40,6 +40,7 @@ class PersonRepositoryImpl(
                         first_name = person.firstName,
                         middle_name = person.middleName,
                         last_name = person.lastName,
+                        external_id = person.externalId,
                     )
                     queries.lastInsertRowId().executeAsOne()
                 }
@@ -52,6 +53,7 @@ class PersonRepositoryImpl(
                 first_name = person.firstName,
                 middle_name = person.middleName,
                 last_name = person.lastName,
+                external_id = person.externalId,
                 id = person.id.id,
             )
         }

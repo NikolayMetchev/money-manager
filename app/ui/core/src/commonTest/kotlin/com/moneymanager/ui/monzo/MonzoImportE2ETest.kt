@@ -176,6 +176,46 @@ private val TRANSACTIONS_WITH_BANK_COUNTERPARTY_JSON =
 }
     """.trimIndent()
 
+private val TRANSACTIONS_WITH_PERSONAL_COUNTERPARTY_JSON =
+    """
+{
+  "transactions": [
+    {
+      "id": "tx_00009TEST000000000040",
+      "account_id": "$ACCOUNT_ID",
+      "created": "2024-06-06T09:15:00.000Z",
+      "amount": -1250,
+      "currency": "GBP",
+      "description": "Sent to John Doe",
+      "merchant": null,
+      "counterparty": {
+        "account_number": "123455678",
+        "beneficiary_account_type": "Personal",
+        "name": "John Doe",
+        "sort_code": "040404",
+        "user_id": "anonuser_95515c2ea95c19a58aad7b"
+      }
+    },
+    {
+      "id": "tx_00009TEST000000000041",
+      "account_id": "$ACCOUNT_ID",
+      "created": "2024-06-07T09:15:00.000Z",
+      "amount": 2500,
+      "currency": "GBP",
+      "description": "Received from John Doe",
+      "merchant": null,
+      "counterparty": {
+        "account_number": "123455678",
+        "beneficiary_account_type": "Personal",
+        "name": "John Q. Doe",
+        "sort_code": "040404",
+        "user_id": "anonuser_95515c2ea95c19a58aad7b"
+      }
+    }
+  ]
+}
+    """.trimIndent()
+
 private val TRANSACTIONS_WITH_ATM_WITHDRAWALS_JSON =
     """
 {
@@ -790,6 +830,115 @@ class MonzoImportE2ETest : DbTest() {
                     .first()
                     .single { it.attributeType.name == "account-external-id" }
             assertEquals("bank:041307:29900313", counterpartyAttribute.value)
+        }
+
+    @Test
+    fun `personal counterparties create one owner person keyed by external id`() =
+        runTest {
+            val deviceId =
+                repositories.deviceRepository.getOrCreateDevice(
+                    DeviceInfo.Jvm("test-machine", "Test OS"),
+                )
+            val sessionId =
+                repositories.apiSessionRepository.createSession(
+                    token = "test-monzo-token",
+                    deviceId = deviceId,
+                    createdAt = Instant.fromEpochMilliseconds(1_700_000_000_000L),
+                    expiresAt = null,
+                )
+            val mockEngine =
+                MockEngine { request ->
+                    val url = request.url.toString()
+                    val json =
+                        when {
+                            url.contains("/accounts") -> ACCOUNTS_JSON
+                            url.contains("/transactions") && !url.contains("before=") -> TRANSACTIONS_WITH_PERSONAL_COUNTERPARTY_JSON
+                            url.contains("/transactions") && url.contains("before=") -> EMPTY_TRANSACTIONS_JSON
+                            else -> error("Unexpected request: $url")
+                        }
+                    respond(
+                        content = json,
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                    )
+                }
+            val apiClient =
+                createApiClient(
+                    trafficRecorder = ApiSessionTrafficRecorder(sessionId, repositories.apiSessionRepository),
+                    engine = mockEngine,
+                )
+            val strategy =
+                repositories.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .single()
+                    .let { strategy ->
+                        strategy.copy(
+                            transactionMappings =
+                                strategy.transactionMappings.copy(
+                                    counterpartyIdField = "counterparty.id",
+                                ),
+                        )
+                    }
+
+            downloadApiSessionAccounts(
+                token = "test-monzo-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+            downloadApiSessionTransactions(
+                token = "test-monzo-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+
+            val importResult =
+                importApiSessionTransactions(
+                    apiSessionRepository = repositories.apiSessionRepository,
+                    accountRepository = repositories.accountRepository,
+                    currencyRepository = repositories.currencyRepository,
+                    transactionRepository = repositories.transactionRepository,
+                    transferSourceQueries = transferSourceQueries,
+                    entitySourceQueries = repositories.entitySourceQueries,
+                    personRepository = repositories.personRepository,
+                    personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
+                    attributeTypeRepository = repositories.attributeTypeRepository,
+                    accountAttributeRepository = repositories.accountAttributeRepository,
+                    deviceId = deviceId,
+                    sessionId = sessionId,
+                    strategy = strategy,
+                )
+
+            assertEquals(1, importResult.personCount)
+
+            val people = repositories.personRepository.getAllPeople().first()
+            val person = people.single()
+            assertEquals("John Doe", person.fullName)
+            assertEquals("anonuser_95515c2ea95c19a58aad7b", person.externalId)
+
+            val counterpartyAccount =
+                repositories.accountRepository
+                    .getAllAccounts()
+                    .first()
+                    .single { account ->
+                        repositories.accountAttributeRepository
+                            .getByAccount(account.id)
+                            .first()
+                            .any {
+                                it.attributeType.name == "account-external-id" &&
+                                    it.value == "user:anonuser_95515c2ea95c19a58aad7b"
+                            }
+                    }
+            val ownerships =
+                repositories.personAccountOwnershipRepository
+                    .getOwnershipsByAccount(counterpartyAccount.id)
+                    .first()
+            assertEquals(1, ownerships.size)
+            assertEquals(person.id, ownerships.single().personId)
         }
 
     @Test
