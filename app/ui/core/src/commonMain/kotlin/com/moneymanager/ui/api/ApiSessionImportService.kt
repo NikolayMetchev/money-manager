@@ -945,7 +945,7 @@ private data class ApiImportAccountOwner(
 private fun ApiTransactionPageItem.personalCounterpartyOwner(): ApiImportAccountOwner? {
     val counterparty = rawJson?.get("counterparty") as? JsonObject ?: return null
     val beneficiaryAccountType = counterparty.stringOrNull("beneficiary_account_type")
-    if (!beneficiaryAccountType.equals("Personal", ignoreCase = true)) return null
+    if (beneficiaryAccountType?.equals("Personal", ignoreCase = true) != true) return null
 
     val userId = counterparty.stringOrNull("user_id")?.takeIf { it.isNotBlank() } ?: return null
     val name = counterparty.stringOrNull("name")?.takeIf { it.isNotBlank() } ?: return null

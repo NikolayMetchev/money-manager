@@ -189,7 +189,7 @@ private val TRANSACTIONS_WITH_PERSONAL_COUNTERPARTY_JSON =
       "description": "Sent to John Doe",
       "merchant": null,
       "counterparty": {
-        "account_number": "123455678",
+        "account_number": "12345678",
         "beneficiary_account_type": "Personal",
         "name": "John Doe",
         "sort_code": "040404",
@@ -205,7 +205,7 @@ private val TRANSACTIONS_WITH_PERSONAL_COUNTERPARTY_JSON =
       "description": "Received from John Doe",
       "merchant": null,
       "counterparty": {
-        "account_number": "123455678",
+        "account_number": "12345678",
         "beneficiary_account_type": "Personal",
         "name": "John Q. Doe",
         "sort_code": "040404",
