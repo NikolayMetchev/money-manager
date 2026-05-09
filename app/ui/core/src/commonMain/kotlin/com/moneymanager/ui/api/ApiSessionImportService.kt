@@ -814,7 +814,11 @@ private suspend fun importPeopleFromAccounts(
                     attributeTypeId = PERSON_EXTERNAL_ID_ATTR_TYPE_ID,
                     value = externalId,
                 )
-                matchedPerson?.let { peopleByExternalId[externalId] = it }
+                val existingPerson =
+                    requireNotNull(matchedPerson) {
+                        "Expected matched person when backfilling external ID attribute for personId=${personId.id}"
+                    }
+                peopleByExternalId[externalId] = existingPerson
             }
 
             if (personId !in existingOwnerPersonIds) {
