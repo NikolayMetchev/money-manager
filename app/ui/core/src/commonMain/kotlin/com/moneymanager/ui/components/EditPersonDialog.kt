@@ -77,9 +77,10 @@ fun EditPersonDialog(
         LaunchedEffect(personToEdit.id) {
             val attrs = personAttributeRepository.getByPerson(personToEdit.id).first()
             originalAttributeList = attrs
-            editableAttributes = attrs.associate { attr ->
-                attr.id to Pair(attr.attributeType.name, attr.value)
-            }
+            editableAttributes =
+                attrs.associate { attr ->
+                    attr.id to Pair(attr.attributeType.name, attr.value)
+                }
         }
     }
 
