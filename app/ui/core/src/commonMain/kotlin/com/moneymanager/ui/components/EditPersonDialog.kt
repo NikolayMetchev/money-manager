@@ -77,9 +77,10 @@ fun EditPersonDialog(
             personAttributeRepository.getByPerson(personToEdit.id).collect { attrs ->
                 if (!attributesLoaded) {
                     originalAttributeList = attrs
-                    editableAttributes = attrs.associate { attr ->
-                        attr.id to Pair(attr.attributeType.name, attr.value)
-                    }
+                    editableAttributes =
+                        attrs.associate { attr ->
+                            attr.id to Pair(attr.attributeType.name, attr.value)
+                        }
                     attributesLoaded = true
                 }
             }

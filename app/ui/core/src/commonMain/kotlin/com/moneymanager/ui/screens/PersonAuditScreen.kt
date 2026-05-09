@@ -68,8 +68,8 @@ private data class PersonAuditDiff(
 private fun computePersonAuditDiffs(
     entries: List<PersonAuditEntry>,
     currentPerson: Person?,
-): List<PersonAuditDiff> {
-    return entries.mapIndexed { index, entry ->
+): List<PersonAuditDiff> =
+    entries.mapIndexed { index, entry ->
         when (entry.auditType) {
             AuditType.INSERT ->
                 PersonAuditDiff(
@@ -150,7 +150,6 @@ private fun computePersonAuditDiffs(
             }
         }
     }
-}
 
 @Composable
 private fun PersonAuditDiffCard(diff: PersonAuditDiff) {
@@ -244,6 +243,6 @@ private fun PersonAttributeChangesSection(
                 AuditType.DELETE -> "-"
                 AuditType.UPDATE -> "~"
             }
-        FieldValueRow("${prefix} ${attr.attributeType.name}", attr.value, labelColor)
+        FieldValueRow("$prefix ${attr.attributeType.name}", attr.value, labelColor)
     }
 }
