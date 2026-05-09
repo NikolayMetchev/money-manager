@@ -736,6 +736,8 @@ private suspend fun importPeopleFromAccounts(
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     personAttributeRepository: PersonAttributeRepository,
 ): Int {
+    fun normalizedExternalId(value: String?): String? = value?.trim()?.ifBlank { null }
+
     val existingPeople = personRepository.getAllPeople().first()
     val peopleByFullName = existingPeople.associateBy { it.fullName }.toMutableMap()
     val peopleByExternalId =
@@ -747,8 +749,7 @@ private suspend fun importPeopleFromAccounts(
                         .first()
                         .firstOrNull { it.attributeType.id == PERSON_EXTERNAL_ID_ATTR_TYPE_ID }
                         ?.value
-                        ?.trim()
-                        ?.ifBlank { null }
+                        .let(::normalizedExternalId)
                 if (externalId != null) {
                     externalId to person
                 } else {
@@ -770,20 +771,21 @@ private suspend fun importPeopleFromAccounts(
                 .toSet()
 
         for (owner in account.owners) {
-            val externalId = owner.userId.trim().ifBlank { null }
+            val externalId = normalizedExternalId(owner.userId)
             val name = owner.preferredName.trim()
             if (name.isBlank()) continue
 
-            val personId =
+            val matchedPerson =
                 externalId
-                    ?.let { peopleByExternalId[it]?.id }
-                    ?: peopleByFullName[name]?.id
+                    ?.let { peopleByExternalId[it] }
+                    ?: peopleByFullName[name]
+            val personId =
+                matchedPerson?.id
                     ?: run {
                         // Split on first space: "John Doe" → firstName="John", lastName="Doe".
                         // For single-word names the lastName is null.
                         // Note: this is a simplified Western-centric split; users can edit names after import.
-                        val safeName = name.ifBlank { "Unknown" }
-                        val nameParts = safeName.split(" ", limit = 2)
+                        val nameParts = name.split(" ", limit = 2)
                         val person =
                             Person(
                                 id = PersonId(0L),
@@ -793,7 +795,7 @@ private suspend fun importPeopleFromAccounts(
                             )
                         val newId = personRepository.createPerson(person)
                         val storedPerson = person.copy(id = newId)
-                        peopleByFullName[safeName] = storedPerson
+                        peopleByFullName[name] = storedPerson
                         if (externalId != null) {
                             personAttributeRepository.insertInCreationMode(
                                 personId = newId,
@@ -812,9 +814,7 @@ private suspend fun importPeopleFromAccounts(
                     attributeTypeId = PERSON_EXTERNAL_ID_ATTR_TYPE_ID,
                     value = externalId,
                 )
-                personRepository.getPersonById(personId).first()?.let { existing ->
-                    peopleByExternalId[externalId] = existing
-                }
+                matchedPerson?.let { peopleByExternalId[externalId] = it }
             }
 
             if (personId !in existingOwnerPersonIds) {
