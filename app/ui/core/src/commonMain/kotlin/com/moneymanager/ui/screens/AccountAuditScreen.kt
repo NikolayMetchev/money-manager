@@ -294,56 +294,53 @@ private fun OwnershipChangesSection(
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         if (ownersAdded.isNotEmpty()) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(
-                    text = "Owners:",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.width(100.dp),
-                )
-                OwnershipNamesRow(ownersAdded, color = MaterialTheme.colorScheme.primary, onOwnerClick = onOwnerClick)
-            }
+            OwnershipLinkRow(
+                label = "Owners:",
+                ownerships = ownersAdded,
+                color = MaterialTheme.colorScheme.primary,
+                onOwnerClick = onOwnerClick,
+            )
         }
         if (ownersRemoved.isNotEmpty()) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(
-                    text = "Owners:",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.width(100.dp),
-                )
-                OwnershipNamesRow(ownersRemoved, color = MaterialTheme.colorScheme.error, onOwnerClick = onOwnerClick)
-            }
+            OwnershipLinkRow(
+                label = "Owners:",
+                ownerships = ownersRemoved,
+                color = MaterialTheme.colorScheme.error,
+                onOwnerClick = onOwnerClick,
+            )
         }
     }
 }
 
 @Composable
-private fun OwnershipNamesRow(
+private fun OwnershipLinkRow(
+    label: String,
     ownerships: List<PersonAccountOwnershipAuditEntry>,
     color: Color,
     onOwnerClick: (PersonId) -> Unit,
 ) {
     Row(
-        modifier = Modifier.padding(top = 2.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        ownerships.forEachIndexed { index, ownership ->
-            if (index > 0) {
-                Text(text = ", ", style = MaterialTheme.typography.bodyMedium, color = color)
-            }
-            val label = ownership.personFullName ?: "Unknown (ID: ${ownership.personId.id})"
-            TextButton(
-                onClick = { onOwnerClick(ownership.personId) },
-                contentPadding = PaddingValues(0.dp),
-            ) {
-                Text(text = label, style = MaterialTheme.typography.bodyMedium, color = color)
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.width(100.dp),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            ownerships.forEachIndexed { index, ownership ->
+                if (index > 0) {
+                    Text(text = ", ", style = MaterialTheme.typography.bodyMedium, color = color)
+                }
+                val ownerLabel = ownership.personFullName ?: "Unknown (ID: ${ownership.personId.id})"
+                TextButton(
+                    onClick = { onOwnerClick(ownership.personId) },
+                    contentPadding = PaddingValues(0.dp),
+                ) {
+                    Text(text = ownerLabel, style = MaterialTheme.typography.bodyMedium, color = color)
+                }
             }
         }
     }
