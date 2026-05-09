@@ -736,7 +736,7 @@ private suspend fun importPeopleFromAccounts(
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     personAttributeRepository: PersonAttributeRepository,
 ): Int {
-    fun normalizedExternalId(value: String?): String? = value?.trim()?.ifBlank { null }
+    fun normalizeExternalId(value: String?): String? = value?.trim()?.ifBlank { null }
 
     val existingPeople = personRepository.getAllPeople().first()
     val peopleByFullName = existingPeople.associateBy { it.fullName }.toMutableMap()
@@ -749,7 +749,7 @@ private suspend fun importPeopleFromAccounts(
                         .first()
                         .firstOrNull { it.attributeType.id == PERSON_EXTERNAL_ID_ATTR_TYPE_ID }
                         ?.value
-                        .let(::normalizedExternalId)
+                        .let(::normalizeExternalId)
                 if (externalId != null) {
                     externalId to person
                 } else {
@@ -771,7 +771,7 @@ private suspend fun importPeopleFromAccounts(
                 .toSet()
 
         for (owner in account.owners) {
-            val externalId = normalizedExternalId(owner.userId)
+            val externalId = normalizeExternalId(owner.userId)
             val name = owner.preferredName.trim()
             if (name.isBlank()) continue
 
@@ -809,6 +809,8 @@ private suspend fun importPeopleFromAccounts(
                     }
 
             if (externalId != null && externalId !in peopleByExternalId) {
+                // Existing person matched by name but without external-id attribute yet:
+                // backfill it so future imports dedupe by stable user_id instead of display name.
                 personAttributeRepository.insertInCreationMode(
                     personId = personId,
                     attributeTypeId = PERSON_EXTERNAL_ID_ATTR_TYPE_ID,
