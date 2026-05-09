@@ -880,6 +880,9 @@ private class MutablePeopleIndex private constructor(
             ?: if (externalId == null) {
                 peopleByFullName[fullName]?.firstOrNull()
             } else {
+                // When an API supplies an external id, only fall back to same-name people that do
+                // not already have their own external id. This avoids merging two distinct people
+                // who happen to share a name but are represented by different upstream ids.
                 peopleByFullName[fullName]?.firstOrNull { it.externalId.isNullOrBlank() }
             }
 
