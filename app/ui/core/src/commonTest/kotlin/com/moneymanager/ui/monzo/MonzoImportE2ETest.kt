@@ -433,6 +433,7 @@ class MonzoImportE2ETest : DbTest() {
                     entitySourceQueries = repositories.entitySourceQueries,
                     personRepository = repositories.personRepository,
                     personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
+                    personAttributeRepository = repositories.personAttributeRepository,
                     attributeTypeRepository = repositories.attributeTypeRepository,
                     accountAttributeRepository = repositories.accountAttributeRepository,
                     deviceId = deviceId,
@@ -622,6 +623,7 @@ class MonzoImportE2ETest : DbTest() {
                     entitySourceQueries = repositories.entitySourceQueries,
                     personRepository = repositories.personRepository,
                     personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
+                    personAttributeRepository = repositories.personAttributeRepository,
                     attributeTypeRepository = repositories.attributeTypeRepository,
                     accountAttributeRepository = repositories.accountAttributeRepository,
                     deviceId = deviceId,
@@ -721,6 +723,7 @@ class MonzoImportE2ETest : DbTest() {
                     entitySourceQueries = repositories.entitySourceQueries,
                     personRepository = repositories.personRepository,
                     personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
+                    personAttributeRepository = repositories.personAttributeRepository,
                     attributeTypeRepository = repositories.attributeTypeRepository,
                     accountAttributeRepository = repositories.accountAttributeRepository,
                     deviceId = deviceId,
@@ -814,6 +817,7 @@ class MonzoImportE2ETest : DbTest() {
                 entitySourceQueries = repositories.entitySourceQueries,
                 personRepository = repositories.personRepository,
                 personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
+                personAttributeRepository = repositories.personAttributeRepository,
                 attributeTypeRepository = repositories.attributeTypeRepository,
                 accountAttributeRepository = repositories.accountAttributeRepository,
                 deviceId = deviceId,
@@ -906,6 +910,7 @@ class MonzoImportE2ETest : DbTest() {
                     entitySourceQueries = repositories.entitySourceQueries,
                     personRepository = repositories.personRepository,
                     personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
+                    personAttributeRepository = repositories.personAttributeRepository,
                     attributeTypeRepository = repositories.attributeTypeRepository,
                     accountAttributeRepository = repositories.accountAttributeRepository,
                     deviceId = deviceId,
@@ -918,7 +923,12 @@ class MonzoImportE2ETest : DbTest() {
             val people = repositories.personRepository.getAllPeople().first()
             val person = people.single()
             assertEquals("John Doe", person.fullName)
-            assertEquals("anonuser_95515c2ea95c19a58aad7b", person.externalId)
+            val personExternalId =
+                repositories.personAttributeRepository
+                    .getByPerson(person.id)
+                    .first()
+                    .single { it.attributeType.name == "person-external-id" }
+            assertEquals("anonuser_95515c2ea95c19a58aad7b", personExternalId.value)
 
             val counterpartyAccount =
                 repositories.accountRepository
@@ -930,7 +940,7 @@ class MonzoImportE2ETest : DbTest() {
                             .first()
                             .any {
                                 it.attributeType.name == "account-external-id" &&
-                                    it.value == "user:anonuser_95515c2ea95c19a58aad7b"
+                                    it.value == "bank:040404:12345678"
                             }
                     }
             val ownerships =
@@ -1025,6 +1035,7 @@ class MonzoImportE2ETest : DbTest() {
                 entitySourceQueries = repositories.entitySourceQueries,
                 personRepository = repositories.personRepository,
                 personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
+                personAttributeRepository = repositories.personAttributeRepository,
                 attributeTypeRepository = repositories.attributeTypeRepository,
                 accountAttributeRepository = repositories.accountAttributeRepository,
                 deviceId = deviceId,
@@ -1112,6 +1123,7 @@ class MonzoImportE2ETest : DbTest() {
                     entitySourceQueries = repositories.entitySourceQueries,
                     personRepository = repositories.personRepository,
                     personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
+                    personAttributeRepository = repositories.personAttributeRepository,
                     attributeTypeRepository = repositories.attributeTypeRepository,
                     accountAttributeRepository = repositories.accountAttributeRepository,
                     deviceId = deviceId,

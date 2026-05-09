@@ -31,6 +31,9 @@ object DatabaseConfig {
     /** Stable ID for the "built-in type" attribute type used by built-in counterparty accounts. */
     const val BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID: Long = -3
 
+    /** Stable ID for the "person-external-id" attribute type (e.g. Monzo userId value). */
+    const val PERSON_EXTERNAL_ID_ATTR_TYPE_ID: Long = -4
+
     /**
      * SQL statements to execute when opening a database connection.
      * Applied to all database connections (JVM, Android, etc.)
@@ -632,6 +635,147 @@ object DatabaseConfig {
     }
 
     /**
+     * Creates audit triggers for person attributes.
+     * Each attribute change bumps the person revision and records to person_attribute_audit.
+     * Must be called BEFORE createAuditTriggers() so generic triggers are skipped via IF NOT EXISTS.
+     */
+    private fun MoneyManagerDatabaseWrapper.createPersonAttributeTriggers() {
+        execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_person_attribute_insert_audit
+            AFTER INSERT ON person_attribute
+            FOR EACH ROW
+            BEGIN
+                UPDATE person
+                SET revision_id = revision_id + 1
+                WHERE id = NEW.person_id
+                  AND NOT EXISTS (SELECT 1 FROM _creation_mode);
+
+                INSERT INTO person_attribute_audit (audit_timestamp, audit_type_id, person_id, revision_id, attribute_type_id, attribute_value)
+                SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, NEW.person_id, revision_id, NEW.attribute_type_id, NEW.attribute_value
+                FROM person WHERE id = NEW.person_id;
+            END
+            """.trimIndent(),
+            0,
+        )
+
+        execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_person_attribute_update_audit
+            AFTER UPDATE ON person_attribute
+            FOR EACH ROW
+            WHEN OLD.attribute_value != NEW.attribute_value
+            BEGIN
+                UPDATE person
+                SET revision_id = revision_id + 1
+                WHERE id = NEW.person_id
+                  AND NOT EXISTS (SELECT 1 FROM _creation_mode);
+
+                INSERT INTO person_attribute_audit (audit_timestamp, audit_type_id, person_id, revision_id, attribute_type_id, attribute_value)
+                SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, NEW.person_id, revision_id, NEW.attribute_type_id, OLD.attribute_value
+                FROM person WHERE id = NEW.person_id;
+            END
+            """.trimIndent(),
+            0,
+        )
+
+        execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_person_attribute_delete_audit
+            AFTER DELETE ON person_attribute
+            FOR EACH ROW
+            BEGIN
+                UPDATE person
+                SET revision_id = revision_id + 1
+                WHERE id = OLD.person_id
+                  AND NOT EXISTS (SELECT 1 FROM _creation_mode);
+
+                INSERT INTO person_attribute_audit (audit_timestamp, audit_type_id, person_id, revision_id, attribute_type_id, attribute_value)
+                SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, OLD.person_id, revision_id, OLD.attribute_type_id, OLD.attribute_value
+                FROM person WHERE id = OLD.person_id;
+            END
+            """.trimIndent(),
+            0,
+        )
+    }
+
+    /**
+     * Runs incremental schema migrations for existing databases.
+     * Idempotent — safe to call on every database open.
+     */
+    fun runMigrations(database: MoneyManagerDatabaseWrapper) {
+        with(database) {
+            // Migration: introduce person_attribute table (external_id moved from column to attribute)
+            execute(
+                null,
+                """
+                CREATE TABLE IF NOT EXISTS person_attribute (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    person_id INTEGER NOT NULL,
+                    attribute_type_id INTEGER NOT NULL,
+                    attribute_value TEXT NOT NULL,
+                    FOREIGN KEY (person_id) REFERENCES person(id) ON DELETE CASCADE,
+                    FOREIGN KEY (attribute_type_id) REFERENCES attribute_type(id) ON DELETE RESTRICT,
+                    UNIQUE (person_id, attribute_type_id)
+                )
+                """.trimIndent(),
+                0,
+            )
+            execute(null, "CREATE INDEX IF NOT EXISTS idx_person_attribute_person ON person_attribute(person_id)", 0)
+            execute(null, "CREATE INDEX IF NOT EXISTS idx_person_attribute_type ON person_attribute(attribute_type_id)", 0)
+
+            execute(
+                null,
+                """
+                CREATE TABLE IF NOT EXISTS person_attribute_audit (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    audit_timestamp INTEGER NOT NULL,
+                    audit_type_id INTEGER NOT NULL,
+                    person_id INTEGER NOT NULL,
+                    revision_id INTEGER NOT NULL,
+                    attribute_type_id INTEGER NOT NULL,
+                    attribute_value TEXT NOT NULL,
+                    FOREIGN KEY (audit_type_id) REFERENCES audit_type(id),
+                    FOREIGN KEY (attribute_type_id) REFERENCES attribute_type(id) ON DELETE RESTRICT
+                )
+                """.trimIndent(),
+                0,
+            )
+            execute(null, "CREATE INDEX IF NOT EXISTS idx_person_attribute_audit_person_id ON person_attribute_audit(person_id)", 0)
+            execute(
+                null,
+                "CREATE INDEX IF NOT EXISTS idx_person_attribute_audit_revision ON person_attribute_audit(person_id, revision_id)",
+                0,
+            )
+
+            execute(
+                null,
+                "INSERT OR IGNORE INTO attribute_type(id, name) VALUES ($PERSON_EXTERNAL_ID_ATTR_TYPE_ID, 'person-external-id')",
+                0,
+            )
+
+            createPersonAttributeTriggers()
+
+            // Migrate existing person.external_id column values if present.
+            if ("external_id" in getTableColumns("person")) {
+                execute(
+                    null,
+                    """
+                    INSERT OR IGNORE INTO person_attribute (person_id, attribute_type_id, attribute_value)
+                    SELECT id, $PERSON_EXTERNAL_ID_ATTR_TYPE_ID, external_id
+                    FROM person
+                    WHERE external_id IS NOT NULL
+                    """.trimIndent(),
+                    0,
+                )
+            }
+        }
+    }
+
+    /**
      * Seeds the database with all available currencies and creates incremental refresh triggers.
      * Should be called once after creating a new database.
      *
@@ -679,6 +823,7 @@ object DatabaseConfig {
             createCreationModeTable()
             createAttributeTriggers()
             createAccountAttributeTriggers()
+            createPersonAttributeTriggers()
 
             // Create custom category audit triggers (must be before generic ones)
             // These include parent_name denormalization via subquery
@@ -700,6 +845,7 @@ object DatabaseConfig {
             attributeTypeQueries.insertWithId(id = EXCLUDED_ATTR_TYPE_ID, name = "excluded")
             attributeTypeQueries.insertWithId(id = ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID, name = "account-external-id")
             attributeTypeQueries.insertWithId(id = BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID, name = "built-in type")
+            attributeTypeQueries.insertWithId(id = PERSON_EXTERNAL_ID_ATTR_TYPE_ID, name = "person-external-id")
 
             // Create system device for system-generated source tracking
             // Platform 0 = SYSTEM, no os/machine/make/model needed

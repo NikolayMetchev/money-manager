@@ -76,6 +76,7 @@ class MoneyManagerDatabaseWrapper(
             "category_audit",
             "transfer_audit",
             "person_audit",
+            "person_attribute_audit",
             "person_account_ownership_audit",
             "transfer_attribute_audit",
             "account_attribute_audit",

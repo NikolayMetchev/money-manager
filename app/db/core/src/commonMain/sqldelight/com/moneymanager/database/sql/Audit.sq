@@ -225,6 +225,22 @@ CREATE INDEX IF NOT EXISTS idx_person_account_ownership_audit_timestamp ON perso
 CREATE INDEX IF NOT EXISTS idx_person_account_ownership_audit_type ON person_account_ownership_audit(audit_type_id);
 CREATE INDEX IF NOT EXISTS idx_person_account_ownership_audit_person_account_ownership_id_timestamp ON person_account_ownership_audit(person_account_ownership_id, audit_timestamp DESC);
 
+-- person_attribute_audit: Audit trail for person attributes
+CREATE TABLE person_attribute_audit (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    audit_timestamp INTEGER NOT NULL,
+    audit_type_id INTEGER NOT NULL,
+    person_id INTEGER NOT NULL,
+    revision_id INTEGER NOT NULL,
+    attribute_type_id INTEGER NOT NULL,
+    attribute_value TEXT NOT NULL,
+    FOREIGN KEY (audit_type_id) REFERENCES audit_type(id),
+    FOREIGN KEY (attribute_type_id) REFERENCES attribute_type(id) ON DELETE RESTRICT
+);
+
+CREATE INDEX IF NOT EXISTS idx_person_attribute_audit_person_id ON person_attribute_audit(person_id);
+CREATE INDEX IF NOT EXISTS idx_person_attribute_audit_revision ON person_attribute_audit(person_id, revision_id);
+
 -- Get audit history for a person account ownership
 selectAuditHistoryForPersonAccountOwnership:
 SELECT

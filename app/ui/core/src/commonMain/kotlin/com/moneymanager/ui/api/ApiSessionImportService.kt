@@ -15,6 +15,7 @@ import com.moneymanager.domain.repository.ApiSessionRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
+import com.moneymanager.domain.repository.PersonAttributeRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.rest.ApiClient
@@ -35,6 +36,7 @@ import kotlin.time.Instant
 
 private val ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID = AttributeTypeId(DatabaseConfig.ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID)
 private val BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID = AttributeTypeId(DatabaseConfig.BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID)
+private val PERSON_EXTERNAL_ID_ATTR_TYPE_ID = AttributeTypeId(DatabaseConfig.PERSON_EXTERNAL_ID_ATTR_TYPE_ID)
 
 data class ApiSessionImportResult(
     val accountCount: Int,
@@ -201,6 +203,7 @@ suspend fun importApiSessionTransactions(
     entitySourceQueries: EntitySourceQueries,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
+    personAttributeRepository: PersonAttributeRepository,
     attributeTypeRepository: AttributeTypeRepository,
     accountAttributeRepository: AccountAttributeRepository,
     deviceId: DeviceId,
@@ -220,6 +223,7 @@ suspend fun importApiSessionTransactions(
             entitySourceQueries,
             personRepository,
             personAccountOwnershipRepository,
+            personAttributeRepository,
             attributeTypeRepository,
             accountAttributeRepository,
             deviceId,
@@ -290,6 +294,7 @@ private data class ImportSetup(
     val transferSourceQueries: TransferSourceQueries,
     val personRepository: PersonRepository,
     val personAccountOwnershipRepository: PersonAccountOwnershipRepository,
+    val personAttributeRepository: PersonAttributeRepository,
 )
 
 private suspend fun setupImportSession(
@@ -301,6 +306,7 @@ private suspend fun setupImportSession(
     entitySourceQueries: EntitySourceQueries,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
+    personAttributeRepository: PersonAttributeRepository,
     attributeTypeRepository: AttributeTypeRepository,
     accountAttributeRepository: AccountAttributeRepository,
     deviceId: DeviceId,
@@ -419,6 +425,7 @@ private suspend fun setupImportSession(
         transferSourceQueries = transferSourceQueries,
         personRepository = personRepository,
         personAccountOwnershipRepository = personAccountOwnershipRepository,
+        personAttributeRepository = personAttributeRepository,
     )
 }
 
@@ -493,6 +500,7 @@ private suspend fun importPeopleFromSession(setup: ImportSetup): Int =
         strategy = setup.strategy,
         personRepository = setup.personRepository,
         personAccountOwnershipRepository = setup.personAccountOwnershipRepository,
+        personAttributeRepository = setup.personAttributeRepository,
     ) +
         importPeopleFromCounterparties(
             transactionResponses = setup.transactionResponses,
@@ -504,6 +512,7 @@ private suspend fun importPeopleFromSession(setup: ImportSetup): Int =
             nameMappings = setup.nameMappings,
             personRepository = setup.personRepository,
             personAccountOwnershipRepository = setup.personAccountOwnershipRepository,
+            personAttributeRepository = setup.personAttributeRepository,
         )
 
 private suspend fun flushPostImportAttributes(setup: ImportSetup) {
@@ -737,8 +746,9 @@ private suspend fun importPeopleFromAccounts(
     strategy: ApiImportStrategy,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
+    personAttributeRepository: PersonAttributeRepository,
 ): Int {
-    val peopleIndex = MutablePeopleIndex.from(personRepository.getAllPeople().first())
+    val peopleIndex = loadPeopleIndex(personRepository, personAttributeRepository)
     var newPeopleCount = 0
 
     for (account in accountsById.values) {
@@ -752,6 +762,7 @@ private suspend fun importPeopleFromAccounts(
                 peopleIndex = peopleIndex,
                 personRepository = personRepository,
                 personAccountOwnershipRepository = personAccountOwnershipRepository,
+                personAttributeRepository = personAttributeRepository,
             )
     }
 
@@ -768,8 +779,9 @@ private suspend fun importPeopleFromCounterparties(
     nameMappings: CounterpartyNameMappings,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
+    personAttributeRepository: PersonAttributeRepository,
 ): Int {
-    val peopleIndex = MutablePeopleIndex.from(personRepository.getAllPeople().first())
+    val peopleIndex = loadPeopleIndex(personRepository, personAttributeRepository)
     var newPeopleCount = 0
 
     for (response in transactionResponses) {
@@ -794,6 +806,7 @@ private suspend fun importPeopleFromCounterparties(
                     peopleIndex = peopleIndex,
                     personRepository = personRepository,
                     personAccountOwnershipRepository = personAccountOwnershipRepository,
+                    personAttributeRepository = personAttributeRepository,
                 )
         }
     }
@@ -807,6 +820,7 @@ private suspend fun importOwnersForAccount(
     peopleIndex: MutablePeopleIndex,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
+    personAttributeRepository: PersonAttributeRepository,
 ): Int {
     val existingOwnerPersonIds =
         personAccountOwnershipRepository
@@ -822,6 +836,7 @@ private suspend fun importOwnersForAccount(
                 owner = owner,
                 peopleIndex = peopleIndex,
                 personRepository = personRepository,
+                personAttributeRepository = personAttributeRepository,
             ) ?: continue
 
         if (existingOwnerPersonIds.add(person.id)) {
@@ -839,20 +854,22 @@ private suspend fun resolveOrCreatePerson(
     owner: ApiImportAccountOwner,
     peopleIndex: MutablePeopleIndex,
     personRepository: PersonRepository,
+    personAttributeRepository: PersonAttributeRepository,
 ): Pair<Person, Boolean>? {
     val name = owner.preferredName.trim()
     val externalId = owner.userId.trim().ifBlank { null }
     if (name.isBlank()) return null
 
     peopleIndex.find(externalId = externalId, fullName = name)?.let { existing ->
-        if (externalId != null && existing.externalId.isNullOrBlank()) {
+        if (externalId != null && existing.externalId == null) {
             logger.info { "Backfilling external id for imported person '${existing.fullName}'" }
-            val updated = existing.copy(externalId = externalId)
-            personRepository.updatePerson(updated)
-            peopleIndex.replace(updated)
-            return updated to false
+            runCatching {
+                personAttributeRepository.insert(existing.person.id, PERSON_EXTERNAL_ID_ATTR_TYPE_ID, externalId)
+            }
+            peopleIndex.replace(existing.person, externalId)
+            return existing.person to false
         }
-        return existing to false
+        return existing.person to false
     }
 
     val nameParts = name.split(" ", limit = 2)
@@ -862,20 +879,49 @@ private suspend fun resolveOrCreatePerson(
             firstName = nameParts[0],
             middleName = null,
             lastName = nameParts.getOrNull(1)?.ifBlank { null },
-            externalId = externalId,
         )
     val newId = personRepository.createPerson(person)
-    return person.copy(id = newId).also(peopleIndex::add) to true
+    val createdPerson = person.copy(id = newId)
+    if (externalId != null) {
+        personAttributeRepository.insertInCreationMode(createdPerson.id, PERSON_EXTERNAL_ID_ATTR_TYPE_ID, externalId)
+    }
+    peopleIndex.add(createdPerson, externalId)
+    return createdPerson to true
+}
+
+private suspend fun loadPeopleIndex(
+    personRepository: PersonRepository,
+    personAttributeRepository: PersonAttributeRepository,
+): MutablePeopleIndex {
+    val people = personRepository.getAllPeople().first()
+    val externalIdsByPersonId =
+        people.associate { person ->
+            person.id to
+                personAttributeRepository
+                    .getByPerson(person.id)
+                    .first()
+                    .firstOrNull { it.attributeType.id == PERSON_EXTERNAL_ID_ATTR_TYPE_ID }
+                    ?.value
+        }
+    return MutablePeopleIndex.from(people, externalIdsByPersonId)
+}
+
+private data class IndexedPerson(
+    val person: Person,
+    val externalId: String?,
+) {
+    val fullName: String
+        get() = person.fullName
 }
 
 private class MutablePeopleIndex private constructor(
-    private val peopleByExternalId: MutableMap<String, Person>,
-    private val peopleByFullName: MutableMap<String, MutableList<Person>>,
+    private val peopleByExternalId: MutableMap<String, IndexedPerson>,
+    private val peopleByFullName: MutableMap<String, MutableList<IndexedPerson>>,
 ) {
     fun find(
         externalId: String?,
         fullName: String,
-    ): Person? =
+    ): IndexedPerson? =
         externalId?.let { peopleByExternalId[it] }
             ?: if (externalId == null) {
                 peopleByFullName[fullName]?.firstOrNull()
@@ -883,33 +929,45 @@ private class MutablePeopleIndex private constructor(
                 // When an API supplies an external id, only fall back to same-name people that do
                 // not already have their own external id. This avoids merging two distinct people
                 // who happen to share a name but are represented by different upstream ids.
-                peopleByFullName[fullName]?.firstOrNull { it.externalId.isNullOrBlank() }
+                peopleByFullName[fullName]?.firstOrNull { it.externalId == null }
             }
 
-    fun add(person: Person) {
-        person.externalId?.let { peopleByExternalId[it] = person }
-        peopleByFullName.getOrPut(person.fullName) { mutableListOf() }.add(person)
+    fun add(
+        person: Person,
+        externalId: String?,
+    ) {
+        val indexedPerson = IndexedPerson(person, externalId)
+        externalId?.let { peopleByExternalId[it] = indexedPerson }
+        peopleByFullName.getOrPut(person.fullName) { mutableListOf() }.add(indexedPerson)
     }
 
-    fun replace(person: Person) {
-        person.externalId?.let { peopleByExternalId[it] = person }
+    fun replace(
+        person: Person,
+        externalId: String?,
+    ) {
+        val indexedPerson = IndexedPerson(person, externalId)
+        externalId?.let { peopleByExternalId[it] = indexedPerson }
         val people = peopleByFullName[person.fullName] ?: return
-        val index = people.indexOfFirst { it.id == person.id }
+        val index = people.indexOfFirst { it.person.id == person.id }
         if (index >= 0) {
-            people[index] = person
+            people[index] = indexedPerson
         }
     }
 
     companion object {
-        fun from(people: List<Person>): MutablePeopleIndex {
+        fun from(
+            people: List<Person>,
+            externalIdsByPersonId: Map<PersonId, String?>,
+        ): MutablePeopleIndex {
+            val indexedPeople = people.map { person -> IndexedPerson(person, externalIdsByPersonId[person.id]) }
             val byExternalId =
-                mutableMapOf<String, Person>().apply {
-                    people.forEach { person ->
+                mutableMapOf<String, IndexedPerson>().apply {
+                    indexedPeople.forEach { person ->
                         person.externalId?.let { put(it, person) }
                     }
                 }
             val byFullName =
-                people
+                indexedPeople
                     .groupByTo(mutableMapOf()) { it.fullName }
                     .mapValuesTo(mutableMapOf()) { (_, group) -> group.toMutableList() }
             return MutablePeopleIndex(byExternalId, byFullName)

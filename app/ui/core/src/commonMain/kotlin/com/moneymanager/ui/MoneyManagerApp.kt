@@ -49,6 +49,7 @@ import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.DeviceRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
+import com.moneymanager.domain.repository.PersonAttributeRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.SettingsRepository
 import com.moneymanager.domain.repository.TransactionRepository
@@ -108,6 +109,7 @@ fun MoneyManagerApp(
     maintenanceService: DatabaseMaintenanceService,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
+    personAttributeRepository: PersonAttributeRepository,
     settingsRepository: SettingsRepository,
     transactionRepository: TransactionRepository,
     transferSourceRepository: TransferSourceRepository,
@@ -420,6 +422,7 @@ fun MoneyManagerApp(
                                     maintenanceService = maintenanceService,
                                     personRepository = personRepository,
                                     personAccountOwnershipRepository = personAccountOwnershipRepository,
+                                    personAttributeRepository = personAttributeRepository,
                                     deviceId = deviceId,
                                     onCsvImportClick = { importId ->
                                         navigationHistory.navigateTo(Screen.CsvImportDetail(importId))

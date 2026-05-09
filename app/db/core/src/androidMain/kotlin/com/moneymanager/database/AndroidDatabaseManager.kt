@@ -68,6 +68,8 @@ class AndroidDatabaseManager(
 
             if (isNewDatabase) {
                 DatabaseConfig.seedDatabase(database, CurrencyRepositoryImpl(database))
+            } else {
+                DatabaseConfig.runMigrations(database)
             }
 
             database

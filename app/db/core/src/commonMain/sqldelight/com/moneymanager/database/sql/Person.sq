@@ -4,13 +4,11 @@ CREATE TABLE person (
     revision_id INTEGER NOT NULL DEFAULT 1,
     first_name TEXT NOT NULL CHECK(length(trim(first_name)) > 0),
     middle_name TEXT,
-    last_name TEXT,
-    external_id TEXT
+    last_name TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_person_first_name ON person(first_name);
 CREATE INDEX IF NOT EXISTS idx_person_last_name ON person(last_name);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_person_external_id ON person(external_id) WHERE external_id IS NOT NULL;
 
 -- Person queries
 selectAll:
@@ -20,13 +18,13 @@ selectById:
 SELECT * FROM person WHERE id = ?;
 
 insert:
-INSERT INTO person(first_name, middle_name, last_name, external_id)
-VALUES (?, ?, ?, ?);
+INSERT INTO person(first_name, middle_name, last_name)
+VALUES (?, ?, ?);
 
 update:
 UPDATE person
 SET revision_id = revision_id + 1,
-    first_name = ?, middle_name = ?, last_name = ?, external_id = ?
+    first_name = ?, middle_name = ?, last_name = ?
 WHERE id = ?;
 
 delete:

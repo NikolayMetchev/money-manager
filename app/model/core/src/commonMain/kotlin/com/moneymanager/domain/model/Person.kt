@@ -8,7 +8,6 @@ data class Person(
     val firstName: String,
     val middleName: String?,
     val lastName: String?,
-    val externalId: String? = null,
 ) {
     val fullName: String
         get() =
