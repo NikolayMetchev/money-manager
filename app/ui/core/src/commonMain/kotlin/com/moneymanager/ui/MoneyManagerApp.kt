@@ -326,6 +326,8 @@ fun MoneyManagerApp(
                                 }
                                 PeopleScreen(
                                     personRepository = personRepository,
+                                    personAttributeRepository = personAttributeRepository,
+                                    attributeTypeRepository = attributeTypeRepository,
                                     personAccountOwnershipRepository = personAccountOwnershipRepository,
                                     entitySourceQueries = entitySourceQueries,
                                     deviceId = deviceId,

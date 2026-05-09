@@ -30,6 +30,9 @@ WHERE id = ?;
 delete:
 DELETE FROM person WHERE id = ?;
 
+bumpRevisionOnly:
+UPDATE person SET revision_id = revision_id + 1 WHERE id = ?;
+
 lastInsertRowId:
 SELECT last_insert_rowid();
 
