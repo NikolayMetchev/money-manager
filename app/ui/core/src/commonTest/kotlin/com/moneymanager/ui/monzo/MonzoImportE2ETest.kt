@@ -945,7 +945,7 @@ class MonzoImportE2ETest : DbTest() {
             val counterpartyAttributes = repositories.accountAttributeRepository.getByAccount(counterpartyAccount.id).first()
             assertTrue(
                 counterpartyAttributes.any {
-                    it.attributeType.name == "person-sort-code" &&
+                    it.attributeType.name == "account-sort-code" &&
                         it.value == "040404"
                 },
                 "Counterparty account should keep the personal sort code attribute: ${counterpartyAttributes.joinToString {
@@ -954,7 +954,7 @@ class MonzoImportE2ETest : DbTest() {
             )
             assertTrue(
                 counterpartyAttributes.any {
-                    it.attributeType.name == "person-account-number" &&
+                    it.attributeType.name == "account-account-number" &&
                         it.value == "12345678"
                 },
                 "Counterparty account should keep the personal account number attribute: ${counterpartyAttributes.joinToString {

@@ -37,8 +37,8 @@ import kotlin.time.Instant
 private val ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID = AttributeTypeId(DatabaseConfig.ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID)
 private val BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID = AttributeTypeId(DatabaseConfig.BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID)
 private val PERSON_EXTERNAL_ID_ATTR_TYPE_ID = AttributeTypeId(DatabaseConfig.PERSON_EXTERNAL_ID_ATTR_TYPE_ID)
-private val PERSON_SORT_CODE_ATTR_TYPE_ID = AttributeTypeId(DatabaseConfig.PERSON_SORT_CODE_ATTR_TYPE_ID)
-private val PERSON_ACCOUNT_NUMBER_ATTR_TYPE_ID = AttributeTypeId(DatabaseConfig.PERSON_ACCOUNT_NUMBER_ATTR_TYPE_ID)
+private val ACCOUNT_SORT_CODE_ATTR_TYPE_ID = AttributeTypeId(DatabaseConfig.ACCOUNT_SORT_CODE_ATTR_TYPE_ID)
+private val ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID = AttributeTypeId(DatabaseConfig.ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID)
 
 data class ApiSessionImportResult(
     val accountCount: Int,
@@ -754,8 +754,8 @@ private suspend fun loadPersonalCounterpartyKeyIndex(
     val index = mutableMapOf<String, AccountId>()
     for (account in accountRepository.getAllAccounts().first()) {
         val attributes = accountAttributeRepository.getByAccount(account.id).first()
-        val sortCode = attributes.firstOrNull { it.attributeType.id == PERSON_SORT_CODE_ATTR_TYPE_ID }?.value
-        val accountNumber = attributes.firstOrNull { it.attributeType.id == PERSON_ACCOUNT_NUMBER_ATTR_TYPE_ID }?.value
+        val sortCode = attributes.firstOrNull { it.attributeType.id == ACCOUNT_SORT_CODE_ATTR_TYPE_ID }?.value
+        val accountNumber = attributes.firstOrNull { it.attributeType.id == ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID }?.value
         if (!sortCode.isNullOrBlank() && !accountNumber.isNullOrBlank()) {
             index["${account.name.lowercase()}|$sortCode|$accountNumber"] = account.id
         }
@@ -1236,8 +1236,8 @@ private suspend fun AccountAttributeRepository.ensureCounterpartyPersonalAttribu
     accountNumber: String?,
 ) {
     val currentAttributes = getByAccount(accountId).first()
-    upsertAccountAttribute(currentAttributes, accountId, PERSON_SORT_CODE_ATTR_TYPE_ID, sortCode)
-    upsertAccountAttribute(currentAttributes, accountId, PERSON_ACCOUNT_NUMBER_ATTR_TYPE_ID, accountNumber)
+    upsertAccountAttribute(currentAttributes, accountId, ACCOUNT_SORT_CODE_ATTR_TYPE_ID, sortCode)
+    upsertAccountAttribute(currentAttributes, accountId, ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID, accountNumber)
 }
 
 private suspend fun AccountAttributeRepository.ensureCounterpartyPersonalAttributesInCreationMode(
@@ -1246,8 +1246,8 @@ private suspend fun AccountAttributeRepository.ensureCounterpartyPersonalAttribu
     accountNumber: String?,
 ) {
     val currentAttributes = getByAccount(accountId).first()
-    upsertAccountAttributeInCreationMode(currentAttributes, accountId, PERSON_SORT_CODE_ATTR_TYPE_ID, sortCode)
-    upsertAccountAttributeInCreationMode(currentAttributes, accountId, PERSON_ACCOUNT_NUMBER_ATTR_TYPE_ID, accountNumber)
+    upsertAccountAttributeInCreationMode(currentAttributes, accountId, ACCOUNT_SORT_CODE_ATTR_TYPE_ID, sortCode)
+    upsertAccountAttributeInCreationMode(currentAttributes, accountId, ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID, accountNumber)
 }
 
 private suspend fun AccountAttributeRepository.upsertAccountAttribute(
