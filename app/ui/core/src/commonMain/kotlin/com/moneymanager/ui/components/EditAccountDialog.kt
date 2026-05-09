@@ -48,6 +48,7 @@ import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
+import com.moneymanager.domain.repository.PersonAttributeRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -69,6 +70,7 @@ fun EditAccountDialog(
     attributeTypeRepository: AttributeTypeRepository,
     categoryRepository: CategoryRepository,
     personRepository: PersonRepository,
+    personAttributeRepository: PersonAttributeRepository? = null,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     entitySourceQueries: EntitySourceQueries,
     deviceId: DeviceId,
@@ -443,6 +445,7 @@ fun EditAccountDialog(
         EditPersonDialog(
             personToEdit = null,
             personRepository = personRepository,
+            personAttributeRepository = personAttributeRepository,
             entitySourceQueries = entitySourceQueries,
             deviceId = deviceId,
             onDismiss = { showCreatePersonDialog = false },

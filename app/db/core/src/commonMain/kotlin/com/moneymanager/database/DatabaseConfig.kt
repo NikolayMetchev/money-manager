@@ -34,6 +34,12 @@ object DatabaseConfig {
     /** Stable ID for the "person-external-id" attribute type (e.g. Monzo userId value). */
     const val PERSON_EXTERNAL_ID_ATTR_TYPE_ID: Long = -4
 
+    /** Stable ID for the "sort code" account attribute type used for personal counterparties. */
+    const val PERSON_SORT_CODE_ATTR_TYPE_ID: Long = -5
+
+    /** Stable ID for the "account number" account attribute type used for personal counterparties. */
+    const val PERSON_ACCOUNT_NUMBER_ATTR_TYPE_ID: Long = -6
+
     /**
      * SQL statements to execute when opening a database connection.
      * Applied to all database connections (JVM, Android, etc.)
@@ -846,6 +852,8 @@ object DatabaseConfig {
             attributeTypeQueries.insertWithId(id = ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID, name = "account-external-id")
             attributeTypeQueries.insertWithId(id = BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID, name = "built-in type")
             attributeTypeQueries.insertWithId(id = PERSON_EXTERNAL_ID_ATTR_TYPE_ID, name = "person-external-id")
+            attributeTypeQueries.insertWithId(id = PERSON_SORT_CODE_ATTR_TYPE_ID, name = "person-sort-code")
+            attributeTypeQueries.insertWithId(id = PERSON_ACCOUNT_NUMBER_ATTR_TYPE_ID, name = "person-account-number")
 
             // Create system device for system-generated source tracking
             // Platform 0 = SYSTEM, no os/machine/make/model needed

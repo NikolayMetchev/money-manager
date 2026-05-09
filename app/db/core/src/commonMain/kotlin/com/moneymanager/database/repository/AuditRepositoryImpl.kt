@@ -7,6 +7,7 @@ import com.moneymanager.database.mapper.CategoryAuditEntryMapper
 import com.moneymanager.database.mapper.CurrencyAuditEntryMapper
 import com.moneymanager.database.mapper.OwnershipAuditHistoryForAccountMapper
 import com.moneymanager.database.mapper.PersonAccountOwnershipAuditEntryMapper
+import com.moneymanager.database.mapper.PersonAttributeAuditEntryMapper
 import com.moneymanager.database.mapper.PersonAuditEntryMapper
 import com.moneymanager.database.mapper.TransferAuditEntryMapper
 import com.moneymanager.database.sql.MoneyManagerDatabase
@@ -20,6 +21,7 @@ import com.moneymanager.domain.model.CategoryAuditEntry
 import com.moneymanager.domain.model.CurrencyAuditEntry
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.PersonAccountOwnershipAuditEntry
+import com.moneymanager.domain.model.PersonAttributeAuditEntry
 import com.moneymanager.domain.model.PersonAuditEntry
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.TransferAttributeAuditEntry
@@ -62,6 +64,14 @@ class AuditRepositoryImpl(
                 .selectAuditHistoryForPerson(personId.id)
                 .executeAsList()
                 .map(PersonAuditEntryMapper::map)
+        }
+
+    override suspend fun getAttributeAuditByPerson(personId: PersonId): List<PersonAttributeAuditEntry> =
+        withContext(Dispatchers.Default) {
+            queries
+                .selectAttributeAuditByPerson(personId.id)
+                .executeAsList()
+                .map(PersonAttributeAuditEntryMapper::map)
         }
 
     override suspend fun getAuditHistoryForPersonAccountOwnership(ownershipId: Long): List<PersonAccountOwnershipAuditEntry> =

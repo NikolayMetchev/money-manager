@@ -32,6 +32,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -39,8 +40,10 @@ import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.database.sql.EntitySourceQueries
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.Person
+import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.PersonAccountOwnership
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
+import com.moneymanager.domain.repository.PersonAttributeRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.ui.components.DeletePersonConfirmationDialog
 import com.moneymanager.ui.components.EditPersonDialog
@@ -49,9 +52,11 @@ import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 @Composable
 fun PeopleScreen(
     personRepository: PersonRepository,
+    personAttributeRepository: PersonAttributeRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     entitySourceQueries: EntitySourceQueries,
     deviceId: DeviceId,
+    scrollToPersonId: PersonId? = null,
     onAuditClick: (Person) -> Unit = {},
 ) {
     val people by personRepository
@@ -95,6 +100,12 @@ fun PeopleScreen(
             }
         } else {
             val lazyListState = rememberLazyListState()
+            LaunchedEffect(scrollToPersonId, people) {
+                val targetIndex = scrollToPersonId?.let { targetId -> people.indexOfFirst { it.id == targetId } } ?: -1
+                if (targetIndex >= 0) {
+                    lazyListState.animateScrollToItem(targetIndex)
+                }
+            }
             Box(modifier = Modifier.fillMaxSize()) {
                 LazyColumn(
                     state = lazyListState,
@@ -125,6 +136,7 @@ fun PeopleScreen(
         EditPersonDialog(
             personToEdit = null,
             personRepository = personRepository,
+            personAttributeRepository = personAttributeRepository,
             entitySourceQueries = entitySourceQueries,
             deviceId = deviceId,
             onDismiss = { showCreateDialog = false },
@@ -136,6 +148,7 @@ fun PeopleScreen(
         EditPersonDialog(
             personToEdit = currentPersonToEdit,
             personRepository = personRepository,
+            personAttributeRepository = personAttributeRepository,
             entitySourceQueries = entitySourceQueries,
             deviceId = deviceId,
             onDismiss = { personToEdit = null },

@@ -927,28 +927,40 @@ class MonzoImportE2ETest : DbTest() {
                 repositories.personAttributeRepository
                     .getByPerson(person.id)
                     .first()
-                    .single { it.attributeType.name == "person-external-id" }
+                    .singleOrNull { it.attributeType.name == "person-external-id" }
+                    ?: error("Expected person-external-id on imported person, but found none")
             assertEquals("anonuser_95515c2ea95c19a58aad7b", personExternalId.value)
 
+            val ownerships =
+                repositories.personAccountOwnershipRepository
+                    .getOwnershipsByPerson(person.id)
+                    .first()
+            assertEquals(1, ownerships.size, "Expected the person to own exactly one counterparty account")
             val counterpartyAccount =
                 repositories.accountRepository
                     .getAllAccounts()
                     .first()
-                    .single { account ->
-                        repositories.accountAttributeRepository
-                            .getByAccount(account.id)
-                            .first()
-                            .any {
-                                it.attributeType.name == "account-external-id" &&
-                                    it.value == "bank:040404:12345678"
-                            }
-                    }
-            val ownerships =
-                repositories.personAccountOwnershipRepository
-                    .getOwnershipsByAccount(counterpartyAccount.id)
-                    .first()
-            assertEquals(1, ownerships.size)
-            assertEquals(person.id, ownerships.single().personId)
+                    .singleOrNull { it.id == ownerships.single().accountId }
+                    ?: error("Could not find the owned counterparty account")
+            val counterpartyAttributes = repositories.accountAttributeRepository.getByAccount(counterpartyAccount.id).first()
+            assertTrue(
+                counterpartyAttributes.any {
+                    it.attributeType.name == "person-sort-code" &&
+                        it.value == "040404"
+                },
+                "Counterparty account should keep the personal sort code attribute: ${counterpartyAttributes.joinToString {
+                    it.attributeType.name + '=' + it.value
+                }}",
+            )
+            assertTrue(
+                counterpartyAttributes.any {
+                    it.attributeType.name == "person-account-number" &&
+                        it.value == "12345678"
+                },
+                "Counterparty account should keep the personal account number attribute: ${counterpartyAttributes.joinToString {
+                    it.attributeType.name + '=' + it.value
+                }}",
+            )
         }
 
     @Test

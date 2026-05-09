@@ -37,6 +37,8 @@ import kotlin.time.Instant
 private val ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID = AttributeTypeId(DatabaseConfig.ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID)
 private val BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID = AttributeTypeId(DatabaseConfig.BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID)
 private val PERSON_EXTERNAL_ID_ATTR_TYPE_ID = AttributeTypeId(DatabaseConfig.PERSON_EXTERNAL_ID_ATTR_TYPE_ID)
+private val PERSON_SORT_CODE_ATTR_TYPE_ID = AttributeTypeId(DatabaseConfig.PERSON_SORT_CODE_ATTR_TYPE_ID)
+private val PERSON_ACCOUNT_NUMBER_ATTR_TYPE_ID = AttributeTypeId(DatabaseConfig.PERSON_ACCOUNT_NUMBER_ATTR_TYPE_ID)
 
 data class ApiSessionImportResult(
     val accountCount: Int,
@@ -234,6 +236,7 @@ suspend fun importApiSessionTransactions(
         )
     precreateAndFlushCounterparties(setup, counterpartyAccountNames)
     importTransactionsConcurrently(setup)
+    flushPostTransactionAttributes(setup)
     val totalPeople = importPeopleFromSession(setup)
     flushPostImportAttributes(setup)
     return ApiSessionImportResult(
@@ -292,6 +295,7 @@ private data class ImportSetup(
     val accountAttributeRepository: AccountAttributeRepository,
     val transactionRepository: TransactionRepository,
     val transferSourceQueries: TransferSourceQueries,
+    val entitySourceQueries: EntitySourceQueries,
     val personRepository: PersonRepository,
     val personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     val personAttributeRepository: PersonAttributeRepository,
@@ -379,16 +383,23 @@ private suspend fun setupImportSession(
             accountRepository = accountRepository,
             accountAttributeRepository = accountAttributeRepository,
         ).toMutableMap()
+    val personalCounterpartyKeyIndex: MutableMap<String, AccountId> =
+        loadPersonalCounterpartyKeyIndex(
+            accountRepository = accountRepository,
+            accountAttributeRepository = accountAttributeRepository,
+        ).toMutableMap()
 
     val counts = ImportCounts(transactionResponses.size)
     val progressMutex = Mutex()
     val accountCache =
         AccountCache(
             accountRepository = accountRepository,
+            accountAttributeRepository = accountAttributeRepository,
             entitySourceQueries = entitySourceQueries,
             deviceId = deviceId,
             accountApiSourceByExternalId = accountApiSourceByExternalId,
             counterpartyIdIndex = counterpartyIdIndex,
+            personalCounterpartyKeyIndex = personalCounterpartyKeyIndex,
             builtInTypeIndex = builtInTypeIndex,
             onAccountCreated = { isSourceAccount ->
                 val message =
@@ -423,6 +434,7 @@ private suspend fun setupImportSession(
         accountAttributeRepository = accountAttributeRepository,
         transactionRepository = transactionRepository,
         transferSourceQueries = transferSourceQueries,
+        entitySourceQueries = entitySourceQueries,
         personRepository = personRepository,
         personAccountOwnershipRepository = personAccountOwnershipRepository,
         personAttributeRepository = personAttributeRepository,
@@ -501,6 +513,11 @@ private suspend fun importPeopleFromSession(setup: ImportSetup): Int =
         personRepository = setup.personRepository,
         personAccountOwnershipRepository = setup.personAccountOwnershipRepository,
         personAttributeRepository = setup.personAttributeRepository,
+        accountAttributeRepository = setup.accountAttributeRepository,
+        entitySourceQueries = setup.entitySourceQueries,
+        accountApiSourceByExternalId = setup.accountCache.accountApiSourceByExternalId,
+        sessionId = setup.sessionId,
+        deviceId = setup.deviceId,
     ) +
         importPeopleFromCounterparties(
             transactionResponses = setup.transactionResponses,
@@ -510,10 +527,30 @@ private suspend fun importPeopleFromSession(setup: ImportSetup): Int =
             accountCache = setup.accountCache,
             counterpartyIdField = setup.counterpartyIdField,
             nameMappings = setup.nameMappings,
+            accountAttributeRepository = setup.accountAttributeRepository,
+            entitySourceQueries = setup.entitySourceQueries,
+            deviceId = setup.deviceId,
             personRepository = setup.personRepository,
             personAccountOwnershipRepository = setup.personAccountOwnershipRepository,
             personAttributeRepository = setup.personAttributeRepository,
         )
+
+private suspend fun flushPostTransactionAttributes(setup: ImportSetup) {
+    if (setup.counterpartyIdField != null) {
+        flushPendingCounterpartyAttributes(
+            accountCache = setup.accountCache,
+            accountAttributeRepository = setup.accountAttributeRepository,
+        )
+    }
+    flushPendingPersonalCounterpartyAttributes(
+        accountCache = setup.accountCache,
+        accountAttributeRepository = setup.accountAttributeRepository,
+    )
+    flushPendingBuiltInTypeAttributes(
+        accountCache = setup.accountCache,
+        accountAttributeRepository = setup.accountAttributeRepository,
+    )
+}
 
 private suspend fun flushPostImportAttributes(setup: ImportSetup) {
     // Flush deferred account attributes now that all concurrent writes are done.
@@ -689,6 +726,22 @@ private suspend fun loadBuiltInTypeIndex(
     return index
 }
 
+private suspend fun loadPersonalCounterpartyKeyIndex(
+    accountRepository: AccountRepository,
+    accountAttributeRepository: AccountAttributeRepository,
+): Map<String, AccountId> {
+    val index = mutableMapOf<String, AccountId>()
+    for (account in accountRepository.getAllAccounts().first()) {
+        val attributes = accountAttributeRepository.getByAccount(account.id).first()
+        val sortCode = attributes.firstOrNull { it.attributeType.id == PERSON_SORT_CODE_ATTR_TYPE_ID }?.value
+        val accountNumber = attributes.firstOrNull { it.attributeType.id == PERSON_ACCOUNT_NUMBER_ATTR_TYPE_ID }?.value
+        if (!sortCode.isNullOrBlank() && !accountNumber.isNullOrBlank()) {
+            index["${account.name.lowercase()}|$sortCode|$accountNumber"] = account.id
+        }
+    }
+    return index
+}
+
 private suspend fun flushPendingCounterpartyAttributes(
     accountCache: AccountCache,
     accountAttributeRepository: AccountAttributeRepository,
@@ -703,6 +756,20 @@ private suspend fun flushPendingCounterpartyAttributes(
                 accountAttributeRepository.insertInCreationMode(accountId, ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID, counterpartyId)
             }
         }
+    }
+}
+
+private suspend fun flushPendingPersonalCounterpartyAttributes(
+    accountCache: AccountCache,
+    accountAttributeRepository: AccountAttributeRepository,
+) {
+    val pending = accountCache.drainPendingPersonalCounterpartyAttributes()
+    for ((accountId, identity) in pending) {
+        accountAttributeRepository.ensureCounterpartyPersonalAttributes(
+            accountId = accountId,
+            sortCode = identity.sortCode,
+            accountNumber = identity.accountNumber,
+        )
     }
 }
 
@@ -747,6 +814,11 @@ private suspend fun importPeopleFromAccounts(
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     personAttributeRepository: PersonAttributeRepository,
+    accountAttributeRepository: AccountAttributeRepository,
+    entitySourceQueries: EntitySourceQueries? = null,
+    accountApiSourceByExternalId: Map<String, AccountApiSource> = emptyMap(),
+    sessionId: ApiSessionId? = null,
+    deviceId: DeviceId? = null,
 ): Int {
     val peopleIndex = loadPeopleIndex(personRepository, personAttributeRepository)
     var newPeopleCount = 0
@@ -755,6 +827,19 @@ private suspend fun importPeopleFromAccounts(
         if (account.owners.isEmpty()) continue
 
         val accountId = accountCache.getOrCreateAccountId(account.id, account.displayName(strategy))
+        val sortCode =
+            account.rawJson?.stringOrNull("sort_code")?.takeIf { it.isNotBlank() }
+                ?: account.owners.firstOrNull { !it.sortCode.isNullOrBlank() }?.sortCode
+        val accountNumber =
+            account.rawJson?.stringOrNull("account_number")?.takeIf { it.isNotBlank() }
+                ?: account.owners.firstOrNull { !it.accountNumber.isNullOrBlank() }?.accountNumber
+        if (sortCode != null || accountNumber != null) {
+            accountAttributeRepository.ensureCounterpartyPersonalAttributes(
+                accountId = accountId,
+                sortCode = sortCode,
+                accountNumber = accountNumber,
+            )
+        }
         newPeopleCount +=
             importOwnersForAccount(
                 owners = account.owners,
@@ -763,6 +848,12 @@ private suspend fun importPeopleFromAccounts(
                 personRepository = personRepository,
                 personAccountOwnershipRepository = personAccountOwnershipRepository,
                 personAttributeRepository = personAttributeRepository,
+                accountAttributeRepository = accountAttributeRepository,
+                entitySourceQueries = entitySourceQueries,
+                deviceId = deviceId,
+                sessionId = sessionId,
+                requestId = accountApiSourceByExternalId[account.id]?.requestId,
+                jsonPath = accountApiSourceByExternalId[account.id]?.jsonPath,
             )
     }
 
@@ -777,9 +868,12 @@ private suspend fun importPeopleFromCounterparties(
     accountCache: AccountCache,
     counterpartyIdField: String?,
     nameMappings: CounterpartyNameMappings,
+    accountAttributeRepository: AccountAttributeRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     personAttributeRepository: PersonAttributeRepository,
+    entitySourceQueries: EntitySourceQueries,
+    deviceId: DeviceId,
 ): Int {
     val peopleIndex = loadPeopleIndex(personRepository, personAttributeRepository)
     var newPeopleCount = 0
@@ -791,14 +885,22 @@ private suspend fun importPeopleFromCounterparties(
             if (item.amountMinorUnits == 0L) continue
             if (builtInCounterpartyType != null) continue
             val owner = item.personalCounterpartyOwner() ?: continue
+            val personalCounterpartyIdentity = owner.personalCounterpartyIdentity() ?: continue
 
             val counterpartyAccountId =
                 accountCache.getOrCreateCounterpartyAccountId(
                     counterpartyId = item.rawJson?.resolveCounterpartyIdentity(counterpartyIdField),
                     builtInType = null,
-                    name = nameMappings.counterpartyPrefix + item.counterpartyName(nameMappings),
+                    name = nameMappings.counterpartyPrefix + personalCounterpartyIdentity.name,
+                    dedupeKey = personalCounterpartyIdentity.dedupeKey,
                     apiSource = AccountApiSource(sessionId, request.id, JsonPath("${item.jsonPath.value}.counterparty")),
+                    personalIdentity = personalCounterpartyIdentity,
                 )
+            accountAttributeRepository.ensureCounterpartyPersonalAttributes(
+                accountId = counterpartyAccountId,
+                sortCode = personalCounterpartyIdentity.sortCode,
+                accountNumber = personalCounterpartyIdentity.accountNumber,
+            )
             newPeopleCount +=
                 importOwnersForAccount(
                     owners = listOf(owner),
@@ -807,6 +909,11 @@ private suspend fun importPeopleFromCounterparties(
                     personRepository = personRepository,
                     personAccountOwnershipRepository = personAccountOwnershipRepository,
                     personAttributeRepository = personAttributeRepository,
+                    accountAttributeRepository = accountAttributeRepository,
+                    entitySourceQueries = entitySourceQueries,
+                    deviceId = deviceId,
+                    sessionId = sessionId,
+                    requestId = request.id,
                 )
         }
     }
@@ -821,13 +928,18 @@ private suspend fun importOwnersForAccount(
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     personAttributeRepository: PersonAttributeRepository,
+    accountAttributeRepository: AccountAttributeRepository,
+    entitySourceQueries: EntitySourceQueries? = null,
+    deviceId: DeviceId? = null,
+    sessionId: ApiSessionId? = null,
+    requestId: ApiRequestId? = null,
+    jsonPath: JsonPath? = null,
 ): Int {
     val existingOwnerPersonIds =
         personAccountOwnershipRepository
             .getOwnershipsByAccount(accountId)
             .first()
-            .map { it.personId }
-            .toMutableSet()
+            .associateBy { it.personId }
     var newPeopleCount = 0
 
     for (owner in owners) {
@@ -837,10 +949,45 @@ private suspend fun importOwnersForAccount(
                 peopleIndex = peopleIndex,
                 personRepository = personRepository,
                 personAttributeRepository = personAttributeRepository,
+                accountAttributeRepository = accountAttributeRepository,
+                entitySourceQueries = entitySourceQueries,
+                deviceId = deviceId,
+                sessionId = sessionId,
+                requestId = requestId,
             ) ?: continue
 
-        if (existingOwnerPersonIds.add(person.id)) {
-            personAccountOwnershipRepository.createOwnership(person.id, accountId)
+        val existingOwnership = existingOwnerPersonIds[person.id]
+        if (existingOwnership == null) {
+            val ownershipId = personAccountOwnershipRepository.createOwnership(person.id, accountId)
+            if (entitySourceQueries != null && deviceId != null && sessionId != null && requestId != null) {
+                ApiEntitySourceRecorder(
+                    queries = entitySourceQueries,
+                    deviceId = deviceId,
+                    sessionId = sessionId,
+                    requestId = requestId,
+                    jsonPath = jsonPath ?: owner.jsonPath,
+                ).insert(EntityType.PERSON_ACCOUNT_OWNERSHIP, ownershipId, 1L)
+            }
+        } else if (entitySourceQueries != null && deviceId != null && sessionId != null && requestId != null) {
+            val recorder =
+                ApiEntitySourceRecorder(
+                    queries = entitySourceQueries,
+                    deviceId = deviceId,
+                    sessionId = sessionId,
+                    requestId = requestId,
+                    jsonPath = jsonPath ?: owner.jsonPath,
+                )
+            val existingSource =
+                entitySourceQueries
+                    .selectSourceByEntityAndRevision(
+                        EntityType.PERSON_ACCOUNT_OWNERSHIP.id,
+                        existingOwnership.id,
+                        existingOwnership.revisionId,
+                    )
+                    .executeAsOneOrNull()
+            if (existingSource == null) {
+                recorder.insert(EntityType.PERSON_ACCOUNT_OWNERSHIP, existingOwnership.id, existingOwnership.revisionId)
+            }
         }
         if (wasCreated) {
             newPeopleCount++
@@ -855,12 +1002,19 @@ private suspend fun resolveOrCreatePerson(
     peopleIndex: MutablePeopleIndex,
     personRepository: PersonRepository,
     personAttributeRepository: PersonAttributeRepository,
+    accountAttributeRepository: AccountAttributeRepository,
+    entitySourceQueries: EntitySourceQueries? = null,
+    deviceId: DeviceId? = null,
+    sessionId: ApiSessionId? = null,
+    requestId: ApiRequestId? = null,
 ): Pair<Person, Boolean>? {
-    val name = owner.preferredName.trim()
     val externalId = owner.userId.trim().ifBlank { null }
-    if (name.isBlank()) return null
+    val bankKey = owner.bankKey()
+    val name = owner.preferredName?.trim().orEmpty()
+    val displayName = name.ifBlank { bankKey ?: externalId ?: return null }
 
-    peopleIndex.find(externalId = externalId, fullName = name)?.let { existing ->
+    val dedupeExternalId = externalId?.takeUnless { it.startsWith("anonuser", ignoreCase = true) }
+    peopleIndex.find(externalId = dedupeExternalId, bankKey = bankKey, fullName = displayName)?.let { existing ->
         if (externalId != null && existing.externalId == null) {
             logger.info { "Backfilling external id for imported person '${existing.fullName}'" }
             runCatching {
@@ -872,7 +1026,7 @@ private suspend fun resolveOrCreatePerson(
         return existing.person to false
     }
 
-    val nameParts = name.split(" ", limit = 2)
+    val nameParts = displayName.split(" ", limit = 2)
     val person =
         Person(
             id = PersonId(0L),
@@ -885,7 +1039,16 @@ private suspend fun resolveOrCreatePerson(
     if (externalId != null) {
         personAttributeRepository.insertInCreationMode(createdPerson.id, PERSON_EXTERNAL_ID_ATTR_TYPE_ID, externalId)
     }
-    peopleIndex.add(createdPerson, externalId)
+    if (entitySourceQueries != null && deviceId != null && sessionId != null && requestId != null) {
+        ApiEntitySourceRecorder(
+            queries = entitySourceQueries,
+            deviceId = deviceId,
+            sessionId = sessionId,
+            requestId = requestId,
+            jsonPath = owner.jsonPath,
+        ).insert(EntityType.PERSON, createdPerson.id.id, 1L)
+    }
+    peopleIndex.add(createdPerson, dedupeExternalId ?: externalId, bankKey)
     return createdPerson to true
 }
 
@@ -909,6 +1072,7 @@ private suspend fun loadPeopleIndex(
 private data class IndexedPerson(
     val person: Person,
     val externalId: String?,
+    val bankKey: String? = null,
 ) {
     val fullName: String
         get() = person.fullName
@@ -916,13 +1080,16 @@ private data class IndexedPerson(
 
 private class MutablePeopleIndex private constructor(
     private val peopleByExternalId: MutableMap<String, IndexedPerson>,
+    private val peopleByBankKey: MutableMap<String, IndexedPerson>,
     private val peopleByFullName: MutableMap<String, MutableList<IndexedPerson>>,
 ) {
     fun find(
         externalId: String?,
+        bankKey: String?,
         fullName: String,
     ): IndexedPerson? =
-        externalId?.let { peopleByExternalId[it] }
+        bankKey?.let { peopleByBankKey[it] }
+            ?: externalId?.let { peopleByExternalId[it] }
             ?: if (externalId == null) {
                 peopleByFullName[fullName]?.firstOrNull()
             } else {
@@ -935,9 +1102,11 @@ private class MutablePeopleIndex private constructor(
     fun add(
         person: Person,
         externalId: String?,
+        bankKey: String? = null,
     ) {
-        val indexedPerson = IndexedPerson(person, externalId)
+        val indexedPerson = IndexedPerson(person, externalId, bankKey)
         externalId?.let { peopleByExternalId[it] = indexedPerson }
+        bankKey?.let { peopleByBankKey[it] = indexedPerson }
         peopleByFullName.getOrPut(person.fullName) { mutableListOf() }.add(indexedPerson)
     }
 
@@ -945,8 +1114,10 @@ private class MutablePeopleIndex private constructor(
         person: Person,
         externalId: String?,
     ) {
-        val indexedPerson = IndexedPerson(person, externalId)
+        val existing = peopleByFullName[person.fullName]?.firstOrNull { it.person.id == person.id }
+        val indexedPerson = IndexedPerson(person, externalId, existing?.bankKey)
         externalId?.let { peopleByExternalId[it] = indexedPerson }
+        existing?.bankKey?.let { peopleByBankKey[it] = indexedPerson }
         val people = peopleByFullName[person.fullName] ?: return
         val index = people.indexOfFirst { it.person.id == person.id }
         if (index >= 0) {
@@ -966,11 +1137,12 @@ private class MutablePeopleIndex private constructor(
                         person.externalId?.let { put(it, person) }
                     }
                 }
+            val byBankKey = mutableMapOf<String, IndexedPerson>()
             val byFullName =
                 indexedPeople
                     .groupByTo(mutableMapOf()) { it.fullName }
                     .mapValuesTo(mutableMapOf()) { (_, group) -> group.toMutableList() }
-            return MutablePeopleIndex(byExternalId, byFullName)
+            return MutablePeopleIndex(byExternalId, byBankKey, byFullName)
         }
     }
 }
@@ -995,22 +1167,107 @@ private data class ApiImportAccount(
     val id: String,
     val description: String,
     val owners: List<ApiImportAccountOwner> = emptyList(),
+    val source: AccountApiSource? = null,
     val rawJson: JsonObject? = null,
 )
 
 private data class ApiImportAccountOwner(
     val userId: String,
-    val preferredName: String,
+    val preferredName: String?,
+    val sortCode: String?,
+    val accountNumber: String?,
+    val jsonPath: JsonPath,
 )
+
+private data class PersonalCounterpartyIdentity(
+    val name: String,
+    val sortCode: String,
+    val accountNumber: String,
+) {
+    val dedupeKey: String
+        get() = "$sortCode|$accountNumber"
+}
+
+private fun ApiImportAccountOwner.personalCounterpartyIdentity(): PersonalCounterpartyIdentity? {
+    val name = preferredName?.trim().orEmpty()
+    val sortCode = sortCode?.trim().orEmpty()
+    val accountNumber = accountNumber?.trim().orEmpty()
+    if (name.isBlank() || sortCode.isBlank() || accountNumber.isBlank()) return null
+    return PersonalCounterpartyIdentity(name = name, sortCode = sortCode, accountNumber = accountNumber)
+}
+
+private fun ApiImportAccountOwner.bankKey(): String? {
+    val identity = personalCounterpartyIdentity() ?: return null
+    return identity.dedupeKey
+}
+
+private fun ApiImportAccountOwner.accountBankKey(): String? {
+    val sortCode = sortCode?.trim().orEmpty()
+    val accountNumber = accountNumber?.trim().orEmpty()
+    return if (sortCode.isNotBlank() && accountNumber.isNotBlank()) "bank:$sortCode:$accountNumber" else null
+}
+
+private suspend fun AccountAttributeRepository.ensureCounterpartyPersonalAttributes(
+    accountId: AccountId,
+    sortCode: String?,
+    accountNumber: String?,
+) {
+    val currentAttributes = getByAccount(accountId).first()
+    val bankKey =
+        sortCode?.trim().orEmpty().takeIf { it.isNotBlank() }?.let { sort ->
+            accountNumber
+                ?.trim()
+                .orEmpty()
+                .takeIf { it.isNotBlank() }
+                ?.let { number -> "bank:$sort:$number" }
+        }
+
+    upsertAccountAttribute(currentAttributes, accountId, ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID, bankKey)
+    upsertAccountAttribute(currentAttributes, accountId, PERSON_SORT_CODE_ATTR_TYPE_ID, sortCode)
+    upsertAccountAttribute(currentAttributes, accountId, PERSON_ACCOUNT_NUMBER_ATTR_TYPE_ID, accountNumber)
+}
+
+private suspend fun AccountAttributeRepository.upsertAccountAttribute(
+    currentAttributes: List<AccountAttribute>,
+    accountId: AccountId,
+    attributeTypeId: AttributeTypeId,
+    value: String?,
+) {
+    val existing = currentAttributes.firstOrNull { it.attributeType.id == attributeTypeId }
+    when {
+        value == null && existing != null -> delete(existing.id)
+        value != null && existing == null -> insert(accountId, attributeTypeId, value)
+        value != null && existing != null && existing.value != value -> updateValue(existing.id, value)
+    }
+}
 
 private fun ApiTransactionPageItem.personalCounterpartyOwner(): ApiImportAccountOwner? {
     val counterparty = rawJson?.get("counterparty") as? JsonObject ?: return null
     val beneficiaryAccountType = counterparty.stringOrNull("beneficiary_account_type")
     if (beneficiaryAccountType?.equals("Personal", ignoreCase = true) != true) return null
 
-    val userId = counterparty.stringOrNull("user_id")?.takeIf { it.isNotBlank() } ?: return null
+    val name = counterparty.stringOrNull("name")?.takeIf { it.isNotBlank() }
+    val userId = counterparty.stringOrNull("user_id")?.takeIf { it.isNotBlank() }.orEmpty()
+    val sortCode = counterparty.stringOrNull("sort_code")?.takeIf { it.isNotBlank() }
+    val accountNumber = counterparty.stringOrNull("account_number")?.takeIf { it.isNotBlank() }
+    if (name == null && sortCode == null && accountNumber == null && userId.isBlank()) return null
+    return ApiImportAccountOwner(
+        userId = userId,
+        preferredName = name,
+        sortCode = sortCode,
+        accountNumber = accountNumber,
+        jsonPath = JsonPath("${jsonPath.value}.counterparty"),
+    )
+}
+
+private fun JsonObject.personalCounterpartyIdentity(nameMappings: CounterpartyNameMappings): PersonalCounterpartyIdentity? {
+    val counterparty = get("counterparty") as? JsonObject ?: return null
+    val beneficiaryAccountType = counterparty.stringOrNull("beneficiary_account_type")
+    if (beneficiaryAccountType?.equals("Personal", ignoreCase = true) != true) return null
+    val sortCode = counterparty.stringOrNull("sort_code")?.takeIf { it.isNotBlank() } ?: return null
+    val accountNumber = counterparty.stringOrNull("account_number")?.takeIf { it.isNotBlank() } ?: return null
     val name = counterparty.stringOrNull("name")?.takeIf { it.isNotBlank() } ?: return null
-    return ApiImportAccountOwner(userId = userId, preferredName = name)
+    return PersonalCounterpartyIdentity(name = name, sortCode = sortCode, accountNumber = accountNumber)
 }
 
 private fun parseAccounts(
@@ -1022,13 +1279,14 @@ private fun parseAccounts(
             .parseToJsonElement(json)
             .jsonObject[strategy.accountsEndpoint.responseArrayKey]
             ?.jsonArray
-            ?.mapNotNull { element ->
+            ?.mapIndexedNotNull { index, element ->
                 val account = element.jsonObject
-                val id = account.resolveJsonPath(strategy.accountMappings.idField) ?: return@mapNotNull null
+                val id = account.resolveJsonPath(strategy.accountMappings.idField) ?: return@mapIndexedNotNull null
                 ApiImportAccount(
                     id = id,
                     description = account.resolveJsonPath(strategy.accountMappings.descriptionField).orEmpty(),
-                    owners = parseAccountOwners(account, strategy),
+                    owners = parseAccountOwners(account, strategy, JsonPath("$.${strategy.accountsEndpoint.responseArrayKey}[$index]")),
+                    source = null,
                     rawJson = account,
                 )
             }
@@ -1041,6 +1299,7 @@ private fun parseAccounts(
 private fun parseAccountOwners(
     account: JsonObject,
     strategy: ApiImportStrategy,
+    accountJsonPath: JsonPath,
 ): List<ApiImportAccountOwner> =
     account["owners"]
         ?.jsonArray
@@ -1050,8 +1309,21 @@ private fun parseAccountOwners(
             val preferredName =
                 strategy.accountMappings.ownerNameField
                     ?.let { owner.resolveJsonPath(it) }
-                    .orEmpty()
-            ApiImportAccountOwner(userId = userId, preferredName = preferredName)
+                    ?.takeIf { it.isNotBlank() }
+                    ?: owner.stringOrNull("name")?.takeIf { it.isNotBlank() }
+            val sortCode =
+                owner.stringOrNull("sort_code")?.takeIf { it.isNotBlank() }
+                    ?: account.stringOrNull("sort_code")?.takeIf { it.isNotBlank() }
+            val accountNumber =
+                owner.stringOrNull("account_number")?.takeIf { it.isNotBlank() }
+                    ?: account.stringOrNull("account_number")?.takeIf { it.isNotBlank() }
+            ApiImportAccountOwner(
+                userId = userId,
+                preferredName = preferredName,
+                sortCode = sortCode,
+                accountNumber = accountNumber,
+                jsonPath = JsonPath("${accountJsonPath.value}.owners"),
+            )
         }
         ?: emptyList()
 
@@ -1065,13 +1337,16 @@ private fun parseAccountsWithPaths(
         ?.jsonArray
         ?.mapIndexedNotNull { index, element ->
             val account = element.jsonObject
-            val id = account.resolveJsonPath(strategy.accountMappings.idField) ?: return@mapIndexedNotNull null
-            ApiImportAccount(
-                id = id,
-                description = account.resolveJsonPath(strategy.accountMappings.descriptionField).orEmpty(),
-                owners = parseAccountOwners(account, strategy),
-            ).copy(rawJson = account) to JsonPath("$.${strategy.accountsEndpoint.responseArrayKey}[$index]")
-        }
+                val id = account.resolveJsonPath(strategy.accountMappings.idField) ?: return@mapIndexedNotNull null
+                val jsonPath = JsonPath("$.${strategy.accountsEndpoint.responseArrayKey}[$index]")
+                ApiImportAccount(
+                    id = id,
+                    description = account.resolveJsonPath(strategy.accountMappings.descriptionField).orEmpty(),
+                    owners = parseAccountOwners(account, strategy, jsonPath),
+                    source = null,
+                    rawJson = account,
+                ) to jsonPath
+            }
         ?: emptyList()
 
 private data class ApiTransactionPageItem(
@@ -1275,13 +1550,16 @@ private suspend fun importValidTransactionItem(
         } else {
             val builtInCounterpartyType = item.rawJson?.resolveBuiltInCounterpartyType(item.amountMinorUnits)
             val counterpartyId = item.rawJson?.resolveCounterpartyIdentity(counterpartyIdField)
+            val personalCounterpartyIdentity = item.rawJson?.personalCounterpartyIdentity(nameMappings)
             accountCache.getOrCreateCounterpartyAccountId(
                 counterpartyId = counterpartyId,
+                dedupeKey = personalCounterpartyIdentity?.dedupeKey,
                 builtInType = builtInCounterpartyType,
                 name =
                     nameMappings.counterpartyPrefix +
                         (builtInCounterpartyType?.defaultCounterpartyName ?: item.counterpartyName(nameMappings)),
                 apiSource = counterpartyApiSource,
+                personalIdentity = personalCounterpartyIdentity,
             )
         }
     val transfer = item.toTransfer(ownAccountId, counterpartyAccountId, currency)
@@ -1443,11 +1721,13 @@ private data class AccountApiSource(
 
 private class AccountCache(
     private val accountRepository: AccountRepository,
+    private val accountAttributeRepository: AccountAttributeRepository,
     private val entitySourceQueries: EntitySourceQueries,
     private val deviceId: DeviceId,
-    private val accountApiSourceByExternalId: Map<String, AccountApiSource>,
+    val accountApiSourceByExternalId: Map<String, AccountApiSource>,
     // Pre-built by the caller in the serial section before concurrent import starts
     private val counterpartyIdIndex: MutableMap<String, AccountId>,
+    private val personalCounterpartyKeyIndex: MutableMap<String, AccountId>,
     private val builtInTypeIndex: MutableMap<BuiltInCounterpartyType, AccountId>,
     private val onAccountCreated: suspend (isSourceAccount: Boolean) -> Unit = {},
 ) {
@@ -1460,11 +1740,17 @@ private class AccountCache(
      * serial section afterwards to avoid concurrent DB writes that cause SQLITE_BUSY.
      */
     private val pendingCounterpartyAttributes: MutableList<Pair<AccountId, String>> = mutableListOf()
+    private val pendingPersonalCounterpartyAttributes: MutableList<Pair<AccountId, PersonalCounterpartyIdentity>> = mutableListOf()
     private val pendingBuiltInTypeAttributes: MutableList<Pair<AccountId, BuiltInCounterpartyType>> = mutableListOf()
 
     suspend fun drainPendingCounterpartyAttributes(): List<Pair<AccountId, String>> =
         mutex.withLock {
             pendingCounterpartyAttributes.toList().also { pendingCounterpartyAttributes.clear() }
+        }
+
+    suspend fun drainPendingPersonalCounterpartyAttributes(): List<Pair<AccountId, PersonalCounterpartyIdentity>> =
+        mutex.withLock {
+            pendingPersonalCounterpartyAttributes.toList().also { pendingPersonalCounterpartyAttributes.clear() }
         }
 
     suspend fun drainPendingBuiltInTypeAttributes(): List<Pair<AccountId, BuiltInCounterpartyType>> =
@@ -1493,9 +1779,11 @@ private class AccountCache(
      */
     suspend fun getOrCreateCounterpartyAccountId(
         counterpartyId: String?,
+        dedupeKey: String? = null,
         builtInType: BuiltInCounterpartyType?,
         name: String,
         apiSource: AccountApiSource,
+        personalIdentity: PersonalCounterpartyIdentity? = null,
     ): AccountId =
         mutex.withLock {
             if (builtInType != null) {
@@ -1511,11 +1799,20 @@ private class AccountCache(
             if (counterpartyId != null) {
                 counterpartyIdIndex[counterpartyId]?.let { return@withLock it }
             }
+            if (dedupeKey != null) {
+                personalCounterpartyKeyIndex[dedupeKey]?.let { return@withLock it }
+            }
             val normalizedName = name.ifBlank { "Unknown" }
             val accountId = loadAccounts()[normalizedName]?.id ?: createAccount(null, normalizedName, apiSource)
             if (counterpartyId != null) {
                 counterpartyIdIndex[counterpartyId] = accountId
                 pendingCounterpartyAttributes.add(accountId to counterpartyId)
+            }
+            if (dedupeKey != null) {
+                personalCounterpartyKeyIndex[dedupeKey] = accountId
+                if (personalIdentity != null) {
+                    pendingPersonalCounterpartyAttributes.add(accountId to personalIdentity)
+                }
             }
             accountId
         }

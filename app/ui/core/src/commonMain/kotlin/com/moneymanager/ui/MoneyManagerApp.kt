@@ -318,7 +318,8 @@ fun MoneyManagerApp(
                                     },
                                 )
                             }
-                            is Screen.People -> {
+                            is Screen.People,
+                            is Screen.PeopleScroll -> {
                                 // Reset currentlyViewedAccountId and currentlyViewedCurrencyId when on other screens
                                 LaunchedEffect(Unit) {
                                     currentlyViewedAccountId = null
@@ -326,9 +327,11 @@ fun MoneyManagerApp(
                                 }
                                 PeopleScreen(
                                     personRepository = personRepository,
+                                    personAttributeRepository = personAttributeRepository,
                                     personAccountOwnershipRepository = personAccountOwnershipRepository,
                                     entitySourceQueries = entitySourceQueries,
                                     deviceId = deviceId,
+                                    scrollToPersonId = (screen as? Screen.PeopleScroll)?.personId,
                                     onAuditClick = { person ->
                                         navigationHistory.navigateTo(Screen.PersonAuditHistory(person.id, person.fullName))
                                     },
@@ -574,6 +577,14 @@ fun MoneyManagerApp(
                                             ),
                                         )
                                     },
+                                    onOwnerClick = { personId ->
+                                        navigationHistory.navigateTo(
+                                            Screen.PeopleScroll(
+                                                personId = personId,
+                                                personName = "People",
+                                            ),
+                                        )
+                                    },
                                     onBack = { navigationHistory.navigateBack() },
                                 )
                             }
@@ -582,6 +593,15 @@ fun MoneyManagerApp(
                                     personId = screen.personId,
                                     auditRepository = auditRepository,
                                     personRepository = personRepository,
+                                    onApiSourceClick = { sessionId, requestId, jsonPath ->
+                                        navigationHistory.navigateTo(
+                                            Screen.ApiSessionTraffic(
+                                                sessionId = sessionId,
+                                                highlightRequestId = requestId,
+                                                highlightJsonPath = jsonPath,
+                                            ),
+                                        )
+                                    },
                                     onBack = { navigationHistory.navigateBack() },
                                 )
                             }
