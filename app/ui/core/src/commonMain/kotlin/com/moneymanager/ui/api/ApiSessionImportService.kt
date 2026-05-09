@@ -746,6 +746,7 @@ private suspend fun importPeopleFromAccounts(
 
     val existingPeople = personRepository.getAllPeople().first()
     val peopleByFullName = existingPeople.associateBy { it.fullName }.toMutableMap()
+    val backfilledPersonIds = mutableSetOf<PersonId>()
     val peopleByExternalId =
         existingPeople
             .mapNotNull { person ->
@@ -824,7 +825,7 @@ private suspend fun importPeopleFromAccounts(
                         newId
                     }
 
-            if (externalId != null && externalId !in peopleByExternalId) {
+            if (externalId != null && externalId !in peopleByExternalId && personId !in backfilledPersonIds) {
                 // Existing person matched by name but without external-id attribute yet:
                 // backfill it so future imports dedupe by stable user_id instead of display name.
                 personAttributeRepository.insertInCreationMode(
@@ -837,6 +838,7 @@ private suspend fun importPeopleFromAccounts(
                         "Expected matched person when backfilling external ID attribute for personId=${personId.id}"
                     }
                 peopleByExternalId[externalId] = existingPerson
+                backfilledPersonIds += personId
             }
 
             if (personId !in existingOwnerPersonIds) {

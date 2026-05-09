@@ -1,4 +1,4 @@
-@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
+@file:OptIn(kotlin.uuid.ExperimentalUuidApi::class, kotlin.time.ExperimentalTime::class)
 
 package com.moneymanager.database.repository
 
@@ -10,6 +10,7 @@ import com.moneymanager.database.mapper.PersonAccountOwnershipAuditEntryMapper
 import com.moneymanager.database.mapper.PersonAuditEntryMapper
 import com.moneymanager.database.mapper.TransferAuditEntryMapper
 import com.moneymanager.database.sql.MoneyManagerDatabase
+import kotlin.time.Instant
 import com.moneymanager.domain.model.AccountAttributeAuditEntry
 import com.moneymanager.domain.model.AccountAuditEntry
 import com.moneymanager.domain.model.AccountId
@@ -159,6 +160,7 @@ class AuditRepositoryImpl(
                         ),
                     auditType = mapAuditType(row.audit_type),
                     value = row.attribute_value,
+                    auditTimestamp = Instant.fromEpochMilliseconds(row.audit_timestamp),
                 )
             }
 

@@ -111,6 +111,7 @@ CREATE INDEX IF NOT EXISTS idx_account_attribute_audit_revision ON account_attri
 -- person_attribute_audit: Audit trail for person attributes
 CREATE TABLE person_attribute_audit (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    audit_timestamp INTEGER NOT NULL,
     audit_type_id INTEGER NOT NULL,
     person_id INTEGER NOT NULL,
     revision_id INTEGER NOT NULL,
@@ -209,6 +210,7 @@ ORDER BY account_attribute_audit.revision_id DESC, attribute_type.name;
 selectAttributeAuditByPerson:
 SELECT
     person_attribute_audit.id,
+    person_attribute_audit.audit_timestamp,
     audit_type.name AS audit_type,
     person_attribute_audit.person_id,
     person_attribute_audit.revision_id,

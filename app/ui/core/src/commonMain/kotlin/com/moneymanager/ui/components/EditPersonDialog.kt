@@ -33,12 +33,14 @@ import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Person
+import com.moneymanager.domain.model.PersonAttribute
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.PersonAttributeRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.screens.transactions.AttributeTypeField
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
 
@@ -62,9 +64,8 @@ fun EditPersonDialog(
 
     var existingAttributeTypes by remember { mutableStateOf<List<AttributeType>>(emptyList()) }
     var editableAttributes by remember { mutableStateOf<Map<Long, Pair<String, String>>>(emptyMap()) }
-    var originalAttributeList by remember { mutableStateOf<List<com.moneymanager.domain.model.PersonAttribute>>(emptyList()) }
+    var originalAttributeList by remember { mutableStateOf<List<PersonAttribute>>(emptyList()) }
     var nextTempId by remember { mutableStateOf(-1L) }
-    var attributesLoaded by remember { mutableStateOf(false) }
 
     if (personToEdit != null && attributeTypeRepository != null && personAttributeRepository != null) {
         LaunchedEffect(Unit) {
@@ -74,15 +75,10 @@ fun EditPersonDialog(
         }
 
         LaunchedEffect(personToEdit.id) {
-            personAttributeRepository.getByPerson(personToEdit.id).collect { attrs ->
-                if (!attributesLoaded) {
-                    originalAttributeList = attrs
-                    editableAttributes =
-                        attrs.associate { attr ->
-                            attr.id to Pair(attr.attributeType.name, attr.value)
-                        }
-                    attributesLoaded = true
-                }
+            val attrs = personAttributeRepository.getByPerson(personToEdit.id).first()
+            originalAttributeList = attrs
+            editableAttributes = attrs.associate { attr ->
+                attr.id to Pair(attr.attributeType.name, attr.value)
             }
         }
     }

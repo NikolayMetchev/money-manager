@@ -1,4 +1,8 @@
+@file:OptIn(kotlin.time.ExperimentalTime::class)
+
 package com.moneymanager.domain.model
+
+import kotlin.time.Instant
 
 /**
  * Represents an audit entry for a person attribute change.
@@ -11,4 +15,5 @@ data class PersonAttributeAuditEntry(
     val attributeType: AttributeType,
     val auditType: AuditType,
     val value: String,
+    val auditTimestamp: Instant,
 )

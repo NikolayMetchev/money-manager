@@ -582,8 +582,8 @@ object DatabaseConfig {
                 WHERE id = NEW.person_id
                   AND NOT EXISTS (SELECT 1 FROM _creation_mode);
 
-                INSERT INTO person_attribute_audit (audit_type_id, person_id, revision_id, attribute_type_id, attribute_value)
-                SELECT 1, NEW.person_id, revision_id, NEW.attribute_type_id, NEW.attribute_value
+                INSERT INTO person_attribute_audit (audit_timestamp, audit_type_id, person_id, revision_id, attribute_type_id, attribute_value)
+                SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, NEW.person_id, revision_id, NEW.attribute_type_id, NEW.attribute_value
                 FROM person WHERE id = NEW.person_id;
             END
             """.trimIndent(),
@@ -604,8 +604,8 @@ object DatabaseConfig {
                 WHERE id = NEW.person_id
                   AND NOT EXISTS (SELECT 1 FROM _creation_mode);
 
-                INSERT INTO person_attribute_audit (audit_type_id, person_id, revision_id, attribute_type_id, attribute_value)
-                SELECT 2, NEW.person_id, revision_id, NEW.attribute_type_id, OLD.attribute_value
+                INSERT INTO person_attribute_audit (audit_timestamp, audit_type_id, person_id, revision_id, attribute_type_id, attribute_value)
+                SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, NEW.person_id, revision_id, NEW.attribute_type_id, OLD.attribute_value
                 FROM person WHERE id = NEW.person_id;
             END
             """.trimIndent(),
@@ -625,8 +625,8 @@ object DatabaseConfig {
                 WHERE id = OLD.person_id
                   AND NOT EXISTS (SELECT 1 FROM _creation_mode);
 
-                INSERT INTO person_attribute_audit (audit_type_id, person_id, revision_id, attribute_type_id, attribute_value)
-                SELECT 3, OLD.person_id, revision_id, OLD.attribute_type_id, OLD.attribute_value
+                INSERT INTO person_attribute_audit (audit_timestamp, audit_type_id, person_id, revision_id, attribute_type_id, attribute_value)
+                SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, OLD.person_id, revision_id, OLD.attribute_type_id, OLD.attribute_value
                 FROM person WHERE id = OLD.person_id;
             END
             """.trimIndent(),
