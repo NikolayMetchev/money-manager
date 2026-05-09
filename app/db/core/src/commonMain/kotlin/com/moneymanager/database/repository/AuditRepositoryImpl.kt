@@ -20,6 +20,7 @@ import com.moneymanager.domain.model.CategoryAuditEntry
 import com.moneymanager.domain.model.CurrencyAuditEntry
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.PersonAccountOwnershipAuditEntry
+import com.moneymanager.domain.model.PersonAttributeAuditEntry
 import com.moneymanager.domain.model.PersonAuditEntry
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.TransferAttributeAuditEntry
@@ -58,10 +59,12 @@ class AuditRepositoryImpl(
 
     override suspend fun getAuditHistoryForPerson(personId: PersonId): List<PersonAuditEntry> =
         withContext(Dispatchers.Default) {
-            queries
-                .selectAuditHistoryForPerson(personId.id)
-                .executeAsList()
-                .map(PersonAuditEntryMapper::map)
+            val entries =
+                queries
+                    .selectAuditHistoryForPerson(personId.id)
+                    .executeAsList()
+                    .map(PersonAuditEntryMapper::map)
+            attachPersonAttributeChanges(personId, entries)
         }
 
     override suspend fun getAuditHistoryForPersonAccountOwnership(ownershipId: Long): List<PersonAccountOwnershipAuditEntry> =
@@ -101,6 +104,11 @@ class AuditRepositoryImpl(
             fetchAccountAttributeAudit(accountId)
         }
 
+    override suspend fun getAttributeAuditByPerson(personId: PersonId): List<PersonAttributeAuditEntry> =
+        withContext(Dispatchers.Default) {
+            fetchPersonAttributeAudit(personId)
+        }
+
     private fun fetchAccountAttributeAudit(accountId: AccountId): List<AccountAttributeAuditEntry> =
         queries
             .selectAttributeAuditByAccount(accountId.id)
@@ -130,6 +138,36 @@ class AuditRepositoryImpl(
         val changesByRevision = allAttributeChanges.groupBy { it.revisionId }
 
         // Attach attribute changes to each audit entry based on revisionId
+        return entries.map { entry ->
+            entry.copy(attributeChanges = changesByRevision[entry.revisionId].orEmpty())
+        }
+    }
+
+    private fun fetchPersonAttributeAudit(personId: PersonId): List<PersonAttributeAuditEntry> =
+        queries
+            .selectAttributeAuditByPerson(personId.id)
+            .executeAsList()
+            .map { row ->
+                PersonAttributeAuditEntry(
+                    id = row.id,
+                    personId = PersonId(row.person_id),
+                    revisionId = row.revision_id,
+                    attributeType =
+                        AttributeType(
+                            id = AttributeTypeId(row.attribute_type_id),
+                            name = row.attribute_type_name,
+                        ),
+                    auditType = mapAuditType(row.audit_type),
+                    value = row.attribute_value,
+                )
+            }
+
+    private fun attachPersonAttributeChanges(
+        personId: PersonId,
+        entries: List<PersonAuditEntry>,
+    ): List<PersonAuditEntry> {
+        val allAttributeChanges = fetchPersonAttributeAudit(personId)
+        val changesByRevision = allAttributeChanges.groupBy { it.revisionId }
         return entries.map { entry ->
             entry.copy(attributeChanges = changesByRevision[entry.revisionId].orEmpty())
         }

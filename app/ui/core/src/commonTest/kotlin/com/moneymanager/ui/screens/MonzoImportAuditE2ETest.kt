@@ -202,6 +202,7 @@ class MonzoImportAuditE2ETest {
                     entitySourceQueries = db.entitySourceQueries,
                     personRepository = dc.personRepository,
                     personAccountOwnershipRepository = dc.personAccountOwnershipRepository,
+                    personAttributeRepository = dc.personAttributeRepository,
                     attributeTypeRepository = dc.attributeTypeRepository,
                     accountAttributeRepository = dc.accountAttributeRepository,
                     deviceId = deviceId,
