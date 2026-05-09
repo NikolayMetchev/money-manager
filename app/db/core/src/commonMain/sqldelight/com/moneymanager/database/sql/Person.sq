@@ -10,7 +10,7 @@ CREATE TABLE person (
 
 CREATE INDEX IF NOT EXISTS idx_person_first_name ON person(first_name);
 CREATE INDEX IF NOT EXISTS idx_person_last_name ON person(last_name);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_person_external_id ON person(external_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_person_external_id ON person(external_id) WHERE external_id IS NOT NULL;
 
 -- Person queries
 selectAll:

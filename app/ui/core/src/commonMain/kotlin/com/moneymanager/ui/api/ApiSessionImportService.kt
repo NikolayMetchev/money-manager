@@ -775,11 +775,10 @@ private suspend fun importPeopleFromCounterparties(
     for (response in transactionResponses) {
         val request = requestsById[response.requestId] ?: continue
         for (item in parseTransactionsWithPath(response.json, strategy)) {
-            val owner = item.personalCounterpartyOwner() ?: continue
-            if (item.amountMinorUnits == 0L) continue
-
             val builtInCounterpartyType = item.rawJson?.resolveBuiltInCounterpartyType(item.amountMinorUnits)
+            if (item.amountMinorUnits == 0L) continue
             if (builtInCounterpartyType != null) continue
+            val owner = item.personalCounterpartyOwner() ?: continue
 
             val counterpartyAccountId =
                 accountCache.getOrCreateCounterpartyAccountId(
@@ -847,6 +846,7 @@ private suspend fun resolveOrCreatePerson(
 
     peopleIndex.find(externalId = externalId, fullName = name)?.let { existing ->
         if (externalId != null && existing.externalId.isNullOrBlank()) {
+            logger.info { "Backfilling external id for imported person '${existing.fullName}'" }
             val updated = existing.copy(externalId = externalId)
             personRepository.updatePerson(updated)
             peopleIndex.replace(updated)
