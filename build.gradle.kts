@@ -116,6 +116,8 @@ kover {
                 classes("*Module$*")
                 // Exclude SQLDelight generated code
                 classes("com.moneymanager.database.*")
+                // Exclude test helper modules — they live in commonMain but are not production code
+                packages("com.moneymanager.test")
             }
         }
         total {
