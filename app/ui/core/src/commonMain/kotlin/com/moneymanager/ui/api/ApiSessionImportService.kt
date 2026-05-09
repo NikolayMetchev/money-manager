@@ -809,7 +809,7 @@ private suspend fun importPeopleFromAccounts(
                     }
 
             if (externalId != null && externalId !in peopleByExternalId) {
-                personAttributeRepository.insert(
+                personAttributeRepository.insertInCreationMode(
                     personId = personId,
                     attributeTypeId = PERSON_EXTERNAL_ID_ATTR_TYPE_ID,
                     value = externalId,

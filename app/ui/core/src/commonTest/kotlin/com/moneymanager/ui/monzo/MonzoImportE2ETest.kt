@@ -817,6 +817,12 @@ class MonzoImportE2ETest : DbTest() {
                     .first()
                     .single { it.attributeType.name == "person-external-id" }
             assertEquals("user_shared_001", personExternalIdAttr.value)
+
+            val ownerships =
+                repositories.personAccountOwnershipRepository
+                    .getOwnershipsByPerson(allPeople.single().id)
+                    .first()
+            assertEquals(2, ownerships.size, "Shared owner.user_id should be linked to both imported accounts")
         }
 
     @Test
