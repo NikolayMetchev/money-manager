@@ -1217,12 +1217,6 @@ private fun ApiImportAccountOwner.bankKey(): String? {
     return identity.dedupeKey
 }
 
-private fun ApiImportAccountOwner.accountBankKey(): String? {
-    val sortCode = sortCode?.trim().orEmpty()
-    val accountNumber = accountNumber?.trim().orEmpty()
-    return if (sortCode.isNotBlank() && accountNumber.isNotBlank()) "bank:$sortCode:$accountNumber" else null
-}
-
 private suspend fun AccountAttributeRepository.ensureCounterpartyPersonalAttributes(
     accountId: AccountId,
     sortCode: String?,

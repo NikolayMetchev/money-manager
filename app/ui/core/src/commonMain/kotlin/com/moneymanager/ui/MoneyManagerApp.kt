@@ -582,7 +582,6 @@ fun MoneyManagerApp(
                                         navigationHistory.navigateTo(
                                             Screen.PeopleScroll(
                                                 personId = personId,
-                                                personName = "People",
                                             ),
                                         )
                                     },

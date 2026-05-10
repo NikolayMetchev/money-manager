@@ -294,7 +294,6 @@ private fun OwnershipChangesSection(
     ) {
         if (ownersAdded.isNotEmpty()) {
             OwnershipLinkRow(
-                label = "Owners:",
                 ownerships = ownersAdded,
                 color = MaterialTheme.colorScheme.primary,
                 onOwnerClick = onOwnerClick,
@@ -302,7 +301,6 @@ private fun OwnershipChangesSection(
         }
         if (ownersRemoved.isNotEmpty()) {
             OwnershipLinkRow(
-                label = "Owners:",
                 ownerships = ownersRemoved,
                 color = MaterialTheme.colorScheme.error,
                 onOwnerClick = onOwnerClick,
@@ -313,7 +311,6 @@ private fun OwnershipChangesSection(
 
 @Composable
 private fun OwnershipLinkRow(
-    label: String,
     ownerships: List<PersonAccountOwnershipAuditEntry>,
     color: Color,
     onOwnerClick: (PersonId) -> Unit,
@@ -323,7 +320,7 @@ private fun OwnershipLinkRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text(
-            text = label,
+            text = "Owners:",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.width(100.dp),

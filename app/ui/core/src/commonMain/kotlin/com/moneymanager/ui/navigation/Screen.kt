@@ -27,7 +27,6 @@ sealed class Screen(
 
     data class PeopleScroll(
         val personId: PersonId,
-        val personName: String,
     ) : Screen("People")
 
     data class Imports(

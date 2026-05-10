@@ -58,9 +58,9 @@ private data class ResponseFixture(
 
 @Serializable
 private data class ExpectedBalance(
-    val account_id: Long,
-    val account_name: String,
-    val currency_id: Long,
+    val accountId: Long,
+    val accountName: String,
+    val currencyId: Long,
     val balance: Long,
 )
 
@@ -158,7 +158,7 @@ class MonzoBalanceFixtureE2ETest : DbTest() {
 
             repositories.transactionRepository.getAccountBalances().first().let { actualBalances ->
                 val expectedBalances = json.decodeFromString<List<ExpectedBalance>>(balancesFile.readText())
-                val expectedByName = expectedBalances.associateBy { it.account_name }
+                val expectedByName = expectedBalances.associateBy { it.accountName }
                 val actualByName =
                     actualBalances.associateBy { balance ->
                         repositories.accountRepository
