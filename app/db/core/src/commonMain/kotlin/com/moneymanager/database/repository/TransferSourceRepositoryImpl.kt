@@ -25,7 +25,7 @@ import kotlinx.coroutines.withContext
  * Manages transfer source records for tracking provenance.
  */
 class TransferSourceRepositoryImpl(
-    private val database: MoneyManagerDatabaseWrapper,
+    database: MoneyManagerDatabaseWrapper,
     private val deviceRepository: DeviceRepository,
 ) : TransferSourceRepository {
     private val queries = database.transferSourceQueries

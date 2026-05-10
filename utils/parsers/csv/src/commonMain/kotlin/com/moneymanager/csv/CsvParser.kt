@@ -78,18 +78,13 @@ class CsvParser {
             val nextChar = content.getOrNull(i + 1)
 
             when {
-                // Handle quoted field
-                char == options.quoteChar && !inQuotes -> {
-                    inQuotes = true
-                }
-                // Handle escaped quote (two consecutive quotes inside quoted field)
-                char == options.quoteChar && inQuotes && nextChar == options.quoteChar -> {
-                    currentField.append(options.quoteChar)
-                    i++ // Skip the next quote
-                }
-                // Handle end of quoted field
-                char == options.quoteChar && inQuotes -> {
-                    inQuotes = false
+                char == options.quoteChar -> {
+                    if (inQuotes && nextChar == options.quoteChar) {
+                        currentField.append(options.quoteChar)
+                        i++ // Skip the next quote
+                    } else {
+                        inQuotes = !inQuotes
+                    }
                 }
                 // Handle delimiter outside quotes
                 char == options.delimiter && !inQuotes -> {
@@ -97,25 +92,25 @@ class CsvParser {
                     currentField.clear()
                 }
                 // Handle newline outside quotes (end of row)
-                (char == '\n' || (char == '\r' && nextChar == '\n')) && !inQuotes -> {
+                char == '\n' && !inQuotes -> {
                     currentRow.add(currentField.toString())
                     currentField.clear()
                     if (currentRow.isNotEmpty()) {
                         result.add(currentRow.toList())
                     }
                     currentRow.clear()
-                    if (char == '\r' && nextChar == '\n') {
+                }
+                // Handle CR outside quotes (CRLF or old Mac format)
+                char == '\r' && !inQuotes -> {
+                    currentRow.add(currentField.toString())
+                    currentField.clear()
+                    if (currentRow.isNotEmpty()) {
+                        result.add(currentRow.toList())
+                    }
+                    currentRow.clear()
+                    if (nextChar == '\n') {
                         i++ // Skip the \n in CRLF
                     }
-                }
-                // Handle standalone CR outside quotes (old Mac format)
-                char == '\r' && nextChar != '\n' && !inQuotes -> {
-                    currentRow.add(currentField.toString())
-                    currentField.clear()
-                    if (currentRow.isNotEmpty()) {
-                        result.add(currentRow.toList())
-                    }
-                    currentRow.clear()
                 }
                 // Regular character (including newlines inside quotes)
                 else -> {

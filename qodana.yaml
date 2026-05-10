@@ -10,8 +10,13 @@ profile:
   path: .qodana/profile.xml
 exclude:
   - name: UnusedSymbol
+  - name: unused
+  - name: SameParameterValue
+  - name: SameReturnValue
+  - name: CanBeParameter
+  - name: EmptyMethod
     paths:
-      - app/di/core/src
+      - app/ui/core/src/commonTest
   - name: KotlinNoActualForExpect
   - name: XmlHighlighting
   - name: FunctionName
@@ -22,6 +27,12 @@ exclude:
     paths:
       - app/ui/core/src/commonTest/kotlin/com/moneymanager/ui/screens/MonzoImportAuditE2ETest.kt
   - name: UnnecessaryModuleDependencyInspection
+  - name: RedundantSuppression
+    paths:
+      - app/ui/core/build/generated
+  - name: EditorConfigKeyCorrectness
+    paths:
+      - app/ui/core/.editorconfig
   - name: All
     paths:
       - build

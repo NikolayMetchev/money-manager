@@ -17,7 +17,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
 class CategoryRepositoryImpl(
-    private val database: MoneyManagerDatabase,
+    database: MoneyManagerDatabase,
 ) : CategoryRepository {
     private val queries = database.categoryQueries
 
