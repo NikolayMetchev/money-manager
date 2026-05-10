@@ -65,8 +65,11 @@ FROM (
         SUM(amount) AS incoming,
         0 AS outgoing
     FROM transfer
-    LEFT JOIN transfer_attribute ta ON transfer.id = ta.transaction_id AND ta.attribute_type_id = -1
-    WHERE ta.transaction_id IS NULL
+    WHERE NOT EXISTS (
+        SELECT 1
+        FROM transfer_attribute ta
+        WHERE ta.transaction_id = transfer.id AND ta.attribute_type_id = -1
+    )
     GROUP BY target_account_id, currency_id
 
     UNION ALL
@@ -77,8 +80,11 @@ FROM (
         0 AS incoming,
         SUM(amount) AS outgoing
     FROM transfer
-    LEFT JOIN transfer_attribute ta ON transfer.id = ta.transaction_id AND ta.attribute_type_id = -1
-    WHERE ta.transaction_id IS NULL
+    WHERE NOT EXISTS (
+        SELECT 1
+        FROM transfer_attribute ta
+        WHERE ta.transaction_id = transfer.id AND ta.attribute_type_id = -1
+    )
     GROUP BY source_account_id, currency_id
 )
 GROUP BY account_id, currency_id;
@@ -100,13 +106,19 @@ SELECT
         FROM (
             SELECT tr.id, tr.timestamp, tr.target_account_id AS account_id, tr.currency_id, tr.amount AS transaction_amount
             FROM transfer tr
-            LEFT JOIN transfer_attribute ta ON tr.id = ta.transaction_id AND ta.attribute_type_id = -1
-            WHERE ta.transaction_id IS NULL
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM transfer_attribute ta
+                WHERE ta.transaction_id = tr.id AND ta.attribute_type_id = -1
+            )
             UNION ALL
             SELECT tr.id, tr.timestamp, tr.source_account_id AS account_id, tr.currency_id, -tr.amount AS transaction_amount
             FROM transfer tr
-            LEFT JOIN transfer_attribute ta ON tr.id = ta.transaction_id AND ta.attribute_type_id = -1
-            WHERE ta.transaction_id IS NULL
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM transfer_attribute ta
+                WHERE ta.transaction_id = tr.id AND ta.attribute_type_id = -1
+            )
         ) m2
         WHERE m2.account_id = m.account_id
           AND m2.currency_id = m.currency_id
@@ -114,14 +126,26 @@ SELECT
     ), 0) AS running_balance
 FROM (
     SELECT tr.id, tr.timestamp, tr.description, tr.target_account_id AS account_id, tr.currency_id, tr.amount AS transaction_amount,
-           CASE WHEN ta.transaction_id IS NOT NULL THEN 1 ELSE 0 END AS is_excluded
+           CASE
+               WHEN EXISTS (
+                   SELECT 1
+                   FROM transfer_attribute ta
+                   WHERE ta.transaction_id = tr.id AND ta.attribute_type_id = -1
+               ) THEN 1
+               ELSE 0
+           END AS is_excluded
     FROM transfer tr
-    LEFT JOIN transfer_attribute ta ON tr.id = ta.transaction_id AND ta.attribute_type_id = -1
     UNION ALL
     SELECT tr.id, tr.timestamp, tr.description, tr.source_account_id AS account_id, tr.currency_id, -tr.amount AS transaction_amount,
-           CASE WHEN ta.transaction_id IS NOT NULL THEN 1 ELSE 0 END AS is_excluded
+           CASE
+               WHEN EXISTS (
+                   SELECT 1
+                   FROM transfer_attribute ta
+                   WHERE ta.transaction_id = tr.id AND ta.attribute_type_id = -1
+               ) THEN 1
+               ELSE 0
+           END AS is_excluded
     FROM transfer tr
-    LEFT JOIN transfer_attribute ta ON tr.id = ta.transaction_id AND ta.attribute_type_id = -1
 ) m;
 
 -- Table to track pending changes for incremental refresh
@@ -315,13 +339,13 @@ SELECT
 FROM running_balance_materialized_view
 JOIN currency ON running_balance_materialized_view.currency_id = currency.id
 JOIN transfer ON running_balance_materialized_view.id = transfer.id
-WHERE running_balance_materialized_view.account_id = ?
+WHERE running_balance_materialized_view.account_id = :accountId
   AND ((:lastTimestamp IS NULL AND :lastId IS NULL)
        OR running_balance_materialized_view.timestamp < :lastTimestamp
        OR (running_balance_materialized_view.timestamp = :lastTimestamp
            AND running_balance_materialized_view.id < :lastId))
 ORDER BY running_balance_materialized_view.timestamp DESC, running_balance_materialized_view.id DESC
-LIMIT ?;
+LIMIT :limit;
 
 -- Load earlier transactions (backward pagination - items newer than the current first item)
 -- Results are returned in ASC order (oldest first), must be reversed in code
@@ -343,12 +367,12 @@ SELECT
 FROM running_balance_materialized_view
 JOIN currency ON running_balance_materialized_view.currency_id = currency.id
 JOIN transfer ON running_balance_materialized_view.id = transfer.id
-WHERE running_balance_materialized_view.account_id = ?
+WHERE running_balance_materialized_view.account_id = :accountId
   AND (running_balance_materialized_view.timestamp > :firstTimestamp
        OR (running_balance_materialized_view.timestamp = :firstTimestamp
            AND running_balance_materialized_view.id > :firstId))
 ORDER BY running_balance_materialized_view.timestamp ASC, running_balance_materialized_view.id ASC
-LIMIT ?;
+LIMIT :limit;
 
 -- Get the row position (0-indexed) of a transaction within an account's transaction list
 -- Returns the count of transactions that come BEFORE this one (i.e., have higher timestamp or same timestamp but higher id)

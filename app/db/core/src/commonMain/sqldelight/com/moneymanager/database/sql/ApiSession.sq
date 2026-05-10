@@ -87,12 +87,6 @@ UPDATE api_credential SET strategy_id = ? WHERE id = ?;
 selectAllCredentials:
 SELECT * FROM api_credential ORDER BY created_at DESC;
 
-selectCredentialByToken:
-SELECT * FROM api_credential WHERE token = ?;
-
-selectAll:
-SELECT * FROM api_session ORDER BY created_at DESC;
-
 selectById:
 SELECT * FROM api_session WHERE id = ?;
 
@@ -191,9 +185,6 @@ SELECT id FROM api_session WHERE imported_at IS NOT NULL;
 
 markSessionImported:
 UPDATE api_session SET imported_at = ? WHERE id = ?;
-
-selectResponseTransactionByResponseIdAndJsonPath:
-SELECT * FROM api_response_transaction WHERE response_id = ? AND json_path = ? LIMIT 1;
 
 lastInsertApiResponseTransactionId:
 SELECT last_insert_rowid();
