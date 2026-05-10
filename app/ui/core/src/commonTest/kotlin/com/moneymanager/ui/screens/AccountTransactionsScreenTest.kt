@@ -1024,8 +1024,16 @@ class AccountTransactionsScreenTest {
             everySuspend { fullRefreshMaterializedViews() } returns Duration.ZERO
         }
 
-    private fun createStubTransferSourceQueries(): TransferSourceQueries {
-        val stubDriver =
+    private fun createStubTransferSourceQueries(): TransferSourceQueries = TransferSourceQueries(stubSqlDriver())
+
+    /**
+     * Creates a stub EntitySourceQueries for tests that don't actually query entity sources.
+     * Uses a minimal SqlDriver stub that throws NotImplementedError if actually invoked.
+     */
+    private companion object {
+        private const val STUB_SQL_DRIVER_MESSAGE = "Stub SqlDriver - should not be called in display-only tests"
+
+        private fun stubSqlDriver(): SqlDriver =
             object : SqlDriver {
                 override fun close() = Unit
 
@@ -1036,7 +1044,7 @@ class AccountTransactionsScreenTest {
                     sql: String,
                     parameters: Int,
                     binders: (SqlPreparedStatement.() -> Unit)?,
-                ): QueryResult<Long> = throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
+                ): QueryResult<Long> = throw NotImplementedError(STUB_SQL_DRIVER_MESSAGE)
 
                 override fun <R> executeQuery(
                     identifier: Int?,
@@ -1044,10 +1052,9 @@ class AccountTransactionsScreenTest {
                     mapper: (SqlCursor) -> QueryResult<R>,
                     parameters: Int,
                     binders: (SqlPreparedStatement.() -> Unit)?,
-                ): QueryResult<R> = throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
+                ): QueryResult<R> = throw NotImplementedError(STUB_SQL_DRIVER_MESSAGE)
 
-                override fun newTransaction(): QueryResult<Transacter.Transaction> =
-                    throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
+                override fun newTransaction(): QueryResult<Transacter.Transaction> = throw NotImplementedError(STUB_SQL_DRIVER_MESSAGE)
 
                 override fun addListener(
                     vararg queryKeys: String,
@@ -1062,53 +1069,6 @@ class AccountTransactionsScreenTest {
                 override fun notifyListeners(vararg queryKeys: String) = Unit
             }
 
-        return TransferSourceQueries(stubDriver)
-    }
-
-    /**
-     * Creates a stub EntitySourceQueries for tests that don't actually query entity sources.
-     * Uses a minimal SqlDriver stub that throws NotImplementedError if actually invoked.
-     */
-    private companion object {
-        fun createStubEntitySourceQueries(): EntitySourceQueries {
-            val stubDriver =
-                object : SqlDriver {
-                    override fun close() = Unit
-
-                    override fun currentTransaction(): Transacter.Transaction? = null
-
-                    override fun execute(
-                        identifier: Int?,
-                        sql: String,
-                        parameters: Int,
-                        binders: (SqlPreparedStatement.() -> Unit)?,
-                    ): QueryResult<Long> = throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
-
-                    override fun <R> executeQuery(
-                        identifier: Int?,
-                        sql: String,
-                        mapper: (SqlCursor) -> QueryResult<R>,
-                        parameters: Int,
-                        binders: (SqlPreparedStatement.() -> Unit)?,
-                    ): QueryResult<R> = throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
-
-                    override fun newTransaction(): QueryResult<Transacter.Transaction> =
-                        throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
-
-                    override fun addListener(
-                        vararg queryKeys: String,
-                        listener: Query.Listener,
-                    ) = Unit
-
-                    override fun removeListener(
-                        vararg queryKeys: String,
-                        listener: Query.Listener,
-                    ) = Unit
-
-                    override fun notifyListeners(vararg queryKeys: String) = Unit
-                }
-
-            return EntitySourceQueries(stubDriver)
-        }
+        fun createStubEntitySourceQueries(): EntitySourceQueries = EntitySourceQueries(stubSqlDriver())
     }
 }
