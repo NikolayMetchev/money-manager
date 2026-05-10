@@ -133,7 +133,6 @@ class MonzoBalanceFixtureE2ETest : DbTest() {
                 accountAttributeRepository = repositories.accountAttributeRepository,
                 deviceId = DeviceId(deviceId.id),
                 sessionId = sessionIdMap.getValue(firstAccountsSession.id),
-                accountsSessionId = null,
                 strategy = strategy,
             )
 
