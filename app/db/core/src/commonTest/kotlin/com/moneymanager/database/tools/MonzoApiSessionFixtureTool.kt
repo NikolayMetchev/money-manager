@@ -28,14 +28,14 @@ fun main(args: Array<String>) {
 
     when (args[0]) {
         "export" -> {
-    requireArgs(args)
+            requireArgs(args)
             exportFixtures(
                 dbPath = args[1],
                 outputDir = File(args[2]),
             )
         }
         "import" -> {
-    requireArgs(args)
+            requireArgs(args)
             importFixtures(
                 dbPath = args[1],
                 inputDir = File(args[2]),
@@ -261,9 +261,7 @@ private fun <T> insertTable(
     rows.forEach(insert)
 }
 
-private fun requireArgs(
-    args: Array<String>,
-) {
+private fun requireArgs(args: Array<String>) {
     if (args.size < 3) printUsageAndExit()
 }
 
