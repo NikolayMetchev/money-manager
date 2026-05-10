@@ -206,7 +206,7 @@ fun MoneyManagerApp(
                             NavigationBarItem(
                                 icon = { Text("\uD83D\uDC65") },
                                 label = { Text("People") },
-                                selected = currentScreen is Screen.People,
+                                selected = currentScreen is Screen.People || currentScreen is Screen.PeopleScroll,
                                 onClick = { navigationHistory.navigateTo(Screen.People) },
                             )
                             NavigationBarItem(
@@ -318,7 +318,9 @@ fun MoneyManagerApp(
                                     },
                                 )
                             }
-                            is Screen.People -> {
+                            is Screen.People,
+                            is Screen.PeopleScroll,
+                            -> {
                                 // Reset currentlyViewedAccountId and currentlyViewedCurrencyId when on other screens
                                 LaunchedEffect(Unit) {
                                     currentlyViewedAccountId = null
@@ -327,10 +329,10 @@ fun MoneyManagerApp(
                                 PeopleScreen(
                                     personRepository = personRepository,
                                     personAttributeRepository = personAttributeRepository,
-                                    attributeTypeRepository = attributeTypeRepository,
                                     personAccountOwnershipRepository = personAccountOwnershipRepository,
                                     entitySourceQueries = entitySourceQueries,
                                     deviceId = deviceId,
+                                    scrollToPersonId = (screen as? Screen.PeopleScroll)?.personId,
                                     onAuditClick = { person ->
                                         navigationHistory.navigateTo(Screen.PersonAuditHistory(person.id, person.fullName))
                                     },
@@ -573,6 +575,13 @@ fun MoneyManagerApp(
                                                 sessionId = sessionId,
                                                 highlightRequestId = requestId,
                                                 highlightJsonPath = jsonPath,
+                                            ),
+                                        )
+                                    },
+                                    onOwnerClick = { personId ->
+                                        navigationHistory.navigateTo(
+                                            Screen.PeopleScroll(
+                                                personId = personId,
                                             ),
                                         )
                                     },

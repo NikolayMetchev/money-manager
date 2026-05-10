@@ -100,17 +100,17 @@ interface RepositoryModule {
 
     @Provides
     @SingleIn(DatabaseScope::class)
+    fun providePersonAttributeRepository(database: MoneyManagerDatabaseWrapper): PersonAttributeRepository =
+        PersonAttributeRepositoryImpl(database)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
     fun providePersonRepository(database: MoneyManagerDatabaseWrapper): PersonRepository = PersonRepositoryImpl(database)
 
     @Provides
     @SingleIn(DatabaseScope::class)
     fun providePersonAccountOwnershipRepository(database: MoneyManagerDatabaseWrapper): PersonAccountOwnershipRepository =
         PersonAccountOwnershipRepositoryImpl(database)
-
-    @Provides
-    @SingleIn(DatabaseScope::class)
-    fun providePersonAttributeRepository(database: MoneyManagerDatabaseWrapper): PersonAttributeRepository =
-        PersonAttributeRepositoryImpl(database)
 
     @Provides
     @SingleIn(DatabaseScope::class)

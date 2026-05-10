@@ -194,6 +194,7 @@ ORDER BY transfer_attribute_audit.revision_id DESC, attribute_type.name;
 selectAttributeAuditByAccount:
 SELECT
     account_attribute_audit.id,
+    account_attribute_audit.audit_timestamp,
     audit_type.name AS audit_type,
     account_attribute_audit.account_id,
     account_attribute_audit.revision_id,
@@ -377,15 +378,15 @@ SELECT
     entity_source.device_id AS source_device_id,
     source_type.id AS source_type_id,
     source_type.name AS source_type_name,
+    api_entity_source.api_session_id AS source_api_session_id,
+    api_entity_source.api_request_id AS source_api_request_id,
+    api_entity_source.json_path AS source_api_json_path,
     device_view.platform_name AS source_platform_name,
     device_view.os_name AS source_os_name,
     device_view.machine_name AS source_machine_name,
     device_view.device_make AS source_device_make,
     device_view.device_model AS source_device_model,
-    entity_source.created_at AS source_created_at,
-    api_entity_source.api_session_id AS source_api_session_id,
-    api_entity_source.api_request_id AS source_api_request_id,
-    api_entity_source.json_path AS source_api_json_path
+    entity_source.created_at AS source_created_at
 FROM person_audit
 JOIN audit_type ON person_audit.audit_type_id = audit_type.id
 LEFT JOIN entity_source ON person_audit.person_id = entity_source.entity_id

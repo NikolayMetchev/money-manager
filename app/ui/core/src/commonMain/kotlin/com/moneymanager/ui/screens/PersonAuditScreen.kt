@@ -2,10 +2,18 @@
 
 package com.moneymanager.ui.screens
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.AuditType
@@ -73,6 +81,7 @@ private fun computePersonAuditDiffs(
     currentPerson: Person?,
 ): List<PersonAuditDiff> =
     entries.mapIndexed { index, entry ->
+        val revisionAttributes = entry.attributeChanges
         when (entry.auditType) {
             AuditType.INSERT ->
                 PersonAuditDiff(
@@ -83,7 +92,7 @@ private fun computePersonAuditDiffs(
                     firstName = FieldChange.Created(entry.firstName),
                     middleName = FieldChange.Created(entry.middleName),
                     lastName = FieldChange.Created(entry.lastName),
-                    attributeChanges = entry.attributeChanges,
+                    attributeChanges = revisionAttributes,
                     source = entry.source,
                 )
             AuditType.DELETE ->
@@ -95,7 +104,7 @@ private fun computePersonAuditDiffs(
                     firstName = FieldChange.Deleted(entry.firstName),
                     middleName = FieldChange.Deleted(entry.middleName),
                     lastName = FieldChange.Deleted(entry.lastName),
-                    attributeChanges = entry.attributeChanges,
+                    attributeChanges = revisionAttributes,
                     source = entry.source,
                 )
             AuditType.UPDATE -> {
@@ -147,7 +156,7 @@ private fun computePersonAuditDiffs(
                         } else {
                             FieldChange.Unchanged(entry.lastName)
                         },
-                    attributeChanges = entry.attributeChanges,
+                    attributeChanges = revisionAttributes,
                     source = entry.source,
                 )
             }
@@ -157,7 +166,7 @@ private fun computePersonAuditDiffs(
 @Composable
 private fun PersonAuditDiffCard(
     diff: PersonAuditDiff,
-    onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit,
+    onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
 ) {
     AuditDiffCard(
         auditType = diff.auditType,
@@ -234,21 +243,36 @@ private fun PersonAuditDiffCard(
 @Composable
 private fun PersonAttributeChangesSection(
     attributeChanges: List<PersonAttributeAuditEntry>,
-    labelColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    valueColor: Color = MaterialTheme.colorScheme.onSurface,
 ) {
     if (attributeChanges.isEmpty()) return
-    Text(
-        text = "Attribute Changes:",
-        style = MaterialTheme.typography.bodySmall,
-        color = labelColor,
-    )
-    attributeChanges.forEach { attr ->
-        val prefix =
-            when (attr.auditType) {
-                AuditType.INSERT -> "+"
-                AuditType.DELETE -> "-"
-                AuditType.UPDATE -> "~"
+
+    Column(
+        modifier = Modifier.padding(top = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Text(
+            text = "Attributes:",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        attributeChanges.forEach { attr ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = attr.attributeType.name,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.width(140.dp),
+                )
+                Text(
+                    text = attr.value,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = valueColor,
+                )
             }
-        FieldValueRow("$prefix ${attr.attributeType.name}", attr.value, labelColor)
+        }
     }
 }

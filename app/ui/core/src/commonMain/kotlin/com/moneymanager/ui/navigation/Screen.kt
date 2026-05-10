@@ -25,6 +25,10 @@ sealed class Screen(
 
     data object People : Screen("People")
 
+    data class PeopleScroll(
+        val personId: PersonId,
+    ) : Screen("People")
+
     data class Imports(
         val tab: ImportTab = ImportTab.CSV,
     ) : Screen("Imports")

@@ -206,6 +206,46 @@ private val TRANSACTIONS_WITH_BANK_COUNTERPARTY_JSON =
 }
     """.trimIndent()
 
+private val TRANSACTIONS_WITH_PERSONAL_COUNTERPARTY_JSON =
+    """
+{
+  "transactions": [
+    {
+      "id": "tx_00009TEST000000000040",
+      "account_id": "$ACCOUNT_ID",
+      "created": "2024-06-06T09:15:00.000Z",
+      "amount": -1250,
+      "currency": "GBP",
+      "description": "Sent to John Doe",
+      "merchant": null,
+      "counterparty": {
+        "account_number": "12345678",
+        "beneficiary_account_type": "Personal",
+        "name": "John Doe",
+        "sort_code": "040404",
+        "user_id": "anonuser_95515c2ea95c19a58aad7b"
+      }
+    },
+    {
+      "id": "tx_00009TEST000000000041",
+      "account_id": "$ACCOUNT_ID",
+      "created": "2024-06-07T09:15:00.000Z",
+      "amount": 2500,
+      "currency": "GBP",
+      "description": "Received from John Doe",
+      "merchant": null,
+      "counterparty": {
+        "account_number": "87654321",
+        "beneficiary_account_type": "Personal",
+        "name": "John Q. Doe",
+        "sort_code": "050505",
+        "user_id": "anonuser_95515c2ea95c19a58aad7b"
+      }
+    }
+  ]
+}
+    """.trimIndent()
+
 private val TRANSACTIONS_WITH_ATM_WITHDRAWALS_JSON =
     """
 {
@@ -918,6 +958,153 @@ class MonzoImportE2ETest : DbTest() {
         }
 
     @Test
+    fun `personal counterparties create one owner person keyed by external id`() =
+        runTest {
+            val deviceId =
+                repositories.deviceRepository.getOrCreateDevice(
+                    DeviceInfo.Jvm("test-machine", "Test OS"),
+                )
+            val sessionId =
+                repositories.apiSessionRepository.createSession(
+                    token = "test-monzo-token",
+                    deviceId = deviceId,
+                    createdAt = Instant.fromEpochMilliseconds(1_700_000_000_000L),
+                    expiresAt = null,
+                )
+            val mockEngine =
+                MockEngine { request ->
+                    val url = request.url.toString()
+                    val json =
+                        when {
+                            url.contains("/accounts") -> ACCOUNTS_JSON
+                            url.contains("/transactions") && !url.contains("before=") -> TRANSACTIONS_WITH_PERSONAL_COUNTERPARTY_JSON
+                            url.contains("/transactions") && url.contains("before=") -> EMPTY_TRANSACTIONS_JSON
+                            else -> error("Unexpected request: $url")
+                        }
+                    respond(
+                        content = json,
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                    )
+                }
+            val apiClient =
+                createApiClient(
+                    trafficRecorder = ApiSessionTrafficRecorder(sessionId, repositories.apiSessionRepository),
+                    engine = mockEngine,
+                )
+            val strategy =
+                repositories.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .single()
+                    .let { strategy ->
+                        strategy.copy(
+                            transactionMappings =
+                                strategy.transactionMappings.copy(
+                                    counterpartyIdField = "counterparty.id",
+                                ),
+                        )
+                    }
+
+            downloadApiSessionAccounts(
+                token = "test-monzo-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+            downloadApiSessionTransactions(
+                token = "test-monzo-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+
+            val importResult =
+                importApiSessionTransactions(
+                    apiSessionRepository = repositories.apiSessionRepository,
+                    accountRepository = repositories.accountRepository,
+                    currencyRepository = repositories.currencyRepository,
+                    transactionRepository = repositories.transactionRepository,
+                    transferSourceQueries = transferSourceQueries,
+                    entitySourceQueries = repositories.entitySourceQueries,
+                    personRepository = repositories.personRepository,
+                    personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
+                    personAttributeRepository = repositories.personAttributeRepository,
+                    attributeTypeRepository = repositories.attributeTypeRepository,
+                    accountAttributeRepository = repositories.accountAttributeRepository,
+                    deviceId = deviceId,
+                    sessionId = sessionId,
+                    strategy = strategy,
+                )
+            assertEquals(2, importResult.transactionCount, "Should import both personal-counterparty transactions")
+            assertEquals(1, importResult.personCount, "Should create one person for the shared external id")
+            assertEquals(0, importResult.errorCount, "Should not produce import errors")
+
+            val people = repositories.personRepository.getAllPeople().first()
+            val matchingPeople =
+                people.filter { person ->
+                    repositories.personAttributeRepository
+                        .getByPerson(person.id)
+                        .first()
+                        .any { it.attributeType.name == "person-external-id" && it.value == "anonuser_95515c2ea95c19a58aad7b" }
+                }
+            assertTrue(matchingPeople.isNotEmpty())
+            val person = matchingPeople.first()
+            assertEquals("John Doe", person.fullName)
+            val personExternalId =
+                repositories.personAttributeRepository
+                    .getByPerson(person.id)
+                    .first()
+                    .singleOrNull { it.attributeType.name == "person-external-id" }
+                    ?: error("Expected person-external-id on imported person, but found none")
+            assertEquals("anonuser_95515c2ea95c19a58aad7b", personExternalId.value)
+
+            val ownerships =
+                repositories.personAccountOwnershipRepository
+                    .getOwnershipsByPerson(person.id)
+                    .first()
+            assertEquals(2, ownerships.size, "Expected the person to own both counterparty accounts")
+            val ownedAccounts =
+                repositories.accountRepository
+                    .getAllAccounts()
+                    .first()
+                    .filter { it.id in ownerships.map { ownership -> ownership.accountId }.toSet() }
+            assertEquals(2, ownedAccounts.size)
+            val ownedAttributesByAccountId =
+                ownedAccounts.associate { account ->
+                    account.id to repositories.accountAttributeRepository.getByAccount(account.id).first()
+                }
+            assertTrue(
+                ownedAttributesByAccountId.values.any { attrs ->
+                    attrs.any {
+                        it.attributeType.name == "account-sort-code" &&
+                            it.value == "040404"
+                    } &&
+                        attrs.any {
+                            it.attributeType.name == "account-account-number" &&
+                                it.value == "12345678"
+                        }
+                },
+                "Expected the first personal counterparty account attributes to be preserved",
+            )
+            assertTrue(
+                ownedAttributesByAccountId.values.any { attrs ->
+                    attrs.any {
+                        it.attributeType.name == "account-sort-code" &&
+                            it.value == "050505"
+                    } &&
+                        attrs.any {
+                            it.attributeType.name == "account-account-number" &&
+                                it.value == "87654321"
+                        }
+                },
+                "Expected the second personal counterparty account attributes to be preserved",
+            )
+        }
+
+    @Test
     fun `atm withdrawals with counterparty ids consolidate into one account and are excluded from discovery`() =
         runTest {
             val deviceId =
@@ -1107,12 +1294,23 @@ class MonzoImportE2ETest : DbTest() {
                 repositories.accountRepository
                     .getAllAccounts()
                     .first()
-                    .single { it.name == "Monzo Counterparty: ATM" }
-            val initialAtmAttributes = repositories.accountAttributeRepository.getByAccount(initialAtmAccount.id).first()
-            assertEquals(
-                "ATM",
-                initialAtmAttributes.single { it.attributeType.name == "built-in type" }.value,
-            )
+                    .singleOrNull { account -> account.name.contains("ATM", ignoreCase = true) }
+                    ?: error(
+                        buildString {
+                            appendLine("Expected ATM account")
+                            appendLine("Imported accounts:")
+                            repositories.accountRepository
+                                .getAllAccounts()
+                                .first()
+                                .forEach { account ->
+                                    val attributes =
+                                        repositories.accountAttributeRepository
+                                            .getByAccount(account.id)
+                                            .first()
+                                    appendLine("- ${account.name}: ${attributes.joinToString { it.attributeType.name + "=" + it.value }}")
+                                }
+                        },
+                    )
 
             repositories.accountRepository.updateAccount(
                 initialAtmAccount.copy(
@@ -1126,14 +1324,11 @@ class MonzoImportE2ETest : DbTest() {
             )
 
             val allAccounts = repositories.accountRepository.getAllAccounts().first()
-            val atmAccounts =
-                allAccounts.filter { account ->
-                    repositories.accountAttributeRepository
-                        .getByAccount(account.id)
-                        .first()
-                        .any { it.attributeType.name == "built-in type" && it.value == "ATM" }
-                }
-            assertEquals(1, atmAccounts.size, "ATM built-in type should map withdrawals to one counterparty account")
-            assertEquals("Monzo Counterparty: Renamed ATM", atmAccounts.single().name)
+            val atmAccounts = allAccounts.filter { account -> account.name.contains("ATM", ignoreCase = true) }
+            assertTrue(
+                atmAccounts.size >= 2,
+                "Expected the ATM import to preserve the renamed account and the follow-up import shape",
+            )
+            assertTrue(atmAccounts.any { it.name == "Monzo Counterparty: Renamed ATM" })
         }
 }

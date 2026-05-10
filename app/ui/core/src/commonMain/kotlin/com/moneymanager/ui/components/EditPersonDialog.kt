@@ -4,15 +4,11 @@ package com.moneymanager.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -23,23 +19,19 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.moneymanager.database.DatabaseConfig
 import com.moneymanager.database.ManualEntitySourceRecorder
 import com.moneymanager.database.sql.EntitySourceQueries
-import com.moneymanager.domain.model.AttributeType
+import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.EntityType
-import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Person
-import com.moneymanager.domain.model.PersonAttribute
 import com.moneymanager.domain.model.PersonId
-import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.PersonAttributeRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
-import com.moneymanager.ui.screens.transactions.AttributeTypeField
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
@@ -50,41 +42,36 @@ private val logger = logging()
 fun EditPersonDialog(
     personToEdit: Person?,
     personRepository: PersonRepository,
+    personAttributeRepository: PersonAttributeRepository? = null,
     entitySourceQueries: EntitySourceQueries,
     deviceId: DeviceId,
     onDismiss: () -> Unit,
-    personAttributeRepository: PersonAttributeRepository? = null,
-    attributeTypeRepository: AttributeTypeRepository? = null,
 ) {
     var firstName by remember { mutableStateOf(personToEdit?.firstName.orEmpty()) }
     var middleName by remember { mutableStateOf(personToEdit?.middleName.orEmpty()) }
     var lastName by remember { mutableStateOf(personToEdit?.lastName.orEmpty()) }
+    var externalId by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
 
-    var existingAttributeTypes by remember { mutableStateOf<List<AttributeType>>(emptyList()) }
-    var editableAttributes by remember { mutableStateOf<Map<Long, Pair<String, String>>>(emptyMap()) }
-    var originalAttributeList by remember { mutableStateOf<List<PersonAttribute>>(emptyList()) }
-    var nextTempId by remember { mutableStateOf(-1L) }
-
-    if (personToEdit != null && attributeTypeRepository != null && personAttributeRepository != null) {
-        LaunchedEffect(Unit) {
-            attributeTypeRepository.getAll().collect { types ->
-                existingAttributeTypes = types
-            }
-        }
-
-        LaunchedEffect(personToEdit.id) {
-            val attrs = personAttributeRepository.getByPerson(personToEdit.id).first()
-            originalAttributeList = attrs
-            editableAttributes =
-                attrs.associate { attr ->
-                    attr.id to Pair(attr.attributeType.name, attr.value)
-                }
-        }
-    }
-
     val scope = rememberSchemaAwareCoroutineScope()
+
+    LaunchedEffect(personToEdit?.id) {
+        externalId =
+            if (personAttributeRepository != null) {
+                personToEdit
+                    ?.let { person ->
+                        personAttributeRepository
+                            .getByPerson(person.id)
+                            .first()
+                            .firstOrNull { it.attributeType.id.id == DatabaseConfig.PERSON_EXTERNAL_ID_ATTR_TYPE_ID }
+                            ?.value
+                            .orEmpty()
+                    }.orEmpty()
+            } else {
+                ""
+            }
+    }
 
     AlertDialog(
         onDismissRequest = { if (!isSaving) onDismiss() },
@@ -94,7 +81,6 @@ fun EditPersonDialog(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .verticalScroll(rememberScrollState())
                         .padding(vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
@@ -125,68 +111,15 @@ fun EditPersonDialog(
                     enabled = !isSaving,
                 )
 
-                if (personToEdit != null && personAttributeRepository != null && attributeTypeRepository != null) {
-                    Column(
+                if (personAttributeRepository != null) {
+                    OutlinedTextField(
+                        value = externalId,
+                        onValueChange = { externalId = it },
+                        label = { Text("External ID") },
                         modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Text(
-                            text = "Attributes",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-
-                        editableAttributes.forEach { (id, pair) ->
-                            val (typeName, value) = pair
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                AttributeTypeField(
-                                    value = typeName,
-                                    onValueChange = { newTypeName ->
-                                        editableAttributes = editableAttributes + (id to Pair(newTypeName, value))
-                                    },
-                                    existingTypes = existingAttributeTypes,
-                                    enabled = !isSaving,
-                                    modifier = Modifier.weight(0.4f),
-                                )
-                                OutlinedTextField(
-                                    value = value,
-                                    onValueChange = { newValue ->
-                                        editableAttributes = editableAttributes + (id to Pair(typeName, newValue))
-                                    },
-                                    label = { Text("Value") },
-                                    modifier = Modifier.weight(0.5f),
-                                    singleLine = true,
-                                    enabled = !isSaving,
-                                )
-                                IconButton(
-                                    onClick = {
-                                        editableAttributes = editableAttributes - id
-                                    },
-                                    enabled = !isSaving,
-                                ) {
-                                    Text(
-                                        text = "X",
-                                        color = MaterialTheme.colorScheme.error,
-                                        style = MaterialTheme.typography.bodyLarge,
-                                    )
-                                }
-                            }
-                        }
-
-                        TextButton(
-                            onClick = {
-                                editableAttributes = editableAttributes + (nextTempId to Pair("", ""))
-                                nextTempId--
-                            },
-                            enabled = !isSaving,
-                        ) {
-                            Text("+ Add Attribute")
-                        }
-                    }
+                        singleLine = true,
+                        enabled = !isSaving,
+                    )
                 }
 
                 errorMessage?.let { error ->
@@ -208,6 +141,7 @@ fun EditPersonDialog(
                         errorMessage = null
                         scope.launch {
                             try {
+                                val resolvedExternalId = externalId.trim().ifBlank { null }
                                 if (personToEdit != null) {
                                     val updatedPerson =
                                         personToEdit.copy(
@@ -215,51 +149,9 @@ fun EditPersonDialog(
                                             middleName = middleName.trim().ifBlank { null },
                                             lastName = lastName.trim().ifBlank { null },
                                         )
-                                    if (attributeTypeRepository != null && personAttributeRepository != null) {
-                                        val originalIds = originalAttributeList.map { it.id }.toSet()
-                                        val editableIds = editableAttributes.keys.filter { it > 0 }.toSet()
-                                        val deletedAttributeIds = originalIds - editableIds
-
-                                        val updatedAttributes = mutableMapOf<Long, NewAttribute>()
-                                        editableAttributes.filter { (id, _) -> id > 0 }.forEach { (id, pair) ->
-                                            val (typeName, value) = pair
-                                            val original = originalAttributeList.find { it.id == id }
-                                            if (original != null) {
-                                                if (original.attributeType.name != typeName || original.value != value) {
-                                                    val typeId = attributeTypeRepository.getOrCreate(typeName.trim())
-                                                    updatedAttributes[id] = NewAttribute(typeId, value.trim())
-                                                }
-                                            }
-                                        }
-
-                                        val newAttributes = mutableListOf<NewAttribute>()
-                                        editableAttributes.filter { (id, _) -> id < 0 }.forEach { (_, pair) ->
-                                            val (typeName, value) = pair
-                                            if (typeName.isNotBlank() && value.isNotBlank()) {
-                                                val typeId = attributeTypeRepository.getOrCreate(typeName.trim())
-                                                newAttributes.add(NewAttribute(typeId, value.trim()))
-                                            }
-                                        }
-
-                                        val personFieldsChanged =
-                                            firstName.trim() != personToEdit.firstName ||
-                                                middleName.trim().ifBlank { null } != personToEdit.middleName ||
-                                                lastName.trim().ifBlank { null } != personToEdit.lastName
-                                        val finalRevisionId =
-                                            personRepository.updatePersonWithAttributes(
-                                                person = if (personFieldsChanged) updatedPerson else null,
-                                                personId = personToEdit.id,
-                                                deletedAttributeIds = deletedAttributeIds,
-                                                updatedAttributes = updatedAttributes,
-                                                newAttributes = newAttributes,
-                                            )
-                                        ManualEntitySourceRecorder(entitySourceQueries, deviceId).insert(
-                                            EntityType.PERSON,
-                                            personToEdit.id.id,
-                                            finalRevisionId,
-                                        )
-                                    } else {
-                                        personRepository.updatePerson(updatedPerson)
+                                    personRepository.updatePerson(updatedPerson)
+                                    if (personAttributeRepository != null) {
+                                        upsertPersonExternalId(personToEdit.id, resolvedExternalId, personAttributeRepository)
                                     }
                                 } else {
                                     val newPerson =
@@ -270,6 +162,10 @@ fun EditPersonDialog(
                                             lastName = lastName.trim().ifBlank { null },
                                         )
                                     val personId = personRepository.createPerson(newPerson)
+                                    if (personAttributeRepository != null) {
+                                        upsertPersonExternalId(personId, resolvedExternalId, personAttributeRepository)
+                                    }
+                                    // Record source for audit trail
                                     ManualEntitySourceRecorder(entitySourceQueries, deviceId).insert(
                                         EntityType.PERSON,
                                         personId.id,
@@ -307,4 +203,33 @@ fun EditPersonDialog(
             }
         },
     )
+}
+
+private suspend fun upsertPersonExternalId(
+    personId: PersonId,
+    externalId: String?,
+    personAttributeRepository: PersonAttributeRepository,
+) {
+    val attributeTypeId = AttributeTypeId(DatabaseConfig.PERSON_EXTERNAL_ID_ATTR_TYPE_ID)
+    val existingAttributes =
+        personAttributeRepository
+            .getByPerson(personId)
+            .first()
+            .filter { it.attributeType.id == attributeTypeId }
+
+    when {
+        externalId == null && existingAttributes.isNotEmpty() ->
+            existingAttributes.forEach { personAttributeRepository.delete(it.id) }
+        externalId != null && existingAttributes.isEmpty() ->
+            personAttributeRepository.insert(personId, attributeTypeId, externalId)
+        externalId != null && existingAttributes.size == 1 && existingAttributes.first().value != externalId ->
+            personAttributeRepository.updateValue(existingAttributes.first().id, externalId)
+        externalId != null && existingAttributes.size > 1 -> {
+            existingAttributes.drop(1).forEach { personAttributeRepository.delete(it.id) }
+            val first = existingAttributes.first()
+            if (first.value != externalId) {
+                personAttributeRepository.updateValue(first.id, externalId)
+            }
+        }
+    }
 }

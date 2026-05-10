@@ -2,6 +2,7 @@
 
 package com.moneymanager.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -23,6 +24,7 @@ import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.EntitySource
 import com.moneymanager.domain.model.PersonAccountOwnershipAuditEntry
+import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AuditRepository
 import com.moneymanager.ui.audit.AuditDiffCard
@@ -42,6 +44,7 @@ fun AccountAuditScreen(
     auditRepository: AuditRepository,
     accountRepository: AccountRepository,
     onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
+    onOwnerClick: (PersonId) -> Unit = {},
     onBack: () -> Unit,
 ) {
     AuditScreen(
@@ -60,7 +63,7 @@ fun AccountAuditScreen(
         },
         diffKey = { it.id },
         onBack = onBack,
-        diffCard = { diff -> AccountAuditDiffCard(diff, onApiSourceClick) },
+        diffCard = { diff -> AccountAuditDiffCard(diff, onApiSourceClick, onOwnerClick) },
     )
 }
 
@@ -72,8 +75,8 @@ private data class AccountAuditDiff(
     val name: FieldChange<String>,
     val openingDate: FieldChange<kotlin.time.Instant>,
     val categoryName: FieldChange<String?>,
-    val ownersAdded: List<String>,
-    val ownersRemoved: List<String>,
+    val ownersAdded: List<PersonAccountOwnershipAuditEntry>,
+    val ownersRemoved: List<PersonAccountOwnershipAuditEntry>,
     val attributeChanges: List<AccountAttributeAuditEntry>,
     val source: EntitySource?,
 ) {
@@ -95,8 +98,8 @@ private fun computeAccountAuditDiffs(
     val timestampWindowMs = 2000L
 
     data class OwnershipChanges(
-        val ownersAdded: List<String>,
-        val ownersRemoved: List<String>,
+        val ownersAdded: List<PersonAccountOwnershipAuditEntry>,
+        val ownersRemoved: List<PersonAccountOwnershipAuditEntry>,
         val source: EntitySource?,
     )
 
@@ -111,12 +114,12 @@ private fun computeAccountAuditDiffs(
         val ownersAdded =
             matchingOwnershipChanges
                 .filter { it.auditType == AuditType.INSERT }
-                .map { it.personFullName ?: "Unknown (ID: ${it.personId.id})" }
+                .toList()
 
         val ownersRemoved =
             matchingOwnershipChanges
                 .filter { it.auditType == AuditType.DELETE }
-                .map { it.personFullName ?: "Unknown (ID: ${it.personId.id})" }
+                .toList()
 
         val ownershipSource = matchingOwnershipChanges.firstNotNullOfOrNull { it.source }
 
@@ -206,6 +209,7 @@ private fun computeAccountAuditDiffs(
 private fun AccountAuditDiffCard(
     diff: AccountAuditDiff,
     onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
+    onOwnerClick: (PersonId) -> Unit = {},
 ) {
     AuditDiffCard(
         auditType = diff.auditType,
@@ -223,7 +227,7 @@ private fun AccountAuditDiffCard(
                 val openingDate = diff.openingDate.value().toLocalDateTime(TimeZone.currentSystemDefault())
                 FieldValueRow("Opening Date", "${openingDate.date}")
                 FieldValueRow("Category", diff.categoryName.value() ?: "Uncategorized")
-                OwnershipChangesSection(diff.ownersAdded, diff.ownersRemoved)
+                OwnershipChangesSection(diff.ownersAdded, diff.ownersRemoved, onOwnerClick)
                 AccountAttributeChangesSection(diff.attributeChanges)
                 SourceInfoSection(diff.source, onApiSourceClick = onApiSourceClick)
             }
@@ -252,7 +256,7 @@ private fun AccountAuditDiffCard(
                             categoryChange.newValue ?: "Uncategorized",
                         )
                     }
-                    OwnershipChangesSection(diff.ownersAdded, diff.ownersRemoved)
+                    OwnershipChangesSection(diff.ownersAdded, diff.ownersRemoved, onOwnerClick)
                     AccountAttributeChangesSection(diff.attributeChanges)
                 }
                 SourceInfoSection(diff.source, onApiSourceClick = onApiSourceClick)
@@ -268,7 +272,7 @@ private fun AccountAuditDiffCard(
                 val openingDate = diff.openingDate.value().toLocalDateTime(TimeZone.currentSystemDefault())
                 FieldValueRow("Opening Date", "${openingDate.date}", errorColor)
                 FieldValueRow("Category", diff.categoryName.value() ?: "Uncategorized", errorColor)
-                OwnershipChangesSection(diff.ownersAdded, diff.ownersRemoved)
+                OwnershipChangesSection(diff.ownersAdded, diff.ownersRemoved, onOwnerClick)
                 AccountAttributeChangesSection(diff.attributeChanges, errorColor)
                 SourceInfoSection(diff.source, labelColor = errorColor.copy(alpha = 0.8f), onApiSourceClick = onApiSourceClick)
             }
@@ -278,8 +282,9 @@ private fun AccountAuditDiffCard(
 
 @Composable
 private fun OwnershipChangesSection(
-    ownersAdded: List<String>,
-    ownersRemoved: List<String>,
+    ownersAdded: List<PersonAccountOwnershipAuditEntry>,
+    ownersRemoved: List<PersonAccountOwnershipAuditEntry>,
+    onOwnerClick: (PersonId) -> Unit,
 ) {
     if (ownersAdded.isEmpty() && ownersRemoved.isEmpty()) return
 
@@ -288,38 +293,49 @@ private fun OwnershipChangesSection(
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         if (ownersAdded.isNotEmpty()) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text(
-                    text = "Owners added:",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.width(100.dp),
-                )
-                Text(
-                    text = ownersAdded.joinToString(", "),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-            }
+            OwnershipLinkRow(
+                ownerships = ownersAdded,
+                color = MaterialTheme.colorScheme.primary,
+                onOwnerClick = onOwnerClick,
+            )
         }
         if (ownersRemoved.isNotEmpty()) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
+            OwnershipLinkRow(
+                ownerships = ownersRemoved,
+                color = MaterialTheme.colorScheme.error,
+                onOwnerClick = onOwnerClick,
+            )
+        }
+    }
+}
+
+@Composable
+private fun OwnershipLinkRow(
+    ownerships: List<PersonAccountOwnershipAuditEntry>,
+    color: Color,
+    onOwnerClick: (PersonId) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = "Owners:",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.width(100.dp),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            ownerships.forEachIndexed { index, ownership ->
+                if (index > 0) {
+                    Text(text = ", ", style = MaterialTheme.typography.bodyMedium, color = color)
+                }
+                val ownerLabel = ownership.personFullName ?: "Unknown (ID: ${ownership.personId.id})"
                 Text(
-                    text = "Owners removed:",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.width(100.dp),
-                )
-                Text(
-                    text = ownersRemoved.joinToString(", "),
+                    text = ownerLabel,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error,
+                    color = color,
+                    modifier = Modifier.clickable { onOwnerClick(ownership.personId) },
                 )
             }
         }
@@ -359,13 +375,14 @@ private fun AccountAttributeChangesSection(
                         AuditType.DELETE -> MaterialTheme.colorScheme.error
                         AuditType.UPDATE -> valueColor
                     }
+                val timestamp = entry.auditTimestamp.toLocalDateTime(TimeZone.currentSystemDefault())
                 Text(
                     text = "$prefix${entry.attributeType.name}:",
                     style = MaterialTheme.typography.bodySmall,
                     color = color,
                 )
                 Text(
-                    text = entry.value,
+                    text = "${entry.value} @ ${timestamp.date} ${timestamp.time}",
                     style = MaterialTheme.typography.bodySmall,
                     color = color,
                 )

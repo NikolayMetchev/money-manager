@@ -1,5 +1,7 @@
 package com.moneymanager.domain.model
 
+import kotlin.time.Instant
+
 /**
  * Represents an audit entry for an account attribute change.
  * Records what happened to an attribute at a specific account revision.
@@ -18,6 +20,7 @@ package com.moneymanager.domain.model
  */
 data class AccountAttributeAuditEntry(
     val id: Long,
+    val auditTimestamp: Instant,
     val accountId: AccountId,
     val revisionId: Long,
     val attributeType: AttributeType,

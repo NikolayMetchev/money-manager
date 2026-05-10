@@ -47,6 +47,15 @@ interface AuditRepository {
     suspend fun getAuditHistoryForPerson(personId: PersonId): List<PersonAuditEntry>
 
     /**
+     * Gets the attribute audit history for a specific person.
+     * Returns all attribute changes (adds/updates/removes) for the given person.
+     *
+     * @param personId The ID of the person to get attribute audit history for
+     * @return List of person attribute audit entries
+     */
+    suspend fun getAttributeAuditByPerson(personId: PersonId): List<PersonAttributeAuditEntry>
+
+    /**
      * Gets the audit history for a specific person-account ownership.
      * Returns entries ordered by audit timestamp descending (most recent first).
      *
@@ -95,14 +104,4 @@ interface AuditRepository {
      * @return List of attribute audit entries
      */
     suspend fun getAttributeAuditByAccount(accountId: AccountId): List<AccountAttributeAuditEntry>
-
-    /**
-     * Gets the attribute audit history for a specific person.
-     * Returns all attribute changes (adds/updates/removes) for the given person.
-     * Results are ordered by revision descending, then attribute type name.
-     *
-     * @param personId The ID of the person to get attribute audit history for
-     * @return List of attribute audit entries
-     */
-    suspend fun getAttributeAuditByPerson(personId: PersonId): List<PersonAttributeAuditEntry>
 }

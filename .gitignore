@@ -37,3 +37,5 @@ app/main/android/src/main/assets/VERSION
 .claude/
 /hs_err_*.log
 .qodana
+# Monzo API session transcript fixtures
+app/db/core/src/commonTest/resources/monzo/sample-apis/

@@ -40,6 +40,7 @@ import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
+import com.moneymanager.domain.repository.PersonAttributeRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -59,6 +60,7 @@ fun CreateAccountDialog(
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
     personRepository: PersonRepository,
+    personAttributeRepository: PersonAttributeRepository? = null,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     entitySourceQueries: EntitySourceQueries,
     deviceId: DeviceId,
@@ -285,6 +287,7 @@ fun CreateAccountDialog(
         EditPersonDialog(
             personToEdit = null,
             personRepository = personRepository,
+            personAttributeRepository = personAttributeRepository,
             entitySourceQueries = entitySourceQueries,
             deviceId = deviceId,
             onDismiss = { showCreatePersonDialog = false },
