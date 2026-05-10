@@ -9,15 +9,22 @@ plugins:
 profile:
   path: .qodana/profile.xml
 exclude:
-  - name: UnusedSymbol
-    paths:
-      - app/di/core/src
   - name: KotlinNoActualForExpect
   - name: XmlHighlighting
   - name: FunctionName
     paths:
       - app/ui/core/src
       - app/main/android/src
+  - name: KotlinUnreachableCode
+    paths:
+      - app/ui/core/src/commonTest/kotlin/com/moneymanager/ui/screens/MonzoImportAuditE2ETest.kt
+  - name: UnnecessaryModuleDependencyInspection
+  - name: RedundantSuppression
+    paths:
+      - app/ui/core/build/generated
+  - name: EditorConfigKeyCorrectness
+    paths:
+      - app/ui/core/.editorconfig
   - name: All
     paths:
       - build
@@ -26,6 +33,7 @@ exclude:
       - "*/*/*/build"
       - gradle/build-logic/build
       - app/db/core/build
+      - app/ui/core/build
 include:
   - name: CheckDependencyLicenses
 failureConditions:

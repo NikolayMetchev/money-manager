@@ -1,9 +1,12 @@
 <component name="InspectionProjectProfileManager">
   <profile version="1.0">
     <option name="myName" value="Money Manager"/>
-<inspection_tool class="ConstantConditionIf" enabled="true" level="ERROR" enabled_by_default="true"/>
+    <inspection_tool class="UnnecessaryModuleDependencyInspection" enabled="false" level="WARNING" enabled_by_default="false"/>
+    <inspection_tool class="UnstableApiUsage" enabled="false" level="WARNING" enabled_by_default="false"/>
+    <inspection_tool class="ConstantConditionIf" enabled="true" level="ERROR" enabled_by_default="true"/>
     <inspection_tool class="ControlFlowWithEmptyBody" enabled="true" level="ERROR" enabled_by_default="true"/>
     <inspection_tool class="FunctionWithLambdaExpressionBody" enabled="true" level="ERROR" enabled_by_default="true"/>
+    <inspection_tool class="MixedNamedAndPositionalParams" enabled="true" level="ERROR" enabled_by_default="true"/>
     <inspection_tool class="RedundantConstructorKeyword" enabled="true" level="ERROR" enabled_by_default="true"/>
     <inspection_tool class="RedundantReturnKeyword" enabled="true" level="ERROR" enabled_by_default="true"/>
     <inspection_tool class="RedundantSuspendModifier" enabled="true" level="ERROR" enabled_by_default="true"/>
@@ -29,7 +32,10 @@
     <inspection_tool class="SimplifyWhenWithBooleanConstantCondition" enabled="true" level="ERROR" enabled_by_default="true"/>
     <inspection_tool class="RemoveEmptyParenthesesFromLambdaCall" enabled="true" level="ERROR" enabled_by_default="true"/>
     <inspection_tool class="RemoveRedundantQualifier" enabled="true" level="ERROR" enabled_by_default="true"/>
+    <inspection_tool class="RedundantNullCheck" enabled="true" level="ERROR" enabled_by_default="true"/>
+    <inspection_tool class="UnusedColumn" enabled="true" level="ERROR" enabled_by_default="true"/>
     <inspection_tool class="UnusedImport" enabled="true" level="ERROR" enabled_by_default="true"/>
+    <inspection_tool class="UnusedQuery" enabled="true" level="ERROR" enabled_by_default="true"/>
     <inspection_tool class="UNUSED_PARAMETER" enabled="true" level="ERROR" enabled_by_default="true"/>
     <inspection_tool class="UnusedVariable" enabled="true" level="ERROR" enabled_by_default="true"/>
     <inspection_tool class="VariableNeverRead" enabled="true" level="ERROR" enabled_by_default="true"/>

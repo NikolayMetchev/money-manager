@@ -563,7 +563,7 @@ class MonzoImportE2ETest : DbTest() {
                 assertNotNull(cpApiSource, "${counterparty.name} must have API source details")
                 assertEquals(sessionId, cpApiSource.sessionId)
                 // The json_path points to the counterparty section of the transaction
-                assert(cpApiSource.jsonPath.value.matches(Regex("""^\$\.transactions\[\d+\]\.counterparty$"""))) {
+                assert(cpApiSource.jsonPath.value.matches(Regex("""^\$\.transactions\[\d+]\.counterparty$"""))) {
                     "${counterparty.name} json_path '${cpApiSource.jsonPath.value}' should be a $.transactions[N].counterparty path"
                 }
             }

@@ -27,7 +27,7 @@ object ColumnDetector {
     private val dateValuePatterns =
         listOf(
             // DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY
-            Regex("""\d{1,2}[/\-\.]\d{1,2}[/\-\.]\d{2,4}"""),
+            Regex("""\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}"""),
             // YYYY-MM-DD, YYYY/MM/DD
             Regex("""\d{4}[/\-]\d{1,2}[/\-]\d{1,2}"""),
             // Month name formats: "24 Feb 2022", "Feb 24, 2022"

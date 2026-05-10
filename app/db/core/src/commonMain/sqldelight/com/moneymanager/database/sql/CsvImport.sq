@@ -115,9 +115,6 @@ LEFT JOIN csv_import_application latest_application
     )
 WHERE csv_import_metadata.id = ?;
 
-selectImportByTableName:
-SELECT * FROM csv_import_metadata WHERE table_name = ?;
-
 selectImportsByChecksum:
 SELECT
     csv_import_metadata.id,
@@ -196,9 +193,3 @@ VALUES (?, ?, ?, ?);
 
 deleteError:
 DELETE FROM csv_import_error WHERE csv_import_id = ? AND row_index = ?;
-
-deleteErrorsForImport:
-DELETE FROM csv_import_error WHERE csv_import_id = ?;
-
-getErrorsForImport:
-SELECT * FROM csv_import_error WHERE csv_import_id = ? ORDER BY row_index;

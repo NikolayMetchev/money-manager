@@ -1,3 +1,5 @@
+@file:Suppress("UNUSED_PARAMETER")
+
 package com.moneymanager.ui.navigation
 
 import androidx.compose.runtime.Composable
@@ -6,6 +8,4 @@ import androidx.compose.runtime.Composable
 actual fun PlatformBackHandler(
     enabled: Boolean,
     onBack: () -> Unit,
-) {
-    // No-op on desktop - mouse back button is handled by mouseButtonNavigation
-}
+) = Unit

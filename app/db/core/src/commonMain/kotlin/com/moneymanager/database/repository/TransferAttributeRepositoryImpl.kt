@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
 class TransferAttributeRepositoryImpl(
-    private val database: MoneyManagerDatabaseWrapper,
+    database: MoneyManagerDatabaseWrapper,
 ) : TransferAttributeRepository {
     private val queries = database.transferAttributeQueries
 
