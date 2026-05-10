@@ -146,3 +146,7 @@ tasks.withType<Test> {
 tasks.matching { it.name == "testAndroidHostTest" }.configureEach {
     enabled = false
 }
+
+tasks.named("jvmTest").configure {
+    dependsOn(project(":app:db:core").tasks.named("restoreMonzoApiSessionFixtures"))
+}

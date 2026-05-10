@@ -101,7 +101,39 @@ tasks.matching { it.name == "testAndroidHostTest" }.configureEach {
 }
 
 val monzoApiFixtureToolClass = "com.moneymanager.database.tools.MonzoApiSessionFixtureToolKt"
+val monzoApiFixtureArchiveToolClass = "com.moneymanager.database.tools.MonzoApiSessionFixtureArchiveToolKt"
 val moneyManagerDbPath = File(System.getProperty("user.home"), ".moneymanager/money_manager.db")
+val monzoFixtureDir = layout.projectDirectory.dir("src/commonTest/resources/monzo/sample-apis").asFile
+val monzoEncryptedFixtureFile = layout.projectDirectory.dir("src/commonTest/resources/monzo").asFile.resolve("sample-apis.zip")
+
+tasks.register<JavaExec>("updateEncryptedMonzoApiSessionFixtures") {
+    group = "verification"
+    description = "Encrypts the Monzo API fixture directory into a zip archive."
+    dependsOn("compileTestKotlinJvm")
+    mainClass.set(monzoApiFixtureArchiveToolClass)
+    classpath = sourceSets["jvmTest"].runtimeClasspath
+    args(
+        "encrypt",
+        monzoFixtureDir.absolutePath,
+        monzoEncryptedFixtureFile.absolutePath,
+    )
+}
+
+tasks.register<JavaExec>("restoreMonzoApiSessionFixtures") {
+    group = "verification"
+    description = "Restores the Monzo API fixture directory from the encrypted archive when empty."
+    dependsOn("compileTestKotlinJvm")
+    onlyIf {
+        !(monzoFixtureDir.exists() && monzoFixtureDir.listFiles()?.isNotEmpty() == true)
+    }
+    mainClass.set(monzoApiFixtureArchiveToolClass)
+    classpath = sourceSets["jvmTest"].runtimeClasspath
+    args(
+        "decrypt",
+        monzoEncryptedFixtureFile.absolutePath,
+        monzoFixtureDir.absolutePath,
+    )
+}
 
 tasks.register<JavaExec>("exportMonzoApiSessionFixtures") {
     group = "verification"
@@ -112,9 +144,7 @@ tasks.register<JavaExec>("exportMonzoApiSessionFixtures") {
     args(
         "export",
         moneyManagerDbPath.absolutePath,
-        layout.projectDirectory
-            .dir("src/commonTest/resources/monzo/sample-apis")
-            .asFile.absolutePath,
+        monzoFixtureDir.absolutePath,
     )
 }
 
@@ -127,8 +157,6 @@ tasks.register<JavaExec>("importMonzoApiSessionFixtures") {
     args(
         "import",
         moneyManagerDbPath.absolutePath,
-        layout.projectDirectory
-            .dir("src/commonTest/resources/monzo/sample-apis")
-            .asFile.absolutePath,
+        monzoFixtureDir.absolutePath,
     )
 }
