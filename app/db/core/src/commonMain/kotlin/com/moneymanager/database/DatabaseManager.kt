@@ -19,6 +19,15 @@ interface DatabaseManager {
     suspend fun openDatabase(location: DbLocation): MoneyManagerDatabaseWrapper
 
     /**
+     * Opens a database and reports progress for user-visible startup feedback.
+     * Implementations that do not have granular progress can rely on the default behavior.
+     */
+    suspend fun openDatabaseWithProgress(
+        location: DbLocation,
+        onProgress: (DatabaseInitializationProgress) -> Unit,
+    ): MoneyManagerDatabaseWrapper = openDatabase(location)
+
+    /**
      * Checks if a database exists at the specified location.
      *
      * @param location Platform-specific database location
@@ -52,4 +61,13 @@ interface DatabaseManager {
      * @throws Exception if deletion fails
      */
     suspend fun deleteDatabase(location: DbLocation)
+}
+
+data class DatabaseInitializationProgress(
+    val text: String,
+    val completedSteps: Int,
+    val totalSteps: Int,
+) {
+    val fraction: Float
+        get() = completedSteps.toFloat() / totalSteps.toFloat()
 }

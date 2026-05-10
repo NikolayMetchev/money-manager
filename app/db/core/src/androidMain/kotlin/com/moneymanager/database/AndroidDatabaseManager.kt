@@ -21,10 +21,18 @@ class AndroidDatabaseManager(
     private val context: Context,
 ) : DatabaseManager {
     override suspend fun openDatabase(location: DbLocation): MoneyManagerDatabaseWrapper =
+        openDatabaseWithProgress(location) {}
+
+    override suspend fun openDatabaseWithProgress(
+        location: DbLocation,
+        onProgress: (DatabaseInitializationProgress) -> Unit,
+    ): MoneyManagerDatabaseWrapper =
         withContext(Dispatchers.IO) {
+            onProgress(DatabaseInitializationProgress("Checking for an existing database...", 1, 6))
             // Check if this is a new database before opening
             val isNewDatabase = !context.getDatabasePath(location.name).exists()
 
+            onProgress(DatabaseInitializationProgress("Opening the SQLite database...", 2, 6))
             // Use custom callback that handles existing databases gracefully
             val driver =
                 AndroidSqliteDriver(
@@ -64,12 +72,24 @@ class AndroidDatabaseManager(
                         },
                 )
 
+            onProgress(
+                if (isNewDatabase) {
+                    DatabaseInitializationProgress("Creating the database schema...", 3, 6)
+                } else {
+                    DatabaseInitializationProgress("Checking the database schema...", 3, 6)
+                },
+            )
             val database = MoneyManagerDatabaseWrapper(driver)
 
+            onProgress(DatabaseInitializationProgress("Applying database settings...", 4, 6))
             if (isNewDatabase) {
+                onProgress(DatabaseInitializationProgress("Adding default currencies and settings...", 5, 6))
                 DatabaseConfig.seedDatabase(database, CurrencyRepositoryImpl(database))
+            } else {
+                onProgress(DatabaseInitializationProgress("Preparing repositories...", 5, 6))
             }
 
+            onProgress(DatabaseInitializationProgress("Finishing database startup...", 6, 6))
             database
         }
 

@@ -13,6 +13,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import com.moneymanager.database.DatabaseInitializationProgress
 import com.moneymanager.database.DatabaseManager
 import com.moneymanager.di.AppComponent
 import com.moneymanager.di.AppComponentParams
@@ -22,6 +23,7 @@ import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.ui.MoneyManagerApp
 import com.moneymanager.ui.components.DatabaseSchemaErrorDialog
+import com.moneymanager.ui.components.DatabaseStartupProgressScreen
 import com.moneymanager.ui.error.GlobalSchemaErrorState
 import com.moneymanager.ui.error.SchemaErrorDetector
 import kotlinx.coroutines.launch
@@ -66,7 +68,9 @@ class MainActivity : ComponentActivity() {
 }
 
 private sealed class AppDatabaseState {
-    data object Loading : AppDatabaseState()
+    data class Loading(
+        val progress: DatabaseInitializationProgress = initialDatabaseProgress(),
+    ) : AppDatabaseState()
 
     data class Loaded(
         val location: DbLocation,
@@ -79,6 +83,13 @@ private sealed class AppDatabaseState {
     ) : AppDatabaseState()
 }
 
+private fun initialDatabaseProgress() =
+    DatabaseInitializationProgress(
+        text = "Finding the default database...",
+        completedSteps = 0,
+        totalSteps = 1,
+    )
+
 @Suppress("FunctionName")
 @Composable
 private fun MainContent(
@@ -86,16 +97,27 @@ private fun MainContent(
     appVersion: AppVersion,
 ) {
     val scope = rememberCoroutineScope()
-    var databaseState by remember { mutableStateOf<AppDatabaseState>(AppDatabaseState.Loading) }
+    var databaseState by remember { mutableStateOf<AppDatabaseState>(AppDatabaseState.Loading()) }
 
     // Open database on first composition
     LaunchedEffect(Unit) {
         val location = databaseManager.getDefaultLocation()
         try {
             Log.i(TAG, "Opening database at: $location")
-            val database = databaseManager.openDatabase(location)
+            val database =
+                databaseManager.openDatabaseWithProgress(location) { progress ->
+                    databaseState = AppDatabaseState.Loading(progress)
+                }
+            databaseState =
+                AppDatabaseState.Loading(
+                    DatabaseInitializationProgress("Preparing application services...", 1, 1),
+                )
             val databaseComponent = DatabaseComponent.create(database)
             // Force initialization of device ID to detect schema errors early
+            databaseState =
+                AppDatabaseState.Loading(
+                    DatabaseInitializationProgress("Verifying this device...", 1, 1),
+                )
             databaseComponent.deviceId
             databaseState = AppDatabaseState.Loaded(location, databaseComponent)
             Log.i(TAG, "Database opened successfully")
@@ -148,9 +170,7 @@ private fun MainContent(
                 deviceId = dc.deviceId,
             )
         }
-        is AppDatabaseState.Loading -> {
-            // Loading...
-        }
+        is AppDatabaseState.Loading -> DatabaseStartupProgressScreen(state.progress)
         is AppDatabaseState.Error -> {
             // Error dialog is shown below
         }
