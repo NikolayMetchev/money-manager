@@ -472,43 +472,39 @@ private suspend fun precreateAndFlushCounterparties(
 
 private suspend fun importTransactionsConcurrently(setup: ImportSetup) {
     coroutineScope {
-        setup.transactionResponses
-            .map { response ->
-                async {
-                    val request = setup.requestsById[response.requestId] ?: return@async null
-                    val account = setup.accountsById[request.accountIdParameter(setup.strategy)] ?: return@async null
-                    val ownAccountId = setup.accountCache.getOrCreateAccountId(account.id, account.displayName(setup.strategy))
-                    val pageResult =
-                        importTransactionPage(
-                            response = response.toApiHttpResponse(),
-                            strategy = setup.strategy,
-                            ownAccountId = ownAccountId,
-                            sessionId = setup.sessionId,
-                            deviceId = setup.deviceId,
-                            accountCache = setup.accountCache,
-                            currencyCache = setup.currencyCache,
-                            attributeTypeCache = setup.attributeTypeCache,
-                            customTxFields = setup.customTxFields,
-                            uniqueIdTxFields = setup.uniqueIdTxFields,
-                            counterpartyIdField = setup.counterpartyIdField,
-                            nameMappings = setup.nameMappings,
-                            apiSessionRepository = setup.apiSessionRepository,
-                            transactionRepository = setup.transactionRepository,
-                            transferSourceQueries = setup.transferSourceQueries,
-                        )
-                    val progressMessage =
-                        setup.progressMutex.withLock {
-                            setup.counts.totalImported += pageResult.importedCount
-                            setup.counts.totalDuplicates += pageResult.duplicateCount
-                            setup.counts.totalErrors += pageResult.errorCount
-                            setup.counts.totalExcluded += pageResult.excludedCount
-                            ++setup.counts.completedCount
-                            setup.counts.progressMessage()
-                        }
-                    setup.onProgress(progressMessage)
-                    pageResult
+        for (response in setup.transactionResponses) {
+            val request = setup.requestsById[response.requestId] ?: continue
+            val account = setup.accountsById[request.accountIdParameter(setup.strategy)] ?: continue
+            val ownAccountId = setup.accountCache.getOrCreateAccountId(account.id, account.displayName(setup.strategy))
+            val pageResult =
+                importTransactionPage(
+                    response = response.toApiHttpResponse(),
+                    strategy = setup.strategy,
+                    ownAccountId = ownAccountId,
+                    sessionId = setup.sessionId,
+                    deviceId = setup.deviceId,
+                    accountCache = setup.accountCache,
+                    currencyCache = setup.currencyCache,
+                    attributeTypeCache = setup.attributeTypeCache,
+                    customTxFields = setup.customTxFields,
+                    uniqueIdTxFields = setup.uniqueIdTxFields,
+                    counterpartyIdField = setup.counterpartyIdField,
+                    nameMappings = setup.nameMappings,
+                    apiSessionRepository = setup.apiSessionRepository,
+                    transactionRepository = setup.transactionRepository,
+                    transferSourceQueries = setup.transferSourceQueries,
+                )
+            val progressMessage =
+                setup.progressMutex.withLock {
+                    setup.counts.totalImported += pageResult.importedCount
+                    setup.counts.totalDuplicates += pageResult.duplicateCount
+                    setup.counts.totalErrors += pageResult.errorCount
+                    setup.counts.totalExcluded += pageResult.excludedCount
+                    ++setup.counts.completedCount
+                    setup.counts.progressMessage()
                 }
-            }.awaitAll()
+            setup.onProgress(progressMessage)
+        }
     }
 }
 
@@ -2008,10 +2004,11 @@ private fun ApiTransactionPageItem.toTransfer(
 
 private fun Transfer.matches(other: Transfer): Boolean =
     timestamp == other.timestamp &&
-        description == other.description &&
-        sourceAccountId == other.sourceAccountId &&
-        targetAccountId == other.targetAccountId &&
-        amount == other.amount
+        amount == other.amount &&
+        (
+            (sourceAccountId == other.sourceAccountId && targetAccountId == other.targetAccountId) ||
+                (sourceAccountId == other.targetAccountId && targetAccountId == other.sourceAccountId)
+        )
 
 private const val MONZO_TRANSACTION_ID_ATTRIBUTE_NAME = "Monzo Transaction Id"
 

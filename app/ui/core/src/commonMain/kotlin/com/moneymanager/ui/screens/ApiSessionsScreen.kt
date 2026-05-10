@@ -138,6 +138,7 @@ fun ApiSessionsScreen(
     // Per-session import state
     var importResultBySession by remember { mutableStateOf<Map<ApiSessionId, ApiSessionImportResult>>(emptyMap()) }
     var importErrorBySession by remember { mutableStateOf<Map<ApiSessionId, String>>(emptyMap()) }
+    var importProgressBySession by remember { mutableStateOf<Map<ApiSessionId, String>>(emptyMap()) }
 
     // Per-credential download result state (cleared when a new download starts)
     var accountsDownloadResultByCredential by remember { mutableStateOf<Map<MonzoCredentialId, ApiAccountsDownloadResult>>(emptyMap()) }
@@ -202,11 +203,15 @@ fun ApiSessionsScreen(
                     accountsSessionId = accountsSession?.id,
                     strategy = strategy,
                     counterpartyAccountNames = counterpartyAccountNames,
-                    onProgress = ::update,
+                    onProgress = { progress ->
+                        importProgressBySession = importProgressBySession + (session.id to progress)
+                        update(progress)
+                    },
                 )
             apiSessionRepository.markSessionImported(session.id, Clock.System.now())
             maintenanceService.refreshMaterializedViews()
             importResultBySession = importResultBySession + (session.id to result)
+            importProgressBySession = importProgressBySession - session.id
             refresh()
             onTransactionsImported()
             result.displaySummary()
@@ -265,6 +270,7 @@ fun ApiSessionsScreen(
                                 downloadProgress = downloadProgressByCredential[credential.id],
                                 importResultBySession = importResultBySession,
                                 importErrorBySession = importErrorBySession,
+                                importProgressBySession = importProgressBySession,
                                 importedSessionIds = importedSessionIds,
                                 isImportingSession = { sessionId -> backgroundTasks.isRunning(monzoImportTaskKey(sessionId)) },
                                 onDownloadAccounts = {
@@ -516,6 +522,7 @@ private fun CredentialCard(
     downloadProgress: ApiTransactionsDownloadProgress?,
     importResultBySession: Map<ApiSessionId, ApiSessionImportResult>,
     importErrorBySession: Map<ApiSessionId, String>,
+    importProgressBySession: Map<ApiSessionId, String>,
     importedSessionIds: Set<ApiSessionId>,
     isImportingSession: (ApiSessionId) -> Boolean,
     onDownloadAccounts: () -> Unit,
@@ -607,6 +614,7 @@ private fun CredentialCard(
                         isAlreadyImported = session.id in importedSessionIds,
                         importResult = importResultBySession[session.id],
                         importError = importErrorBySession[session.id],
+                        importProgress = importProgressBySession[session.id],
                         onImport = { onImport(session) },
                         onOpenTraffic = { onSessionClick(session) },
                         onCopyError = onCopyError,
@@ -624,6 +632,7 @@ private fun SessionRow(
     isAlreadyImported: Boolean,
     importResult: ApiSessionImportResult?,
     importError: String?,
+    importProgress: String?,
     onImport: () -> Unit,
     onOpenTraffic: () -> Unit,
     onCopyError: (String) -> Unit,
@@ -684,6 +693,9 @@ private fun SessionRow(
                     null -> "Importing..."
                 }
             Text(text = importLabel, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+            importProgress?.let {
+                Text(text = it, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+            }
         }
 
         importError?.let { error ->
