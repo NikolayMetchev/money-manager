@@ -319,7 +319,8 @@ fun MoneyManagerApp(
                                 )
                             }
                             is Screen.People,
-                            is Screen.PeopleScroll -> {
+                            is Screen.PeopleScroll,
+                            -> {
                                 // Reset currentlyViewedAccountId and currentlyViewedCurrencyId when on other screens
                                 LaunchedEffect(Unit) {
                                     currentlyViewedAccountId = null

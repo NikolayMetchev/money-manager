@@ -1004,8 +1004,7 @@ private suspend fun importOwnersForAccount(
                         EntityType.PERSON_ACCOUNT_OWNERSHIP.id,
                         existingOwnership.id,
                         existingOwnership.revisionId,
-                    )
-                    .executeAsOneOrNull()
+                    ).executeAsOneOrNull()
             if (existingSource == null) {
                 recorder.insert(EntityType.PERSON_ACCOUNT_OWNERSHIP, existingOwnership.id, existingOwnership.revisionId)
             }
@@ -1376,18 +1375,18 @@ private fun parseAccountsWithPaths(
         ?.jsonArray
         ?.mapIndexedNotNull { index, element ->
             val account = element.jsonObject
-                val id = account.resolveJsonPath(strategy.accountMappings.idField) ?: return@mapIndexedNotNull null
-                val jsonPath = JsonPath("$.${strategy.accountsEndpoint.responseArrayKey}[$index]")
-                ApiImportAccount(
-                    id = id,
-                    description = account.resolveJsonPath(strategy.accountMappings.descriptionField).orEmpty(),
-                    owners = parseAccountOwners(account, strategy, jsonPath),
-                    source = null,
-                    sortCode = account.stringOrNull("sort_code"),
-                    accountNumber = account.stringOrNull("account_number"),
-                    rawJson = account,
-                ) to jsonPath
-            }
+            val id = account.resolveJsonPath(strategy.accountMappings.idField) ?: return@mapIndexedNotNull null
+            val jsonPath = JsonPath("$.${strategy.accountsEndpoint.responseArrayKey}[$index]")
+            ApiImportAccount(
+                id = id,
+                description = account.resolveJsonPath(strategy.accountMappings.descriptionField).orEmpty(),
+                owners = parseAccountOwners(account, strategy, jsonPath),
+                source = null,
+                sortCode = account.stringOrNull("sort_code"),
+                accountNumber = account.stringOrNull("account_number"),
+                rawJson = account,
+            ) to jsonPath
+        }
         ?: emptyList()
 
 private data class ApiTransactionPageItem(
@@ -1836,10 +1835,18 @@ private class AccountCache(
                 // that ATM withdrawals from different locations always consolidate into one account.
                 builtInTypeIndex[builtInType]?.let { return@withLock it }
                 val normalizedName = name.ifBlank { "Unknown" }
-        val accountId = loadAccounts()[normalizedName]?.id ?: createAccount(null, normalizedName, apiSource)
-        if (accountAttributeRepository.getByAccount(accountId).first().none { it.attributeType.id == ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID }) {
-            accountAttributeRepository.insertInCreationMode(accountId, ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID, counterpartyId ?: return@withLock accountId)
-        }
+                val accountId = loadAccounts()[normalizedName]?.id ?: createAccount(null, normalizedName, apiSource)
+                if (accountAttributeRepository.getByAccount(accountId).first().none {
+                        it.attributeType.id ==
+                            ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID
+                    }
+                ) {
+                    accountAttributeRepository.insertInCreationMode(
+                        accountId,
+                        ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID,
+                        counterpartyId ?: return@withLock accountId,
+                    )
+                }
                 builtInTypeIndex[builtInType] = accountId
                 pendingBuiltInTypeAttributes.add(accountId to builtInType)
                 return@withLock accountId

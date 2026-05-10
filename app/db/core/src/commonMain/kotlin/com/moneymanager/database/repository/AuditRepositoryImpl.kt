@@ -7,7 +7,6 @@ import com.moneymanager.database.mapper.CategoryAuditEntryMapper
 import com.moneymanager.database.mapper.CurrencyAuditEntryMapper
 import com.moneymanager.database.mapper.OwnershipAuditHistoryForAccountMapper
 import com.moneymanager.database.mapper.PersonAccountOwnershipAuditEntryMapper
-import com.moneymanager.database.mapper.PersonAttributeAuditEntryMapper
 import com.moneymanager.database.mapper.PersonAuditEntryMapper
 import com.moneymanager.database.mapper.TransferAuditEntryMapper
 import com.moneymanager.database.sql.MoneyManagerDatabase
@@ -30,7 +29,6 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.AuditRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlin.time.Instant
 
 class AuditRepositoryImpl(
     database: MoneyManagerDatabase,
