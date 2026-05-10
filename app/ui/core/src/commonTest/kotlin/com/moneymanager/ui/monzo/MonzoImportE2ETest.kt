@@ -1038,6 +1038,9 @@ class MonzoImportE2ETest : DbTest() {
                     sessionId = sessionId,
                     strategy = strategy,
                 )
+            assertEquals(2, importResult.transactionCount, "Should import both personal-counterparty transactions")
+            assertEquals(1, importResult.personCount, "Should create one person for the shared external id")
+            assertEquals(0, importResult.errorCount, "Should not produce import errors")
 
             val people = repositories.personRepository.getAllPeople().first()
             val matchingPeople =
