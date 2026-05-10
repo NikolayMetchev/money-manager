@@ -78,11 +78,12 @@ private fun initialDatabaseProgress() =
 @Suppress("FunctionName")
 private fun MainWindow(onExit: () -> Unit) {
     // Initialize DI component once
-    val component = remember {
-        AppComponent.create(AppComponentParams()).also {
-            logger.info { "DI component created successfully" }
+    val component =
+        remember {
+            AppComponent.create(AppComponentParams()).also {
+                logger.info { "DI component created successfully" }
+            }
         }
-    }
 
     val databaseManager = component.databaseManager
     val appVersion = component.appVersion

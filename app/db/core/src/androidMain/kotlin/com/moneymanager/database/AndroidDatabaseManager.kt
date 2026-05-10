@@ -20,8 +20,7 @@ private val DEFAULT_DB_LOCATION = DbLocation(DEFAULT_DATABASE_NAME)
 class AndroidDatabaseManager(
     private val context: Context,
 ) : DatabaseManager {
-    override suspend fun openDatabase(location: DbLocation): MoneyManagerDatabaseWrapper =
-        openDatabaseWithProgress(location) {}
+    override suspend fun openDatabase(location: DbLocation): MoneyManagerDatabaseWrapper = openDatabaseWithProgress(location) {}
 
     override suspend fun openDatabaseWithProgress(
         location: DbLocation,

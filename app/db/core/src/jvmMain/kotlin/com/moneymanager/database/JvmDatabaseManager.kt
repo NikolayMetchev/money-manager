@@ -20,8 +20,7 @@ private val DbLocation.jdbcUrl: String
  * Stateless - does not track open databases.
  */
 class JvmDatabaseManager : DatabaseManager {
-    override suspend fun openDatabase(location: DbLocation): MoneyManagerDatabaseWrapper =
-        openDatabaseWithProgress(location) {}
+    override suspend fun openDatabase(location: DbLocation): MoneyManagerDatabaseWrapper = openDatabaseWithProgress(location) {}
 
     override suspend fun openDatabaseWithProgress(
         location: DbLocation,
