@@ -3,8 +3,8 @@
 package com.moneymanager.database.tools
 
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.Json
 import java.io.File
 import java.sql.Connection
 import java.sql.DriverManager
@@ -103,7 +103,13 @@ private fun exportFixtures(
                 json = row.getString("json"),
             )
         }
-        exportTable(connection, outputDir, "api_response_transaction", "api_response_transaction.json", ApiResponseTransactionRow.serializer()) { row ->
+        exportTable(
+            connection,
+            outputDir,
+            "api_response_transaction",
+            "api_response_transaction.json",
+            ApiResponseTransactionRow.serializer(),
+        ) { row ->
             ApiResponseTransactionRow(
                 id = row.getLong("id"),
                 responseId = row.getLong("response_id"),
@@ -133,69 +139,87 @@ private fun importFixtures(
                 }
             }
             insertTable(connection, inputDir, "api_credential.json", ApiCredentialRow.serializer()) { row ->
-                connection.prepareStatement("INSERT OR IGNORE INTO api_credential(id, type_id, token, created_at, strategy_id) VALUES (?, ?, ?, ?, ?)").use { ps ->
-                    ps.setLong(1, row.id)
-                    ps.setLong(2, row.typeId)
-                    ps.setString(3, row.token)
-                    ps.setLong(4, row.createdAt)
-                    if (row.strategyId == null) ps.setNull(5, java.sql.Types.VARCHAR) else ps.setString(5, row.strategyId)
-                    ps.executeUpdate()
-                }
+                connection
+                    .prepareStatement(
+                        "INSERT OR IGNORE INTO api_credential(id, type_id, token, created_at, strategy_id) VALUES (?, ?, ?, ?, ?)",
+                    ).use { ps ->
+                        ps.setLong(1, row.id)
+                        ps.setLong(2, row.typeId)
+                        ps.setString(3, row.token)
+                        ps.setLong(4, row.createdAt)
+                        if (row.strategyId == null) ps.setNull(5, java.sql.Types.VARCHAR) else ps.setString(5, row.strategyId)
+                        ps.executeUpdate()
+                    }
             }
             insertTable(connection, inputDir, "api_session.json", ApiSessionRow.serializer()) { row ->
-                connection.prepareStatement("INSERT OR IGNORE INTO api_session(id, type_id, token, device_id, created_at, expires_at, credential_id, kind, imported_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").use { ps ->
-                    ps.setLong(1, row.id)
-                    ps.setLong(2, row.typeId)
-                    ps.setString(3, row.token)
-                    ps.setLong(4, row.deviceId)
-                    ps.setLong(5, row.createdAt)
-                    if (row.expiresAt == null) ps.setNull(6, java.sql.Types.INTEGER) else ps.setLong(6, row.expiresAt)
-                    if (row.credentialId == null) ps.setNull(7, java.sql.Types.INTEGER) else ps.setLong(7, row.credentialId)
-                    if (row.kind == null) ps.setNull(8, java.sql.Types.VARCHAR) else ps.setString(8, row.kind)
-                    if (row.importedAt == null) ps.setNull(9, java.sql.Types.INTEGER) else ps.setLong(9, row.importedAt)
-                    ps.executeUpdate()
-                }
+                connection
+                    .prepareStatement(
+                        "INSERT OR IGNORE INTO api_session(id, type_id, token, device_id, created_at, expires_at, credential_id, kind, imported_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    ).use { ps ->
+                        ps.setLong(1, row.id)
+                        ps.setLong(2, row.typeId)
+                        ps.setString(3, row.token)
+                        ps.setLong(4, row.deviceId)
+                        ps.setLong(5, row.createdAt)
+                        if (row.expiresAt == null) ps.setNull(6, java.sql.Types.INTEGER) else ps.setLong(6, row.expiresAt)
+                        if (row.credentialId == null) ps.setNull(7, java.sql.Types.INTEGER) else ps.setLong(7, row.credentialId)
+                        if (row.kind == null) ps.setNull(8, java.sql.Types.VARCHAR) else ps.setString(8, row.kind)
+                        if (row.importedAt == null) ps.setNull(9, java.sql.Types.INTEGER) else ps.setLong(9, row.importedAt)
+                        ps.executeUpdate()
+                    }
             }
             insertTable(connection, inputDir, "api_request.json", ApiRequestRow.serializer()) { row ->
-                connection.prepareStatement("INSERT OR IGNORE INTO api_request(id, session_id, requested_at, method, url) VALUES (?, ?, ?, ?, ?)").use { ps ->
-                    ps.setLong(1, row.id)
-                    ps.setLong(2, row.sessionId)
-                    ps.setLong(3, row.requestedAt)
-                    ps.setString(4, row.method)
-                    ps.setString(5, row.url)
-                    ps.executeUpdate()
-                }
+                connection
+                    .prepareStatement(
+                        "INSERT OR IGNORE INTO api_request(id, session_id, requested_at, method, url) VALUES (?, ?, ?, ?, ?)",
+                    ).use { ps ->
+                        ps.setLong(1, row.id)
+                        ps.setLong(2, row.sessionId)
+                        ps.setLong(3, row.requestedAt)
+                        ps.setString(4, row.method)
+                        ps.setString(5, row.url)
+                        ps.executeUpdate()
+                    }
             }
             insertTable(connection, inputDir, "api_request_header.json", ApiRequestHeaderRow.serializer()) { row ->
-                connection.prepareStatement("INSERT OR IGNORE INTO api_request_header(id, request_id, key, value) VALUES (?, ?, ?, ?)").use { ps ->
-                    ps.setLong(1, row.id)
-                    ps.setLong(2, row.requestId)
-                    ps.setString(3, row.key)
-                    ps.setString(4, row.value)
-                    ps.executeUpdate()
-                }
+                connection
+                    .prepareStatement(
+                        "INSERT OR IGNORE INTO api_request_header(id, request_id, key, value) VALUES (?, ?, ?, ?)",
+                    ).use { ps ->
+                        ps.setLong(1, row.id)
+                        ps.setLong(2, row.requestId)
+                        ps.setString(3, row.key)
+                        ps.setString(4, row.value)
+                        ps.executeUpdate()
+                    }
             }
             insertTable(connection, inputDir, "api_response.json", ApiResponseRow.serializer()) { row ->
-                connection.prepareStatement("INSERT OR IGNORE INTO api_response(id, request_id, session_id, responded_at, json) VALUES (?, ?, ?, ?, ?)").use { ps ->
-                    ps.setLong(1, row.id)
-                    ps.setLong(2, row.requestId)
-                    ps.setLong(3, row.sessionId)
-                    ps.setLong(4, row.respondedAt)
-                    ps.setString(5, row.json)
-                    ps.executeUpdate()
-                }
+                connection
+                    .prepareStatement(
+                        "INSERT OR IGNORE INTO api_response(id, request_id, session_id, responded_at, json) VALUES (?, ?, ?, ?, ?)",
+                    ).use { ps ->
+                        ps.setLong(1, row.id)
+                        ps.setLong(2, row.requestId)
+                        ps.setLong(3, row.sessionId)
+                        ps.setLong(4, row.respondedAt)
+                        ps.setString(5, row.json)
+                        ps.executeUpdate()
+                    }
             }
             insertTable(connection, inputDir, "api_response_transaction.json", ApiResponseTransactionRow.serializer()) { row ->
-                connection.prepareStatement("INSERT OR IGNORE INTO api_response_transaction(id, response_id, json_path, state, transaction_id, error_message, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)").use { ps ->
-                    ps.setLong(1, row.id)
-                    ps.setLong(2, row.responseId)
-                    ps.setString(3, row.jsonPath)
-                    ps.setLong(4, row.state)
-                    if (row.transactionId == null) ps.setNull(5, java.sql.Types.INTEGER) else ps.setLong(5, row.transactionId)
-                    if (row.errorMessage == null) ps.setNull(6, java.sql.Types.VARCHAR) else ps.setString(6, row.errorMessage)
-                    ps.setLong(7, row.createdAt)
-                    ps.executeUpdate()
-                }
+                connection
+                    .prepareStatement(
+                        "INSERT OR IGNORE INTO api_response_transaction(id, response_id, json_path, state, transaction_id, error_message, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    ).use { ps ->
+                        ps.setLong(1, row.id)
+                        ps.setLong(2, row.responseId)
+                        ps.setString(3, row.jsonPath)
+                        ps.setLong(4, row.state)
+                        if (row.transactionId == null) ps.setNull(5, java.sql.Types.INTEGER) else ps.setLong(5, row.transactionId)
+                        if (row.errorMessage == null) ps.setNull(6, java.sql.Types.VARCHAR) else ps.setString(6, row.errorMessage)
+                        ps.setLong(7, row.createdAt)
+                        ps.executeUpdate()
+                    }
             }
             connection.commit()
         } finally {
@@ -238,7 +262,10 @@ private fun <T> insertTable(
     rows.forEach(insert)
 }
 
-private fun requireArgs(args: Array<String>, minSize: Int) {
+private fun requireArgs(
+    args: Array<String>,
+    minSize: Int,
+) {
     if (args.size < minSize) printUsageAndExit()
 }
 

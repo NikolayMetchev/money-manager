@@ -1448,11 +1448,12 @@ private suspend fun importTransactionPage(
     val requestId = ApiRequestId(response.requestId)
     val existingTransfers = transactionRepository.getTransactionsByAccount(ownAccountId).first().toMutableList()
     val existingTransfersByApiId =
-        existingTransfers.mapNotNull { transfer ->
-            transfer.attributes.firstOrNull { it.attributeType.name == MONZO_TRANSACTION_ID_ATTRIBUTE_NAME }?.value?.let { apiId ->
-                apiId to transfer
-            }
-        }.toMap()
+        existingTransfers
+            .mapNotNull { transfer ->
+                transfer.attributes.firstOrNull { it.attributeType.name == MONZO_TRANSACTION_ID_ATTRIBUTE_NAME }?.value?.let { apiId ->
+                    apiId to transfer
+                }
+            }.toMap()
 
     // Index existing transfers by their unique-identifier attribute values for O(1) lookup
     val existingByUniqueId: Map<Map<String, String>, TransferId> =
@@ -1621,14 +1622,14 @@ private suspend fun importValidTransactionItem(
     val duplicateTransferId: TransferId? =
         transactionApiId?.let { existingTransfersByApiId[it]?.id }
             ?: if (uniqueIdTxFields.isNotEmpty() && item.rawJson != null) {
-            val key =
-                uniqueIdTxFields.associateWith { fieldName ->
-                    customTxFields[fieldName]?.let { item.rawJson.resolveJsonPath(it) } ?: ""
-                }
-            existingByUniqueId[key]
-        } else {
-            existingTransfers.firstOrNull { it.matches(transfer) }?.id
-        }
+                val key =
+                    uniqueIdTxFields.associateWith { fieldName ->
+                        customTxFields[fieldName]?.let { item.rawJson.resolveJsonPath(it) } ?: ""
+                    }
+                existingByUniqueId[key]
+            } else {
+                existingTransfers.firstOrNull { it.matches(transfer) }?.id
+            }
 
     if (duplicateTransferId != null) {
         apiSessionRepository.insertResponseTransaction(

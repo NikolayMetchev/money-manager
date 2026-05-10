@@ -112,7 +112,9 @@ tasks.register<JavaExec>("exportMonzoApiSessionFixtures") {
     args(
         "export",
         moneyManagerDbPath.absolutePath,
-        layout.projectDirectory.dir("src/commonTest/resources/monzo/sample-apis").asFile.absolutePath,
+        layout.projectDirectory
+            .dir("src/commonTest/resources/monzo/sample-apis")
+            .asFile.absolutePath,
     )
 }
 
@@ -125,6 +127,8 @@ tasks.register<JavaExec>("importMonzoApiSessionFixtures") {
     args(
         "import",
         moneyManagerDbPath.absolutePath,
-        layout.projectDirectory.dir("src/commonTest/resources/monzo/sample-apis").asFile.absolutePath,
+        layout.projectDirectory
+            .dir("src/commonTest/resources/monzo/sample-apis")
+            .asFile.absolutePath,
     )
 }
