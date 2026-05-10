@@ -17,15 +17,24 @@ import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import androidx.compose.ui.test.waitUntilDoesNotExist
 import androidx.compose.ui.test.waitUntilExactlyOneExists
+import app.cash.sqldelight.Query
+import app.cash.sqldelight.Transacter
+import app.cash.sqldelight.db.QueryResult
+import app.cash.sqldelight.db.SqlCursor
+import app.cash.sqldelight.db.SqlDriver
+import app.cash.sqldelight.db.SqlPreparedStatement
 import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.database.ManualSourceRecorder
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.SampleGeneratorSourceRecorder
+import com.moneymanager.database.sql.EntitySourceQueries
+import com.moneymanager.database.sql.TransferSourceQueries
 import com.moneymanager.di.database.DatabaseComponent
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
 import com.moneymanager.domain.model.AttributeTypeId
+import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DbLocation
@@ -65,6 +74,7 @@ import dev.mokkery.mock
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
+import kotlin.properties.Delegates
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -278,9 +288,9 @@ class AccountTransactionsScreenTest {
         var testDbLocation: DbLocation? = null
         lateinit var database: MoneyManagerDatabaseWrapper
         lateinit var repositories: DatabaseComponent
-        var checkingAccountId: AccountId? = null
-        var savingsAccountId: AccountId? = null
-        var transferId: TransferId? = null
+        var checkingAccountId by Delegates.notNull<AccountId>()
+        var savingsAccountId by Delegates.notNull<AccountId>()
+        var transferId by Delegates.notNull<TransferId>()
 
         try {
             // Given: Set up a real database with accounts and a transaction
@@ -342,7 +352,7 @@ class AccountTransactionsScreenTest {
                 // When: Viewing the account transactions screen
                 setContent {
                     ProvideSchemaAwareScope {
-                        var currentAccountId by remember { mutableStateOf(checkingAccountId!!) }
+                        var currentAccountId by remember { mutableStateOf(checkingAccountId) }
                         var auditTransferId by remember { mutableStateOf<TransferId?>(null) }
 
                         if (auditTransferId != null) {
@@ -418,7 +428,7 @@ class AccountTransactionsScreenTest {
                     // Get the transfer's current revision
                     val savedTransfer =
                         repositories.transactionRepository
-                            .getTransactionById(transferId!!.id)
+                            .getTransactionById(transferId.id)
                             .first()!!
                     // Note: For revisionId = 1 (newly created transfers), adding attributes
                     // doesn't bump the revision - they're part of the initial creation.
@@ -485,9 +495,9 @@ class AccountTransactionsScreenTest {
         var testDbLocation: DbLocation? = null
         lateinit var database: MoneyManagerDatabaseWrapper
         lateinit var repositories: DatabaseComponent
-        var checkingAccountId: AccountId? = null
-        var savingsAccountId: AccountId? = null
-        var transferId: TransferId? = null
+        var checkingAccountId by Delegates.notNull<AccountId>()
+        var savingsAccountId by Delegates.notNull<AccountId>()
+        var transferId by Delegates.notNull<TransferId>()
 
         try {
             // Given: Set up a real database with accounts and a transaction
@@ -554,7 +564,7 @@ class AccountTransactionsScreenTest {
                 // When: Viewing the account transactions screen
                 setContent {
                     ProvideSchemaAwareScope {
-                        var currentAccountId by remember { mutableStateOf(checkingAccountId!!) }
+                        var currentAccountId by remember { mutableStateOf(checkingAccountId) }
                         var auditTransferId by remember { mutableStateOf<TransferId?>(null) }
 
                         if (auditTransferId != null) {
@@ -667,9 +677,9 @@ class AccountTransactionsScreenTest {
         var testDbLocation: DbLocation? = null
         lateinit var database: MoneyManagerDatabaseWrapper
         lateinit var repositories: DatabaseComponent
-        var checkingAccountId: AccountId? = null
-        var savingsAccountId: AccountId? = null
-        var transferId: TransferId? = null
+        var checkingAccountId by Delegates.notNull<AccountId>()
+        var savingsAccountId by Delegates.notNull<AccountId>()
+        var transferId by Delegates.notNull<TransferId>()
 
         try {
             // Given: Set up a real database with accounts and a transaction
@@ -736,7 +746,7 @@ class AccountTransactionsScreenTest {
                 // When: Viewing the account transactions screen
                 setContent {
                     ProvideSchemaAwareScope {
-                        var currentAccountId by remember { mutableStateOf(checkingAccountId!!) }
+                        var currentAccountId by remember { mutableStateOf(checkingAccountId) }
                         var auditTransferId by remember { mutableStateOf<TransferId?>(null) }
 
                         if (auditTransferId != null) {
@@ -951,12 +961,9 @@ class AccountTransactionsScreenTest {
         mock(MockMode.autoUnit) {
             val categories =
                 listOf(
-                    com.moneymanager.domain.model
-                        .Category(id = -1L, name = "Uncategorized"),
-                    com.moneymanager.domain.model
-                        .Category(id = 1L, name = "Food"),
-                    com.moneymanager.domain.model
-                        .Category(id = 2L, name = "Transport"),
+                    Category(id = -1L, name = "Uncategorized"),
+                    Category(id = 1L, name = "Food"),
+                    Category(id = 2L, name = "Transport"),
                 )
             every { getAllCategories() } returns flowOf(categories)
             every { getCategoryBalances() } returns flowOf(emptyList())
@@ -1008,7 +1015,7 @@ class AccountTransactionsScreenTest {
             everySuspend { createOwnership(any(), any()) } returns 0L
         }
 
-    private fun createMaintenanceService(): com.moneymanager.database.DatabaseMaintenanceService =
+    private fun createMaintenanceService(): DatabaseMaintenanceService =
         mock(MockMode.autoUnit) {
             everySuspend { reindex() } returns Duration.ZERO
             everySuspend { vacuum() } returns Duration.ZERO
@@ -1017,48 +1024,45 @@ class AccountTransactionsScreenTest {
             everySuspend { fullRefreshMaterializedViews() } returns Duration.ZERO
         }
 
-    private fun createStubTransferSourceQueries(): com.moneymanager.database.sql.TransferSourceQueries {
+    private fun createStubTransferSourceQueries(): TransferSourceQueries {
         val stubDriver =
-            object : app.cash.sqldelight.db.SqlDriver {
+            object : SqlDriver {
                 override fun close() = Unit
 
-                override fun currentTransaction(): app.cash.sqldelight.Transacter.Transaction? = null
+                override fun currentTransaction(): Transacter.Transaction? = null
 
                 override fun execute(
                     identifier: Int?,
                     sql: String,
                     parameters: Int,
-                    binders: (app.cash.sqldelight.db.SqlPreparedStatement.() -> Unit)?,
-                ): app.cash.sqldelight.db.QueryResult<Long> =
-                    throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
+                    binders: (SqlPreparedStatement.() -> Unit)?,
+                ): QueryResult<Long> = throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
 
                 override fun <R> executeQuery(
                     identifier: Int?,
                     sql: String,
-                    mapper: (app.cash.sqldelight.db.SqlCursor) -> app.cash.sqldelight.db.QueryResult<R>,
+                    mapper: (SqlCursor) -> QueryResult<R>,
                     parameters: Int,
-                    binders: (app.cash.sqldelight.db.SqlPreparedStatement.() -> Unit)?,
-                ): app.cash.sqldelight.db.QueryResult<R> =
-                    throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
+                    binders: (SqlPreparedStatement.() -> Unit)?,
+                ): QueryResult<R> = throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
 
-                override fun newTransaction(): app.cash.sqldelight.db.QueryResult<app.cash.sqldelight.Transacter.Transaction> =
+                override fun newTransaction(): QueryResult<Transacter.Transaction> =
                     throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
 
                 override fun addListener(
                     vararg queryKeys: String,
-                    listener: app.cash.sqldelight.Query.Listener,
+                    listener: Query.Listener,
                 ) = Unit
 
                 override fun removeListener(
                     vararg queryKeys: String,
-                    listener: app.cash.sqldelight.Query.Listener,
+                    listener: Query.Listener,
                 ) = Unit
 
                 override fun notifyListeners(vararg queryKeys: String) = Unit
             }
 
-        return com.moneymanager.database.sql
-            .TransferSourceQueries(stubDriver)
+        return TransferSourceQueries(stubDriver)
     }
 
     /**
@@ -1066,48 +1070,45 @@ class AccountTransactionsScreenTest {
      * Uses a minimal SqlDriver stub that throws NotImplementedError if actually invoked.
      */
     private companion object {
-        fun createStubEntitySourceQueries(): com.moneymanager.database.sql.EntitySourceQueries {
+        fun createStubEntitySourceQueries(): EntitySourceQueries {
             val stubDriver =
-                object : app.cash.sqldelight.db.SqlDriver {
+                object : SqlDriver {
                     override fun close() = Unit
 
-                    override fun currentTransaction(): app.cash.sqldelight.Transacter.Transaction? = null
+                    override fun currentTransaction(): Transacter.Transaction? = null
 
                     override fun execute(
                         identifier: Int?,
                         sql: String,
                         parameters: Int,
-                        binders: (app.cash.sqldelight.db.SqlPreparedStatement.() -> Unit)?,
-                    ): app.cash.sqldelight.db.QueryResult<Long> =
-                        throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
+                        binders: (SqlPreparedStatement.() -> Unit)?,
+                    ): QueryResult<Long> = throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
 
                     override fun <R> executeQuery(
                         identifier: Int?,
                         sql: String,
-                        mapper: (app.cash.sqldelight.db.SqlCursor) -> app.cash.sqldelight.db.QueryResult<R>,
+                        mapper: (SqlCursor) -> QueryResult<R>,
                         parameters: Int,
-                        binders: (app.cash.sqldelight.db.SqlPreparedStatement.() -> Unit)?,
-                    ): app.cash.sqldelight.db.QueryResult<R> =
-                        throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
+                        binders: (SqlPreparedStatement.() -> Unit)?,
+                    ): QueryResult<R> = throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
 
-                    override fun newTransaction(): app.cash.sqldelight.db.QueryResult<app.cash.sqldelight.Transacter.Transaction> =
+                    override fun newTransaction(): QueryResult<Transacter.Transaction> =
                         throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
 
                     override fun addListener(
                         vararg queryKeys: String,
-                        listener: app.cash.sqldelight.Query.Listener,
+                        listener: Query.Listener,
                     ) = Unit
 
                     override fun removeListener(
                         vararg queryKeys: String,
-                        listener: app.cash.sqldelight.Query.Listener,
+                        listener: Query.Listener,
                     ) = Unit
 
                     override fun notifyListeners(vararg queryKeys: String) = Unit
                 }
 
-            return com.moneymanager.database.sql
-                .EntitySourceQueries(stubDriver)
+            return EntitySourceQueries(stubDriver)
         }
     }
 }

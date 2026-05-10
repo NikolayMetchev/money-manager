@@ -21,6 +21,7 @@ exclude:
   - name: KotlinUnreachableCode
     paths:
       - app/ui/core/src/commonTest/kotlin/com/moneymanager/ui/screens/MonzoImportAuditE2ETest.kt
+  - name: UnnecessaryModuleDependencyInspection
   - name: All
     paths:
       - build
