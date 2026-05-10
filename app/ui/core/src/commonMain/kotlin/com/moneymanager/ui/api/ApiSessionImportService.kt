@@ -361,10 +361,11 @@ private suspend fun setupImportSession(
     val counterpartyIdField = strategy.transactionMappings.counterpartyIdField
     val nameMappings = CounterpartyNameMappings.from(strategy)
 
-    // Pre-create custom transaction attribute types before the concurrent section so that
+    // Pre-create transaction attribute types before the concurrent section so that
     // no two coroutines race to write the same type, which causes SQLITE_BUSY.
     // The well-known types (account-external-id, built-in type) are seeded with stable IDs
     // and do not need to be looked up.
+    attributeTypeCache.getOrCreate(MONZO_TRANSACTION_ID_ATTRIBUTE_NAME)
     for (fieldName in customTxFields.keys) attributeTypeCache.getOrCreate(fieldName)
 
     // Build the counterparty ID index (externalId → AccountId) from existing account attributes
@@ -1446,6 +1447,12 @@ private suspend fun importTransactionPage(
     val responseId = ApiResponseId(response.responseId)
     val requestId = ApiRequestId(response.requestId)
     val existingTransfers = transactionRepository.getTransactionsByAccount(ownAccountId).first().toMutableList()
+    val existingTransfersByApiId =
+        existingTransfers.mapNotNull { transfer ->
+            transfer.attributes.firstOrNull { it.attributeType.name == MONZO_TRANSACTION_ID_ATTRIBUTE_NAME }?.value?.let { apiId ->
+                apiId to transfer
+            }
+        }.toMap()
 
     // Index existing transfers by their unique-identifier attribute values for O(1) lookup
     val existingByUniqueId: Map<Map<String, String>, TransferId> =
@@ -1479,6 +1486,7 @@ private suspend fun importTransactionPage(
                 counterpartyIdField = counterpartyIdField,
                 nameMappings = nameMappings,
                 existingByUniqueId = existingByUniqueId,
+                existingTransfersByApiId = existingTransfersByApiId,
                 existingTransfers = existingTransfers,
                 apiSessionRepository = apiSessionRepository,
                 transactionRepository = transactionRepository,
@@ -1514,6 +1522,7 @@ private suspend fun importTransactionItem(
     counterpartyIdField: String?,
     nameMappings: CounterpartyNameMappings,
     existingByUniqueId: Map<Map<String, String>, TransferId>,
+    existingTransfersByApiId: Map<String, Transfer>,
     existingTransfers: MutableList<Transfer>,
     apiSessionRepository: ApiSessionRepository,
     transactionRepository: TransactionRepository,
@@ -1545,6 +1554,7 @@ private suspend fun importTransactionItem(
             counterpartyIdField = counterpartyIdField,
             nameMappings = nameMappings,
             existingByUniqueId = existingByUniqueId,
+            existingTransfersByApiId = existingTransfersByApiId,
             existingTransfers = existingTransfers,
             apiSessionRepository = apiSessionRepository,
             transactionRepository = transactionRepository,
@@ -1577,6 +1587,7 @@ private suspend fun importValidTransactionItem(
     counterpartyIdField: String?,
     nameMappings: CounterpartyNameMappings,
     existingByUniqueId: Map<Map<String, String>, TransferId>,
+    existingTransfersByApiId: Map<String, Transfer>,
     existingTransfers: MutableList<Transfer>,
     apiSessionRepository: ApiSessionRepository,
     transactionRepository: TransactionRepository,
@@ -1603,10 +1614,13 @@ private suspend fun importValidTransactionItem(
             )
         }
     val transfer = item.toTransfer(ownAccountId, counterpartyAccountId, currency)
+    val transactionApiId = item.rawJson?.resolveJsonPath("id")?.takeIf { it.isNotBlank() }
 
-    // Prefer unique-identifier lookup when configured; fall back to full-field match
+    // Prefer a stable API transaction id when present; then configured unique IDs; then
+    // fall back to a field-by-field match.
     val duplicateTransferId: TransferId? =
-        if (uniqueIdTxFields.isNotEmpty() && item.rawJson != null) {
+        transactionApiId?.let { existingTransfersByApiId[it]?.id }
+            ?: if (uniqueIdTxFields.isNotEmpty() && item.rawJson != null) {
             val key =
                 uniqueIdTxFields.associateWith { fieldName ->
                     customTxFields[fieldName]?.let { item.rawJson.resolveJsonPath(it) } ?: ""
@@ -1645,6 +1659,9 @@ private suspend fun importValidTransactionItem(
                     val value = item.rawJson.resolveJsonPath(jsonPath) ?: continue
                     add(NewAttribute(typeId = attributeTypeCache.getOrCreate(fieldName), value = value))
                 }
+            }
+            if (transactionApiId != null) {
+                add(NewAttribute(typeId = attributeTypeCache.getOrCreate(MONZO_TRANSACTION_ID_ATTRIBUTE_NAME), value = transactionApiId))
             }
         }
     transactionRepository.createTransfers(
@@ -1994,6 +2011,8 @@ private fun Transfer.matches(other: Transfer): Boolean =
         sourceAccountId == other.sourceAccountId &&
         targetAccountId == other.targetAccountId &&
         amount == other.amount
+
+private const val MONZO_TRANSACTION_ID_ATTRIBUTE_NAME = "Monzo Transaction Id"
 
 private suspend fun ApiSessionRepository.recordTransactionError(
     responseId: ApiResponseId,

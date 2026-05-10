@@ -114,11 +114,6 @@ interface RepositoryModule {
 
     @Provides
     @SingleIn(DatabaseScope::class)
-    fun providePersonAttributeRepository(database: MoneyManagerDatabaseWrapper): PersonAttributeRepository =
-        PersonAttributeRepositoryImpl(database)
-
-    @Provides
-    @SingleIn(DatabaseScope::class)
     fun provideCsvImportRepository(
         database: MoneyManagerDatabaseWrapper,
         deviceId: DeviceId,

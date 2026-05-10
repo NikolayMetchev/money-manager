@@ -99,3 +99,32 @@ tasks.withType<app.cash.sqldelight.gradle.VerifyMigrationTask>().configureEach {
 tasks.matching { it.name == "testAndroidHostTest" }.configureEach {
     enabled = false
 }
+
+val monzoApiFixtureToolClass = "com.moneymanager.database.tools.MonzoApiSessionFixtureToolKt"
+val moneyManagerDbPath = File(System.getProperty("user.home"), ".moneymanager/money_manager.db")
+
+tasks.register<JavaExec>("exportMonzoApiSessionFixtures") {
+    group = "verification"
+    description = "Exports the API session transcript tables to JSON fixtures."
+    dependsOn("compileTestKotlinJvm")
+    mainClass.set(monzoApiFixtureToolClass)
+    classpath = sourceSets["jvmTest"].runtimeClasspath
+    args(
+        "export",
+        moneyManagerDbPath.absolutePath,
+        layout.projectDirectory.dir("src/commonTest/resources/monzo/sample-apis").asFile.absolutePath,
+    )
+}
+
+tasks.register<JavaExec>("importMonzoApiSessionFixtures") {
+    group = "verification"
+    description = "Imports API session transcript JSON fixtures into a SQLite database."
+    dependsOn("compileTestKotlinJvm")
+    mainClass.set(monzoApiFixtureToolClass)
+    classpath = sourceSets["jvmTest"].runtimeClasspath
+    args(
+        "import",
+        moneyManagerDbPath.absolutePath,
+        layout.projectDirectory.dir("src/commonTest/resources/monzo/sample-apis").asFile.absolutePath,
+    )
+}
