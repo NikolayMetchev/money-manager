@@ -3,13 +3,10 @@ package com.moneymanager.database.tools
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
-import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.security.SecureRandom
 import java.security.spec.KeySpec
-import java.util.zip.GZIPInputStream
-import java.util.zip.GZIPOutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
@@ -42,7 +39,11 @@ fun main(args: Array<String>) {
     }
 }
 
-fun encryptDirectory(inputDir: File, outputFile: File, passphrase: String) {
+fun encryptDirectory(
+    inputDir: File,
+    outputFile: File,
+    passphrase: String,
+) {
     val zipBytes = zipDirectory(inputDir)
     val salt = ByteArray(SALT_LEN).also { SecureRandom().nextBytes(it) }
     val iv = ByteArray(IV_LEN).also { SecureRandom().nextBytes(it) }
@@ -60,7 +61,11 @@ fun encryptDirectory(inputDir: File, outputFile: File, passphrase: String) {
     }
 }
 
-fun decryptArchive(inputFile: File, outputDir: File, passphrase: String) {
+fun decryptArchive(
+    inputFile: File,
+    outputDir: File,
+    passphrase: String,
+) {
     outputDir.mkdirs()
     FileInputStream(inputFile).use { fis ->
         val magic = fis.readNBytes(MAGIC.length).toString(Charsets.UTF_8)
@@ -81,7 +86,12 @@ private fun zipDirectory(inputDir: File): ByteArray {
     ZipOutputStream(baos).use { zos ->
         Files.walk(inputDir.toPath()).use { paths ->
             paths.filter { Files.isRegularFile(it) }.forEach { path ->
-                val rel = inputDir.toPath().relativize(path).toString().replace('\\', '/')
+                val rel =
+                    inputDir
+                        .toPath()
+                        .relativize(path)
+                        .toString()
+                        .replace('\\', '/')
                 zos.putNextEntry(ZipEntry(rel))
                 Files.newInputStream(path).use { it.copyTo(zos) }
                 zos.closeEntry()
@@ -91,7 +101,10 @@ private fun zipDirectory(inputDir: File): ByteArray {
     return baos.toByteArray()
 }
 
-private fun unzipDirectory(zipBytes: ByteArray, outputDir: File) {
+private fun unzipDirectory(
+    zipBytes: ByteArray,
+    outputDir: File,
+) {
     ZipInputStream(zipBytes.inputStream()).use { zis ->
         while (true) {
             val entry = zis.nextEntry ?: break
@@ -103,7 +116,10 @@ private fun unzipDirectory(zipBytes: ByteArray, outputDir: File) {
     }
 }
 
-private fun deriveKey(passphrase: String, salt: ByteArray): SecretKey {
+private fun deriveKey(
+    passphrase: String,
+    salt: ByteArray,
+): SecretKey {
     val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
     val spec: KeySpec = PBEKeySpec(passphrase.toCharArray(), salt, PBKDF2_ITERS, 256)
     return SecretKeySpec(factory.generateSecret(spec).encoded, "AES")

@@ -104,7 +104,11 @@ val monzoApiFixtureToolClass = "com.moneymanager.database.tools.MonzoApiSessionF
 val monzoApiFixtureArchiveToolClass = "com.moneymanager.database.tools.MonzoApiSessionFixtureArchiveToolKt"
 val moneyManagerDbPath = File(System.getProperty("user.home"), ".moneymanager/money_manager.db")
 val monzoFixtureDir = layout.projectDirectory.dir("src/commonTest/resources/monzo/sample-apis").asFile
-val monzoEncryptedFixtureFile = layout.projectDirectory.dir("src/commonTest/resources/monzo").asFile.resolve("sample-apis.zip")
+val monzoEncryptedFixtureFile =
+    layout.projectDirectory
+        .dir("src/commonTest/resources/monzo")
+        .asFile
+        .resolve("sample-apis.zip")
 
 tasks.register<JavaExec>("updateEncryptedMonzoApiSessionFixtures") {
     group = "verification"

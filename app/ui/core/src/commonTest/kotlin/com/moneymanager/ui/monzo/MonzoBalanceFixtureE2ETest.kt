@@ -2,13 +2,11 @@
 
 package com.moneymanager.ui.monzo
 
-import com.moneymanager.domain.model.ApiSessionKind
-import com.moneymanager.domain.model.DeviceInfo
-import com.moneymanager.domain.model.DeviceId
-import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.ApiRequestId
-import com.moneymanager.domain.model.ApiResponseId
-import com.moneymanager.rest.ApiHttpResponse
+import com.moneymanager.domain.model.ApiSessionId
+import com.moneymanager.domain.model.ApiSessionKind
+import com.moneymanager.domain.model.DeviceId
+import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.ui.api.importApiSessionTransactions
 import kotlinx.coroutines.flow.first
@@ -115,7 +113,11 @@ class MonzoBalanceFixtureE2ETest : DbTest() {
                 sessions.firstOrNull { it.kind == ApiSessionKind.ACCOUNTS.name }
                     ?: return@runTest
             val transactionSessions = sessions.filter { it.kind == ApiSessionKind.TRANSACTIONS.name }
-            val strategy = repositories.apiImportStrategyRepository.getAllStrategies().first().first()
+            val strategy =
+                repositories.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .first()
 
             importApiSessionTransactions(
                 apiSessionRepository = repositories.apiSessionRepository,
@@ -160,7 +162,10 @@ class MonzoBalanceFixtureE2ETest : DbTest() {
                 val expectedByName = expectedBalances.associateBy { it.account_name }
                 val actualByName =
                     actualBalances.associateBy { balance ->
-                        repositories.accountRepository.getAccountById(balance.accountId).first()!!.name
+                        repositories.accountRepository
+                            .getAccountById(balance.accountId)
+                            .first()!!
+                            .name
                     }
                 assertEquals(expectedByName.keys.sorted(), actualByName.keys.sorted())
                 expectedByName.forEach { (accountName, expected) ->
@@ -169,12 +174,9 @@ class MonzoBalanceFixtureE2ETest : DbTest() {
             }
         }
 
-    private fun loadSessions(): List<SessionFixture> =
-        json.decodeFromString(File(fixtureDir, "api_session.json").readText())
+    private fun loadSessions(): List<SessionFixture> = json.decodeFromString(File(fixtureDir, "api_session.json").readText())
 
-    private fun loadRequests(): List<RequestFixture> =
-        json.decodeFromString(File(fixtureDir, "api_request.json").readText())
+    private fun loadRequests(): List<RequestFixture> = json.decodeFromString(File(fixtureDir, "api_request.json").readText())
 
-    private fun loadResponses(): List<ResponseFixture> =
-        json.decodeFromString(File(fixtureDir, "api_response.json").readText())
+    private fun loadResponses(): List<ResponseFixture> = json.decodeFromString(File(fixtureDir, "api_response.json").readText())
 }
