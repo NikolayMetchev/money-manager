@@ -1027,8 +1027,7 @@ private suspend fun resolveOrCreatePerson(
     val name = owner.preferredName?.trim().orEmpty()
     val displayName = name.ifBlank { bankKey ?: externalId ?: return null }
 
-    val dedupeExternalId = externalId?.takeUnless { it.startsWith("anonuser", ignoreCase = true) }
-    peopleIndex.find(externalId = dedupeExternalId, bankKey = bankKey, fullName = displayName)?.let { existing ->
+    peopleIndex.find(externalId = externalId, bankKey = bankKey, fullName = displayName)?.let { existing ->
         if (externalId != null && existing.externalId == null) {
             logger.info { "Backfilling external id for imported person '${existing.fullName}'" }
             runCatching {
@@ -1062,7 +1061,7 @@ private suspend fun resolveOrCreatePerson(
             jsonPath = owner.jsonPath,
         ).insert(EntityType.PERSON, createdPerson.id.id, 1L)
     }
-    peopleIndex.add(createdPerson, dedupeExternalId ?: externalId, bankKey)
+    peopleIndex.add(createdPerson, externalId, bankKey)
     return createdPerson to true
 }
 
@@ -1102,8 +1101,8 @@ private class MutablePeopleIndex private constructor(
         bankKey: String?,
         fullName: String,
     ): IndexedPerson? =
-        bankKey?.let { peopleByBankKey[it] }
-            ?: externalId?.let { peopleByExternalId[it] }
+        externalId?.let { peopleByExternalId[it] }
+            ?: bankKey?.let { peopleByBankKey[it] }
             ?: if (externalId == null) {
                 peopleByFullName[fullName]?.firstOrNull()
             } else {
@@ -1837,6 +1836,10 @@ private class AccountCache(
                 // Built-in type transactions all share one account; counterpartyId is ignored so
                 // that ATM withdrawals from different locations always consolidate into one account.
                 builtInTypeIndex[builtInType]?.let { return@withLock it }
+                findBuiltInTypeAccountId(builtInType)?.let {
+                    builtInTypeIndex[builtInType] = it
+                    return@withLock it
+                }
                 val normalizedName = name.ifBlank { "Unknown" }
                 val accountId = loadAccounts()[normalizedName]?.id ?: createAccount(null, normalizedName, apiSource)
                 if (accountAttributeRepository.getByAccount(accountId).first().none {
@@ -1874,6 +1877,22 @@ private class AccountCache(
             }
             accountId
         }
+
+    private suspend fun findBuiltInTypeAccountId(builtInType: BuiltInCounterpartyType): AccountId? {
+        val accounts = accountRepository.getAllAccounts().first()
+        for (account in accounts) {
+            val attributes = accountAttributeRepository.getByAccount(account.id).first()
+            if (
+                attributes.any {
+                    it.attributeType.id == BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID &&
+                        it.value == builtInType.attributeValue
+                }
+            ) {
+                return account.id
+            }
+        }
+        return null
+    }
 
     suspend fun getOrCreateAccountId(
         name: String,
