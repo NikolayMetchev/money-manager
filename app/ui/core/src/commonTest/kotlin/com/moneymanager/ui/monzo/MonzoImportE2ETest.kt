@@ -51,6 +51,36 @@ private val ACCOUNTS_JSON =
 }
     """.trimIndent()
 
+private val ACCOUNTS_WITH_SHARED_OWNER_ID_JSON =
+    """
+{
+  "accounts": [
+    {
+      "id": "$ACCOUNT_ID",
+      "closed": false,
+      "created": "2022-01-01T00:00:00.000Z",
+      "description": "$ACCOUNT_DESCRIPTION",
+      "type": "uk_retail",
+      "currency": "GBP",
+      "owners": [
+        { "user_id": "user_shared_001", "preferred_name": "Alice Example" }
+      ]
+    },
+    {
+      "id": "acc_00009TEST000000000099",
+      "closed": false,
+      "created": "2022-01-02T00:00:00.000Z",
+      "description": "joint_00009TEST000000001",
+      "type": "uk_retail",
+      "currency": "GBP",
+      "owners": [
+        { "user_id": "user_shared_001", "preferred_name": "Alice Smith" }
+      ]
+    }
+  ]
+}
+    """.trimIndent()
+
 /**
  * Four anonymised transactions plus one declined transaction:
  *   tx1 – outgoing payment to a merchant  (amount negative, merchant.name set)
@@ -742,6 +772,97 @@ class MonzoImportE2ETest : DbTest() {
                     }.filter { it.attributeType.name == "account-external-id" }
             assertEquals(1, counterpartyAttributes.size, "account-external-id should be stored once as an account attribute")
             assertEquals("cp_alice_001", counterpartyAttributes.single().value)
+        }
+
+    @Test
+    fun `account owners with same external user id create one person with person-external-id attribute`() =
+        runTest {
+            val deviceId =
+                repositories.deviceRepository.getOrCreateDevice(
+                    DeviceInfo.Jvm("test-machine", "Test OS"),
+                )
+            val sessionId =
+                repositories.apiSessionRepository.createSession(
+                    token = "test-monzo-token",
+                    deviceId = deviceId,
+                    createdAt = Instant.fromEpochMilliseconds(1_700_000_000_000L),
+                    expiresAt = null,
+                )
+            val mockEngine =
+                MockEngine { request ->
+                    val url = request.url.toString()
+                    val json =
+                        when {
+                            url.contains("/accounts") -> ACCOUNTS_WITH_SHARED_OWNER_ID_JSON
+                            url.contains("/transactions") -> EMPTY_TRANSACTIONS_JSON
+                            else -> error("Unexpected request: $url")
+                        }
+                    respond(
+                        content = json,
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                    )
+                }
+            val apiClient =
+                createApiClient(
+                    trafficRecorder = ApiSessionTrafficRecorder(sessionId, repositories.apiSessionRepository),
+                    engine = mockEngine,
+                )
+            val strategy =
+                repositories.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .single()
+
+            downloadApiSessionAccounts(
+                token = "test-monzo-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+            downloadApiSessionTransactions(
+                token = "test-monzo-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+
+            val importResult =
+                importApiSessionTransactions(
+                    apiSessionRepository = repositories.apiSessionRepository,
+                    accountRepository = repositories.accountRepository,
+                    currencyRepository = repositories.currencyRepository,
+                    transactionRepository = repositories.transactionRepository,
+                    transferSourceQueries = transferSourceQueries,
+                    entitySourceQueries = repositories.entitySourceQueries,
+                    personRepository = repositories.personRepository,
+                    personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
+                    personAttributeRepository = repositories.personAttributeRepository,
+                    attributeTypeRepository = repositories.attributeTypeRepository,
+                    accountAttributeRepository = repositories.accountAttributeRepository,
+                    deviceId = deviceId,
+                    sessionId = sessionId,
+                    strategy = strategy,
+                )
+
+            assertEquals(1, importResult.personCount)
+
+            val allPeople = repositories.personRepository.getAllPeople().first()
+            assertEquals(1, allPeople.size, "Same owner.user_id must map to one person even when names differ")
+            val personExternalIdAttr =
+                repositories.personAttributeRepository
+                    .getByPerson(allPeople.single().id)
+                    .first()
+                    .single { it.attributeType.name == "person-external-id" }
+            assertEquals("user_shared_001", personExternalIdAttr.value)
+
+            val ownerships =
+                repositories.personAccountOwnershipRepository
+                    .getOwnershipsByPerson(allPeople.single().id)
+                    .first()
+            assertEquals(2, ownerships.size, "Shared owner.user_id should be linked to both imported accounts")
         }
 
     @Test

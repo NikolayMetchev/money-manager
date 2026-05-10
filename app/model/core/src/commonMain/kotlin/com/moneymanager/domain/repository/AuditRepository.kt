@@ -104,4 +104,5 @@ interface AuditRepository {
      * @return List of attribute audit entries
      */
     suspend fun getAttributeAuditByAccount(accountId: AccountId): List<AccountAttributeAuditEntry>
+
 }

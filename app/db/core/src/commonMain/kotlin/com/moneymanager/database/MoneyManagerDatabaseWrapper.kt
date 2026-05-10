@@ -106,6 +106,7 @@ class MoneyManagerDatabaseWrapper(
             "attribute_type",
             "transfer_attribute",
             "account_attribute",
+            "person_attribute",
             "_import_batch",
             "_creation_mode",
             "settings",
