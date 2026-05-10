@@ -18,6 +18,7 @@ package com.moneymanager.domain.model
  */
 data class AccountAttributeAuditEntry(
     val id: Long,
+    val auditTimestamp: kotlin.time.Instant,
     val accountId: AccountId,
     val revisionId: Long,
     val attributeType: AttributeType,

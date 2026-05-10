@@ -375,13 +375,14 @@ private fun AccountAttributeChangesSection(
                         AuditType.DELETE -> MaterialTheme.colorScheme.error
                         AuditType.UPDATE -> valueColor
                     }
+                val timestamp = entry.auditTimestamp.toLocalDateTime(TimeZone.currentSystemDefault())
                 Text(
                     text = "$prefix${entry.attributeType.name}:",
                     style = MaterialTheme.typography.bodySmall,
                     color = color,
                 )
                 Text(
-                    text = entry.value,
+                    text = "${entry.value} @ ${timestamp.date} ${timestamp.time}",
                     style = MaterialTheme.typography.bodySmall,
                     color = color,
                 )

@@ -7,6 +7,7 @@ import com.moneymanager.database.mapper.CategoryAuditEntryMapper
 import com.moneymanager.database.mapper.CurrencyAuditEntryMapper
 import com.moneymanager.database.mapper.OwnershipAuditHistoryForAccountMapper
 import com.moneymanager.database.mapper.PersonAccountOwnershipAuditEntryMapper
+import com.moneymanager.database.mapper.PersonAttributeAuditEntryMapper
 import com.moneymanager.database.mapper.PersonAuditEntryMapper
 import com.moneymanager.database.mapper.TransferAuditEntryMapper
 import com.moneymanager.database.sql.MoneyManagerDatabase
@@ -110,23 +111,24 @@ class AuditRepositoryImpl(
         }
 
     private fun fetchAccountAttributeAudit(accountId: AccountId): List<AccountAttributeAuditEntry> =
-        queries
-            .selectAttributeAuditByAccount(accountId.id)
-            .executeAsList()
-            .map { row ->
-                AccountAttributeAuditEntry(
-                    id = row.id,
-                    accountId = AccountId(row.account_id),
-                    revisionId = row.revision_id,
-                    attributeType =
-                        AttributeType(
-                            id = AttributeTypeId(row.attribute_type_id),
-                            name = row.attribute_type_name,
-                        ),
-                    auditType = mapAuditType(row.audit_type),
-                    value = row.attribute_value,
-                )
-            }
+            queries
+                .selectAttributeAuditByAccount(accountId.id)
+                .executeAsList()
+                .map { row ->
+                    AccountAttributeAuditEntry(
+                        id = row.id,
+                        auditTimestamp = kotlin.time.Instant.fromEpochMilliseconds(row.audit_timestamp),
+                        accountId = AccountId(row.account_id),
+                        revisionId = row.revision_id,
+                        attributeType =
+                            AttributeType(
+                                id = AttributeTypeId(row.attribute_type_id),
+                                name = row.attribute_type_name,
+                            ),
+                        auditType = mapAuditType(row.audit_type),
+                        value = row.attribute_value,
+                    )
+                }
 
     private fun attachAccountAttributeChanges(
         accountId: AccountId,
@@ -144,23 +146,10 @@ class AuditRepositoryImpl(
     }
 
     private fun fetchPersonAttributeAudit(personId: PersonId): List<PersonAttributeAuditEntry> =
-        queries
-            .selectAttributeAuditByPerson(personId.id)
-            .executeAsList()
-            .map { row ->
-                PersonAttributeAuditEntry(
-                    id = row.id,
-                    personId = PersonId(row.person_id),
-                    revisionId = row.revision_id,
-                    attributeType =
-                        AttributeType(
-                            id = AttributeTypeId(row.attribute_type_id),
-                            name = row.attribute_type_name,
-                        ),
-                    auditType = mapAuditType(row.audit_type),
-                    value = row.attribute_value,
-                )
-            }
+            queries
+                .selectAttributeAuditByPerson(personId.id)
+                .executeAsList()
+                .map(PersonAttributeAuditEntryMapper::map)
 
     private fun attachPersonAttributeChanges(
         personId: PersonId,

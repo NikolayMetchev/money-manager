@@ -151,7 +151,6 @@ class MonzoBalanceFixtureE2ETest : DbTest() {
                     accountAttributeRepository = repositories.accountAttributeRepository,
                     deviceId = DeviceId(deviceId.id),
                     sessionId = sessionIdMap.getValue(fixture.id),
-                    accountsSessionId = sessionIdMap.getValue(firstAccountsSession.id),
                     strategy = strategy,
                 )
             }

@@ -194,6 +194,7 @@ ORDER BY transfer_attribute_audit.revision_id DESC, attribute_type.name;
 selectAttributeAuditByAccount:
 SELECT
     account_attribute_audit.id,
+    account_attribute_audit.audit_timestamp,
     audit_type.name AS audit_type,
     account_attribute_audit.account_id,
     account_attribute_audit.revision_id,

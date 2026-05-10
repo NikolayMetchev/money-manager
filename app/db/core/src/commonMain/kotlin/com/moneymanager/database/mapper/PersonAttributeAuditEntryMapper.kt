@@ -8,6 +8,7 @@ import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.PersonAttributeAuditEntry
 import com.moneymanager.domain.model.PersonId
 import tech.mappie.api.ObjectMappie
+import kotlin.time.Instant
 
 object PersonAttributeAuditEntryMapper :
     ObjectMappie<SelectAttributeAuditByPerson, PersonAttributeAuditEntry>(),
@@ -16,6 +17,7 @@ object PersonAttributeAuditEntryMapper :
     override fun map(from: SelectAttributeAuditByPerson): PersonAttributeAuditEntry =
         PersonAttributeAuditEntry(
             id = from.id,
+            auditTimestamp = Instant.fromEpochMilliseconds(from.audit_timestamp),
             personId = PersonId(from.person_id),
             revisionId = from.revision_id,
             attributeType =
