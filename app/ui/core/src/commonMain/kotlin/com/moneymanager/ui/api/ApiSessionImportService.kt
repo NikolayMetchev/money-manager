@@ -470,9 +470,9 @@ private suspend fun precreateAndFlushCounterparties(
 
 private suspend fun importTransactionsConcurrently(setup: ImportSetup) {
     coroutineScope {
-        for (response in setup.transactionResponses) {
-            val request = setup.requestsById[response.requestId] ?: continue
-            val account = setup.accountsById[request.accountIdParameter(setup.strategy)] ?: continue
+        setup.transactionResponses.forEach { response ->
+            val request = setup.requestsById[response.requestId] ?: return@forEach
+            val account = setup.accountsById[request.accountIdParameter(setup.strategy)] ?: return@forEach
             val ownAccountId = setup.accountCache.getOrCreateAccountId(account.id, account.displayName(setup.strategy))
             val pageResult =
                 importTransactionPage(
@@ -864,7 +864,6 @@ private suspend fun importPeopleFromAccounts(
                 personRepository = personRepository,
                 personAccountOwnershipRepository = personAccountOwnershipRepository,
                 personAttributeRepository = personAttributeRepository,
-                accountAttributeRepository = accountAttributeRepository,
                 entitySourceQueries = entitySourceQueries,
                 deviceId = deviceId,
                 sessionId = sessionId,
@@ -896,13 +895,17 @@ private suspend fun importPeopleFromCounterparties(
 
     for (response in transactionResponses) {
         val request = requestsById[response.requestId] ?: continue
+        val personalCounterpartyItems = mutableListOf<Triple<ApiTransactionPageItem, ApiImportAccountOwner, PersonalCounterpartyIdentity>>()
         for (item in parseTransactionsWithPath(response.json, strategy)) {
-            val builtInCounterpartyType = item.rawJson?.resolveBuiltInCounterpartyType(item.amountMinorUnits)
-            if (item.amountMinorUnits == 0L) continue
-            if (builtInCounterpartyType != null) continue
-            val owner = item.personalCounterpartyOwner() ?: continue
-            val personalCounterpartyIdentity = owner.personalCounterpartyIdentity() ?: continue
-
+            if (item.amountMinorUnits != 0L && item.rawJson?.resolveBuiltInCounterpartyType(item.amountMinorUnits) == null) {
+                val owner = item.personalCounterpartyOwner()
+                val personalCounterpartyIdentity = owner?.personalCounterpartyIdentity()
+                if (owner != null && personalCounterpartyIdentity != null) {
+                    personalCounterpartyItems.add(Triple(item, owner, personalCounterpartyIdentity))
+                }
+            }
+        }
+        for ((item, owner, personalCounterpartyIdentity) in personalCounterpartyItems) {
             val counterpartyAccountId =
                 accountCache.getOrCreateCounterpartyAccountId(
                     counterpartyId = item.rawJson?.resolveCounterpartyIdentity(counterpartyIdField),
@@ -925,7 +928,6 @@ private suspend fun importPeopleFromCounterparties(
                     personRepository = personRepository,
                     personAccountOwnershipRepository = personAccountOwnershipRepository,
                     personAttributeRepository = personAttributeRepository,
-                    accountAttributeRepository = accountAttributeRepository,
                     entitySourceQueries = entitySourceQueries,
                     deviceId = deviceId,
                     sessionId = sessionId,
@@ -944,7 +946,6 @@ private suspend fun importOwnersForAccount(
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     personAttributeRepository: PersonAttributeRepository,
-    accountAttributeRepository: AccountAttributeRepository,
     entitySourceQueries: EntitySourceQueries? = null,
     deviceId: DeviceId? = null,
     sessionId: ApiSessionId? = null,
@@ -965,7 +966,6 @@ private suspend fun importOwnersForAccount(
                 peopleIndex = peopleIndex,
                 personRepository = personRepository,
                 personAttributeRepository = personAttributeRepository,
-                accountAttributeRepository = accountAttributeRepository,
                 entitySourceQueries = entitySourceQueries,
                 deviceId = deviceId,
                 sessionId = sessionId,
@@ -1017,7 +1017,6 @@ private suspend fun resolveOrCreatePerson(
     peopleIndex: MutablePeopleIndex,
     personRepository: PersonRepository,
     personAttributeRepository: PersonAttributeRepository,
-    accountAttributeRepository: AccountAttributeRepository,
     entitySourceQueries: EntitySourceQueries? = null,
     deviceId: DeviceId? = null,
     sessionId: ApiSessionId? = null,
@@ -1291,7 +1290,7 @@ private fun ApiTransactionPageItem.personalCounterpartyOwner(): ApiImportAccount
     )
 }
 
-private fun JsonObject.personalCounterpartyIdentity(nameMappings: CounterpartyNameMappings): PersonalCounterpartyIdentity? {
+private fun JsonObject.personalCounterpartyIdentity(): PersonalCounterpartyIdentity? {
     val counterparty = get("counterparty") as? JsonObject ?: return null
     val beneficiaryAccountType = counterparty.stringOrNull("beneficiary_account_type")
     if (beneficiaryAccountType?.equals("Personal", ignoreCase = true) != true) return null
@@ -1596,7 +1595,7 @@ private suspend fun importValidTransactionItem(
         } else {
             val builtInCounterpartyType = item.rawJson?.resolveBuiltInCounterpartyType(item.amountMinorUnits)
             val counterpartyId = item.rawJson?.resolveCounterpartyIdentity(counterpartyIdField)
-            val personalCounterpartyIdentity = item.rawJson?.personalCounterpartyIdentity(nameMappings)
+            val personalCounterpartyIdentity = item.rawJson?.personalCounterpartyIdentity()
             accountCache.getOrCreateCounterpartyAccountId(
                 counterpartyId = counterpartyId,
                 dedupeKey = personalCounterpartyIdentity?.dedupeKey,

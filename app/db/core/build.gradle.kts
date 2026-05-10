@@ -127,9 +127,6 @@ tasks.register<JavaExec>("restoreMonzoApiSessionFixtures") {
     group = "verification"
     description = "Restores the Monzo API fixture directory from the encrypted archive when empty."
     dependsOn("compileTestKotlinJvm")
-    onlyIf {
-        !(monzoFixtureDir.exists() && monzoFixtureDir.listFiles()?.isNotEmpty() == true)
-    }
     mainClass.set(monzoApiFixtureArchiveToolClass)
     classpath = sourceSets["jvmTest"].runtimeClasspath
     args(

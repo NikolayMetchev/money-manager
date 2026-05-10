@@ -131,14 +131,14 @@ private fun importFixtures(
         connection.autoCommit = false
         connection.createStatement().use { stmt -> stmt.execute("PRAGMA foreign_keys = OFF") }
         try {
-            insertTable(connection, inputDir, "api_session_type.json", ApiSessionTypeRow.serializer()) { row ->
+            insertTable(inputDir, "api_session_type.json", ApiSessionTypeRow.serializer()) { row ->
                 connection.prepareStatement("INSERT OR IGNORE INTO api_session_type(id, name) VALUES (?, ?)").use { ps ->
                     ps.setLong(1, row.id)
                     ps.setString(2, row.name)
                     ps.executeUpdate()
                 }
             }
-            insertTable(connection, inputDir, "api_credential.json", ApiCredentialRow.serializer()) { row ->
+            insertTable(inputDir, "api_credential.json", ApiCredentialRow.serializer()) { row ->
                 connection
                     .prepareStatement(
                         "INSERT OR IGNORE INTO api_credential(id, type_id, token, created_at, strategy_id) VALUES (?, ?, ?, ?, ?)",
@@ -151,7 +151,7 @@ private fun importFixtures(
                         ps.executeUpdate()
                     }
             }
-            insertTable(connection, inputDir, "api_session.json", ApiSessionRow.serializer()) { row ->
+            insertTable(inputDir, "api_session.json", ApiSessionRow.serializer()) { row ->
                 connection
                     .prepareStatement(
                         "INSERT OR IGNORE INTO api_session(id, type_id, token, device_id, created_at, expires_at, credential_id, kind, imported_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -168,7 +168,7 @@ private fun importFixtures(
                         ps.executeUpdate()
                     }
             }
-            insertTable(connection, inputDir, "api_request.json", ApiRequestRow.serializer()) { row ->
+            insertTable(inputDir, "api_request.json", ApiRequestRow.serializer()) { row ->
                 connection
                     .prepareStatement(
                         "INSERT OR IGNORE INTO api_request(id, session_id, requested_at, method, url) VALUES (?, ?, ?, ?, ?)",
@@ -181,7 +181,7 @@ private fun importFixtures(
                         ps.executeUpdate()
                     }
             }
-            insertTable(connection, inputDir, "api_request_header.json", ApiRequestHeaderRow.serializer()) { row ->
+            insertTable(inputDir, "api_request_header.json", ApiRequestHeaderRow.serializer()) { row ->
                 connection
                     .prepareStatement(
                         "INSERT OR IGNORE INTO api_request_header(id, request_id, key, value) VALUES (?, ?, ?, ?)",
@@ -193,7 +193,7 @@ private fun importFixtures(
                         ps.executeUpdate()
                     }
             }
-            insertTable(connection, inputDir, "api_response.json", ApiResponseRow.serializer()) { row ->
+            insertTable(inputDir, "api_response.json", ApiResponseRow.serializer()) { row ->
                 connection
                     .prepareStatement(
                         "INSERT OR IGNORE INTO api_response(id, request_id, session_id, responded_at, json) VALUES (?, ?, ?, ?, ?)",
@@ -206,7 +206,7 @@ private fun importFixtures(
                         ps.executeUpdate()
                     }
             }
-            insertTable(connection, inputDir, "api_response_transaction.json", ApiResponseTransactionRow.serializer()) { row ->
+            insertTable(inputDir, "api_response_transaction.json", ApiResponseTransactionRow.serializer()) { row ->
                 connection
                     .prepareStatement(
                         "INSERT OR IGNORE INTO api_response_transaction(id, response_id, json_path, state, transaction_id, error_message, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",

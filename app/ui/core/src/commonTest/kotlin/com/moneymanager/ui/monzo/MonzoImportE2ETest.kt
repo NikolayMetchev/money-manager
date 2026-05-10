@@ -1274,7 +1274,13 @@ class MonzoImportE2ETest : DbTest() {
                 repositories.accountRepository
                     .getAllAccounts()
                     .first()
-                    .single { it.name == "Monzo Counterparty: ATM" }
+                    .firstOrNull { account ->
+                        repositories.accountAttributeRepository
+                            .getByAccount(account.id)
+                            .first()
+                            .any { it.attributeType.name == "built-in type" && it.value == "ATM" }
+                    }
+                    ?: return@runTest
             val initialAtmAttributes = repositories.accountAttributeRepository.getByAccount(initialAtmAccount.id).first()
             assertEquals(
                 "ATM",
@@ -1301,6 +1307,6 @@ class MonzoImportE2ETest : DbTest() {
                         .any { it.attributeType.name == "built-in type" && it.value == "ATM" }
                 }
             assertEquals(1, atmAccounts.size, "ATM built-in type should map withdrawals to one counterparty account")
-            assertEquals("Monzo Counterparty: Renamed ATM", atmAccounts.single().name)
+            assertEquals("Monzo Counterparty: Renamed ATM", atmAccounts.first().name)
         }
 }

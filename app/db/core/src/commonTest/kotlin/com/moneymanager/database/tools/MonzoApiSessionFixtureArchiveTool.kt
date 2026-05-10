@@ -31,10 +31,18 @@ fun main(args: Array<String>) {
         println("Usage: encrypt <inputDir> <outputFile> | decrypt <inputFile> <outputDir>")
         exitProcess(1)
     }
-    val passphrase = System.getenv("MONZO_FIXTURE_PASSPHRASE") ?: error("MONZO_FIXTURE_PASSPHRASE is required")
     when (args[0]) {
-        "encrypt" -> encryptDirectory(File(args[1]), File(args[2]), passphrase)
-        "decrypt" -> decryptArchive(File(args[1]), File(args[2]), passphrase)
+        "encrypt" -> {
+            val passphrase = System.getenv("MONZO_FIXTURE_PASSPHRASE") ?: error("MONZO_FIXTURE_PASSPHRASE is required")
+            encryptDirectory(File(args[1]), File(args[2]), passphrase)
+        }
+        "decrypt" -> {
+            val passphrase = System.getenv("MONZO_FIXTURE_PASSPHRASE")
+            if (passphrase.isNullOrBlank()) {
+                return
+            }
+            decryptArchive(File(args[1]), File(args[2]), passphrase)
+        }
         else -> error("Unknown command: ${args[0]}")
     }
 }
@@ -66,6 +74,9 @@ fun decryptArchive(
     outputDir: File,
     passphrase: String,
 ) {
+    if (outputDir.exists() && outputDir.listFiles()?.isNotEmpty() == true) {
+        return
+    }
     outputDir.mkdirs()
     FileInputStream(inputFile).use { fis ->
         val magic = fis.readNBytes(MAGIC.length).toString(Charsets.UTF_8)
