@@ -27,4 +27,3 @@ data class AccountAttributeAuditEntry(
     val auditType: AuditType,
     val value: String,
 )
-

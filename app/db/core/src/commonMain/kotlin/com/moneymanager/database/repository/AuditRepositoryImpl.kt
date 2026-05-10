@@ -204,4 +204,3 @@ class AuditRepositoryImpl(
             else -> error("Unknown audit type: $name")
         }
 }
-

@@ -11,4 +11,3 @@ data class PersonAttributeAuditEntry(
     val auditType: AuditType,
     val value: String,
 )
-
