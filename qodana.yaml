@@ -9,14 +9,6 @@ plugins:
 profile:
   path: .qodana/profile.xml
 exclude:
-  - name: UnusedSymbol
-  - name: unused
-  - name: SameParameterValue
-  - name: SameReturnValue
-  - name: CanBeParameter
-  - name: EmptyMethod
-    paths:
-      - app/ui/core/src/commonTest
   - name: KotlinNoActualForExpect
   - name: XmlHighlighting
   - name: FunctionName
