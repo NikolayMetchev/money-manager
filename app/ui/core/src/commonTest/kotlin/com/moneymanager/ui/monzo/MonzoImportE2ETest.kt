@@ -235,10 +235,10 @@ private val TRANSACTIONS_WITH_PERSONAL_COUNTERPARTY_JSON =
       "description": "Received from John Doe",
       "merchant": null,
       "counterparty": {
-        "account_number": "12345678",
+        "account_number": "87654321",
         "beneficiary_account_type": "Personal",
         "name": "John Q. Doe",
-        "sort_code": "040404",
+        "sort_code": "050505",
         "user_id": "anonuser_95515c2ea95c19a58aad7b"
       }
     }
@@ -1280,7 +1280,7 @@ class MonzoImportE2ETest : DbTest() {
                             .first()
                             .any { it.attributeType.name == "built-in type" && it.value == "ATM" }
                     }
-                    ?: return@runTest
+            assertNotNull(initialAtmAccount, "Expected built-in ATM account")
             val initialAtmAttributes = repositories.accountAttributeRepository.getByAccount(initialAtmAccount.id).first()
             assertEquals(
                 "ATM",

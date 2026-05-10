@@ -206,7 +206,7 @@ fun MoneyManagerApp(
                             NavigationBarItem(
                                 icon = { Text("\uD83D\uDC65") },
                                 label = { Text("People") },
-                                selected = currentScreen is Screen.People,
+                                selected = currentScreen is Screen.People || currentScreen is Screen.PeopleScroll,
                                 onClick = { navigationHistory.navigateTo(Screen.People) },
                             )
                             NavigationBarItem(

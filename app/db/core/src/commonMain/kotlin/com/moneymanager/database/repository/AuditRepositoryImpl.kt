@@ -30,6 +30,7 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.AuditRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlin.time.Instant
 
 class AuditRepositoryImpl(
     database: MoneyManagerDatabase,
@@ -117,7 +118,7 @@ class AuditRepositoryImpl(
             .map { row ->
                 AccountAttributeAuditEntry(
                     id = row.id,
-                    auditTimestamp = kotlin.time.Instant.fromEpochMilliseconds(row.audit_timestamp),
+                    auditTimestamp = Instant.fromEpochMilliseconds(row.audit_timestamp),
                     accountId = AccountId(row.account_id),
                     revisionId = row.revision_id,
                     attributeType =
@@ -203,3 +204,4 @@ class AuditRepositoryImpl(
             else -> error("Unknown audit type: $name")
         }
 }
+

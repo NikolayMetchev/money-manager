@@ -48,9 +48,8 @@ fun PersonAuditScreen(
         loadKey = personId,
         loadData = {
             val entries = auditRepository.getAuditHistoryForPerson(personId)
-            val attributeEntries = auditRepository.getAttributeAuditByPerson(personId)
             val currentPerson = personRepository.getPersonById(personId).first()
-            val diffs = computePersonAuditDiffs(entries, attributeEntries, currentPerson)
+            val diffs = computePersonAuditDiffs(entries, currentPerson)
             AuditScreenData(
                 title = "Person Audit: ${currentPerson?.fullName ?: personId}",
                 diffs = diffs,
@@ -79,11 +78,10 @@ private data class PersonAuditDiff(
 
 private fun computePersonAuditDiffs(
     entries: List<PersonAuditEntry>,
-    attributeEntries: List<PersonAttributeAuditEntry>,
     currentPerson: Person?,
 ): List<PersonAuditDiff> =
     entries.mapIndexed { index, entry ->
-        val revisionAttributes = attributeEntries.filter { it.revisionId == entry.revisionId }
+        val revisionAttributes = entry.attributeChanges
         when (entry.auditType) {
             AuditType.INSERT ->
                 PersonAuditDiff(
