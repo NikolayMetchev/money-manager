@@ -60,8 +60,6 @@ class JvmDatabaseManager : DatabaseManager {
 
             if (isNewDatabase) {
                 DatabaseConfig.seedDatabase(database, CurrencyRepositoryImpl(database))
-            } else {
-                DatabaseConfig.runMigrations(database)
             }
 
             database
