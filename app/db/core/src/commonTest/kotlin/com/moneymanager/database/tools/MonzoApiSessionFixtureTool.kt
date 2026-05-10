@@ -250,7 +250,6 @@ private fun <T> exportTable(
 }
 
 private fun <T> insertTable(
-    connection: Connection,
     inputDir: File,
     fileName: String,
     serializer: kotlinx.serialization.KSerializer<T>,
