@@ -667,4 +667,3 @@ fun MoneyManagerApp(
         }
     }
 }
-

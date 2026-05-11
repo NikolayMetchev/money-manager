@@ -2112,5 +2112,3 @@ private class AttributeTypeCache(
 
     suspend fun getOrCreate(name: String): AttributeTypeId = mutex.withLock { cache.getOrPut(name) { repo.getOrCreate(name) } }
 }
-
-
