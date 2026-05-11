@@ -43,7 +43,7 @@ metro = "1.0.0"
 mokkery = "3.3.0"
 schemaspy = "7.0.2"
 slf4j = "2.0.17"
-sort-dependencies = "0.17.1"
+sort-dependencies = "0.18.0"
 sqldelight = "2.3.2"
 turbine = "1.2.1"
 
