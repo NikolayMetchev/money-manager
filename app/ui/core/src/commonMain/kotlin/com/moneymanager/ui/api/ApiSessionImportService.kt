@@ -856,7 +856,6 @@ private suspend fun importPeopleFromAccounts(
                 personAccountOwnershipRepository = personAccountOwnershipRepository,
                 personAttributeRepository = personAttributeRepository,
                 entitySource = entitySource,
-                deviceId = deviceId,
                 sessionId = sessionId,
                 requestId = accountApiSourceByExternalId[account.id]?.requestId,
                 jsonPath = accountApiSourceByExternalId[account.id]?.jsonPath,
@@ -920,7 +919,6 @@ private suspend fun importPeopleFromCounterparties(
                     personAccountOwnershipRepository = personAccountOwnershipRepository,
                     personAttributeRepository = personAttributeRepository,
                     entitySource = entitySource,
-                    deviceId = deviceId,
                     sessionId = sessionId,
                     requestId = request.id,
                 )
@@ -1446,7 +1444,6 @@ private suspend fun importTransactionPage(
                 responseId = responseId,
                 requestId = requestId,
                 sessionId = sessionId,
-                deviceId = deviceId,
                 accountCache = accountCache,
                 currencyCache = currencyCache,
                 attributeTypeCache = attributeTypeCache,
@@ -1482,7 +1479,6 @@ private suspend fun importTransactionItem(
     responseId: ApiResponseId,
     requestId: ApiRequestId,
     sessionId: ApiSessionId,
-    deviceId: DeviceId,
     accountCache: AccountCache,
     currencyCache: CurrencyCache,
     attributeTypeCache: AttributeTypeCache,
@@ -2116,3 +2112,5 @@ private class AttributeTypeCache(
 
     suspend fun getOrCreate(name: String): AttributeTypeId = mutex.withLock { cache.getOrPut(name) { repo.getOrCreate(name) } }
 }
+
+

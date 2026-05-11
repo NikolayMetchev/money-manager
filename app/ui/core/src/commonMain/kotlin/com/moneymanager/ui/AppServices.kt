@@ -49,15 +49,15 @@ data class ImportsDomain(
     val csvImportRepository: CsvImportRepository,
     val csvImportStrategyRepository: CsvImportStrategyRepository,
     val csvStrategyExportService: CsvStrategyExportService,
-    val CsvStrategyImportExport: CsvStrategyImportExport,
-    val Maintenance: Maintenance,
+    val csvStrategyImportExport: CsvStrategyImportExport,
+    val maintenance: Maintenance,
 )
 
 data class TransactionsDomain(
     val transactionRepository: TransactionRepository,
     val transferSourceRepository: TransferSourceRepository,
     val attributeTypeRepository: AttributeTypeRepository,
-    val EntitySource: EntitySource,
+    val entitySource: EntitySource,
     val sampleEntitySourcePort: EntitySource,
 )
 
@@ -93,15 +93,15 @@ fun Application.toAppServices() =
                 csvImportRepository = imports.csvImportRepository,
                 csvImportStrategyRepository = imports.csvImportStrategyRepository,
                 csvStrategyExportService = imports.csvStrategyExportService,
-                CsvStrategyImportExport = imports.CsvStrategyImportExport,
-                Maintenance = imports.Maintenance,
+                csvStrategyImportExport = imports.csvStrategyImportExport,
+                maintenance = imports.maintenance,
             ),
         transactions =
             TransactionsDomain(
                 transactionRepository = transactions.transactionRepository,
                 transferSourceRepository = transactions.transferSourceRepository,
                 attributeTypeRepository = transactions.attributeTypeRepository,
-                EntitySource = transactions.EntitySource,
+                entitySource = transactions.entitySource,
                 sampleEntitySourcePort = transactions.sampleEntitySourcePort,
             ),
         people =

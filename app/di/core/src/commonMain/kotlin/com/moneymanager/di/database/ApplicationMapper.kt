@@ -29,15 +29,15 @@ fun DatabaseComponent.toApplication() =
                 csvImportRepository = csvImportRepository,
                 csvImportStrategyRepository = csvImportStrategyRepository,
                 csvStrategyExportService = csvStrategyExportService,
-                CsvStrategyImportExport = DbCsvStrategyImportExport(csvStrategyExportService),
-                Maintenance = DbMaintenance(maintenanceService),
+                csvStrategyImportExport = DbCsvStrategyImportExport(csvStrategyExportService),
+                maintenance = DbMaintenance(maintenanceService),
             ),
         transactions =
             Transactions(
                 transactionRepository = transactionRepository,
                 transferSourceRepository = transferSourceRepository,
                 attributeTypeRepository = attributeTypeRepository,
-                EntitySource = DbEntitySource(entitySourceQueries, transferSourceQueries, deviceId),
+                entitySource = DbEntitySource(entitySourceQueries, transferSourceQueries, deviceId),
                 sampleEntitySourcePort = DbSampleEntitySource(entitySourceQueries, transferSourceQueries, deviceId),
             ),
         people =

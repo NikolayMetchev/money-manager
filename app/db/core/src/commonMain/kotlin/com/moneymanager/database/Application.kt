@@ -48,15 +48,15 @@ data class Imports(
     val csvImportRepository: CsvImportRepository,
     val csvImportStrategyRepository: CsvImportStrategyRepository,
     val csvStrategyExportService: CsvStrategyExportService,
-    val CsvStrategyImportExport: CsvStrategyImportExport,
-    val Maintenance: Maintenance,
+    val csvStrategyImportExport: CsvStrategyImportExport,
+    val maintenance: Maintenance,
 )
 
 data class Transactions(
     val transactionRepository: TransactionRepository,
     val transferSourceRepository: TransferSourceRepository,
     val attributeTypeRepository: AttributeTypeRepository,
-    val EntitySource: EntitySource,
+    val entitySource: EntitySource,
     val sampleEntitySourcePort: EntitySource,
 )
 
