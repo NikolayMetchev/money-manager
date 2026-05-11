@@ -114,8 +114,8 @@ fun ApiSessionsScreen(
     accountRepository: AccountRepository,
     currencyRepository: CurrencyRepository,
     transactionRepository: TransactionRepository,
-    EntitySource: EntitySource,
-    Maintenance: Maintenance,
+    entitySource: EntitySource,
+    maintenance: Maintenance,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     personAttributeRepository: PersonAttributeRepository,
@@ -189,7 +189,7 @@ fun ApiSessionsScreen(
                     accountRepository = accountRepository,
                     currencyRepository = currencyRepository,
                     transactionRepository = transactionRepository,
-                    entitySource = EntitySource,
+                    entitySource = entitySource,
                     personRepository = personRepository,
                     personAccountOwnershipRepository = personAccountOwnershipRepository,
                     personAttributeRepository = personAttributeRepository,
@@ -206,7 +206,7 @@ fun ApiSessionsScreen(
                     },
                 )
             apiSessionRepository.markSessionImported(session.id, Clock.System.now())
-            Maintenance.refreshMaterializedViews()
+            maintenance.refreshMaterializedViews()
             importResultBySession = importResultBySession + (session.id to result)
             importProgressBySession = importProgressBySession - session.id
             refresh()
@@ -1246,9 +1246,9 @@ private fun JsonTreeNode(
     val childCount = element.childCount()
     val expandable = childCount > 0
     // This node is the target if all highlight segments have been consumed
-    val isHighlightTarget = remainingHighlightSegments != null && remainingHighlightSegments.isEmpty()
+    val isHighlightTarget = !remainingHighlightSegments.isNullOrEmpty()
     // Force-expand the node if it's on the highlight path
-    val forceExpandPath = remainingHighlightSegments != null && remainingHighlightSegments.isNotEmpty()
+    val forceExpandPath = !remainingHighlightSegments.isNullOrEmpty()
     val shouldForceExpand = forceExpandSubtree || forceExpandPath || isHighlightTarget
     var expanded by remember(label, element, remainingHighlightSegments, forceExpandSubtree) {
         mutableStateOf(depth == 0 || shouldForceExpand)

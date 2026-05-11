@@ -393,7 +393,6 @@ private suspend fun setupImportSession(
             accountRepository = accountRepository,
             accountAttributeRepository = accountAttributeRepository,
             entitySource = entitySource,
-            deviceId = deviceId,
             accountApiSourceByExternalId = accountApiSourceByExternalId,
             sourceAccountExternalIdIndex = sourceAccountExternalIdIndex,
             counterpartyIdIndex = counterpartyIdIndex,
@@ -959,7 +958,6 @@ private suspend fun importOwnersForAccount(
                 personRepository = personRepository,
                 personAttributeRepository = personAttributeRepository,
                 entitySource = entitySource,
-                deviceId = deviceId,
                 sessionId = sessionId,
                 requestId = requestId,
             ) ?: continue
@@ -1004,7 +1002,6 @@ private suspend fun resolveOrCreatePerson(
     personRepository: PersonRepository,
     personAttributeRepository: PersonAttributeRepository,
     entitySource: EntitySource? = null,
-    deviceId: DeviceId? = null,
     sessionId: ApiSessionId? = null,
     requestId: ApiRequestId? = null,
 ): Pair<Person, Boolean>? {
@@ -1518,7 +1515,6 @@ private suspend fun importTransactionItem(
             responseId = responseId,
             requestId = requestId,
             sessionId = sessionId,
-            deviceId = deviceId,
             accountCache = accountCache,
             attributeTypeCache = attributeTypeCache,
             customTxFields = customTxFields,
@@ -1551,7 +1547,6 @@ private suspend fun importValidTransactionItem(
     responseId: ApiResponseId,
     requestId: ApiRequestId,
     sessionId: ApiSessionId,
-    deviceId: DeviceId,
     accountCache: AccountCache,
     attributeTypeCache: AttributeTypeCache,
     customTxFields: Map<String, String>,
@@ -1752,7 +1747,6 @@ private class AccountCache(
     private val accountRepository: AccountRepository,
     private val accountAttributeRepository: AccountAttributeRepository,
     private val entitySource: EntitySource,
-    private val deviceId: DeviceId,
     val accountApiSourceByExternalId: Map<String, AccountApiSource>,
     private val sourceAccountExternalIdIndex: MutableMap<String, AccountId>,
     // Pre-built by the caller in the serial section before concurrent import starts
