@@ -23,10 +23,6 @@ import com.moneymanager.database.SampleGeneratorSourceRecorder
 import com.moneymanager.database.port.DbMaintenance
 import com.moneymanager.database.port.DbTransferSource
 import com.moneymanager.di.database.DatabaseComponent
-import com.moneymanager.domain.port.EntitySource
-import com.moneymanager.domain.port.Maintenance
-import com.moneymanager.domain.port.TransferSource
-import com.moneymanager.domain.model.SourceRecorder
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
@@ -42,8 +38,12 @@ import com.moneymanager.domain.model.PageWithTargetIndex
 import com.moneymanager.domain.model.PagingInfo
 import com.moneymanager.domain.model.PagingResult
 import com.moneymanager.domain.model.PersonId
+import com.moneymanager.domain.model.SourceRecorder
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.port.EntitySource
+import com.moneymanager.domain.port.Maintenance
+import com.moneymanager.domain.port.TransferSource
 import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
@@ -1017,12 +1017,8 @@ class AccountTransactionsScreenTest {
         }
     }
 
-    private fun createDbMaintenancePort(repositories: DatabaseComponent): Maintenance =
-        DbMaintenance(repositories.maintenanceService)
+    private fun createDbMaintenancePort(repositories: DatabaseComponent): Maintenance = DbMaintenance(repositories.maintenanceService)
 
     private fun createDbTransferSourcePort(repositories: DatabaseComponent): TransferSource =
         DbTransferSource(repositories.transferSourceQueries, repositories.deviceId)
-
 }
-
-

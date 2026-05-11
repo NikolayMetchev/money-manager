@@ -5,6 +5,8 @@ package com.moneymanager.ui.api
 import com.moneymanager.database.DatabaseConfig
 import com.moneymanager.domain.model.*
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
+import com.moneymanager.domain.port.EntitySource
+import com.moneymanager.domain.port.TransferSource
 import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.ApiSessionRepository
@@ -14,8 +16,6 @@ import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonAttributeRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
-import com.moneymanager.domain.port.EntitySource
-import com.moneymanager.domain.port.TransferSource
 import com.moneymanager.rest.ApiClient
 import com.moneymanager.rest.ApiHttpResponse
 import com.moneymanager.ui.screens.transactions.logger
@@ -974,7 +974,17 @@ private suspend fun importOwnersForAccount(
         if (existingOwnership == null) {
             val ownershipId = personAccountOwnershipRepository.createOwnership(person.id, accountId)
             if (EntitySource != null && deviceId != null && sessionId != null && requestId != null) {
-                EntitySource.recordFromApi(entityType = EntityType.PERSON_ACCOUNT_OWNERSHIP, entityId = ownershipId, revisionId = 1L, sessionId = sessionId, requestId = requestId, jsonPath = (jsonPath ?: owner.jsonPath))
+                EntitySource.recordFromApi(
+                    entityType = EntityType.PERSON_ACCOUNT_OWNERSHIP,
+                    entityId = ownershipId,
+                    revisionId = 1L,
+                    sessionId = sessionId,
+                    requestId = requestId,
+                    jsonPath = (
+                        jsonPath
+                            ?: owner.jsonPath
+                    ),
+                )
             }
         } else if (EntitySource != null && deviceId != null && sessionId != null && requestId != null) {
             EntitySource.recordFromApi(
@@ -2118,5 +2128,3 @@ private class AttributeTypeCache(
 
     suspend fun getOrCreate(name: String): AttributeTypeId = mutex.withLock { cache.getOrPut(name) { repo.getOrCreate(name) } }
 }
-
-
