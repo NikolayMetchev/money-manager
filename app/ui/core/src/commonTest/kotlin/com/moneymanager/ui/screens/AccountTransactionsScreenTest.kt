@@ -20,8 +20,8 @@ import androidx.compose.ui.test.waitUntilExactlyOneExists
 import com.moneymanager.database.ManualSourceRecorder
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.SampleGeneratorSourceRecorder
-import com.moneymanager.database.port.DbMaintenance
 import com.moneymanager.database.port.DbEntitySource
+import com.moneymanager.database.port.DbMaintenance
 import com.moneymanager.di.database.DatabaseComponent
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
@@ -1016,7 +1016,3 @@ class AccountTransactionsScreenTest {
     private fun createDbEntitySource(repositories: DatabaseComponent): EntitySource =
         DbEntitySource(repositories.entitySourceQueries, repositories.transferSourceQueries, repositories.deviceId)
 }
-
-
-
-
