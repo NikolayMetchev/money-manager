@@ -1,29 +1,28 @@
 package com.moneymanager.di.database
 
-import com.moneymanager.database.AccountsGraph
-import com.moneymanager.database.ApplicationGraph
-import com.moneymanager.database.AuditGraph
-import com.moneymanager.database.ImportsGraph
-import com.moneymanager.database.PeopleGraph
-import com.moneymanager.database.SettingsGraph
-import com.moneymanager.database.TransactionsGraph
+import com.moneymanager.database.Accounts
+import com.moneymanager.database.Application
+import com.moneymanager.database.Audit
+import com.moneymanager.database.Imports
+import com.moneymanager.database.People
+import com.moneymanager.database.Settings
+import com.moneymanager.database.Transactions
 import com.moneymanager.database.port.DbCsvStrategyImportExport
 import com.moneymanager.database.port.DbEntitySource
 import com.moneymanager.database.port.DbMaintenance
 import com.moneymanager.database.port.DbSampleEntitySource
-import com.moneymanager.database.port.DbTransferSource
 
-fun DatabaseComponent.toApplicationGraph() =
-    ApplicationGraph(
+fun DatabaseComponent.toApplication() =
+    Application(
         accounts =
-            AccountsGraph(
+            Accounts(
                 accountRepository = accountRepository,
                 accountAttributeRepository = accountAttributeRepository,
                 categoryRepository = categoryRepository,
                 currencyRepository = currencyRepository,
             ),
         imports =
-            ImportsGraph(
+            Imports(
                 apiImportStrategyRepository = apiImportStrategyRepository,
                 apiSessionRepository = apiSessionRepository,
                 csvAccountMappingRepository = csvAccountMappingRepository,
@@ -34,25 +33,24 @@ fun DatabaseComponent.toApplicationGraph() =
                 Maintenance = DbMaintenance(maintenanceService),
             ),
         transactions =
-            TransactionsGraph(
+            Transactions(
                 transactionRepository = transactionRepository,
                 transferSourceRepository = transferSourceRepository,
                 attributeTypeRepository = attributeTypeRepository,
-                EntitySource = DbEntitySource(entitySourceQueries, deviceId),
-                TransferSource = DbTransferSource(transferSourceQueries, deviceId),
-                sampleEntitySourcePort = DbSampleEntitySource(entitySourceQueries, deviceId),
+                EntitySource = DbEntitySource(entitySourceQueries, transferSourceQueries, deviceId),
+                sampleEntitySourcePort = DbSampleEntitySource(entitySourceQueries, transferSourceQueries, deviceId),
             ),
         people =
-            PeopleGraph(
+            People(
                 personRepository = personRepository,
                 personAccountOwnershipRepository = personAccountOwnershipRepository,
                 personAttributeRepository = personAttributeRepository,
             ),
         settings =
-            SettingsGraph(
+            Settings(
                 settingsRepository = settingsRepository,
                 deviceRepository = deviceRepository,
             ),
-        audit = AuditGraph(auditRepository = auditRepository),
+        audit = Audit(auditRepository = auditRepository),
         deviceId = deviceId,
     )

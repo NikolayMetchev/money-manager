@@ -1,12 +1,11 @@
 package com.moneymanager.ui
 
-import com.moneymanager.database.ApplicationGraph
+import com.moneymanager.database.Application
 import com.moneymanager.database.service.CsvStrategyExportService
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.port.CsvStrategyImportExport
 import com.moneymanager.domain.port.EntitySource
 import com.moneymanager.domain.port.Maintenance
-import com.moneymanager.domain.port.TransferSource
 import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.ApiImportStrategyRepository
@@ -59,7 +58,6 @@ data class TransactionsDomain(
     val transferSourceRepository: TransferSourceRepository,
     val attributeTypeRepository: AttributeTypeRepository,
     val EntitySource: EntitySource,
-    val TransferSource: TransferSource,
     val sampleEntitySourcePort: EntitySource,
 )
 
@@ -78,7 +76,7 @@ data class AuditDomain(
     val auditRepository: AuditRepository,
 )
 
-fun ApplicationGraph.toAppServices() =
+fun Application.toAppServices() =
     AppServices(
         accounts =
             AccountsDomain(
@@ -104,7 +102,6 @@ fun ApplicationGraph.toAppServices() =
                 transferSourceRepository = transactions.transferSourceRepository,
                 attributeTypeRepository = transactions.attributeTypeRepository,
                 EntitySource = transactions.EntitySource,
-                TransferSource = transactions.TransferSource,
                 sampleEntitySourcePort = transactions.sampleEntitySourcePort,
             ),
         people =

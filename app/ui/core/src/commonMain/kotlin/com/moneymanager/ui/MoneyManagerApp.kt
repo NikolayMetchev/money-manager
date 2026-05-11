@@ -92,9 +92,8 @@ fun MoneyManagerApp(
     val settingsRepository = services.settings.settingsRepository
     val transactionRepository = services.transactions.transactionRepository
     val transferSourceRepository = services.transactions.transferSourceRepository
-    val TransferSource = services.transactions.TransferSource
-    val sampleEntitySourcePort = services.transactions.sampleEntitySourcePort
     val EntitySource = services.transactions.EntitySource
+    val sampleEntitySourcePort = services.transactions.sampleEntitySourcePort
     val deviceId = services.deviceId
 
     ProvideSchemaAwareScope {
@@ -334,7 +333,6 @@ fun MoneyManagerApp(
                                     transactionRepository = transactionRepository,
                                     settingsRepository = settingsRepository,
                                     Maintenance = Maintenance,
-                                    TransferSource = TransferSource,
                                     EntitySource = sampleEntitySourcePort,
                                 )
                             }
@@ -347,7 +345,6 @@ fun MoneyManagerApp(
                                     accountId = currentlyViewedAccountId ?: screen.accountId,
                                     transactionRepository = transactionRepository,
                                     transferSourceRepository = transferSourceRepository,
-                                    TransferSource = TransferSource,
                                     EntitySource = EntitySource,
                                     accountRepository = accountRepository,
                                     accountAttributeRepository = accountAttributeRepository,
@@ -399,7 +396,6 @@ fun MoneyManagerApp(
                                     accountRepository = accountRepository,
                                     currencyRepository = currencyRepository,
                                     transactionRepository = transactionRepository,
-                                    TransferSource = TransferSource,
                                     EntitySource = EntitySource,
                                     Maintenance = Maintenance,
                                     personRepository = personRepository,
@@ -453,7 +449,6 @@ fun MoneyManagerApp(
                                     personAccountOwnershipRepository = personAccountOwnershipRepository,
                                     Maintenance = Maintenance,
                                     transferSourceRepository = transferSourceRepository,
-                                    TransferSource = TransferSource,
                                     EntitySource = EntitySource,
                                     deviceRepository = deviceRepository,
                                     deviceId = deviceId,
@@ -647,7 +642,6 @@ fun MoneyManagerApp(
                     TransactionEditDialog(
                         transactionRepository = transactionRepository,
                         transferSourceRepository = transferSourceRepository,
-                        TransferSource = TransferSource,
                         EntitySource = EntitySource,
                         accountRepository = accountRepository,
                         categoryRepository = categoryRepository,

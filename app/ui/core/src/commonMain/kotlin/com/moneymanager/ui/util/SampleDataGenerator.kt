@@ -15,7 +15,6 @@ import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.port.EntitySource
 import com.moneymanager.domain.port.Maintenance
-import com.moneymanager.domain.port.TransferSource
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CategoryRepository
@@ -39,7 +38,6 @@ suspend fun generateSampleData(
     attributeTypeRepository: AttributeTypeRepository,
     transactionRepository: TransactionRepository,
     Maintenance: Maintenance,
-    TransferSource: TransferSource,
     EntitySource: EntitySource,
     progressFlow: MutableStateFlow<GenerationProgress>,
 ) {
@@ -400,7 +398,7 @@ suspend fun generateSampleData(
     transactionRepository.createTransfers(
         transfers = allTransfers,
         newAttributes = allNewAttributes,
-        sourceRecorder = TransferSource.sampleGeneratorRecorder(),
+        sourceRecorder = EntitySource.sampleGeneratorRecorder(),
         onProgress = { created, total ->
             transactionsCreated = created
             progressFlow.emit(

@@ -5,7 +5,6 @@ import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.port.CsvStrategyImportExport
 import com.moneymanager.domain.port.EntitySource
 import com.moneymanager.domain.port.Maintenance
-import com.moneymanager.domain.port.TransferSource
 import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.ApiImportStrategyRepository
@@ -25,24 +24,24 @@ import com.moneymanager.domain.repository.SettingsRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.domain.repository.TransferSourceRepository
 
-data class ApplicationGraph(
-    val accounts: AccountsGraph,
-    val imports: ImportsGraph,
-    val transactions: TransactionsGraph,
-    val people: PeopleGraph,
-    val settings: SettingsGraph,
-    val audit: AuditGraph,
+data class Application(
+    val accounts: Accounts,
+    val imports: Imports,
+    val transactions: Transactions,
+    val people: People,
+    val settings: Settings,
+    val audit: Audit,
     val deviceId: DeviceId,
 )
 
-data class AccountsGraph(
+data class Accounts(
     val accountRepository: AccountRepository,
     val accountAttributeRepository: AccountAttributeRepository,
     val categoryRepository: CategoryRepository,
     val currencyRepository: CurrencyRepository,
 )
 
-data class ImportsGraph(
+data class Imports(
     val apiImportStrategyRepository: ApiImportStrategyRepository,
     val apiSessionRepository: ApiSessionRepository,
     val csvAccountMappingRepository: CsvAccountMappingRepository,
@@ -53,26 +52,25 @@ data class ImportsGraph(
     val Maintenance: Maintenance,
 )
 
-data class TransactionsGraph(
+data class Transactions(
     val transactionRepository: TransactionRepository,
     val transferSourceRepository: TransferSourceRepository,
     val attributeTypeRepository: AttributeTypeRepository,
     val EntitySource: EntitySource,
-    val TransferSource: TransferSource,
     val sampleEntitySourcePort: EntitySource,
 )
 
-data class PeopleGraph(
+data class People(
     val personRepository: PersonRepository,
     val personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     val personAttributeRepository: PersonAttributeRepository,
 )
 
-data class SettingsGraph(
+data class Settings(
     val settingsRepository: SettingsRepository,
     val deviceRepository: DeviceRepository,
 )
 
-data class AuditGraph(
+data class Audit(
     val auditRepository: AuditRepository,
 )

@@ -49,7 +49,6 @@ import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.port.EntitySource
 import com.moneymanager.domain.port.Maintenance
-import com.moneymanager.domain.port.TransferSource
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CategoryRepository
@@ -76,7 +75,6 @@ fun TransactionEditDialog(
     transaction: Transfer? = null,
     transactionRepository: TransactionRepository,
     transferSourceRepository: TransferSourceRepository,
-    TransferSource: TransferSource,
     EntitySource: EntitySource,
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
@@ -599,7 +597,7 @@ fun TransactionEditDialog(
                                         transactionRepository.createTransfers(
                                             transfers = listOf(transfer),
                                             newAttributes = mapOf(transfer.id to attributesToSave),
-                                            sourceRecorder = TransferSource.manualRecorder(),
+                                            sourceRecorder = EntitySource.manualRecorder(),
                                         )
                                     }
 

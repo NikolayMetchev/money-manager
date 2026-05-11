@@ -67,7 +67,6 @@ import com.moneymanager.domain.model.MonzoCredentialId
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.port.EntitySource
 import com.moneymanager.domain.port.Maintenance
-import com.moneymanager.domain.port.TransferSource
 import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.ApiImportStrategyRepository
@@ -115,7 +114,6 @@ fun ApiSessionsScreen(
     accountRepository: AccountRepository,
     currencyRepository: CurrencyRepository,
     transactionRepository: TransactionRepository,
-    TransferSource: TransferSource,
     EntitySource: EntitySource,
     Maintenance: Maintenance,
     personRepository: PersonRepository,
@@ -191,7 +189,6 @@ fun ApiSessionsScreen(
                     accountRepository = accountRepository,
                     currencyRepository = currencyRepository,
                     transactionRepository = transactionRepository,
-                    TransferSource = TransferSource,
                     EntitySource = EntitySource,
                     personRepository = personRepository,
                     personAccountOwnershipRepository = personAccountOwnershipRepository,

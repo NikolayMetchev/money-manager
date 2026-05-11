@@ -21,7 +21,7 @@ import com.moneymanager.database.ManualSourceRecorder
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.SampleGeneratorSourceRecorder
 import com.moneymanager.database.port.DbMaintenance
-import com.moneymanager.database.port.DbTransferSource
+import com.moneymanager.database.port.DbEntitySource
 import com.moneymanager.di.database.DatabaseComponent
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
@@ -43,7 +43,6 @@ import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.port.EntitySource
 import com.moneymanager.domain.port.Maintenance
-import com.moneymanager.domain.port.TransferSource
 import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
@@ -120,7 +119,7 @@ class AccountTransactionsScreenTest {
             val accountRepository = createAccountRepository(listOf(checking, savings))
             val transactionRepository = createTransactionRepository(listOf(transfer))
             val transferSourceRepository = createTransferSourceRepository()
-            val TransferSource = createStubTransferSourcePort()
+            val EntitySource = createStubEntitySource()
             val currencyRepository = createCurrencyRepository(listOf(usdCurrency))
             val categoryRepository = createCategoryRepository()
             val attributeTypeRepository = createAttributeTypeRepository()
@@ -137,8 +136,7 @@ class AccountTransactionsScreenTest {
                         accountId = currentAccountId,
                         transactionRepository = transactionRepository,
                         transferSourceRepository = transferSourceRepository,
-                        TransferSource = TransferSource,
-                        EntitySource = stubEntitySourcePort,
+                        EntitySource = EntitySource,
                         accountRepository = accountRepository,
                         accountAttributeRepository = createAccountAttributeRepository(),
                         categoryRepository = categoryRepository,
@@ -219,7 +217,7 @@ class AccountTransactionsScreenTest {
             val accountRepository = createAccountRepository(listOf(checking, savings))
             val transactionRepository = createTransactionRepository(listOf(transfer))
             val transferSourceRepository = createTransferSourceRepository()
-            val TransferSource = createStubTransferSourcePort()
+            val EntitySource = createStubEntitySource()
             val currencyRepository = createCurrencyRepository(listOf(usdCurrency))
             val categoryRepository = createCategoryRepository()
             val attributeTypeRepository = createAttributeTypeRepository()
@@ -235,8 +233,7 @@ class AccountTransactionsScreenTest {
                         accountId = currentAccountId,
                         transactionRepository = transactionRepository,
                         transferSourceRepository = transferSourceRepository,
-                        TransferSource = TransferSource,
-                        EntitySource = stubEntitySourcePort,
+                        EntitySource = EntitySource,
                         accountRepository = accountRepository,
                         accountAttributeRepository = createAccountAttributeRepository(),
                         categoryRepository = categoryRepository,
@@ -360,8 +357,7 @@ class AccountTransactionsScreenTest {
                                 accountId = currentAccountId,
                                 transactionRepository = repositories.transactionRepository,
                                 transferSourceRepository = repositories.transferSourceRepository,
-                                TransferSource = createDbTransferSourcePort(repositories),
-                                EntitySource = stubEntitySourcePort,
+                                EntitySource = createDbEntitySource(repositories),
                                 accountRepository = repositories.accountRepository,
                                 accountAttributeRepository = repositories.accountAttributeRepository,
                                 categoryRepository = repositories.categoryRepository,
@@ -571,8 +567,7 @@ class AccountTransactionsScreenTest {
                                 accountId = currentAccountId,
                                 transactionRepository = repositories.transactionRepository,
                                 transferSourceRepository = repositories.transferSourceRepository,
-                                TransferSource = createDbTransferSourcePort(repositories),
-                                EntitySource = stubEntitySourcePort,
+                                EntitySource = createDbEntitySource(repositories),
                                 accountRepository = repositories.accountRepository,
                                 accountAttributeRepository = repositories.accountAttributeRepository,
                                 categoryRepository = repositories.categoryRepository,
@@ -752,8 +747,7 @@ class AccountTransactionsScreenTest {
                                 accountId = currentAccountId,
                                 transactionRepository = repositories.transactionRepository,
                                 transferSourceRepository = repositories.transferSourceRepository,
-                                TransferSource = createDbTransferSourcePort(repositories),
-                                EntitySource = stubEntitySourcePort,
+                                EntitySource = createDbEntitySource(repositories),
                                 accountRepository = repositories.accountRepository,
                                 accountAttributeRepository = repositories.accountAttributeRepository,
                                 categoryRepository = repositories.categoryRepository,
@@ -1007,7 +1001,7 @@ class AccountTransactionsScreenTest {
             everySuspend { fullRefreshMaterializedViews() } returns Duration.ZERO
         }
 
-    private fun createStubTransferSourcePort(): TransferSource {
+    private fun createStubEntitySource(): EntitySource {
         val recorder: SourceRecorder = mock(MockMode.autoUnit)
         return mock(MockMode.autoUnit) {
             every { manualRecorder() } returns recorder
@@ -1019,6 +1013,10 @@ class AccountTransactionsScreenTest {
 
     private fun createDbMaintenancePort(repositories: DatabaseComponent): Maintenance = DbMaintenance(repositories.maintenanceService)
 
-    private fun createDbTransferSourcePort(repositories: DatabaseComponent): TransferSource =
-        DbTransferSource(repositories.transferSourceQueries, repositories.deviceId)
+    private fun createDbEntitySource(repositories: DatabaseComponent): EntitySource =
+        DbEntitySource(repositories.entitySourceQueries, repositories.transferSourceQueries, repositories.deviceId)
 }
+
+
+
+

@@ -36,7 +36,6 @@ import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.port.EntitySource
 import com.moneymanager.domain.port.Maintenance
-import com.moneymanager.domain.port.TransferSource
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CategoryRepository
@@ -73,7 +72,6 @@ fun CsvImportDetailScreen(
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     Maintenance: Maintenance,
     transferSourceRepository: TransferSourceRepository,
-    TransferSource: TransferSource,
     EntitySource: EntitySource,
     deviceRepository: DeviceRepository,
     deviceId: DeviceId,
@@ -423,7 +421,6 @@ fun CsvImportDetailScreen(
             attributeTypeRepository = attributeTypeRepository,
             Maintenance = Maintenance,
             EntitySource = EntitySource,
-            TransferSource = TransferSource,
             transferSourceRepository = transferSourceRepository,
             deviceId = deviceId,
             onDismiss = { showApplyStrategyDialog = false },

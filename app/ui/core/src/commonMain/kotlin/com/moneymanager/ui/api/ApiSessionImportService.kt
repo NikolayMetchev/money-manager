@@ -6,7 +6,6 @@ import com.moneymanager.database.DatabaseConfig
 import com.moneymanager.domain.model.*
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.port.EntitySource
-import com.moneymanager.domain.port.TransferSource
 import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.ApiSessionRepository
@@ -197,7 +196,6 @@ suspend fun importApiSessionTransactions(
     accountRepository: AccountRepository,
     currencyRepository: CurrencyRepository,
     transactionRepository: TransactionRepository,
-    TransferSource: TransferSource,
     EntitySource: EntitySource,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
@@ -217,7 +215,6 @@ suspend fun importApiSessionTransactions(
             accountRepository,
             currencyRepository,
             transactionRepository,
-            TransferSource,
             EntitySource,
             personRepository,
             personAccountOwnershipRepository,
@@ -290,7 +287,6 @@ private data class ImportSetup(
     val apiSessionRepository: ApiSessionRepository,
     val accountAttributeRepository: AccountAttributeRepository,
     val transactionRepository: TransactionRepository,
-    val TransferSource: TransferSource,
     val EntitySource: EntitySource,
     val personRepository: PersonRepository,
     val personAccountOwnershipRepository: PersonAccountOwnershipRepository,
@@ -302,7 +298,6 @@ private suspend fun setupImportSession(
     accountRepository: AccountRepository,
     currencyRepository: CurrencyRepository,
     transactionRepository: TransactionRepository,
-    TransferSource: TransferSource,
     EntitySource: EntitySource,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
@@ -436,7 +431,6 @@ private suspend fun setupImportSession(
         apiSessionRepository = apiSessionRepository,
         accountAttributeRepository = accountAttributeRepository,
         transactionRepository = transactionRepository,
-        TransferSource = TransferSource,
         EntitySource = EntitySource,
         personRepository = personRepository,
         personAccountOwnershipRepository = personAccountOwnershipRepository,
@@ -488,7 +482,7 @@ private suspend fun importTransactionsConcurrently(setup: ImportSetup) {
                     nameMappings = setup.nameMappings,
                     apiSessionRepository = setup.apiSessionRepository,
                     transactionRepository = setup.transactionRepository,
-                    TransferSource = setup.TransferSource,
+                    EntitySource = setup.EntitySource,
                 )
             val progressMessage =
                 setup.progressMutex.withLock {
@@ -1418,7 +1412,7 @@ private suspend fun importTransactionPage(
     nameMappings: CounterpartyNameMappings,
     apiSessionRepository: ApiSessionRepository,
     transactionRepository: TransactionRepository,
-    TransferSource: TransferSource,
+    EntitySource: EntitySource,
 ): ApiImportPageResult {
     val transactions = parseTransactionsWithPath(response.body, strategy)
     val responseId = ApiResponseId(response.responseId)
@@ -1468,7 +1462,7 @@ private suspend fun importTransactionPage(
                 existingTransfers = existingTransfers,
                 apiSessionRepository = apiSessionRepository,
                 transactionRepository = transactionRepository,
-                TransferSource = TransferSource,
+                EntitySource = EntitySource,
             )
         }
 
@@ -1504,7 +1498,7 @@ private suspend fun importTransactionItem(
     existingTransfers: MutableList<Transfer>,
     apiSessionRepository: ApiSessionRepository,
     transactionRepository: TransactionRepository,
-    TransferSource: TransferSource,
+    EntitySource: EntitySource,
 ): ApiResponseTransactionState {
     val currency = currencyCache.getCurrency(item.currencyCode)
     if (currency == null) {
@@ -1536,7 +1530,7 @@ private suspend fun importTransactionItem(
             existingTransfers = existingTransfers,
             apiSessionRepository = apiSessionRepository,
             transactionRepository = transactionRepository,
-            TransferSource = TransferSource,
+            EntitySource = EntitySource,
             declineReason = item.declineReason,
         )
     } catch (expected: Exception) {
@@ -1569,7 +1563,7 @@ private suspend fun importValidTransactionItem(
     existingTransfers: MutableList<Transfer>,
     apiSessionRepository: ApiSessionRepository,
     transactionRepository: TransactionRepository,
-    TransferSource: TransferSource,
+    EntitySource: EntitySource,
     declineReason: String? = null,
 ): ApiResponseTransactionState {
     val counterpartyApiSource = AccountApiSource(sessionId, requestId, JsonPath("${item.jsonPath.value}.counterparty"))
@@ -1620,7 +1614,7 @@ private suspend fun importValidTransactionItem(
     }
 
     val sourceRecorder =
-        TransferSource.apiImportRecorder(sessionId = sessionId, requestId = requestId, jsonPath = item.jsonPath)
+        EntitySource.apiImportRecorder(sessionId = sessionId, requestId = requestId, jsonPath = item.jsonPath)
     val attributes =
         buildList {
             if (!declineReason.isNullOrBlank()) {

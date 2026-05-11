@@ -9,7 +9,7 @@ import androidx.compose.ui.window.rememberWindowState
 import com.moneymanager.di.AppComponent
 import com.moneymanager.di.AppComponentParams
 import com.moneymanager.di.database.DatabaseComponent
-import com.moneymanager.di.database.toApplicationGraph
+import com.moneymanager.di.database.toApplication
 import com.moneymanager.ui.AppStartupHost
 import com.moneymanager.ui.error.GlobalSchemaErrorState
 import com.moneymanager.ui.error.SchemaErrorDetector
@@ -65,7 +65,7 @@ private fun MainWindow(onExit: () -> Unit) {
             databaseManager = databaseManager,
             appVersion = appVersion,
             createAppServices = { database ->
-                DatabaseComponent.create(database).toApplicationGraph().toAppServices()
+                DatabaseComponent.create(database).toApplication().toAppServices()
             },
             onInfoLog = { message -> logger.info { message } },
             onErrorLog = { message, error -> logger.error(error) { message } },

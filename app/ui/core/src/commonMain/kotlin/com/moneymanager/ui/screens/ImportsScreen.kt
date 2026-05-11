@@ -12,7 +12,6 @@ import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.port.EntitySource
 import com.moneymanager.domain.port.Maintenance
-import com.moneymanager.domain.port.TransferSource
 import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.ApiImportStrategyRepository
@@ -38,7 +37,6 @@ fun ImportsScreen(
     accountRepository: AccountRepository,
     currencyRepository: CurrencyRepository,
     transactionRepository: TransactionRepository,
-    TransferSource: TransferSource,
     EntitySource: EntitySource,
     Maintenance: Maintenance,
     personRepository: PersonRepository,
@@ -82,7 +80,6 @@ fun ImportsScreen(
                     accountRepository = accountRepository,
                     currencyRepository = currencyRepository,
                     transactionRepository = transactionRepository,
-                    TransferSource = TransferSource,
                     EntitySource = EntitySource,
                     Maintenance = Maintenance,
                     personRepository = personRepository,

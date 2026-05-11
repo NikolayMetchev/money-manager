@@ -8,7 +8,7 @@ import androidx.activity.enableEdgeToEdge
 import com.moneymanager.di.AppComponent
 import com.moneymanager.di.AppComponentParams
 import com.moneymanager.di.database.DatabaseComponent
-import com.moneymanager.di.database.toApplicationGraph
+import com.moneymanager.di.database.toApplication
 import com.moneymanager.di.initializeVersionReader
 import com.moneymanager.ui.AppStartupHost
 import com.moneymanager.ui.error.GlobalSchemaErrorState
@@ -46,7 +46,7 @@ class MainActivity : ComponentActivity() {
                 databaseManager = component.databaseManager,
                 appVersion = component.appVersion,
                 createAppServices = { database ->
-                    DatabaseComponent.create(database).toApplicationGraph().toAppServices()
+                    DatabaseComponent.create(database).toApplication().toAppServices()
                 },
                 onInfoLog = { message -> Log.i(TAG, message) },
                 onErrorLog = { message, error -> Log.e(TAG, message, error) },

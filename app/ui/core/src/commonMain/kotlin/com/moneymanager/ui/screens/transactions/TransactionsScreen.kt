@@ -50,7 +50,6 @@ import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.port.EntitySource
 import com.moneymanager.domain.port.Maintenance
-import com.moneymanager.domain.port.TransferSource
 import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
@@ -72,7 +71,6 @@ fun AccountTransactionsScreen(
     accountId: AccountId,
     transactionRepository: TransactionRepository,
     transferSourceRepository: TransferSourceRepository,
-    TransferSource: TransferSource,
     EntitySource: EntitySource,
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
@@ -946,7 +944,6 @@ fun AccountTransactionsScreen(
             transaction = transfer,
             transactionRepository = transactionRepository,
             transferSourceRepository = transferSourceRepository,
-            TransferSource = TransferSource,
             EntitySource = EntitySource,
             accountRepository = accountRepository,
             categoryRepository = categoryRepository,

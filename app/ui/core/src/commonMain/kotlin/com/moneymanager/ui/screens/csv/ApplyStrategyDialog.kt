@@ -63,7 +63,6 @@ import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.port.EntitySource
 import com.moneymanager.domain.port.Maintenance
-import com.moneymanager.domain.port.TransferSource
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CategoryRepository
@@ -115,7 +114,6 @@ fun ApplyStrategyDialog(
     attributeTypeRepository: AttributeTypeRepository,
     Maintenance: Maintenance,
     EntitySource: EntitySource,
-    TransferSource: TransferSource,
     transferSourceRepository: TransferSourceRepository,
     deviceId: DeviceId,
     onDismiss: () -> Unit,
@@ -637,7 +635,7 @@ fun ApplyStrategyDialog(
                                                 transfers = listOf(transfer),
                                                 newAttributes = mapOf(transfer.id to attributes),
                                                 sourceRecorder =
-                                                    TransferSource.csvImportRecorder(
+                                                    EntitySource.csvImportRecorder(
                                                         csvImportId = csvImport.id,
                                                         rowIndexForTransfer = { generatedTransferId ->
                                                             createdTransferId = generatedTransferId

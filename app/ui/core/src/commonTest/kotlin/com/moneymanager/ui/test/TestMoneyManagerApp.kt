@@ -10,7 +10,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import com.moneymanager.database.DatabaseManager
 import com.moneymanager.di.database.DatabaseComponent
-import com.moneymanager.di.database.toApplicationGraph
+import com.moneymanager.di.database.toApplication
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.ui.MoneyManagerApp
@@ -82,7 +82,7 @@ fun TestMoneyManagerApp(
             MoneyManagerApp(
                 appVersion = appVersion,
                 databaseLocation = state.location,
-                services = dc.toApplicationGraph().toAppServices(),
+                services = dc.toApplication().toAppServices(),
             )
         }
         is TestDatabaseState.Loading -> {

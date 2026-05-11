@@ -34,7 +34,6 @@ import com.moneymanager.domain.port.CsvStrategyImportExport
 import com.moneymanager.domain.port.CsvUnresolvedReference
 import com.moneymanager.domain.port.EntitySource
 import com.moneymanager.domain.port.Maintenance
-import com.moneymanager.domain.port.TransferSource
 
 class DbMaintenance(
     private val delegate: DatabaseMaintenanceService,
@@ -68,10 +67,11 @@ class DbCsvStrategyImportExport(
 }
 
 class DbEntitySource(
-    private val queries: EntitySourceQueries,
+    private val entitySourceQueries: EntitySourceQueries,
+    private val transferSourceQueries: TransferSourceQueries,
     private val deviceId: DeviceId,
 ) : EntitySource {
-    private val recorder = ManualEntitySourceRecorder(queries, deviceId)
+    private val recorder = ManualEntitySourceRecorder(entitySourceQueries, deviceId)
 
     override fun record(
         entityType: EntityType,
@@ -89,24 +89,19 @@ class DbEntitySource(
         requestId: ApiRequestId,
         jsonPath: JsonPath,
     ) {
-        ApiEntitySourceRecorder(queries, deviceId, sessionId, requestId, jsonPath).insert(entityType, entityId, revisionId)
+        ApiEntitySourceRecorder(entitySourceQueries, deviceId, sessionId, requestId, jsonPath).insert(entityType, entityId, revisionId)
     }
-}
 
-class DbTransferSource(
-    private val queries: TransferSourceQueries,
-    private val deviceId: DeviceId,
-) : TransferSource {
-    override fun manualRecorder(): SourceRecorder = ManualSourceRecorder(queries, deviceId)
+    override fun manualRecorder(): SourceRecorder = ManualSourceRecorder(transferSourceQueries, deviceId)
 
-    override fun sampleGeneratorRecorder(): SourceRecorder = SampleGeneratorSourceRecorder(queries, deviceId)
+    override fun sampleGeneratorRecorder(): SourceRecorder = SampleGeneratorSourceRecorder(transferSourceQueries, deviceId)
 
     override fun csvImportRecorder(
         csvImportId: CsvImportId,
         rowIndexForTransfer: (TransferId) -> Long,
     ): SourceRecorder =
         CsvImportSourceRecorder(
-            queries = queries,
+            queries = transferSourceQueries,
             deviceId = deviceId,
             csvImportId = csvImportId,
             rowIndexForTransfer = { transferId -> rowIndexForTransfer(transferId) },
@@ -118,7 +113,7 @@ class DbTransferSource(
         jsonPath: JsonPath,
     ): SourceRecorder =
         ApiImportSourceRecorder(
-            queries = queries,
+            queries = transferSourceQueries,
             deviceId = deviceId,
             sessionId = sessionId,
             requestId = requestId,
@@ -128,7 +123,8 @@ class DbTransferSource(
 
 class DbSampleEntitySource(
     queries: EntitySourceQueries,
-    deviceId: DeviceId,
+    private val transferSourceQueries: TransferSourceQueries,
+    private val deviceId: DeviceId,
 ) : EntitySource {
     private val recorder = SampleGeneratorEntitySourceRecorder(queries, deviceId)
 
@@ -150,6 +146,34 @@ class DbSampleEntitySource(
     ) {
         recorder.insert(entityType, entityId, revisionId)
     }
+
+    override fun manualRecorder(): SourceRecorder = ManualSourceRecorder(transferSourceQueries, deviceId)
+
+    override fun sampleGeneratorRecorder(): SourceRecorder = SampleGeneratorSourceRecorder(transferSourceQueries, deviceId)
+
+    override fun csvImportRecorder(
+        csvImportId: CsvImportId,
+        rowIndexForTransfer: (TransferId) -> Long,
+    ): SourceRecorder =
+        CsvImportSourceRecorder(
+            queries = transferSourceQueries,
+            deviceId = deviceId,
+            csvImportId = csvImportId,
+            rowIndexForTransfer = { transferId -> rowIndexForTransfer(transferId) },
+        )
+
+    override fun apiImportRecorder(
+        sessionId: ApiSessionId,
+        requestId: ApiRequestId,
+        jsonPath: JsonPath,
+    ): SourceRecorder =
+        ApiImportSourceRecorder(
+            queries = transferSourceQueries,
+            deviceId = deviceId,
+            sessionId = sessionId,
+            requestId = requestId,
+            jsonPath = jsonPath,
+        )
 }
 
 private fun ImportParseResult.toDomain() =

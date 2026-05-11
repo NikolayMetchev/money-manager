@@ -36,7 +36,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moneymanager.domain.port.EntitySource
 import com.moneymanager.domain.port.Maintenance
-import com.moneymanager.domain.port.TransferSource
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CategoryRepository
@@ -117,7 +116,6 @@ fun SettingsScreen(
     transactionRepository: TransactionRepository,
     settingsRepository: SettingsRepository,
     Maintenance: Maintenance,
-    TransferSource: TransferSource,
     EntitySource: EntitySource,
 ) {
     var showWarningDialog by remember { mutableStateOf(false) }
@@ -445,7 +443,6 @@ fun SettingsScreen(
                                     attributeTypeRepository = attributeTypeRepository,
                                     transactionRepository = transactionRepository,
                                     Maintenance = Maintenance,
-                                    TransferSource = TransferSource,
                                     EntitySource = EntitySource,
                                     progressFlow = progressFlow,
                                 )
