@@ -11,9 +11,9 @@ import com.moneymanager.di.database.DatabaseComponent
 import com.moneymanager.di.database.toApplicationGraph
 import com.moneymanager.di.initializeVersionReader
 import com.moneymanager.ui.AppStartupHost
-import com.moneymanager.ui.toAppServices
 import com.moneymanager.ui.error.GlobalSchemaErrorState
 import com.moneymanager.ui.error.SchemaErrorDetector
+import com.moneymanager.ui.toAppServices
 
 private const val TAG = "MainActivity"
 

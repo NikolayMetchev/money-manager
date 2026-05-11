@@ -1,10 +1,10 @@
 package com.moneymanager.domain.port
 
-import com.moneymanager.domain.model.SourceRecorder
-import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.JsonPath
+import com.moneymanager.domain.model.SourceRecorder
+import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImportId
 
 interface TransferSourcePort {

@@ -504,5 +504,4 @@ class AccountsScreenTest {
             every { getByName(any()) } returns flowOf(null)
             everySuspend { getOrCreate(any()) } returns AttributeTypeId(0L)
         }
-
 }

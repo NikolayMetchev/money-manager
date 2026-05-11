@@ -23,10 +23,6 @@ import com.moneymanager.database.SampleGeneratorSourceRecorder
 import com.moneymanager.database.port.DbMaintenancePort
 import com.moneymanager.database.port.DbTransferSourcePort
 import com.moneymanager.di.database.DatabaseComponent
-import com.moneymanager.domain.port.EntitySourcePort
-import com.moneymanager.domain.port.MaintenancePort
-import com.moneymanager.domain.port.TransferSourcePort
-import com.moneymanager.domain.model.SourceRecorder
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
@@ -42,8 +38,12 @@ import com.moneymanager.domain.model.PageWithTargetIndex
 import com.moneymanager.domain.model.PagingInfo
 import com.moneymanager.domain.model.PagingResult
 import com.moneymanager.domain.model.PersonId
+import com.moneymanager.domain.model.SourceRecorder
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.port.EntitySourcePort
+import com.moneymanager.domain.port.MaintenancePort
+import com.moneymanager.domain.port.TransferSourcePort
 import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
@@ -1022,7 +1022,4 @@ class AccountTransactionsScreenTest {
 
     private fun createDbTransferSourcePort(repositories: DatabaseComponent): TransferSourcePort =
         DbTransferSourcePort(repositories.transferSourceQueries, repositories.deviceId)
-
 }
-
-

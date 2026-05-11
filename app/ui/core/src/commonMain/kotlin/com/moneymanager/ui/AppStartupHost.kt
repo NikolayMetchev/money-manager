@@ -10,9 +10,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import com.moneymanager.database.DatabaseInitializationProgress
 import com.moneymanager.database.DatabaseManager
+import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.DbLocation
-import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.ui.components.DatabaseSchemaErrorDialog
 import com.moneymanager.ui.components.DatabaseStartupProgressScreen
 import com.moneymanager.ui.error.GlobalSchemaErrorState

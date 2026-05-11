@@ -150,4 +150,3 @@ class CurrenciesScreenTest {
 
     private fun createEntitySourcePort(): EntitySourcePort = mock(MockMode.autoUnit)
 }
-
