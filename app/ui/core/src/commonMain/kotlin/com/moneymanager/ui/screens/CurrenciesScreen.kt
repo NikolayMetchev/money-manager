@@ -13,7 +13,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.domain.model.Currency
-import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.port.EntitySource
 import com.moneymanager.domain.repository.CurrencyRepository
@@ -28,7 +27,6 @@ private val logger = logging()
 fun CurrenciesScreen(
     currencyRepository: CurrencyRepository,
     EntitySource: EntitySource,
-    deviceId: DeviceId,
     onAuditClick: (Currency) -> Unit = {},
 ) {
     val currencies by currencyRepository
@@ -97,7 +95,6 @@ fun CurrenciesScreen(
             CreateCurrencyDialog(
                 currencyRepository = currencyRepository,
                 EntitySource = EntitySource,
-                deviceId = deviceId,
                 onDismiss = { showCreateDialog = false },
             )
         }
@@ -167,7 +164,6 @@ fun CurrencyCard(
 fun CreateCurrencyDialog(
     currencyRepository: CurrencyRepository,
     EntitySource: EntitySource,
-    deviceId: DeviceId,
     onDismiss: () -> Unit,
 ) {
     var code by remember { mutableStateOf("") }

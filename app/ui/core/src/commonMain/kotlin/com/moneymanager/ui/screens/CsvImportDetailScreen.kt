@@ -43,7 +43,6 @@ import com.moneymanager.domain.repository.CsvAccountMappingRepository
 import com.moneymanager.domain.repository.CsvImportRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
-import com.moneymanager.domain.repository.DeviceRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
@@ -73,7 +72,6 @@ fun CsvImportDetailScreen(
     Maintenance: Maintenance,
     transferSourceRepository: TransferSourceRepository,
     EntitySource: EntitySource,
-    deviceRepository: DeviceRepository,
     deviceId: DeviceId,
     onBack: () -> Unit,
     onDeleted: () -> Unit,

@@ -277,7 +277,6 @@ fun MoneyManagerApp(
                                 CurrenciesScreen(
                                     currencyRepository = currencyRepository,
                                     EntitySource = entitySource,
-                                    deviceId = deviceId,
                                     onAuditClick = { currency ->
                                         navigationHistory.navigateTo(Screen.CurrencyAuditHistory(currency.id, currency.code))
                                     },
@@ -310,7 +309,6 @@ fun MoneyManagerApp(
                                     personAttributeRepository = personAttributeRepository,
                                     personAccountOwnershipRepository = personAccountOwnershipRepository,
                                     EntitySource = entitySource,
-                                    deviceId = deviceId,
                                     scrollToPersonId = (screen as? Screen.PeopleScroll)?.personId,
                                     onAuditClick = { person ->
                                         navigationHistory.navigateTo(Screen.PersonAuditHistory(person.id, person.fullName))
@@ -450,7 +448,6 @@ fun MoneyManagerApp(
                                     Maintenance = maintenance,
                                     transferSourceRepository = transferSourceRepository,
                                     EntitySource = entitySource,
-                                    deviceRepository = deviceRepository,
                                     deviceId = deviceId,
                                     onBack = { navigationHistory.navigateBack() },
                                     onDeleted = { navigationHistory.navigateTo(Screen.Imports(ImportTab.CSV)) },

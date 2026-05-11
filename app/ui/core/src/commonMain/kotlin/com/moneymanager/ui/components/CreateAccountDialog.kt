@@ -32,7 +32,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
-import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.port.EntitySource
@@ -62,7 +61,6 @@ fun CreateAccountDialog(
     personAttributeRepository: PersonAttributeRepository? = null,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     EntitySource: EntitySource,
-    deviceId: DeviceId,
     onDismiss: () -> Unit,
     onAccountCreated: ((AccountId) -> Unit)? = null,
     initialName: String = "",
@@ -280,7 +278,6 @@ fun CreateAccountDialog(
             personRepository = personRepository,
             personAttributeRepository = personAttributeRepository,
             EntitySource = EntitySource,
-            deviceId = deviceId,
             onDismiss = { showCreatePersonDialog = false },
         )
     }

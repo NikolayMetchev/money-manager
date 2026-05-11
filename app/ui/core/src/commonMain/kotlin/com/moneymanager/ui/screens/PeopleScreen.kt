@@ -37,7 +37,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
-import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonAccountOwnership
 import com.moneymanager.domain.model.PersonId
@@ -55,7 +54,6 @@ fun PeopleScreen(
     personAttributeRepository: PersonAttributeRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     EntitySource: EntitySource,
-    deviceId: DeviceId,
     scrollToPersonId: PersonId? = null,
     onAuditClick: (Person) -> Unit = {},
 ) {
@@ -138,7 +136,6 @@ fun PeopleScreen(
             personRepository = personRepository,
             personAttributeRepository = personAttributeRepository,
             EntitySource = EntitySource,
-            deviceId = deviceId,
             onDismiss = { showCreateDialog = false },
         )
     }
@@ -150,7 +147,6 @@ fun PeopleScreen(
             personRepository = personRepository,
             personAttributeRepository = personAttributeRepository,
             EntitySource = EntitySource,
-            deviceId = deviceId,
             onDismiss = { personToEdit = null },
         )
     }

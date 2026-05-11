@@ -37,7 +37,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AttributeType
-import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.PersonId
@@ -72,7 +71,6 @@ fun EditAccountDialog(
     personAttributeRepository: PersonAttributeRepository? = null,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     EntitySource: EntitySource,
-    deviceId: DeviceId,
     onDismiss: () -> Unit,
 ) {
     var name by remember { mutableStateOf(account.name) }
@@ -438,7 +436,6 @@ fun EditAccountDialog(
             personRepository = personRepository,
             personAttributeRepository = personAttributeRepository,
             EntitySource = EntitySource,
-            deviceId = deviceId,
             onDismiss = { showCreatePersonDialog = false },
         )
     }

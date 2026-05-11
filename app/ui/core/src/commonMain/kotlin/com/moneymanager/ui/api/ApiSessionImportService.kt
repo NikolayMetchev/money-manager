@@ -471,7 +471,6 @@ private suspend fun importTransactionsConcurrently(setup: ImportSetup) {
                     strategy = setup.strategy,
                     ownAccountId = ownAccountId,
                     sessionId = setup.sessionId,
-                    deviceId = setup.deviceId,
                     accountCache = setup.accountCache,
                     currencyCache = setup.currencyCache,
                     attributeTypeCache = setup.attributeTypeCache,
@@ -509,7 +508,6 @@ private suspend fun importPeopleFromSession(setup: ImportSetup): Int =
         entitySource = setup.entitySource,
         accountApiSourceByExternalId = setup.accountCache.accountApiSourceByExternalId,
         sessionId = setup.sessionId,
-        deviceId = setup.deviceId,
     ) +
         importPeopleFromCounterparties(
             transactionResponses = setup.transactionResponses,
@@ -521,7 +519,6 @@ private suspend fun importPeopleFromSession(setup: ImportSetup): Int =
             nameMappings = setup.nameMappings,
             accountAttributeRepository = setup.accountAttributeRepository,
             entitySource = setup.entitySource,
-            deviceId = setup.deviceId,
             personRepository = setup.personRepository,
             personAccountOwnershipRepository = setup.personAccountOwnershipRepository,
             personAttributeRepository = setup.personAttributeRepository,
@@ -825,7 +822,6 @@ private suspend fun importPeopleFromAccounts(
     entitySource: EntitySource? = null,
     accountApiSourceByExternalId: Map<String, AccountApiSource> = emptyMap(),
     sessionId: ApiSessionId? = null,
-    deviceId: DeviceId? = null,
 ): Int {
     val peopleIndex = loadPeopleIndex(personRepository, personAttributeRepository)
     var newPeopleCount = 0
@@ -878,7 +874,6 @@ private suspend fun importPeopleFromCounterparties(
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     personAttributeRepository: PersonAttributeRepository,
     entitySource: EntitySource,
-    deviceId: DeviceId,
 ): Int {
     val peopleIndex = loadPeopleIndex(personRepository, personAttributeRepository)
     var newPeopleCount = 0
@@ -1397,7 +1392,6 @@ private suspend fun importTransactionPage(
     strategy: ApiImportStrategy,
     ownAccountId: AccountId,
     sessionId: ApiSessionId,
-    deviceId: DeviceId,
     accountCache: AccountCache,
     currencyCache: CurrencyCache,
     attributeTypeCache: AttributeTypeCache,
