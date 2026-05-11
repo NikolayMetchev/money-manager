@@ -29,14 +29,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.moneymanager.database.DatabaseMaintenanceService
-import com.moneymanager.database.sql.EntitySourceQueries
-import com.moneymanager.database.sql.TransferSourceQueries
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.SourceType
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csv.CsvRow
+import com.moneymanager.domain.port.EntitySourcePort
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CategoryRepository
@@ -49,6 +47,8 @@ import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.domain.repository.TransferSourceRepository
+import com.moneymanager.domain.port.MaintenancePort
+import com.moneymanager.domain.port.TransferSourcePort
 import com.moneymanager.ui.components.csv.CsvPreviewTable
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -71,10 +71,10 @@ fun CsvImportDetailScreen(
     attributeTypeRepository: AttributeTypeRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    maintenanceService: DatabaseMaintenanceService,
+    maintenancePort: MaintenancePort,
     transferSourceRepository: TransferSourceRepository,
-    transferSourceQueries: TransferSourceQueries,
-    entitySourceQueries: EntitySourceQueries,
+    transferSourcePort: TransferSourcePort,
+    entitySourcePort: EntitySourcePort,
     deviceRepository: DeviceRepository,
     deviceId: DeviceId,
     onBack: () -> Unit,
@@ -421,11 +421,10 @@ fun CsvImportDetailScreen(
             transactionRepository = transactionRepository,
             csvImportRepository = csvImportRepository,
             attributeTypeRepository = attributeTypeRepository,
-            maintenanceService = maintenanceService,
-            entitySourceQueries = entitySourceQueries,
-            transferSourceQueries = transferSourceQueries,
+            maintenancePort = maintenancePort,
+            entitySourcePort = entitySourcePort,
+            transferSourcePort = transferSourcePort,
             transferSourceRepository = transferSourceRepository,
-            deviceRepository = deviceRepository,
             deviceId = deviceId,
             onDismiss = { showApplyStrategyDialog = false },
             onImportComplete = { result ->
@@ -452,7 +451,7 @@ fun CsvImportDetailScreen(
             attributeTypeRepository = attributeTypeRepository,
             personRepository = personRepository,
             personAccountOwnershipRepository = personAccountOwnershipRepository,
-            entitySourceQueries = entitySourceQueries,
+            entitySourcePort = entitySourcePort,
             deviceId = deviceId,
             csvColumns = import!!.columns,
             rows = rows,

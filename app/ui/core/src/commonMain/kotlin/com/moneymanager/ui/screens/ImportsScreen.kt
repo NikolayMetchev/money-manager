@@ -7,9 +7,6 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import com.moneymanager.database.DatabaseMaintenanceService
-import com.moneymanager.database.sql.EntitySourceQueries
-import com.moneymanager.database.sql.TransferSourceQueries
 import com.moneymanager.domain.model.ApiSession
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.csv.CsvImportId
@@ -24,6 +21,9 @@ import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonAttributeRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.domain.port.EntitySourcePort
+import com.moneymanager.domain.port.MaintenancePort
+import com.moneymanager.domain.port.TransferSourcePort
 import com.moneymanager.ui.navigation.ImportTab
 
 @Composable
@@ -38,9 +38,9 @@ fun ImportsScreen(
     accountRepository: AccountRepository,
     currencyRepository: CurrencyRepository,
     transactionRepository: TransactionRepository,
-    transferSourceQueries: TransferSourceQueries,
-    entitySourceQueries: EntitySourceQueries,
-    maintenanceService: DatabaseMaintenanceService,
+    transferSourcePort: TransferSourcePort,
+    entitySourcePort: EntitySourcePort,
+    maintenancePort: MaintenancePort,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     personAttributeRepository: PersonAttributeRepository,
@@ -82,9 +82,9 @@ fun ImportsScreen(
                     accountRepository = accountRepository,
                     currencyRepository = currencyRepository,
                     transactionRepository = transactionRepository,
-                    transferSourceQueries = transferSourceQueries,
-                    entitySourceQueries = entitySourceQueries,
-                    maintenanceService = maintenanceService,
+                    transferSourcePort = transferSourcePort,
+                    entitySourcePort = entitySourcePort,
+                    maintenancePort = maintenancePort,
                     personRepository = personRepository,
                     personAccountOwnershipRepository = personAccountOwnershipRepository,
                     personAttributeRepository = personAttributeRepository,

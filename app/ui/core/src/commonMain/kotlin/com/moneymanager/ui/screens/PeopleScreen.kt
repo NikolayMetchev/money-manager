@@ -37,11 +37,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
-import com.moneymanager.database.sql.EntitySourceQueries
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonAccountOwnership
 import com.moneymanager.domain.model.PersonId
+import com.moneymanager.domain.port.EntitySourcePort
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonAttributeRepository
 import com.moneymanager.domain.repository.PersonRepository
@@ -54,7 +54,7 @@ fun PeopleScreen(
     personRepository: PersonRepository,
     personAttributeRepository: PersonAttributeRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    entitySourceQueries: EntitySourceQueries,
+    entitySourcePort: EntitySourcePort,
     deviceId: DeviceId,
     scrollToPersonId: PersonId? = null,
     onAuditClick: (Person) -> Unit = {},
@@ -137,7 +137,7 @@ fun PeopleScreen(
             personToEdit = null,
             personRepository = personRepository,
             personAttributeRepository = personAttributeRepository,
-            entitySourceQueries = entitySourceQueries,
+            entitySourcePort = entitySourcePort,
             deviceId = deviceId,
             onDismiss = { showCreateDialog = false },
         )
@@ -149,7 +149,7 @@ fun PeopleScreen(
             personToEdit = currentPersonToEdit,
             personRepository = personRepository,
             personAttributeRepository = personAttributeRepository,
-            entitySourceQueries = entitySourceQueries,
+            entitySourcePort = entitySourcePort,
             deviceId = deviceId,
             onDismiss = { personToEdit = null },
         )

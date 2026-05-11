@@ -17,14 +17,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
-import com.moneymanager.database.DatabaseMaintenanceService
-import com.moneymanager.database.sql.EntitySourceQueries
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.Transfer
+import com.moneymanager.domain.port.EntitySourcePort
+import com.moneymanager.domain.port.MaintenancePort
 import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
@@ -52,8 +52,8 @@ fun AccountsScreen(
     transactionRepository: TransactionRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    maintenanceService: DatabaseMaintenanceService,
-    entitySourceQueries: EntitySourceQueries,
+    maintenancePort: MaintenancePort,
+    entitySourcePort: EntitySourcePort,
     deviceId: DeviceId,
     scrollToAccountId: AccountId?,
     onAccountClick: (Account) -> Unit,
@@ -132,7 +132,7 @@ fun AccountsScreen(
                             accountRepository = accountRepository,
                             personRepository = personRepository,
                             personAccountOwnershipRepository = personAccountOwnershipRepository,
-                            maintenanceService = maintenanceService,
+                            maintenancePort = maintenancePort,
                             onClick = { onAccountClick(account) },
                             onEditClick = { accountToEdit = account },
                             onAuditClick = { onAuditClick(account) },
@@ -153,7 +153,7 @@ fun AccountsScreen(
             categoryRepository = categoryRepository,
             personRepository = personRepository,
             personAccountOwnershipRepository = personAccountOwnershipRepository,
-            entitySourceQueries = entitySourceQueries,
+            entitySourcePort = entitySourcePort,
             deviceId = deviceId,
             onDismiss = { showCreateDialog = false },
         )
@@ -169,7 +169,7 @@ fun AccountsScreen(
             categoryRepository = categoryRepository,
             personRepository = personRepository,
             personAccountOwnershipRepository = personAccountOwnershipRepository,
-            entitySourceQueries = entitySourceQueries,
+            entitySourcePort = entitySourcePort,
             deviceId = deviceId,
             onDismiss = { accountToEdit = null },
         )
@@ -184,7 +184,7 @@ fun AccountCard(
     accountRepository: AccountRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    maintenanceService: DatabaseMaintenanceService,
+    maintenancePort: MaintenancePort,
     onClick: () -> Unit,
     onEditClick: () -> Unit,
     onAuditClick: () -> Unit = {},
@@ -309,7 +309,7 @@ fun AccountCard(
         DeleteAccountDialog(
             account = account,
             accountRepository = accountRepository,
-            maintenanceService = maintenanceService,
+            maintenancePort = maintenancePort,
             onDismiss = { showDeleteDialog = false },
         )
     }
@@ -472,7 +472,7 @@ fun CreateAccountDialog(
 fun DeleteAccountDialog(
     account: Account,
     accountRepository: AccountRepository,
-    maintenanceService: DatabaseMaintenanceService,
+    maintenancePort: MaintenancePort,
     onDismiss: () -> Unit,
 ) {
     var isDeleting by remember { mutableStateOf(false) }
@@ -617,7 +617,7 @@ fun DeleteAccountDialog(
                                     accountToDelete = account.id,
                                     targetAccount = selectedTargetAccount!!.id,
                                 )
-                                maintenanceService.fullRefreshMaterializedViews()
+                                maintenancePort.fullRefreshMaterializedViews()
                             } else {
                                 accountRepository.deleteAccount(account.id)
                             }

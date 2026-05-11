@@ -10,9 +10,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import com.moneymanager.database.DatabaseManager
 import com.moneymanager.di.database.DatabaseComponent
+import com.moneymanager.di.database.toApplicationGraph
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.ui.MoneyManagerApp
+import com.moneymanager.ui.toAppServices
 import com.moneymanager.ui.components.DatabaseSchemaErrorDialog
 import com.moneymanager.ui.error.GlobalSchemaErrorState
 import kotlinx.coroutines.flow.first
@@ -80,29 +82,7 @@ fun TestMoneyManagerApp(
             MoneyManagerApp(
                 appVersion = appVersion,
                 databaseLocation = state.location,
-                accountAttributeRepository = dc.accountAttributeRepository,
-                accountRepository = dc.accountRepository,
-                apiImportStrategyRepository = dc.apiImportStrategyRepository,
-                apiSessionRepository = dc.apiSessionRepository,
-                attributeTypeRepository = dc.attributeTypeRepository,
-                auditRepository = dc.auditRepository,
-                categoryRepository = dc.categoryRepository,
-                csvAccountMappingRepository = dc.csvAccountMappingRepository,
-                csvImportRepository = dc.csvImportRepository,
-                csvImportStrategyRepository = dc.csvImportStrategyRepository,
-                csvStrategyExportService = dc.csvStrategyExportService,
-                currencyRepository = dc.currencyRepository,
-                deviceRepository = dc.deviceRepository,
-                maintenanceService = dc.maintenanceService,
-                personRepository = dc.personRepository,
-                personAccountOwnershipRepository = dc.personAccountOwnershipRepository,
-                personAttributeRepository = dc.personAttributeRepository,
-                settingsRepository = dc.settingsRepository,
-                transactionRepository = dc.transactionRepository,
-                transferSourceRepository = dc.transferSourceRepository,
-                transferSourceQueries = dc.transferSourceQueries,
-                entitySourceQueries = dc.entitySourceQueries,
-                deviceId = dc.deviceId,
+                services = dc.toApplicationGraph().toAppServices(),
             )
         }
         is TestDatabaseState.Loading -> {

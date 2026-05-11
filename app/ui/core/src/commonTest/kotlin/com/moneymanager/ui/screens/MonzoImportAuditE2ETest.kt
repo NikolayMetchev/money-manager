@@ -12,6 +12,8 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import androidx.compose.ui.test.waitUntilDoesNotExist
 import com.moneymanager.database.DatabaseManager
+import com.moneymanager.database.port.DbEntitySourcePort
+import com.moneymanager.database.port.DbTransferSourcePort
 import com.moneymanager.di.database.DatabaseComponent
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.DbLocation
@@ -198,8 +200,8 @@ class MonzoImportAuditE2ETest {
                     accountRepository = dc.accountRepository,
                     currencyRepository = dc.currencyRepository,
                     transactionRepository = dc.transactionRepository,
-                    transferSourceQueries = db.transferSourceQueries,
-                    entitySourceQueries = db.entitySourceQueries,
+                    transferSourcePort = DbTransferSourcePort(db.transferSourceQueries, deviceId),
+                    entitySourcePort = DbEntitySourcePort(db.entitySourceQueries, deviceId),
                     personRepository = dc.personRepository,
                     personAccountOwnershipRepository = dc.personAccountOwnershipRepository,
                     personAttributeRepository = dc.personAttributeRepository,
@@ -262,3 +264,5 @@ class MonzoImportAuditE2ETest {
             waitUntilDoesNotExist(hasText("Source data missing"), timeoutMillis = 3000)
         }
 }
+
+

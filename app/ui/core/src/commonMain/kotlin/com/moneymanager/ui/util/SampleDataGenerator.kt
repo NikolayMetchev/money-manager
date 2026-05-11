@@ -2,11 +2,6 @@
 
 package com.moneymanager.ui.util
 
-import com.moneymanager.database.DatabaseMaintenanceService
-import com.moneymanager.database.SampleGeneratorEntitySourceRecorder
-import com.moneymanager.database.SampleGeneratorSourceRecorder
-import com.moneymanager.database.sql.EntitySourceQueries
-import com.moneymanager.database.sql.TransferSourceQueries
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeTypeId
@@ -26,6 +21,9 @@ import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.domain.port.EntitySourcePort
+import com.moneymanager.domain.port.MaintenancePort
+import com.moneymanager.domain.port.TransferSourcePort
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlin.random.Random
@@ -41,13 +39,11 @@ suspend fun generateSampleData(
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     attributeTypeRepository: AttributeTypeRepository,
     transactionRepository: TransactionRepository,
-    maintenanceService: DatabaseMaintenanceService,
-    transferSourceQueries: TransferSourceQueries,
-    entitySourceQueries: EntitySourceQueries,
-    deviceId: DeviceId,
+    maintenancePort: MaintenancePort,
+    transferSourcePort: TransferSourcePort,
+    entitySourcePort: EntitySourcePort,
     progressFlow: MutableStateFlow<GenerationProgress>,
 ) {
-    val entitySourceRecorder = SampleGeneratorEntitySourceRecorder(entitySourceQueries, deviceId)
     val random = Random.Default
 
     // Step 1: Fetch currencies
@@ -180,7 +176,7 @@ suspend fun generateSampleData(
         val personId = personRepository.createPerson(person)
         personIds.add(personId)
         // Record source for person (initial revision is 1)
-        entitySourceRecorder.insert(EntityType.PERSON, personId.id, 1L)
+        entitySourcePort.record(EntityType.PERSON, personId.id, 1L)
     }
 
     progressFlow.emit(
@@ -251,7 +247,7 @@ suspend fun generateSampleData(
 
     // Record source for all accounts (initial revision is 1)
     for (accountId in accountIds) {
-        entitySourceRecorder.insert(EntityType.ACCOUNT, accountId.id, 1L)
+        entitySourcePort.record(EntityType.ACCOUNT, accountId.id, 1L)
     }
 
     progressFlow.emit(
@@ -287,7 +283,7 @@ suspend fun generateSampleData(
                     accountId = accountId,
                 )
             // Record source for ownership (initial revision is 1)
-            entitySourceRecorder.insert(EntityType.PERSON_ACCOUNT_OWNERSHIP, ownershipId, 1L)
+            entitySourcePort.record(EntityType.PERSON_ACCOUNT_OWNERSHIP, ownershipId, 1L)
         }
     }
 
@@ -405,7 +401,7 @@ suspend fun generateSampleData(
     transactionRepository.createTransfers(
         transfers = allTransfers,
         newAttributes = allNewAttributes,
-        sourceRecorder = SampleGeneratorSourceRecorder(transferSourceQueries, deviceId),
+        sourceRecorder = transferSourcePort.sampleGeneratorRecorder(),
         onProgress = { created, total ->
             transactionsCreated = created
             progressFlow.emit(
@@ -432,7 +428,7 @@ suspend fun generateSampleData(
             currentOperation = "Refreshing materialized views...",
         ),
     )
-    maintenanceService.refreshMaterializedViews()
+    maintenancePort.refreshMaterializedViews()
 
     // Final progress update
     progressFlow.emit(

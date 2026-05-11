@@ -41,16 +41,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.moneymanager.database.CsvImportSourceRecorder
-import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.database.csv.CsvTransferMapper
 import com.moneymanager.database.csv.DiscoveredAccountMapping
 import com.moneymanager.database.csv.ImportPreparation
 import com.moneymanager.database.csv.NewAccount
 import com.moneymanager.database.csv.StrategyMatcher
-import com.moneymanager.database.sql.EntitySourceQueries
-import com.moneymanager.database.sql.TransferSourceQueries
-import com.moneymanager.domain.getDeviceInfo
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.DeviceId
@@ -66,6 +61,9 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.port.EntitySourcePort
+import com.moneymanager.domain.port.MaintenancePort
+import com.moneymanager.domain.port.TransferSourcePort
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CategoryRepository
@@ -73,7 +71,6 @@ import com.moneymanager.domain.repository.CsvAccountMappingRepository
 import com.moneymanager.domain.repository.CsvImportRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
-import com.moneymanager.domain.repository.DeviceRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
@@ -116,11 +113,10 @@ fun ApplyStrategyDialog(
     transactionRepository: TransactionRepository,
     csvImportRepository: CsvImportRepository,
     attributeTypeRepository: AttributeTypeRepository,
-    maintenanceService: DatabaseMaintenanceService,
-    entitySourceQueries: EntitySourceQueries,
-    transferSourceQueries: TransferSourceQueries,
+    maintenancePort: MaintenancePort,
+    entitySourcePort: EntitySourcePort,
+    transferSourcePort: TransferSourcePort,
     transferSourceRepository: TransferSourceRepository,
-    deviceRepository: DeviceRepository,
     deviceId: DeviceId,
     onDismiss: () -> Unit,
     onImportComplete: (CsvImportResult) -> Unit,
@@ -293,7 +289,7 @@ fun ApplyStrategyDialog(
                     categoryRepository = categoryRepository,
                     personRepository = personRepository,
                     personAccountOwnershipRepository = personAccountOwnershipRepository,
-                    entitySourceQueries = entitySourceQueries,
+                    entitySourcePort = entitySourcePort,
                     deviceId = deviceId,
                     enabled = !isImporting,
                     isError = selectedSourceAccountId == null,
@@ -618,7 +614,6 @@ fun ApplyStrategyDialog(
                             val failedRows = mutableListOf<CsvImportResult.FailedRow>()
                             var successCount = 0
                             var duplicateCount = 0
-                            val deviceId = deviceRepository.getOrCreateDevice(getDeviceInfo())
 
                             for (transferWithAttrs in finalPrep.validTransfers) {
                                 val transfer = transferWithAttrs.transfer
@@ -642,9 +637,7 @@ fun ApplyStrategyDialog(
                                                 transfers = listOf(transfer),
                                                 newAttributes = mapOf(transfer.id to attributes),
                                                 sourceRecorder =
-                                                    CsvImportSourceRecorder(
-                                                        queries = transferSourceQueries,
-                                                        deviceId = deviceId,
+                                                    transferSourcePort.csvImportRecorder(
                                                         csvImportId = csvImport.id,
                                                         rowIndexForTransfer = { generatedTransferId ->
                                                             createdTransferId = generatedTransferId
@@ -740,7 +733,7 @@ fun ApplyStrategyDialog(
 
                             // Refresh materialized views so transfers are visible
                             logger.info { "Refreshing materialized views" }
-                            maintenanceService.refreshMaterializedViews()
+                            maintenancePort.refreshMaterializedViews()
 
                             if ((successCount + duplicateCount) > 0) {
                                 runCatching {

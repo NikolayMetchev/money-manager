@@ -52,9 +52,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
-import com.moneymanager.database.DatabaseMaintenanceService
-import com.moneymanager.database.sql.EntitySourceQueries
-import com.moneymanager.database.sql.TransferSourceQueries
 import com.moneymanager.domain.model.ApiRequest
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiResponse
@@ -78,6 +75,9 @@ import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonAttributeRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.domain.port.EntitySourcePort
+import com.moneymanager.domain.port.MaintenancePort
+import com.moneymanager.domain.port.TransferSourcePort
 import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.createApiClient
 import com.moneymanager.ui.api.ApiAccountsDownloadResult
@@ -115,9 +115,9 @@ fun ApiSessionsScreen(
     accountRepository: AccountRepository,
     currencyRepository: CurrencyRepository,
     transactionRepository: TransactionRepository,
-    transferSourceQueries: TransferSourceQueries,
-    entitySourceQueries: EntitySourceQueries,
-    maintenanceService: DatabaseMaintenanceService,
+    transferSourcePort: TransferSourcePort,
+    entitySourcePort: EntitySourcePort,
+    maintenancePort: MaintenancePort,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     personAttributeRepository: PersonAttributeRepository,
@@ -191,8 +191,8 @@ fun ApiSessionsScreen(
                     accountRepository = accountRepository,
                     currencyRepository = currencyRepository,
                     transactionRepository = transactionRepository,
-                    transferSourceQueries = transferSourceQueries,
-                    entitySourceQueries = entitySourceQueries,
+                    transferSourcePort = transferSourcePort,
+                    entitySourcePort = entitySourcePort,
                     personRepository = personRepository,
                     personAccountOwnershipRepository = personAccountOwnershipRepository,
                     personAttributeRepository = personAttributeRepository,
@@ -209,7 +209,7 @@ fun ApiSessionsScreen(
                     },
                 )
             apiSessionRepository.markSessionImported(session.id, Clock.System.now())
-            maintenanceService.refreshMaterializedViews()
+            maintenancePort.refreshMaterializedViews()
             importResultBySession = importResultBySession + (session.id to result)
             importProgressBySession = importProgressBySession - session.id
             refresh()

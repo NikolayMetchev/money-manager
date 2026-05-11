@@ -51,7 +51,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.moneymanager.database.sql.EntitySourceQueries
+import com.moneymanager.domain.port.EntitySourcePort
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.CurrencyId
@@ -337,7 +337,7 @@ fun CreateCsvStrategyDialog(
     attributeTypeRepository: AttributeTypeRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    entitySourceQueries: EntitySourceQueries,
+    entitySourcePort: EntitySourcePort,
     deviceId: DeviceId,
     csvColumns: List<CsvColumn>,
     rows: List<CsvRow>,
@@ -555,7 +555,7 @@ fun CreateCsvStrategyDialog(
                     categoryRepository = categoryRepository,
                     personRepository = personRepository,
                     personAccountOwnershipRepository = personAccountOwnershipRepository,
-                    entitySourceQueries = entitySourceQueries,
+                    entitySourcePort = entitySourcePort,
                     deviceId = deviceId,
                     enabled = !isSaving,
                 )

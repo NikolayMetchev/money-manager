@@ -2,6 +2,8 @@
 
 package com.moneymanager.ui.monzo
 
+import com.moneymanager.database.port.DbEntitySourcePort
+import com.moneymanager.database.port.DbTransferSourcePort
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.ApiSessionKind
@@ -124,8 +126,8 @@ class MonzoBalanceFixtureE2ETest : DbTest() {
                 accountRepository = repositories.accountRepository,
                 currencyRepository = repositories.currencyRepository,
                 transactionRepository = repositories.transactionRepository,
-                transferSourceQueries = transferSourceQueries,
-                entitySourceQueries = database.entitySourceQueries,
+                transferSourcePort = DbTransferSourcePort(transferSourceQueries, DeviceId(deviceId.id)),
+                entitySourcePort = DbEntitySourcePort(database.entitySourceQueries, DeviceId(deviceId.id)),
                 personRepository = repositories.personRepository,
                 personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                 personAttributeRepository = repositories.personAttributeRepository,
@@ -142,8 +144,8 @@ class MonzoBalanceFixtureE2ETest : DbTest() {
                     accountRepository = repositories.accountRepository,
                     currencyRepository = repositories.currencyRepository,
                     transactionRepository = repositories.transactionRepository,
-                    transferSourceQueries = transferSourceQueries,
-                    entitySourceQueries = database.entitySourceQueries,
+                    transferSourcePort = DbTransferSourcePort(transferSourceQueries, DeviceId(deviceId.id)),
+                    entitySourcePort = DbEntitySourcePort(database.entitySourceQueries, DeviceId(deviceId.id)),
                     personRepository = repositories.personRepository,
                     personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                     personAttributeRepository = repositories.personAttributeRepository,
@@ -178,3 +180,5 @@ class MonzoBalanceFixtureE2ETest : DbTest() {
 
     private fun loadResponses(): List<ResponseFixture> = json.decodeFromString(File(fixtureDir, "api_response.json").readText())
 }
+
+

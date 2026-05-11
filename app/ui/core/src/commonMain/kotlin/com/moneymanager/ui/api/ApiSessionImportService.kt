@@ -2,11 +2,7 @@
 
 package com.moneymanager.ui.api
 
-import com.moneymanager.database.ApiEntitySourceRecorder
-import com.moneymanager.database.ApiImportSourceRecorder
 import com.moneymanager.database.DatabaseConfig
-import com.moneymanager.database.sql.EntitySourceQueries
-import com.moneymanager.database.sql.TransferSourceQueries
 import com.moneymanager.domain.model.*
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.repository.AccountAttributeRepository
@@ -18,6 +14,8 @@ import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonAttributeRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.domain.port.EntitySourcePort
+import com.moneymanager.domain.port.TransferSourcePort
 import com.moneymanager.rest.ApiClient
 import com.moneymanager.rest.ApiHttpResponse
 import com.moneymanager.ui.screens.transactions.logger
@@ -199,8 +197,8 @@ suspend fun importApiSessionTransactions(
     accountRepository: AccountRepository,
     currencyRepository: CurrencyRepository,
     transactionRepository: TransactionRepository,
-    transferSourceQueries: TransferSourceQueries,
-    entitySourceQueries: EntitySourceQueries,
+    transferSourcePort: TransferSourcePort,
+    entitySourcePort: EntitySourcePort,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     personAttributeRepository: PersonAttributeRepository,
@@ -219,8 +217,8 @@ suspend fun importApiSessionTransactions(
             accountRepository,
             currencyRepository,
             transactionRepository,
-            transferSourceQueries,
-            entitySourceQueries,
+            transferSourcePort,
+            entitySourcePort,
             personRepository,
             personAccountOwnershipRepository,
             personAttributeRepository,
@@ -292,8 +290,8 @@ private data class ImportSetup(
     val apiSessionRepository: ApiSessionRepository,
     val accountAttributeRepository: AccountAttributeRepository,
     val transactionRepository: TransactionRepository,
-    val transferSourceQueries: TransferSourceQueries,
-    val entitySourceQueries: EntitySourceQueries,
+    val transferSourcePort: TransferSourcePort,
+    val entitySourcePort: EntitySourcePort,
     val personRepository: PersonRepository,
     val personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     val personAttributeRepository: PersonAttributeRepository,
@@ -304,8 +302,8 @@ private suspend fun setupImportSession(
     accountRepository: AccountRepository,
     currencyRepository: CurrencyRepository,
     transactionRepository: TransactionRepository,
-    transferSourceQueries: TransferSourceQueries,
-    entitySourceQueries: EntitySourceQueries,
+    transferSourcePort: TransferSourcePort,
+    entitySourcePort: EntitySourcePort,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     personAttributeRepository: PersonAttributeRepository,
@@ -399,7 +397,7 @@ private suspend fun setupImportSession(
         AccountCache(
             accountRepository = accountRepository,
             accountAttributeRepository = accountAttributeRepository,
-            entitySourceQueries = entitySourceQueries,
+            entitySourcePort = entitySourcePort,
             deviceId = deviceId,
             accountApiSourceByExternalId = accountApiSourceByExternalId,
             sourceAccountExternalIdIndex = sourceAccountExternalIdIndex,
@@ -438,8 +436,8 @@ private suspend fun setupImportSession(
         apiSessionRepository = apiSessionRepository,
         accountAttributeRepository = accountAttributeRepository,
         transactionRepository = transactionRepository,
-        transferSourceQueries = transferSourceQueries,
-        entitySourceQueries = entitySourceQueries,
+        transferSourcePort = transferSourcePort,
+        entitySourcePort = entitySourcePort,
         personRepository = personRepository,
         personAccountOwnershipRepository = personAccountOwnershipRepository,
         personAttributeRepository = personAttributeRepository,
@@ -490,7 +488,7 @@ private suspend fun importTransactionsConcurrently(setup: ImportSetup) {
                     nameMappings = setup.nameMappings,
                     apiSessionRepository = setup.apiSessionRepository,
                     transactionRepository = setup.transactionRepository,
-                    transferSourceQueries = setup.transferSourceQueries,
+                    transferSourcePort = setup.transferSourcePort,
                 )
             val progressMessage =
                 setup.progressMutex.withLock {
@@ -515,7 +513,7 @@ private suspend fun importPeopleFromSession(setup: ImportSetup): Int =
         personAccountOwnershipRepository = setup.personAccountOwnershipRepository,
         personAttributeRepository = setup.personAttributeRepository,
         accountAttributeRepository = setup.accountAttributeRepository,
-        entitySourceQueries = setup.entitySourceQueries,
+        entitySourcePort = setup.entitySourcePort,
         accountApiSourceByExternalId = setup.accountCache.accountApiSourceByExternalId,
         sessionId = setup.sessionId,
         deviceId = setup.deviceId,
@@ -529,7 +527,7 @@ private suspend fun importPeopleFromSession(setup: ImportSetup): Int =
             counterpartyIdField = setup.counterpartyIdField,
             nameMappings = setup.nameMappings,
             accountAttributeRepository = setup.accountAttributeRepository,
-            entitySourceQueries = setup.entitySourceQueries,
+            entitySourcePort = setup.entitySourcePort,
             deviceId = setup.deviceId,
             personRepository = setup.personRepository,
             personAccountOwnershipRepository = setup.personAccountOwnershipRepository,
@@ -831,7 +829,7 @@ private suspend fun importPeopleFromAccounts(
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     personAttributeRepository: PersonAttributeRepository,
     accountAttributeRepository: AccountAttributeRepository,
-    entitySourceQueries: EntitySourceQueries? = null,
+    entitySourcePort: EntitySourcePort? = null,
     accountApiSourceByExternalId: Map<String, AccountApiSource> = emptyMap(),
     sessionId: ApiSessionId? = null,
     deviceId: DeviceId? = null,
@@ -864,7 +862,7 @@ private suspend fun importPeopleFromAccounts(
                 personRepository = personRepository,
                 personAccountOwnershipRepository = personAccountOwnershipRepository,
                 personAttributeRepository = personAttributeRepository,
-                entitySourceQueries = entitySourceQueries,
+                entitySourcePort = entitySourcePort,
                 deviceId = deviceId,
                 sessionId = sessionId,
                 requestId = accountApiSourceByExternalId[account.id]?.requestId,
@@ -887,7 +885,7 @@ private suspend fun importPeopleFromCounterparties(
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     personAttributeRepository: PersonAttributeRepository,
-    entitySourceQueries: EntitySourceQueries,
+    entitySourcePort: EntitySourcePort,
     deviceId: DeviceId,
 ): Int {
     val peopleIndex = loadPeopleIndex(personRepository, personAttributeRepository)
@@ -928,7 +926,7 @@ private suspend fun importPeopleFromCounterparties(
                     personRepository = personRepository,
                     personAccountOwnershipRepository = personAccountOwnershipRepository,
                     personAttributeRepository = personAttributeRepository,
-                    entitySourceQueries = entitySourceQueries,
+                    entitySourcePort = entitySourcePort,
                     deviceId = deviceId,
                     sessionId = sessionId,
                     requestId = request.id,
@@ -946,7 +944,7 @@ private suspend fun importOwnersForAccount(
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     personAttributeRepository: PersonAttributeRepository,
-    entitySourceQueries: EntitySourceQueries? = null,
+    entitySourcePort: EntitySourcePort? = null,
     deviceId: DeviceId? = null,
     sessionId: ApiSessionId? = null,
     requestId: ApiRequestId? = null,
@@ -966,7 +964,7 @@ private suspend fun importOwnersForAccount(
                 peopleIndex = peopleIndex,
                 personRepository = personRepository,
                 personAttributeRepository = personAttributeRepository,
-                entitySourceQueries = entitySourceQueries,
+                entitySourcePort = entitySourcePort,
                 deviceId = deviceId,
                 sessionId = sessionId,
                 requestId = requestId,
@@ -975,34 +973,18 @@ private suspend fun importOwnersForAccount(
         val existingOwnership = existingOwnerPersonIds[person.id]
         if (existingOwnership == null) {
             val ownershipId = personAccountOwnershipRepository.createOwnership(person.id, accountId)
-            if (entitySourceQueries != null && deviceId != null && sessionId != null && requestId != null) {
-                ApiEntitySourceRecorder(
-                    queries = entitySourceQueries,
-                    deviceId = deviceId,
-                    sessionId = sessionId,
-                    requestId = requestId,
-                    jsonPath = jsonPath ?: owner.jsonPath,
-                ).insert(EntityType.PERSON_ACCOUNT_OWNERSHIP, ownershipId, 1L)
+            if (entitySourcePort != null && deviceId != null && sessionId != null && requestId != null) {
+                entitySourcePort.recordFromApi(entityType = EntityType.PERSON_ACCOUNT_OWNERSHIP, entityId = ownershipId, revisionId = 1L, sessionId = sessionId, requestId = requestId, jsonPath = (jsonPath ?: owner.jsonPath))
             }
-        } else if (entitySourceQueries != null && deviceId != null && sessionId != null && requestId != null) {
-            val recorder =
-                ApiEntitySourceRecorder(
-                    queries = entitySourceQueries,
-                    deviceId = deviceId,
-                    sessionId = sessionId,
-                    requestId = requestId,
-                    jsonPath = jsonPath ?: owner.jsonPath,
-                )
-            val existingSource =
-                entitySourceQueries
-                    .selectSourceByEntityAndRevision(
-                        EntityType.PERSON_ACCOUNT_OWNERSHIP.id,
-                        existingOwnership.id,
-                        existingOwnership.revisionId,
-                    ).executeAsOneOrNull()
-            if (existingSource == null) {
-                recorder.insert(EntityType.PERSON_ACCOUNT_OWNERSHIP, existingOwnership.id, existingOwnership.revisionId)
-            }
+        } else if (entitySourcePort != null && deviceId != null && sessionId != null && requestId != null) {
+            entitySourcePort.recordFromApi(
+                entityType = EntityType.PERSON_ACCOUNT_OWNERSHIP,
+                entityId = existingOwnership.id,
+                revisionId = existingOwnership.revisionId,
+                sessionId = sessionId,
+                requestId = requestId,
+                jsonPath = (jsonPath ?: owner.jsonPath),
+            )
         }
         if (wasCreated) {
             newPeopleCount++
@@ -1017,7 +999,7 @@ private suspend fun resolveOrCreatePerson(
     peopleIndex: MutablePeopleIndex,
     personRepository: PersonRepository,
     personAttributeRepository: PersonAttributeRepository,
-    entitySourceQueries: EntitySourceQueries? = null,
+    entitySourcePort: EntitySourcePort? = null,
     deviceId: DeviceId? = null,
     sessionId: ApiSessionId? = null,
     requestId: ApiRequestId? = null,
@@ -1052,14 +1034,15 @@ private suspend fun resolveOrCreatePerson(
     if (externalId != null) {
         personAttributeRepository.insertInCreationMode(createdPerson.id, PERSON_EXTERNAL_ID_ATTR_TYPE_ID, externalId)
     }
-    if (entitySourceQueries != null && deviceId != null && sessionId != null && requestId != null) {
-        ApiEntitySourceRecorder(
-            queries = entitySourceQueries,
-            deviceId = deviceId,
+    if (entitySourcePort != null && sessionId != null && requestId != null) {
+        entitySourcePort.recordFromApi(
+            entityType = EntityType.PERSON,
+            entityId = createdPerson.id.id,
+            revisionId = 1L,
             sessionId = sessionId,
             requestId = requestId,
             jsonPath = owner.jsonPath,
-        ).insert(EntityType.PERSON, createdPerson.id.id, 1L)
+        )
     }
     peopleIndex.add(createdPerson, externalId, bankKey)
     return createdPerson to true
@@ -1425,7 +1408,7 @@ private suspend fun importTransactionPage(
     nameMappings: CounterpartyNameMappings,
     apiSessionRepository: ApiSessionRepository,
     transactionRepository: TransactionRepository,
-    transferSourceQueries: TransferSourceQueries,
+    transferSourcePort: TransferSourcePort,
 ): ApiImportPageResult {
     val transactions = parseTransactionsWithPath(response.body, strategy)
     val responseId = ApiResponseId(response.responseId)
@@ -1475,7 +1458,7 @@ private suspend fun importTransactionPage(
                 existingTransfers = existingTransfers,
                 apiSessionRepository = apiSessionRepository,
                 transactionRepository = transactionRepository,
-                transferSourceQueries = transferSourceQueries,
+                transferSourcePort = transferSourcePort,
             )
         }
 
@@ -1511,7 +1494,7 @@ private suspend fun importTransactionItem(
     existingTransfers: MutableList<Transfer>,
     apiSessionRepository: ApiSessionRepository,
     transactionRepository: TransactionRepository,
-    transferSourceQueries: TransferSourceQueries,
+    transferSourcePort: TransferSourcePort,
 ): ApiResponseTransactionState {
     val currency = currencyCache.getCurrency(item.currencyCode)
     if (currency == null) {
@@ -1543,7 +1526,7 @@ private suspend fun importTransactionItem(
             existingTransfers = existingTransfers,
             apiSessionRepository = apiSessionRepository,
             transactionRepository = transactionRepository,
-            transferSourceQueries = transferSourceQueries,
+            transferSourcePort = transferSourcePort,
             declineReason = item.declineReason,
         )
     } catch (expected: Exception) {
@@ -1576,7 +1559,7 @@ private suspend fun importValidTransactionItem(
     existingTransfers: MutableList<Transfer>,
     apiSessionRepository: ApiSessionRepository,
     transactionRepository: TransactionRepository,
-    transferSourceQueries: TransferSourceQueries,
+    transferSourcePort: TransferSourcePort,
     declineReason: String? = null,
 ): ApiResponseTransactionState {
     val counterpartyApiSource = AccountApiSource(sessionId, requestId, JsonPath("${item.jsonPath.value}.counterparty"))
@@ -1627,13 +1610,7 @@ private suspend fun importValidTransactionItem(
     }
 
     val sourceRecorder =
-        ApiImportSourceRecorder(
-            queries = transferSourceQueries,
-            deviceId = deviceId,
-            sessionId = sessionId,
-            requestId = requestId,
-            jsonPath = item.jsonPath,
-        )
+        transferSourcePort.apiImportRecorder(sessionId = sessionId, requestId = requestId, jsonPath = item.jsonPath)
     val attributes =
         buildList {
             if (!declineReason.isNullOrBlank()) {
@@ -1654,7 +1631,13 @@ private suspend fun importValidTransactionItem(
         newAttributes = if (attributes.isNotEmpty()) mapOf(transfer.id to attributes) else emptyMap(),
         sourceRecorder = sourceRecorder,
     )
-    val importedTransferId = sourceRecorder.insertedTransferId ?: transfer.id
+    val importedTransferId =
+        transactionRepository
+            .getTransactionsByAccount(ownAccountId)
+            .first()
+            .firstOrNull { candidate ->
+                candidate.matches(transfer) && existingTransfers.none { it.id == candidate.id }
+            }?.id ?: transfer.id
     existingTransfers.add(transfer.copy(id = importedTransferId))
     apiSessionRepository.insertResponseTransaction(
         responseId = responseId,
@@ -1764,7 +1747,7 @@ private data class AccountApiSource(
 private class AccountCache(
     private val accountRepository: AccountRepository,
     private val accountAttributeRepository: AccountAttributeRepository,
-    private val entitySourceQueries: EntitySourceQueries,
+    private val entitySourcePort: EntitySourcePort,
     private val deviceId: DeviceId,
     val accountApiSourceByExternalId: Map<String, AccountApiSource>,
     private val sourceAccountExternalIdIndex: MutableMap<String, AccountId>,
@@ -1926,13 +1909,14 @@ private class AccountCache(
         }
         val resolvedSource = externalId?.let { accountApiSourceByExternalId[it] } ?: apiSource
         if (resolvedSource != null) {
-            ApiEntitySourceRecorder(
-                queries = entitySourceQueries,
-                deviceId = deviceId,
+            entitySourcePort.recordFromApi(
+                entityType = EntityType.ACCOUNT,
+                entityId = newId.id,
+                revisionId = 1L,
                 sessionId = resolvedSource.sessionId,
                 requestId = resolvedSource.requestId,
                 jsonPath = resolvedSource.jsonPath,
-            ).insert(EntityType.ACCOUNT, newId.id, 1L)
+            )
         }
         return newId
     }
@@ -2134,3 +2118,5 @@ private class AttributeTypeCache(
 
     suspend fun getOrCreate(name: String): AttributeTypeId = mutex.withLock { cache.getOrPut(name) { repo.getOrCreate(name) } }
 }
+
+

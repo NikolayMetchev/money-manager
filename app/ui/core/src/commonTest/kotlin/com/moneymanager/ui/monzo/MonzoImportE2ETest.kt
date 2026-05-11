@@ -2,6 +2,8 @@
 
 package com.moneymanager.ui.monzo
 
+import com.moneymanager.database.port.DbEntitySourcePort
+import com.moneymanager.database.port.DbTransferSourcePort
 import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.JsonPath
@@ -459,8 +461,8 @@ class MonzoImportE2ETest : DbTest() {
                     accountRepository = repositories.accountRepository,
                     currencyRepository = repositories.currencyRepository,
                     transactionRepository = repositories.transactionRepository,
-                    transferSourceQueries = transferSourceQueries,
-                    entitySourceQueries = repositories.entitySourceQueries,
+                    transferSourcePort = DbTransferSourcePort(transferSourceQueries, deviceId),
+                    entitySourcePort = DbEntitySourcePort(repositories.entitySourceQueries, deviceId),
                     personRepository = repositories.personRepository,
                     personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                     personAttributeRepository = repositories.personAttributeRepository,
@@ -649,8 +651,8 @@ class MonzoImportE2ETest : DbTest() {
                     accountRepository = repositories.accountRepository,
                     currencyRepository = repositories.currencyRepository,
                     transactionRepository = repositories.transactionRepository,
-                    transferSourceQueries = transferSourceQueries,
-                    entitySourceQueries = repositories.entitySourceQueries,
+                    transferSourcePort = DbTransferSourcePort(transferSourceQueries, deviceId),
+                    entitySourcePort = DbEntitySourcePort(repositories.entitySourceQueries, deviceId),
                     personRepository = repositories.personRepository,
                     personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                     personAttributeRepository = repositories.personAttributeRepository,
@@ -749,8 +751,8 @@ class MonzoImportE2ETest : DbTest() {
                     accountRepository = repositories.accountRepository,
                     currencyRepository = repositories.currencyRepository,
                     transactionRepository = repositories.transactionRepository,
-                    transferSourceQueries = transferSourceQueries,
-                    entitySourceQueries = repositories.entitySourceQueries,
+                    transferSourcePort = DbTransferSourcePort(transferSourceQueries, deviceId),
+                    entitySourcePort = DbEntitySourcePort(repositories.entitySourceQueries, deviceId),
                     personRepository = repositories.personRepository,
                     personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                     personAttributeRepository = repositories.personAttributeRepository,
@@ -835,8 +837,8 @@ class MonzoImportE2ETest : DbTest() {
                     accountRepository = repositories.accountRepository,
                     currencyRepository = repositories.currencyRepository,
                     transactionRepository = repositories.transactionRepository,
-                    transferSourceQueries = transferSourceQueries,
-                    entitySourceQueries = repositories.entitySourceQueries,
+                    transferSourcePort = DbTransferSourcePort(transferSourceQueries, deviceId),
+                    entitySourcePort = DbEntitySourcePort(repositories.entitySourceQueries, deviceId),
                     personRepository = repositories.personRepository,
                     personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                     personAttributeRepository = repositories.personAttributeRepository,
@@ -934,8 +936,8 @@ class MonzoImportE2ETest : DbTest() {
                 accountRepository = repositories.accountRepository,
                 currencyRepository = repositories.currencyRepository,
                 transactionRepository = repositories.transactionRepository,
-                transferSourceQueries = transferSourceQueries,
-                entitySourceQueries = repositories.entitySourceQueries,
+                transferSourcePort = DbTransferSourcePort(transferSourceQueries, deviceId),
+                entitySourcePort = DbEntitySourcePort(repositories.entitySourceQueries, deviceId),
                 personRepository = repositories.personRepository,
                 personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                 personAttributeRepository = repositories.personAttributeRepository,
@@ -1027,8 +1029,8 @@ class MonzoImportE2ETest : DbTest() {
                     accountRepository = repositories.accountRepository,
                     currencyRepository = repositories.currencyRepository,
                     transactionRepository = repositories.transactionRepository,
-                    transferSourceQueries = transferSourceQueries,
-                    entitySourceQueries = repositories.entitySourceQueries,
+                    transferSourcePort = DbTransferSourcePort(transferSourceQueries, deviceId),
+                    entitySourcePort = DbEntitySourcePort(repositories.entitySourceQueries, deviceId),
                     personRepository = repositories.personRepository,
                     personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                     personAttributeRepository = repositories.personAttributeRepository,
@@ -1184,8 +1186,8 @@ class MonzoImportE2ETest : DbTest() {
                 accountRepository = repositories.accountRepository,
                 currencyRepository = repositories.currencyRepository,
                 transactionRepository = repositories.transactionRepository,
-                transferSourceQueries = transferSourceQueries,
-                entitySourceQueries = repositories.entitySourceQueries,
+                transferSourcePort = DbTransferSourcePort(transferSourceQueries, deviceId),
+                entitySourcePort = DbEntitySourcePort(repositories.entitySourceQueries, deviceId),
                 personRepository = repositories.personRepository,
                 personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                 personAttributeRepository = repositories.personAttributeRepository,
@@ -1272,8 +1274,8 @@ class MonzoImportE2ETest : DbTest() {
                     accountRepository = repositories.accountRepository,
                     currencyRepository = repositories.currencyRepository,
                     transactionRepository = repositories.transactionRepository,
-                    transferSourceQueries = transferSourceQueries,
-                    entitySourceQueries = repositories.entitySourceQueries,
+                    transferSourcePort = DbTransferSourcePort(transferSourceQueries, deviceId),
+                    entitySourcePort = DbEntitySourcePort(repositories.entitySourceQueries, deviceId),
                     personRepository = repositories.personRepository,
                     personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                     personAttributeRepository = repositories.personAttributeRepository,
@@ -1332,3 +1334,5 @@ class MonzoImportE2ETest : DbTest() {
             assertTrue(atmAccounts.any { it.name == "Monzo Counterparty: Renamed ATM" })
         }
 }
+
+

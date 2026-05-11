@@ -44,12 +44,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.moneymanager.database.service.CsvStrategyExportService
-import com.moneymanager.database.service.ImportParseResult
-import com.moneymanager.database.service.ReferenceType
-import com.moneymanager.database.service.Resolution
-import com.moneymanager.database.service.UnresolvedReference
-import com.moneymanager.database.sql.EntitySourceQueries
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Category
@@ -58,6 +52,12 @@ import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.model.csvstrategy.export.CsvAccountMappingExport
+import com.moneymanager.domain.port.CsvImportParseResult
+import com.moneymanager.domain.port.CsvReferenceType
+import com.moneymanager.domain.port.CsvResolution
+import com.moneymanager.domain.port.CsvStrategyImportExportPort
+import com.moneymanager.domain.port.CsvUnresolvedReference
+import com.moneymanager.domain.port.EntitySourcePort
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CsvAccountMappingRepository
@@ -77,16 +77,16 @@ import kotlinx.coroutines.launch
  */
 @Composable
 fun ImportStrategyDialog(
-    parseResult: ImportParseResult,
+    parseResult: CsvImportParseResult,
     csvImportStrategyRepository: CsvImportStrategyRepository,
     csvAccountMappingRepository: CsvAccountMappingRepository,
-    csvStrategyExportService: CsvStrategyExportService,
+    csvStrategyImportExportPort: CsvStrategyImportExportPort,
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    entitySourceQueries: EntitySourceQueries,
+    entitySourcePort: EntitySourcePort,
     deviceId: DeviceId,
     onDismiss: () -> Unit,
     onImportSuccess: () -> Unit,
@@ -102,7 +102,7 @@ fun ImportStrategyDialog(
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
 
     var resolutions by remember {
-        mutableStateOf<Map<UnresolvedReference, Resolution>>(emptyMap())
+        mutableStateOf<Map<CsvUnresolvedReference, CsvResolution>>(emptyMap())
     }
     var strategyName by remember { mutableStateOf(parseResult.strategyName) }
     var isImporting by remember { mutableStateOf(false) }
@@ -113,7 +113,7 @@ fun ImportStrategyDialog(
     val allResolved = parseResult.unresolvedReferences.all { it in resolutions.keys }
     val unresolvedAccountReferences =
         parseResult.unresolvedReferences.filter { reference ->
-            reference.type == ReferenceType.ACCOUNT && reference !in resolutions.keys
+            reference.type == CsvReferenceType.ACCOUNT && reference !in resolutions.keys
         }
 
     // Check for name conflict
@@ -176,7 +176,7 @@ fun ImportStrategyDialog(
                                 resolutions =
                                     resolutions +
                                     unresolvedAccountReferences.associateWith { reference ->
-                                        Resolution.CreateNew(reference.name)
+                                        CsvResolution.CreateNew(reference.name)
                                     }
                             },
                             enabled = !isImporting,
@@ -200,7 +200,7 @@ fun ImportStrategyDialog(
                             categoryRepository = categoryRepository,
                             personRepository = personRepository,
                             personAccountOwnershipRepository = personAccountOwnershipRepository,
-                            entitySourceQueries = entitySourceQueries,
+                            entitySourcePort = entitySourcePort,
                             deviceId = deviceId,
                             enabled = !isImporting,
                         )
@@ -231,7 +231,7 @@ fun ImportStrategyDialog(
 
                             // Create the strategy
                             val strategy =
-                                csvStrategyExportService.createStrategyFromExport(
+                                csvStrategyImportExportPort.createStrategyFromExport(
                                     export = exportWithNewName,
                                     resolutions = resolutions,
                                 )
@@ -296,7 +296,7 @@ private data class ResolvedAccountMapping(
 
 private fun resolveAccountMappings(
     accountMappings: List<CsvAccountMappingExport>,
-    resolutions: Map<UnresolvedReference, Resolution>,
+    resolutions: Map<CsvUnresolvedReference, CsvResolution>,
     accounts: List<Account>,
 ): List<ResolvedAccountMapping> {
     val accountsByName = accounts.associateBy { it.name }
@@ -307,14 +307,14 @@ private fun resolveAccountMappings(
             resolutions[accountMappingReference(mapping.accountName)]
                 ?: resolutions.entries
                     .firstOrNull { (reference) ->
-                        reference.type == ReferenceType.ACCOUNT && reference.name == mapping.accountName
+                        reference.type == CsvReferenceType.ACCOUNT && reference.name == mapping.accountName
                     }?.value
         val account =
             when (resolution) {
-                is Resolution.CreateNew ->
+                is CsvResolution.CreateNew ->
                     accountsByName[resolution.name]
                         ?: error("Created account not found: ${resolution.name}")
-                is Resolution.MapToExisting ->
+                is CsvResolution.MapToExisting ->
                     accountsById[resolution.id]
                         ?: error("Resolved account not found: ${mapping.accountName}")
                 null ->
@@ -330,9 +330,9 @@ private fun resolveAccountMappings(
     }
 }
 
-private fun accountMappingReference(accountName: String): UnresolvedReference =
-    UnresolvedReference(
-        type = ReferenceType.ACCOUNT,
+private fun accountMappingReference(accountName: String): CsvUnresolvedReference =
+    CsvUnresolvedReference(
+        type = CsvReferenceType.ACCOUNT,
         name = accountName,
         fieldType = null,
     )
@@ -342,9 +342,9 @@ private fun accountMappingReference(accountName: String): UnresolvedReference =
  */
 @Composable
 private fun ReferenceResolutionRow(
-    reference: UnresolvedReference,
-    resolution: Resolution?,
-    onResolutionChanged: (Resolution) -> Unit,
+    reference: CsvUnresolvedReference,
+    resolution: CsvResolution?,
+    onResolutionChanged: (CsvResolution) -> Unit,
     accounts: List<Account>,
     categories: List<Category>,
     currencies: List<Currency>,
@@ -352,7 +352,7 @@ private fun ReferenceResolutionRow(
     categoryRepository: CategoryRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    entitySourceQueries: EntitySourceQueries,
+    entitySourcePort: EntitySourcePort,
     deviceId: DeviceId,
     enabled: Boolean,
 ) {
@@ -362,8 +362,8 @@ private fun ReferenceResolutionRow(
     var selectedOption by remember(resolution) {
         mutableStateOf(
             when (resolution) {
-                is Resolution.CreateNew -> "create"
-                is Resolution.MapToExisting -> "existing:${resolution.id}"
+                is CsvResolution.CreateNew -> "create"
+                is CsvResolution.MapToExisting -> "existing:${resolution.id}"
                 null -> null
             },
         )
@@ -416,7 +416,7 @@ private fun ReferenceResolutionRow(
 
             // Resolution options
             when (reference.type) {
-                ReferenceType.ACCOUNT -> {
+                CsvReferenceType.ACCOUNT -> {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -456,7 +456,7 @@ private fun ReferenceResolutionRow(
                                         text = { Text(account.name) },
                                         onClick = {
                                             selectedOption = "existing:${account.id.id}"
-                                            onResolutionChanged(Resolution.MapToExisting(account.id.id))
+                                            onResolutionChanged(CsvResolution.MapToExisting(account.id.id))
                                             expanded = false
                                         },
                                     )
@@ -470,7 +470,7 @@ private fun ReferenceResolutionRow(
                                     },
                                     onClick = {
                                         selectedOption = "create"
-                                        onResolutionChanged(Resolution.CreateNew(createNewName))
+                                        onResolutionChanged(CsvResolution.CreateNew(createNewName))
                                         expanded = false
                                     },
                                 )
@@ -490,7 +490,7 @@ private fun ReferenceResolutionRow(
                             value = createNewName,
                             onValueChange = { newName ->
                                 createNewName = newName
-                                onResolutionChanged(Resolution.CreateNew(newName))
+                                onResolutionChanged(CsvResolution.CreateNew(newName))
                             },
                             label = { Text("New account name") },
                             modifier = Modifier.fillMaxWidth(),
@@ -505,19 +505,19 @@ private fun ReferenceResolutionRow(
                             categoryRepository = categoryRepository,
                             personRepository = personRepository,
                             personAccountOwnershipRepository = personAccountOwnershipRepository,
-                            entitySourceQueries = entitySourceQueries,
+                            entitySourcePort = entitySourcePort,
                             deviceId = deviceId,
                             initialName = reference.name,
                             onDismiss = { showCreateAccountDialog = false },
                             onAccountCreated = { accountId ->
                                 selectedOption = "existing:${accountId.id}"
-                                onResolutionChanged(Resolution.MapToExisting(accountId.id))
+                                onResolutionChanged(CsvResolution.MapToExisting(accountId.id))
                             },
                         )
                     }
                 }
 
-                ReferenceType.CATEGORY -> {
+                CsvReferenceType.CATEGORY -> {
                     ExposedDropdownMenuBox(
                         expanded = expanded,
                         onExpandedChange = { if (enabled) expanded = !expanded },
@@ -555,7 +555,7 @@ private fun ReferenceResolutionRow(
                                 },
                                 onClick = {
                                     selectedOption = "create"
-                                    onResolutionChanged(Resolution.CreateNew(createNewName))
+                                    onResolutionChanged(CsvResolution.CreateNew(createNewName))
                                     expanded = false
                                 },
                             )
@@ -564,7 +564,7 @@ private fun ReferenceResolutionRow(
                                     text = { Text(category.name) },
                                     onClick = {
                                         selectedOption = "existing:${category.id}"
-                                        onResolutionChanged(Resolution.MapToExisting(category.id))
+                                        onResolutionChanged(CsvResolution.MapToExisting(category.id))
                                         expanded = false
                                     },
                                 )
@@ -578,7 +578,7 @@ private fun ReferenceResolutionRow(
                             value = createNewName,
                             onValueChange = { newName ->
                                 createNewName = newName
-                                onResolutionChanged(Resolution.CreateNew(newName))
+                                onResolutionChanged(CsvResolution.CreateNew(newName))
                             },
                             label = { Text("New category name") },
                             modifier = Modifier.fillMaxWidth(),
@@ -588,7 +588,7 @@ private fun ReferenceResolutionRow(
                     }
                 }
 
-                ReferenceType.CURRENCY -> {
+                CsvReferenceType.CURRENCY -> {
                     ExposedDropdownMenuBox(
                         expanded = expanded,
                         onExpandedChange = { if (enabled) expanded = !expanded },
@@ -627,7 +627,7 @@ private fun ReferenceResolutionRow(
                                 },
                                 onClick = {
                                     selectedOption = "create"
-                                    onResolutionChanged(Resolution.CreateNew(createNewName))
+                                    onResolutionChanged(CsvResolution.CreateNew(createNewName))
                                     expanded = false
                                 },
                             )
@@ -638,7 +638,7 @@ private fun ReferenceResolutionRow(
                                         selectedOption = "existing:${currency.id.id}"
                                         // Currency uses UUID, so we need to handle differently
                                         // For now, store the string representation
-                                        onResolutionChanged(Resolution.MapToExisting(0L)) // This won't work for currency
+                                        onResolutionChanged(CsvResolution.MapToExisting(0L)) // This won't work for currency
                                         expanded = false
                                     },
                                 )
@@ -652,7 +652,7 @@ private fun ReferenceResolutionRow(
                             value = createNewName,
                             onValueChange = { newName ->
                                 createNewName = newName
-                                onResolutionChanged(Resolution.CreateNew(newName))
+                                onResolutionChanged(CsvResolution.CreateNew(newName))
                             },
                             label = { Text("New currency code") },
                             modifier = Modifier.fillMaxWidth(),

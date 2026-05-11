@@ -22,13 +22,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.database.DatabaseConfig
-import com.moneymanager.database.ManualEntitySourceRecorder
-import com.moneymanager.database.sql.EntitySourceQueries
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonId
+import com.moneymanager.domain.port.EntitySourcePort
 import com.moneymanager.domain.repository.PersonAttributeRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -43,7 +42,7 @@ fun EditPersonDialog(
     personToEdit: Person?,
     personRepository: PersonRepository,
     personAttributeRepository: PersonAttributeRepository? = null,
-    entitySourceQueries: EntitySourceQueries,
+    entitySourcePort: EntitySourcePort,
     deviceId: DeviceId,
     onDismiss: () -> Unit,
 ) {
@@ -166,11 +165,7 @@ fun EditPersonDialog(
                                         upsertPersonExternalId(personId, resolvedExternalId, personAttributeRepository)
                                     }
                                     // Record source for audit trail
-                                    ManualEntitySourceRecorder(entitySourceQueries, deviceId).insert(
-                                        EntityType.PERSON,
-                                        personId.id,
-                                        1L,
-                                    )
+                                    entitySourcePort.record(EntityType.PERSON, personId.id, 1L)
                                 }
                                 onDismiss()
                             } catch (expected: Exception) {
