@@ -125,7 +125,7 @@ class MonzoBalanceFixtureE2ETest : DbTest() {
                 accountRepository = repositories.accountRepository,
                 currencyRepository = repositories.currencyRepository,
                 transactionRepository = repositories.transactionRepository,
-                EntitySource = DbEntitySource(database.entitySourceQueries, database.transferSourceQueries, DeviceId(deviceId.id)),
+                entitySource = DbEntitySource(database.entitySourceQueries, database.transferSourceQueries, DeviceId(deviceId.id)),
                 personRepository = repositories.personRepository,
                 personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                 personAttributeRepository = repositories.personAttributeRepository,
@@ -142,7 +142,7 @@ class MonzoBalanceFixtureE2ETest : DbTest() {
                     accountRepository = repositories.accountRepository,
                     currencyRepository = repositories.currencyRepository,
                     transactionRepository = repositories.transactionRepository,
-                    EntitySource = DbEntitySource(database.entitySourceQueries, database.transferSourceQueries, DeviceId(deviceId.id)),
+                    entitySource = DbEntitySource(database.entitySourceQueries, database.transferSourceQueries, DeviceId(deviceId.id)),
                     personRepository = repositories.personRepository,
                     personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                     personAttributeRepository = repositories.personAttributeRepository,
@@ -177,3 +177,7 @@ class MonzoBalanceFixtureE2ETest : DbTest() {
 
     private fun loadResponses(): List<ResponseFixture> = json.decodeFromString(File(fixtureDir, "api_response.json").readText())
 }
+
+
+
+

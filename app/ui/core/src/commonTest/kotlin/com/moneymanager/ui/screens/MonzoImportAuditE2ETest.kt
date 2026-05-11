@@ -199,7 +199,7 @@ class MonzoImportAuditE2ETest {
                     accountRepository = dc.accountRepository,
                     currencyRepository = dc.currencyRepository,
                     transactionRepository = dc.transactionRepository,
-                    EntitySource = DbEntitySource(db.entitySourceQueries, db.transferSourceQueries, deviceId),
+                    entitySource = DbEntitySource(db.entitySourceQueries, db.transferSourceQueries, deviceId),
                     personRepository = dc.personRepository,
                     personAccountOwnershipRepository = dc.personAccountOwnershipRepository,
                     personAttributeRepository = dc.personAttributeRepository,
@@ -262,3 +262,7 @@ class MonzoImportAuditE2ETest {
             waitUntilDoesNotExist(hasText("Source data missing"), timeoutMillis = 3000)
         }
 }
+
+
+
+
