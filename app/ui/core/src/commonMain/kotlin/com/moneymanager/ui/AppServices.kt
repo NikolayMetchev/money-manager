@@ -3,10 +3,10 @@ package com.moneymanager.ui
 import com.moneymanager.database.ApplicationGraph
 import com.moneymanager.database.service.CsvStrategyExportService
 import com.moneymanager.domain.model.DeviceId
-import com.moneymanager.domain.port.CsvStrategyImportExportPort
-import com.moneymanager.domain.port.EntitySourcePort
-import com.moneymanager.domain.port.MaintenancePort
-import com.moneymanager.domain.port.TransferSourcePort
+import com.moneymanager.domain.port.CsvStrategyImportExport
+import com.moneymanager.domain.port.EntitySource
+import com.moneymanager.domain.port.Maintenance
+import com.moneymanager.domain.port.TransferSource
 import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.ApiImportStrategyRepository
@@ -50,17 +50,17 @@ data class ImportsDomain(
     val csvImportRepository: CsvImportRepository,
     val csvImportStrategyRepository: CsvImportStrategyRepository,
     val csvStrategyExportService: CsvStrategyExportService,
-    val csvStrategyImportExportPort: CsvStrategyImportExportPort,
-    val maintenancePort: MaintenancePort,
+    val CsvStrategyImportExport: CsvStrategyImportExport,
+    val Maintenance: Maintenance,
 )
 
 data class TransactionsDomain(
     val transactionRepository: TransactionRepository,
     val transferSourceRepository: TransferSourceRepository,
     val attributeTypeRepository: AttributeTypeRepository,
-    val entitySourcePort: EntitySourcePort,
-    val transferSourcePort: TransferSourcePort,
-    val sampleEntitySourcePort: EntitySourcePort,
+    val EntitySource: EntitySource,
+    val TransferSource: TransferSource,
+    val sampleEntitySourcePort: EntitySource,
 )
 
 data class PeopleDomain(
@@ -95,16 +95,16 @@ fun ApplicationGraph.toAppServices() =
                 csvImportRepository = imports.csvImportRepository,
                 csvImportStrategyRepository = imports.csvImportStrategyRepository,
                 csvStrategyExportService = imports.csvStrategyExportService,
-                csvStrategyImportExportPort = imports.csvStrategyImportExportPort,
-                maintenancePort = imports.maintenancePort,
+                CsvStrategyImportExport = imports.CsvStrategyImportExport,
+                Maintenance = imports.Maintenance,
             ),
         transactions =
             TransactionsDomain(
                 transactionRepository = transactions.transactionRepository,
                 transferSourceRepository = transactions.transferSourceRepository,
                 attributeTypeRepository = transactions.attributeTypeRepository,
-                entitySourcePort = transactions.entitySourcePort,
-                transferSourcePort = transactions.transferSourcePort,
+                EntitySource = transactions.EntitySource,
+                TransferSource = transactions.TransferSource,
                 sampleEntitySourcePort = transactions.sampleEntitySourcePort,
             ),
         people =

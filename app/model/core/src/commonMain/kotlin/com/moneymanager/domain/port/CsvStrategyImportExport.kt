@@ -34,7 +34,7 @@ data class CsvImportParseResult(
     val unresolvedReferences: List<CsvUnresolvedReference>,
 )
 
-interface CsvStrategyImportExportPort {
+interface CsvStrategyImportExport {
     suspend fun toExport(
         strategy: CsvImportStrategy,
         appVersion: AppVersion,

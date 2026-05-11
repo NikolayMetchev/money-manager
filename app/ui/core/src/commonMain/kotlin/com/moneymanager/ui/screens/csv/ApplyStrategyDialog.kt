@@ -61,9 +61,9 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
-import com.moneymanager.domain.port.EntitySourcePort
-import com.moneymanager.domain.port.MaintenancePort
-import com.moneymanager.domain.port.TransferSourcePort
+import com.moneymanager.domain.port.EntitySource
+import com.moneymanager.domain.port.Maintenance
+import com.moneymanager.domain.port.TransferSource
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CategoryRepository
@@ -113,9 +113,9 @@ fun ApplyStrategyDialog(
     transactionRepository: TransactionRepository,
     csvImportRepository: CsvImportRepository,
     attributeTypeRepository: AttributeTypeRepository,
-    maintenancePort: MaintenancePort,
-    entitySourcePort: EntitySourcePort,
-    transferSourcePort: TransferSourcePort,
+    Maintenance: Maintenance,
+    EntitySource: EntitySource,
+    TransferSource: TransferSource,
     transferSourceRepository: TransferSourceRepository,
     deviceId: DeviceId,
     onDismiss: () -> Unit,
@@ -289,7 +289,7 @@ fun ApplyStrategyDialog(
                     categoryRepository = categoryRepository,
                     personRepository = personRepository,
                     personAccountOwnershipRepository = personAccountOwnershipRepository,
-                    entitySourcePort = entitySourcePort,
+                    EntitySource = EntitySource,
                     deviceId = deviceId,
                     enabled = !isImporting,
                     isError = selectedSourceAccountId == null,
@@ -637,7 +637,7 @@ fun ApplyStrategyDialog(
                                                 transfers = listOf(transfer),
                                                 newAttributes = mapOf(transfer.id to attributes),
                                                 sourceRecorder =
-                                                    transferSourcePort.csvImportRecorder(
+                                                    TransferSource.csvImportRecorder(
                                                         csvImportId = csvImport.id,
                                                         rowIndexForTransfer = { generatedTransferId ->
                                                             createdTransferId = generatedTransferId
@@ -733,7 +733,7 @@ fun ApplyStrategyDialog(
 
                             // Refresh materialized views so transfers are visible
                             logger.info { "Refreshing materialized views" }
-                            maintenancePort.refreshMaterializedViews()
+                            Maintenance.refreshMaterializedViews()
 
                             if ((successCount + duplicateCount) > 0) {
                                 runCatching {

@@ -41,7 +41,7 @@ import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonAccountOwnership
 import com.moneymanager.domain.model.PersonId
-import com.moneymanager.domain.port.EntitySourcePort
+import com.moneymanager.domain.port.EntitySource
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonAttributeRepository
 import com.moneymanager.domain.repository.PersonRepository
@@ -54,7 +54,7 @@ fun PeopleScreen(
     personRepository: PersonRepository,
     personAttributeRepository: PersonAttributeRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    entitySourcePort: EntitySourcePort,
+    EntitySource: EntitySource,
     deviceId: DeviceId,
     scrollToPersonId: PersonId? = null,
     onAuditClick: (Person) -> Unit = {},
@@ -137,7 +137,7 @@ fun PeopleScreen(
             personToEdit = null,
             personRepository = personRepository,
             personAttributeRepository = personAttributeRepository,
-            entitySourcePort = entitySourcePort,
+            EntitySource = EntitySource,
             deviceId = deviceId,
             onDismiss = { showCreateDialog = false },
         )
@@ -149,7 +149,7 @@ fun PeopleScreen(
             personToEdit = currentPersonToEdit,
             personRepository = personRepository,
             personAttributeRepository = personAttributeRepository,
-            entitySourcePort = entitySourcePort,
+            EntitySource = EntitySource,
             deviceId = deviceId,
             onDismiss = { personToEdit = null },
         )

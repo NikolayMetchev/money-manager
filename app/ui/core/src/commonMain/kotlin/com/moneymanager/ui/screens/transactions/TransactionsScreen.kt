@@ -48,9 +48,9 @@ import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
-import com.moneymanager.domain.port.EntitySourcePort
-import com.moneymanager.domain.port.MaintenancePort
-import com.moneymanager.domain.port.TransferSourcePort
+import com.moneymanager.domain.port.EntitySource
+import com.moneymanager.domain.port.Maintenance
+import com.moneymanager.domain.port.TransferSource
 import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
@@ -72,8 +72,8 @@ fun AccountTransactionsScreen(
     accountId: AccountId,
     transactionRepository: TransactionRepository,
     transferSourceRepository: TransferSourceRepository,
-    transferSourcePort: TransferSourcePort,
-    entitySourcePort: EntitySourcePort,
+    TransferSource: TransferSource,
+    EntitySource: EntitySource,
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
@@ -81,7 +81,7 @@ fun AccountTransactionsScreen(
     attributeTypeRepository: AttributeTypeRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    maintenancePort: MaintenancePort,
+    Maintenance: Maintenance,
     deviceId: DeviceId,
     onAccountIdChange: (AccountId) -> Unit = {},
     onCurrencyIdChange: (CurrencyId?) -> Unit = {},
@@ -946,15 +946,15 @@ fun AccountTransactionsScreen(
             transaction = transfer,
             transactionRepository = transactionRepository,
             transferSourceRepository = transferSourceRepository,
-            transferSourcePort = transferSourcePort,
-            entitySourcePort = entitySourcePort,
+            TransferSource = TransferSource,
+            EntitySource = EntitySource,
             accountRepository = accountRepository,
             categoryRepository = categoryRepository,
             currencyRepository = currencyRepository,
             attributeTypeRepository = attributeTypeRepository,
             personRepository = personRepository,
             personAccountOwnershipRepository = personAccountOwnershipRepository,
-            maintenancePort = maintenancePort,
+            Maintenance = Maintenance,
             deviceId = deviceId,
             onDismiss = { transactionIdToEdit = null },
             onSaved = { refreshTrigger++ },
@@ -971,7 +971,7 @@ fun AccountTransactionsScreen(
             categoryRepository = categoryRepository,
             personRepository = personRepository,
             personAccountOwnershipRepository = personAccountOwnershipRepository,
-            entitySourcePort = entitySourcePort,
+            EntitySource = EntitySource,
             deviceId = deviceId,
             // No onSaved refresh needed: allAccounts is collected from a Flow and updates automatically
             onDismiss = { accountToEdit = null },

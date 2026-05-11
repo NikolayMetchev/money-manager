@@ -9,7 +9,7 @@ import androidx.compose.ui.test.performClick
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DeviceId
-import com.moneymanager.domain.port.EntitySourcePort
+import com.moneymanager.domain.port.EntitySource
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
@@ -44,7 +44,7 @@ class CurrenciesScreenTest {
                 ProvideSchemaAwareScope {
                     CurrenciesScreen(
                         currencyRepository = repository,
-                        entitySourcePort = stubEntitySourcePort,
+                        EntitySource = stubEntitySourcePort,
                         deviceId = testDeviceId,
                     )
                 }
@@ -68,7 +68,7 @@ class CurrenciesScreenTest {
                 ProvideSchemaAwareScope {
                     CurrenciesScreen(
                         currencyRepository = repository,
-                        entitySourcePort = stubEntitySourcePort,
+                        EntitySource = stubEntitySourcePort,
                         deviceId = testDeviceId,
                     )
                 }
@@ -93,7 +93,7 @@ class CurrenciesScreenTest {
                 ProvideSchemaAwareScope {
                     CurrenciesScreen(
                         currencyRepository = repository,
-                        entitySourcePort = stubEntitySourcePort,
+                        EntitySource = stubEntitySourcePort,
                         deviceId = testDeviceId,
                     )
                 }
@@ -116,7 +116,7 @@ class CurrenciesScreenTest {
                 ProvideSchemaAwareScope {
                     CurrenciesScreen(
                         currencyRepository = repository,
-                        entitySourcePort = stubEntitySourcePort,
+                        EntitySource = stubEntitySourcePort,
                         deviceId = testDeviceId,
                     )
                 }
@@ -136,7 +136,7 @@ class CurrenciesScreenTest {
                 ProvideSchemaAwareScope {
                     CurrenciesScreen(
                         currencyRepository = repository,
-                        entitySourcePort = stubEntitySourcePort,
+                        EntitySource = stubEntitySourcePort,
                         deviceId = testDeviceId,
                     )
                 }
@@ -148,5 +148,5 @@ class CurrenciesScreenTest {
             onNodeWithText("Currency code is required").assertIsDisplayed()
         }
 
-    private fun createEntitySourcePort(): EntitySourcePort = mock(MockMode.autoUnit)
+    private fun createEntitySourcePort(): EntitySource = mock(MockMode.autoUnit)
 }

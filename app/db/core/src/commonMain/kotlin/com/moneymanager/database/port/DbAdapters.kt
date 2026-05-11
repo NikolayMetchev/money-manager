@@ -30,15 +30,15 @@ import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExport
 import com.moneymanager.domain.port.CsvImportParseResult
 import com.moneymanager.domain.port.CsvReferenceType
 import com.moneymanager.domain.port.CsvResolution
-import com.moneymanager.domain.port.CsvStrategyImportExportPort
+import com.moneymanager.domain.port.CsvStrategyImportExport
 import com.moneymanager.domain.port.CsvUnresolvedReference
-import com.moneymanager.domain.port.EntitySourcePort
-import com.moneymanager.domain.port.MaintenancePort
-import com.moneymanager.domain.port.TransferSourcePort
+import com.moneymanager.domain.port.EntitySource
+import com.moneymanager.domain.port.Maintenance
+import com.moneymanager.domain.port.TransferSource
 
-class DbMaintenancePort(
+class DbMaintenance(
     private val delegate: DatabaseMaintenanceService,
-) : MaintenancePort {
+) : Maintenance {
     override suspend fun reindex() = delegate.reindex()
 
     override suspend fun vacuum() = delegate.vacuum()
@@ -50,9 +50,9 @@ class DbMaintenancePort(
     override suspend fun fullRefreshMaterializedViews() = delegate.fullRefreshMaterializedViews()
 }
 
-class DbCsvStrategyImportExportPort(
+class DbCsvStrategyImportExport(
     private val delegate: CsvStrategyExportService,
-) : CsvStrategyImportExportPort {
+) : CsvStrategyImportExport {
     override suspend fun toExport(
         strategy: CsvImportStrategy,
         appVersion: AppVersion,
@@ -67,10 +67,10 @@ class DbCsvStrategyImportExportPort(
     ): CsvImportStrategy = delegate.createStrategyFromExport(export, resolutions.toDb())
 }
 
-class DbEntitySourcePort(
+class DbEntitySource(
     private val queries: EntitySourceQueries,
     private val deviceId: DeviceId,
-) : EntitySourcePort {
+) : EntitySource {
     private val recorder = ManualEntitySourceRecorder(queries, deviceId)
 
     override fun record(
@@ -93,10 +93,10 @@ class DbEntitySourcePort(
     }
 }
 
-class DbTransferSourcePort(
+class DbTransferSource(
     private val queries: TransferSourceQueries,
     private val deviceId: DeviceId,
-) : TransferSourcePort {
+) : TransferSource {
     override fun manualRecorder(): SourceRecorder = ManualSourceRecorder(queries, deviceId)
 
     override fun sampleGeneratorRecorder(): SourceRecorder = SampleGeneratorSourceRecorder(queries, deviceId)
@@ -126,10 +126,10 @@ class DbTransferSourcePort(
         )
 }
 
-class DbSampleEntitySourcePort(
+class DbSampleEntitySource(
     private val queries: EntitySourceQueries,
     private val deviceId: DeviceId,
-) : EntitySourcePort {
+) : EntitySource {
     private val recorder = SampleGeneratorEntitySourceRecorder(queries, deviceId)
 
     override fun record(

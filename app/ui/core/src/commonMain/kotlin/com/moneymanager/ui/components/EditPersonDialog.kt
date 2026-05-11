@@ -27,7 +27,7 @@ import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonId
-import com.moneymanager.domain.port.EntitySourcePort
+import com.moneymanager.domain.port.EntitySource
 import com.moneymanager.domain.repository.PersonAttributeRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -42,7 +42,7 @@ fun EditPersonDialog(
     personToEdit: Person?,
     personRepository: PersonRepository,
     personAttributeRepository: PersonAttributeRepository? = null,
-    entitySourcePort: EntitySourcePort,
+    EntitySource: EntitySource,
     deviceId: DeviceId,
     onDismiss: () -> Unit,
 ) {
@@ -165,7 +165,7 @@ fun EditPersonDialog(
                                         upsertPersonExternalId(personId, resolvedExternalId, personAttributeRepository)
                                     }
                                     // Record source for audit trail
-                                    entitySourcePort.record(EntityType.PERSON, personId.id, 1L)
+                                    EntitySource.record(EntityType.PERSON, personId.id, 1L)
                                 }
                                 onDismiss()
                             } catch (expected: Exception) {

@@ -20,9 +20,13 @@ import androidx.compose.ui.test.waitUntilExactlyOneExists
 import com.moneymanager.database.ManualSourceRecorder
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.SampleGeneratorSourceRecorder
-import com.moneymanager.database.port.DbMaintenancePort
-import com.moneymanager.database.port.DbTransferSourcePort
+import com.moneymanager.database.port.DbMaintenance
+import com.moneymanager.database.port.DbTransferSource
 import com.moneymanager.di.database.DatabaseComponent
+import com.moneymanager.domain.port.EntitySource
+import com.moneymanager.domain.port.Maintenance
+import com.moneymanager.domain.port.TransferSource
+import com.moneymanager.domain.model.SourceRecorder
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
@@ -38,12 +42,8 @@ import com.moneymanager.domain.model.PageWithTargetIndex
 import com.moneymanager.domain.model.PagingInfo
 import com.moneymanager.domain.model.PagingResult
 import com.moneymanager.domain.model.PersonId
-import com.moneymanager.domain.model.SourceRecorder
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
-import com.moneymanager.domain.port.EntitySourcePort
-import com.moneymanager.domain.port.MaintenancePort
-import com.moneymanager.domain.port.TransferSourcePort
 import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
@@ -80,7 +80,7 @@ import kotlin.time.Duration
 @OptIn(ExperimentalTestApi::class)
 class AccountTransactionsScreenTest {
     private val testDeviceId = DeviceId(1L)
-    private val stubEntitySourcePort: EntitySourcePort = mock(MockMode.autoUnit)
+    private val stubEntitySourcePort: EntitySource = mock(MockMode.autoUnit)
 
     @Test
     fun accountTransactionCard_flipsAccountDisplay_whenPerspectiveChanges() =
@@ -120,13 +120,13 @@ class AccountTransactionsScreenTest {
             val accountRepository = createAccountRepository(listOf(checking, savings))
             val transactionRepository = createTransactionRepository(listOf(transfer))
             val transferSourceRepository = createTransferSourceRepository()
-            val transferSourcePort = createStubTransferSourcePort()
+            val TransferSource = createStubTransferSourcePort()
             val currencyRepository = createCurrencyRepository(listOf(usdCurrency))
             val categoryRepository = createCategoryRepository()
             val attributeTypeRepository = createAttributeTypeRepository()
             val personRepository = createPersonRepository()
             val personAccountOwnershipRepository = createPersonAccountOwnershipRepository()
-            val maintenancePort = createMaintenancePort()
+            val Maintenance = createMaintenancePort()
 
             // When: Viewing from Checking account's perspective
             setContent {
@@ -137,8 +137,8 @@ class AccountTransactionsScreenTest {
                         accountId = currentAccountId,
                         transactionRepository = transactionRepository,
                         transferSourceRepository = transferSourceRepository,
-                        transferSourcePort = transferSourcePort,
-                        entitySourcePort = stubEntitySourcePort,
+                        TransferSource = TransferSource,
+                        EntitySource = stubEntitySourcePort,
                         accountRepository = accountRepository,
                         accountAttributeRepository = createAccountAttributeRepository(),
                         categoryRepository = categoryRepository,
@@ -146,7 +146,7 @@ class AccountTransactionsScreenTest {
                         attributeTypeRepository = attributeTypeRepository,
                         personRepository = personRepository,
                         personAccountOwnershipRepository = personAccountOwnershipRepository,
-                        maintenancePort = maintenancePort,
+                        Maintenance = Maintenance,
                         deviceId = testDeviceId,
                         onAccountIdChange = { currentAccountId = it },
                         onCurrencyIdChange = {},
@@ -219,13 +219,13 @@ class AccountTransactionsScreenTest {
             val accountRepository = createAccountRepository(listOf(checking, savings))
             val transactionRepository = createTransactionRepository(listOf(transfer))
             val transferSourceRepository = createTransferSourceRepository()
-            val transferSourcePort = createStubTransferSourcePort()
+            val TransferSource = createStubTransferSourcePort()
             val currencyRepository = createCurrencyRepository(listOf(usdCurrency))
             val categoryRepository = createCategoryRepository()
             val attributeTypeRepository = createAttributeTypeRepository()
             val personRepository = createPersonRepository()
             val personAccountOwnershipRepository = createPersonAccountOwnershipRepository()
-            val maintenancePort = createMaintenancePort()
+            val Maintenance = createMaintenancePort()
 
             setContent {
                 ProvideSchemaAwareScope {
@@ -235,8 +235,8 @@ class AccountTransactionsScreenTest {
                         accountId = currentAccountId,
                         transactionRepository = transactionRepository,
                         transferSourceRepository = transferSourceRepository,
-                        transferSourcePort = transferSourcePort,
-                        entitySourcePort = stubEntitySourcePort,
+                        TransferSource = TransferSource,
+                        EntitySource = stubEntitySourcePort,
                         accountRepository = accountRepository,
                         accountAttributeRepository = createAccountAttributeRepository(),
                         categoryRepository = categoryRepository,
@@ -244,7 +244,7 @@ class AccountTransactionsScreenTest {
                         attributeTypeRepository = attributeTypeRepository,
                         personRepository = personRepository,
                         personAccountOwnershipRepository = personAccountOwnershipRepository,
-                        maintenancePort = maintenancePort,
+                        Maintenance = Maintenance,
                         deviceId = testDeviceId,
                         onAccountIdChange = { currentAccountId = it },
                         onCurrencyIdChange = {},
@@ -360,8 +360,8 @@ class AccountTransactionsScreenTest {
                                 accountId = currentAccountId,
                                 transactionRepository = repositories.transactionRepository,
                                 transferSourceRepository = repositories.transferSourceRepository,
-                                transferSourcePort = createDbTransferSourcePort(repositories),
-                                entitySourcePort = stubEntitySourcePort,
+                                TransferSource = createDbTransferSourcePort(repositories),
+                                EntitySource = stubEntitySourcePort,
                                 accountRepository = repositories.accountRepository,
                                 accountAttributeRepository = repositories.accountAttributeRepository,
                                 categoryRepository = repositories.categoryRepository,
@@ -369,7 +369,7 @@ class AccountTransactionsScreenTest {
                                 attributeTypeRepository = repositories.attributeTypeRepository,
                                 personRepository = repositories.personRepository,
                                 personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                                maintenancePort = createDbMaintenancePort(repositories),
+                                Maintenance = createDbMaintenancePort(repositories),
                                 deviceId = repositories.deviceId,
                                 onAccountIdChange = { currentAccountId = it },
                                 onCurrencyIdChange = {},
@@ -571,8 +571,8 @@ class AccountTransactionsScreenTest {
                                 accountId = currentAccountId,
                                 transactionRepository = repositories.transactionRepository,
                                 transferSourceRepository = repositories.transferSourceRepository,
-                                transferSourcePort = createDbTransferSourcePort(repositories),
-                                entitySourcePort = stubEntitySourcePort,
+                                TransferSource = createDbTransferSourcePort(repositories),
+                                EntitySource = stubEntitySourcePort,
                                 accountRepository = repositories.accountRepository,
                                 accountAttributeRepository = repositories.accountAttributeRepository,
                                 categoryRepository = repositories.categoryRepository,
@@ -580,7 +580,7 @@ class AccountTransactionsScreenTest {
                                 attributeTypeRepository = repositories.attributeTypeRepository,
                                 personRepository = repositories.personRepository,
                                 personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                                maintenancePort = createDbMaintenancePort(repositories),
+                                Maintenance = createDbMaintenancePort(repositories),
                                 deviceId = repositories.deviceId,
                                 onAccountIdChange = { currentAccountId = it },
                                 onCurrencyIdChange = {},
@@ -752,8 +752,8 @@ class AccountTransactionsScreenTest {
                                 accountId = currentAccountId,
                                 transactionRepository = repositories.transactionRepository,
                                 transferSourceRepository = repositories.transferSourceRepository,
-                                transferSourcePort = createDbTransferSourcePort(repositories),
-                                entitySourcePort = stubEntitySourcePort,
+                                TransferSource = createDbTransferSourcePort(repositories),
+                                EntitySource = stubEntitySourcePort,
                                 accountRepository = repositories.accountRepository,
                                 accountAttributeRepository = repositories.accountAttributeRepository,
                                 categoryRepository = repositories.categoryRepository,
@@ -761,7 +761,7 @@ class AccountTransactionsScreenTest {
                                 attributeTypeRepository = repositories.attributeTypeRepository,
                                 personRepository = repositories.personRepository,
                                 personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                                maintenancePort = createDbMaintenancePort(repositories),
+                                Maintenance = createDbMaintenancePort(repositories),
                                 deviceId = repositories.deviceId,
                                 onAccountIdChange = { currentAccountId = it },
                                 onCurrencyIdChange = {},
@@ -998,7 +998,7 @@ class AccountTransactionsScreenTest {
             everySuspend { createOwnership(any(), any()) } returns 0L
         }
 
-    private fun createMaintenancePort(): MaintenancePort =
+    private fun createMaintenancePort(): Maintenance =
         mock(MockMode.autoUnit) {
             everySuspend { reindex() } returns Duration.ZERO
             everySuspend { vacuum() } returns Duration.ZERO
@@ -1007,7 +1007,7 @@ class AccountTransactionsScreenTest {
             everySuspend { fullRefreshMaterializedViews() } returns Duration.ZERO
         }
 
-    private fun createStubTransferSourcePort(): TransferSourcePort {
+    private fun createStubTransferSourcePort(): TransferSource {
         val recorder: SourceRecorder = mock(MockMode.autoUnit)
         return mock(MockMode.autoUnit) {
             every { manualRecorder() } returns recorder
@@ -1017,9 +1017,12 @@ class AccountTransactionsScreenTest {
         }
     }
 
-    private fun createDbMaintenancePort(repositories: DatabaseComponent): MaintenancePort =
-        DbMaintenancePort(repositories.maintenanceService)
+    private fun createDbMaintenancePort(repositories: DatabaseComponent): Maintenance =
+        DbMaintenance(repositories.maintenanceService)
 
-    private fun createDbTransferSourcePort(repositories: DatabaseComponent): TransferSourcePort =
-        DbTransferSourcePort(repositories.transferSourceQueries, repositories.deviceId)
+    private fun createDbTransferSourcePort(repositories: DatabaseComponent): TransferSource =
+        DbTransferSource(repositories.transferSourceQueries, repositories.deviceId)
+
 }
+
+

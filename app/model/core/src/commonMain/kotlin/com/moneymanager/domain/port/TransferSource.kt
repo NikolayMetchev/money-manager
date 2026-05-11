@@ -7,7 +7,7 @@ import com.moneymanager.domain.model.SourceRecorder
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImportId
 
-interface TransferSourcePort {
+interface TransferSource {
     fun manualRecorder(): SourceRecorder
 
     fun sampleGeneratorRecorder(): SourceRecorder

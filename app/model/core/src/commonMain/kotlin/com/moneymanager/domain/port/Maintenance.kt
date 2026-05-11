@@ -2,7 +2,7 @@ package com.moneymanager.domain.port
 
 import kotlin.time.Duration
 
-interface MaintenancePort {
+interface Maintenance {
     suspend fun reindex(): Duration
 
     suspend fun vacuum(): Duration

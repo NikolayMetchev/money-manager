@@ -35,7 +35,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.PersonId
-import com.moneymanager.domain.port.EntitySourcePort
+import com.moneymanager.domain.port.EntitySource
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
@@ -61,7 +61,7 @@ fun CreateAccountDialog(
     personRepository: PersonRepository,
     personAttributeRepository: PersonAttributeRepository? = null,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    entitySourcePort: EntitySourcePort,
+    EntitySource: EntitySource,
     deviceId: DeviceId,
     onDismiss: () -> Unit,
     onAccountCreated: ((AccountId) -> Unit)? = null,
@@ -220,7 +220,7 @@ fun CreateAccountDialog(
                                     )
                                 val accountId = accountRepository.createAccount(newAccount)
                                 // Record source for audit trail
-                                entitySourcePort.record(EntityType.ACCOUNT, accountId.id, 1L)
+                                EntitySource.record(EntityType.ACCOUNT, accountId.id, 1L)
                                 selectedOwnerIds.forEach { personId ->
                                     val ownershipId =
                                         personAccountOwnershipRepository.createOwnership(
@@ -228,7 +228,7 @@ fun CreateAccountDialog(
                                             accountId = accountId,
                                         )
                                     // Record source for ownership audit trail
-                                    entitySourcePort.record(EntityType.PERSON_ACCOUNT_OWNERSHIP, ownershipId, 1L)
+                                    EntitySource.record(EntityType.PERSON_ACCOUNT_OWNERSHIP, ownershipId, 1L)
                                 }
                                 onAccountCreated?.invoke(accountId)
                                 onDismiss()
@@ -279,7 +279,7 @@ fun CreateAccountDialog(
             personToEdit = null,
             personRepository = personRepository,
             personAttributeRepository = personAttributeRepository,
-            entitySourcePort = entitySourcePort,
+            EntitySource = EntitySource,
             deviceId = deviceId,
             onDismiss = { showCreatePersonDialog = false },
         )

@@ -83,19 +83,19 @@ fun MoneyManagerApp(
     val csvImportRepository = services.imports.csvImportRepository
     val csvImportStrategyRepository = services.imports.csvImportStrategyRepository
     val csvStrategyExportService = services.imports.csvStrategyExportService
-    val csvStrategyImportExportPort = services.imports.csvStrategyImportExportPort
+    val CsvStrategyImportExport = services.imports.CsvStrategyImportExport
     val currencyRepository = services.accounts.currencyRepository
     val deviceRepository = services.settings.deviceRepository
-    val maintenancePort = services.imports.maintenancePort
+    val Maintenance = services.imports.Maintenance
     val personRepository = services.people.personRepository
     val personAccountOwnershipRepository = services.people.personAccountOwnershipRepository
     val personAttributeRepository = services.people.personAttributeRepository
     val settingsRepository = services.settings.settingsRepository
     val transactionRepository = services.transactions.transactionRepository
     val transferSourceRepository = services.transactions.transferSourceRepository
-    val transferSourcePort = services.transactions.transferSourcePort
+    val TransferSource = services.transactions.TransferSource
     val sampleEntitySourcePort = services.transactions.sampleEntitySourcePort
-    val entitySourcePort = services.transactions.entitySourcePort
+    val EntitySource = services.transactions.EntitySource
     val deviceId = services.deviceId
 
     ProvideSchemaAwareScope {
@@ -255,8 +255,8 @@ fun MoneyManagerApp(
                                     transactionRepository = transactionRepository,
                                     personRepository = personRepository,
                                     personAccountOwnershipRepository = personAccountOwnershipRepository,
-                                    maintenancePort = maintenancePort,
-                                    entitySourcePort = entitySourcePort,
+                                    Maintenance = Maintenance,
+                                    EntitySource = EntitySource,
                                     deviceId = deviceId,
                                     scrollToAccountId = screen.scrollToAccountId,
                                     onAccountClick = { account ->
@@ -278,7 +278,7 @@ fun MoneyManagerApp(
                                 }
                                 CurrenciesScreen(
                                     currencyRepository = currencyRepository,
-                                    entitySourcePort = entitySourcePort,
+                                    EntitySource = EntitySource,
                                     deviceId = deviceId,
                                     onAuditClick = { currency ->
                                         navigationHistory.navigateTo(Screen.CurrencyAuditHistory(currency.id, currency.code))
@@ -311,7 +311,7 @@ fun MoneyManagerApp(
                                     personRepository = personRepository,
                                     personAttributeRepository = personAttributeRepository,
                                     personAccountOwnershipRepository = personAccountOwnershipRepository,
-                                    entitySourcePort = entitySourcePort,
+                                    EntitySource = EntitySource,
                                     deviceId = deviceId,
                                     scrollToPersonId = (screen as? Screen.PeopleScroll)?.personId,
                                     onAuditClick = { person ->
@@ -334,9 +334,9 @@ fun MoneyManagerApp(
                                     attributeTypeRepository = attributeTypeRepository,
                                     transactionRepository = transactionRepository,
                                     settingsRepository = settingsRepository,
-                                    maintenancePort = maintenancePort,
-                                    transferSourcePort = transferSourcePort,
-                                    entitySourcePort = sampleEntitySourcePort,
+                                    Maintenance = Maintenance,
+                                    TransferSource = TransferSource,
+                                    EntitySource = sampleEntitySourcePort,
                                 )
                             }
                             is Screen.AccountTransactions -> {
@@ -348,8 +348,8 @@ fun MoneyManagerApp(
                                     accountId = currentlyViewedAccountId ?: screen.accountId,
                                     transactionRepository = transactionRepository,
                                     transferSourceRepository = transferSourceRepository,
-                                    transferSourcePort = transferSourcePort,
-                                    entitySourcePort = entitySourcePort,
+                                    TransferSource = TransferSource,
+                                    EntitySource = EntitySource,
                                     accountRepository = accountRepository,
                                     accountAttributeRepository = accountAttributeRepository,
                                     categoryRepository = categoryRepository,
@@ -357,7 +357,7 @@ fun MoneyManagerApp(
                                     attributeTypeRepository = attributeTypeRepository,
                                     personRepository = personRepository,
                                     personAccountOwnershipRepository = personAccountOwnershipRepository,
-                                    maintenancePort = maintenancePort,
+                                    Maintenance = Maintenance,
                                     deviceId = deviceId,
                                     onAccountIdChange = { accountId ->
                                         currentlyViewedAccountId = accountId
@@ -400,9 +400,9 @@ fun MoneyManagerApp(
                                     accountRepository = accountRepository,
                                     currencyRepository = currencyRepository,
                                     transactionRepository = transactionRepository,
-                                    transferSourcePort = transferSourcePort,
-                                    entitySourcePort = entitySourcePort,
-                                    maintenancePort = maintenancePort,
+                                    TransferSource = TransferSource,
+                                    EntitySource = EntitySource,
+                                    Maintenance = Maintenance,
                                     personRepository = personRepository,
                                     personAccountOwnershipRepository = personAccountOwnershipRepository,
                                     personAttributeRepository = personAttributeRepository,
@@ -452,10 +452,10 @@ fun MoneyManagerApp(
                                     attributeTypeRepository = attributeTypeRepository,
                                     personRepository = personRepository,
                                     personAccountOwnershipRepository = personAccountOwnershipRepository,
-                                    maintenancePort = maintenancePort,
+                                    Maintenance = Maintenance,
                                     transferSourceRepository = transferSourceRepository,
-                                    transferSourcePort = transferSourcePort,
-                                    entitySourcePort = entitySourcePort,
+                                    TransferSource = TransferSource,
+                                    EntitySource = EntitySource,
                                     deviceRepository = deviceRepository,
                                     deviceId = deviceId,
                                     onBack = { navigationHistory.navigateBack() },
@@ -505,9 +505,9 @@ fun MoneyManagerApp(
                                     attributeTypeRepository = attributeTypeRepository,
                                     personRepository = personRepository,
                                     personAccountOwnershipRepository = personAccountOwnershipRepository,
-                                    entitySourcePort = entitySourcePort,
+                                    EntitySource = EntitySource,
                                     deviceId = deviceId,
-                                    csvStrategyImportExportPort = csvStrategyImportExportPort,
+                                    CsvStrategyImportExport = CsvStrategyImportExport,
                                     appVersion = appVersion,
                                     onBack = { navigationHistory.navigateBack() },
                                 )
@@ -648,15 +648,15 @@ fun MoneyManagerApp(
                     TransactionEditDialog(
                         transactionRepository = transactionRepository,
                         transferSourceRepository = transferSourceRepository,
-                        transferSourcePort = transferSourcePort,
-                        entitySourcePort = entitySourcePort,
+                        TransferSource = TransferSource,
+                        EntitySource = EntitySource,
                         accountRepository = accountRepository,
                         categoryRepository = categoryRepository,
                         currencyRepository = currencyRepository,
                         attributeTypeRepository = attributeTypeRepository,
                         personRepository = personRepository,
                         personAccountOwnershipRepository = personAccountOwnershipRepository,
-                        maintenancePort = maintenancePort,
+                        Maintenance = Maintenance,
                         deviceId = deviceId,
                         preSelectedSourceAccountId = preSelectedAccountId,
                         preSelectedCurrencyId = preSelectedCurrencyId,

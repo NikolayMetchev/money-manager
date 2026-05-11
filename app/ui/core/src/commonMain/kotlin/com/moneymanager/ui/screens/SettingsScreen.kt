@@ -34,9 +34,9 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.moneymanager.domain.port.EntitySourcePort
-import com.moneymanager.domain.port.MaintenancePort
-import com.moneymanager.domain.port.TransferSourcePort
+import com.moneymanager.domain.port.EntitySource
+import com.moneymanager.domain.port.Maintenance
+import com.moneymanager.domain.port.TransferSource
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CategoryRepository
@@ -116,9 +116,9 @@ fun SettingsScreen(
     attributeTypeRepository: AttributeTypeRepository,
     transactionRepository: TransactionRepository,
     settingsRepository: SettingsRepository,
-    maintenancePort: MaintenancePort,
-    transferSourcePort: TransferSourcePort,
-    entitySourcePort: EntitySourcePort,
+    Maintenance: Maintenance,
+    TransferSource: TransferSource,
+    EntitySource: EntitySource,
 ) {
     var showWarningDialog by remember { mutableStateOf(false) }
     var isGenerating by remember { mutableStateOf(false) }
@@ -216,13 +216,13 @@ fun SettingsScreen(
                                         val duration =
                                             when (operation) {
                                                 MaintenanceOperation.REINDEX ->
-                                                    maintenancePort.reindex()
+                                                    Maintenance.reindex()
 
                                                 MaintenanceOperation.VACUUM ->
-                                                    maintenancePort.vacuum()
+                                                    Maintenance.vacuum()
 
                                                 MaintenanceOperation.ANALYZE ->
-                                                    maintenancePort.analyze()
+                                                    Maintenance.analyze()
                                             }
                                         maintenanceState =
                                             maintenanceState.copy(
@@ -275,7 +275,7 @@ fun SettingsScreen(
                                     refreshViewsError = null
                                     scope.launch {
                                         try {
-                                            incrementalRefreshDuration = maintenancePort.refreshMaterializedViews()
+                                            incrementalRefreshDuration = Maintenance.refreshMaterializedViews()
                                         } catch (expected: Exception) {
                                             refreshViewsError = "Incremental refresh failed: ${expected.message}"
                                         } finally {
@@ -312,7 +312,7 @@ fun SettingsScreen(
                                     refreshViewsError = null
                                     scope.launch {
                                         try {
-                                            fullRefreshDuration = maintenancePort.fullRefreshMaterializedViews()
+                                            fullRefreshDuration = Maintenance.fullRefreshMaterializedViews()
                                         } catch (expected: Exception) {
                                             refreshViewsError = "Full refresh failed: ${expected.message}"
                                         } finally {
@@ -444,9 +444,9 @@ fun SettingsScreen(
                                     personAccountOwnershipRepository = personAccountOwnershipRepository,
                                     attributeTypeRepository = attributeTypeRepository,
                                     transactionRepository = transactionRepository,
-                                    maintenancePort = maintenancePort,
-                                    transferSourcePort = transferSourcePort,
-                                    entitySourcePort = entitySourcePort,
+                                    Maintenance = Maintenance,
+                                    TransferSource = TransferSource,
+                                    EntitySource = EntitySource,
                                     progressFlow = progressFlow,
                                 )
 

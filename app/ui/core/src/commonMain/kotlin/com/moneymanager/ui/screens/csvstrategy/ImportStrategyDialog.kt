@@ -55,9 +55,9 @@ import com.moneymanager.domain.model.csvstrategy.export.CsvAccountMappingExport
 import com.moneymanager.domain.port.CsvImportParseResult
 import com.moneymanager.domain.port.CsvReferenceType
 import com.moneymanager.domain.port.CsvResolution
-import com.moneymanager.domain.port.CsvStrategyImportExportPort
+import com.moneymanager.domain.port.CsvStrategyImportExport
 import com.moneymanager.domain.port.CsvUnresolvedReference
-import com.moneymanager.domain.port.EntitySourcePort
+import com.moneymanager.domain.port.EntitySource
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CsvAccountMappingRepository
@@ -80,13 +80,13 @@ fun ImportStrategyDialog(
     parseResult: CsvImportParseResult,
     csvImportStrategyRepository: CsvImportStrategyRepository,
     csvAccountMappingRepository: CsvAccountMappingRepository,
-    csvStrategyImportExportPort: CsvStrategyImportExportPort,
+    CsvStrategyImportExport: CsvStrategyImportExport,
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    entitySourcePort: EntitySourcePort,
+    EntitySource: EntitySource,
     deviceId: DeviceId,
     onDismiss: () -> Unit,
     onImportSuccess: () -> Unit,
@@ -200,7 +200,7 @@ fun ImportStrategyDialog(
                             categoryRepository = categoryRepository,
                             personRepository = personRepository,
                             personAccountOwnershipRepository = personAccountOwnershipRepository,
-                            entitySourcePort = entitySourcePort,
+                            EntitySource = EntitySource,
                             deviceId = deviceId,
                             enabled = !isImporting,
                         )
@@ -231,7 +231,7 @@ fun ImportStrategyDialog(
 
                             // Create the strategy
                             val strategy =
-                                csvStrategyImportExportPort.createStrategyFromExport(
+                                CsvStrategyImportExport.createStrategyFromExport(
                                     export = exportWithNewName,
                                     resolutions = resolutions,
                                 )
@@ -352,7 +352,7 @@ private fun ReferenceResolutionRow(
     categoryRepository: CategoryRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    entitySourcePort: EntitySourcePort,
+    EntitySource: EntitySource,
     deviceId: DeviceId,
     enabled: Boolean,
 ) {
@@ -505,7 +505,7 @@ private fun ReferenceResolutionRow(
                             categoryRepository = categoryRepository,
                             personRepository = personRepository,
                             personAccountOwnershipRepository = personAccountOwnershipRepository,
-                            entitySourcePort = entitySourcePort,
+                            EntitySource = EntitySource,
                             deviceId = deviceId,
                             initialName = reference.name,
                             onDismiss = { showCreateAccountDialog = false },

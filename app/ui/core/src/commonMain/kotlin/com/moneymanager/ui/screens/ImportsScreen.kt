@@ -10,9 +10,6 @@ import androidx.compose.ui.Modifier
 import com.moneymanager.domain.model.ApiSession
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.csv.CsvImportId
-import com.moneymanager.domain.port.EntitySourcePort
-import com.moneymanager.domain.port.MaintenancePort
-import com.moneymanager.domain.port.TransferSourcePort
 import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.ApiImportStrategyRepository
@@ -24,6 +21,9 @@ import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonAttributeRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.domain.port.EntitySource
+import com.moneymanager.domain.port.Maintenance
+import com.moneymanager.domain.port.TransferSource
 import com.moneymanager.ui.navigation.ImportTab
 
 @Composable
@@ -38,9 +38,9 @@ fun ImportsScreen(
     accountRepository: AccountRepository,
     currencyRepository: CurrencyRepository,
     transactionRepository: TransactionRepository,
-    transferSourcePort: TransferSourcePort,
-    entitySourcePort: EntitySourcePort,
-    maintenancePort: MaintenancePort,
+    TransferSource: TransferSource,
+    EntitySource: EntitySource,
+    Maintenance: Maintenance,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     personAttributeRepository: PersonAttributeRepository,
@@ -82,9 +82,9 @@ fun ImportsScreen(
                     accountRepository = accountRepository,
                     currencyRepository = currencyRepository,
                     transactionRepository = transactionRepository,
-                    transferSourcePort = transferSourcePort,
-                    entitySourcePort = entitySourcePort,
-                    maintenancePort = maintenancePort,
+                    TransferSource = TransferSource,
+                    EntitySource = EntitySource,
+                    Maintenance = Maintenance,
                     personRepository = personRepository,
                     personAccountOwnershipRepository = personAccountOwnershipRepository,
                     personAttributeRepository = personAttributeRepository,

@@ -15,7 +15,7 @@ import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.EntityType
-import com.moneymanager.domain.port.EntitySourcePort
+import com.moneymanager.domain.port.EntitySource
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -27,7 +27,7 @@ private val logger = logging()
 @Composable
 fun CurrenciesScreen(
     currencyRepository: CurrencyRepository,
-    entitySourcePort: EntitySourcePort,
+    EntitySource: EntitySource,
     deviceId: DeviceId,
     onAuditClick: (Currency) -> Unit = {},
 ) {
@@ -96,7 +96,7 @@ fun CurrenciesScreen(
         if (showCreateDialog) {
             CreateCurrencyDialog(
                 currencyRepository = currencyRepository,
-                entitySourcePort = entitySourcePort,
+                EntitySource = EntitySource,
                 deviceId = deviceId,
                 onDismiss = { showCreateDialog = false },
             )
@@ -166,7 +166,7 @@ fun CurrencyCard(
 @Composable
 fun CreateCurrencyDialog(
     currencyRepository: CurrencyRepository,
-    entitySourcePort: EntitySourcePort,
+    EntitySource: EntitySource,
     deviceId: DeviceId,
     onDismiss: () -> Unit,
 ) {
@@ -229,7 +229,7 @@ fun CreateCurrencyDialog(
                                 try {
                                     val currencyId = currencyRepository.upsertCurrencyByCode(code.trim(), name.trim())
                                     // Record source for audit trail
-                                    entitySourcePort.record(EntityType.CURRENCY, currencyId.id, 1L)
+                                    EntitySource.record(EntityType.CURRENCY, currencyId.id, 1L)
                                     onDismiss()
                                 } catch (expected: Exception) {
                                     logger.error(expected) { "Failed to create currency: ${expected.message}" }

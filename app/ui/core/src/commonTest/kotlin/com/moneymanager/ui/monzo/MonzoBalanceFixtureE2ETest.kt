@@ -2,8 +2,8 @@
 
 package com.moneymanager.ui.monzo
 
-import com.moneymanager.database.port.DbEntitySourcePort
-import com.moneymanager.database.port.DbTransferSourcePort
+import com.moneymanager.database.port.DbEntitySource
+import com.moneymanager.database.port.DbTransferSource
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.ApiSessionKind
@@ -126,8 +126,8 @@ class MonzoBalanceFixtureE2ETest : DbTest() {
                 accountRepository = repositories.accountRepository,
                 currencyRepository = repositories.currencyRepository,
                 transactionRepository = repositories.transactionRepository,
-                transferSourcePort = DbTransferSourcePort(transferSourceQueries, DeviceId(deviceId.id)),
-                entitySourcePort = DbEntitySourcePort(database.entitySourceQueries, DeviceId(deviceId.id)),
+                TransferSource = DbTransferSource(transferSourceQueries, DeviceId(deviceId.id)),
+                EntitySource = DbEntitySource(database.entitySourceQueries, DeviceId(deviceId.id)),
                 personRepository = repositories.personRepository,
                 personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                 personAttributeRepository = repositories.personAttributeRepository,
@@ -144,8 +144,8 @@ class MonzoBalanceFixtureE2ETest : DbTest() {
                     accountRepository = repositories.accountRepository,
                     currencyRepository = repositories.currencyRepository,
                     transactionRepository = repositories.transactionRepository,
-                    transferSourcePort = DbTransferSourcePort(transferSourceQueries, DeviceId(deviceId.id)),
-                    entitySourcePort = DbEntitySourcePort(database.entitySourceQueries, DeviceId(deviceId.id)),
+                    TransferSource = DbTransferSource(transferSourceQueries, DeviceId(deviceId.id)),
+                    EntitySource = DbEntitySource(database.entitySourceQueries, DeviceId(deviceId.id)),
                     personRepository = repositories.personRepository,
                     personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                     personAttributeRepository = repositories.personAttributeRepository,

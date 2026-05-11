@@ -5,7 +5,7 @@ import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.JsonPath
 
-interface EntitySourcePort {
+interface EntitySource {
     fun record(
         entityType: EntityType,
         entityId: Long,

@@ -65,9 +65,6 @@ import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.MonzoCredential
 import com.moneymanager.domain.model.MonzoCredentialId
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
-import com.moneymanager.domain.port.EntitySourcePort
-import com.moneymanager.domain.port.MaintenancePort
-import com.moneymanager.domain.port.TransferSourcePort
 import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.ApiImportStrategyRepository
@@ -78,6 +75,9 @@ import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonAttributeRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.domain.port.EntitySource
+import com.moneymanager.domain.port.Maintenance
+import com.moneymanager.domain.port.TransferSource
 import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.createApiClient
 import com.moneymanager.ui.api.ApiAccountsDownloadResult
@@ -115,9 +115,9 @@ fun ApiSessionsScreen(
     accountRepository: AccountRepository,
     currencyRepository: CurrencyRepository,
     transactionRepository: TransactionRepository,
-    transferSourcePort: TransferSourcePort,
-    entitySourcePort: EntitySourcePort,
-    maintenancePort: MaintenancePort,
+    TransferSource: TransferSource,
+    EntitySource: EntitySource,
+    Maintenance: Maintenance,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     personAttributeRepository: PersonAttributeRepository,
@@ -191,8 +191,8 @@ fun ApiSessionsScreen(
                     accountRepository = accountRepository,
                     currencyRepository = currencyRepository,
                     transactionRepository = transactionRepository,
-                    transferSourcePort = transferSourcePort,
-                    entitySourcePort = entitySourcePort,
+                    TransferSource = TransferSource,
+                    EntitySource = EntitySource,
                     personRepository = personRepository,
                     personAccountOwnershipRepository = personAccountOwnershipRepository,
                     personAttributeRepository = personAttributeRepository,
@@ -209,7 +209,7 @@ fun ApiSessionsScreen(
                     },
                 )
             apiSessionRepository.markSessionImported(session.id, Clock.System.now())
-            maintenancePort.refreshMaterializedViews()
+            Maintenance.refreshMaterializedViews()
             importResultBySession = importResultBySession + (session.id to result)
             importProgressBySession = importProgressBySession - session.id
             refresh()

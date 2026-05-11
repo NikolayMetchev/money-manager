@@ -6,6 +6,7 @@ import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Category
+import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
@@ -13,9 +14,6 @@ import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
-import com.moneymanager.domain.port.EntitySourcePort
-import com.moneymanager.domain.port.MaintenancePort
-import com.moneymanager.domain.port.TransferSourcePort
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CategoryRepository
@@ -23,6 +21,9 @@ import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.domain.port.EntitySource
+import com.moneymanager.domain.port.Maintenance
+import com.moneymanager.domain.port.TransferSource
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlin.random.Random
@@ -38,9 +39,9 @@ suspend fun generateSampleData(
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     attributeTypeRepository: AttributeTypeRepository,
     transactionRepository: TransactionRepository,
-    maintenancePort: MaintenancePort,
-    transferSourcePort: TransferSourcePort,
-    entitySourcePort: EntitySourcePort,
+    Maintenance: Maintenance,
+    TransferSource: TransferSource,
+    EntitySource: EntitySource,
     progressFlow: MutableStateFlow<GenerationProgress>,
 ) {
     val random = Random.Default
@@ -175,7 +176,7 @@ suspend fun generateSampleData(
         val personId = personRepository.createPerson(person)
         personIds.add(personId)
         // Record source for person (initial revision is 1)
-        entitySourcePort.record(EntityType.PERSON, personId.id, 1L)
+        EntitySource.record(EntityType.PERSON, personId.id, 1L)
     }
 
     progressFlow.emit(
@@ -246,7 +247,7 @@ suspend fun generateSampleData(
 
     // Record source for all accounts (initial revision is 1)
     for (accountId in accountIds) {
-        entitySourcePort.record(EntityType.ACCOUNT, accountId.id, 1L)
+        EntitySource.record(EntityType.ACCOUNT, accountId.id, 1L)
     }
 
     progressFlow.emit(
@@ -282,7 +283,7 @@ suspend fun generateSampleData(
                     accountId = accountId,
                 )
             // Record source for ownership (initial revision is 1)
-            entitySourcePort.record(EntityType.PERSON_ACCOUNT_OWNERSHIP, ownershipId, 1L)
+            EntitySource.record(EntityType.PERSON_ACCOUNT_OWNERSHIP, ownershipId, 1L)
         }
     }
 
@@ -400,7 +401,7 @@ suspend fun generateSampleData(
     transactionRepository.createTransfers(
         transfers = allTransfers,
         newAttributes = allNewAttributes,
-        sourceRecorder = transferSourcePort.sampleGeneratorRecorder(),
+        sourceRecorder = TransferSource.sampleGeneratorRecorder(),
         onProgress = { created, total ->
             transactionsCreated = created
             progressFlow.emit(
@@ -427,7 +428,7 @@ suspend fun generateSampleData(
             currentOperation = "Refreshing materialized views...",
         ),
     )
-    maintenancePort.refreshMaterializedViews()
+    Maintenance.refreshMaterializedViews()
 
     // Final progress update
     progressFlow.emit(

@@ -41,7 +41,7 @@ import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.PersonId
-import com.moneymanager.domain.port.EntitySourcePort
+import com.moneymanager.domain.port.EntitySource
 import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
@@ -71,7 +71,7 @@ fun EditAccountDialog(
     personRepository: PersonRepository,
     personAttributeRepository: PersonAttributeRepository? = null,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    entitySourcePort: EntitySourcePort,
+    EntitySource: EntitySource,
     deviceId: DeviceId,
     onDismiss: () -> Unit,
 ) {
@@ -367,7 +367,7 @@ fun EditAccountDialog(
                                     )
 
                                 // Record manual source for the single audit entry
-                                entitySourcePort.record(EntityType.ACCOUNT, account.id.id, finalRevisionId)
+                                EntitySource.record(EntityType.ACCOUNT, account.id.id, finalRevisionId)
 
                                 val existingOwnerIds = existingOwnerships.map { it.personId.id }.toSet()
                                 val ownersToAdd = selectedOwnerIds - existingOwnerIds
@@ -386,7 +386,7 @@ fun EditAccountDialog(
                                             personId = PersonId(personId),
                                             accountId = account.id,
                                         )
-                                    entitySourcePort.record(EntityType.PERSON_ACCOUNT_OWNERSHIP, ownershipId, 1L)
+                                    EntitySource.record(EntityType.PERSON_ACCOUNT_OWNERSHIP, ownershipId, 1L)
                                 }
 
                                 onDismiss()
@@ -437,7 +437,7 @@ fun EditAccountDialog(
             personToEdit = null,
             personRepository = personRepository,
             personAttributeRepository = personAttributeRepository,
-            entitySourcePort = entitySourcePort,
+            EntitySource = EntitySource,
             deviceId = deviceId,
             onDismiss = { showCreatePersonDialog = false },
         )
