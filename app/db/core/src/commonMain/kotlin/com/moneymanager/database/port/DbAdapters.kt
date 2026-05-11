@@ -127,8 +127,8 @@ class DbTransferSource(
 }
 
 class DbSampleEntitySource(
-    private val queries: EntitySourceQueries,
-    private val deviceId: DeviceId,
+    queries: EntitySourceQueries,
+    deviceId: DeviceId,
 ) : EntitySource {
     private val recorder = SampleGeneratorEntitySourceRecorder(queries, deviceId)
 
@@ -140,6 +140,7 @@ class DbSampleEntitySource(
         recorder.insert(entityType, entityId, revisionId)
     }
 
+    @Suppress("UNUSED_PARAMETER")
     override fun recordFromApi(
         entityType: EntityType,
         entityId: Long,

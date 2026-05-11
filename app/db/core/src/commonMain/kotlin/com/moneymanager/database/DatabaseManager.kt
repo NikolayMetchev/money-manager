@@ -69,5 +69,5 @@ data class DatabaseInitializationProgress(
     val totalSteps: Int,
 ) {
     val fraction: Float
-        get() = completedSteps.toFloat() / totalSteps.toFloat()
+        get() = if (totalSteps > 0) completedSteps.toFloat() / totalSteps.toFloat() else 0f
 }
