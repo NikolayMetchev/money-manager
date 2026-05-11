@@ -140,7 +140,6 @@ class DbSampleEntitySource(
         recorder.insert(entityType, entityId, revisionId)
     }
 
-    @Suppress("UNUSED_PARAMETER")
     override fun recordFromApi(
         entityType: EntityType,
         entityId: Long,
