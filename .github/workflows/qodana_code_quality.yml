@@ -21,7 +21,7 @@ jobs:
       checks: write
       security-events: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.pull_request.head.sha }}  # to check out the actual pull request commit, not the merge commit
           fetch-depth: 0  # a full history is required for pull request analysis
@@ -32,7 +32,7 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
       - name: Restore Qodana cache (read-only on non-main branches)
         if: github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/heads/releases/')
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: ${{ runner.temp }}/qodana/caches
           key: qodana-2026.1-refs/heads/main
@@ -48,7 +48,7 @@ jobs:
           QODANA_ENDPOINT: 'https://qodana.cloud'
       - name: Upload SARIF as artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: qodana-sarif
           path: ${{ runner.temp }}/qodana/results/qodana.sarif.json
