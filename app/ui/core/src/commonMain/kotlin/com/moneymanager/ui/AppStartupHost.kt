@@ -81,11 +81,11 @@ fun AppStartupHost(
         globalSchemaError
             ?.takeIf { info -> SchemaErrorDetector.isSchemaError(info.error) }
             ?.let { info ->
-            val location =
-                (databaseState as? AppDatabaseState.Loaded)?.location
-                    ?: databaseManager.getDefaultLocation()
-            location to info.error
-        } ?: (databaseState as? AppDatabaseState.Error)
+                val location =
+                    (databaseState as? AppDatabaseState.Loaded)?.location
+                        ?: databaseManager.getDefaultLocation()
+                location to info.error
+            } ?: (databaseState as? AppDatabaseState.Error)
             ?.takeIf { SchemaErrorDetector.isSchemaError(it.error) }
             ?.let { it.location to it.error }
 
