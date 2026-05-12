@@ -29,7 +29,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.SourceType
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImportId
@@ -72,7 +71,6 @@ fun CsvImportDetailScreen(
     Maintenance: Maintenance,
     transferSourceRepository: TransferSourceRepository,
     EntitySource: EntitySource,
-    deviceId: DeviceId,
     onBack: () -> Unit,
     onDeleted: () -> Unit,
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
@@ -417,10 +415,9 @@ fun CsvImportDetailScreen(
             transactionRepository = transactionRepository,
             csvImportRepository = csvImportRepository,
             attributeTypeRepository = attributeTypeRepository,
-            Maintenance = Maintenance,
-            EntitySource = EntitySource,
+            maintenance = Maintenance,
+            entitySource = EntitySource,
             transferSourceRepository = transferSourceRepository,
-            deviceId = deviceId,
             onDismiss = { showApplyStrategyDialog = false },
             onImportComplete = { result ->
                 showApplyStrategyDialog = false
@@ -446,8 +443,7 @@ fun CsvImportDetailScreen(
             attributeTypeRepository = attributeTypeRepository,
             personRepository = personRepository,
             personAccountOwnershipRepository = personAccountOwnershipRepository,
-            EntitySource = EntitySource,
-            deviceId = deviceId,
+            entitySource = EntitySource,
             csvColumns = import!!.columns,
             rows = rows,
             onDismiss = { showCreateStrategyDialog = false },

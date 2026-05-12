@@ -60,7 +60,7 @@ fun CreateAccountDialog(
     personRepository: PersonRepository,
     personAttributeRepository: PersonAttributeRepository? = null,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    EntitySource: EntitySource,
+    entitySource: EntitySource,
     onDismiss: () -> Unit,
     onAccountCreated: ((AccountId) -> Unit)? = null,
     initialName: String = "",
@@ -218,7 +218,7 @@ fun CreateAccountDialog(
                                     )
                                 val accountId = accountRepository.createAccount(newAccount)
                                 // Record source for audit trail
-                                EntitySource.record(EntityType.ACCOUNT, accountId.id, 1L)
+                                entitySource.record(EntityType.ACCOUNT, accountId.id, 1L)
                                 selectedOwnerIds.forEach { personId ->
                                     val ownershipId =
                                         personAccountOwnershipRepository.createOwnership(
@@ -226,7 +226,7 @@ fun CreateAccountDialog(
                                             accountId = accountId,
                                         )
                                     // Record source for ownership audit trail
-                                    EntitySource.record(EntityType.PERSON_ACCOUNT_OWNERSHIP, ownershipId, 1L)
+                                    entitySource.record(EntityType.PERSON_ACCOUNT_OWNERSHIP, ownershipId, 1L)
                                 }
                                 onAccountCreated?.invoke(accountId)
                                 onDismiss()
@@ -277,7 +277,7 @@ fun CreateAccountDialog(
             personToEdit = null,
             personRepository = personRepository,
             personAttributeRepository = personAttributeRepository,
-            EntitySource = EntitySource,
+            entitySource = entitySource,
             onDismiss = { showCreatePersonDialog = false },
         )
     }

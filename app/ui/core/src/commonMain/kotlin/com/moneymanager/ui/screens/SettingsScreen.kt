@@ -115,8 +115,8 @@ fun SettingsScreen(
     attributeTypeRepository: AttributeTypeRepository,
     transactionRepository: TransactionRepository,
     settingsRepository: SettingsRepository,
-    Maintenance: Maintenance,
-    EntitySource: EntitySource,
+    maintenance: Maintenance,
+    entitySource: EntitySource,
 ) {
     var showWarningDialog by remember { mutableStateOf(false) }
     var isGenerating by remember { mutableStateOf(false) }
@@ -214,13 +214,13 @@ fun SettingsScreen(
                                         val duration =
                                             when (operation) {
                                                 MaintenanceOperation.REINDEX ->
-                                                    Maintenance.reindex()
+                                                    maintenance.reindex()
 
                                                 MaintenanceOperation.VACUUM ->
-                                                    Maintenance.vacuum()
+                                                    maintenance.vacuum()
 
                                                 MaintenanceOperation.ANALYZE ->
-                                                    Maintenance.analyze()
+                                                    maintenance.analyze()
                                             }
                                         maintenanceState =
                                             maintenanceState.copy(
@@ -273,7 +273,7 @@ fun SettingsScreen(
                                     refreshViewsError = null
                                     scope.launch {
                                         try {
-                                            incrementalRefreshDuration = Maintenance.refreshMaterializedViews()
+                                            incrementalRefreshDuration = maintenance.refreshMaterializedViews()
                                         } catch (expected: Exception) {
                                             refreshViewsError = "Incremental refresh failed: ${expected.message}"
                                         } finally {
@@ -310,7 +310,7 @@ fun SettingsScreen(
                                     refreshViewsError = null
                                     scope.launch {
                                         try {
-                                            fullRefreshDuration = Maintenance.fullRefreshMaterializedViews()
+                                            fullRefreshDuration = maintenance.fullRefreshMaterializedViews()
                                         } catch (expected: Exception) {
                                             refreshViewsError = "Full refresh failed: ${expected.message}"
                                         } finally {
@@ -442,8 +442,8 @@ fun SettingsScreen(
                                     personAccountOwnershipRepository = personAccountOwnershipRepository,
                                     attributeTypeRepository = attributeTypeRepository,
                                     transactionRepository = transactionRepository,
-                                    Maintenance = Maintenance,
-                                    EntitySource = EntitySource,
+                                    maintenance = maintenance,
+                                    entitySource = entitySource,
                                     progressFlow = progressFlow,
                                 )
 

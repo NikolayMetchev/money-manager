@@ -53,7 +53,7 @@ fun PeopleScreen(
     personRepository: PersonRepository,
     personAttributeRepository: PersonAttributeRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    EntitySource: EntitySource,
+    entitySource: EntitySource,
     scrollToPersonId: PersonId? = null,
     onAuditClick: (Person) -> Unit = {},
 ) {
@@ -135,7 +135,7 @@ fun PeopleScreen(
             personToEdit = null,
             personRepository = personRepository,
             personAttributeRepository = personAttributeRepository,
-            EntitySource = EntitySource,
+            entitySource = entitySource,
             onDismiss = { showCreateDialog = false },
         )
     }
@@ -146,7 +146,7 @@ fun PeopleScreen(
             personToEdit = currentPersonToEdit,
             personRepository = personRepository,
             personAttributeRepository = personAttributeRepository,
-            EntitySource = EntitySource,
+            entitySource = entitySource,
             onDismiss = { personToEdit = null },
         )
     }

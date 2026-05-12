@@ -41,7 +41,7 @@ fun EditPersonDialog(
     personToEdit: Person?,
     personRepository: PersonRepository,
     personAttributeRepository: PersonAttributeRepository? = null,
-    EntitySource: EntitySource,
+    entitySource: EntitySource,
     onDismiss: () -> Unit,
 ) {
     var firstName by remember { mutableStateOf(personToEdit?.firstName.orEmpty()) }
@@ -163,7 +163,7 @@ fun EditPersonDialog(
                                         upsertPersonExternalId(personId, resolvedExternalId, personAttributeRepository)
                                     }
                                     // Record source for audit trail
-                                    EntitySource.record(EntityType.PERSON, personId.id, 1L)
+                                    entitySource.record(EntityType.PERSON, personId.id, 1L)
                                 }
                                 onDismiss()
                             } catch (expected: Exception) {

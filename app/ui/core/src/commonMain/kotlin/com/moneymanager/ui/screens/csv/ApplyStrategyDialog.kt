@@ -48,7 +48,6 @@ import com.moneymanager.database.csv.NewAccount
 import com.moneymanager.database.csv.StrategyMatcher
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
-import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
@@ -112,10 +111,9 @@ fun ApplyStrategyDialog(
     transactionRepository: TransactionRepository,
     csvImportRepository: CsvImportRepository,
     attributeTypeRepository: AttributeTypeRepository,
-    Maintenance: Maintenance,
-    EntitySource: EntitySource,
+    maintenance: Maintenance,
+    entitySource: EntitySource,
     transferSourceRepository: TransferSourceRepository,
-    deviceId: DeviceId,
     onDismiss: () -> Unit,
     onImportComplete: (CsvImportResult) -> Unit,
 ) {
@@ -287,8 +285,7 @@ fun ApplyStrategyDialog(
                     categoryRepository = categoryRepository,
                     personRepository = personRepository,
                     personAccountOwnershipRepository = personAccountOwnershipRepository,
-                    EntitySource = EntitySource,
-                    deviceId = deviceId,
+                    entitySource = entitySource,
                     enabled = !isImporting,
                     isError = selectedSourceAccountId == null,
                 )
@@ -635,7 +632,7 @@ fun ApplyStrategyDialog(
                                                 transfers = listOf(transfer),
                                                 newAttributes = mapOf(transfer.id to attributes),
                                                 sourceRecorder =
-                                                    EntitySource.csvImportRecorder(
+                                                    entitySource.csvImportRecorder(
                                                         csvImportId = csvImport.id,
                                                         rowIndexForTransfer = { generatedTransferId ->
                                                             createdTransferId = generatedTransferId
@@ -731,7 +728,7 @@ fun ApplyStrategyDialog(
 
                             // Refresh materialized views so transfers are visible
                             logger.info { "Refreshing materialized views" }
-                            Maintenance.refreshMaterializedViews()
+                            maintenance.refreshMaterializedViews()
 
                             if ((successCount + duplicateCount) > 0) {
                                 runCatching {

@@ -21,7 +21,6 @@ import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Category
-import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.port.EntitySource
 import com.moneymanager.domain.port.Maintenance
@@ -52,9 +51,8 @@ fun AccountsScreen(
     transactionRepository: TransactionRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    Maintenance: Maintenance,
-    EntitySource: EntitySource,
-    deviceId: DeviceId,
+    maintenance: Maintenance,
+    entitySource: EntitySource,
     scrollToAccountId: AccountId?,
     onAccountClick: (Account) -> Unit,
     onAuditClick: (Account) -> Unit = {},
@@ -132,7 +130,7 @@ fun AccountsScreen(
                             accountRepository = accountRepository,
                             personRepository = personRepository,
                             personAccountOwnershipRepository = personAccountOwnershipRepository,
-                            Maintenance = Maintenance,
+                            maintenance = maintenance,
                             onClick = { onAccountClick(account) },
                             onEditClick = { accountToEdit = account },
                             onAuditClick = { onAuditClick(account) },
@@ -153,7 +151,7 @@ fun AccountsScreen(
             categoryRepository = categoryRepository,
             personRepository = personRepository,
             personAccountOwnershipRepository = personAccountOwnershipRepository,
-            EntitySource = EntitySource,
+            entitySource = entitySource,
             onDismiss = { showCreateDialog = false },
         )
     }
@@ -168,7 +166,7 @@ fun AccountsScreen(
             categoryRepository = categoryRepository,
             personRepository = personRepository,
             personAccountOwnershipRepository = personAccountOwnershipRepository,
-            EntitySource = EntitySource,
+            entitySource = entitySource,
             onDismiss = { accountToEdit = null },
         )
     }
@@ -182,7 +180,7 @@ fun AccountCard(
     accountRepository: AccountRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    Maintenance: Maintenance,
+    maintenance: Maintenance,
     onClick: () -> Unit,
     onEditClick: () -> Unit,
     onAuditClick: () -> Unit = {},
@@ -307,7 +305,7 @@ fun AccountCard(
         DeleteAccountDialog(
             account = account,
             accountRepository = accountRepository,
-            Maintenance = Maintenance,
+            maintenance = maintenance,
             onDismiss = { showDeleteDialog = false },
         )
     }
@@ -470,7 +468,7 @@ fun CreateAccountDialog(
 fun DeleteAccountDialog(
     account: Account,
     accountRepository: AccountRepository,
-    Maintenance: Maintenance,
+    maintenance: Maintenance,
     onDismiss: () -> Unit,
 ) {
     var isDeleting by remember { mutableStateOf(false) }
@@ -615,7 +613,7 @@ fun DeleteAccountDialog(
                                     accountToDelete = account.id,
                                     targetAccount = selectedTargetAccount!!.id,
                                 )
-                                Maintenance.fullRefreshMaterializedViews()
+                                maintenance.fullRefreshMaterializedViews()
                             } else {
                                 accountRepository.deleteAccount(account.id)
                             }

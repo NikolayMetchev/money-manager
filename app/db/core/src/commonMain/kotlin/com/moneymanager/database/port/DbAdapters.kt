@@ -122,11 +122,11 @@ class DbEntitySource(
 }
 
 class DbSampleEntitySource(
-    queries: EntitySourceQueries,
+    private val entitySourceQueries: EntitySourceQueries,
     private val transferSourceQueries: TransferSourceQueries,
     private val deviceId: DeviceId,
 ) : EntitySource {
-    private val recorder = SampleGeneratorEntitySourceRecorder(queries, deviceId)
+    private val recorder = SampleGeneratorEntitySourceRecorder(entitySourceQueries, deviceId)
 
     override fun record(
         entityType: EntityType,
@@ -144,7 +144,7 @@ class DbSampleEntitySource(
         requestId: ApiRequestId,
         jsonPath: JsonPath,
     ) {
-        recorder.insert(entityType, entityId, revisionId)
+        ApiEntitySourceRecorder(entitySourceQueries, deviceId, sessionId, requestId, jsonPath).insert(entityType, entityId, revisionId)
     }
 
     override fun manualRecorder(): SourceRecorder = ManualSourceRecorder(transferSourceQueries, deviceId)
@@ -216,4 +216,5 @@ private fun CsvResolution.toDb(): Resolution =
     when (this) {
         is CsvResolution.CreateNew -> Resolution.CreateNew(name)
         is CsvResolution.MapToExisting -> Resolution.MapToExisting(id)
+        is CsvResolution.MapToExistingCurrency -> Resolution.MapToExistingCurrency(id)
     }

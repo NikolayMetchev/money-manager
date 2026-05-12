@@ -8,7 +8,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
-import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.port.EntitySource
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.ui.error.ProvideSchemaAwareScope
@@ -24,7 +23,6 @@ import kotlin.test.Test
 
 @OptIn(ExperimentalTestApi::class)
 class CurrenciesScreenTest {
-    private val testDeviceId = DeviceId(1L)
     private val stubEntitySourcePort = createEntitySourcePort()
 
     private fun createCurrencyRepository(currencies: List<Currency>): CurrencyRepository =
@@ -44,8 +42,7 @@ class CurrenciesScreenTest {
                 ProvideSchemaAwareScope {
                     CurrenciesScreen(
                         currencyRepository = repository,
-                        EntitySource = stubEntitySourcePort,
-                        deviceId = testDeviceId,
+                        entitySource = stubEntitySourcePort,
                     )
                 }
             }
@@ -68,8 +65,7 @@ class CurrenciesScreenTest {
                 ProvideSchemaAwareScope {
                     CurrenciesScreen(
                         currencyRepository = repository,
-                        EntitySource = stubEntitySourcePort,
-                        deviceId = testDeviceId,
+                        entitySource = stubEntitySourcePort,
                     )
                 }
             }
@@ -93,8 +89,7 @@ class CurrenciesScreenTest {
                 ProvideSchemaAwareScope {
                     CurrenciesScreen(
                         currencyRepository = repository,
-                        EntitySource = stubEntitySourcePort,
-                        deviceId = testDeviceId,
+                        entitySource = stubEntitySourcePort,
                     )
                 }
             }
@@ -116,8 +111,7 @@ class CurrenciesScreenTest {
                 ProvideSchemaAwareScope {
                     CurrenciesScreen(
                         currencyRepository = repository,
-                        EntitySource = stubEntitySourcePort,
-                        deviceId = testDeviceId,
+                        entitySource = stubEntitySourcePort,
                     )
                 }
             }
@@ -136,8 +130,7 @@ class CurrenciesScreenTest {
                 ProvideSchemaAwareScope {
                     CurrenciesScreen(
                         currencyRepository = repository,
-                        EntitySource = stubEntitySourcePort,
-                        deviceId = testDeviceId,
+                        entitySource = stubEntitySourcePort,
                     )
                 }
             }

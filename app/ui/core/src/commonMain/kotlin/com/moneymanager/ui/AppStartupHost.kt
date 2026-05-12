@@ -16,6 +16,8 @@ import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.ui.components.DatabaseSchemaErrorDialog
 import com.moneymanager.ui.components.DatabaseStartupProgressScreen
 import com.moneymanager.ui.error.GlobalSchemaErrorState
+import com.moneymanager.ui.error.SchemaErrorDetector
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 private sealed class AppDatabaseState {
@@ -66,6 +68,8 @@ fun AppStartupHost(
             services.deviceId
             databaseState = AppDatabaseState.Loaded(location, services)
             onInfoLog("Database opened successfully")
+        } catch (expected: CancellationException) {
+            throw expected
         } catch (expected: Exception) {
             onErrorLog("Failed to open database: ${expected.message}", expected)
             databaseState = AppDatabaseState.Error(location, expected)
@@ -74,12 +78,16 @@ fun AppStartupHost(
 
     val globalSchemaError by GlobalSchemaErrorState.schemaError.collectAsState()
     val effectiveSchemaError: Pair<DbLocation, Throwable>? =
-        globalSchemaError?.let { info ->
+        globalSchemaError
+            ?.takeIf { info -> SchemaErrorDetector.isSchemaError(info.error) }
+            ?.let { info ->
             val location =
                 (databaseState as? AppDatabaseState.Loaded)?.location
                     ?: databaseManager.getDefaultLocation()
             location to info.error
-        } ?: (databaseState as? AppDatabaseState.Error)?.let { it.location to it.error }
+        } ?: (databaseState as? AppDatabaseState.Error)
+            ?.takeIf { SchemaErrorDetector.isSchemaError(it.error) }
+            ?.let { it.location to it.error }
 
     when (val state = databaseState) {
         is AppDatabaseState.Loaded -> {
@@ -152,6 +160,8 @@ private suspend fun recreateDatabase(
         databaseStateUpdater(AppDatabaseState.Loaded(location, services))
         GlobalSchemaErrorState.clearError()
         onInfoLog("New database created successfully")
+    } catch (expected: CancellationException) {
+        throw expected
     } catch (expected: Exception) {
         val message =
             if (shouldBackup) {

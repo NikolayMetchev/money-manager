@@ -44,7 +44,6 @@ import com.moneymanager.compose.scrollbar.VerticalScrollbarForScrollState
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CurrencyId
-import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
@@ -80,7 +79,6 @@ fun AccountTransactionsScreen(
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     Maintenance: Maintenance,
-    deviceId: DeviceId,
     onAccountIdChange: (AccountId) -> Unit = {},
     onCurrencyIdChange: (CurrencyId?) -> Unit = {},
     onAccountClick: (AccountId, String, CurrencyId?) -> Unit = { _, _, _ -> },
@@ -952,7 +950,6 @@ fun AccountTransactionsScreen(
             personRepository = personRepository,
             personAccountOwnershipRepository = personAccountOwnershipRepository,
             Maintenance = Maintenance,
-            deviceId = deviceId,
             onDismiss = { transactionIdToEdit = null },
             onSaved = { refreshTrigger++ },
         )
@@ -968,7 +965,7 @@ fun AccountTransactionsScreen(
             categoryRepository = categoryRepository,
             personRepository = personRepository,
             personAccountOwnershipRepository = personAccountOwnershipRepository,
-            EntitySource = EntitySource,
+            entitySource = EntitySource,
             // No onSaved refresh needed: allAccounts is collected from a Flow and updates automatically
             onDismiss = { accountToEdit = null },
         )

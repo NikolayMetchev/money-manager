@@ -42,7 +42,6 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.CurrencyId
-import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Transfer
@@ -83,7 +82,6 @@ fun TransactionEditDialog(
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     Maintenance: Maintenance,
-    deviceId: DeviceId,
     preSelectedSourceAccountId: AccountId? = null,
     preSelectedCurrencyId: CurrencyId? = null,
     onDismiss: () -> Unit,
@@ -232,8 +230,7 @@ fun TransactionEditDialog(
                     categoryRepository = categoryRepository,
                     personRepository = personRepository,
                     personAccountOwnershipRepository = personAccountOwnershipRepository,
-                    EntitySource = EntitySource,
-                    deviceId = deviceId,
+                    entitySource = EntitySource,
                     enabled = !isSaving,
                     excludeAccountId = targetAccountId,
                 )
@@ -247,8 +244,7 @@ fun TransactionEditDialog(
                     categoryRepository = categoryRepository,
                     personRepository = personRepository,
                     personAccountOwnershipRepository = personAccountOwnershipRepository,
-                    EntitySource = EntitySource,
-                    deviceId = deviceId,
+                    entitySource = EntitySource,
                     enabled = !isSaving,
                     excludeAccountId = sourceAccountId,
                 )

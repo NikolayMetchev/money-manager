@@ -1246,7 +1246,7 @@ private fun JsonTreeNode(
     val childCount = element.childCount()
     val expandable = childCount > 0
     // This node is the target if all highlight segments have been consumed
-    val isHighlightTarget = !remainingHighlightSegments.isNullOrEmpty()
+    val isHighlightTarget = remainingHighlightSegments.isNullOrEmpty()
     // Force-expand the node if it's on the highlight path
     val forceExpandPath = !remainingHighlightSegments.isNullOrEmpty()
     val shouldForceExpand = forceExpandSubtree || forceExpandPath || isHighlightTarget

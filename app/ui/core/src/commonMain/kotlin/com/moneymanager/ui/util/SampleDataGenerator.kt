@@ -37,8 +37,8 @@ suspend fun generateSampleData(
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     attributeTypeRepository: AttributeTypeRepository,
     transactionRepository: TransactionRepository,
-    Maintenance: Maintenance,
-    EntitySource: EntitySource,
+    maintenance: Maintenance,
+    entitySource: EntitySource,
     progressFlow: MutableStateFlow<GenerationProgress>,
 ) {
     val random = Random.Default
@@ -173,7 +173,7 @@ suspend fun generateSampleData(
         val personId = personRepository.createPerson(person)
         personIds.add(personId)
         // Record source for person (initial revision is 1)
-        EntitySource.record(EntityType.PERSON, personId.id, 1L)
+        entitySource.record(EntityType.PERSON, personId.id, 1L)
     }
 
     progressFlow.emit(
@@ -244,7 +244,7 @@ suspend fun generateSampleData(
 
     // Record source for all accounts (initial revision is 1)
     for (accountId in accountIds) {
-        EntitySource.record(EntityType.ACCOUNT, accountId.id, 1L)
+        entitySource.record(EntityType.ACCOUNT, accountId.id, 1L)
     }
 
     progressFlow.emit(
@@ -280,7 +280,7 @@ suspend fun generateSampleData(
                     accountId = accountId,
                 )
             // Record source for ownership (initial revision is 1)
-            EntitySource.record(EntityType.PERSON_ACCOUNT_OWNERSHIP, ownershipId, 1L)
+            entitySource.record(EntityType.PERSON_ACCOUNT_OWNERSHIP, ownershipId, 1L)
         }
     }
 
@@ -398,7 +398,7 @@ suspend fun generateSampleData(
     transactionRepository.createTransfers(
         transfers = allTransfers,
         newAttributes = allNewAttributes,
-        sourceRecorder = EntitySource.sampleGeneratorRecorder(),
+        sourceRecorder = entitySource.sampleGeneratorRecorder(),
         onProgress = { created, total ->
             transactionsCreated = created
             progressFlow.emit(
@@ -425,7 +425,7 @@ suspend fun generateSampleData(
             currentOperation = "Refreshing materialized views...",
         ),
     )
-    Maintenance.refreshMaterializedViews()
+    maintenance.refreshMaterializedViews()
 
     // Final progress update
     progressFlow.emit(

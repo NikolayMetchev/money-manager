@@ -931,7 +931,6 @@ private suspend fun importOwnersForAccount(
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     personAttributeRepository: PersonAttributeRepository,
     entitySource: EntitySource? = null,
-    deviceId: DeviceId? = null,
     sessionId: ApiSessionId? = null,
     requestId: ApiRequestId? = null,
     jsonPath: JsonPath? = null,
@@ -958,7 +957,7 @@ private suspend fun importOwnersForAccount(
         val existingOwnership = existingOwnerPersonIds[person.id]
         if (existingOwnership == null) {
             val ownershipId = personAccountOwnershipRepository.createOwnership(person.id, accountId)
-            if (entitySource != null && deviceId != null && sessionId != null && requestId != null) {
+            if (entitySource != null && sessionId != null && requestId != null) {
                 entitySource.recordFromApi(
                     entityType = EntityType.PERSON_ACCOUNT_OWNERSHIP,
                     entityId = ownershipId,
@@ -971,7 +970,7 @@ private suspend fun importOwnersForAccount(
                     ),
                 )
             }
-        } else if (entitySource != null && deviceId != null && sessionId != null && requestId != null) {
+        } else if (entitySource != null && sessionId != null && requestId != null) {
             entitySource.recordFromApi(
                 entityType = EntityType.PERSON_ACCOUNT_OWNERSHIP,
                 entityId = existingOwnership.id,

@@ -78,6 +78,13 @@ sealed interface Resolution {
     ) : Resolution
 
     /**
+     * Map currency reference to an existing currency by UUID string.
+     */
+    data class MapToExistingCurrency(
+        val id: String,
+    ) : Resolution
+
+    /**
      * Create a new entity with the given name.
      */
     data class CreateNew(
@@ -299,27 +306,33 @@ class CsvStrategyExportService(
 
         // Add resolution mappings for MapToExisting
         for ((ref, resolution) in resolutions) {
-            if (resolution is Resolution.MapToExisting) {
-                when (ref.type) {
-                    ReferenceType.ACCOUNT -> {
-                        val account = accounts.find { it.id.id == resolution.id }
-                        if (account != null) {
-                            accountsByName[ref.name] = account
+            when (resolution) {
+                is Resolution.MapToExisting -> {
+                    when (ref.type) {
+                        ReferenceType.ACCOUNT -> {
+                            val account = accounts.find { it.id.id == resolution.id }
+                            if (account != null) {
+                                accountsByName[ref.name] = account
+                            }
                         }
-                    }
-                    ReferenceType.CATEGORY -> {
-                        val category = categories.find { it.id == resolution.id }
-                        if (category != null) {
-                            categoriesByName[ref.name] = category
+                        ReferenceType.CATEGORY -> {
+                            val category = categories.find { it.id == resolution.id }
+                            if (category != null) {
+                                categoriesByName[ref.name] = category
+                            }
                         }
+                        ReferenceType.CURRENCY -> Unit
                     }
-                    ReferenceType.CURRENCY -> {
-                        val currency = currencies.find { it.id.id.toString() == resolution.id.toString() }
+                }
+                is Resolution.MapToExistingCurrency -> {
+                    if (ref.type == ReferenceType.CURRENCY) {
+                        val currency = currencies.find { it.id.id.toString() == resolution.id }
                         if (currency != null) {
                             currenciesByCode[ref.name] = currency
                         }
                     }
                 }
+                is Resolution.CreateNew -> Unit
             }
         }
 

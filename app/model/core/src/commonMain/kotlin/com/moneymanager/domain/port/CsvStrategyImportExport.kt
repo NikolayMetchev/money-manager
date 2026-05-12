@@ -23,6 +23,10 @@ sealed interface CsvResolution {
         val id: Long,
     ) : CsvResolution
 
+    data class MapToExistingCurrency(
+        val id: String,
+    ) : CsvResolution
+
     data class CreateNew(
         val name: String,
     ) : CsvResolution

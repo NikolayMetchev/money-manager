@@ -48,7 +48,6 @@ import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Currency
-import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.model.csvstrategy.export.CsvAccountMappingExport
@@ -80,14 +79,13 @@ fun ImportStrategyDialog(
     parseResult: CsvImportParseResult,
     csvImportStrategyRepository: CsvImportStrategyRepository,
     csvAccountMappingRepository: CsvAccountMappingRepository,
-    CsvStrategyImportExport: CsvStrategyImportExport,
+    csvStrategyImportExport: CsvStrategyImportExport,
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    EntitySource: EntitySource,
-    deviceId: DeviceId,
+    entitySource: EntitySource,
     onDismiss: () -> Unit,
     onImportSuccess: () -> Unit,
 ) {
@@ -200,8 +198,7 @@ fun ImportStrategyDialog(
                             categoryRepository = categoryRepository,
                             personRepository = personRepository,
                             personAccountOwnershipRepository = personAccountOwnershipRepository,
-                            EntitySource = EntitySource,
-                            deviceId = deviceId,
+                            entitySource = entitySource,
                             enabled = !isImporting,
                         )
                         Spacer(modifier = Modifier.height(8.dp))
@@ -231,7 +228,7 @@ fun ImportStrategyDialog(
 
                             // Create the strategy
                             val strategy =
-                                CsvStrategyImportExport.createStrategyFromExport(
+                                csvStrategyImportExport.createStrategyFromExport(
                                     export = exportWithNewName,
                                     resolutions = resolutions,
                                 )
@@ -317,6 +314,8 @@ private fun resolveAccountMappings(
                 is CsvResolution.MapToExisting ->
                     accountsById[resolution.id]
                         ?: error("Resolved account not found: ${mapping.accountName}")
+                is CsvResolution.MapToExistingCurrency ->
+                    error("Currency resolution is not valid for account mapping: ${mapping.accountName}")
                 null ->
                     accountsByName[mapping.accountName]
                         ?: error("Account not found: ${mapping.accountName}")
@@ -352,8 +351,7 @@ private fun ReferenceResolutionRow(
     categoryRepository: CategoryRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    EntitySource: EntitySource,
-    deviceId: DeviceId,
+    entitySource: EntitySource,
     enabled: Boolean,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -364,6 +362,7 @@ private fun ReferenceResolutionRow(
             when (resolution) {
                 is CsvResolution.CreateNew -> "create"
                 is CsvResolution.MapToExisting -> "existing:${resolution.id}"
+                is CsvResolution.MapToExistingCurrency -> "existing:${resolution.id}"
                 null -> null
             },
         )
@@ -505,7 +504,7 @@ private fun ReferenceResolutionRow(
                             categoryRepository = categoryRepository,
                             personRepository = personRepository,
                             personAccountOwnershipRepository = personAccountOwnershipRepository,
-                            EntitySource = EntitySource,
+                            entitySource = entitySource,
                             initialName = reference.name,
                             onDismiss = { showCreateAccountDialog = false },
                             onAccountCreated = { accountId ->
@@ -635,9 +634,7 @@ private fun ReferenceResolutionRow(
                                     text = { Text("${currency.code} - ${currency.name}") },
                                     onClick = {
                                         selectedOption = "existing:${currency.id.id}"
-                                        // Currency uses UUID, so we need to handle differently
-                                        // For now, store the string representation
-                                        onResolutionChanged(CsvResolution.MapToExisting(0L)) // This won't work for currency
+                                        onResolutionChanged(CsvResolution.MapToExistingCurrency(currency.id.id.toString()))
                                         expanded = false
                                     },
                                 )

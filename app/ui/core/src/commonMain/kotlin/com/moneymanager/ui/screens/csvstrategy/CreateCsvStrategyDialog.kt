@@ -54,7 +54,6 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.CurrencyId
-import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
@@ -337,8 +336,7 @@ fun CreateCsvStrategyDialog(
     attributeTypeRepository: AttributeTypeRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    EntitySource: EntitySource,
-    deviceId: DeviceId,
+    entitySource: EntitySource,
     csvColumns: List<CsvColumn>,
     rows: List<CsvRow>,
     onDismiss: () -> Unit,
@@ -555,8 +553,7 @@ fun CreateCsvStrategyDialog(
                     categoryRepository = categoryRepository,
                     personRepository = personRepository,
                     personAccountOwnershipRepository = personAccountOwnershipRepository,
-                    EntitySource = EntitySource,
-                    deviceId = deviceId,
+                    entitySource = entitySource,
                     enabled = !isSaving,
                 )
 

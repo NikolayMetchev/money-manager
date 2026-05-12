@@ -70,7 +70,7 @@ fun EditAccountDialog(
     personRepository: PersonRepository,
     personAttributeRepository: PersonAttributeRepository? = null,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    EntitySource: EntitySource,
+    entitySource: EntitySource,
     onDismiss: () -> Unit,
 ) {
     var name by remember { mutableStateOf(account.name) }
@@ -365,7 +365,7 @@ fun EditAccountDialog(
                                     )
 
                                 // Record manual source for the single audit entry
-                                EntitySource.record(EntityType.ACCOUNT, account.id.id, finalRevisionId)
+                                entitySource.record(EntityType.ACCOUNT, account.id.id, finalRevisionId)
 
                                 val existingOwnerIds = existingOwnerships.map { it.personId.id }.toSet()
                                 val ownersToAdd = selectedOwnerIds - existingOwnerIds
@@ -384,7 +384,7 @@ fun EditAccountDialog(
                                             personId = PersonId(personId),
                                             accountId = account.id,
                                         )
-                                    EntitySource.record(EntityType.PERSON_ACCOUNT_OWNERSHIP, ownershipId, 1L)
+                                    entitySource.record(EntityType.PERSON_ACCOUNT_OWNERSHIP, ownershipId, 1L)
                                 }
 
                                 onDismiss()
@@ -435,7 +435,7 @@ fun EditAccountDialog(
             personToEdit = null,
             personRepository = personRepository,
             personAttributeRepository = personAttributeRepository,
-            EntitySource = EntitySource,
+            entitySource = entitySource,
             onDismiss = { showCreatePersonDialog = false },
         )
     }

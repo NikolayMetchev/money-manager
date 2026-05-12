@@ -78,7 +78,6 @@ import kotlin.time.Duration
 
 @OptIn(ExperimentalTestApi::class)
 class AccountTransactionsScreenTest {
-    private val testDeviceId = DeviceId(1L)
     private val stubEntitySourcePort: EntitySource = mock(MockMode.autoUnit)
 
     @Test
@@ -145,7 +144,6 @@ class AccountTransactionsScreenTest {
                         personRepository = personRepository,
                         personAccountOwnershipRepository = personAccountOwnershipRepository,
                         Maintenance = Maintenance,
-                        deviceId = testDeviceId,
                         onAccountIdChange = { currentAccountId = it },
                         onCurrencyIdChange = {},
                     )
@@ -242,7 +240,6 @@ class AccountTransactionsScreenTest {
                         personRepository = personRepository,
                         personAccountOwnershipRepository = personAccountOwnershipRepository,
                         Maintenance = Maintenance,
-                        deviceId = testDeviceId,
                         onAccountIdChange = { currentAccountId = it },
                         onCurrencyIdChange = {},
                     )
@@ -366,7 +363,6 @@ class AccountTransactionsScreenTest {
                                 personRepository = repositories.personRepository,
                                 personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                                 Maintenance = createDbMaintenancePort(repositories),
-                                deviceId = repositories.deviceId,
                                 onAccountIdChange = { currentAccountId = it },
                                 onCurrencyIdChange = {},
                                 onAuditClick = { auditTransferId = it },
@@ -576,7 +572,6 @@ class AccountTransactionsScreenTest {
                                 personRepository = repositories.personRepository,
                                 personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                                 Maintenance = createDbMaintenancePort(repositories),
-                                deviceId = repositories.deviceId,
                                 onAccountIdChange = { currentAccountId = it },
                                 onCurrencyIdChange = {},
                                 onAuditClick = { auditTransferId = it },
@@ -756,7 +751,6 @@ class AccountTransactionsScreenTest {
                                 personRepository = repositories.personRepository,
                                 personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                                 Maintenance = createDbMaintenancePort(repositories),
-                                deviceId = repositories.deviceId,
                                 onAccountIdChange = { currentAccountId = it },
                                 onCurrencyIdChange = {},
                                 onAuditClick = { auditTransferId = it },

@@ -42,7 +42,6 @@ import com.moneymanager.compose.filepicker.rememberFileSaver
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.database.json.CsvStrategyExportCodec
 import com.moneymanager.domain.model.AppVersion
-import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
@@ -75,9 +74,8 @@ fun CsvStrategiesScreen(
     attributeTypeRepository: AttributeTypeRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    EntitySource: EntitySource,
-    deviceId: DeviceId,
-    CsvStrategyImportExport: CsvStrategyImportExport,
+    entitySource: EntitySource,
+    csvStrategyImportExport: CsvStrategyImportExport,
     appVersion: AppVersion,
     onStrategyClick: (CsvImportStrategy) -> Unit = {},
     onBack: () -> Unit = {},
@@ -126,7 +124,7 @@ fun CsvStrategiesScreen(
                         try {
                             val jsonContent = result.content
                             val export = CsvStrategyExportCodec.decode(jsonContent)
-                            val parseResult = CsvStrategyImportExport.parseExport(export)
+                            val parseResult = csvStrategyImportExport.parseExport(export)
                             importParseResult = parseResult
                             importError = null
                             exportError = null
@@ -154,7 +152,7 @@ fun CsvStrategiesScreen(
                         emptyList()
                     }
                 val export =
-                    CsvStrategyImportExport.toExport(
+                    csvStrategyImportExport.toExport(
                         strategy = strategy,
                         appVersion = appVersion,
                         accountMappings = persistedAccountMappings.takeIf { includeAccountMappings },
@@ -333,8 +331,7 @@ fun CsvStrategiesScreen(
             attributeTypeRepository = attributeTypeRepository,
             personRepository = personRepository,
             personAccountOwnershipRepository = personAccountOwnershipRepository,
-            EntitySource = EntitySource,
-            deviceId = deviceId,
+            entitySource = entitySource,
             csvColumns = currentCsvImport.columns,
             rows = csvRows,
             onDismiss = {
@@ -353,14 +350,13 @@ fun CsvStrategiesScreen(
             parseResult = currentParseResult,
             csvImportStrategyRepository = csvImportStrategyRepository,
             csvAccountMappingRepository = csvAccountMappingRepository,
-            CsvStrategyImportExport = CsvStrategyImportExport,
+            csvStrategyImportExport = csvStrategyImportExport,
             accountRepository = accountRepository,
             categoryRepository = categoryRepository,
             currencyRepository = currencyRepository,
             personRepository = personRepository,
             personAccountOwnershipRepository = personAccountOwnershipRepository,
-            EntitySource = EntitySource,
-            deviceId = deviceId,
+            entitySource = entitySource,
             onDismiss = {
                 importParseResult = null
                 importError = null

@@ -10,7 +10,6 @@ import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
 import com.moneymanager.domain.model.AttributeTypeId
-import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.PageWithTargetIndex
 import com.moneymanager.domain.model.PagingInfo
 import com.moneymanager.domain.model.PagingResult
@@ -39,7 +38,6 @@ import kotlin.time.Duration
 
 @OptIn(ExperimentalTestApi::class)
 class AccountsScreenTest {
-    private val testDeviceId = DeviceId(1L)
     private val stubEntitySourcePort = createEntitySourcePort()
 
     @Test
@@ -59,9 +57,8 @@ class AccountsScreenTest {
                         transactionRepository = createTransactionRepository(),
                         personRepository = createPersonRepository(),
                         personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
-                        Maintenance = createMaintenancePort(),
-                        EntitySource = stubEntitySourcePort,
-                        deviceId = testDeviceId,
+                        maintenance = createMaintenancePort(),
+                        entitySource = stubEntitySourcePort,
                         scrollToAccountId = null,
                         onAccountClick = {},
                     )
@@ -104,9 +101,8 @@ class AccountsScreenTest {
                         transactionRepository = createTransactionRepository(),
                         personRepository = createPersonRepository(),
                         personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
-                        Maintenance = createMaintenancePort(),
-                        EntitySource = stubEntitySourcePort,
-                        deviceId = testDeviceId,
+                        maintenance = createMaintenancePort(),
+                        entitySource = stubEntitySourcePort,
                         scrollToAccountId = null,
                         onAccountClick = {},
                     )
@@ -135,9 +131,8 @@ class AccountsScreenTest {
                         transactionRepository = createTransactionRepository(),
                         personRepository = createPersonRepository(),
                         personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
-                        Maintenance = createMaintenancePort(),
-                        EntitySource = stubEntitySourcePort,
-                        deviceId = testDeviceId,
+                        maintenance = createMaintenancePort(),
+                        entitySource = stubEntitySourcePort,
                         scrollToAccountId = null,
                         onAccountClick = {},
                     )
@@ -165,9 +160,8 @@ class AccountsScreenTest {
                         transactionRepository = createTransactionRepository(),
                         personRepository = createPersonRepository(),
                         personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
-                        Maintenance = createMaintenancePort(),
-                        EntitySource = stubEntitySourcePort,
-                        deviceId = testDeviceId,
+                        maintenance = createMaintenancePort(),
+                        entitySource = stubEntitySourcePort,
                         scrollToAccountId = null,
                         onAccountClick = {},
                     )
@@ -205,9 +199,8 @@ class AccountsScreenTest {
                         transactionRepository = createTransactionRepository(),
                         personRepository = createPersonRepository(),
                         personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
-                        Maintenance = createMaintenancePort(),
-                        EntitySource = stubEntitySourcePort,
-                        deviceId = testDeviceId,
+                        maintenance = createMaintenancePort(),
+                        entitySource = stubEntitySourcePort,
                         scrollToAccountId = null,
                         onAccountClick = {},
                     )
@@ -242,9 +235,8 @@ class AccountsScreenTest {
                         transactionRepository = createTransactionRepository(),
                         personRepository = createPersonRepository(),
                         personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
-                        Maintenance = createMaintenancePort(),
-                        EntitySource = stubEntitySourcePort,
-                        deviceId = testDeviceId,
+                        maintenance = createMaintenancePort(),
+                        entitySource = stubEntitySourcePort,
                         scrollToAccountId = null,
                         onAccountClick = {},
                     )
@@ -276,9 +268,8 @@ class AccountsScreenTest {
                         transactionRepository = createTransactionRepository(),
                         personRepository = createPersonRepository(),
                         personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
-                        Maintenance = createMaintenancePort(),
-                        EntitySource = stubEntitySourcePort,
-                        deviceId = testDeviceId,
+                        maintenance = createMaintenancePort(),
+                        entitySource = stubEntitySourcePort,
                         scrollToAccountId = null,
                         onAccountClick = {},
                     )
@@ -312,9 +303,8 @@ class AccountsScreenTest {
                         transactionRepository = createTransactionRepository(),
                         personRepository = createPersonRepository(),
                         personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
-                        Maintenance = createMaintenancePort(),
-                        EntitySource = stubEntitySourcePort,
-                        deviceId = testDeviceId,
+                        maintenance = createMaintenancePort(),
+                        entitySource = stubEntitySourcePort,
                         scrollToAccountId = null,
                         onAccountClick = {},
                     )
@@ -356,9 +346,8 @@ class AccountsScreenTest {
                         transactionRepository = createTransactionRepository(),
                         personRepository = createPersonRepository(),
                         personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
-                        Maintenance = createMaintenancePort(),
-                        EntitySource = stubEntitySourcePort,
-                        deviceId = testDeviceId,
+                        maintenance = createMaintenancePort(),
+                        entitySource = stubEntitySourcePort,
                         scrollToAccountId = null,
                         onAccountClick = {},
                     )
@@ -412,9 +401,8 @@ class AccountsScreenTest {
                         transactionRepository = createTransactionRepository(),
                         personRepository = createPersonRepository(),
                         personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
-                        Maintenance = createMaintenancePort(),
-                        EntitySource = stubEntitySourcePort,
-                        deviceId = testDeviceId,
+                        maintenance = createMaintenancePort(),
+                        entitySource = stubEntitySourcePort,
                         scrollToAccountId = null,
                         onAccountClick = {},
                     )
