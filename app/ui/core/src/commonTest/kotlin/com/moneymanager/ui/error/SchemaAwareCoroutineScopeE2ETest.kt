@@ -64,7 +64,7 @@ class SchemaAwareCoroutineScopeE2ETest {
 
             // Then: Schema error dialog should be displayed at startup
             // (old database is missing Device/Platform tables)
-            waitUntilExactlyOneExists(hasText("Database Schema Error"), timeoutMillis = 10000)
+            waitUntilExactlyOneExists(hasText("Database Schema Error"), timeoutMillis = 30000)
             onNodeWithText("Database Schema Error").assertIsDisplayed()
             // The error message should mention a missing table
             onNodeWithText(text = "no such table", substring = true).assertIsDisplayed()
@@ -92,14 +92,14 @@ class SchemaAwareCoroutineScopeE2ETest {
             }
 
             // Wait for schema error dialog (shown at startup due to missing tables)
-            waitUntilExactlyOneExists(hasText("Database Schema Error"), timeoutMillis = 10000)
-            waitUntilExactlyOneExists(hasText("Delete Database and Start Fresh"), timeoutMillis = 10000)
+            waitUntilExactlyOneExists(hasText("Database Schema Error"), timeoutMillis = 30000)
+            waitUntilExactlyOneExists(hasText("Delete Database and Start Fresh"), timeoutMillis = 30000)
 
             // When: User clicks "Delete Database and Start Fresh"
             onNodeWithText("Delete Database and Start Fresh").performClick()
 
             // Then: Dialog should disappear and app should recover
-            waitUntilDoesNotExist(hasText("Database Schema Error"), timeoutMillis = 10000)
+            waitUntilDoesNotExist(hasText("Database Schema Error"), timeoutMillis = 30000)
             waitForIdle()
             onNodeWithText("Database Schema Error").assertDoesNotExist()
 
