@@ -1,4 +1,4 @@
-package com.moneymanager.domain.port
+package com.moneymanager.domain
 
 import kotlin.time.Duration
 

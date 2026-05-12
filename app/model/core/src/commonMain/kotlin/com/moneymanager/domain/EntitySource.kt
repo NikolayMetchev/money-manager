@@ -1,4 +1,4 @@
-package com.moneymanager.domain.port
+package com.moneymanager.domain
 
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiSessionId

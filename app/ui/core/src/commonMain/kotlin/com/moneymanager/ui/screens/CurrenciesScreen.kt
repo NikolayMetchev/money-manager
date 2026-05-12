@@ -14,7 +14,7 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.EntityType
-import com.moneymanager.domain.port.EntitySource
+import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope

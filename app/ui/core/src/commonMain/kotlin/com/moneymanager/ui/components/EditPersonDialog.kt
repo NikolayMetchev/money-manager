@@ -26,7 +26,7 @@ import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonId
-import com.moneymanager.domain.port.EntitySource
+import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.repository.PersonAttributeRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope

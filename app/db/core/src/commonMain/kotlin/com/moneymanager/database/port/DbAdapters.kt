@@ -27,13 +27,13 @@ import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExport
-import com.moneymanager.domain.port.CsvImportParseResult
-import com.moneymanager.domain.port.CsvReferenceType
-import com.moneymanager.domain.port.CsvResolution
-import com.moneymanager.domain.port.CsvStrategyImportExport
-import com.moneymanager.domain.port.CsvUnresolvedReference
-import com.moneymanager.domain.port.EntitySource
-import com.moneymanager.domain.port.Maintenance
+import com.moneymanager.domain.CsvImportParseResult
+import com.moneymanager.domain.CsvReferenceType
+import com.moneymanager.domain.CsvResolution
+import com.moneymanager.domain.CsvStrategyImportExport
+import com.moneymanager.domain.CsvUnresolvedReference
+import com.moneymanager.domain.EntitySource
+import com.moneymanager.domain.Maintenance
 
 class DbMaintenance(
     private val delegate: DatabaseMaintenanceService,

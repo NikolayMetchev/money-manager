@@ -40,7 +40,7 @@ import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.PersonId
-import com.moneymanager.domain.port.EntitySource
+import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
