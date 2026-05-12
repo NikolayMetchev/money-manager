@@ -969,7 +969,6 @@ fun AccountTransactionsScreen(
             personRepository = personRepository,
             personAccountOwnershipRepository = personAccountOwnershipRepository,
             EntitySource = EntitySource,
-            deviceId = deviceId,
             // No onSaved refresh needed: allAccounts is collected from a Flow and updates automatically
             onDismiss = { accountToEdit = null },
         )

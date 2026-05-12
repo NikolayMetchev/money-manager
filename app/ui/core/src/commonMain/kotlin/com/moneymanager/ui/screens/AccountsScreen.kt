@@ -154,7 +154,6 @@ fun AccountsScreen(
             personRepository = personRepository,
             personAccountOwnershipRepository = personAccountOwnershipRepository,
             EntitySource = EntitySource,
-            deviceId = deviceId,
             onDismiss = { showCreateDialog = false },
         )
     }
@@ -170,7 +169,6 @@ fun AccountsScreen(
             personRepository = personRepository,
             personAccountOwnershipRepository = personAccountOwnershipRepository,
             EntitySource = EntitySource,
-            deviceId = deviceId,
             onDismiss = { accountToEdit = null },
         )
     }

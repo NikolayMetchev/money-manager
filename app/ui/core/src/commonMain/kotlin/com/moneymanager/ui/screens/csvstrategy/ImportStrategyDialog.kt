@@ -506,7 +506,6 @@ private fun ReferenceResolutionRow(
                             personRepository = personRepository,
                             personAccountOwnershipRepository = personAccountOwnershipRepository,
                             EntitySource = EntitySource,
-                            deviceId = deviceId,
                             initialName = reference.name,
                             onDismiss = { showCreateAccountDialog = false },
                             onAccountCreated = { accountId ->

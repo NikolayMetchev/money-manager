@@ -143,7 +143,6 @@ fun AccountPicker(
             personRepository = personRepository,
             personAccountOwnershipRepository = personAccountOwnershipRepository,
             EntitySource = EntitySource,
-            deviceId = deviceId,
             onDismiss = { showCreateAccountDialog = false },
             onAccountCreated = { accountId ->
                 onAccountSelected(accountId)
