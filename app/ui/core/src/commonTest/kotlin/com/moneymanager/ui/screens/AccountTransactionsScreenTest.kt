@@ -23,6 +23,8 @@ import com.moneymanager.database.SampleGeneratorSourceRecorder
 import com.moneymanager.database.port.DbEntitySource
 import com.moneymanager.database.port.DbMaintenance
 import com.moneymanager.di.database.DatabaseComponent
+import com.moneymanager.domain.EntitySource
+import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
@@ -40,8 +42,6 @@ import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.SourceRecorder
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
-import com.moneymanager.domain.EntitySource
-import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository

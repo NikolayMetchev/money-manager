@@ -3,9 +3,9 @@
 package com.moneymanager.ui.api
 
 import com.moneymanager.database.DatabaseConfig
+import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.model.*
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
-import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.ApiSessionRepository

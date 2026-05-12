@@ -2,10 +2,10 @@ package com.moneymanager.ui
 
 import com.moneymanager.database.Application
 import com.moneymanager.database.service.CsvStrategyExportService
-import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.CsvStrategyImportExport
 import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.Maintenance
+import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.ApiImportStrategyRepository
