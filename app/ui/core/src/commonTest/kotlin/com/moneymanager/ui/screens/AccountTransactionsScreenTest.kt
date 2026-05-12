@@ -117,13 +117,13 @@ class AccountTransactionsScreenTest {
             val accountRepository = createAccountRepository(listOf(checking, savings))
             val transactionRepository = createTransactionRepository(listOf(transfer))
             val transferSourceRepository = createTransferSourceRepository()
-            val EntitySource = createStubEntitySource()
+            val entitySource = createStubEntitySource()
             val currencyRepository = createCurrencyRepository(listOf(usdCurrency))
             val categoryRepository = createCategoryRepository()
             val attributeTypeRepository = createAttributeTypeRepository()
             val personRepository = createPersonRepository()
             val personAccountOwnershipRepository = createPersonAccountOwnershipRepository()
-            val Maintenance = createMaintenancePort()
+            val maintenance = createMaintenancePort()
 
             // When: Viewing from Checking account's perspective
             setContent {
@@ -134,7 +134,7 @@ class AccountTransactionsScreenTest {
                         accountId = currentAccountId,
                         transactionRepository = transactionRepository,
                         transferSourceRepository = transferSourceRepository,
-                        EntitySource = EntitySource,
+                        EntitySource = entitySource,
                         accountRepository = accountRepository,
                         accountAttributeRepository = createAccountAttributeRepository(),
                         categoryRepository = categoryRepository,
@@ -142,7 +142,7 @@ class AccountTransactionsScreenTest {
                         attributeTypeRepository = attributeTypeRepository,
                         personRepository = personRepository,
                         personAccountOwnershipRepository = personAccountOwnershipRepository,
-                        Maintenance = Maintenance,
+                        Maintenance = maintenance,
                         onAccountIdChange = { currentAccountId = it },
                         onCurrencyIdChange = {},
                     )
@@ -214,13 +214,13 @@ class AccountTransactionsScreenTest {
             val accountRepository = createAccountRepository(listOf(checking, savings))
             val transactionRepository = createTransactionRepository(listOf(transfer))
             val transferSourceRepository = createTransferSourceRepository()
-            val EntitySource = createStubEntitySource()
+            val entitySource = createStubEntitySource()
             val currencyRepository = createCurrencyRepository(listOf(usdCurrency))
             val categoryRepository = createCategoryRepository()
             val attributeTypeRepository = createAttributeTypeRepository()
             val personRepository = createPersonRepository()
             val personAccountOwnershipRepository = createPersonAccountOwnershipRepository()
-            val Maintenance = createMaintenancePort()
+            val maintenance = createMaintenancePort()
 
             setContent {
                 ProvideSchemaAwareScope {
@@ -230,7 +230,7 @@ class AccountTransactionsScreenTest {
                         accountId = currentAccountId,
                         transactionRepository = transactionRepository,
                         transferSourceRepository = transferSourceRepository,
-                        EntitySource = EntitySource,
+                        EntitySource = entitySource,
                         accountRepository = accountRepository,
                         accountAttributeRepository = createAccountAttributeRepository(),
                         categoryRepository = categoryRepository,
@@ -238,7 +238,7 @@ class AccountTransactionsScreenTest {
                         attributeTypeRepository = attributeTypeRepository,
                         personRepository = personRepository,
                         personAccountOwnershipRepository = personAccountOwnershipRepository,
-                        Maintenance = Maintenance,
+                        Maintenance = maintenance,
                         onAccountIdChange = { currentAccountId = it },
                         onCurrencyIdChange = {},
                     )
