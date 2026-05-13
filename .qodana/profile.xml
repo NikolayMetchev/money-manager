@@ -43,6 +43,13 @@
       <option name="ADD_NONJAVA_TO_ENTRIES" value="true"/>
       <entry_point TYPE="annotation" FQNAME="dev.zacsweers.metro.Provides"/>
     </inspection_tool>
+    <inspection_tool class="unused" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="ADD_MAINS_TO_ENTRIES" value="true"/>
+      <option name="ADD_APPLET_TO_ENTRIES" value="true"/>
+      <option name="ADD_SERVLET_TO_ENTRIES" value="true"/>
+      <option name="ADD_NONJAVA_TO_ENTRIES" value="true"/>
+      <entry_point TYPE="annotation" FQNAME="dev.zacsweers.metro.Provides"/>
+    </inspection_tool>
     <inspection_tool class="UnusedVariable" enabled="true" level="ERROR" enabled_by_default="true"/>
     <inspection_tool class="VariableNeverRead" enabled="true" level="ERROR" enabled_by_default="true"/>
   </profile>
