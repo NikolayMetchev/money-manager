@@ -20,11 +20,18 @@ private val DbLocation.jdbcUrl: String
  * Stateless - does not track open databases.
  */
 class JvmDatabaseManager : DatabaseManager {
-    override suspend fun openDatabase(location: DbLocation): MoneyManagerDatabaseWrapper =
+    override suspend fun openDatabase(location: DbLocation): MoneyManagerDatabaseWrapper = openDatabaseWithProgress(location) {}
+
+    override suspend fun openDatabaseWithProgress(
+        location: DbLocation,
+        onProgress: (DatabaseInitializationProgress) -> Unit,
+    ): MoneyManagerDatabaseWrapper =
         withContext(Dispatchers.IO) {
+            onProgress(DatabaseInitializationProgress("Checking for an existing database...", 1, 7))
             // Auto-detect if this is a new database
             val isNewDatabase = !location.exists()
 
+            onProgress(DatabaseInitializationProgress("Preparing the database folder...", 2, 7))
             // Create parent directories if they don't exist
             location.path.parent?.let { parentDir ->
                 if (!parentDir.exists()) {
@@ -32,6 +39,7 @@ class JvmDatabaseManager : DatabaseManager {
                 }
             }
 
+            onProgress(DatabaseInitializationProgress("Opening the SQLite database...", 3, 7))
             // Create driver with JDBC URL and properties to enable foreign keys
             // Note: foreign_keys must be set via Properties for file-based databases
             // See: https://github.com/sqldelight/sqldelight/issues/2421
@@ -41,6 +49,7 @@ class JvmDatabaseManager : DatabaseManager {
                 }
             val driver = JdbcSqliteDriver(location.jdbcUrl, properties)
 
+            onProgress(DatabaseInitializationProgress("Applying database settings...", 4, 7))
             // Apply cross-platform pragmas (foreign_keys already set via Properties above).
             // WAL mode and busy_timeout are JVM-only: on Android WAL is enabled via
             // enableWriteAheadLogging() and the connection pool handles contention differently.
@@ -52,16 +61,23 @@ class JvmDatabaseManager : DatabaseManager {
                 }
 
             if (isNewDatabase) {
+                onProgress(DatabaseInitializationProgress("Creating the database schema...", 5, 7))
                 // Create schema for new database
                 MoneyManagerDatabase.Schema.create(driver)
+            } else {
+                onProgress(DatabaseInitializationProgress("Checking the database schema...", 5, 7))
             }
 
             val database = MoneyManagerDatabaseWrapper(driver)
 
             if (isNewDatabase) {
+                onProgress(DatabaseInitializationProgress("Adding default currencies and settings...", 6, 7))
                 DatabaseConfig.seedDatabase(database, CurrencyRepositoryImpl(database))
+            } else {
+                onProgress(DatabaseInitializationProgress("Preparing repositories...", 6, 7))
             }
 
+            onProgress(DatabaseInitializationProgress("Finishing database startup...", 7, 7))
             database
         }
 

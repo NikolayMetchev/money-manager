@@ -7,9 +7,8 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import com.moneymanager.database.DatabaseMaintenanceService
-import com.moneymanager.database.sql.EntitySourceQueries
-import com.moneymanager.database.sql.TransferSourceQueries
+import com.moneymanager.domain.EntitySource
+import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.ApiSession
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.csv.CsvImportId
@@ -38,9 +37,8 @@ fun ImportsScreen(
     accountRepository: AccountRepository,
     currencyRepository: CurrencyRepository,
     transactionRepository: TransactionRepository,
-    transferSourceQueries: TransferSourceQueries,
-    entitySourceQueries: EntitySourceQueries,
-    maintenanceService: DatabaseMaintenanceService,
+    entitySource: EntitySource,
+    maintenance: Maintenance,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     personAttributeRepository: PersonAttributeRepository,
@@ -82,9 +80,8 @@ fun ImportsScreen(
                     accountRepository = accountRepository,
                     currencyRepository = currencyRepository,
                     transactionRepository = transactionRepository,
-                    transferSourceQueries = transferSourceQueries,
-                    entitySourceQueries = entitySourceQueries,
-                    maintenanceService = maintenanceService,
+                    entitySource = entitySource,
+                    maintenance = maintenance,
                     personRepository = personRepository,
                     personAccountOwnershipRepository = personAccountOwnershipRepository,
                     personAttributeRepository = personAttributeRepository,
