@@ -93,7 +93,6 @@ fun MoneyManagerApp(
     val transactionRepository = services.transactions.transactionRepository
     val transferSourceRepository = services.transactions.transferSourceRepository
     val entitySource = services.transactions.entitySource
-    val sampleEntitySourcePort = services.transactions.sampleEntitySourcePort
     val deviceId = services.deviceId
 
     ProvideSchemaAwareScope {
@@ -330,7 +329,7 @@ fun MoneyManagerApp(
                                     transactionRepository = transactionRepository,
                                     settingsRepository = settingsRepository,
                                     maintenance = maintenance,
-                                    entitySource = sampleEntitySourcePort,
+                                    entitySource = services.transactions.sampleEntitySourcePort,
                                 )
                             }
                             is Screen.AccountTransactions -> {
