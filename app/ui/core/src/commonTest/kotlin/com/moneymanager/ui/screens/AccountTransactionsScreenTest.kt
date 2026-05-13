@@ -77,8 +77,6 @@ import kotlin.time.Duration
 
 @OptIn(ExperimentalTestApi::class)
 class AccountTransactionsScreenTest {
-    private val stubEntitySource: EntitySource = mock(MockMode.autoUnit)
-
     @Test
     fun accountTransactionCard_flipsAccountDisplay_whenPerspectiveChanges() =
         runMoneyManagerComposeUiTest {
