@@ -493,4 +493,3 @@ class AccountsScreenTest {
             everySuspend { getOrCreate(any()) } returns AttributeTypeId(0L)
         }
 }
-

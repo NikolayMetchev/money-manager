@@ -1009,4 +1009,3 @@ class AccountTransactionsScreenTest {
     private fun createDbEntitySource(repositories: DatabaseComponent): EntitySource =
         DbEntitySource(repositories.entitySourceQueries, repositories.transferSourceQueries, repositories.deviceId)
 }
-
