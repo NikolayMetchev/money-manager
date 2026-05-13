@@ -27,10 +27,12 @@ exclude:
       - app/ui/core/.editorconfig
   - name: unused
     paths:
-      - app/di/core/src
+      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/*Module.kt
+      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/database/*Module.kt
   - name: UnusedDeclaration
     paths:
-      - app/di/core/src
+      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/*Module.kt
+      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/database/*Module.kt
   - name: All
     paths:
       - build
