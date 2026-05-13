@@ -84,7 +84,6 @@ fun MoneyManagerApp(
     val csvImportStrategyRepository = services.imports.csvImportStrategyRepository
     val csvStrategyImportExport = services.imports.csvStrategyImportExport
     val currencyRepository = services.accounts.currencyRepository
-    val deviceRepository = services.settings.deviceRepository
     val maintenance = services.imports.maintenance
     val personRepository = services.people.personRepository
     val personAccountOwnershipRepository = services.people.personAccountOwnershipRepository
