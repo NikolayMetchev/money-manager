@@ -25,6 +25,12 @@ exclude:
   - name: EditorConfigKeyCorrectness
     paths:
       - app/ui/core/.editorconfig
+  - name: unused
+    paths:
+      - app/di/core/src
+  - name: UnusedDeclaration
+    paths:
+      - app/di/core/src
   - name: All
     paths:
       - build
