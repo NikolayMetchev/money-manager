@@ -40,10 +40,8 @@ dependencies {
     implementation(libs.androidx.activity)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.runtime)
-    implementation(libs.kotlinx.coroutines.core)
     implementation(projects.app.db.core)
     implementation(projects.app.di.core)
-    implementation(projects.app.model.core)
     implementation(projects.app.ui.core)
 }
 

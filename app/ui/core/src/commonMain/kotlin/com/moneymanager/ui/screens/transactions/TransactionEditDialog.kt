@@ -37,16 +37,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.moneymanager.bigdecimal.BigDecimal
-import com.moneymanager.database.DatabaseMaintenanceService
-import com.moneymanager.database.ManualSourceRecorder
-import com.moneymanager.database.sql.EntitySourceQueries
-import com.moneymanager.database.sql.TransferSourceQueries
+import com.moneymanager.domain.EntitySource
+import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.getDeviceInfo
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.CurrencyId
-import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Transfer
@@ -55,7 +52,6 @@ import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
-import com.moneymanager.domain.repository.DeviceRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
@@ -78,17 +74,14 @@ fun TransactionEditDialog(
     transaction: Transfer? = null,
     transactionRepository: TransactionRepository,
     transferSourceRepository: TransferSourceRepository,
-    transferSourceQueries: TransferSourceQueries,
-    entitySourceQueries: EntitySourceQueries,
-    deviceRepository: DeviceRepository,
+    EntitySource: EntitySource,
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
     attributeTypeRepository: AttributeTypeRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    maintenanceService: DatabaseMaintenanceService,
-    deviceId: DeviceId,
+    Maintenance: Maintenance,
     preSelectedSourceAccountId: AccountId? = null,
     preSelectedCurrencyId: CurrencyId? = null,
     onDismiss: () -> Unit,
@@ -237,8 +230,7 @@ fun TransactionEditDialog(
                     categoryRepository = categoryRepository,
                     personRepository = personRepository,
                     personAccountOwnershipRepository = personAccountOwnershipRepository,
-                    entitySourceQueries = entitySourceQueries,
-                    deviceId = deviceId,
+                    entitySource = EntitySource,
                     enabled = !isSaving,
                     excludeAccountId = targetAccountId,
                 )
@@ -252,8 +244,7 @@ fun TransactionEditDialog(
                     categoryRepository = categoryRepository,
                     personRepository = personRepository,
                     personAccountOwnershipRepository = personAccountOwnershipRepository,
-                    entitySourceQueries = entitySourceQueries,
-                    deviceId = deviceId,
+                    entitySource = EntitySource,
                     enabled = !isSaving,
                     excludeAccountId = sourceAccountId,
                 )
@@ -599,15 +590,14 @@ fun TransactionEditDialog(
                                             attributesToSave.add(NewAttribute(AttributeTypeId(-1), excludeReason))
                                         }
 
-                                        val transferDeviceId = deviceRepository.getOrCreateDevice(getDeviceInfo())
                                         transactionRepository.createTransfers(
                                             transfers = listOf(transfer),
                                             newAttributes = mapOf(transfer.id to attributesToSave),
-                                            sourceRecorder = ManualSourceRecorder(transferSourceQueries, transferDeviceId),
+                                            sourceRecorder = EntitySource.manualRecorder(),
                                         )
                                     }
 
-                                    maintenanceService.refreshMaterializedViews()
+                                    Maintenance.refreshMaterializedViews()
 
                                     onSaved()
                                     onDismiss()

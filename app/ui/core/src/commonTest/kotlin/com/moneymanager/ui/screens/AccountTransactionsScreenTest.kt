@@ -1,4 +1,4 @@
-﻿@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
+@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
 
 package com.moneymanager.ui.screens
 
@@ -17,19 +17,14 @@ import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import androidx.compose.ui.test.waitUntilDoesNotExist
 import androidx.compose.ui.test.waitUntilExactlyOneExists
-import app.cash.sqldelight.Query
-import app.cash.sqldelight.Transacter
-import app.cash.sqldelight.db.QueryResult
-import app.cash.sqldelight.db.SqlCursor
-import app.cash.sqldelight.db.SqlDriver
-import app.cash.sqldelight.db.SqlPreparedStatement
-import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.database.ManualSourceRecorder
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.SampleGeneratorSourceRecorder
-import com.moneymanager.database.sql.EntitySourceQueries
-import com.moneymanager.database.sql.TransferSourceQueries
+import com.moneymanager.database.port.DbEntitySource
+import com.moneymanager.database.port.DbMaintenance
 import com.moneymanager.di.database.DatabaseComponent
+import com.moneymanager.domain.EntitySource
+import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
@@ -38,13 +33,13 @@ import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DbLocation
-import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.PageWithTargetIndex
 import com.moneymanager.domain.model.PagingInfo
 import com.moneymanager.domain.model.PagingResult
 import com.moneymanager.domain.model.PersonId
+import com.moneymanager.domain.model.SourceRecorder
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.AccountAttributeRepository
@@ -52,7 +47,6 @@ import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
-import com.moneymanager.domain.repository.DeviceRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
@@ -83,9 +77,6 @@ import kotlin.time.Duration
 
 @OptIn(ExperimentalTestApi::class)
 class AccountTransactionsScreenTest {
-    private val testDeviceId = DeviceId(1L)
-    private val stubEntitySourceQueries = createStubEntitySourceQueries()
-
     @Test
     fun accountTransactionCard_flipsAccountDisplay_whenPerspectiveChanges() =
         runMoneyManagerComposeUiTest {
@@ -124,14 +115,13 @@ class AccountTransactionsScreenTest {
             val accountRepository = createAccountRepository(listOf(checking, savings))
             val transactionRepository = createTransactionRepository(listOf(transfer))
             val transferSourceRepository = createTransferSourceRepository()
-            val transferSourceQueries = createStubTransferSourceQueries()
-            val deviceRepository = createDeviceRepository()
+            val entitySource = createStubEntitySource()
             val currencyRepository = createCurrencyRepository(listOf(usdCurrency))
             val categoryRepository = createCategoryRepository()
             val attributeTypeRepository = createAttributeTypeRepository()
             val personRepository = createPersonRepository()
             val personAccountOwnershipRepository = createPersonAccountOwnershipRepository()
-            val maintenanceService = createMaintenanceService()
+            val maintenance = createMaintenance()
 
             // When: Viewing from Checking account's perspective
             setContent {
@@ -142,9 +132,7 @@ class AccountTransactionsScreenTest {
                         accountId = currentAccountId,
                         transactionRepository = transactionRepository,
                         transferSourceRepository = transferSourceRepository,
-                        transferSourceQueries = transferSourceQueries,
-                        entitySourceQueries = stubEntitySourceQueries,
-                        deviceRepository = deviceRepository,
+                        EntitySource = entitySource,
                         accountRepository = accountRepository,
                         accountAttributeRepository = createAccountAttributeRepository(),
                         categoryRepository = categoryRepository,
@@ -152,8 +140,7 @@ class AccountTransactionsScreenTest {
                         attributeTypeRepository = attributeTypeRepository,
                         personRepository = personRepository,
                         personAccountOwnershipRepository = personAccountOwnershipRepository,
-                        maintenanceService = maintenanceService,
-                        deviceId = testDeviceId,
+                        Maintenance = maintenance,
                         onAccountIdChange = { currentAccountId = it },
                         onCurrencyIdChange = {},
                     )
@@ -225,14 +212,13 @@ class AccountTransactionsScreenTest {
             val accountRepository = createAccountRepository(listOf(checking, savings))
             val transactionRepository = createTransactionRepository(listOf(transfer))
             val transferSourceRepository = createTransferSourceRepository()
-            val transferSourceQueries = createStubTransferSourceQueries()
-            val deviceRepository = createDeviceRepository()
+            val entitySource = createStubEntitySource()
             val currencyRepository = createCurrencyRepository(listOf(usdCurrency))
             val categoryRepository = createCategoryRepository()
             val attributeTypeRepository = createAttributeTypeRepository()
             val personRepository = createPersonRepository()
             val personAccountOwnershipRepository = createPersonAccountOwnershipRepository()
-            val maintenanceService = createMaintenanceService()
+            val maintenance = createMaintenance()
 
             setContent {
                 ProvideSchemaAwareScope {
@@ -242,9 +228,7 @@ class AccountTransactionsScreenTest {
                         accountId = currentAccountId,
                         transactionRepository = transactionRepository,
                         transferSourceRepository = transferSourceRepository,
-                        transferSourceQueries = transferSourceQueries,
-                        entitySourceQueries = stubEntitySourceQueries,
-                        deviceRepository = deviceRepository,
+                        EntitySource = entitySource,
                         accountRepository = accountRepository,
                         accountAttributeRepository = createAccountAttributeRepository(),
                         categoryRepository = categoryRepository,
@@ -252,8 +236,7 @@ class AccountTransactionsScreenTest {
                         attributeTypeRepository = attributeTypeRepository,
                         personRepository = personRepository,
                         personAccountOwnershipRepository = personAccountOwnershipRepository,
-                        maintenanceService = maintenanceService,
-                        deviceId = testDeviceId,
+                        Maintenance = maintenance,
                         onAccountIdChange = { currentAccountId = it },
                         onCurrencyIdChange = {},
                     )
@@ -368,9 +351,7 @@ class AccountTransactionsScreenTest {
                                 accountId = currentAccountId,
                                 transactionRepository = repositories.transactionRepository,
                                 transferSourceRepository = repositories.transferSourceRepository,
-                                transferSourceQueries = repositories.transferSourceQueries,
-                                entitySourceQueries = repositories.entitySourceQueries,
-                                deviceRepository = repositories.deviceRepository,
+                                EntitySource = createDbEntitySource(repositories),
                                 accountRepository = repositories.accountRepository,
                                 accountAttributeRepository = repositories.accountAttributeRepository,
                                 categoryRepository = repositories.categoryRepository,
@@ -378,8 +359,7 @@ class AccountTransactionsScreenTest {
                                 attributeTypeRepository = repositories.attributeTypeRepository,
                                 personRepository = repositories.personRepository,
                                 personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                                maintenanceService = repositories.maintenanceService,
-                                deviceId = repositories.deviceId,
+                                Maintenance = createDbMaintenance(repositories),
                                 onAccountIdChange = { currentAccountId = it },
                                 onCurrencyIdChange = {},
                                 onAuditClick = { auditTransferId = it },
@@ -467,7 +447,7 @@ class AccountTransactionsScreenTest {
                 // Wait for audit button to be visible (indicates UI has refreshed)
                 waitUntilExactlyOneExists(hasText("\uD83D\uDCDC"), timeoutMillis = 10000)
 
-                // Now click the Audit History button (ðŸ“œ) and verify it shows the new attribute
+                // Now click the Audit History button (📜) and verify it shows the new attribute
                 onNodeWithText("\uD83D\uDCDC").performClick()
 
                 // Wait for audit history dialog to appear
@@ -580,9 +560,7 @@ class AccountTransactionsScreenTest {
                                 accountId = currentAccountId,
                                 transactionRepository = repositories.transactionRepository,
                                 transferSourceRepository = repositories.transferSourceRepository,
-                                transferSourceQueries = repositories.transferSourceQueries,
-                                entitySourceQueries = repositories.entitySourceQueries,
-                                deviceRepository = repositories.deviceRepository,
+                                EntitySource = createDbEntitySource(repositories),
                                 accountRepository = repositories.accountRepository,
                                 accountAttributeRepository = repositories.accountAttributeRepository,
                                 categoryRepository = repositories.categoryRepository,
@@ -590,8 +568,7 @@ class AccountTransactionsScreenTest {
                                 attributeTypeRepository = repositories.attributeTypeRepository,
                                 personRepository = repositories.personRepository,
                                 personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                                maintenanceService = repositories.maintenanceService,
-                                deviceId = repositories.deviceId,
+                                Maintenance = createDbMaintenance(repositories),
                                 onAccountIdChange = { currentAccountId = it },
                                 onCurrencyIdChange = {},
                                 onAuditClick = { auditTransferId = it },
@@ -762,9 +739,7 @@ class AccountTransactionsScreenTest {
                                 accountId = currentAccountId,
                                 transactionRepository = repositories.transactionRepository,
                                 transferSourceRepository = repositories.transferSourceRepository,
-                                transferSourceQueries = repositories.transferSourceQueries,
-                                entitySourceQueries = repositories.entitySourceQueries,
-                                deviceRepository = repositories.deviceRepository,
+                                EntitySource = createDbEntitySource(repositories),
                                 accountRepository = repositories.accountRepository,
                                 accountAttributeRepository = repositories.accountAttributeRepository,
                                 categoryRepository = repositories.categoryRepository,
@@ -772,8 +747,7 @@ class AccountTransactionsScreenTest {
                                 attributeTypeRepository = repositories.attributeTypeRepository,
                                 personRepository = repositories.personRepository,
                                 personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                                maintenanceService = repositories.maintenanceService,
-                                deviceId = repositories.deviceId,
+                                Maintenance = createDbMaintenance(repositories),
                                 onAccountIdChange = { currentAccountId = it },
                                 onCurrencyIdChange = {},
                                 onAuditClick = { auditTransferId = it },
@@ -994,12 +968,6 @@ class AccountTransactionsScreenTest {
             everySuspend { insertInCreationMode(any(), any(), any()) } returns 0L
         }
 
-    private fun createDeviceRepository(): DeviceRepository =
-        mock(MockMode.autoUnit) {
-            every { getOrCreateDevice(any()) } returns DeviceId(1L)
-            everySuspend { getDeviceById(any()) } returns null
-        }
-
     private fun createPersonRepository(): PersonRepository =
         mock(MockMode.autoUnit) {
             every { getAllPeople() } returns flowOf(emptyList())
@@ -1015,7 +983,7 @@ class AccountTransactionsScreenTest {
             everySuspend { createOwnership(any(), any()) } returns 0L
         }
 
-    private fun createMaintenanceService(): DatabaseMaintenanceService =
+    private fun createMaintenance(): Maintenance =
         mock(MockMode.autoUnit) {
             everySuspend { reindex() } returns Duration.ZERO
             everySuspend { vacuum() } returns Duration.ZERO
@@ -1024,51 +992,18 @@ class AccountTransactionsScreenTest {
             everySuspend { fullRefreshMaterializedViews() } returns Duration.ZERO
         }
 
-    private fun createStubTransferSourceQueries(): TransferSourceQueries = TransferSourceQueries(stubSqlDriver())
-
-    /**
-     * Creates a stub EntitySourceQueries for tests that don't actually query entity sources.
-     * Uses a minimal SqlDriver stub that throws NotImplementedError if actually invoked.
-     */
-    private companion object {
-        private const val STUB_SQL_DRIVER_MESSAGE = "Stub SqlDriver - should not be called in display-only tests"
-
-        private fun stubSqlDriver(): SqlDriver =
-            object : SqlDriver {
-                override fun close() = Unit
-
-                override fun currentTransaction(): Transacter.Transaction? = null
-
-                override fun execute(
-                    identifier: Int?,
-                    sql: String,
-                    parameters: Int,
-                    binders: (SqlPreparedStatement.() -> Unit)?,
-                ): QueryResult<Long> = throw NotImplementedError(STUB_SQL_DRIVER_MESSAGE)
-
-                override fun <R> executeQuery(
-                    identifier: Int?,
-                    sql: String,
-                    mapper: (SqlCursor) -> QueryResult<R>,
-                    parameters: Int,
-                    binders: (SqlPreparedStatement.() -> Unit)?,
-                ): QueryResult<R> = throw NotImplementedError(STUB_SQL_DRIVER_MESSAGE)
-
-                override fun newTransaction(): QueryResult<Transacter.Transaction> = throw NotImplementedError(STUB_SQL_DRIVER_MESSAGE)
-
-                override fun addListener(
-                    vararg queryKeys: String,
-                    listener: Query.Listener,
-                ) = Unit
-
-                override fun removeListener(
-                    vararg queryKeys: String,
-                    listener: Query.Listener,
-                ) = Unit
-
-                override fun notifyListeners(vararg queryKeys: String) = Unit
-            }
-
-        fun createStubEntitySourceQueries(): EntitySourceQueries = EntitySourceQueries(stubSqlDriver())
+    private fun createStubEntitySource(): EntitySource {
+        val recorder: SourceRecorder = mock(MockMode.autoUnit)
+        return mock(MockMode.autoUnit) {
+            every { manualRecorder() } returns recorder
+            every { sampleGeneratorRecorder() } returns recorder
+            every { csvImportRecorder(any(), any()) } returns recorder
+            every { apiImportRecorder(any(), any(), any()) } returns recorder
+        }
     }
+
+    private fun createDbMaintenance(repositories: DatabaseComponent): Maintenance = DbMaintenance(repositories.maintenanceService)
+
+    private fun createDbEntitySource(repositories: DatabaseComponent): EntitySource =
+        DbEntitySource(repositories.entitySourceQueries, repositories.transferSourceQueries, repositories.deviceId)
 }

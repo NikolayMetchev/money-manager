@@ -41,11 +41,10 @@ import com.moneymanager.compose.filepicker.rememberFilePicker
 import com.moneymanager.compose.filepicker.rememberFileSaver
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.database.json.CsvStrategyExportCodec
-import com.moneymanager.database.service.CsvStrategyExportService
-import com.moneymanager.database.service.ImportParseResult
-import com.moneymanager.database.sql.EntitySourceQueries
+import com.moneymanager.domain.CsvImportParseResult
+import com.moneymanager.domain.CsvStrategyImportExport
+import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.model.AppVersion
-import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
@@ -75,9 +74,8 @@ fun CsvStrategiesScreen(
     attributeTypeRepository: AttributeTypeRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    entitySourceQueries: EntitySourceQueries,
-    deviceId: DeviceId,
-    csvStrategyExportService: CsvStrategyExportService,
+    entitySource: EntitySource,
+    csvStrategyImportExport: CsvStrategyImportExport,
     appVersion: AppVersion,
     onStrategyClick: (CsvImportStrategy) -> Unit = {},
     onBack: () -> Unit = {},
@@ -102,7 +100,7 @@ fun CsvStrategiesScreen(
     val scope = rememberCoroutineScope()
 
     // Import state
-    var importParseResult by remember { mutableStateOf<ImportParseResult?>(null) }
+    var importParseResult by remember { mutableStateOf<CsvImportParseResult?>(null) }
     var importError by remember { mutableStateOf<String?>(null) }
 
     // File saver for export
@@ -126,7 +124,7 @@ fun CsvStrategiesScreen(
                         try {
                             val jsonContent = result.content
                             val export = CsvStrategyExportCodec.decode(jsonContent)
-                            val parseResult = csvStrategyExportService.parseExport(export)
+                            val parseResult = csvStrategyImportExport.parseExport(export)
                             importParseResult = parseResult
                             importError = null
                             exportError = null
@@ -154,7 +152,7 @@ fun CsvStrategiesScreen(
                         emptyList()
                     }
                 val export =
-                    csvStrategyExportService.toExport(
+                    csvStrategyImportExport.toExport(
                         strategy = strategy,
                         appVersion = appVersion,
                         accountMappings = persistedAccountMappings.takeIf { includeAccountMappings },
@@ -333,8 +331,7 @@ fun CsvStrategiesScreen(
             attributeTypeRepository = attributeTypeRepository,
             personRepository = personRepository,
             personAccountOwnershipRepository = personAccountOwnershipRepository,
-            entitySourceQueries = entitySourceQueries,
-            deviceId = deviceId,
+            entitySource = entitySource,
             csvColumns = currentCsvImport.columns,
             rows = csvRows,
             onDismiss = {
@@ -353,14 +350,13 @@ fun CsvStrategiesScreen(
             parseResult = currentParseResult,
             csvImportStrategyRepository = csvImportStrategyRepository,
             csvAccountMappingRepository = csvAccountMappingRepository,
-            csvStrategyExportService = csvStrategyExportService,
+            csvStrategyImportExport = csvStrategyImportExport,
             accountRepository = accountRepository,
             categoryRepository = categoryRepository,
             currencyRepository = currencyRepository,
             personRepository = personRepository,
             personAccountOwnershipRepository = personAccountOwnershipRepository,
-            entitySourceQueries = entitySourceQueries,
-            deviceId = deviceId,
+            entitySource = entitySource,
             onDismiss = {
                 importParseResult = null
                 importError = null

@@ -36,7 +36,9 @@
     <inspection_tool class="UnusedColumn" enabled="true" level="ERROR" enabled_by_default="true"/>
     <inspection_tool class="UnusedImport" enabled="true" level="ERROR" enabled_by_default="true"/>
     <inspection_tool class="UnusedQuery" enabled="true" level="ERROR" enabled_by_default="true"/>
-    <inspection_tool class="UNUSED_PARAMETER" enabled="true" level="ERROR" enabled_by_default="true"/>
+    <inspection_tool class="UNUSED_PARAMETER" enabled="true" level="ERROR" enabled_by_default="true">
+      <option name="IGNORE_PARAMETERS_OVERRIDING_METHODS" value="true"/>
+    </inspection_tool>
     <inspection_tool class="UnusedVariable" enabled="true" level="ERROR" enabled_by_default="true"/>
     <inspection_tool class="VariableNeverRead" enabled="true" level="ERROR" enabled_by_default="true"/>
   </profile>

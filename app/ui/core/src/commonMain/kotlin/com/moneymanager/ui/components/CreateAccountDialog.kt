@@ -30,11 +30,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.moneymanager.database.ManualEntitySourceRecorder
-import com.moneymanager.database.sql.EntitySourceQueries
+import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
-import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.repository.AccountRepository
@@ -62,8 +60,7 @@ fun CreateAccountDialog(
     personRepository: PersonRepository,
     personAttributeRepository: PersonAttributeRepository? = null,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    entitySourceQueries: EntitySourceQueries,
-    deviceId: DeviceId,
+    entitySource: EntitySource,
     onDismiss: () -> Unit,
     onAccountCreated: ((AccountId) -> Unit)? = null,
     initialName: String = "",
@@ -221,11 +218,7 @@ fun CreateAccountDialog(
                                     )
                                 val accountId = accountRepository.createAccount(newAccount)
                                 // Record source for audit trail
-                                ManualEntitySourceRecorder(entitySourceQueries, deviceId).insert(
-                                    EntityType.ACCOUNT,
-                                    accountId.id,
-                                    1L,
-                                )
+                                entitySource.record(EntityType.ACCOUNT, accountId.id, 1L)
                                 selectedOwnerIds.forEach { personId ->
                                     val ownershipId =
                                         personAccountOwnershipRepository.createOwnership(
@@ -233,11 +226,7 @@ fun CreateAccountDialog(
                                             accountId = accountId,
                                         )
                                     // Record source for ownership audit trail
-                                    ManualEntitySourceRecorder(entitySourceQueries, deviceId).insert(
-                                        EntityType.PERSON_ACCOUNT_OWNERSHIP,
-                                        ownershipId,
-                                        1L,
-                                    )
+                                    entitySource.record(EntityType.PERSON_ACCOUNT_OWNERSHIP, ownershipId, 1L)
                                 }
                                 onAccountCreated?.invoke(accountId)
                                 onDismiss()
@@ -288,8 +277,7 @@ fun CreateAccountDialog(
             personToEdit = null,
             personRepository = personRepository,
             personAttributeRepository = personAttributeRepository,
-            entitySourceQueries = entitySourceQueries,
-            deviceId = deviceId,
+            entitySource = entitySource,
             onDismiss = { showCreatePersonDialog = false },
         )
     }

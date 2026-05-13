@@ -2,6 +2,7 @@
 
 package com.moneymanager.ui.monzo
 
+import com.moneymanager.database.port.DbEntitySource
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.ApiSessionKind
@@ -124,8 +125,7 @@ class MonzoBalanceFixtureE2ETest : DbTest() {
                 accountRepository = repositories.accountRepository,
                 currencyRepository = repositories.currencyRepository,
                 transactionRepository = repositories.transactionRepository,
-                transferSourceQueries = transferSourceQueries,
-                entitySourceQueries = database.entitySourceQueries,
+                entitySource = DbEntitySource(database.entitySourceQueries, database.transferSourceQueries, DeviceId(deviceId.id)),
                 personRepository = repositories.personRepository,
                 personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                 personAttributeRepository = repositories.personAttributeRepository,
@@ -142,8 +142,7 @@ class MonzoBalanceFixtureE2ETest : DbTest() {
                     accountRepository = repositories.accountRepository,
                     currencyRepository = repositories.currencyRepository,
                     transactionRepository = repositories.transactionRepository,
-                    transferSourceQueries = transferSourceQueries,
-                    entitySourceQueries = database.entitySourceQueries,
+                    entitySource = DbEntitySource(database.entitySourceQueries, database.transferSourceQueries, DeviceId(deviceId.id)),
                     personRepository = repositories.personRepository,
                     personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                     personAttributeRepository = repositories.personAttributeRepository,

@@ -41,13 +41,11 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.scrollbar.HorizontalScrollbarForScrollState
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForScrollState
-import com.moneymanager.database.DatabaseMaintenanceService
-import com.moneymanager.database.sql.EntitySourceQueries
-import com.moneymanager.database.sql.TransferSourceQueries
+import com.moneymanager.domain.EntitySource
+import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CurrencyId
-import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
@@ -56,7 +54,6 @@ import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
-import com.moneymanager.domain.repository.DeviceRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
@@ -73,9 +70,7 @@ fun AccountTransactionsScreen(
     accountId: AccountId,
     transactionRepository: TransactionRepository,
     transferSourceRepository: TransferSourceRepository,
-    transferSourceQueries: TransferSourceQueries,
-    entitySourceQueries: EntitySourceQueries,
-    deviceRepository: DeviceRepository,
+    EntitySource: EntitySource,
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
@@ -83,8 +78,7 @@ fun AccountTransactionsScreen(
     attributeTypeRepository: AttributeTypeRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    maintenanceService: DatabaseMaintenanceService,
-    deviceId: DeviceId,
+    Maintenance: Maintenance,
     onAccountIdChange: (AccountId) -> Unit = {},
     onCurrencyIdChange: (CurrencyId?) -> Unit = {},
     onAccountClick: (AccountId, String, CurrencyId?) -> Unit = { _, _, _ -> },
@@ -948,17 +942,14 @@ fun AccountTransactionsScreen(
             transaction = transfer,
             transactionRepository = transactionRepository,
             transferSourceRepository = transferSourceRepository,
-            transferSourceQueries = transferSourceQueries,
-            entitySourceQueries = entitySourceQueries,
-            deviceRepository = deviceRepository,
+            EntitySource = EntitySource,
             accountRepository = accountRepository,
             categoryRepository = categoryRepository,
             currencyRepository = currencyRepository,
             attributeTypeRepository = attributeTypeRepository,
             personRepository = personRepository,
             personAccountOwnershipRepository = personAccountOwnershipRepository,
-            maintenanceService = maintenanceService,
-            deviceId = deviceId,
+            Maintenance = Maintenance,
             onDismiss = { transactionIdToEdit = null },
             onSaved = { refreshTrigger++ },
         )
@@ -974,8 +965,7 @@ fun AccountTransactionsScreen(
             categoryRepository = categoryRepository,
             personRepository = personRepository,
             personAccountOwnershipRepository = personAccountOwnershipRepository,
-            entitySourceQueries = entitySourceQueries,
-            deviceId = deviceId,
+            entitySource = EntitySource,
             // No onSaved refresh needed: allAccounts is collected from a Flow and updates automatically
             onDismiss = { accountToEdit = null },
         )

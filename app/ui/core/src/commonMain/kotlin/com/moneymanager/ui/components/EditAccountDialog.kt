@@ -35,11 +35,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.moneymanager.database.ManualEntitySourceRecorder
-import com.moneymanager.database.sql.EntitySourceQueries
+import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AttributeType
-import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.PersonId
@@ -72,8 +70,7 @@ fun EditAccountDialog(
     personRepository: PersonRepository,
     personAttributeRepository: PersonAttributeRepository? = null,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    entitySourceQueries: EntitySourceQueries,
-    deviceId: DeviceId,
+    entitySource: EntitySource,
     onDismiss: () -> Unit,
 ) {
     var name by remember { mutableStateOf(account.name) }
@@ -368,11 +365,7 @@ fun EditAccountDialog(
                                     )
 
                                 // Record manual source for the single audit entry
-                                ManualEntitySourceRecorder(entitySourceQueries, deviceId).insert(
-                                    EntityType.ACCOUNT,
-                                    account.id.id,
-                                    finalRevisionId,
-                                )
+                                entitySource.record(EntityType.ACCOUNT, account.id.id, finalRevisionId)
 
                                 val existingOwnerIds = existingOwnerships.map { it.personId.id }.toSet()
                                 val ownersToAdd = selectedOwnerIds - existingOwnerIds
@@ -391,11 +384,7 @@ fun EditAccountDialog(
                                             personId = PersonId(personId),
                                             accountId = account.id,
                                         )
-                                    ManualEntitySourceRecorder(entitySourceQueries, deviceId).insert(
-                                        EntityType.PERSON_ACCOUNT_OWNERSHIP,
-                                        ownershipId,
-                                        1L,
-                                    )
+                                    entitySource.record(EntityType.PERSON_ACCOUNT_OWNERSHIP, ownershipId, 1L)
                                 }
 
                                 onDismiss()
@@ -446,8 +435,7 @@ fun EditAccountDialog(
             personToEdit = null,
             personRepository = personRepository,
             personAttributeRepository = personAttributeRepository,
-            entitySourceQueries = entitySourceQueries,
-            deviceId = deviceId,
+            entitySource = entitySource,
             onDismiss = { showCreatePersonDialog = false },
         )
     }

@@ -6,19 +6,12 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import app.cash.sqldelight.Query
-import app.cash.sqldelight.Transacter
-import app.cash.sqldelight.db.QueryResult
-import app.cash.sqldelight.db.SqlCursor
-import app.cash.sqldelight.db.SqlDriver
-import app.cash.sqldelight.db.SqlPreparedStatement
-import com.moneymanager.database.DatabaseMaintenanceService
-import com.moneymanager.database.sql.EntitySourceQueries
+import com.moneymanager.domain.EntitySource
+import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
 import com.moneymanager.domain.model.AttributeTypeId
-import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.PageWithTargetIndex
 import com.moneymanager.domain.model.PagingInfo
 import com.moneymanager.domain.model.PagingResult
@@ -45,8 +38,7 @@ import kotlin.time.Duration
 
 @OptIn(ExperimentalTestApi::class)
 class AccountsScreenTest {
-    private val testDeviceId = DeviceId(1L)
-    private val stubEntitySourceQueries = createStubEntitySourceQueries()
+    private val stubEntitySource = createEntitySource()
 
     @Test
     fun accountsScreen_displaysEmptyState_whenNoAccounts() =
@@ -65,9 +57,8 @@ class AccountsScreenTest {
                         transactionRepository = createTransactionRepository(),
                         personRepository = createPersonRepository(),
                         personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
-                        maintenanceService = createMaintenanceService(),
-                        entitySourceQueries = stubEntitySourceQueries,
-                        deviceId = testDeviceId,
+                        maintenance = createMaintenance(),
+                        entitySource = stubEntitySource,
                         scrollToAccountId = null,
                         onAccountClick = {},
                     )
@@ -110,9 +101,8 @@ class AccountsScreenTest {
                         transactionRepository = createTransactionRepository(),
                         personRepository = createPersonRepository(),
                         personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
-                        maintenanceService = createMaintenanceService(),
-                        entitySourceQueries = stubEntitySourceQueries,
-                        deviceId = testDeviceId,
+                        maintenance = createMaintenance(),
+                        entitySource = stubEntitySource,
                         scrollToAccountId = null,
                         onAccountClick = {},
                     )
@@ -141,9 +131,8 @@ class AccountsScreenTest {
                         transactionRepository = createTransactionRepository(),
                         personRepository = createPersonRepository(),
                         personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
-                        maintenanceService = createMaintenanceService(),
-                        entitySourceQueries = stubEntitySourceQueries,
-                        deviceId = testDeviceId,
+                        maintenance = createMaintenance(),
+                        entitySource = stubEntitySource,
                         scrollToAccountId = null,
                         onAccountClick = {},
                     )
@@ -171,9 +160,8 @@ class AccountsScreenTest {
                         transactionRepository = createTransactionRepository(),
                         personRepository = createPersonRepository(),
                         personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
-                        maintenanceService = createMaintenanceService(),
-                        entitySourceQueries = stubEntitySourceQueries,
-                        deviceId = testDeviceId,
+                        maintenance = createMaintenance(),
+                        entitySource = stubEntitySource,
                         scrollToAccountId = null,
                         onAccountClick = {},
                     )
@@ -211,9 +199,8 @@ class AccountsScreenTest {
                         transactionRepository = createTransactionRepository(),
                         personRepository = createPersonRepository(),
                         personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
-                        maintenanceService = createMaintenanceService(),
-                        entitySourceQueries = stubEntitySourceQueries,
-                        deviceId = testDeviceId,
+                        maintenance = createMaintenance(),
+                        entitySource = stubEntitySource,
                         scrollToAccountId = null,
                         onAccountClick = {},
                     )
@@ -248,9 +235,8 @@ class AccountsScreenTest {
                         transactionRepository = createTransactionRepository(),
                         personRepository = createPersonRepository(),
                         personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
-                        maintenanceService = createMaintenanceService(),
-                        entitySourceQueries = stubEntitySourceQueries,
-                        deviceId = testDeviceId,
+                        maintenance = createMaintenance(),
+                        entitySource = stubEntitySource,
                         scrollToAccountId = null,
                         onAccountClick = {},
                     )
@@ -282,9 +268,8 @@ class AccountsScreenTest {
                         transactionRepository = createTransactionRepository(),
                         personRepository = createPersonRepository(),
                         personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
-                        maintenanceService = createMaintenanceService(),
-                        entitySourceQueries = stubEntitySourceQueries,
-                        deviceId = testDeviceId,
+                        maintenance = createMaintenance(),
+                        entitySource = stubEntitySource,
                         scrollToAccountId = null,
                         onAccountClick = {},
                     )
@@ -318,9 +303,8 @@ class AccountsScreenTest {
                         transactionRepository = createTransactionRepository(),
                         personRepository = createPersonRepository(),
                         personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
-                        maintenanceService = createMaintenanceService(),
-                        entitySourceQueries = stubEntitySourceQueries,
-                        deviceId = testDeviceId,
+                        maintenance = createMaintenance(),
+                        entitySource = stubEntitySource,
                         scrollToAccountId = null,
                         onAccountClick = {},
                     )
@@ -362,9 +346,8 @@ class AccountsScreenTest {
                         transactionRepository = createTransactionRepository(),
                         personRepository = createPersonRepository(),
                         personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
-                        maintenanceService = createMaintenanceService(),
-                        entitySourceQueries = stubEntitySourceQueries,
-                        deviceId = testDeviceId,
+                        maintenance = createMaintenance(),
+                        entitySource = stubEntitySource,
                         scrollToAccountId = null,
                         onAccountClick = {},
                     )
@@ -418,9 +401,8 @@ class AccountsScreenTest {
                         transactionRepository = createTransactionRepository(),
                         personRepository = createPersonRepository(),
                         personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
-                        maintenanceService = createMaintenanceService(),
-                        entitySourceQueries = stubEntitySourceQueries,
-                        deviceId = testDeviceId,
+                        maintenance = createMaintenance(),
+                        entitySource = stubEntitySource,
                         scrollToAccountId = null,
                         onAccountClick = {},
                     )
@@ -485,7 +467,7 @@ class AccountsScreenTest {
             everySuspend { createOwnership(any(), any()) } returns 0L
         }
 
-    private fun createMaintenanceService(): DatabaseMaintenanceService =
+    private fun createMaintenance(): Maintenance =
         mock(MockMode.autoUnit) {
             everySuspend { reindex() } returns Duration.ZERO
             everySuspend { vacuum() } returns Duration.ZERO
@@ -493,6 +475,8 @@ class AccountsScreenTest {
             everySuspend { refreshMaterializedViews() } returns Duration.ZERO
             everySuspend { fullRefreshMaterializedViews() } returns Duration.ZERO
         }
+
+    private fun createEntitySource(): EntitySource = mock(MockMode.autoUnit)
 
     private fun createAccountAttributeRepository(): AccountAttributeRepository =
         mock(MockMode.autoUnit) {
@@ -508,51 +492,4 @@ class AccountsScreenTest {
             every { getByName(any()) } returns flowOf(null)
             everySuspend { getOrCreate(any()) } returns AttributeTypeId(0L)
         }
-
-    /**
-     * Creates a stub EntitySourceQueries for tests that don't actually query entity sources.
-     * Uses a minimal SqlDriver stub that throws NotImplementedError if actually invoked.
-     */
-    private companion object {
-        fun createStubEntitySourceQueries(): EntitySourceQueries {
-            val stubDriver =
-                object : SqlDriver {
-                    override fun close() = Unit
-
-                    override fun currentTransaction(): Transacter.Transaction? = null
-
-                    override fun execute(
-                        identifier: Int?,
-                        sql: String,
-                        parameters: Int,
-                        binders: (SqlPreparedStatement.() -> Unit)?,
-                    ): QueryResult<Long> = throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
-
-                    override fun <R> executeQuery(
-                        identifier: Int?,
-                        sql: String,
-                        mapper: (SqlCursor) -> QueryResult<R>,
-                        parameters: Int,
-                        binders: (SqlPreparedStatement.() -> Unit)?,
-                    ): QueryResult<R> = throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
-
-                    override fun newTransaction(): QueryResult<Transacter.Transaction> =
-                        throw NotImplementedError("Stub SqlDriver - should not be called in display-only tests")
-
-                    override fun addListener(
-                        vararg queryKeys: String,
-                        listener: Query.Listener,
-                    ) = Unit
-
-                    override fun removeListener(
-                        vararg queryKeys: String,
-                        listener: Query.Listener,
-                    ) = Unit
-
-                    override fun notifyListeners(vararg queryKeys: String) = Unit
-                }
-
-            return EntitySourceQueries(stubDriver)
-        }
-    }
 }
