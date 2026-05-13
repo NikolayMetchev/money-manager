@@ -328,7 +328,7 @@ fun MoneyManagerApp(
                                     transactionRepository = transactionRepository,
                                     settingsRepository = settingsRepository,
                                     maintenance = maintenance,
-                                    entitySource = services.transactions.sampleEntitySourcePort,
+                                    entitySource = services.transactions.sampleEntitySource,
                                 )
                             }
                             is Screen.AccountTransactions -> {

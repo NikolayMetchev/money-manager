@@ -38,7 +38,7 @@ fun DatabaseComponent.toApplication() =
                 transferSourceRepository = transferSourceRepository,
                 attributeTypeRepository = attributeTypeRepository,
                 entitySource = DbEntitySource(entitySourceQueries, transferSourceQueries, deviceId),
-                sampleEntitySourcePort = DbSampleEntitySource(entitySourceQueries, transferSourceQueries, deviceId),
+                sampleEntitySource = DbSampleEntitySource(entitySourceQueries, transferSourceQueries, deviceId),
             ),
         people =
             People(

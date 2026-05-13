@@ -58,7 +58,7 @@ data class TransactionsDomain(
     val transferSourceRepository: TransferSourceRepository,
     val attributeTypeRepository: AttributeTypeRepository,
     val entitySource: EntitySource,
-    val sampleEntitySourcePort: EntitySource,
+    val sampleEntitySource: EntitySource,
 )
 
 data class PeopleDomain(
@@ -102,7 +102,7 @@ fun Application.toAppServices() =
                 transferSourceRepository = transactions.transferSourceRepository,
                 attributeTypeRepository = transactions.attributeTypeRepository,
                 entitySource = transactions.entitySource,
-                sampleEntitySourcePort = transactions.sampleEntitySourcePort,
+                sampleEntitySource = transactions.sampleEntitySource,
             ),
         people =
             PeopleDomain(

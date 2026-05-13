@@ -23,7 +23,7 @@ import kotlin.test.Test
 
 @OptIn(ExperimentalTestApi::class)
 class CurrenciesScreenTest {
-    private val stubEntitySourcePort = createEntitySourcePort()
+    private val stubEntitySource = createEntitySource()
 
     private fun createCurrencyRepository(currencies: List<Currency>): CurrencyRepository =
         mock<CurrencyRepository>(MockMode.autoUnit) {
@@ -42,7 +42,7 @@ class CurrenciesScreenTest {
                 ProvideSchemaAwareScope {
                     CurrenciesScreen(
                         currencyRepository = repository,
-                        entitySource = stubEntitySourcePort,
+                        entitySource = stubEntitySource,
                     )
                 }
             }
@@ -65,7 +65,7 @@ class CurrenciesScreenTest {
                 ProvideSchemaAwareScope {
                     CurrenciesScreen(
                         currencyRepository = repository,
-                        entitySource = stubEntitySourcePort,
+                        entitySource = stubEntitySource,
                     )
                 }
             }
@@ -89,7 +89,7 @@ class CurrenciesScreenTest {
                 ProvideSchemaAwareScope {
                     CurrenciesScreen(
                         currencyRepository = repository,
-                        entitySource = stubEntitySourcePort,
+                        entitySource = stubEntitySource,
                     )
                 }
             }
@@ -111,7 +111,7 @@ class CurrenciesScreenTest {
                 ProvideSchemaAwareScope {
                     CurrenciesScreen(
                         currencyRepository = repository,
-                        entitySource = stubEntitySourcePort,
+                        entitySource = stubEntitySource,
                     )
                 }
             }
@@ -130,7 +130,7 @@ class CurrenciesScreenTest {
                 ProvideSchemaAwareScope {
                     CurrenciesScreen(
                         currencyRepository = repository,
-                        entitySource = stubEntitySourcePort,
+                        entitySource = stubEntitySource,
                     )
                 }
             }
@@ -141,5 +141,5 @@ class CurrenciesScreenTest {
             onNodeWithText("Currency code is required").assertIsDisplayed()
         }
 
-    private fun createEntitySourcePort(): EntitySource = mock(MockMode.autoUnit)
+    private fun createEntitySource(): EntitySource = mock(MockMode.autoUnit)
 }

@@ -57,7 +57,7 @@ data class Transactions(
     val transferSourceRepository: TransferSourceRepository,
     val attributeTypeRepository: AttributeTypeRepository,
     val entitySource: EntitySource,
-    val sampleEntitySourcePort: EntitySource,
+    val sampleEntitySource: EntitySource,
 )
 
 data class People(

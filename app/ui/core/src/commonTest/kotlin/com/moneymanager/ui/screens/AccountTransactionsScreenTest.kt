@@ -77,7 +77,7 @@ import kotlin.time.Duration
 
 @OptIn(ExperimentalTestApi::class)
 class AccountTransactionsScreenTest {
-    private val stubEntitySourcePort: EntitySource = mock(MockMode.autoUnit)
+    private val stubEntitySource: EntitySource = mock(MockMode.autoUnit)
 
     @Test
     fun accountTransactionCard_flipsAccountDisplay_whenPerspectiveChanges() =
@@ -123,7 +123,7 @@ class AccountTransactionsScreenTest {
             val attributeTypeRepository = createAttributeTypeRepository()
             val personRepository = createPersonRepository()
             val personAccountOwnershipRepository = createPersonAccountOwnershipRepository()
-            val maintenance = createMaintenancePort()
+            val maintenance = createMaintenance()
 
             // When: Viewing from Checking account's perspective
             setContent {
@@ -220,7 +220,7 @@ class AccountTransactionsScreenTest {
             val attributeTypeRepository = createAttributeTypeRepository()
             val personRepository = createPersonRepository()
             val personAccountOwnershipRepository = createPersonAccountOwnershipRepository()
-            val maintenance = createMaintenancePort()
+            val maintenance = createMaintenance()
 
             setContent {
                 ProvideSchemaAwareScope {
@@ -361,7 +361,7 @@ class AccountTransactionsScreenTest {
                                 attributeTypeRepository = repositories.attributeTypeRepository,
                                 personRepository = repositories.personRepository,
                                 personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                                Maintenance = createDbMaintenancePort(repositories),
+                                Maintenance = createDbMaintenance(repositories),
                                 onAccountIdChange = { currentAccountId = it },
                                 onCurrencyIdChange = {},
                                 onAuditClick = { auditTransferId = it },
@@ -570,7 +570,7 @@ class AccountTransactionsScreenTest {
                                 attributeTypeRepository = repositories.attributeTypeRepository,
                                 personRepository = repositories.personRepository,
                                 personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                                Maintenance = createDbMaintenancePort(repositories),
+                                Maintenance = createDbMaintenance(repositories),
                                 onAccountIdChange = { currentAccountId = it },
                                 onCurrencyIdChange = {},
                                 onAuditClick = { auditTransferId = it },
@@ -749,7 +749,7 @@ class AccountTransactionsScreenTest {
                                 attributeTypeRepository = repositories.attributeTypeRepository,
                                 personRepository = repositories.personRepository,
                                 personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                                Maintenance = createDbMaintenancePort(repositories),
+                                Maintenance = createDbMaintenance(repositories),
                                 onAccountIdChange = { currentAccountId = it },
                                 onCurrencyIdChange = {},
                                 onAuditClick = { auditTransferId = it },
@@ -985,7 +985,7 @@ class AccountTransactionsScreenTest {
             everySuspend { createOwnership(any(), any()) } returns 0L
         }
 
-    private fun createMaintenancePort(): Maintenance =
+    private fun createMaintenance(): Maintenance =
         mock(MockMode.autoUnit) {
             everySuspend { reindex() } returns Duration.ZERO
             everySuspend { vacuum() } returns Duration.ZERO
@@ -1004,8 +1004,9 @@ class AccountTransactionsScreenTest {
         }
     }
 
-    private fun createDbMaintenancePort(repositories: DatabaseComponent): Maintenance = DbMaintenance(repositories.maintenanceService)
+    private fun createDbMaintenance(repositories: DatabaseComponent): Maintenance = DbMaintenance(repositories.maintenanceService)
 
     private fun createDbEntitySource(repositories: DatabaseComponent): EntitySource =
         DbEntitySource(repositories.entitySourceQueries, repositories.transferSourceQueries, repositories.deviceId)
 }
+
