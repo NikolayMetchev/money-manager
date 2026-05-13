@@ -15,7 +15,6 @@ kotlin {
                 api(projects.utils.bigdecimal)
                 api(projects.utils.rest)
 
-                implementation(libs.compose.components.resources)
                 implementation(libs.human.readable)
                 implementation(libs.kmlogging)
                 implementation(libs.kotlinx.serialization.json)
@@ -76,7 +75,6 @@ kotlin {
 
                 implementation(libs.compose.animation.core.desktop)
                 implementation(libs.compose.animation.desktop)
-                implementation(libs.compose.components.resources.desktop)
                 implementation(libs.compose.material.desktop)
                 implementation(libs.compose.material.icons.core.desktop)
                 implementation(libs.compose.material3.desktop)
