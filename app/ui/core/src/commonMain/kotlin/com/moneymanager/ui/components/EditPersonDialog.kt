@@ -43,6 +43,7 @@ fun EditPersonDialog(
     personAttributeRepository: PersonAttributeRepository? = null,
     entitySource: EntitySource,
     onDismiss: () -> Unit,
+    onPersonCreated: ((PersonId) -> Unit)? = null,
 ) {
     var firstName by remember { mutableStateOf(personToEdit?.firstName.orEmpty()) }
     var middleName by remember { mutableStateOf(personToEdit?.middleName.orEmpty()) }
@@ -164,6 +165,7 @@ fun EditPersonDialog(
                                     }
                                     // Record source for audit trail
                                     entitySource.record(EntityType.PERSON, personId.id, 1L)
+                                    onPersonCreated?.invoke(personId)
                                 }
                                 onDismiss()
                             } catch (expected: Exception) {
