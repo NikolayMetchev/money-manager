@@ -152,8 +152,7 @@ fun SourceInfoSection(
                     }
                 }
                 SourceType.SAMPLE_GENERATOR -> {
-                    val deviceInfo = source.deviceInfo
-                    when (deviceInfo) {
+                    when (val deviceInfo = source.deviceInfo) {
                         is DeviceInfo.Jvm -> {
                             FieldValueRow("Origin", "Sample Generator (Desktop)", labelWidth = labelWidth)
                             FieldValueRow("Machine", deviceInfo.machineName, labelWidth = labelWidth)

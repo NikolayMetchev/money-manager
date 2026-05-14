@@ -8,11 +8,5 @@ data class Category(
     companion object {
         const val UNCATEGORIZED_ID = -1L
         const val UNCATEGORIZED_NAME = "Uncategorized"
-
-        val UNCATEGORIZED =
-            Category(
-                id = UNCATEGORIZED_ID,
-                name = UNCATEGORIZED_NAME,
-            )
     }
 }

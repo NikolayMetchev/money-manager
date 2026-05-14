@@ -440,9 +440,9 @@ class ImportMonzoCsvE2ETest {
         var inQuotes = false
 
         for (char in line) {
-            when {
-                char == '"' -> inQuotes = !inQuotes
-                char == ',' && !inQuotes -> {
+            when (char) {
+                '"' -> inQuotes = !inQuotes
+                ',' if !inQuotes -> {
                     result.add(current.toString())
                     current = StringBuilder()
                 }

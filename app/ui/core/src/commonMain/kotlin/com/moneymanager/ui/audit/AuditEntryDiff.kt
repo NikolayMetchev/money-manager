@@ -5,7 +5,6 @@ package com.moneymanager.ui.audit
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.Money
-import com.moneymanager.domain.model.TransferAttribute
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.TransferSource
 import kotlin.time.Instant
@@ -75,31 +74,4 @@ sealed class AttributeChange {
         override val attributeTypeName: String,
         val value: String,
     ) : AttributeChange()
-}
-
-/**
- * Computes the changes between two sets of attributes.
- */
-fun computeAttributeChanges(
-    oldAttributes: List<TransferAttribute>,
-    newAttributes: List<TransferAttribute>,
-): List<AttributeChange> {
-    val oldByType = oldAttributes.associateBy { it.attributeType.name }
-    val newByType = newAttributes.associateBy { it.attributeType.name }
-
-    val allTypeNames = (oldByType.keys + newByType.keys).sorted()
-
-    return allTypeNames.mapNotNull { typeName ->
-        val old = oldByType[typeName]
-        val new = newByType[typeName]
-
-        when {
-            old == null && new != null -> AttributeChange.Added(typeName, new.value)
-            old != null && new == null -> AttributeChange.Removed(typeName, old.value)
-            old != null && new != null && old.value != new.value ->
-                AttributeChange.Changed(typeName, old.value, new.value)
-            old != null && new != null -> AttributeChange.Unchanged(typeName, new.value)
-            else -> null
-        }
-    }
 }

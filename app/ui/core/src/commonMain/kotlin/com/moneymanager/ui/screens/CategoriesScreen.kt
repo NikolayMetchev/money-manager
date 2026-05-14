@@ -1039,35 +1039,3 @@ fun DeleteCategoryDialog(
         },
     )
 }
-
-@Composable
-fun CategoryCard(category: Category) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-    ) {
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column {
-                Text(
-                    text = category.name,
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                if (category.parentId != null) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Subcategory",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.secondary,
-                    )
-                }
-            }
-        }
-    }
-}
