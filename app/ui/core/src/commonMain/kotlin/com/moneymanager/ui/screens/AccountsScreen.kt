@@ -311,7 +311,6 @@ fun AccountCard(
 }
 
 @Composable
-@Composable
 fun DeleteAccountDialog(
     account: Account,
     accountRepository: AccountRepository,
