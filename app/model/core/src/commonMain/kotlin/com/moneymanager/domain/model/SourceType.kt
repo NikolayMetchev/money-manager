@@ -26,10 +26,6 @@ enum class SourceType(
     companion object {
         fun fromId(id: Int): SourceType = entries.first { it.id == id }
 
-        fun fromIdOrNull(id: Int): SourceType? = entries.find { it.id == id }
-
         fun fromName(name: String): SourceType = valueOf(name.uppercase())
-
-        fun fromNameOrNull(name: String): SourceType? = entries.find { it.name.equals(name, ignoreCase = true) }
     }
 }

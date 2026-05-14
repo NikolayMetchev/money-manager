@@ -195,25 +195,6 @@ class CsvTableManager(
     }
 
     /**
-     * Updates the import status for a specific row.
-     *
-     * @param tableName The name of the table
-     * @param rowIndex The row index to update
-     * @param status The import status to set (IMPORTED, DUPLICATE, UPDATED)
-     */
-    fun updateImportStatus(
-        tableName: String,
-        rowIndex: Long,
-        status: String,
-    ) {
-        database.execute(
-            null,
-            "UPDATE $tableName SET import_status = '$status' WHERE row_index = $rowIndex",
-            0,
-        )
-    }
-
-    /**
      * Updates the import status and transfer ID for a specific row.
      *
      * @param tableName The name of the table

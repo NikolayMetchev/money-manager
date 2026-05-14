@@ -13,7 +13,5 @@ enum class Platform {
 
     companion object {
         fun fromName(name: String): Platform = valueOf(name.uppercase())
-
-        fun fromNameOrNull(name: String): Platform? = entries.find { it.name.equals(name, ignoreCase = true) }
     }
 }

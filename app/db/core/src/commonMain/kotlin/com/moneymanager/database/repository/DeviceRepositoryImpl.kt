@@ -3,7 +3,6 @@ package com.moneymanager.database.repository
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.DeviceInfo
-import com.moneymanager.domain.model.Platform
 import com.moneymanager.domain.repository.DeviceRepository
 
 class DeviceRepositoryImpl(
@@ -106,16 +105,6 @@ class DeviceRepositoryImpl(
     }
 
     companion object {
-        /**
-         * Maps a platform name to a Platform enum.
-         */
-        fun mapPlatform(platformName: String): Platform =
-            when (platformName) {
-                "JVM" -> Platform.JVM
-                "ANDROID" -> Platform.ANDROID
-                else -> throw IllegalArgumentException("Unknown platform: $platformName")
-            }
-
         /**
          * Creates DeviceInfo from query result columns.
          */

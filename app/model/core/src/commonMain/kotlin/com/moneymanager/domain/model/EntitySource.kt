@@ -19,8 +19,6 @@ enum class EntityType(
 
     companion object {
         fun fromId(id: Long): EntityType = entries.first { it.id == id }
-
-        fun fromName(name: String): EntityType = valueOf(name)
     }
 }
 
