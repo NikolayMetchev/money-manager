@@ -75,4 +75,3 @@ sealed class AttributeChange {
         val value: String,
     ) : AttributeChange()
 }
-

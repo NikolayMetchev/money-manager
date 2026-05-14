@@ -1039,5 +1039,3 @@ fun DeleteCategoryDialog(
         },
     )
 }
-
-
