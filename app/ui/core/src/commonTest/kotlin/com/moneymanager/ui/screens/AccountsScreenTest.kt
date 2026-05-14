@@ -15,6 +15,7 @@ import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.PageWithTargetIndex
 import com.moneymanager.domain.model.PagingInfo
 import com.moneymanager.domain.model.PagingResult
+import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
@@ -173,6 +174,45 @@ class AccountsScreenTest {
             // Then
             onNodeWithText("Create New Account").assertIsDisplayed()
             onNodeWithText("Account Name").assertIsDisplayed()
+        }
+
+    @Test
+    fun createAccountDialog_addsOwnersFromDropdown() =
+        runMoneyManagerComposeUiTest {
+            // Given
+            val repository = createAccountRepository(emptyList())
+            val people =
+                listOf(
+                    Person(id = PersonId(1L), firstName = "Alice", middleName = null, lastName = null),
+                    Person(id = PersonId(2L), firstName = "Bob", middleName = null, lastName = null),
+                )
+
+            // When
+            setContent {
+                ProvideSchemaAwareScope {
+                    AccountsScreen(
+                        accountRepository = repository,
+                        accountAttributeRepository = createAccountAttributeRepository(),
+                        attributeTypeRepository = createAttributeTypeRepository(),
+                        categoryRepository = createCategoryRepository(),
+                        transactionRepository = createTransactionRepository(),
+                        personRepository = createPersonRepository(people),
+                        personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
+                        maintenance = createMaintenance(),
+                        entitySource = stubEntitySource,
+                        scrollToAccountId = null,
+                        onAccountClick = {},
+                    )
+                }
+            }
+
+            onNodeWithText("+ Add Account").performClick()
+            onNodeWithText("Select owner").performClick()
+            onNodeWithText("Alice").performClick()
+            onNodeWithText("+ Add Owner").performClick()
+
+            // Then
+            onNodeWithText("Remove").assertIsDisplayed()
         }
 
     @Test
@@ -452,9 +492,9 @@ class AccountsScreenTest {
             everySuspend { createCategory(any()) } returns 0L
         }
 
-    private fun createPersonRepository(): PersonRepository =
+    private fun createPersonRepository(people: List<Person> = emptyList()): PersonRepository =
         mock(MockMode.autoUnit) {
-            every { getAllPeople() } returns flowOf(emptyList())
+            every { getAllPeople() } returns flowOf(people)
             every { getPersonById(any()) } returns flowOf(null)
             everySuspend { createPerson(any()) } returns PersonId(0L)
         }

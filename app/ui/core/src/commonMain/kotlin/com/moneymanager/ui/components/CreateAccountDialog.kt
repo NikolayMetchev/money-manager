@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
@@ -72,6 +71,8 @@ fun CreateAccountDialog(
     var showCreateCategoryDialog by remember { mutableStateOf(false) }
     var showCreatePersonDialog by remember { mutableStateOf(false) }
     var selectedOwnerIds by remember { mutableStateOf(setOf<Long>()) }
+    var selectedOwnerIdForAddition by remember { mutableStateOf<Long?>(null) }
+    var ownerDropdownExpanded by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
 
@@ -157,26 +158,68 @@ fun CreateAccountDialog(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     } else {
-                        people.forEach { person ->
+                        ExposedDropdownMenuBox(
+                            expanded = ownerDropdownExpanded,
+                            onExpandedChange = { ownerDropdownExpanded = !ownerDropdownExpanded && !isSaving },
+                        ) {
+                            OutlinedTextField(
+                                value = people.find { it.id.id == selectedOwnerIdForAddition }?.fullName ?: "Select owner",
+                                onValueChange = {},
+                                readOnly = true,
+                                label = { Text("Owner") },
+                                trailingIcon = {
+                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = ownerDropdownExpanded)
+                                },
+                                modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+                                enabled = !isSaving && people.any { !selectedOwnerIds.contains(it.id.id) },
+                            )
+                            ExposedDropdownMenu(
+                                expanded = ownerDropdownExpanded,
+                                onDismissRequest = { ownerDropdownExpanded = false },
+                            ) {
+                                people
+                                    .filterNot { selectedOwnerIds.contains(it.id.id) }
+                                    .forEach { person ->
+                                        DropdownMenuItem(
+                                            text = { Text(person.fullName) },
+                                            onClick = {
+                                                selectedOwnerIdForAddition = person.id.id
+                                                ownerDropdownExpanded = false
+                                            },
+                                        )
+                                    }
+                            }
+                        }
+                        TextButton(
+                            onClick = {
+                                selectedOwnerIdForAddition?.let { personId ->
+                                    selectedOwnerIds = selectedOwnerIds + personId
+                                    selectedOwnerIdForAddition = null
+                                }
+                            },
+                            enabled = !isSaving && selectedOwnerIdForAddition != null,
+                        ) {
+                            Text("+ Add Owner")
+                        }
+
+                        selectedOwnerIds.forEach { selectedOwnerId ->
+                            val person = people.find { it.id.id == selectedOwnerId } ?: return@forEach
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
                             ) {
-                                Checkbox(
-                                    checked = selectedOwnerIds.contains(person.id.id),
-                                    onCheckedChange = { checked ->
-                                        selectedOwnerIds =
-                                            if (checked) {
-                                                selectedOwnerIds + person.id.id
-                                            } else {
-                                                selectedOwnerIds - person.id.id
-                                            }
-                                    },
-                                    enabled = !isSaving,
-                                )
                                 Text(
                                     text = person.fullName,
                                     style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                TextButton(
+                                    onClick = {
+                                        selectedOwnerIds = selectedOwnerIds - person.id.id
+                                    },
+                                    enabled = !isSaving,
+                                ) {
+                                    Text("Remove")
                                 )
                             }
                         }
