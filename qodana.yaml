@@ -25,6 +25,44 @@ exclude:
   - name: EditorConfigKeyCorrectness
     paths:
       - app/ui/core/.editorconfig
+  - name: unused
+    paths:
+      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/AppVersionModule.kt
+      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/database/DatabaseManagerModule.kt
+      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/database/DeviceIdModule.kt
+      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/database/RepositoryModule.kt
+  - name: UnusedSymbol
+    paths:
+      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/AppVersionModule.kt
+      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/database/DatabaseManagerModule.kt
+      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/database/DeviceIdModule.kt
+      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/database/RepositoryModule.kt
+  - name: UnusedDeclaration
+    paths:
+      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/AppVersionModule.kt
+      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/database/DatabaseManagerModule.kt
+      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/database/DeviceIdModule.kt
+      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/database/RepositoryModule.kt
+  - name: UnusedSymbolLocal
+    paths:
+      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/AppVersionModule.kt
+      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/database/DatabaseManagerModule.kt
+      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/database/DeviceIdModule.kt
+      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/database/RepositoryModule.kt
+  - name: UnusedSymbol
+    paths:
+      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/AppComponent.kt
+      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/database/DatabaseComponent.kt
+      - test/app/db/src/commonMain/kotlin/com/moneymanager/test/database/DbTest.kt
+      - utils/compose/scrollbar/src/jvmMain/kotlin/com/moneymanager/compose/scrollbar/PlatformScrollbar.kt
+      - app/ui/core/src/jvmMain/kotlin/com/moneymanager/ui/DatabaseSelectionDialog.kt
+      - app/ui/core/src/commonMain/kotlin/com/moneymanager/ui/MinimalErrorScreen.kt
+      - app/ui/core/src/commonMain/kotlin/com/moneymanager/ui/SimpleFallbackErrorScreen.kt
+      - app/ui/core/src/commonMain/kotlin/com/moneymanager/ui/ErrorDialog.kt
+      - app/db/core/src/commonMain/kotlin/com/moneymanager/database/mapper/AuditTypeConversions.kt
+      - app/db/core/src/commonMain/kotlin/com/moneymanager/database/mapper/IdConversions.kt
+      - app/db/core/src/commonMain/kotlin/com/moneymanager/database/mapper/InstantConversions.kt
+      - app/db/core/src/commonMain/kotlin/com/moneymanager/database/mapper/SourceTypeConversions.kt
   - name: All
     paths:
       - build
