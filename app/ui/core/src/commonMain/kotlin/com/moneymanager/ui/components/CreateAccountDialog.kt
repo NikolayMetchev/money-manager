@@ -177,6 +177,14 @@ fun CreateAccountDialog(
                                 expanded = ownerDropdownExpanded,
                                 onDismissRequest = { ownerDropdownExpanded = false },
                             ) {
+                                DropdownMenuItem(
+                                    text = { Text("+ Create New Person") },
+                                    onClick = {
+                                        ownerDropdownExpanded = false
+                                        showCreatePersonDialog = true
+                                    },
+                                )
+                                HorizontalDivider()
                                 people
                                     .filterNot { selectedOwnerIds.contains(it.id.id) }
                                     .forEach { person ->
@@ -220,15 +228,9 @@ fun CreateAccountDialog(
                                     enabled = !isSaving,
                                 ) {
                                     Text("Remove")
-                                )
+                                }
                             }
                         }
-                    }
-                    TextButton(
-                        onClick = { showCreatePersonDialog = true },
-                        enabled = !isSaving,
-                    ) {
-                        Text("+ Add New Person")
                     }
                 }
 
@@ -321,6 +323,9 @@ fun CreateAccountDialog(
             personRepository = personRepository,
             personAttributeRepository = personAttributeRepository,
             entitySource = entitySource,
+            onPersonCreated = { personId ->
+                selectedOwnerIdForAddition = personId.id
+            },
             onDismiss = { showCreatePersonDialog = false },
         )
     }
