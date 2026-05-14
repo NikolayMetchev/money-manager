@@ -59,6 +59,10 @@ exclude:
       - app/ui/core/src/commonMain/kotlin/com/moneymanager/ui/MinimalErrorScreen.kt
       - app/ui/core/src/commonMain/kotlin/com/moneymanager/ui/SimpleFallbackErrorScreen.kt
       - app/ui/core/src/commonMain/kotlin/com/moneymanager/ui/ErrorDialog.kt
+      - app/db/core/src/commonMain/kotlin/com/moneymanager/database/mapper/AuditTypeConversions.kt
+      - app/db/core/src/commonMain/kotlin/com/moneymanager/database/mapper/IdConversions.kt
+      - app/db/core/src/commonMain/kotlin/com/moneymanager/database/mapper/InstantConversions.kt
+      - app/db/core/src/commonMain/kotlin/com/moneymanager/database/mapper/SourceTypeConversions.kt
   - name: All
     paths:
       - build
