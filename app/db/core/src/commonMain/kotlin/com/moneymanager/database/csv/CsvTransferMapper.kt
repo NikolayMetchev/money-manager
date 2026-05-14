@@ -149,12 +149,12 @@ data class DiscoveredAccountMapping(
  */
 class CsvTransferMapper(
     private val strategy: CsvImportStrategy,
-    private val columns: List<CsvColumn>,
+    columns: List<CsvColumn>,
     private val existingAccounts: Map<String, Account>,
     private val existingCurrencies: Map<CurrencyId, Currency>,
     private val existingCurrenciesByCode: Map<String, Currency>,
     private val existingTransfers: List<ExistingTransferInfo> = emptyList(),
-    private val accountMappings: List<CsvAccountMapping> = emptyList(),
+    accountMappings: List<CsvAccountMapping> = emptyList(),
     /** When set, overrides the strategy's SOURCE_ACCOUNT mapping for every row. */
     private val sourceAccountOverride: AccountId? = null,
 ) {
@@ -204,9 +204,8 @@ class CsvTransferMapper(
                     statusCounts[result.importStatus] = statusCounts.getOrDefault(result.importStatus, 0) + 1
 
                     if (result.newAccountName != null) {
-                        val lookupMapping = strategy.fieldMappings[TransferField.TARGET_ACCOUNT]
                         val categoryId =
-                            when (lookupMapping) {
+                            when (val lookupMapping = strategy.fieldMappings[TransferField.TARGET_ACCOUNT]) {
                                 is AccountLookupMapping -> lookupMapping.defaultCategoryId
                                 is RegexAccountMapping -> lookupMapping.defaultCategoryId
                                 else -> UNCATEGORIZED_ID

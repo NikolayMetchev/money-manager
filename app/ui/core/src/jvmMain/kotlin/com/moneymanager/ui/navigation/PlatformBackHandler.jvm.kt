@@ -1,5 +1,3 @@
-@file:Suppress("UNUSED_PARAMETER")
-
 package com.moneymanager.ui.navigation
 
 import androidx.compose.runtime.Composable
