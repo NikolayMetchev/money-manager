@@ -10,57 +10,57 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                api(libs.kotlinx.coroutines.core)
-                api(libs.mappie.api)
-                api(projects.app.model.core)
-                api(projects.utils.currency)
+            api(libs.kotlinx.coroutines.core)
+            api(libs.mappie.api)
+            api(projects.app.model.core)
+            api(projects.utils.currency)
 
-                implementation(libs.kotlinx.datetime)
-                implementation(libs.kmlogging)
-                implementation(libs.kotlinx.serialization.json)
-                implementation(libs.sqldelight.coroutines.extensions)
-                implementation(projects.utils.bigdecimal)
-            }
+            implementation(libs.kmlogging)
+            implementation(libs.kotlinx.datetime)
+            implementation(libs.kotlinx.serialization.json)
+            implementation(libs.sqldelight.coroutines.extensions)
+            implementation(projects.utils.bigdecimal)
+        }
         }
 
         val commonTest by getting {
             dependencies {
-                implementation(kotlin("test"))
-                implementation(libs.kotlinx.coroutines.test)
-                implementation(projects.app.model.core)
-                implementation(projects.test.app.db)
-            }
+            implementation(kotlin("test"))
+            implementation(libs.kotlinx.coroutines.test)
+            implementation(projects.app.model.core)
+            implementation(projects.test.app.db)
+        }
         }
 
         val jvmMain by getting {
             dependencies {
-                api(libs.kotlinx.serialization.core)
-                api(projects.utils.currency)
+            api(libs.kotlinx.serialization.core)
+            api(projects.utils.currency)
 
-                implementation(libs.sqldelight.sqlite.driver)
-            }
+            implementation(libs.sqldelight.sqlite.driver)
+        }
         }
 
         val jvmTest by getting {
             dependencies {
-                implementation(projects.app.db.core)
-                implementation(projects.app.di.core)
-            }
+            implementation(projects.app.db.core)
+            implementation(projects.app.di.core)
+        }
         }
 
         val androidMain by getting {
             dependencies {
-                api(libs.kotlinx.serialization.core)
+            api(libs.kotlinx.serialization.core)
 
-                implementation(libs.androidx.sqlite)
-                implementation(libs.sqldelight.android.driver)
-            }
+            implementation(libs.androidx.sqlite)
+            implementation(libs.sqldelight.android.driver)
+        }
         }
 
         val androidHostTest by getting {
             dependencies {
-                implementation(projects.app.di.core)
-            }
+            implementation(projects.app.di.core)
+        }
         }
 
         val androidDeviceTest by getting {
@@ -68,13 +68,13 @@ kotlin {
             // Tests are shared via srcDir() below, but we exclude the expect declarations
             // file since androidDeviceTest provides its own implementation
             dependencies {
-                implementation(kotlin("test"))
-                implementation(libs.kotlinx.coroutines.test)
-                implementation(projects.app.di.core)
-                implementation(projects.test.app.db)
+            implementation(kotlin("test"))
+            implementation(libs.kotlinx.coroutines.test)
+            implementation(projects.app.di.core)
+            implementation(projects.test.app.db)
 
-                runtimeOnly(libs.androidx.test.runner)
-            }
+            runtimeOnly(libs.androidx.test.runner)
+        }
             // Include repository tests from commonTest (not the expect declarations file)
             kotlin.srcDir("src/commonTest/kotlin/com/moneymanager/database/repository")
         }
