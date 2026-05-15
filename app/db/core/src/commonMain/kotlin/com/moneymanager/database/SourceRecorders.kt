@@ -155,7 +155,7 @@ class ApiEntitySourceRecorder(
         entityId: Long,
         revisionId: Long,
     ) {
-         queries.transaction {
+        queries.transaction {
             queries.insertSource(
                 entity_type_id = entityType.id,
                 entity_id = entityId,
@@ -171,7 +171,9 @@ class ApiEntitySourceRecorder(
                         revision_id = revisionId,
                     ).executeAsOne()
             if (queries.selectApiEntitySourceId(id = entitySourceId).executeAsOneOrNull() != null) {
-                println("Suppressed duplicate API entity source: entity_type_id=${entityType.id}, entity_id=$entityId, revision_id=$revisionId")
+                println(
+                    "Suppressed duplicate API entity source: entity_type_id=${entityType.id}, entity_id=$entityId, revision_id=$revisionId",
+                )
                 return@transaction
             }
             queries.insertApiSource(
