@@ -37,6 +37,7 @@ kotlin {
                 api(libs.kotlinx.serialization.core)
                 api(projects.utils.currency)
 
+                implementation(libs.diamondedge.logging)
                 implementation(libs.sqldelight.sqlite.driver)
             }
         }
@@ -53,6 +54,7 @@ kotlin {
                 api(libs.kotlinx.serialization.core)
 
                 implementation(libs.androidx.sqlite)
+                implementation(libs.diamondedge.logging)
                 implementation(libs.sqldelight.android.driver)
             }
         }
