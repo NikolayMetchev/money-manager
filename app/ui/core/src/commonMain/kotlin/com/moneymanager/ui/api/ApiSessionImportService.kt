@@ -1242,7 +1242,7 @@ private suspend fun AccountAttributeRepository.upsertAccountAttributeInCreationM
 }
 
 private fun ApiTransactionPageItem.personalCounterpartyOwner(peopleMappings: ApiPeopleMappings): ApiImportAccountOwner? {
-    val counterparty = rawJson?.get(peopleMappings.counterpartyObjectField) as? JsonObject ?: return null
+    val counterparty = rawJson?.resolveJsonObjectPath(peopleMappings.counterpartyObjectField) ?: return null
     val beneficiaryAccountType = counterparty.stringOrNull(peopleMappings.beneficiaryAccountTypeField)
     if (beneficiaryAccountType?.equals(peopleMappings.personalBeneficiaryAccountTypeValue, ignoreCase = true) != true) return null
 
@@ -1261,7 +1261,7 @@ private fun ApiTransactionPageItem.personalCounterpartyOwner(peopleMappings: Api
 }
 
 private fun JsonObject.personalCounterpartyIdentity(peopleMappings: ApiPeopleMappings): PersonalCounterpartyIdentity? {
-    val counterparty = get(peopleMappings.counterpartyObjectField) as? JsonObject ?: return null
+    val counterparty = resolveJsonObjectPath(peopleMappings.counterpartyObjectField) ?: return null
     val beneficiaryAccountType = counterparty.stringOrNull(peopleMappings.beneficiaryAccountTypeField)
     if (beneficiaryAccountType?.equals(peopleMappings.personalBeneficiaryAccountTypeValue, ignoreCase = true) != true) return null
     val sortCode = counterparty.stringOrNull(peopleMappings.counterpartySortCodeField)?.takeIf { it.isNotBlank() } ?: return null
@@ -2030,11 +2030,17 @@ private fun JsonObject.resolveCounterpartyIdentity(
     resolveJsonPath(counterpartyIdField)?.takeIf { it.isNotBlank() }?.let { return it }
 
     if (counterpartyIdField.endsWith(".id")) {
-        val accountIdField = counterpartyIdField.removeSuffix(".id") + peopleMappings.fallbackCounterpartyAccountIdSuffix
+        val counterpartyIdSuffix = "." + peopleMappings.counterpartyUserIdField.substringAfterLast(".")
+        val accountIdField =
+            if (counterpartyIdField.endsWith(counterpartyIdSuffix)) {
+                counterpartyIdField.removeSuffix(counterpartyIdSuffix) + peopleMappings.fallbackCounterpartyAccountIdSuffix
+            } else {
+                counterpartyIdField + peopleMappings.fallbackCounterpartyAccountIdSuffix
+            }
         resolveJsonPath(accountIdField)?.takeIf { it.isNotBlank() }?.let { return it }
     }
 
-    val counterparty = counterpartyObject(counterpartyIdField) ?: return null
+    val counterparty = resolveJsonObjectPath(peopleMappings.counterpartyObjectField) ?: return null
     val sortCode = counterparty.stringOrNull(peopleMappings.counterpartySortCodeField)?.takeIf { it.isNotBlank() }
     val accountNumber = counterparty.stringOrNull(peopleMappings.counterpartyAccountNumberField)?.takeIf { it.isNotBlank() }
     if (sortCode != null && accountNumber != null) {
@@ -2054,12 +2060,9 @@ private fun JsonObject.resolveCounterpartyIdentity(
     return null
 }
 
-private fun JsonObject.counterpartyObject(counterpartyIdField: String): JsonObject? {
-    val parts = counterpartyIdField.split(".")
-    if (parts.size <= 1) return this
-
+private fun JsonObject.resolveJsonObjectPath(dotPath: String): JsonObject? {
     var current: JsonElement = this
-    for (part in parts.dropLast(1)) {
+    for (part in dotPath.split(".")) {
         current = (current as? JsonObject)?.get(part) ?: return null
     }
     return current as? JsonObject

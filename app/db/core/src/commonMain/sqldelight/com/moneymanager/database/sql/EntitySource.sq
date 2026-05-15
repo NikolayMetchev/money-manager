@@ -57,12 +57,24 @@ CREATE INDEX IF NOT EXISTS idx_api_entity_source_request ON api_entity_source(ap
 
 -- Insert source for an entity
 insertSource:
-INSERT INTO entity_source (entity_type_id, entity_id, revision_id, source_type_id, device_id)
+INSERT OR IGNORE INTO entity_source (entity_type_id, entity_id, revision_id, source_type_id, device_id)
 VALUES (?, ?, ?, ?, ?);
 
 -- Get the last inserted entity_source ID
 lastInsertedId:
 SELECT last_insert_rowid();
+
+selectEntitySourceId:
+SELECT id
+FROM entity_source
+WHERE entity_type_id = ?
+  AND entity_id = ?
+  AND revision_id = ?;
+
+selectApiEntitySourceId:
+SELECT id
+FROM api_entity_source
+WHERE id = ?;
 
 -- Insert API-specific details for an entity source (must be called after insertSource)
 insertApiSource:

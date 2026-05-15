@@ -49,6 +49,7 @@ import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
 import com.moneymanager.domain.model.apistrategy.ApiPaginationConfig
+import com.moneymanager.domain.model.apistrategy.ApiPeopleMappings
 import com.moneymanager.domain.model.apistrategy.ApiQueryParam
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
 import com.moneymanager.domain.repository.ApiSessionRepository
@@ -562,13 +563,18 @@ fun ApiStrategyEditDialog(
                     pickingPaths = txJsonPaths
                     pickingForSetter = setter
                 })
-                FieldMappingRow(label = "Counterparty service user number field", value = peopleCounterpartyServiceUserNumberField, onValueChange = {
-                    peopleCounterpartyServiceUserNumberField =
-                        it
-                }, paths = txJsonPaths, onPickRequest = { setter ->
-                    pickingPaths = txJsonPaths
-                    pickingForSetter = setter
-                })
+                FieldMappingRow(
+                    label = "Counterparty service user number field",
+                    value = peopleCounterpartyServiceUserNumberField,
+                    onValueChange = {
+                        peopleCounterpartyServiceUserNumberField = it
+                    },
+                    paths = txJsonPaths,
+                    onPickRequest = { setter ->
+                        pickingPaths = txJsonPaths
+                        pickingForSetter = setter
+                    },
+                )
                 FieldMappingRow(label = "Fallback account id suffix", value = peopleFallbackCounterpartyAccountIdSuffix, onValueChange = {
                     peopleFallbackCounterpartyAccountIdSuffix =
                         it
@@ -661,7 +667,7 @@ fun ApiStrategyEditDialog(
                             accountNamePrefix = accountNamePrefix.trim(),
                             counterpartyPrefix = counterpartyPrefix.trim(),
                             peopleMappings =
-                                com.moneymanager.domain.model.apistrategy.ApiPeopleMappings(
+                                ApiPeopleMappings(
                                     counterpartyObjectField = peopleCounterpartyObjectField.trim(),
                                     beneficiaryAccountTypeField = peopleBeneficiaryAccountTypeField.trim(),
                                     personalBeneficiaryAccountTypeValue = peoplePersonalBeneficiaryAccountTypeValue.trim(),
