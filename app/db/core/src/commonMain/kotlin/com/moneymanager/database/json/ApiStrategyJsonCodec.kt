@@ -3,6 +3,7 @@ package com.moneymanager.database.json
 import com.moneymanager.domain.model.apistrategy.ApiAccountMappings
 import com.moneymanager.domain.model.apistrategy.ApiAuthType
 import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
+import com.moneymanager.domain.model.apistrategy.ApiPeopleMappings
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -21,6 +22,7 @@ data class ApiStrategyConfigJson(
     val transactionMappings: ApiTransactionMappings,
     val accountNamePrefix: String,
     val counterpartyPrefix: String,
+    val peopleMappings: ApiPeopleMappings = ApiPeopleMappings(),
 )
 
 /**

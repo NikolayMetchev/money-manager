@@ -6,6 +6,7 @@ import com.moneymanager.database.DatabaseConfig
 import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.model.*
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
+import com.moneymanager.domain.model.apistrategy.ApiPeopleMappings
 import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.ApiSessionRepository
@@ -629,7 +630,7 @@ private suspend fun precreateCounterparties(
                 val request = requestsById[response.requestId] ?: return@flatMap emptyList()
                 parseTransactionsWithPath(response.json, strategy).mapNotNull { item ->
                     val counterpartyId =
-                        item.rawJson?.resolveCounterpartyIdentity(counterpartyIdField)
+                        item.rawJson?.resolveCounterpartyIdentity(counterpartyIdField, strategy.peopleMappings)
                             ?: return@mapNotNull null
                     val downloadedName = item.cleanCounterpartyName(nameMappings) ?: item.counterpartyName(nameMappings)
                     CounterpartyImportCandidate(
@@ -670,7 +671,7 @@ private fun collectCounterpartiesFromResponses(
                     return@mapNotNull null
                 }
                 val counterpartyId =
-                    item.rawJson?.resolveCounterpartyIdentity(counterpartyIdField)
+                    item.rawJson?.resolveCounterpartyIdentity(counterpartyIdField, strategy.peopleMappings)
                         ?: return@mapNotNull null
                 // Use only the proper name (merchant/counterparty name field), not the
                 // description fallback. Description-based names are per-transaction references
@@ -883,7 +884,7 @@ private suspend fun importPeopleFromCounterparties(
         val personalCounterpartyItems = mutableListOf<Triple<ApiTransactionPageItem, ApiImportAccountOwner, PersonalCounterpartyIdentity>>()
         for (item in parseTransactionsWithPath(response.json, strategy)) {
             if (item.amountMinorUnits != 0L && item.rawJson?.resolveBuiltInCounterpartyType(item.amountMinorUnits) == null) {
-                val owner = item.personalCounterpartyOwner()
+                val owner = item.personalCounterpartyOwner(strategy.peopleMappings)
                 val personalCounterpartyIdentity = owner?.personalCounterpartyIdentity()
                 if (owner != null && personalCounterpartyIdentity != null) {
                     personalCounterpartyItems.add(Triple(item, owner, personalCounterpartyIdentity))
@@ -893,7 +894,7 @@ private suspend fun importPeopleFromCounterparties(
         for ((item, owner, personalCounterpartyIdentity) in personalCounterpartyItems) {
             val counterpartyAccountId =
                 accountCache.getOrCreateCounterpartyAccountId(
-                    counterpartyId = item.rawJson?.resolveCounterpartyIdentity(counterpartyIdField),
+                    counterpartyId = item.rawJson?.resolveCounterpartyIdentity(counterpartyIdField, strategy.peopleMappings),
                     builtInType = null,
                     name = nameMappings.counterpartyPrefix + personalCounterpartyIdentity.name,
                     dedupeKey = personalCounterpartyIdentity.dedupeKey,
@@ -1240,15 +1241,15 @@ private suspend fun AccountAttributeRepository.upsertAccountAttributeInCreationM
     }
 }
 
-private fun ApiTransactionPageItem.personalCounterpartyOwner(): ApiImportAccountOwner? {
-    val counterparty = rawJson?.get("counterparty") as? JsonObject ?: return null
-    val beneficiaryAccountType = counterparty.stringOrNull("beneficiary_account_type")
-    if (beneficiaryAccountType?.equals("Personal", ignoreCase = true) != true) return null
+private fun ApiTransactionPageItem.personalCounterpartyOwner(peopleMappings: ApiPeopleMappings): ApiImportAccountOwner? {
+    val counterparty = rawJson?.get(peopleMappings.counterpartyObjectField) as? JsonObject ?: return null
+    val beneficiaryAccountType = counterparty.stringOrNull(peopleMappings.beneficiaryAccountTypeField)
+    if (beneficiaryAccountType?.equals(peopleMappings.personalBeneficiaryAccountTypeValue, ignoreCase = true) != true) return null
 
-    val name = counterparty.stringOrNull("name")?.takeIf { it.isNotBlank() }
-    val userId = counterparty.stringOrNull("user_id")?.takeIf { it.isNotBlank() }.orEmpty()
-    val sortCode = counterparty.stringOrNull("sort_code")?.takeIf { it.isNotBlank() }
-    val accountNumber = counterparty.stringOrNull("account_number")?.takeIf { it.isNotBlank() }
+    val name = counterparty.stringOrNull(peopleMappings.counterpartyNameField)?.takeIf { it.isNotBlank() }
+    val userId = counterparty.stringOrNull(peopleMappings.counterpartyUserIdField)?.takeIf { it.isNotBlank() }.orEmpty()
+    val sortCode = counterparty.stringOrNull(peopleMappings.counterpartySortCodeField)?.takeIf { it.isNotBlank() }
+    val accountNumber = counterparty.stringOrNull(peopleMappings.counterpartyAccountNumberField)?.takeIf { it.isNotBlank() }
     if (name == null && sortCode == null && accountNumber == null && userId.isBlank()) return null
     return ApiImportAccountOwner(
         userId = userId,
@@ -1259,13 +1260,13 @@ private fun ApiTransactionPageItem.personalCounterpartyOwner(): ApiImportAccount
     )
 }
 
-private fun JsonObject.personalCounterpartyIdentity(): PersonalCounterpartyIdentity? {
-    val counterparty = get("counterparty") as? JsonObject ?: return null
-    val beneficiaryAccountType = counterparty.stringOrNull("beneficiary_account_type")
-    if (beneficiaryAccountType?.equals("Personal", ignoreCase = true) != true) return null
-    val sortCode = counterparty.stringOrNull("sort_code")?.takeIf { it.isNotBlank() } ?: return null
-    val accountNumber = counterparty.stringOrNull("account_number")?.takeIf { it.isNotBlank() } ?: return null
-    val name = counterparty.stringOrNull("name")?.takeIf { it.isNotBlank() } ?: return null
+private fun JsonObject.personalCounterpartyIdentity(peopleMappings: ApiPeopleMappings): PersonalCounterpartyIdentity? {
+    val counterparty = get(peopleMappings.counterpartyObjectField) as? JsonObject ?: return null
+    val beneficiaryAccountType = counterparty.stringOrNull(peopleMappings.beneficiaryAccountTypeField)
+    if (beneficiaryAccountType?.equals(peopleMappings.personalBeneficiaryAccountTypeValue, ignoreCase = true) != true) return null
+    val sortCode = counterparty.stringOrNull(peopleMappings.counterpartySortCodeField)?.takeIf { it.isNotBlank() } ?: return null
+    val accountNumber = counterparty.stringOrNull(peopleMappings.counterpartyAccountNumberField)?.takeIf { it.isNotBlank() } ?: return null
+    val name = counterparty.stringOrNull(peopleMappings.counterpartyNameField)?.takeIf { it.isNotBlank() } ?: return null
     return PersonalCounterpartyIdentity(name = name, sortCode = sortCode, accountNumber = accountNumber)
 }
 
@@ -1443,6 +1444,7 @@ private suspend fun importTransactionPage(
                 customTxFields = customTxFields,
                 uniqueIdTxFields = uniqueIdTxFields,
                 counterpartyIdField = counterpartyIdField,
+                peopleMappings = strategy.peopleMappings,
                 nameMappings = nameMappings,
                 existingByUniqueId = existingByUniqueId,
                 existingTransfersByApiId = existingTransfersByApiId,
@@ -1478,6 +1480,7 @@ private suspend fun importTransactionItem(
     customTxFields: Map<String, String>,
     uniqueIdTxFields: Set<String>,
     counterpartyIdField: String?,
+    peopleMappings: ApiPeopleMappings,
     nameMappings: CounterpartyNameMappings,
     existingByUniqueId: Map<Map<String, String>, TransferId>,
     existingTransfersByApiId: Map<String, Transfer>,
@@ -1509,6 +1512,7 @@ private suspend fun importTransactionItem(
             customTxFields = customTxFields,
             uniqueIdTxFields = uniqueIdTxFields,
             counterpartyIdField = counterpartyIdField,
+            peopleMappings = peopleMappings,
             nameMappings = nameMappings,
             existingByUniqueId = existingByUniqueId,
             existingTransfersByApiId = existingTransfersByApiId,
@@ -1541,6 +1545,7 @@ private suspend fun importValidTransactionItem(
     customTxFields: Map<String, String>,
     uniqueIdTxFields: Set<String>,
     counterpartyIdField: String?,
+    peopleMappings: ApiPeopleMappings,
     nameMappings: CounterpartyNameMappings,
     existingByUniqueId: Map<Map<String, String>, TransferId>,
     existingTransfersByApiId: Map<String, Transfer>,
@@ -1556,8 +1561,8 @@ private suspend fun importValidTransactionItem(
             accountCache.getOrCreateAccountId(name = nameMappings.counterpartyPrefix + "Void", transactionApiSource = counterpartyApiSource)
         } else {
             val builtInCounterpartyType = item.rawJson?.resolveBuiltInCounterpartyType(item.amountMinorUnits)
-            val counterpartyId = item.rawJson?.resolveCounterpartyIdentity(counterpartyIdField)
-            val personalCounterpartyIdentity = item.rawJson?.personalCounterpartyIdentity()
+            val counterpartyId = item.rawJson?.resolveCounterpartyIdentity(counterpartyIdField, peopleMappings)
+            val personalCounterpartyIdentity = item.rawJson?.personalCounterpartyIdentity(peopleMappings)
             accountCache.getOrCreateCounterpartyAccountId(
                 counterpartyId = counterpartyId,
                 dedupeKey = personalCounterpartyIdentity?.dedupeKey,
@@ -2016,29 +2021,32 @@ private fun JsonObject.resolveJsonPath(dotPath: String): String? {
     return (current as? JsonPrimitive)?.contentOrNull
 }
 
-private fun JsonObject.resolveCounterpartyIdentity(counterpartyIdField: String?): String? {
+private fun JsonObject.resolveCounterpartyIdentity(
+    counterpartyIdField: String?,
+    peopleMappings: ApiPeopleMappings,
+): String? {
     if (counterpartyIdField == null) return null
 
     resolveJsonPath(counterpartyIdField)?.takeIf { it.isNotBlank() }?.let { return it }
 
     if (counterpartyIdField.endsWith(".id")) {
-        val accountIdField = counterpartyIdField.removeSuffix(".id") + ".account_id"
+        val accountIdField = counterpartyIdField.removeSuffix(".id") + peopleMappings.fallbackCounterpartyAccountIdSuffix
         resolveJsonPath(accountIdField)?.takeIf { it.isNotBlank() }?.let { return it }
     }
 
     val counterparty = counterpartyObject(counterpartyIdField) ?: return null
-    val sortCode = counterparty.stringOrNull("sort_code")?.takeIf { it.isNotBlank() }
-    val accountNumber = counterparty.stringOrNull("account_number")?.takeIf { it.isNotBlank() }
+    val sortCode = counterparty.stringOrNull(peopleMappings.counterpartySortCodeField)?.takeIf { it.isNotBlank() }
+    val accountNumber = counterparty.stringOrNull(peopleMappings.counterpartyAccountNumberField)?.takeIf { it.isNotBlank() }
     if (sortCode != null && accountNumber != null) {
         return "bank:$sortCode:$accountNumber"
     }
 
-    val serviceUserNumber = counterparty.stringOrNull("service_user_number")?.takeIf { it.isNotBlank() }
+    val serviceUserNumber = counterparty.stringOrNull(peopleMappings.counterpartyServiceUserNumberField)?.takeIf { it.isNotBlank() }
     if (serviceUserNumber != null) {
         return "service_user:$serviceUserNumber"
     }
 
-    val userId = counterparty.stringOrNull("user_id")?.takeIf { it.isNotBlank() }
+    val userId = counterparty.stringOrNull(peopleMappings.counterpartyUserIdField)?.takeIf { it.isNotBlank() }
     if (userId != null) {
         return "user:$userId"
     }

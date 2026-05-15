@@ -111,3 +111,16 @@ data class ApiTransactionMappings(
     val customFields: Map<String, String> = emptyMap(),
     val uniqueIdentifierFields: Set<String> = emptySet(),
 )
+
+@Serializable
+data class ApiPeopleMappings(
+    val counterpartyObjectField: String = "counterparty",
+    val beneficiaryAccountTypeField: String = "beneficiary_account_type",
+    val personalBeneficiaryAccountTypeValue: String = "Personal",
+    val counterpartyNameField: String = "name",
+    val counterpartyUserIdField: String = "user_id",
+    val counterpartySortCodeField: String = "sort_code",
+    val counterpartyAccountNumberField: String = "account_number",
+    val counterpartyServiceUserNumberField: String = "service_user_number",
+    val fallbackCounterpartyAccountIdSuffix: String = ".account_id",
+)

@@ -155,21 +155,30 @@ class ApiEntitySourceRecorder(
         entityId: Long,
         revisionId: Long,
     ) {
-        queries.transaction {
-            queries.insertSource(
-                entity_type_id = entityType.id,
-                entity_id = entityId,
-                revision_id = revisionId,
-                source_type_id = SourceType.API.id.toLong(),
-                device_id = deviceId.id,
-            )
-            val entitySourceId = queries.lastInsertedId().executeAsOne()
-            queries.insertApiSource(
-                id = entitySourceId,
-                api_session_id = sessionId.id,
-                api_request_id = requestId.id,
-                json_path = jsonPath.value,
-            )
+        runCatching {
+            queries.transaction {
+                queries.insertSource(
+                    entity_type_id = entityType.id,
+                    entity_id = entityId,
+                    revision_id = revisionId,
+                    source_type_id = SourceType.API.id.toLong(),
+                    device_id = deviceId.id,
+                )
+                val entitySourceId = queries.lastInsertedId().executeAsOne()
+                queries.insertApiSource(
+                    id = entitySourceId,
+                    api_session_id = sessionId.id,
+                    api_request_id = requestId.id,
+                    json_path = jsonPath.value,
+                )
+            }
+        }.onFailure { error ->
+            val isDuplicateRevisionSource =
+                error.message?.contains("UNIQUE constraint failed: entity_source.entity_type_id, entity_source.entity_id, entity_source.revision_id") ==
+                    true
+            if (!isDuplicateRevisionSource) {
+                throw error
+            }
         }
     }
 }
