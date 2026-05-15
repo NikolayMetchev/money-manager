@@ -14,6 +14,7 @@ import com.moneymanager.domain.model.SourceType
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImportId
+import org.lighthousegames.logging.logging
 
 /** Manual entry from UI. */
 class ManualSourceRecorder(
@@ -150,6 +151,8 @@ class ApiEntitySourceRecorder(
     private val requestId: ApiRequestId,
     private val jsonPath: JsonPath,
 ) {
+    private val logger = logging()
+
     fun insert(
         entityType: EntityType,
         entityId: Long,
@@ -171,9 +174,9 @@ class ApiEntitySourceRecorder(
                         revision_id = revisionId,
                     ).executeAsOne()
             if (queries.selectApiEntitySourceId(id = entitySourceId).executeAsOneOrNull() != null) {
-                println(
-                    "Suppressed duplicate API entity source: entity_type_id=${entityType.id}, entity_id=$entityId, revision_id=$revisionId",
-                )
+                logger.warn {
+                    "Suppressed duplicate API entity source: entity_type_id=${entityType.id}, entity_id=$entityId, revision_id=$revisionId"
+                }
                 return@transaction
             }
             queries.insertApiSource(

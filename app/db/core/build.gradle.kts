@@ -16,6 +16,7 @@ kotlin {
                 api(projects.utils.currency)
 
                 implementation(libs.kotlinx.datetime)
+                implementation(libs.kmlogging)
                 implementation(libs.kotlinx.serialization.json)
                 implementation(libs.sqldelight.coroutines.extensions)
                 implementation(projects.utils.bigdecimal)
