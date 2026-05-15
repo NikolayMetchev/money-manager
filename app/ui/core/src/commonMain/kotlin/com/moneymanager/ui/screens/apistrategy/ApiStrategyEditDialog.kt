@@ -117,14 +117,34 @@ fun ApiStrategyEditDialog(
     var txCounterpartyIdField by remember { mutableStateOf(strategy?.transactionMappings?.counterpartyIdField ?: "") }
     var txDeclineReasonField by remember { mutableStateOf(strategy?.transactionMappings?.declineReasonField ?: "") }
     var peopleCounterpartyObjectField by remember { mutableStateOf(strategy?.peopleMappings?.counterpartyObjectField ?: "counterparty") }
-    var peopleBeneficiaryAccountTypeField by remember { mutableStateOf(strategy?.peopleMappings?.beneficiaryAccountTypeField ?: "beneficiary_account_type") }
-    var peoplePersonalBeneficiaryAccountTypeValue by remember { mutableStateOf(strategy?.peopleMappings?.personalBeneficiaryAccountTypeValue ?: "Personal") }
+    var peopleBeneficiaryAccountTypeField by remember {
+        mutableStateOf(
+            strategy?.peopleMappings?.beneficiaryAccountTypeField ?: "beneficiary_account_type",
+        )
+    }
+    var peoplePersonalBeneficiaryAccountTypeValue by remember {
+        mutableStateOf(
+            strategy?.peopleMappings?.personalBeneficiaryAccountTypeValue ?: "Personal",
+        )
+    }
     var peopleCounterpartyNameField by remember { mutableStateOf(strategy?.peopleMappings?.counterpartyNameField ?: "name") }
     var peopleCounterpartyUserIdField by remember { mutableStateOf(strategy?.peopleMappings?.counterpartyUserIdField ?: "user_id") }
     var peopleCounterpartySortCodeField by remember { mutableStateOf(strategy?.peopleMappings?.counterpartySortCodeField ?: "sort_code") }
-    var peopleCounterpartyAccountNumberField by remember { mutableStateOf(strategy?.peopleMappings?.counterpartyAccountNumberField ?: "account_number") }
-    var peopleCounterpartyServiceUserNumberField by remember { mutableStateOf(strategy?.peopleMappings?.counterpartyServiceUserNumberField ?: "service_user_number") }
-    var peopleFallbackCounterpartyAccountIdSuffix by remember { mutableStateOf(strategy?.peopleMappings?.fallbackCounterpartyAccountIdSuffix ?: ".account_id") }
+    var peopleCounterpartyAccountNumberField by remember {
+        mutableStateOf(
+            strategy?.peopleMappings?.counterpartyAccountNumberField ?: "account_number",
+        )
+    }
+    var peopleCounterpartyServiceUserNumberField by remember {
+        mutableStateOf(
+            strategy?.peopleMappings?.counterpartyServiceUserNumberField ?: "service_user_number",
+        )
+    }
+    var peopleFallbackCounterpartyAccountIdSuffix by remember {
+        mutableStateOf(
+            strategy?.peopleMappings?.fallbackCounterpartyAccountIdSuffix ?: ".account_id",
+        )
+    }
     var customTxFields by remember {
         mutableStateOf<List<CustomFieldState>>(
             strategy?.transactionMappings?.customFields?.map { (k, v) ->
@@ -496,15 +516,63 @@ fun ApiStrategyEditDialog(
                 Spacer(Modifier.height(4.dp))
                 HorizontalDivider()
                 SectionHeader("People Mappings")
-                FieldMappingRow(label = "Counterparty object field", value = peopleCounterpartyObjectField, onValueChange = { peopleCounterpartyObjectField = it }, paths = txJsonPaths, onPickRequest = { setter -> pickingPaths = txJsonPaths; pickingForSetter = setter })
-                FieldMappingRow(label = "Beneficiary account type field", value = peopleBeneficiaryAccountTypeField, onValueChange = { peopleBeneficiaryAccountTypeField = it }, paths = txJsonPaths, onPickRequest = { setter -> pickingPaths = txJsonPaths; pickingForSetter = setter })
-                FieldMappingRow(label = "Personal beneficiary value", value = peoplePersonalBeneficiaryAccountTypeValue, onValueChange = { peoplePersonalBeneficiaryAccountTypeValue = it }, paths = emptyList(), onPickRequest = {})
-                FieldMappingRow(label = "Counterparty name field", value = peopleCounterpartyNameField, onValueChange = { peopleCounterpartyNameField = it }, paths = txJsonPaths, onPickRequest = { setter -> pickingPaths = txJsonPaths; pickingForSetter = setter })
-                FieldMappingRow(label = "Counterparty user id field", value = peopleCounterpartyUserIdField, onValueChange = { peopleCounterpartyUserIdField = it }, paths = txJsonPaths, onPickRequest = { setter -> pickingPaths = txJsonPaths; pickingForSetter = setter })
-                FieldMappingRow(label = "Counterparty sort code field", value = peopleCounterpartySortCodeField, onValueChange = { peopleCounterpartySortCodeField = it }, paths = txJsonPaths, onPickRequest = { setter -> pickingPaths = txJsonPaths; pickingForSetter = setter })
-                FieldMappingRow(label = "Counterparty account number field", value = peopleCounterpartyAccountNumberField, onValueChange = { peopleCounterpartyAccountNumberField = it }, paths = txJsonPaths, onPickRequest = { setter -> pickingPaths = txJsonPaths; pickingForSetter = setter })
-                FieldMappingRow(label = "Counterparty service user number field", value = peopleCounterpartyServiceUserNumberField, onValueChange = { peopleCounterpartyServiceUserNumberField = it }, paths = txJsonPaths, onPickRequest = { setter -> pickingPaths = txJsonPaths; pickingForSetter = setter })
-                FieldMappingRow(label = "Fallback account id suffix", value = peopleFallbackCounterpartyAccountIdSuffix, onValueChange = { peopleFallbackCounterpartyAccountIdSuffix = it }, paths = emptyList(), onPickRequest = {})
+                FieldMappingRow(label = "Counterparty object field", value = peopleCounterpartyObjectField, onValueChange = {
+                    peopleCounterpartyObjectField =
+                        it
+                }, paths = txJsonPaths, onPickRequest = { setter ->
+                    pickingPaths = txJsonPaths
+                    pickingForSetter = setter
+                })
+                FieldMappingRow(label = "Beneficiary account type field", value = peopleBeneficiaryAccountTypeField, onValueChange = {
+                    peopleBeneficiaryAccountTypeField =
+                        it
+                }, paths = txJsonPaths, onPickRequest = { setter ->
+                    pickingPaths = txJsonPaths
+                    pickingForSetter = setter
+                })
+                FieldMappingRow(label = "Personal beneficiary value", value = peoplePersonalBeneficiaryAccountTypeValue, onValueChange = {
+                    peoplePersonalBeneficiaryAccountTypeValue =
+                        it
+                }, paths = emptyList(), onPickRequest = {})
+                FieldMappingRow(label = "Counterparty name field", value = peopleCounterpartyNameField, onValueChange = {
+                    peopleCounterpartyNameField =
+                        it
+                }, paths = txJsonPaths, onPickRequest = { setter ->
+                    pickingPaths = txJsonPaths
+                    pickingForSetter = setter
+                })
+                FieldMappingRow(label = "Counterparty user id field", value = peopleCounterpartyUserIdField, onValueChange = {
+                    peopleCounterpartyUserIdField =
+                        it
+                }, paths = txJsonPaths, onPickRequest = { setter ->
+                    pickingPaths = txJsonPaths
+                    pickingForSetter = setter
+                })
+                FieldMappingRow(label = "Counterparty sort code field", value = peopleCounterpartySortCodeField, onValueChange = {
+                    peopleCounterpartySortCodeField =
+                        it
+                }, paths = txJsonPaths, onPickRequest = { setter ->
+                    pickingPaths = txJsonPaths
+                    pickingForSetter = setter
+                })
+                FieldMappingRow(label = "Counterparty account number field", value = peopleCounterpartyAccountNumberField, onValueChange = {
+                    peopleCounterpartyAccountNumberField =
+                        it
+                }, paths = txJsonPaths, onPickRequest = { setter ->
+                    pickingPaths = txJsonPaths
+                    pickingForSetter = setter
+                })
+                FieldMappingRow(label = "Counterparty service user number field", value = peopleCounterpartyServiceUserNumberField, onValueChange = {
+                    peopleCounterpartyServiceUserNumberField =
+                        it
+                }, paths = txJsonPaths, onPickRequest = { setter ->
+                    pickingPaths = txJsonPaths
+                    pickingForSetter = setter
+                })
+                FieldMappingRow(label = "Fallback account id suffix", value = peopleFallbackCounterpartyAccountIdSuffix, onValueChange = {
+                    peopleFallbackCounterpartyAccountIdSuffix =
+                        it
+                }, paths = emptyList(), onPickRequest = {})
                 CustomFieldsSection(
                     fields = customTxFields,
                     onFieldsChange = { customTxFields = it },

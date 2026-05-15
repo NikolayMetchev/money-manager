@@ -174,7 +174,9 @@ class ApiEntitySourceRecorder(
             }
         }.onFailure { error ->
             val isDuplicateRevisionSource =
-                error.message?.contains("UNIQUE constraint failed: entity_source.entity_type_id, entity_source.entity_id, entity_source.revision_id") ==
+                error.message?.contains(
+                    "UNIQUE constraint failed: entity_source.entity_type_id, entity_source.entity_id, entity_source.revision_id",
+                ) ==
                     true
             if (!isDuplicateRevisionSource) {
                 throw error
