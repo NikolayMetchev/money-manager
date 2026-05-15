@@ -93,6 +93,7 @@ class ApiImportStrategyRepositoryImpl(
             transactionMappings = config.transactionMappings,
             accountNamePrefix = config.accountNamePrefix,
             counterpartyPrefix = config.counterpartyPrefix,
+            peopleMappings = config.peopleMappings,
             createdAt = Instant.fromEpochMilliseconds(entity.created_at),
             updatedAt = Instant.fromEpochMilliseconds(entity.updated_at),
         )
@@ -108,5 +109,6 @@ class ApiImportStrategyRepositoryImpl(
             transactionMappings = transactionMappings,
             accountNamePrefix = accountNamePrefix,
             counterpartyPrefix = counterpartyPrefix,
+            peopleMappings = peopleMappings,
         )
 }

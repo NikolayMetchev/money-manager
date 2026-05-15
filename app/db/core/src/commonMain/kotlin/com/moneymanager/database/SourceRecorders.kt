@@ -14,6 +14,7 @@ import com.moneymanager.domain.model.SourceType
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImportId
+import org.lighthousegames.logging.logging
 
 /** Manual entry from UI. */
 class ManualSourceRecorder(
@@ -150,6 +151,8 @@ class ApiEntitySourceRecorder(
     private val requestId: ApiRequestId,
     private val jsonPath: JsonPath,
 ) {
+    private val logger = logging()
+
     fun insert(
         entityType: EntityType,
         entityId: Long,
@@ -163,7 +166,26 @@ class ApiEntitySourceRecorder(
                 source_type_id = SourceType.API.id.toLong(),
                 device_id = deviceId.id,
             )
-            val entitySourceId = queries.lastInsertedId().executeAsOne()
+            val entitySource =
+                queries
+                    .selectEntitySourceForRevision(
+                        entity_type_id = entityType.id,
+                        entity_id = entityId,
+                        revision_id = revisionId,
+                    ).executeAsOne()
+            if (entitySource.source_type_id != SourceType.API.id.toLong()) {
+                logger.warn {
+                    "Skipped API entity source insert due to existing non-API source: entity_type_id=${entityType.id}, entity_id=$entityId, revision_id=$revisionId"
+                }
+                return@transaction
+            }
+            val entitySourceId = entitySource.id
+            if (queries.selectApiEntitySourceId(id = entitySourceId).executeAsOneOrNull() != null) {
+                logger.warn {
+                    "Suppressed duplicate API entity source: entity_type_id=${entityType.id}, entity_id=$entityId, revision_id=$revisionId"
+                }
+                return@transaction
+            }
             queries.insertApiSource(
                 id = entitySourceId,
                 api_session_id = sessionId.id,

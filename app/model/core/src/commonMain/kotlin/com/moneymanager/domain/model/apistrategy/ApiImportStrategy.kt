@@ -16,6 +16,7 @@ import kotlin.time.Instant
  * @property transactionMappings JSON field paths for mapping transaction fields
  * @property accountNamePrefix Prefix prepended to account names on import (e.g. "Monzo: ")
  * @property counterpartyPrefix Prefix prepended to counterparty account names (e.g. "Monzo Counterparty: ")
+ * @property peopleMappings JSON field paths/values for people and personal counterparties
  * @property createdAt Timestamp when this strategy was created
  * @property updatedAt Timestamp when this strategy was last modified
  */
@@ -30,6 +31,7 @@ data class ApiImportStrategy(
     val transactionMappings: ApiTransactionMappings,
     val accountNamePrefix: String,
     val counterpartyPrefix: String,
+    val peopleMappings: ApiPeopleMappings = ApiPeopleMappings(),
     val createdAt: Instant,
     val updatedAt: Instant,
 )
