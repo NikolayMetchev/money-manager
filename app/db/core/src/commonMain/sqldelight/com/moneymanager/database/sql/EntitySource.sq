@@ -60,10 +60,6 @@ insertSource:
 INSERT OR IGNORE INTO entity_source (entity_type_id, entity_id, revision_id, source_type_id, device_id)
 VALUES (?, ?, ?, ?, ?);
 
--- Get the last inserted entity_source ID
-lastInsertedId:
-SELECT last_insert_rowid();
-
 selectEntitySourceId:
 SELECT id
 FROM entity_source
