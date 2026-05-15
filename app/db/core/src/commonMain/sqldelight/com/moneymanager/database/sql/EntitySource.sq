@@ -60,8 +60,8 @@ insertSource:
 INSERT OR IGNORE INTO entity_source (entity_type_id, entity_id, revision_id, source_type_id, device_id)
 VALUES (?, ?, ?, ?, ?);
 
-selectEntitySourceId:
-SELECT id
+selectEntitySourceForRevision:
+SELECT id, source_type_id
 FROM entity_source
 WHERE entity_type_id = ?
   AND entity_id = ?

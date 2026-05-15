@@ -166,13 +166,20 @@ class ApiEntitySourceRecorder(
                 source_type_id = SourceType.API.id.toLong(),
                 device_id = deviceId.id,
             )
-            val entitySourceId =
+            val entitySource =
                 queries
-                    .selectEntitySourceId(
+                    .selectEntitySourceForRevision(
                         entity_type_id = entityType.id,
                         entity_id = entityId,
                         revision_id = revisionId,
                     ).executeAsOne()
+            if (entitySource.source_type_id != SourceType.API.id.toLong()) {
+                logger.warn {
+                    "Skipped API entity source insert due to existing non-API source: entity_type_id=${entityType.id}, entity_id=$entityId, revision_id=$revisionId"
+                }
+                return@transaction
+            }
+            val entitySourceId = entitySource.id
             if (queries.selectApiEntitySourceId(id = entitySourceId).executeAsOneOrNull() != null) {
                 logger.warn {
                     "Suppressed duplicate API entity source: entity_type_id=${entityType.id}, entity_id=$entityId, revision_id=$revisionId"
