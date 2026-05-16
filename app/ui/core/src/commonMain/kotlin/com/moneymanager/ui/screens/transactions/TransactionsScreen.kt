@@ -88,6 +88,21 @@ private fun horizontalMatrixScrollTarget(
         (columnCenterPx - (viewportWidthPx / 2)).coerceAtLeast(0f).toInt()
     }
 
+private fun verticalMatrixScrollTarget(
+    currencyIndex: Int,
+    containerHeightDp: androidx.compose.ui.unit.Dp,
+    density: androidx.compose.ui.unit.Density,
+): Int =
+    with(density) {
+        val rowHeightPx = 28.dp.toPx()
+        val matrixHeightPx = containerHeightDp.toPx() * 0.3f
+        val accountHeaderHeightPx = 24.dp.toPx()
+        val viewportHeightPx = matrixHeightPx - accountHeaderHeightPx
+        val rowStartPx = currencyIndex * rowHeightPx
+        val rowCenterPx = rowStartPx + (rowHeightPx / 2)
+        (rowCenterPx - (viewportHeightPx / 2)).coerceAtLeast(0f).toInt()
+    }
+
 @Composable
 fun AccountTransactionsScreen(
     accountId: AccountId,
@@ -767,17 +782,14 @@ fun AccountTransactionsScreen(
                                         containerWidthDp = containerWidthDp,
                                         density = density,
                                     )
-                                with(density) {
-                                    val rowHeightPx = 28.dp.toPx()
-                                    val matrixHeightPx = containerHeightDp.toPx() * 0.3f
-                                    val accountHeaderHeightPx = 24.dp.toPx()
-                                    val viewportHeightPx = matrixHeightPx - accountHeaderHeightPx
-                                    val rowStartPx = currencyIndex * rowHeightPx
-                                    val rowCenterPx = rowStartPx + (rowHeightPx / 2)
-                                    val targetScrollY = (rowCenterPx - (viewportHeightPx / 2)).coerceAtLeast(0f).toInt()
-                                    launch { horizontalScrollState.animateScrollTo(targetScrollX) }
-                                    launch { verticalScrollState.animateScrollTo(targetScrollY) }
-                                }
+                                val targetScrollY =
+                                    verticalMatrixScrollTarget(
+                                        currencyIndex = currencyIndex,
+                                        containerHeightDp = containerHeightDp,
+                                        density = density,
+                                    )
+                                launch { horizontalScrollState.animateScrollTo(targetScrollX) }
+                                launch { verticalScrollState.animateScrollTo(targetScrollY) }
                             }
                         }
                     }
