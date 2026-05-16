@@ -971,4 +971,3 @@ fun AccountTransactionsScreen(
         )
     }
 }
-

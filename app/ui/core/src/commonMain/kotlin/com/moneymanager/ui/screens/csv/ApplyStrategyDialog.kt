@@ -23,7 +23,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
@@ -1051,7 +1050,13 @@ private fun ImportPreviewSection(
                 stats =
                     listOfNotNull(
                         prep.statusCounts[ImportStatus.IMPORTED]?.let { StatCardData("New", it, MaterialTheme.colorScheme.primary) },
-                        prep.statusCounts[ImportStatus.DUPLICATE]?.let { StatCardData("Duplicate", it, MaterialTheme.colorScheme.secondary) },
+                        prep.statusCounts[ImportStatus.DUPLICATE]?.let {
+                            StatCardData(
+                                "Duplicate",
+                                it,
+                                MaterialTheme.colorScheme.secondary,
+                            )
+                        },
                         prep.statusCounts[ImportStatus.UPDATED]?.let { StatCardData("Updated", it, MaterialTheme.colorScheme.tertiary) },
                     ),
             )
