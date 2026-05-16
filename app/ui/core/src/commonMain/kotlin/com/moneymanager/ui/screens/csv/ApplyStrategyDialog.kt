@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
@@ -73,6 +72,7 @@ import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.domain.repository.TransferSourceRepository
 import com.moneymanager.ui.components.AccountPicker
+import com.moneymanager.ui.components.LoadingTextButton
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.flow.first
@@ -787,6 +787,7 @@ fun ApplyStrategyDialog(
                 loading = isImporting,
                 label = "Import ${importPreparation?.validTransfers?.size ?: 0} Transfers",
                 loadingIndicatorModifier = Modifier.padding(end = 8.dp),
+                showLabelWhenLoading = true,
             )
         },
         dismissButton = {
@@ -1369,24 +1370,3 @@ private fun ReadonlyDropdownField(
     )
 }
 
-@Composable
-private fun LoadingTextButton(
-    onClick: () -> Unit,
-    enabled: Boolean,
-    loading: Boolean,
-    label: String,
-    loadingIndicatorModifier: Modifier = Modifier,
-) {
-    TextButton(
-        onClick = onClick,
-        enabled = enabled,
-    ) {
-        if (loading) {
-            CircularProgressIndicator(
-                modifier = loadingIndicatorModifier,
-                strokeWidth = 2.dp,
-            )
-        }
-        Text(label)
-    }
-}

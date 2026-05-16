@@ -14,6 +14,8 @@ fun LoadingTextButton(
     enabled: Boolean,
     loading: Boolean,
     label: String,
+    loadingIndicatorModifier: Modifier = Modifier,
+    showLabelWhenLoading: Boolean = false,
 ) {
     TextButton(
         onClick = onClick,
@@ -21,10 +23,11 @@ fun LoadingTextButton(
     ) {
         if (loading) {
             CircularProgressIndicator(
-                modifier = Modifier.size(16.dp),
+                modifier = loadingIndicatorModifier.size(16.dp),
                 strokeWidth = 2.dp,
             )
-        } else {
+        }
+        if (!loading || showLabelWhenLoading) {
             Text(label)
         }
     }

@@ -73,6 +73,7 @@ import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.ui.components.LoadingTextButton
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.util.CategoryNode
@@ -912,28 +913,6 @@ private fun ParentCategorySelector(
                     },
                 )
             }
-        }
-    }
-}
-
-@Composable
-private fun LoadingTextButton(
-    onClick: () -> Unit,
-    enabled: Boolean,
-    loading: Boolean,
-    label: String,
-) {
-    TextButton(
-        onClick = onClick,
-        enabled = enabled,
-    ) {
-        if (loading) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(16.dp),
-                strokeWidth = 2.dp,
-            )
-        } else {
-            Text(label)
         }
     }
 }
