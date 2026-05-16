@@ -346,11 +346,11 @@ fun ApplyStrategyDialog(
             }
         },
         confirmButton = {
-            TextButton(
+            LoadingTextButton(
                 onClick = {
-                    val strategy = selectedStrategy ?: return@TextButton
-                    val basePrep = baseImportPreparation ?: return@TextButton
-                    val prep = importPreparation ?: return@TextButton
+                    val strategy = selectedStrategy ?: return@LoadingTextButton
+                    val basePrep = baseImportPreparation ?: return@LoadingTextButton
+                    val prep = importPreparation ?: return@LoadingTextButton
 
                     isImporting = true
                     errorMessage = null
@@ -785,15 +785,10 @@ fun ApplyStrategyDialog(
                             newAccountNames = selectedNewAccountNames,
                         ) &&
                         importPreparation?.validTransfers?.isNotEmpty() == true,
-            ) {
-                if (isImporting) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.padding(end = 8.dp),
-                        strokeWidth = 2.dp,
-                    )
-                }
-                Text("Import ${importPreparation?.validTransfers?.size ?: 0} Transfers")
-            }
+                loading = isImporting,
+                label = "Import ${importPreparation?.validTransfers?.size ?: 0} Transfers",
+                loadingIndicatorModifier = Modifier.padding(end = 8.dp),
+            )
         },
         dismissButton = {
             TextButton(
@@ -827,15 +822,10 @@ private fun StrategySelector(
             expanded = expanded,
             onExpandedChange = { if (enabled) expanded = !expanded },
         ) {
-            OutlinedTextField(
+            ReadonlyDropdownField(
                 value = selectedStrategy?.name ?: "No strategy selected",
-                onValueChange = {},
-                readOnly = true,
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+                expanded = expanded,
+                modifier = Modifier.fillMaxWidth(),
                 enabled = enabled,
             )
             ExposedDropdownMenu(
@@ -972,15 +962,10 @@ private fun NewAccountResolutionRow(
             expanded = expanded,
             onExpandedChange = { if (enabled) expanded = !expanded },
         ) {
-            OutlinedTextField(
+            ReadonlyDropdownField(
                 value = dropdownLabel,
-                onValueChange = {},
-                readOnly = true,
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+                expanded = expanded,
+                modifier = Modifier.fillMaxWidth(),
                 enabled = enabled,
             )
             ExposedDropdownMenu(
@@ -1062,55 +1047,25 @@ private fun ImportPreviewSection(
                 style = MaterialTheme.typography.titleSmall,
             )
             Spacer(modifier = Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-            ) {
-                prep.statusCounts[ImportStatus.IMPORTED]?.let { count ->
-                    StatCard(
-                        label = "New",
-                        count = count,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                }
-                prep.statusCounts[ImportStatus.DUPLICATE]?.let { count ->
-                    StatCard(
-                        label = "Duplicate",
-                        count = count,
-                        color = MaterialTheme.colorScheme.secondary,
-                    )
-                }
-                prep.statusCounts[ImportStatus.UPDATED]?.let { count ->
-                    StatCard(
-                        label = "Updated",
-                        count = count,
-                        color = MaterialTheme.colorScheme.tertiary,
-                    )
-                }
-            }
+            StatCardRow(
+                stats =
+                    listOfNotNull(
+                        prep.statusCounts[ImportStatus.IMPORTED]?.let { StatCardData("New", it, MaterialTheme.colorScheme.primary) },
+                        prep.statusCounts[ImportStatus.DUPLICATE]?.let { StatCardData("Duplicate", it, MaterialTheme.colorScheme.secondary) },
+                        prep.statusCounts[ImportStatus.UPDATED]?.let { StatCardData("Updated", it, MaterialTheme.colorScheme.tertiary) },
+                    ),
+            )
             Spacer(modifier = Modifier.height(16.dp))
         }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-        ) {
-            StatCard(
-                label = "Valid",
-                count = prep.validTransfers.size,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            StatCard(
-                label = "Errors",
-                count = prep.errorRows.size,
-                color = MaterialTheme.colorScheme.error,
-            )
-            StatCard(
-                label = "New Accounts",
-                count = prep.newAccounts.size,
-                color = MaterialTheme.colorScheme.tertiary,
-            )
-        }
+        StatCardRow(
+            stats =
+                listOf(
+                    StatCardData("Valid", prep.validTransfers.size, MaterialTheme.colorScheme.primary),
+                    StatCardData("Errors", prep.errorRows.size, MaterialTheme.colorScheme.error),
+                    StatCardData("New Accounts", prep.newAccounts.size, MaterialTheme.colorScheme.tertiary),
+                ),
+        )
 
         // New accounts to create
         if (prep.newAccounts.isNotEmpty()) {
@@ -1250,6 +1205,7 @@ internal fun buildAccountsToCreate(
     newAccountNames: Map<String, String>,
 ): List<NewAccount> =
     preparation.newAccounts
+        .asSequence()
         .filter { it.name !in existingAccountSelections }
         .mapNotNull { account ->
             val finalName = newAccountNames[account.name]?.trim()?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
@@ -1258,6 +1214,7 @@ internal fun buildAccountsToCreate(
                 categoryId = account.categoryId,
             )
         }.distinctBy { it.name }
+        .toList()
 
 internal fun hasBlankNewAccountNames(
     preparation: ImportPreparation?,
@@ -1303,6 +1260,28 @@ private fun StatCard(
             style = MaterialTheme.typography.bodySmall,
             color = color,
         )
+    }
+}
+
+private data class StatCardData(
+    val label: String,
+    val count: Int,
+    val color: androidx.compose.ui.graphics.Color,
+)
+
+@Composable
+private fun StatCardRow(stats: List<StatCardData>) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+    ) {
+        stats.forEach { stat ->
+            StatCard(
+                label = stat.label,
+                count = stat.count,
+                color = stat.color,
+            )
+        }
     }
 }
 
@@ -1365,5 +1344,44 @@ private fun TableCell(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
+    }
+}
+
+@Composable
+private fun ReadonlyDropdownField(
+    value: String,
+    expanded: Boolean,
+    modifier: Modifier = Modifier,
+    enabled: Boolean,
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = {},
+        readOnly = true,
+        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+        modifier = modifier,
+        enabled = enabled,
+    )
+}
+
+@Composable
+private fun LoadingTextButton(
+    onClick: () -> Unit,
+    enabled: Boolean,
+    loading: Boolean,
+    label: String,
+    loadingIndicatorModifier: Modifier = Modifier,
+) {
+    TextButton(
+        onClick = onClick,
+        enabled = enabled,
+    ) {
+        if (loading) {
+            CircularProgressIndicator(
+                modifier = loadingIndicatorModifier,
+                strokeWidth = 2.dp,
+            )
+        }
+        Text(label)
     }
 }

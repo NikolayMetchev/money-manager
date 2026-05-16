@@ -74,14 +74,14 @@ fun TransactionEditDialog(
     transaction: Transfer? = null,
     transactionRepository: TransactionRepository,
     transferSourceRepository: TransferSourceRepository,
-    EntitySource: EntitySource,
+    entitySource: EntitySource,
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
     attributeTypeRepository: AttributeTypeRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    Maintenance: Maintenance,
+    maintenance: Maintenance,
     preSelectedSourceAccountId: AccountId? = null,
     preSelectedCurrencyId: CurrencyId? = null,
     onDismiss: () -> Unit,
@@ -230,7 +230,7 @@ fun TransactionEditDialog(
                     categoryRepository = categoryRepository,
                     personRepository = personRepository,
                     personAccountOwnershipRepository = personAccountOwnershipRepository,
-                    entitySource = EntitySource,
+                    entitySource = entitySource,
                     enabled = !isSaving,
                     excludeAccountId = targetAccountId,
                 )
@@ -244,7 +244,7 @@ fun TransactionEditDialog(
                     categoryRepository = categoryRepository,
                     personRepository = personRepository,
                     personAccountOwnershipRepository = personAccountOwnershipRepository,
-                    entitySource = EntitySource,
+                    entitySource = entitySource,
                     enabled = !isSaving,
                     excludeAccountId = sourceAccountId,
                 )
@@ -264,61 +264,23 @@ fun TransactionEditDialog(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    OutlinedTextField(
+                    PickerReadonlyField(
                         value = selectedDate.toString(),
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Date") },
-                        textStyle = dateTimeTextStyle,
-                        trailingIcon = {
-                            IconButton(
-                                onClick = { showDatePicker = true },
-                                enabled = !isSaving,
-                            ) {
-                                Text(
-                                    text = "\uD83D\uDCC5",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                )
-                            }
-                        },
+                        label = "Date",
+                        icon = "\uD83D\uDCC5",
+                        onIconClick = { showDatePicker = true },
+                        iconEnabled = !isSaving,
                         modifier = Modifier.weight(1.5f),
-                        enabled = false,
-                        singleLine = true,
-                        colors =
-                            OutlinedTextFieldDefaults.colors(
-                                disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                                disabledBorderColor = MaterialTheme.colorScheme.outline,
-                                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            ),
                     )
 
                     val time = LocalTime(selectedHour, selectedMinute)
-                    OutlinedTextField(
+                    PickerReadonlyField(
                         value = time.toString(),
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Time") },
-                        textStyle = dateTimeTextStyle,
-                        trailingIcon = {
-                            IconButton(
-                                onClick = { showTimePicker = true },
-                                enabled = !isSaving,
-                            ) {
-                                Text(
-                                    text = "\uD83D\uDD54",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                )
-                            }
-                        },
+                        label = "Time",
+                        icon = "\uD83D\uDD54",
+                        onIconClick = { showTimePicker = true },
+                        iconEnabled = !isSaving,
                         modifier = Modifier.weight(1f),
-                        enabled = false,
-                        singleLine = true,
-                        colors =
-                            OutlinedTextFieldDefaults.colors(
-                                disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                                disabledBorderColor = MaterialTheme.colorScheme.outline,
-                                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            ),
                     )
                 }
 
@@ -452,17 +414,16 @@ fun TransactionEditDialog(
             }
         },
         confirmButton = {
-            TextButton(
+            LoadingTextButton(
                 onClick = {
-                    val validAmount = parsedAmount
                     when {
                         sourceAccountId == null -> errorMessage = "Source account is required"
                         targetAccountId == null -> errorMessage = "Target account is required"
                         sourceAccountId == targetAccountId -> errorMessage = "Source and target accounts must be different"
                         currencyId == null -> errorMessage = "Currency is required"
                         amount.isBlank() -> errorMessage = "Amount is required"
-                        validAmount == null -> errorMessage = "Invalid amount"
-                        validAmount <= BigDecimal.ZERO -> errorMessage = "Amount must be greater than 0"
+                        parsedAmount == null -> errorMessage = "Invalid amount"
+                        parsedAmount <= BigDecimal.ZERO -> errorMessage = "Amount must be greater than 0"
                         description.isBlank() -> errorMessage = "Description is required"
                         else -> {
                             isSaving = true
@@ -486,7 +447,7 @@ fun TransactionEditDialog(
                                             sourceAccountId != transaction.sourceAccountId ||
                                                 targetAccountId != transaction.targetAccountId ||
                                                 currencyId != transaction.amount.currency.id ||
-                                                validAmount != transaction.amount.toDisplayValue() ||
+                                                parsedAmount != transaction.amount.toDisplayValue() ||
                                                 description.trim() != transaction.description ||
                                                 timestamp != transaction.timestamp
 
@@ -499,7 +460,7 @@ fun TransactionEditDialog(
                                                     description = description.trim(),
                                                     sourceAccountId = sourceAccountId!!,
                                                     targetAccountId = targetAccountId!!,
-                                                    amount = Money.fromDisplayValue(validAmount, currency),
+                                                    amount = Money.fromDisplayValue(parsedAmount, currency),
                                                 )
                                             } else {
                                                 null
@@ -574,7 +535,7 @@ fun TransactionEditDialog(
                                                 description = description.trim(),
                                                 sourceAccountId = sourceAccountId!!,
                                                 targetAccountId = targetAccountId!!,
-                                                amount = Money.fromDisplayValue(validAmount, currency),
+                                                amount = Money.fromDisplayValue(parsedAmount, currency),
                                             )
 
                                         // Build attributes to save (only non-blank ones)
@@ -593,11 +554,11 @@ fun TransactionEditDialog(
                                         transactionRepository.createTransfers(
                                             transfers = listOf(transfer),
                                             newAttributes = mapOf(transfer.id to attributesToSave),
-                                            sourceRecorder = EntitySource.manualRecorder(),
+                                            sourceRecorder = entitySource.manualRecorder(),
                                         )
                                     }
 
-                                    Maintenance.refreshMaterializedViews()
+                                    maintenance.refreshMaterializedViews()
 
                                     onSaved()
                                     onDismiss()
@@ -614,16 +575,9 @@ fun TransactionEditDialog(
                     }
                 },
                 enabled = !isSaving && hasChanges,
-            ) {
-                if (isSaving) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp,
-                    )
-                } else {
-                    Text(if (isEditMode) "Update" else "Create")
-                }
-            }
+                loading = isSaving,
+                label = if (isEditMode) "Update" else "Create",
+            )
         },
         dismissButton = {
             TextButton(
@@ -703,3 +657,64 @@ fun TransactionEditDialog(
         )
     }
 }
+
+@Composable
+private fun LoadingTextButton(
+    onClick: () -> Unit,
+    enabled: Boolean,
+    loading: Boolean,
+    label: String,
+) {
+    TextButton(
+        onClick = onClick,
+        enabled = enabled,
+    ) {
+        if (loading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(16.dp),
+                strokeWidth = 2.dp,
+            )
+        } else {
+            Text(label)
+        }
+    }
+}
+
+@Composable
+private fun PickerReadonlyField(
+    value: String,
+    label: String,
+    icon: String,
+    onIconClick: () -> Unit,
+    iconEnabled: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = {},
+        readOnly = true,
+        label = { Text(label) },
+        textStyle = MaterialTheme.typography.bodySmall,
+        trailingIcon = {
+            IconButton(
+                onClick = onIconClick,
+                enabled = iconEnabled,
+            ) {
+                Text(
+                    text = icon,
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+            }
+        },
+        modifier = modifier,
+        enabled = false,
+        singleLine = true,
+        colors =
+            OutlinedTextFieldDefaults.colors(
+                disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                disabledBorderColor = MaterialTheme.colorScheme.outline,
+                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            ),
+    )
+}
+

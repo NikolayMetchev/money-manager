@@ -942,14 +942,14 @@ fun AccountTransactionsScreen(
             transaction = transfer,
             transactionRepository = transactionRepository,
             transferSourceRepository = transferSourceRepository,
-            EntitySource = EntitySource,
+            entitySource = EntitySource,
             accountRepository = accountRepository,
             categoryRepository = categoryRepository,
             currencyRepository = currencyRepository,
             attributeTypeRepository = attributeTypeRepository,
             personRepository = personRepository,
             personAccountOwnershipRepository = personAccountOwnershipRepository,
-            Maintenance = Maintenance,
+            maintenance = Maintenance,
             onDismiss = { transactionIdToEdit = null },
             onSaved = { refreshTrigger++ },
         )
@@ -971,3 +971,4 @@ fun AccountTransactionsScreen(
         )
     }
 }
+

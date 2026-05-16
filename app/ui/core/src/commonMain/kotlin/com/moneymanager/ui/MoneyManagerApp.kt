@@ -633,14 +633,14 @@ fun MoneyManagerApp(
                     TransactionEditDialog(
                         transactionRepository = transactionRepository,
                         transferSourceRepository = transferSourceRepository,
-                        EntitySource = entitySource,
+                        entitySource = entitySource,
                         accountRepository = accountRepository,
                         categoryRepository = categoryRepository,
                         currencyRepository = currencyRepository,
                         attributeTypeRepository = attributeTypeRepository,
                         personRepository = personRepository,
                         personAccountOwnershipRepository = personAccountOwnershipRepository,
-                        Maintenance = maintenance,
+                        maintenance = maintenance,
                         preSelectedSourceAccountId = preSelectedAccountId,
                         preSelectedCurrencyId = preSelectedCurrencyId,
                         onDismiss = {
