@@ -271,9 +271,8 @@ fun TransactionEditDialog(
                         modifier = Modifier.weight(1.5f),
                     )
 
-                    val time = LocalTime(selectedHour, selectedMinute)
                     PickerReadonlyField(
-                        value = time.toString(),
+                        value = LocalTime(selectedHour, selectedMinute).toString(),
                         label = "Time",
                         icon = "\uD83D\uDD54",
                         onIconClick = { showTimePicker = true },
