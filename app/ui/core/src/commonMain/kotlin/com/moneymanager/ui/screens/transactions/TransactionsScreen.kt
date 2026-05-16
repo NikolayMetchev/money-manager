@@ -65,6 +65,29 @@ import com.moneymanager.ui.util.formatAmount
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
+private fun horizontalMatrixScrollTarget(
+    accountIndex: Int,
+    allAccounts: List<Account>,
+    accountColumnWidths: Map<AccountId, androidx.compose.ui.unit.Dp>,
+    containerWidthDp: androidx.compose.ui.unit.Dp,
+    density: androidx.compose.ui.unit.Density,
+): Int =
+    with(density) {
+        val spacingPx = 8.dp.toPx()
+        val currencyLabelWidthPx = 60.dp.toPx()
+        val viewportWidthPx = containerWidthDp.toPx() - currencyLabelWidthPx
+        var columnStartPx = 0f
+        for (i in 0 until accountIndex) {
+            val acc = allAccounts[i]
+            val colWidth = accountColumnWidths[acc.id] ?: ACCOUNT_COLUMN_MIN_WIDTH
+            columnStartPx += colWidth.toPx() + spacingPx
+        }
+        val targetAccount = allAccounts[accountIndex]
+        val targetColumnWidth = accountColumnWidths[targetAccount.id] ?: ACCOUNT_COLUMN_MIN_WIDTH
+        val columnCenterPx = columnStartPx + (targetColumnWidth.toPx() / 2)
+        (columnCenterPx - (viewportWidthPx / 2)).coerceAtLeast(0f).toInt()
+    }
+
 @Composable
 fun AccountTransactionsScreen(
     accountId: AccountId,
@@ -349,28 +372,15 @@ fun AccountTransactionsScreen(
             // Scroll horizontally to center the selected account column
             val accountIndex = allAccounts.indexOfFirst { it.id == selectedAccountId }
             if (accountIndex >= 0) {
-                with(density) {
-                    val spacingPx = 8.dp.toPx()
-                    val currencyLabelWidthPx = 60.dp.toPx()
-                    val viewportWidthPx = containerWidthDp.toPx() - currencyLabelWidthPx
-
-                    // Calculate column position by summing preceding column widths
-                    var columnStartPx = 0f
-                    for (i in 0 until accountIndex) {
-                        val acc = allAccounts[i]
-                        val colWidth = accountColumnWidths[acc.id] ?: ACCOUNT_COLUMN_MIN_WIDTH
-                        columnStartPx += colWidth.toPx() + spacingPx
-                    }
-                    val targetAccount = allAccounts[accountIndex]
-                    val targetColumnWidth = accountColumnWidths[targetAccount.id] ?: ACCOUNT_COLUMN_MIN_WIDTH
-                    val columnCenterPx = columnStartPx + (targetColumnWidth.toPx() / 2)
-
-                    // Center the column in the viewport
-                    val targetScrollX = (columnCenterPx - (viewportWidthPx / 2)).coerceAtLeast(0f).toInt()
-
-                    // Animate horizontal scroll
-                    horizontalScrollState.animateScrollTo(targetScrollX)
-                }
+                horizontalScrollState.animateScrollTo(
+                    horizontalMatrixScrollTarget(
+                        accountIndex = accountIndex,
+                        allAccounts = allAccounts,
+                        accountColumnWidths = accountColumnWidths,
+                        containerWidthDp = containerWidthDp,
+                        density = density,
+                    ),
+                )
             }
         }
 
@@ -749,24 +759,15 @@ fun AccountTransactionsScreen(
                                 }
 
                             if (accountIndex >= 0 && currencyIndex >= 0) {
+                                val targetScrollX =
+                                    horizontalMatrixScrollTarget(
+                                        accountIndex = accountIndex,
+                                        allAccounts = allAccounts,
+                                        accountColumnWidths = accountColumnWidths,
+                                        containerWidthDp = containerWidthDp,
+                                        density = density,
+                                    )
                                 with(density) {
-                                    val spacingPx = 8.dp.toPx()
-
-                                    // Calculate horizontal scroll position
-                                    var columnStartPx = 0f
-                                    for (i in 0 until accountIndex) {
-                                        val acc = allAccounts[i]
-                                        val colWidth = accountColumnWidths[acc.id] ?: ACCOUNT_COLUMN_MIN_WIDTH
-                                        columnStartPx += colWidth.toPx() + spacingPx
-                                    }
-                                    val targetAccount = allAccounts[accountIndex]
-                                    val targetColumnWidth = accountColumnWidths[targetAccount.id] ?: ACCOUNT_COLUMN_MIN_WIDTH
-                                    val currencyLabelWidthPx = 60.dp.toPx()
-                                    val viewportWidthPx = containerWidthDp.toPx() - currencyLabelWidthPx
-                                    val columnCenterPx = columnStartPx + (targetColumnWidth.toPx() / 2)
-                                    val targetScrollX = (columnCenterPx - (viewportWidthPx / 2)).coerceAtLeast(0f).toInt()
-
-                                    // Calculate vertical scroll position
                                     val rowHeightPx = 28.dp.toPx()
                                     val matrixHeightPx = containerHeightDp.toPx() * 0.3f
                                     val accountHeaderHeightPx = 24.dp.toPx()
@@ -774,8 +775,6 @@ fun AccountTransactionsScreen(
                                     val rowStartPx = currencyIndex * rowHeightPx
                                     val rowCenterPx = rowStartPx + (rowHeightPx / 2)
                                     val targetScrollY = (rowCenterPx - (viewportHeightPx / 2)).coerceAtLeast(0f).toInt()
-
-                                    // Animate scrolls
                                     launch { horizontalScrollState.animateScrollTo(targetScrollX) }
                                     launch { verticalScrollState.animateScrollTo(targetScrollY) }
                                 }
@@ -848,28 +847,15 @@ fun AccountTransactionsScreen(
                                         // Calculate horizontal scroll position for the account
                                         val accountIndex = allAccounts.indexOfFirst { it.id == clickedAccountId }
                                         if (accountIndex >= 0) {
-                                            // Convert dp to pixels using density
+                                            val targetScrollX =
+                                                horizontalMatrixScrollTarget(
+                                                    accountIndex = accountIndex,
+                                                    allAccounts = allAccounts,
+                                                    accountColumnWidths = accountColumnWidths,
+                                                    containerWidthDp = containerWidthDp,
+                                                    density = density,
+                                                )
                                             with(density) {
-                                                val spacingPx = 8.dp.toPx()
-
-                                                // Calculate viewport width (total width - currency label column - padding)
-                                                val currencyLabelWidthPx = 60.dp.toPx()
-                                                val viewportWidthPx = containerWidthDp.toPx() - currencyLabelWidthPx
-
-                                                // Calculate column position by summing preceding column widths
-                                                var columnStartPx = 0f
-                                                for (i in 0 until accountIndex) {
-                                                    val acc = allAccounts[i]
-                                                    val colWidth = accountColumnWidths[acc.id] ?: ACCOUNT_COLUMN_MIN_WIDTH
-                                                    columnStartPx += colWidth.toPx() + spacingPx
-                                                }
-                                                val targetAccount = allAccounts[accountIndex]
-                                                val targetColumnWidth = accountColumnWidths[targetAccount.id] ?: ACCOUNT_COLUMN_MIN_WIDTH
-                                                val columnCenterPx = columnStartPx + (targetColumnWidth.toPx() / 2)
-
-                                                // Center the column in the viewport
-                                                val targetScrollX = (columnCenterPx - (viewportWidthPx / 2)).coerceAtLeast(0f).toInt()
-
                                                 // Calculate vertical scroll position for the currency
                                                 val currencyIndex =
                                                     uniqueCurrencyIds.indexOfFirst {
