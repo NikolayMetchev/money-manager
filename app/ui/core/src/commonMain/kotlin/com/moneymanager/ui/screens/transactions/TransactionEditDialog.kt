@@ -258,7 +258,6 @@ fun TransactionEditDialog(
                 )
 
                 // Date and Time Pickers
-                val dateTimeTextStyle = MaterialTheme.typography.bodySmall
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
