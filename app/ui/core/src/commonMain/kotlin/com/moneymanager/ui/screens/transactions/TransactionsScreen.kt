@@ -504,7 +504,6 @@ fun AccountTransactionsScreen(
                                     verticalArrangement = Arrangement.spacedBy(4.dp),
                                 ) {
                                     uniqueCurrencyIds.forEach { currencyId ->
-                                        val currency = currencies.find { it.id == currencyId }
                                         val isCurrencySelected = selectedCurrencyId == currencyId
                                         Box(
                                             modifier =
@@ -519,7 +518,7 @@ fun AccountTransactionsScreen(
                                                     ).padding(vertical = 4.dp),
                                         ) {
                                             Text(
-                                                text = "${currency?.code ?: "?"}:",
+                                                text = "${currencies.find { it.id == currencyId }?.code ?: "?"}:",
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color =
                                                     if (isCurrencySelected) {
