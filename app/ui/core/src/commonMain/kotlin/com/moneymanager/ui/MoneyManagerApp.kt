@@ -197,15 +197,17 @@ fun MoneyManagerApp(
                                         currentScreen is Screen.ApiSessionTraffic ||
                                         currentScreen is Screen.MonzoConnect,
                                 onClick = {
-                                    val tab =
-                                        when (currentScreen) {
-                                            is Screen.ApiSessionTraffic, is Screen.MonzoConnect,
-                                            is Screen.ApiStrategies,
-                                            -> ImportTab.API
-                                            is Screen.Imports -> currentScreen.tab
-                                            else -> ImportTab.CSV
-                                        }
-                                    navigationHistory.navigateTo(Screen.Imports(tab))
+                                    navigationHistory.navigateTo(
+                                        Screen.Imports(
+                                            when (currentScreen) {
+                                                is Screen.ApiSessionTraffic, is Screen.MonzoConnect,
+                                                is Screen.ApiStrategies,
+                                                -> ImportTab.API
+                                                is Screen.Imports -> currentScreen.tab
+                                                else -> ImportTab.CSV
+                                            },
+                                        ),
+                                    )
                                 },
                             )
                             NavigationBarItem(
