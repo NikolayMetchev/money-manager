@@ -6,9 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -87,7 +85,7 @@ fun CreateCurrencyDialog(
             }
         },
         confirmButton = {
-            TextButton(
+            LoadingTextButton(
                 onClick = {
                     when {
                         code.isBlank() -> errorMessage = "Currency code is required"
@@ -110,16 +108,9 @@ fun CreateCurrencyDialog(
                     }
                 },
                 enabled = !isSaving,
-            ) {
-                if (isSaving) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp,
-                    )
-                } else {
-                    Text("Create")
-                }
-            }
+                loading = isSaving,
+                label = "Create",
+            )
         },
         dismissButton = {
             TextButton(

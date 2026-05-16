@@ -10,9 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -244,7 +242,7 @@ fun CreateAccountDialog(
             }
         },
         confirmButton = {
-            TextButton(
+            LoadingTextButton(
                 onClick = {
                     if (name.isBlank()) {
                         errorMessage = "Account name is required"
@@ -284,16 +282,9 @@ fun CreateAccountDialog(
                     }
                 },
                 enabled = !isSaving,
-            ) {
-                if (isSaving) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp,
-                    )
-                } else {
-                    Text("Create")
-                }
-            }
+                loading = isSaving,
+                label = "Create",
+            )
         },
         dismissButton = {
             TextButton(
