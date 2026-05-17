@@ -109,29 +109,26 @@ private fun computePersonAuditDiffs(
                 )
             AuditType.UPDATE -> {
                 val newFirstName =
-                    if (index == 0 && currentPerson != null) {
-                        currentPerson.firstName
-                    } else if (index > 0) {
-                        entries[index - 1].firstName
-                    } else {
-                        entry.firstName
-                    }
+                    resolveUpdateValue(
+                        index = index,
+                        currentValue = currentPerson?.firstName,
+                        previousValue = entries.getOrNull(index - 1)?.firstName,
+                        entryValue = entry.firstName,
+                    )
                 val newMiddleName =
-                    if (index == 0 && currentPerson != null) {
-                        currentPerson.middleName
-                    } else if (index > 0) {
-                        entries[index - 1].middleName
-                    } else {
-                        entry.middleName
-                    }
+                    resolveUpdateValue(
+                        index = index,
+                        currentValue = currentPerson?.middleName,
+                        previousValue = entries.getOrNull(index - 1)?.middleName,
+                        entryValue = entry.middleName,
+                    )
                 val newLastName =
-                    if (index == 0 && currentPerson != null) {
-                        currentPerson.lastName
-                    } else if (index > 0) {
-                        entries[index - 1].lastName
-                    } else {
-                        entry.lastName
-                    }
+                    resolveUpdateValue(
+                        index = index,
+                        currentValue = currentPerson?.lastName,
+                        previousValue = entries.getOrNull(index - 1)?.lastName,
+                        entryValue = entry.lastName,
+                    )
 
                 PersonAuditDiff(
                     id = entry.id,

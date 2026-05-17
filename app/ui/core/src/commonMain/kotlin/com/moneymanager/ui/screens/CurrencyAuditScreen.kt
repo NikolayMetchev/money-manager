@@ -92,29 +92,26 @@ private fun computeCurrencyAuditDiffs(
                 )
             AuditType.UPDATE -> {
                 val newCode =
-                    if (index == 0 && currentCurrency != null) {
-                        currentCurrency.code
-                    } else if (index > 0) {
-                        entries[index - 1].code
-                    } else {
-                        entry.code
-                    }
+                    resolveUpdateValue(
+                        index = index,
+                        currentValue = currentCurrency?.code,
+                        previousValue = entries.getOrNull(index - 1)?.code,
+                        entryValue = entry.code,
+                    )
                 val newName =
-                    if (index == 0 && currentCurrency != null) {
-                        currentCurrency.name
-                    } else if (index > 0) {
-                        entries[index - 1].name
-                    } else {
-                        entry.name
-                    }
+                    resolveUpdateValue(
+                        index = index,
+                        currentValue = currentCurrency?.name,
+                        previousValue = entries.getOrNull(index - 1)?.name,
+                        entryValue = entry.name,
+                    )
                 val newScaleFactor =
-                    if (index == 0 && currentCurrency != null) {
-                        currentCurrency.scaleFactor
-                    } else if (index > 0) {
-                        entries[index - 1].scaleFactor
-                    } else {
-                        entry.scaleFactor
-                    }
+                    resolveUpdateValue(
+                        index = index,
+                        currentValue = currentCurrency?.scaleFactor,
+                        previousValue = entries.getOrNull(index - 1)?.scaleFactor,
+                        entryValue = entry.scaleFactor,
+                    )
 
                 CurrencyAuditDiff(
                     id = entry.id,
