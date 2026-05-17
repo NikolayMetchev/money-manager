@@ -16,11 +16,6 @@ enum class EntityType(
     PERSON_ACCOUNT_OWNERSHIP(4),
     CATEGORY(5),
     ;
-
-    companion object {
-        @Suppress("unused")
-        fun fromId(id: Long): EntityType = entries.first { it.id == id }
-    }
 }
 
 /**

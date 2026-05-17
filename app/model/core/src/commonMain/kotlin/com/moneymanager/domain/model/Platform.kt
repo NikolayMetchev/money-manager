@@ -10,9 +10,4 @@ enum class Platform {
     /** Android mobile application */
     ANDROID,
     ;
-
-    companion object {
-        @Suppress("unused")
-        fun fromName(name: String): Platform = valueOf(name.uppercase())
-    }
 }
