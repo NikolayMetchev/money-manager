@@ -49,6 +49,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.EntitySource
@@ -1230,18 +1231,10 @@ private fun ColumnDropdown(
             columns.sortedBy { it.columnIndex }.forEach { column ->
                 DropdownMenuItem(
                     text = {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                        ) {
-                            Text(column.originalName)
-                            if (column.originalName == selectedColumn) {
-                                Text(
-                                    "✓",
-                                    color = MaterialTheme.colorScheme.primary,
-                                )
-                            }
-                        }
+                        DropdownSelectionRow(
+                            text = column.originalName,
+                            selected = column.originalName == selectedColumn,
+                        )
                     },
                     onClick = {
                         onColumnSelected(column.originalName)
@@ -1294,21 +1287,11 @@ private fun OptionalColumnDropdown(
         ) {
             DropdownMenuItem(
                 text = {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Text(
-                            "None",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        if (selectedColumn == null) {
-                            Text(
-                                "✓",
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                        }
-                    }
+                    DropdownSelectionRow(
+                        text = "None",
+                        selected = selectedColumn == null,
+                        textColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 },
                 onClick = {
                     onColumnSelected(null)
@@ -1318,18 +1301,10 @@ private fun OptionalColumnDropdown(
             columns.sortedBy { it.columnIndex }.forEach { column ->
                 DropdownMenuItem(
                     text = {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                        ) {
-                            Text(column.originalName)
-                            if (column.originalName == selectedColumn) {
-                                Text(
-                                    "✓",
-                                    color = MaterialTheme.colorScheme.primary,
-                                )
-                            }
-                        }
+                        DropdownSelectionRow(
+                            text = column.originalName,
+                            selected = column.originalName == selectedColumn,
+                        )
                     },
                     onClick = {
                         onColumnSelected(column.originalName)
@@ -1337,6 +1312,29 @@ private fun OptionalColumnDropdown(
                     },
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun DropdownSelectionRow(
+    text: String,
+    selected: Boolean,
+    textColor: Color = MaterialTheme.colorScheme.onSurface,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(
+            text = text,
+            color = textColor,
+        )
+        if (selected) {
+            Text(
+                text = "\u2713",
+                color = MaterialTheme.colorScheme.primary,
+            )
         }
     }
 }
@@ -1711,18 +1709,10 @@ private fun AttributeTypeSelector(
                 suggestions.forEach { typeName ->
                     DropdownMenuItem(
                         text = {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                            ) {
-                                Text(typeName)
-                                if (typeName == selectedTypeName) {
-                                    Text(
-                                        "✓",
-                                        color = MaterialTheme.colorScheme.primary,
-                                    )
-                                }
-                            }
+                            DropdownSelectionRow(
+                                text = typeName,
+                                selected = typeName == selectedTypeName,
+                            )
                         },
                         onClick = {
                             textValue = typeName
