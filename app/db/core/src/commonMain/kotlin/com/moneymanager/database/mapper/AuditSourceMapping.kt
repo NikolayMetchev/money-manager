@@ -2,10 +2,13 @@
 
 package com.moneymanager.database.mapper
 
+import com.moneymanager.domain.model.ApiRequestId
+import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.ApiSourceDetails
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.EntitySource
 import com.moneymanager.domain.model.EntityType
+import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.SourceType
 import kotlin.time.Instant
 
@@ -30,9 +33,23 @@ internal fun auditDeviceInfo(
         else -> null
     }
 
+internal fun auditApiSource(
+    sessionId: Long?,
+    requestId: Long?,
+    jsonPath: String?,
+): ApiSourceDetails? =
+    if (sessionId != null && requestId != null && jsonPath != null) {
+        ApiSourceDetails(
+            sessionId = ApiSessionId(sessionId),
+            requestId = ApiRequestId(requestId),
+            jsonPath = JsonPath(jsonPath),
+        )
+    } else {
+        null
+    }
+
 internal fun auditEntitySource(
     sourceId: Long?,
-    sourceTypeId: Long?,
     sourceTypeName: String?,
     deviceId: Long?,
     createdAt: Long?,
@@ -43,7 +60,6 @@ internal fun auditEntitySource(
     apiSource: ApiSourceDetails? = null,
 ): EntitySource? {
     val resolvedSourceId = sourceId ?: return null
-    sourceTypeId ?: return null
     val resolvedSourceTypeName = sourceTypeName ?: return null
     val resolvedDeviceId = deviceId ?: return null
     val resolvedCreatedAt = createdAt ?: return null

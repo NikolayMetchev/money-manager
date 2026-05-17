@@ -116,17 +116,32 @@ private fun computePersonAuditDiffs(
                     auditType = entry.auditType,
                     revisionId = entry.revisionId,
                     firstName =
-                        resolveUpdateChange(index, currentPerson?.firstName, previousEntry, entry.firstName) {
-                            it.firstName
-                        },
+                        resolveUpdateChange(
+                            index = index,
+                            currentEntry = currentPerson,
+                            previousEntry = previousEntry,
+                            entryValue = entry.firstName,
+                            currentValue = { it.firstName },
+                            previousValue = { it.firstName },
+                        ),
                     middleName =
-                        resolveUpdateChange(index, currentPerson?.middleName, previousEntry, entry.middleName) {
-                            it.middleName
-                        },
+                        resolveUpdateChange(
+                            index = index,
+                            currentEntry = currentPerson,
+                            previousEntry = previousEntry,
+                            entryValue = entry.middleName,
+                            currentValue = { it.middleName },
+                            previousValue = { it.middleName },
+                        ),
                     lastName =
-                        resolveUpdateChange(index, currentPerson?.lastName, previousEntry, entry.lastName) {
-                            it.lastName
-                        },
+                        resolveUpdateChange(
+                            index = index,
+                            currentEntry = currentPerson,
+                            previousEntry = previousEntry,
+                            entryValue = entry.lastName,
+                            currentValue = { it.lastName },
+                            previousValue = { it.lastName },
+                        ),
                     attributeChanges = revisionAttributes,
                     source = entry.source,
                 )

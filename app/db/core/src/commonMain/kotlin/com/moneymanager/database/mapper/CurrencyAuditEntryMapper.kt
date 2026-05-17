@@ -31,7 +31,6 @@ private fun SelectAuditHistoryForCurrency.toEntitySource(): EntitySource? {
 
     return auditEntitySource(
         sourceId = source_id,
-        sourceTypeId = source_type_id,
         sourceTypeName = source_type_name,
         deviceId = source_device_id,
         createdAt = source_created_at,

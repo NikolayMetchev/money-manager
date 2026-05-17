@@ -37,6 +37,8 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.scrollbar.HorizontalScrollbarForScrollState
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
@@ -68,9 +70,9 @@ import kotlinx.coroutines.launch
 private fun horizontalMatrixScrollTarget(
     accountIndex: Int,
     allAccounts: List<Account>,
-    accountColumnWidths: Map<AccountId, androidx.compose.ui.unit.Dp>,
-    containerWidthDp: androidx.compose.ui.unit.Dp,
-    density: androidx.compose.ui.unit.Density,
+    accountColumnWidths: Map<AccountId, Dp>,
+    containerWidthDp: Dp,
+    density: Density,
 ): Int =
     with(density) {
         val spacingPx = 8.dp.toPx()
@@ -90,8 +92,8 @@ private fun horizontalMatrixScrollTarget(
 
 private fun verticalMatrixScrollTarget(
     currencyIndex: Int,
-    containerHeightDp: androidx.compose.ui.unit.Dp,
-    density: androidx.compose.ui.unit.Density,
+    containerHeightDp: Dp,
+    density: Density,
 ): Int =
     with(density) {
         val rowHeightPx = 28.dp.toPx()
@@ -238,7 +240,7 @@ fun AccountTransactionsScreen(
     val uniqueCurrencyIds = accountBalances.map { it.balance.currency.id }.distinct()
 
     // Calculate column widths for each account based on account name and balance amounts
-    val accountColumnWidths: Map<AccountId, androidx.compose.ui.unit.Dp> =
+    val accountColumnWidths: Map<AccountId, Dp> =
         remember(allAccounts, accountBalances) {
             allAccounts.associate { account ->
                 // Calculate width needed for account name header

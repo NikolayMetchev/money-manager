@@ -22,7 +22,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuBoxScope
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -38,6 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.moneymanager.database.csv.CsvTransferMapper
 import com.moneymanager.database.csv.DiscoveredAccountMapping
@@ -1333,7 +1336,7 @@ private fun TransferPreviewTable(transfers: List<Transfer>) {
 private fun TableCell(
     text: String,
     isHeader: Boolean = false,
-    width: androidx.compose.ui.unit.Dp = 100.dp,
+    width: Dp = 100.dp,
 ) {
     Box(
         modifier =
@@ -1356,7 +1359,7 @@ private fun TableCell(
 }
 
 @Composable
-private fun ReadonlyDropdownField(
+private fun ExposedDropdownMenuBoxScope.ReadonlyDropdownField(
     value: String,
     expanded: Boolean,
     modifier: Modifier = Modifier,
@@ -1367,7 +1370,7 @@ private fun ReadonlyDropdownField(
         onValueChange = {},
         readOnly = true,
         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-        modifier = modifier,
+        modifier = modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
         enabled = enabled,
     )
 }

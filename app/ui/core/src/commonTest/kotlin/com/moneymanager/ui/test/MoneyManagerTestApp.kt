@@ -47,19 +47,23 @@ internal object MoneyManagerTestApp {
         val scope = rememberCoroutineScope()
         var databaseState by remember { mutableStateOf<TestDatabaseState>(TestDatabaseState.Loading) }
 
+        suspend fun openAndPrimeDatabase(location: DbLocation): TestDatabaseState.Loaded {
+            val database = databaseManager.openDatabase(location)
+            val component = DatabaseComponent.create(database)
+            // Force initialization of all lazy properties to detect schema errors early
+            component.deviceId
+            // Set a default currency to avoid the init dialog blocking E2E tests
+            val currencies = component.currencyRepository.getAllCurrencies().first()
+            if (currencies.isNotEmpty()) {
+                component.settingsRepository.setDefaultCurrencyId(currencies.first().id)
+            }
+            return TestDatabaseState.Loaded(location, component)
+        }
+
         LaunchedEffect(Unit) {
             val location = databaseManager.getDefaultLocation()
             try {
-                val database = databaseManager.openDatabase(location)
-                val component = DatabaseComponent.create(database)
-                // Force initialization of all lazy properties to detect schema errors early
-                component.deviceId
-                // Set a default currency to avoid the init dialog blocking E2E tests
-                val currencies = component.currencyRepository.getAllCurrencies().first()
-                if (currencies.isNotEmpty()) {
-                    component.settingsRepository.setDefaultCurrencyId(currencies.first().id)
-                }
-                databaseState = TestDatabaseState.Loaded(location, component)
+                databaseState = openAndPrimeDatabase(location)
             } catch (expected: Exception) {
                 databaseState = TestDatabaseState.Error(location, expected)
             }
@@ -106,9 +110,8 @@ internal object MoneyManagerTestApp {
                     scope.launch {
                         try {
                             databaseManager.backupDatabase(location)
-                            val database = databaseManager.openDatabase(location)
-                            val component = DatabaseComponent.create(database)
-                            databaseState = TestDatabaseState.Loaded(location, component)
+                            databaseManager.deleteDatabase(location)
+                            databaseState = openAndPrimeDatabase(location)
                         } catch (expected: Exception) {
                             databaseState = TestDatabaseState.Error(location, expected)
                         }
@@ -121,9 +124,7 @@ internal object MoneyManagerTestApp {
                     scope.launch {
                         try {
                             databaseManager.deleteDatabase(location)
-                            val database = databaseManager.openDatabase(location)
-                            val component = DatabaseComponent.create(database)
-                            databaseState = TestDatabaseState.Loaded(location, component)
+                            databaseState = openAndPrimeDatabase(location)
                         } catch (expected: Exception) {
                             databaseState = TestDatabaseState.Error(location, expected)
                         }

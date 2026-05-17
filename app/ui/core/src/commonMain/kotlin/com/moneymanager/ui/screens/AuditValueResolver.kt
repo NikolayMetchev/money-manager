@@ -2,15 +2,19 @@ package com.moneymanager.ui.screens
 
 import com.moneymanager.ui.audit.FieldChange
 
-internal fun <T> resolveUpdateValue(
+private data class ResolvedValue<T>(
+    val value: T,
+)
+
+private fun <T> resolveUpdateValue(
     index: Int,
-    currentValue: T?,
-    previousValue: T?,
+    currentValue: ResolvedValue<T>?,
+    previousValue: ResolvedValue<T>?,
     entryValue: T,
 ): T =
     when {
-        index == 0 && currentValue != null -> currentValue
-        index > 0 && previousValue != null -> previousValue
+        index == 0 && currentValue != null -> currentValue.value
+        index > 0 && previousValue != null -> previousValue.value
         else -> entryValue
     }
 
@@ -24,9 +28,27 @@ internal fun <T> changedOrUnchanged(
         FieldChange.Unchanged(oldValue)
     }
 
-internal inline fun <T, E> resolveUpdateChange(
+internal fun <T, C, E> resolveUpdateChange(
     index: Int,
-    currentValue: T?,
+    currentEntry: C?,
+    previousEntry: E?,
+    entryValue: T,
+    currentValue: (C) -> T,
+    previousValue: (E) -> T,
+): FieldChange<T> =
+    changedOrUnchanged(
+        oldValue = entryValue,
+        newValue =
+            resolveUpdateValue(
+                index = index,
+                currentValue = currentEntry?.let { ResolvedValue(currentValue(it)) },
+                previousValue = previousEntry?.let { ResolvedValue(previousValue(it)) },
+                entryValue = entryValue,
+            ),
+    )
+
+internal fun <T, E> resolveUpdateChange(
+    index: Int,
     previousEntry: E?,
     entryValue: T,
     previousValue: (E) -> T,
@@ -36,8 +58,8 @@ internal inline fun <T, E> resolveUpdateChange(
         newValue =
             resolveUpdateValue(
                 index = index,
-                currentValue = currentValue,
-                previousValue = previousEntry?.let(previousValue),
+                currentValue = null,
+                previousValue = previousEntry?.let { ResolvedValue(previousValue(it)) },
                 entryValue = entryValue,
             ),
     )

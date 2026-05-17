@@ -170,12 +170,23 @@ private fun computeAccountAuditDiffs(
                     auditTimestamp = entry.auditTimestamp,
                     auditType = entry.auditType,
                     revisionId = entry.revisionId,
-                    name = resolveUpdateChange(index, currentAccount?.name, previousEntry, entry.name) { it.name },
+                    name =
+                        resolveUpdateChange(
+                            index = index,
+                            currentEntry = currentAccount,
+                            previousEntry = previousEntry,
+                            entryValue = entry.name,
+                            currentValue = { it.name },
+                            previousValue = { it.name },
+                        ),
                     openingDate = FieldChange.Unchanged(entry.openingDate),
                     categoryName =
-                        resolveUpdateChange(index, null, previousEntry, entry.categoryName) {
-                            it.categoryName
-                        },
+                        resolveUpdateChange(
+                            index = index,
+                            previousEntry = previousEntry,
+                            entryValue = entry.categoryName,
+                            previousValue = { it.categoryName },
+                        ),
                     ownersAdded = ownershipChanges.ownersAdded,
                     ownersRemoved = ownershipChanges.ownersRemoved,
                     attributeChanges = entry.attributeChanges,

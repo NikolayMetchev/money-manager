@@ -288,8 +288,8 @@ class CsvImportRepositoryImpl(
             tableName = tableName,
             originalFileName = originalFileName,
             importTimestampMs = importTimestampMs,
-            rowCount = rowCount.toInt(),
-            columnCount = columnCount.toInt(),
+            rowCount = rowCount.toIntChecked("rowCount"),
+            columnCount = columnCount.toIntChecked("columnCount"),
             deviceId = deviceId,
             platformName = platformName,
             osName = osName,
@@ -298,11 +298,16 @@ class CsvImportRepositoryImpl(
             deviceModel = deviceModel,
             fileChecksum = fileChecksum,
             fileLastModifiedMs = fileLastModifiedMs,
-            applicationCount = applicationCount.toInt(),
+            applicationCount = applicationCount.toIntChecked("applicationCount"),
             lastAppliedStrategyId = lastAppliedStrategyId,
             lastAppliedStrategyName = lastAppliedStrategyName,
             lastAppliedAtMs = lastAppliedAtMs,
         )
+
+    private fun Long.toIntChecked(field: String): Int {
+        require(this in Int.MIN_VALUE..Int.MAX_VALUE) { "$field out of Int range: $this" }
+        return toInt()
+    }
 
     private fun toCsvImport(
         record: CsvImportRecord,

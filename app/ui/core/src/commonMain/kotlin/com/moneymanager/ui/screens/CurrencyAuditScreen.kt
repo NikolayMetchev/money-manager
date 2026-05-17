@@ -98,12 +98,33 @@ private fun computeCurrencyAuditDiffs(
                     auditTimestamp = entry.auditTimestamp,
                     auditType = entry.auditType,
                     revisionId = entry.revisionId,
-                    code = resolveUpdateChange(index, currentCurrency?.code, previousEntry, entry.code) { it.code },
-                    name = resolveUpdateChange(index, currentCurrency?.name, previousEntry, entry.name) { it.name },
+                    code =
+                        resolveUpdateChange(
+                            index = index,
+                            currentEntry = currentCurrency,
+                            previousEntry = previousEntry,
+                            entryValue = entry.code,
+                            currentValue = { it.code },
+                            previousValue = { it.code },
+                        ),
+                    name =
+                        resolveUpdateChange(
+                            index = index,
+                            currentEntry = currentCurrency,
+                            previousEntry = previousEntry,
+                            entryValue = entry.name,
+                            currentValue = { it.name },
+                            previousValue = { it.name },
+                        ),
                     scaleFactor =
-                        resolveUpdateChange(index, currentCurrency?.scaleFactor, previousEntry, entry.scaleFactor) {
-                            it.scaleFactor
-                        },
+                        resolveUpdateChange(
+                            index = index,
+                            currentEntry = currentCurrency,
+                            previousEntry = previousEntry,
+                            entryValue = entry.scaleFactor,
+                            currentValue = { it.scaleFactor },
+                            previousValue = { it.scaleFactor },
+                        ),
                     source = entry.source,
                 )
             }

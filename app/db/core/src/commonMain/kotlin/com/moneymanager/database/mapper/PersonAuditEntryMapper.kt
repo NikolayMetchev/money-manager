@@ -3,12 +3,8 @@
 package com.moneymanager.database.mapper
 
 import com.moneymanager.database.sql.SelectAuditHistoryForPerson
-import com.moneymanager.domain.model.ApiRequestId
-import com.moneymanager.domain.model.ApiSessionId
-import com.moneymanager.domain.model.ApiSourceDetails
 import com.moneymanager.domain.model.EntitySource
 import com.moneymanager.domain.model.EntityType
-import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.PersonAuditEntry
 import tech.mappie.api.ObjectMappie
 
@@ -33,20 +29,8 @@ private fun SelectAuditHistoryForPerson.toEntitySource(): EntitySource? {
             deviceModel = source_device_model,
         )
 
-    val apiSource =
-        if (source_api_session_id != null && source_api_request_id != null && source_api_json_path != null) {
-            ApiSourceDetails(
-                sessionId = ApiSessionId(source_api_session_id),
-                requestId = ApiRequestId(source_api_request_id),
-                jsonPath = JsonPath(source_api_json_path),
-            )
-        } else {
-            null
-        }
-
     return auditEntitySource(
         sourceId = source_id,
-        sourceTypeId = source_type_id,
         sourceTypeName = source_type_name,
         deviceId = source_device_id,
         createdAt = source_created_at,
@@ -54,6 +38,11 @@ private fun SelectAuditHistoryForPerson.toEntitySource(): EntitySource? {
         entityId = person_id,
         revisionId = revision_id,
         deviceInfo = deviceInfo,
-        apiSource = apiSource,
+        apiSource =
+            auditApiSource(
+                sessionId = source_api_session_id,
+                requestId = source_api_request_id,
+                jsonPath = source_api_json_path,
+            ),
     )
 }
