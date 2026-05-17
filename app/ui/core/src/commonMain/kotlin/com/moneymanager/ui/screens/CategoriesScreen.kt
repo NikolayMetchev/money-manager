@@ -609,85 +609,11 @@ fun CategoryTreeItem(
 fun CreateCategoryDialogInCategories(
     categoryRepository: CategoryRepository,
     onDismiss: () -> Unit,
-) {
-    var name by remember { mutableStateOf("") }
-    var selectedParentId by remember { mutableStateOf<Long?>(null) }
-    var expanded by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    var isSaving by remember { mutableStateOf(false) }
-
-    val categories by categoryRepository
-        .getAllCategories()
-        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
-    val scope = rememberSchemaAwareCoroutineScope()
-
-    AlertDialog(
-        onDismissRequest = { if (!isSaving) onDismiss() },
-        title = { Text("Create New Category") },
-        text = {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Category Name") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    enabled = !isSaving,
-                )
-
-                ParentCategorySelector(
-                    categories = categories,
-                    selectedParentId = selectedParentId,
-                    onParentSelected = { selectedParentId = it },
-                    expanded = expanded,
-                    onExpandedChange = { expanded = it },
-                    enabled = !isSaving,
-                    additionalExcludedIds = emptySet(),
-                )
-
-                errorMessage?.let { error -> ErrorMessageText(error) }
-            }
-        },
-        confirmButton = {
-            LoadingTextButton(
-                onClick = {
-                    saveCategoryWithValidation(
-                        scope = scope,
-                        name = name,
-                        setSaving = { isSaving = it },
-                        setError = { errorMessage = it },
-                        onSuccess = onDismiss,
-                        failurePrefix = "Failed to create category",
-                    ) { trimmedName ->
-                        categoryRepository.createCategory(
-                            Category(
-                                name = trimmedName,
-                                parentId = selectedParentId,
-                            ),
-                        )
-                    }
-                },
-                enabled = !isSaving,
-                loading = isSaving,
-                label = "Create",
-            )
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                enabled = !isSaving,
-            ) {
-                Text("Cancel")
-            }
-        },
-    )
-}
+) = CreateCategoryDialog(
+    categoryRepository = categoryRepository,
+    onCategoryCreated = { _, _ -> onDismiss() },
+    onDismiss = onDismiss,
+)
 
 @Composable
 fun EditCategoryDialog(

@@ -48,8 +48,7 @@ fun EditPersonDialog(
     var middleName by remember { mutableStateOf(personToEdit?.middleName.orEmpty()) }
     var lastName by remember { mutableStateOf(personToEdit?.lastName.orEmpty()) }
     var externalId by remember { mutableStateOf("") }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    var isSaving by remember { mutableStateOf(false) }
+    val saveState = rememberDialogSaveState()
 
     val scope = rememberSchemaAwareCoroutineScope()
 
@@ -71,7 +70,7 @@ fun EditPersonDialog(
     }
 
     AlertDialog(
-        onDismissRequest = { if (!isSaving) onDismiss() },
+        onDismissRequest = { if (!saveState.isSaving) onDismiss() },
         title = { Text(if (personToEdit != null) "Edit Person" else "Create New Person") },
         text = {
             Column(
@@ -87,7 +86,7 @@ fun EditPersonDialog(
                     label = { Text("First Name *") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    enabled = !isSaving,
+                    enabled = !saveState.isSaving,
                 )
 
                 OutlinedTextField(
@@ -96,7 +95,7 @@ fun EditPersonDialog(
                     label = { Text("Middle Name(s)") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    enabled = !isSaving,
+                    enabled = !saveState.isSaving,
                 )
 
                 OutlinedTextField(
@@ -105,7 +104,7 @@ fun EditPersonDialog(
                     label = { Text("Last Name") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    enabled = !isSaving,
+                    enabled = !saveState.isSaving,
                 )
 
                 if (personAttributeRepository != null) {
@@ -115,21 +114,21 @@ fun EditPersonDialog(
                         label = { Text("External ID") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        enabled = !isSaving,
+                        enabled = !saveState.isSaving,
                     )
                 }
 
-                errorMessage?.let { error -> ErrorMessageText(error) }
+                saveState.errorMessage?.let { error -> ErrorMessageText(error) }
             }
         },
         confirmButton = {
             TextButton(
                 onClick = {
                     if (firstName.isBlank()) {
-                        errorMessage = "First name is required"
+                        saveState.errorMessage = "First name is required"
                     } else {
-                        isSaving = true
-                        errorMessage = null
+                        saveState.isSaving = true
+                        saveState.errorMessage = null
                         scope.launch {
                             try {
                                 val resolvedExternalId = externalId.trim().ifBlank { null }
@@ -164,15 +163,15 @@ fun EditPersonDialog(
                             } catch (expected: Exception) {
                                 val action = if (personToEdit != null) "update" else "create"
                                 logger.error(expected) { "Failed to $action person: ${expected.message}" }
-                                errorMessage = "Failed to $action person: ${expected.message}"
-                                isSaving = false
+                                saveState.errorMessage = "Failed to $action person: ${expected.message}"
+                                saveState.isSaving = false
                             }
                         }
                     }
                 },
-                enabled = !isSaving,
+                enabled = !saveState.isSaving,
             ) {
-                if (isSaving) {
+                if (saveState.isSaving) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(16.dp),
                         strokeWidth = 2.dp,
@@ -185,7 +184,7 @@ fun EditPersonDialog(
         dismissButton = {
             TextButton(
                 onClick = onDismiss,
-                enabled = !isSaving,
+                enabled = !saveState.isSaving,
             ) {
                 Text("Cancel")
             }

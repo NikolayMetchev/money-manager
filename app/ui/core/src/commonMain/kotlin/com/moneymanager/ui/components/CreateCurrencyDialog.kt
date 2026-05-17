@@ -40,13 +40,12 @@ fun CreateCurrencyDialog(
 ) {
     var code by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    var isSaving by remember { mutableStateOf(false) }
+    val saveState = rememberDialogSaveState()
 
     val scope = rememberSchemaAwareCoroutineScope()
 
     AlertDialog(
-        onDismissRequest = { if (!isSaving) onDismiss() },
+        onDismissRequest = { if (!saveState.isSaving) onDismiss() },
         title = { Text("Create New Currency") },
         text = {
             Column(
@@ -62,7 +61,7 @@ fun CreateCurrencyDialog(
                     label = { Text("Currency Code (e.g., USD)") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    enabled = !isSaving,
+                    enabled = !saveState.isSaving,
                 )
 
                 OutlinedTextField(
@@ -71,44 +70,44 @@ fun CreateCurrencyDialog(
                     label = { Text("Currency Name (e.g., US Dollar)") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    enabled = !isSaving,
+                    enabled = !saveState.isSaving,
                 )
 
-                errorMessage?.let { error -> ErrorMessageText(error) }
+                saveState.errorMessage?.let { error -> ErrorMessageText(error) }
             }
         },
         confirmButton = {
             LoadingTextButton(
                 onClick = {
                     when {
-                        code.isBlank() -> errorMessage = "Currency code is required"
-                        code.length != 3 -> errorMessage = "Currency code must be 3 characters"
-                        name.isBlank() -> errorMessage = "Currency name is required"
+                        code.isBlank() -> saveState.errorMessage = "Currency code is required"
+                        code.length != 3 -> saveState.errorMessage = "Currency code must be 3 characters"
+                        name.isBlank() -> saveState.errorMessage = "Currency name is required"
                         else -> {
-                            isSaving = true
-                            errorMessage = null
+                            saveState.isSaving = true
+                            saveState.errorMessage = null
                             scope.launch {
                                 try {
                                     val currencyId = currencyRepository.upsertCurrencyByCode(code.trim(), name.trim())
                                     onCurrencyCreated(currencyId)
                                 } catch (expected: Exception) {
                                     logger.error(expected) { "Failed to create currency: ${expected.message}" }
-                                    errorMessage = "Failed to create currency: ${expected.message}"
-                                    isSaving = false
+                                    saveState.errorMessage = "Failed to create currency: ${expected.message}"
+                                    saveState.isSaving = false
                                 }
                             }
                         }
                     }
                 },
-                enabled = !isSaving,
-                loading = isSaving,
+                enabled = !saveState.isSaving,
+                loading = saveState.isSaving,
                 label = "Create",
             )
         },
         dismissButton = {
             TextButton(
                 onClick = onDismiss,
-                enabled = !isSaving,
+                enabled = !saveState.isSaving,
             ) {
                 Text("Cancel")
             }

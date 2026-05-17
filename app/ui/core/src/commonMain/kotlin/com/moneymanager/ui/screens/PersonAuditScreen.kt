@@ -135,24 +135,9 @@ private fun computePersonAuditDiffs(
                     auditTimestamp = entry.auditTimestamp,
                     auditType = entry.auditType,
                     revisionId = entry.revisionId,
-                    firstName =
-                        if (entry.firstName != newFirstName) {
-                            FieldChange.Changed(entry.firstName, newFirstName)
-                        } else {
-                            FieldChange.Unchanged(entry.firstName)
-                        },
-                    middleName =
-                        if (entry.middleName != newMiddleName) {
-                            FieldChange.Changed(entry.middleName, newMiddleName)
-                        } else {
-                            FieldChange.Unchanged(entry.middleName)
-                        },
-                    lastName =
-                        if (entry.lastName != newLastName) {
-                            FieldChange.Changed(entry.lastName, newLastName)
-                        } else {
-                            FieldChange.Unchanged(entry.lastName)
-                        },
+                    firstName = changedOrUnchanged(entry.firstName, newFirstName),
+                    middleName = changedOrUnchanged(entry.middleName, newMiddleName),
+                    lastName = changedOrUnchanged(entry.lastName, newLastName),
                     attributeChanges = revisionAttributes,
                     source = entry.source,
                 )

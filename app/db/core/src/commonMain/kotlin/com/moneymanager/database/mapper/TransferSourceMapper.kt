@@ -10,6 +10,7 @@ import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.ApiSourceDetails
 import com.moneymanager.domain.model.CsvSourceDetails
+import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.SourceType
 import com.moneymanager.domain.model.TransferSource
@@ -22,21 +23,14 @@ object TransferSourceFromRevisionMapper :
     IdConversions,
     InstantConversions,
     SourceTypeConversions {
-    override fun map(from: SelectByTransactionIdAndRevision): TransferSource =
-        mapping {
-            TransferSource::deviceInfo fromValue
-                DeviceRepositoryImpl.createDeviceInfo(
-                    platformName = from.platform_name,
-                    osName = from.os_name,
-                    machineName = from.machine_name,
-                    deviceMake = from.device_make,
-                    deviceModel = from.device_model,
-                )
-            TransferSource::csvSource fromValue
-                mapCsvSource(toSourceType(from.source_type), from.csv_import_id, from.csv_row_index, from.csv_file_name)
-            TransferSource::apiSource fromValue
-                mapApiSource(toSourceType(from.source_type), from.api_session_id, from.api_request_id, from.api_json_path)
+    override fun map(from: SelectByTransactionIdAndRevision): TransferSource {
+        val sourceType = toSourceType(from.source_type)
+        return mapping {
+            TransferSource::deviceInfo fromValue from.toDeviceInfo()
+            TransferSource::csvSource fromValue mapCsvSource(sourceType, from.csv_import_id, from.csv_row_index, from.csv_file_name)
+            TransferSource::apiSource fromValue mapApiSource(sourceType, from.api_session_id, from.api_request_id, from.api_json_path)
         }
+    }
 }
 
 object TransferSourceFromTransactionIdMapper :
@@ -44,21 +38,14 @@ object TransferSourceFromTransactionIdMapper :
     IdConversions,
     InstantConversions,
     SourceTypeConversions {
-    override fun map(from: SelectAllByTransactionId): TransferSource =
-        mapping {
-            TransferSource::deviceInfo fromValue
-                DeviceRepositoryImpl.createDeviceInfo(
-                    platformName = from.platform_name,
-                    osName = from.os_name,
-                    machineName = from.machine_name,
-                    deviceMake = from.device_make,
-                    deviceModel = from.device_model,
-                )
-            TransferSource::csvSource fromValue
-                mapCsvSource(toSourceType(from.source_type), from.csv_import_id, from.csv_row_index, from.csv_file_name)
-            TransferSource::apiSource fromValue
-                mapApiSource(toSourceType(from.source_type), from.api_session_id, from.api_request_id, from.api_json_path)
+    override fun map(from: SelectAllByTransactionId): TransferSource {
+        val sourceType = toSourceType(from.source_type)
+        return mapping {
+            TransferSource::deviceInfo fromValue from.toDeviceInfo()
+            TransferSource::csvSource fromValue mapCsvSource(sourceType, from.csv_import_id, from.csv_row_index, from.csv_file_name)
+            TransferSource::apiSource fromValue mapApiSource(sourceType, from.api_session_id, from.api_request_id, from.api_json_path)
         }
+    }
 }
 
 object TransferSourceFromAuditMapper :
@@ -127,3 +114,36 @@ private fun mapApiSource(
         jsonPath = JsonPath(checkNotNull(apiJsonPath)),
     )
 }
+
+private fun SelectByTransactionIdAndRevision.toDeviceInfo(): DeviceInfo =
+    transferDeviceInfo(
+        platformName = platform_name,
+        osName = os_name,
+        machineName = machine_name,
+        deviceMake = device_make,
+        deviceModel = device_model,
+    )
+
+private fun SelectAllByTransactionId.toDeviceInfo(): DeviceInfo =
+    transferDeviceInfo(
+        platformName = platform_name,
+        osName = os_name,
+        machineName = machine_name,
+        deviceMake = device_make,
+        deviceModel = device_model,
+    )
+
+private fun transferDeviceInfo(
+    platformName: String,
+    osName: String?,
+    machineName: String?,
+    deviceMake: String?,
+    deviceModel: String?,
+): DeviceInfo =
+    DeviceRepositoryImpl.createDeviceInfo(
+        platformName = platformName,
+        osName = osName,
+        machineName = machineName,
+        deviceMake = deviceMake,
+        deviceModel = deviceModel,
+    )

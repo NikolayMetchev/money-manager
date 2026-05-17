@@ -15,6 +15,40 @@ import androidx.compose.ui.Modifier
 import com.moneymanager.domain.model.Category
 
 @Composable
+internal fun AccountBasicsFields(
+    name: String,
+    onNameChange: (String) -> Unit,
+    categories: List<Category>,
+    selectedCategoryId: Long,
+    selectedCategoryName: String?,
+    expanded: Boolean,
+    isSaving: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    onCategorySelected: (Long) -> Unit,
+    onCreateCategoryClick: () -> Unit,
+) {
+    OutlinedTextField(
+        value = name,
+        onValueChange = onNameChange,
+        label = { Text("Account Name") },
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = true,
+        enabled = !isSaving,
+    )
+
+    AccountCategorySelector(
+        categories = categories,
+        selectedCategoryId = selectedCategoryId,
+        selectedCategoryName = selectedCategoryName,
+        expanded = expanded,
+        isSaving = isSaving,
+        onExpandedChange = onExpandedChange,
+        onCategorySelected = onCategorySelected,
+        onCreateCategoryClick = onCreateCategoryClick,
+    )
+}
+
+@Composable
 internal fun AccountCategorySelector(
     categories: List<Category>,
     selectedCategoryId: Long,

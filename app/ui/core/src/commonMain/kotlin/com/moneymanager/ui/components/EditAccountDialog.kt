@@ -17,7 +17,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -132,16 +131,9 @@ fun EditAccountDialog(
                         .padding(vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Account Name") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    enabled = !isSaving,
-                )
-
-                AccountCategorySelector(
+                AccountBasicsFields(
+                    name = name,
+                    onNameChange = { name = it },
                     categories = categories,
                     selectedCategoryId = selectedCategoryId,
                     selectedCategoryName = selectedCategoryName,

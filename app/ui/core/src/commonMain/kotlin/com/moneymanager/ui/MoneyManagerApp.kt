@@ -72,28 +72,6 @@ fun MoneyManagerApp(
     databaseLocation: DbLocation,
     services: AppServices,
 ) {
-    val accountAttributeRepository = services.accounts.accountAttributeRepository
-    val accountRepository = services.accounts.accountRepository
-    val apiImportStrategyRepository = services.imports.apiImportStrategyRepository
-    val apiSessionRepository = services.imports.apiSessionRepository
-    val attributeTypeRepository = services.transactions.attributeTypeRepository
-    val auditRepository = services.audit.auditRepository
-    val categoryRepository = services.accounts.categoryRepository
-    val csvAccountMappingRepository = services.imports.csvAccountMappingRepository
-    val csvImportRepository = services.imports.csvImportRepository
-    val csvImportStrategyRepository = services.imports.csvImportStrategyRepository
-    val csvStrategyImportExport = services.imports.csvStrategyImportExport
-    val currencyRepository = services.accounts.currencyRepository
-    val maintenance = services.imports.maintenance
-    val personRepository = services.people.personRepository
-    val personAccountOwnershipRepository = services.people.personAccountOwnershipRepository
-    val personAttributeRepository = services.people.personAttributeRepository
-    val settingsRepository = services.settings.settingsRepository
-    val transactionRepository = services.transactions.transactionRepository
-    val transferSourceRepository = services.transactions.transferSourceRepository
-    val entitySource = services.transactions.entitySource
-    val deviceId = services.deviceId
-
     ProvideSchemaAwareScope {
         val scope = rememberSchemaAwareCoroutineScope()
         val backgroundTaskManager = rememberBackgroundTaskManager(scope)
@@ -107,13 +85,13 @@ fun MoneyManagerApp(
         var transactionRefreshTrigger by remember { mutableStateOf(0) }
 
         var defaultCurrencyLoaded by remember { mutableStateOf(false) }
-        val defaultCurrencyId by settingsRepository
+        val defaultCurrencyId by services.settings.settingsRepository
             .getDefaultCurrencyId()
             .onEach { defaultCurrencyLoaded = true }
             .collectAsStateWithSchemaErrorHandling(initial = null)
 
         // Use schema-error-aware collection for flows that may fail on old databases
-        val accounts by accountRepository
+        val accounts by services.accounts.accountRepository
             .getAllAccounts()
             .collectAsStateWithSchemaErrorHandling(initial = emptyList())
 
@@ -246,15 +224,15 @@ fun MoneyManagerApp(
                                     currentlyViewedCurrencyId = null
                                 }
                                 AccountsScreen(
-                                    accountRepository = accountRepository,
-                                    accountAttributeRepository = accountAttributeRepository,
-                                    attributeTypeRepository = attributeTypeRepository,
-                                    categoryRepository = categoryRepository,
-                                    transactionRepository = transactionRepository,
-                                    personRepository = personRepository,
-                                    personAccountOwnershipRepository = personAccountOwnershipRepository,
-                                    maintenance = maintenance,
-                                    entitySource = entitySource,
+                                    accountRepository = services.accounts.accountRepository,
+                                    accountAttributeRepository = services.accounts.accountAttributeRepository,
+                                    attributeTypeRepository = services.transactions.attributeTypeRepository,
+                                    categoryRepository = services.accounts.categoryRepository,
+                                    transactionRepository = services.transactions.transactionRepository,
+                                    personRepository = services.people.personRepository,
+                                    personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
+                                    maintenance = services.imports.maintenance,
+                                    entitySource = services.transactions.entitySource,
                                     scrollToAccountId = screen.scrollToAccountId,
                                     onAccountClick = { account ->
                                         // Replace current screen with one that remembers the clicked account
@@ -274,8 +252,8 @@ fun MoneyManagerApp(
                                     currentlyViewedCurrencyId = null
                                 }
                                 CurrenciesScreen(
-                                    currencyRepository = currencyRepository,
-                                    entitySource = entitySource,
+                                    currencyRepository = services.accounts.currencyRepository,
+                                    entitySource = services.transactions.entitySource,
                                     onAuditClick = { currency ->
                                         navigationHistory.navigateTo(Screen.CurrencyAuditHistory(currency.id, currency.code))
                                     },
@@ -288,8 +266,8 @@ fun MoneyManagerApp(
                                     currentlyViewedCurrencyId = null
                                 }
                                 CategoriesScreen(
-                                    categoryRepository = categoryRepository,
-                                    currencyRepository = currencyRepository,
+                                    categoryRepository = services.accounts.categoryRepository,
+                                    currencyRepository = services.accounts.currencyRepository,
                                     onAuditClick = { category ->
                                         navigationHistory.navigateTo(Screen.CategoryAuditHistory(category.id, category.name))
                                     },
@@ -304,10 +282,10 @@ fun MoneyManagerApp(
                                     currentlyViewedCurrencyId = null
                                 }
                                 PeopleScreen(
-                                    personRepository = personRepository,
-                                    personAttributeRepository = personAttributeRepository,
-                                    personAccountOwnershipRepository = personAccountOwnershipRepository,
-                                    entitySource = entitySource,
+                                    personRepository = services.people.personRepository,
+                                    personAttributeRepository = services.people.personAttributeRepository,
+                                    personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
+                                    entitySource = services.transactions.entitySource,
                                     scrollToPersonId = (screen as? Screen.PeopleScroll)?.personId,
                                     onAuditClick = { person ->
                                         navigationHistory.navigateTo(Screen.PersonAuditHistory(person.id, person.fullName))
@@ -321,15 +299,15 @@ fun MoneyManagerApp(
                                     currentlyViewedCurrencyId = null
                                 }
                                 SettingsScreen(
-                                    currencyRepository = currencyRepository,
-                                    categoryRepository = categoryRepository,
-                                    accountRepository = accountRepository,
-                                    personRepository = personRepository,
-                                    personAccountOwnershipRepository = personAccountOwnershipRepository,
-                                    attributeTypeRepository = attributeTypeRepository,
-                                    transactionRepository = transactionRepository,
-                                    settingsRepository = settingsRepository,
-                                    maintenance = maintenance,
+                                    currencyRepository = services.accounts.currencyRepository,
+                                    categoryRepository = services.accounts.categoryRepository,
+                                    accountRepository = services.accounts.accountRepository,
+                                    personRepository = services.people.personRepository,
+                                    personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
+                                    attributeTypeRepository = services.transactions.attributeTypeRepository,
+                                    transactionRepository = services.transactions.transactionRepository,
+                                    settingsRepository = services.settings.settingsRepository,
+                                    maintenance = services.imports.maintenance,
                                     entitySource = services.transactions.sampleEntitySource,
                                 )
                             }
@@ -340,17 +318,17 @@ fun MoneyManagerApp(
                                 }
                                 AccountTransactionsScreen(
                                     accountId = currentlyViewedAccountId ?: screen.accountId,
-                                    transactionRepository = transactionRepository,
-                                    transferSourceRepository = transferSourceRepository,
-                                    EntitySource = entitySource,
-                                    accountRepository = accountRepository,
-                                    accountAttributeRepository = accountAttributeRepository,
-                                    categoryRepository = categoryRepository,
-                                    currencyRepository = currencyRepository,
-                                    attributeTypeRepository = attributeTypeRepository,
-                                    personRepository = personRepository,
-                                    personAccountOwnershipRepository = personAccountOwnershipRepository,
-                                    Maintenance = maintenance,
+                                    transactionRepository = services.transactions.transactionRepository,
+                                    transferSourceRepository = services.transactions.transferSourceRepository,
+                                    EntitySource = services.transactions.entitySource,
+                                    accountRepository = services.accounts.accountRepository,
+                                    accountAttributeRepository = services.accounts.accountAttributeRepository,
+                                    categoryRepository = services.accounts.categoryRepository,
+                                    currencyRepository = services.accounts.currencyRepository,
+                                    attributeTypeRepository = services.transactions.attributeTypeRepository,
+                                    personRepository = services.people.personRepository,
+                                    personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
+                                    Maintenance = services.imports.maintenance,
                                     onAccountIdChange = { accountId ->
                                         currentlyViewedAccountId = accountId
                                     },
@@ -384,20 +362,20 @@ fun MoneyManagerApp(
                                     onTabSelected = { tab ->
                                         navigationHistory.replaceCurrentScreen(Screen.Imports(tab))
                                     },
-                                    csvImportRepository = csvImportRepository,
-                                    apiSessionRepository = apiSessionRepository,
-                                    apiImportStrategyRepository = apiImportStrategyRepository,
-                                    attributeTypeRepository = attributeTypeRepository,
-                                    accountAttributeRepository = accountAttributeRepository,
-                                    accountRepository = accountRepository,
-                                    currencyRepository = currencyRepository,
-                                    transactionRepository = transactionRepository,
-                                    entitySource = entitySource,
-                                    maintenance = maintenance,
-                                    personRepository = personRepository,
-                                    personAccountOwnershipRepository = personAccountOwnershipRepository,
-                                    personAttributeRepository = personAttributeRepository,
-                                    deviceId = deviceId,
+                                    csvImportRepository = services.imports.csvImportRepository,
+                                    apiSessionRepository = services.imports.apiSessionRepository,
+                                    apiImportStrategyRepository = services.imports.apiImportStrategyRepository,
+                                    attributeTypeRepository = services.transactions.attributeTypeRepository,
+                                    accountAttributeRepository = services.accounts.accountAttributeRepository,
+                                    accountRepository = services.accounts.accountRepository,
+                                    currencyRepository = services.accounts.currencyRepository,
+                                    transactionRepository = services.transactions.transactionRepository,
+                                    entitySource = services.transactions.entitySource,
+                                    maintenance = services.imports.maintenance,
+                                    personRepository = services.people.personRepository,
+                                    personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
+                                    personAttributeRepository = services.people.personAttributeRepository,
+                                    deviceId = services.deviceId,
                                     onCsvImportClick = { importId ->
                                         navigationHistory.navigateTo(Screen.CsvImportDetail(importId))
                                     },
@@ -424,8 +402,8 @@ fun MoneyManagerApp(
                                     currentlyViewedCurrencyId = null
                                 }
                                 ApiStrategiesScreen(
-                                    apiImportStrategyRepository = apiImportStrategyRepository,
-                                    apiSessionRepository = apiSessionRepository,
+                                    apiImportStrategyRepository = services.imports.apiImportStrategyRepository,
+                                    apiSessionRepository = services.imports.apiSessionRepository,
                                     onBack = { navigationHistory.navigateBack() },
                                 )
                             }
@@ -433,19 +411,19 @@ fun MoneyManagerApp(
                                 CsvImportDetailScreen(
                                     importId = screen.importId,
                                     scrollToRowIndex = screen.scrollToRowIndex,
-                                    csvImportRepository = csvImportRepository,
-                                    csvImportStrategyRepository = csvImportStrategyRepository,
-                                    csvAccountMappingRepository = csvAccountMappingRepository,
-                                    accountRepository = accountRepository,
-                                    categoryRepository = categoryRepository,
-                                    currencyRepository = currencyRepository,
-                                    transactionRepository = transactionRepository,
-                                    attributeTypeRepository = attributeTypeRepository,
-                                    personRepository = personRepository,
-                                    personAccountOwnershipRepository = personAccountOwnershipRepository,
-                                    Maintenance = maintenance,
-                                    transferSourceRepository = transferSourceRepository,
-                                    EntitySource = entitySource,
+                                    csvImportRepository = services.imports.csvImportRepository,
+                                    csvImportStrategyRepository = services.imports.csvImportStrategyRepository,
+                                    csvAccountMappingRepository = services.imports.csvAccountMappingRepository,
+                                    accountRepository = services.accounts.accountRepository,
+                                    categoryRepository = services.accounts.categoryRepository,
+                                    currencyRepository = services.accounts.currencyRepository,
+                                    transactionRepository = services.transactions.transactionRepository,
+                                    attributeTypeRepository = services.transactions.attributeTypeRepository,
+                                    personRepository = services.people.personRepository,
+                                    personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
+                                    Maintenance = services.imports.maintenance,
+                                    transferSourceRepository = services.transactions.transferSourceRepository,
+                                    EntitySource = services.transactions.entitySource,
                                     onBack = { navigationHistory.navigateBack() },
                                     onDeleted = { navigationHistory.navigateTo(Screen.Imports(ImportTab.CSV)) },
                                     onCsvSourceClick = { importId, rowIndex ->
@@ -454,7 +432,7 @@ fun MoneyManagerApp(
                                     onTransferClick = { transferId, isPositiveAmount ->
                                         scope.launch {
                                             val transfer =
-                                                transactionRepository
+                                                services.transactions.transactionRepository
                                                     .getTransactionById(transferId.id)
                                                     .first()
                                                     ?: return@launch
@@ -484,17 +462,17 @@ fun MoneyManagerApp(
                                     currentlyViewedCurrencyId = null
                                 }
                                 CsvStrategiesScreen(
-                                    csvImportStrategyRepository = csvImportStrategyRepository,
-                                    csvImportRepository = csvImportRepository,
-                                    csvAccountMappingRepository = csvAccountMappingRepository,
-                                    accountRepository = accountRepository,
-                                    categoryRepository = categoryRepository,
-                                    currencyRepository = currencyRepository,
-                                    attributeTypeRepository = attributeTypeRepository,
-                                    personRepository = personRepository,
-                                    personAccountOwnershipRepository = personAccountOwnershipRepository,
-                                    entitySource = entitySource,
-                                    csvStrategyImportExport = csvStrategyImportExport,
+                                    csvImportStrategyRepository = services.imports.csvImportStrategyRepository,
+                                    csvImportRepository = services.imports.csvImportRepository,
+                                    csvAccountMappingRepository = services.imports.csvAccountMappingRepository,
+                                    accountRepository = services.accounts.accountRepository,
+                                    categoryRepository = services.accounts.categoryRepository,
+                                    currencyRepository = services.accounts.currencyRepository,
+                                    attributeTypeRepository = services.transactions.attributeTypeRepository,
+                                    personRepository = services.people.personRepository,
+                                    personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
+                                    entitySource = services.transactions.entitySource,
+                                    csvStrategyImportExport = services.imports.csvStrategyImportExport,
                                     appVersion = appVersion,
                                     onBack = { navigationHistory.navigateBack() },
                                 )
@@ -502,10 +480,10 @@ fun MoneyManagerApp(
                             is Screen.AuditHistory -> {
                                 TransactionAuditScreen(
                                     transferId = screen.transferId,
-                                    auditRepository = auditRepository,
-                                    accountRepository = accountRepository,
-                                    transactionRepository = transactionRepository,
-                                    currentDeviceId = deviceId,
+                                    auditRepository = services.audit.auditRepository,
+                                    accountRepository = services.accounts.accountRepository,
+                                    transactionRepository = services.transactions.transactionRepository,
+                                    currentDeviceId = services.deviceId,
                                     onCsvSourceClick = { importId, rowIndex ->
                                         navigationHistory.navigateTo(Screen.CsvImportDetail(importId, rowIndex))
                                     },
@@ -533,8 +511,8 @@ fun MoneyManagerApp(
                             is Screen.AccountAuditHistory -> {
                                 AccountAuditScreen(
                                     accountId = screen.accountId,
-                                    auditRepository = auditRepository,
-                                    accountRepository = accountRepository,
+                                    auditRepository = services.audit.auditRepository,
+                                    accountRepository = services.accounts.accountRepository,
                                     onApiSourceClick = { sessionId, requestId, jsonPath ->
                                         navigationHistory.navigateTo(
                                             Screen.ApiSessionTraffic(
@@ -557,8 +535,8 @@ fun MoneyManagerApp(
                             is Screen.PersonAuditHistory -> {
                                 PersonAuditScreen(
                                     personId = screen.personId,
-                                    auditRepository = auditRepository,
-                                    personRepository = personRepository,
+                                    auditRepository = services.audit.auditRepository,
+                                    personRepository = services.people.personRepository,
                                     onApiSourceClick = { sessionId, requestId, jsonPath ->
                                         navigationHistory.navigateTo(
                                             Screen.ApiSessionTraffic(
@@ -574,16 +552,16 @@ fun MoneyManagerApp(
                             is Screen.CurrencyAuditHistory -> {
                                 CurrencyAuditScreen(
                                     currencyId = screen.currencyId,
-                                    auditRepository = auditRepository,
-                                    currencyRepository = currencyRepository,
+                                    auditRepository = services.audit.auditRepository,
+                                    currencyRepository = services.accounts.currencyRepository,
                                     onBack = { navigationHistory.navigateBack() },
                                 )
                             }
                             is Screen.CategoryAuditHistory -> {
                                 CategoryAuditScreen(
                                     categoryId = screen.categoryId,
-                                    auditRepository = auditRepository,
-                                    categoryRepository = categoryRepository,
+                                    auditRepository = services.audit.auditRepository,
+                                    categoryRepository = services.accounts.categoryRepository,
                                     onBack = { navigationHistory.navigateBack() },
                                 )
                             }
@@ -593,7 +571,7 @@ fun MoneyManagerApp(
                                     currentlyViewedCurrencyId = null
                                 }
                                 MonzoAuthScreen(
-                                    apiSessionRepository = apiSessionRepository,
+                                    apiSessionRepository = services.imports.apiSessionRepository,
                                     onCredentialSaved = {
                                         navigationHistory.navigateBack()
                                     },
@@ -606,7 +584,7 @@ fun MoneyManagerApp(
                                     currentlyViewedCurrencyId = null
                                 }
                                 ApiSessionTrafficScreen(
-                                    apiSessionRepository = apiSessionRepository,
+                                    apiSessionRepository = services.imports.apiSessionRepository,
                                     sessionId = screen.sessionId,
                                     highlightRequestId = screen.highlightRequestId,
                                     highlightJsonPath = screen.highlightJsonPath,
@@ -626,23 +604,23 @@ fun MoneyManagerApp(
 
                 if (defaultCurrencyLoaded && defaultCurrencyId == null) {
                     DefaultCurrencyInitDialog(
-                        currencyRepository = currencyRepository,
-                        settingsRepository = settingsRepository,
+                        currencyRepository = services.accounts.currencyRepository,
+                        settingsRepository = services.settings.settingsRepository,
                     )
                 }
 
                 if (showTransactionDialog) {
                     TransactionEditDialog(
-                        transactionRepository = transactionRepository,
-                        transferSourceRepository = transferSourceRepository,
-                        entitySource = entitySource,
-                        accountRepository = accountRepository,
-                        categoryRepository = categoryRepository,
-                        currencyRepository = currencyRepository,
-                        attributeTypeRepository = attributeTypeRepository,
-                        personRepository = personRepository,
-                        personAccountOwnershipRepository = personAccountOwnershipRepository,
-                        maintenance = maintenance,
+                        transactionRepository = services.transactions.transactionRepository,
+                        transferSourceRepository = services.transactions.transferSourceRepository,
+                        entitySource = services.transactions.entitySource,
+                        accountRepository = services.accounts.accountRepository,
+                        categoryRepository = services.accounts.categoryRepository,
+                        currencyRepository = services.accounts.currencyRepository,
+                        attributeTypeRepository = services.transactions.attributeTypeRepository,
+                        personRepository = services.people.personRepository,
+                        personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
+                        maintenance = services.imports.maintenance,
                         preSelectedSourceAccountId = preSelectedAccountId,
                         preSelectedCurrencyId = preSelectedCurrencyId,
                         onDismiss = {

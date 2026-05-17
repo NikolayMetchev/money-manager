@@ -6,14 +6,11 @@ import com.moneymanager.database.sql.SelectAuditHistoryForPerson
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.ApiSourceDetails
-import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.EntitySource
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.PersonAuditEntry
-import com.moneymanager.domain.model.SourceType
 import tech.mappie.api.ObjectMappie
-import kotlin.time.Instant
 
 object PersonAuditEntryMapper :
     ObjectMappie<SelectAuditHistoryForPerson, PersonAuditEntry>(),
@@ -27,26 +24,14 @@ object PersonAuditEntryMapper :
 }
 
 private fun SelectAuditHistoryForPerson.toEntitySource(): EntitySource? {
-    val sourceId = source_id ?: return null
-    source_type_id ?: return null
-    val sourceTypeName = source_type_name ?: return null
-    val deviceId = source_device_id ?: return null
-    val createdAt = source_created_at ?: return null
-
     val deviceInfo =
-        when (source_platform_name) {
-            "JVM" ->
-                DeviceInfo.Jvm(
-                    machineName = source_machine_name ?: "Unknown",
-                    osName = source_os_name ?: "Unknown",
-                )
-            "Android" ->
-                DeviceInfo.Android(
-                    deviceMake = source_device_make ?: "Unknown",
-                    deviceModel = source_device_model ?: "Unknown",
-                )
-            else -> null
-        }
+        auditDeviceInfo(
+            platformName = source_platform_name,
+            machineName = source_machine_name,
+            osName = source_os_name,
+            deviceMake = source_device_make,
+            deviceModel = source_device_model,
+        )
 
     val apiSource =
         if (source_api_session_id != null && source_api_request_id != null && source_api_json_path != null) {
@@ -59,15 +44,16 @@ private fun SelectAuditHistoryForPerson.toEntitySource(): EntitySource? {
             null
         }
 
-    return EntitySource(
-        id = sourceId,
+    return auditEntitySource(
+        sourceId = source_id,
+        sourceTypeId = source_type_id,
+        sourceTypeName = source_type_name,
+        deviceId = source_device_id,
+        createdAt = source_created_at,
         entityType = EntityType.PERSON,
         entityId = person_id,
         revisionId = revision_id,
-        sourceType = SourceType.fromName(sourceTypeName),
-        deviceId = deviceId,
         deviceInfo = deviceInfo,
-        createdAt = Instant.fromEpochMilliseconds(createdAt),
         apiSource = apiSource,
     )
 }

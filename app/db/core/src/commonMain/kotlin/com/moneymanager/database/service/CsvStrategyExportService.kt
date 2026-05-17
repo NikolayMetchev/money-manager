@@ -109,7 +109,14 @@ private data class StrategyReferenceData(
     val accounts: List<Account>,
     val currencies: List<Currency>,
     val categories: List<Category>,
-)
+) {
+    val accountsById = accounts.associateBy { it.id }
+    val currenciesById = currencies.associateBy { it.id }
+    val categoriesById = categories.associateBy { it.id }
+    val accountsByName = accounts.associateBy { it.name }
+    val currenciesByCode = currencies.associateBy { it.code }
+    val categoriesByName = categories.associateBy { it.name }
+}
 
 /**
  * Service for converting between domain models and portable export format.
@@ -130,24 +137,20 @@ class CsvStrategyExportService(
     ): CsvStrategyExport {
         val referenceData = loadReferenceData()
 
-        val accountsById = referenceData.accounts.associateBy { it.id }
-        val currenciesById = referenceData.currencies.associateBy { it.id }
-        val categoriesById = referenceData.categories.associateBy { it.id }
-
         return CsvStrategyExport(
             version = appVersion.value,
             name = strategy.name,
             identificationColumns = strategy.identificationColumns,
             fieldMappings =
                 strategy.fieldMappings.mapValues { (_, mapping) ->
-                    mapping.toExport(accountsById, currenciesById, categoriesById)
+                    mapping.toExport(referenceData.accountsById, referenceData.currenciesById, referenceData.categoriesById)
                 },
             attributeMappings = strategy.attributeMappings,
             accountMappings =
                 accountMappings
                     ?.map { mapping ->
                         val account =
-                            accountsById[mapping.accountId]
+                            referenceData.accountsById[mapping.accountId]
                                 ?: error("Missing account for id ${mapping.accountId.id} in CsvAccountMapping")
                         CsvAccountMappingExport(
                             columnName = mapping.columnName,
@@ -165,16 +168,12 @@ class CsvStrategyExportService(
     suspend fun parseExport(export: CsvStrategyExport): ImportParseResult {
         val referenceData = loadReferenceData()
 
-        val accountsByName = referenceData.accounts.associateBy { it.name }
-        val currenciesByCode = referenceData.currencies.associateBy { it.code }
-        val categoriesByName = referenceData.categories.associateBy { it.name }
-
         val unresolvedReferences = mutableListOf<UnresolvedReference>()
 
         for ((fieldType, mappingExport) in export.fieldMappings) {
             when (mappingExport) {
                 is HardCodedAccountExport -> {
-                    if (accountsByName[mappingExport.accountName] == null) {
+                    if (referenceData.accountsByName[mappingExport.accountName] == null) {
                         unresolvedReferences.add(
                             UnresolvedReference(
                                 type = ReferenceType.ACCOUNT,
@@ -186,7 +185,7 @@ class CsvStrategyExportService(
                 }
                 is AccountLookupExport -> {
                     if (mappingExport.defaultCategoryName != Category.UNCATEGORIZED_NAME &&
-                        categoriesByName[mappingExport.defaultCategoryName] == null
+                        referenceData.categoriesByName[mappingExport.defaultCategoryName] == null
                     ) {
                         unresolvedReferences.add(
                             UnresolvedReference(
@@ -199,7 +198,7 @@ class CsvStrategyExportService(
                 }
                 is RegexAccountExport -> {
                     if (mappingExport.defaultCategoryName != Category.UNCATEGORIZED_NAME &&
-                        categoriesByName[mappingExport.defaultCategoryName] == null
+                        referenceData.categoriesByName[mappingExport.defaultCategoryName] == null
                     ) {
                         unresolvedReferences.add(
                             UnresolvedReference(
@@ -211,7 +210,7 @@ class CsvStrategyExportService(
                     }
                 }
                 is HardCodedCurrencyExport -> {
-                    if (currenciesByCode[mappingExport.currencyCode] == null) {
+                    if (referenceData.currenciesByCode[mappingExport.currencyCode] == null) {
                         unresolvedReferences.add(
                             UnresolvedReference(
                                 type = ReferenceType.CURRENCY,
@@ -233,7 +232,7 @@ class CsvStrategyExportService(
         }
 
         for (mapping in export.accountMappings) {
-            if (accountsByName[mapping.accountName] == null) {
+            if (referenceData.accountsByName[mapping.accountName] == null) {
                 unresolvedReferences.add(
                     UnresolvedReference(
                         type = ReferenceType.ACCOUNT,

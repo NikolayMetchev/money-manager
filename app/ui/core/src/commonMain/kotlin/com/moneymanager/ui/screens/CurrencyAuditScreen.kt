@@ -118,24 +118,9 @@ private fun computeCurrencyAuditDiffs(
                     auditTimestamp = entry.auditTimestamp,
                     auditType = entry.auditType,
                     revisionId = entry.revisionId,
-                    code =
-                        if (entry.code != newCode) {
-                            FieldChange.Changed(entry.code, newCode)
-                        } else {
-                            FieldChange.Unchanged(entry.code)
-                        },
-                    name =
-                        if (entry.name != newName) {
-                            FieldChange.Changed(entry.name, newName)
-                        } else {
-                            FieldChange.Unchanged(entry.name)
-                        },
-                    scaleFactor =
-                        if (entry.scaleFactor != newScaleFactor) {
-                            FieldChange.Changed(entry.scaleFactor, newScaleFactor)
-                        } else {
-                            FieldChange.Unchanged(entry.scaleFactor)
-                        },
+                    code = changedOrUnchanged(entry.code, newCode),
+                    name = changedOrUnchanged(entry.name, newName),
+                    scaleFactor = changedOrUnchanged(entry.scaleFactor, newScaleFactor),
                     source = entry.source,
                 )
             }

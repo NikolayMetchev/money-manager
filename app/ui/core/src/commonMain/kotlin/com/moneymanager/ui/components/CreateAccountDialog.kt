@@ -93,16 +93,9 @@ fun CreateAccountDialog(
                         .padding(vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Account Name") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    enabled = !isSaving,
-                )
-
-                AccountCategorySelector(
+                AccountBasicsFields(
+                    name = name,
+                    onNameChange = { name = it },
                     categories = categories,
                     selectedCategoryId = selectedCategoryId,
                     selectedCategoryName = selectedCategoryName,
