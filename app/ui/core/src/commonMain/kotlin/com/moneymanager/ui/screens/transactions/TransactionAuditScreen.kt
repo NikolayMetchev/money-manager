@@ -239,9 +239,8 @@ private fun UpdateDiffContent(
                     labelWidth = LABEL_WIDTH,
                 )
             }
-            val significantAttrChanges = diff.attributeChanges.filter { it !is AttributeChange.Unchanged }
-            if (significantAttrChanges.isNotEmpty()) {
-                AttributeChangesSection(significantAttrChanges)
+            if (diff.attributeChanges.isNotEmpty()) {
+                AttributeChangesSection(diff.attributeChanges)
             }
         }
         SourceInfoSection(
@@ -306,7 +305,6 @@ private fun AttributesSection(
                     is AttributeChange.Removed -> change.value
                     is AttributeChange.Changed -> change.newValue
                     is AttributeChange.ModifiedFrom -> change.oldValue
-                    is AttributeChange.Unchanged -> change.value
                 }
             Row(
                 modifier = Modifier.padding(start = 8.dp),
@@ -431,9 +429,6 @@ private fun AttributeChangesSection(attributeChanges: List<AttributeChange>) {
                         )
                     }
                 }
-                is AttributeChange.Unchanged -> {
-                    // Don't show unchanged attributes in the changes section
-                }
             }
         }
     }
@@ -507,15 +502,7 @@ private fun SourceInfoSection(
                 } else {
                     FieldValueRow("Origin", "CSV Import$thisDeviceSuffix", labelWidth = LABEL_WIDTH)
                 }
-                when (deviceInfo) {
-                    is DeviceInfo.Jvm -> {
-                        FieldValueRow("Machine", deviceInfo.machineName, labelWidth = LABEL_WIDTH)
-                        FieldValueRow("OS", deviceInfo.osName, labelWidth = LABEL_WIDTH)
-                    }
-                    is DeviceInfo.Android -> {
-                        FieldValueRow("Device", "${deviceInfo.deviceMake} ${deviceInfo.deviceModel}", labelWidth = LABEL_WIDTH)
-                    }
-                }
+                DeviceInfoFields(deviceInfo)
             }
             SourceType.SAMPLE_GENERATOR -> {
                 val deviceInfo = source.deviceInfo
@@ -559,17 +546,23 @@ private fun SourceInfoSection(
                         onApiSourceClick = onApiSourceClick,
                     )
                 }
-                when (deviceInfo) {
-                    is DeviceInfo.Jvm -> {
-                        FieldValueRow("Machine", deviceInfo.machineName, labelWidth = LABEL_WIDTH)
-                        FieldValueRow("OS", deviceInfo.osName, labelWidth = LABEL_WIDTH)
-                    }
-                    is DeviceInfo.Android -> {
-                        FieldValueRow("Device", "${deviceInfo.deviceMake} ${deviceInfo.deviceModel}", labelWidth = LABEL_WIDTH)
-                    }
-                }
+                DeviceInfoFields(deviceInfo)
             }
         }
+    }
+}
+
+@Composable
+private fun DeviceInfoFields(deviceInfo: DeviceInfo?) {
+    when (deviceInfo) {
+        is DeviceInfo.Jvm -> {
+            FieldValueRow("Machine", deviceInfo.machineName, labelWidth = LABEL_WIDTH)
+            FieldValueRow("OS", deviceInfo.osName, labelWidth = LABEL_WIDTH)
+        }
+        is DeviceInfo.Android -> {
+            FieldValueRow("Device", "${deviceInfo.deviceMake} ${deviceInfo.deviceModel}", labelWidth = LABEL_WIDTH)
+        }
+        null -> Unit
     }
 }
 

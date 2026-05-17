@@ -152,6 +152,7 @@ data class AmountParsingMapping(
     val flipAccountsOnPositive: Boolean = false,
 ) : FieldMapping {
     init {
+        require(id.toString().isNotBlank()) { "id is required" }
         when (mode) {
             AmountMode.SINGLE_COLUMN ->
                 requireNotNull(amountColumnName) {

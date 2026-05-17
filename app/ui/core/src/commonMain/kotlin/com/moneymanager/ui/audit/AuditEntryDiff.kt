@@ -68,10 +68,4 @@ sealed class AttributeChange {
         override val attributeTypeName: String,
         val oldValue: String,
     ) : AttributeChange()
-
-    /** Attribute value stayed the same. */
-    data class Unchanged(
-        override val attributeTypeName: String,
-        val value: String,
-    ) : AttributeChange()
 }
