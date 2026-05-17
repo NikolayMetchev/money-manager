@@ -193,7 +193,7 @@ suspend fun generateSampleData(
         ),
     )
 
-    val accountNames = generateAccountNames(100)
+    val accountNames = generateAccountNames()
 
     // Step 4: Determine transaction counts per account (variable distribution)
     val transactionCounts = mutableListOf<Int>()
@@ -440,7 +440,8 @@ suspend fun generateSampleData(
     )
 }
 
-private fun generateAccountNames(count: Int): List<String> {
+private fun generateAccountNames(): List<String> {
+    val count = 100
     val prefixes =
         listOf(
             "Personal",

@@ -175,8 +175,6 @@ fun SourceInfoSection(
                     val apiSource = source.apiSource
                     if (apiSource != null && onApiSourceClick != null) {
                         ApiSourceLinkRow(
-                            label = "Origin",
-                            value = "API Import",
                             sessionId = apiSource.sessionId,
                             requestId = apiSource.requestId,
                             jsonPath = apiSource.jsonPath.value,
@@ -204,8 +202,6 @@ fun SourceInfoSection(
 
 @Composable
 private fun ApiSourceLinkRow(
-    label: String,
-    value: String,
     sessionId: ApiSessionId,
     requestId: ApiRequestId,
     jsonPath: String,
@@ -218,7 +214,7 @@ private fun ApiSourceLinkRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = "$label:",
+            text = "Origin:",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.width(labelWidth),
@@ -227,7 +223,7 @@ private fun ApiSourceLinkRow(
             onClick = { onApiSourceClick(sessionId, requestId, jsonPath) },
             contentPadding = PaddingValues(0.dp),
         ) {
-            Text(value)
+            Text("API Import")
         }
     }
 }

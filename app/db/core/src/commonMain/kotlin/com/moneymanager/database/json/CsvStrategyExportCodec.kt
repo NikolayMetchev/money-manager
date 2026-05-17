@@ -1,7 +1,6 @@
 package com.moneymanager.database.json
 
 import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExport
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 /**

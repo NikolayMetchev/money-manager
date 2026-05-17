@@ -12,6 +12,7 @@ enum class Platform {
     ;
 
     companion object {
+        @Suppress("unused")
         fun fromName(name: String): Platform = valueOf(name.uppercase())
     }
 }

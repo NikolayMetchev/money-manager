@@ -4,6 +4,6 @@ import androidx.compose.runtime.Composable
 
 @Composable
 actual fun PlatformBackHandler(
-    enabled: Boolean,
-    onBack: () -> Unit,
+    @Suppress("unused") enabled: Boolean,
+    @Suppress("unused") onBack: () -> Unit,
 ) = Unit

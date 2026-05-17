@@ -18,6 +18,7 @@ enum class EntityType(
     ;
 
     companion object {
+        @Suppress("unused")
         fun fromId(id: Long): EntityType = entries.first { it.id == id }
     }
 }

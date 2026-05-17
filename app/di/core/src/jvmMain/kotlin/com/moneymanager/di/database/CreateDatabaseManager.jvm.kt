@@ -5,4 +5,4 @@ import com.moneymanager.database.JvmDatabaseManager
 import com.moneymanager.di.AppComponentParams
 
 @Suppress("ktlint:standard:function-naming")
-actual fun createDatabaseManager(params: AppComponentParams): DatabaseManager = JvmDatabaseManager()
+actual fun createDatabaseManager(@Suppress("unused") params: AppComponentParams): DatabaseManager = JvmDatabaseManager()
