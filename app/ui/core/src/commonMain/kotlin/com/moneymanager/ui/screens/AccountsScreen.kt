@@ -33,6 +33,7 @@ import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.ui.components.CreateAccountDialog
 import com.moneymanager.ui.components.EditAccountDialog
+import com.moneymanager.ui.components.LoadingTextButton
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.util.formatAmount
@@ -535,46 +536,15 @@ fun CreateCategoryDialog(
                     enabled = !isSaving,
                 )
 
-                ExposedDropdownMenuBox(
+                ParentCategorySelector(
+                    categories = categories,
+                    selectedParentId = selectedParentId,
+                    onParentSelected = { selectedParentId = it },
                     expanded = expanded,
-                    onExpandedChange = { expanded = !expanded && !isSaving },
-                ) {
-                    OutlinedTextField(
-                        value =
-                            if (selectedParentId == null) {
-                                "None (Top Level)"
-                            } else {
-                                categories.find { it.id == selectedParentId }?.name ?: "None (Top Level)"
-                            },
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Parent Category") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                        modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
-                        enabled = !isSaving,
-                    )
-                    ExposedDropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { expanded = false },
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("None (Top Level)") },
-                            onClick = {
-                                selectedParentId = null
-                                expanded = false
-                            },
-                        )
-                        categories.forEach { category ->
-                            DropdownMenuItem(
-                                text = { Text(category.name) },
-                                onClick = {
-                                    selectedParentId = category.id
-                                    expanded = false
-                                },
-                            )
-                        }
-                    }
-                }
+                    onExpandedChange = { expanded = it },
+                    enabled = !isSaving,
+                    additionalExcludedIds = emptySet(),
+                )
 
                 errorMessage?.let { error ->
                     Text(
@@ -586,41 +556,30 @@ fun CreateCategoryDialog(
             }
         },
         confirmButton = {
-            TextButton(
+            LoadingTextButton(
                 onClick = {
-                    if (name.isBlank()) {
-                        errorMessage = "Category name is required"
-                    } else {
-                        isSaving = true
-                        errorMessage = null
-                        scope.launch {
-                            try {
-                                val newCategory =
-                                    Category(
-                                        name = name.trim(),
-                                        parentId = selectedParentId,
-                                    )
-                                val categoryId = categoryRepository.createCategory(newCategory)
-                                onCategoryCreated(categoryId, name.trim())
-                            } catch (expected: Exception) {
-                                logger.error(expected) { "Failed to create category: ${expected.message}" }
-                                errorMessage = "Failed to create category: ${expected.message}"
-                                isSaving = false
-                            }
-                        }
+                    saveCategoryWithValidation(
+                        scope = scope,
+                        name = name,
+                        setSaving = { isSaving = it },
+                        setError = { errorMessage = it },
+                        onSuccess = onDismiss,
+                        failurePrefix = "Failed to create category",
+                    ) { trimmedName ->
+                        val categoryId =
+                            categoryRepository.createCategory(
+                                Category(
+                                    name = trimmedName,
+                                    parentId = selectedParentId,
+                                ),
+                            )
+                        onCategoryCreated(categoryId, trimmedName)
                     }
                 },
                 enabled = !isSaving,
-            ) {
-                if (isSaving) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp,
-                    )
-                } else {
-                    Text("Create")
-                }
-            }
+                loading = isSaving,
+                label = "Create",
+            )
         },
         dismissButton = {
             TextButton(

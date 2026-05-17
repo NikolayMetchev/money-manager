@@ -819,7 +819,7 @@ fun EditCategoryDialog(
     }
 }
 
-private fun saveCategoryWithValidation(
+internal fun saveCategoryWithValidation(
     scope: CoroutineScope,
     name: String,
     setSaving: (Boolean) -> Unit,
@@ -848,7 +848,7 @@ private fun saveCategoryWithValidation(
 }
 
 @Composable
-private fun ParentCategorySelector(
+internal fun ParentCategorySelector(
     categories: List<Category>,
     selectedParentId: Long?,
     onParentSelected: (Long?) -> Unit,
