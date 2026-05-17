@@ -293,7 +293,7 @@ fun CategoriesScreen(
                                 for ((id, positions) in itemPositions) {
                                     if (id != draggedCategoryId && id !in draggedDescendants) {
                                         val (top, bottom) = positions
-                                        if (currentY >= top && currentY <= bottom) {
+                                        if (currentY in top..bottom) {
                                             newDropTarget = id
                                             break
                                         }
@@ -699,7 +699,6 @@ fun EditCategoryDialog(
                         setSaving = { isSaving = it },
                         setError = { errorMessage = it },
                         onSuccess = onDismiss,
-                        failurePrefix = "Failed to update category",
                     ) { trimmedName ->
                         categoryRepository.updateCategory(
                             category.copy(
@@ -740,7 +739,6 @@ private fun saveCategoryWithValidation(
     setSaving: (Boolean) -> Unit,
     setError: (String?) -> Unit,
     onSuccess: () -> Unit,
-    failurePrefix: String,
     saveAction: suspend (trimmedName: String) -> Unit,
 ) {
     if (name.isBlank()) {
@@ -755,15 +753,15 @@ private fun saveCategoryWithValidation(
             saveAction(name.trim())
             onSuccess()
         } catch (expected: Exception) {
-            logger.error(expected) { "$failurePrefix: ${expected.message}" }
-            setError("$failurePrefix: ${expected.message}")
+            logger.error(expected) { "Failed to update category: ${expected.message}" }
+            setError("Failed to update category: ${expected.message}")
             setSaving(false)
         }
     }
 }
 
 @Composable
-private fun ParentCategorySelector(
+internal fun ParentCategorySelector(
     categories: List<Category>,
     selectedParentId: Long?,
     onParentSelected: (Long?) -> Unit,

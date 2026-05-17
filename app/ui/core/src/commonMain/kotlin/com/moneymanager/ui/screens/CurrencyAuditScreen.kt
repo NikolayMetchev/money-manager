@@ -91,36 +91,19 @@ private fun computeCurrencyAuditDiffs(
                     source = entry.source,
                 )
             AuditType.UPDATE -> {
-                val newCode =
-                    resolveUpdateValue(
-                        index = index,
-                        currentValue = currentCurrency?.code,
-                        previousValue = entries.getOrNull(index - 1)?.code,
-                        entryValue = entry.code,
-                    )
-                val newName =
-                    resolveUpdateValue(
-                        index = index,
-                        currentValue = currentCurrency?.name,
-                        previousValue = entries.getOrNull(index - 1)?.name,
-                        entryValue = entry.name,
-                    )
-                val newScaleFactor =
-                    resolveUpdateValue(
-                        index = index,
-                        currentValue = currentCurrency?.scaleFactor,
-                        previousValue = entries.getOrNull(index - 1)?.scaleFactor,
-                        entryValue = entry.scaleFactor,
-                    )
+                val previousEntry = entries.getOrNull(index - 1)
 
                 CurrencyAuditDiff(
                     id = entry.id,
                     auditTimestamp = entry.auditTimestamp,
                     auditType = entry.auditType,
                     revisionId = entry.revisionId,
-                    code = changedOrUnchanged(entry.code, newCode),
-                    name = changedOrUnchanged(entry.name, newName),
-                    scaleFactor = changedOrUnchanged(entry.scaleFactor, newScaleFactor),
+                    code = resolveUpdateChange(index, currentCurrency?.code, previousEntry, entry.code) { it.code },
+                    name = resolveUpdateChange(index, currentCurrency?.name, previousEntry, entry.name) { it.name },
+                    scaleFactor =
+                        resolveUpdateChange(index, currentCurrency?.scaleFactor, previousEntry, entry.scaleFactor) {
+                            it.scaleFactor
+                        },
                     source = entry.source,
                 )
             }

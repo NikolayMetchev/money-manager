@@ -23,3 +23,21 @@ internal fun <T> changedOrUnchanged(
     } else {
         FieldChange.Unchanged(oldValue)
     }
+
+internal inline fun <T, E> resolveUpdateChange(
+    index: Int,
+    currentValue: T?,
+    previousEntry: E?,
+    entryValue: T,
+    previousValue: (E) -> T,
+): FieldChange<T> =
+    changedOrUnchanged(
+        oldValue = entryValue,
+        newValue =
+            resolveUpdateValue(
+                index = index,
+                currentValue = currentValue,
+                previousValue = previousEntry?.let(previousValue),
+                entryValue = entryValue,
+            ),
+    )

@@ -320,7 +320,7 @@ fun MoneyManagerApp(
                                     accountId = currentlyViewedAccountId ?: screen.accountId,
                                     transactionRepository = services.transactions.transactionRepository,
                                     transferSourceRepository = services.transactions.transferSourceRepository,
-                                    EntitySource = services.transactions.entitySource,
+                                    entitySource = services.transactions.entitySource,
                                     accountRepository = services.accounts.accountRepository,
                                     accountAttributeRepository = services.accounts.accountAttributeRepository,
                                     categoryRepository = services.accounts.categoryRepository,
@@ -328,7 +328,7 @@ fun MoneyManagerApp(
                                     attributeTypeRepository = services.transactions.attributeTypeRepository,
                                     personRepository = services.people.personRepository,
                                     personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
-                                    Maintenance = services.imports.maintenance,
+                                    maintenance = services.imports.maintenance,
                                     onAccountIdChange = { accountId ->
                                         currentlyViewedAccountId = accountId
                                     },
@@ -421,9 +421,9 @@ fun MoneyManagerApp(
                                     attributeTypeRepository = services.transactions.attributeTypeRepository,
                                     personRepository = services.people.personRepository,
                                     personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
-                                    Maintenance = services.imports.maintenance,
+                                    maintenance = services.imports.maintenance,
                                     transferSourceRepository = services.transactions.transferSourceRepository,
-                                    EntitySource = services.transactions.entitySource,
+                                    entitySource = services.transactions.entitySource,
                                     onBack = { navigationHistory.navigateBack() },
                                     onDeleted = { navigationHistory.navigateTo(Screen.Imports(ImportTab.CSV)) },
                                     onCsvSourceClick = { importId, rowIndex ->

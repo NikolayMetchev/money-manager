@@ -108,36 +108,25 @@ private fun computePersonAuditDiffs(
                     source = entry.source,
                 )
             AuditType.UPDATE -> {
-                val newFirstName =
-                    resolveUpdateValue(
-                        index = index,
-                        currentValue = currentPerson?.firstName,
-                        previousValue = entries.getOrNull(index - 1)?.firstName,
-                        entryValue = entry.firstName,
-                    )
-                val newMiddleName =
-                    resolveUpdateValue(
-                        index = index,
-                        currentValue = currentPerson?.middleName,
-                        previousValue = entries.getOrNull(index - 1)?.middleName,
-                        entryValue = entry.middleName,
-                    )
-                val newLastName =
-                    resolveUpdateValue(
-                        index = index,
-                        currentValue = currentPerson?.lastName,
-                        previousValue = entries.getOrNull(index - 1)?.lastName,
-                        entryValue = entry.lastName,
-                    )
+                val previousEntry = entries.getOrNull(index - 1)
 
                 PersonAuditDiff(
                     id = entry.id,
                     auditTimestamp = entry.auditTimestamp,
                     auditType = entry.auditType,
                     revisionId = entry.revisionId,
-                    firstName = changedOrUnchanged(entry.firstName, newFirstName),
-                    middleName = changedOrUnchanged(entry.middleName, newMiddleName),
-                    lastName = changedOrUnchanged(entry.lastName, newLastName),
+                    firstName =
+                        resolveUpdateChange(index, currentPerson?.firstName, previousEntry, entry.firstName) {
+                            it.firstName
+                        },
+                    middleName =
+                        resolveUpdateChange(index, currentPerson?.middleName, previousEntry, entry.middleName) {
+                            it.middleName
+                        },
+                    lastName =
+                        resolveUpdateChange(index, currentPerson?.lastName, previousEntry, entry.lastName) {
+                            it.lastName
+                        },
                     attributeChanges = revisionAttributes,
                     source = entry.source,
                 )

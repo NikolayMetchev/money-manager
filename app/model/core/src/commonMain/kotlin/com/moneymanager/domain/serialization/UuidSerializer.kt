@@ -22,7 +22,7 @@ object UuidSerializer : KSerializer<Uuid> {
     override fun deserialize(decoder: Decoder): Uuid = Uuid.parse(decoder.decodeString())
 }
 
-val UuidSerializersModule =
+val UuidSerializersModule: SerializersModule =
     SerializersModule {
         contextual(Uuid::class, UuidSerializer)
     }

@@ -66,14 +66,7 @@ fun EditAccountDialog(
     entitySource: EntitySource,
     onDismiss: () -> Unit,
 ) {
-    var name by remember { mutableStateOf(account.name) }
-    var selectedCategoryId by remember { mutableStateOf(account.categoryId) }
-    var selectedCategoryName by remember { mutableStateOf<String?>(null) }
-    var expanded by remember { mutableStateOf(false) }
-    var showCreateCategoryDialog by remember { mutableStateOf(false) }
-    var showCreatePersonDialog by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    var isSaving by remember { mutableStateOf(false) }
+    val accountState = rememberAccountDialogState(initialName = account.name, initialCategoryId = account.categoryId)
 
     val categories by categoryRepository
         .getAllCategories()
@@ -120,7 +113,7 @@ fun EditAccountDialog(
     val scope = rememberSchemaAwareCoroutineScope()
 
     AlertDialog(
-        onDismissRequest = { if (!isSaving) onDismiss() },
+        onDismissRequest = { if (!accountState.isSaving) onDismiss() },
         title = { Text("Edit Account") },
         text = {
             Column(
@@ -132,19 +125,16 @@ fun EditAccountDialog(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 AccountBasicsFields(
-                    name = name,
-                    onNameChange = { name = it },
+                    name = accountState.name,
+                    onNameChange = { accountState.name = it },
                     categories = categories,
-                    selectedCategoryId = selectedCategoryId,
-                    selectedCategoryName = selectedCategoryName,
-                    expanded = expanded,
-                    isSaving = isSaving,
-                    onExpandedChange = { expanded = it },
-                    onCategorySelected = { categoryId ->
-                        selectedCategoryId = categoryId
-                        selectedCategoryName = null
-                    },
-                    onCreateCategoryClick = { showCreateCategoryDialog = true },
+                    selectedCategoryId = accountState.selectedCategoryId,
+                    selectedCategoryName = accountState.selectedCategoryName,
+                    expanded = accountState.categoryExpanded,
+                    isSaving = accountState.isSaving,
+                    onExpandedChange = { accountState.categoryExpanded = it },
+                    onCategorySelected = accountState::selectCategory,
+                    onCreateCategoryClick = { accountState.showCreateCategoryDialog = true },
                 )
 
                 Column(modifier = Modifier.fillMaxWidth()) {
@@ -175,7 +165,7 @@ fun EditAccountDialog(
                                                 selectedOwnerIds - person.id.id
                                             }
                                     },
-                                    enabled = !isSaving,
+                                    enabled = !accountState.isSaving,
                                 )
                                 Text(
                                     text = person.fullName,
@@ -185,8 +175,8 @@ fun EditAccountDialog(
                         }
                     }
                     TextButton(
-                        onClick = { showCreatePersonDialog = true },
-                        enabled = !isSaving,
+                        onClick = { accountState.showCreatePersonDialog = true },
+                        enabled = !accountState.isSaving,
                     ) {
                         Text("+ Add New Person")
                     }
@@ -195,7 +185,7 @@ fun EditAccountDialog(
                 EditableAttributesSection(
                     editableAttributes = editableAttributes,
                     existingAttributeTypes = existingAttributeTypes,
-                    isSaving = isSaving,
+                    isSaving = accountState.isSaving,
                     onAttributesChange = { editableAttributes = it },
                     onAddAttribute = {
                         editableAttributes = editableAttributes + (nextTempId to Pair("", ""))
@@ -203,26 +193,29 @@ fun EditAccountDialog(
                     },
                 )
 
-                errorMessage?.let { error -> ErrorMessageText(error) }
+                accountState.errorMessage?.let { error -> ErrorMessageText(error) }
             }
         },
         confirmButton = {
             TextButton(
                 onClick = {
-                    if (name.isBlank()) {
-                        errorMessage = "Account name is required"
+                    if (accountState.name.isBlank()) {
+                        accountState.errorMessage = "Account name is required"
                     } else {
-                        isSaving = true
-                        errorMessage = null
+                        accountState.isSaving = true
+                        accountState.errorMessage = null
                         scope.launch {
                             try {
                                 // Determine if account fields actually changed
                                 val accountFieldsChanged =
-                                    name.trim() != account.name ||
-                                        selectedCategoryId != account.categoryId
+                                    accountState.name.trim() != account.name ||
+                                        accountState.selectedCategoryId != account.categoryId
                                 val updatedAccount =
                                     if (accountFieldsChanged) {
-                                        account.copy(name = name.trim(), categoryId = selectedCategoryId)
+                                        account.copy(
+                                            name = accountState.name.trim(),
+                                            categoryId = accountState.selectedCategoryId,
+                                        )
                                     } else {
                                         null
                                     }
@@ -291,15 +284,15 @@ fun EditAccountDialog(
                                 onDismiss()
                             } catch (expected: Exception) {
                                 logger.error(expected) { "Failed to update account: ${expected.message}" }
-                                errorMessage = "Failed to update account: ${expected.message}"
-                                isSaving = false
+                                accountState.errorMessage = "Failed to update account: ${expected.message}"
+                                accountState.isSaving = false
                             }
                         }
                     }
                 },
-                enabled = !isSaving,
+                enabled = !accountState.isSaving,
             ) {
-                if (isSaving) {
+                if (accountState.isSaving) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(16.dp),
                         strokeWidth = 2.dp,
@@ -312,32 +305,28 @@ fun EditAccountDialog(
         dismissButton = {
             TextButton(
                 onClick = onDismiss,
-                enabled = !isSaving,
+                enabled = !accountState.isSaving,
             ) {
                 Text("Cancel")
             }
         },
     )
 
-    if (showCreateCategoryDialog) {
+    if (accountState.showCreateCategoryDialog) {
         CreateCategoryDialog(
             categoryRepository = categoryRepository,
-            onCategoryCreated = { categoryId, categoryName ->
-                selectedCategoryId = categoryId
-                selectedCategoryName = categoryName
-                showCreateCategoryDialog = false
-            },
-            onDismiss = { showCreateCategoryDialog = false },
+            onCategoryCreated = accountState::selectCreatedCategory,
+            onDismiss = { accountState.showCreateCategoryDialog = false },
         )
     }
 
-    if (showCreatePersonDialog) {
+    if (accountState.showCreatePersonDialog) {
         EditPersonDialog(
             personToEdit = null,
             personRepository = personRepository,
             personAttributeRepository = personAttributeRepository,
             entitySource = entitySource,
-            onDismiss = { showCreatePersonDialog = false },
+            onDismiss = { accountState.showCreatePersonDialog = false },
         )
     }
 }

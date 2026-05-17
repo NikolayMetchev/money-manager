@@ -535,46 +535,15 @@ fun CreateCategoryDialog(
                     enabled = !isSaving,
                 )
 
-                ExposedDropdownMenuBox(
+                ParentCategorySelector(
+                    categories = categories,
+                    selectedParentId = selectedParentId,
+                    onParentSelected = { selectedParentId = it },
                     expanded = expanded,
-                    onExpandedChange = { expanded = !expanded && !isSaving },
-                ) {
-                    OutlinedTextField(
-                        value =
-                            if (selectedParentId == null) {
-                                "None (Top Level)"
-                            } else {
-                                categories.find { it.id == selectedParentId }?.name ?: "None (Top Level)"
-                            },
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Parent Category") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                        modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
-                        enabled = !isSaving,
-                    )
-                    ExposedDropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { expanded = false },
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("None (Top Level)") },
-                            onClick = {
-                                selectedParentId = null
-                                expanded = false
-                            },
-                        )
-                        categories.forEach { category ->
-                            DropdownMenuItem(
-                                text = { Text(category.name) },
-                                onClick = {
-                                    selectedParentId = category.id
-                                    expanded = false
-                                },
-                            )
-                        }
-                    }
-                }
+                    onExpandedChange = { expanded = it },
+                    enabled = !isSaving,
+                    additionalExcludedIds = emptySet(),
+                )
 
                 errorMessage?.let { error ->
                     Text(

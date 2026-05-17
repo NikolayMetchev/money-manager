@@ -114,7 +114,7 @@ fun NoVisibleChangesText() {
 }
 
 @Composable
-fun DeletedFinalValuesLabel(errorColor: androidx.compose.ui.graphics.Color) {
+fun DeletedFinalValuesLabel(errorColor: Color) {
     Text(
         text = "Deleted (final values):",
         style = MaterialTheme.typography.labelMedium,
@@ -148,8 +148,7 @@ fun SourceInfoSection(
         } else {
             when (source.sourceType) {
                 SourceType.MANUAL -> {
-                    val deviceInfo = source.deviceInfo
-                    when (deviceInfo) {
+                    when (val deviceInfo = source.deviceInfo) {
                         is DeviceInfo.Jvm -> {
                             FieldValueRow("Origin", "Manual (Desktop)", labelWidth = labelWidth)
                             DeviceInfoRows(deviceInfo, labelWidth)

@@ -163,40 +163,18 @@ private fun computeAccountAuditDiffs(
                     source = effectiveSource,
                 )
             AuditType.UPDATE -> {
-                val newName =
-                    if (index == 0 && currentAccount != null) {
-                        currentAccount.name
-                    } else if (index > 0) {
-                        entries[index - 1].name
-                    } else {
-                        entry.name
-                    }
-                val newCategoryName =
-                    if (index == 0 && currentAccount != null) {
-                        entries.getOrNull(index - 1)?.categoryName ?: entry.categoryName
-                    } else if (index > 0) {
-                        entries[index - 1].categoryName
-                    } else {
-                        entry.categoryName
-                    }
+                val previousEntry = entries.getOrNull(index - 1)
 
                 AccountAuditDiff(
                     id = entry.id,
                     auditTimestamp = entry.auditTimestamp,
                     auditType = entry.auditType,
                     revisionId = entry.revisionId,
-                    name =
-                        if (entry.name != newName) {
-                            FieldChange.Changed(entry.name, newName)
-                        } else {
-                            FieldChange.Unchanged(entry.name)
-                        },
+                    name = resolveUpdateChange(index, currentAccount?.name, previousEntry, entry.name) { it.name },
                     openingDate = FieldChange.Unchanged(entry.openingDate),
                     categoryName =
-                        if (entry.categoryName != newCategoryName) {
-                            FieldChange.Changed(entry.categoryName, newCategoryName)
-                        } else {
-                            FieldChange.Unchanged(entry.categoryName)
+                        resolveUpdateChange(index, null, previousEntry, entry.categoryName) {
+                            it.categoryName
                         },
                     ownersAdded = ownershipChanges.ownersAdded,
                     ownersRemoved = ownershipChanges.ownersRemoved,

@@ -1166,6 +1166,7 @@ internal fun buildPendingAccountMappings(
     }
 
     return preparation.validTransfers
+        .asSequence()
         .mapNotNull { it.discoveredMapping }
         .filter { discoveredMapping -> discoveredMapping.targetAccountName in accountSelections }
         .map { discoveredMapping ->
@@ -1178,6 +1179,7 @@ internal fun buildPendingAccountMappings(
                 accountId = selectedAccountId,
             )
         }.distinct()
+        .toList()
         .mapIndexed { index, mapping ->
             CsvAccountMapping(
                 id = -(index + 1).toLong(),
