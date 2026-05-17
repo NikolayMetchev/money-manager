@@ -205,13 +205,7 @@ fun CreateAccountDialog(
                     }
                 }
 
-                errorMessage?.let { error ->
-                    Text(
-                        text = error,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
+                errorMessage?.let { error -> ErrorMessageText(error) }
             }
         },
         confirmButton = {

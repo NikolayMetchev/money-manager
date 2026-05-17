@@ -96,6 +96,33 @@ fun FieldChangeRow(
 }
 
 @Composable
+fun AuditSectionLabel(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+@Composable
+fun NoVisibleChangesText() {
+    Text(
+        text = "No visible changes recorded",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+@Composable
+fun DeletedFinalValuesLabel(errorColor: androidx.compose.ui.graphics.Color) {
+    Text(
+        text = "Deleted (final values):",
+        style = MaterialTheme.typography.labelMedium,
+        color = errorColor.copy(alpha = 0.8f),
+    )
+}
+
+@Composable
 fun SourceInfoSection(
     source: EntitySource?,
     labelColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -125,12 +152,11 @@ fun SourceInfoSection(
                     when (deviceInfo) {
                         is DeviceInfo.Jvm -> {
                             FieldValueRow("Origin", "Manual (Desktop)", labelWidth = labelWidth)
-                            FieldValueRow("Machine", deviceInfo.machineName, labelWidth = labelWidth)
-                            FieldValueRow("OS", deviceInfo.osName, labelWidth = labelWidth)
+                            DeviceInfoRows(deviceInfo, labelWidth)
                         }
                         is DeviceInfo.Android -> {
                             FieldValueRow("Origin", "Manual (Android)", labelWidth = labelWidth)
-                            FieldValueRow("Device", "${deviceInfo.deviceMake} ${deviceInfo.deviceModel}", labelWidth = labelWidth)
+                            DeviceInfoRows(deviceInfo, labelWidth)
                         }
                         null -> {
                             FieldValueRow("Origin", "Manual", labelWidth = labelWidth)
@@ -140,27 +166,17 @@ fun SourceInfoSection(
                 SourceType.CSV_IMPORT -> {
                     val deviceInfo = source.deviceInfo
                     FieldValueRow("Origin", "CSV Import", labelWidth = labelWidth)
-                    when (deviceInfo) {
-                        is DeviceInfo.Jvm -> {
-                            FieldValueRow("Machine", deviceInfo.machineName, labelWidth = labelWidth)
-                            FieldValueRow("OS", deviceInfo.osName, labelWidth = labelWidth)
-                        }
-                        is DeviceInfo.Android -> {
-                            FieldValueRow("Device", "${deviceInfo.deviceMake} ${deviceInfo.deviceModel}", labelWidth = labelWidth)
-                        }
-                        null -> {}
-                    }
+                    DeviceInfoRows(deviceInfo, labelWidth)
                 }
                 SourceType.SAMPLE_GENERATOR -> {
                     when (val deviceInfo = source.deviceInfo) {
                         is DeviceInfo.Jvm -> {
                             FieldValueRow("Origin", "Sample Generator (Desktop)", labelWidth = labelWidth)
-                            FieldValueRow("Machine", deviceInfo.machineName, labelWidth = labelWidth)
-                            FieldValueRow("OS", deviceInfo.osName, labelWidth = labelWidth)
+                            DeviceInfoRows(deviceInfo, labelWidth)
                         }
                         is DeviceInfo.Android -> {
                             FieldValueRow("Origin", "Sample Generator (Android)", labelWidth = labelWidth)
-                            FieldValueRow("Device", "${deviceInfo.deviceMake} ${deviceInfo.deviceModel}", labelWidth = labelWidth)
+                            DeviceInfoRows(deviceInfo, labelWidth)
                         }
                         null -> {
                             FieldValueRow("Origin", "Sample Generator", labelWidth = labelWidth)
@@ -184,19 +200,27 @@ fun SourceInfoSection(
                     } else {
                         FieldValueRow("Origin", "API Import", labelWidth = labelWidth)
                     }
-                    when (deviceInfo) {
-                        is DeviceInfo.Jvm -> {
-                            FieldValueRow("Machine", deviceInfo.machineName, labelWidth = labelWidth)
-                            FieldValueRow("OS", deviceInfo.osName, labelWidth = labelWidth)
-                        }
-                        is DeviceInfo.Android -> {
-                            FieldValueRow("Device", "${deviceInfo.deviceMake} ${deviceInfo.deviceModel}", labelWidth = labelWidth)
-                        }
-                        null -> {}
-                    }
+                    DeviceInfoRows(deviceInfo, labelWidth)
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun DeviceInfoRows(
+    deviceInfo: DeviceInfo?,
+    labelWidth: Dp,
+) {
+    when (deviceInfo) {
+        is DeviceInfo.Jvm -> {
+            FieldValueRow("Machine", deviceInfo.machineName, labelWidth = labelWidth)
+            FieldValueRow("OS", deviceInfo.osName, labelWidth = labelWidth)
+        }
+        is DeviceInfo.Android -> {
+            FieldValueRow("Device", "${deviceInfo.deviceMake} ${deviceInfo.deviceModel}", labelWidth = labelWidth)
+        }
+        null -> {}
     }
 }
 

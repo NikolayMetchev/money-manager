@@ -66,53 +66,39 @@ class PersonRepositoryImpl(
         newAttributes: List<NewAttribute>,
     ): Long =
         withContext(Dispatchers.Default) {
-            val hasAttributeChanges =
-                deletedAttributeIds.isNotEmpty() ||
-                    updatedAttributes.isNotEmpty() ||
-                    newAttributes.isNotEmpty()
             val effectivePersonId = person?.id ?: personId
 
             queries.transactionWithResult {
-                if (person != null) {
-                    queries.update(
-                        first_name = person.firstName,
-                        middle_name = person.middleName,
-                        last_name = person.lastName,
-                        id = person.id.id,
-                    )
-                } else if (hasAttributeChanges) {
-                    queries.bumpRevisionOnly(effectivePersonId.id)
-                }
-
-                if (hasAttributeChanges) {
-                    applyAttributeChangesInCreationMode(
-                        database = database,
-                        deletedAttributeIds = deletedAttributeIds,
-                        updatedAttributes = updatedAttributes,
-                        newAttributes = newAttributes,
-                        selectCurrentTypeId = { id ->
-                            attributeQueries.selectById(id).executeAsOneOrNull()?.attribute_type_id
-                        },
-                        deleteById = { id -> attributeQueries.deleteById(id) },
-                        insertAttribute = { attr ->
-                            attributeQueries.insert(
-                                person_id = effectivePersonId.id,
-                                attribute_type_id = attr.typeId.id,
-                                attribute_value = attr.value,
-                            )
-                        },
-                        insertAttributeForUpdatedType = { attr ->
-                            attributeQueries.insert(
-                                person_id = effectivePersonId.id,
-                                attribute_type_id = attr.typeId.id,
-                                attribute_value = attr.value,
-                            )
-                        },
-                        updateValue = { value, id -> attributeQueries.updateValue(value, id) },
-                    )
-                }
-
-                queries.selectRevisionById(effectivePersonId.id).executeAsOne()
+                updateEntityWithAttributes(
+                    database = database,
+                    hasEntityChanges = person != null,
+                    deletedAttributeIds = deletedAttributeIds,
+                    updatedAttributes = updatedAttributes,
+                    newAttributes = newAttributes,
+                    updateEntity = {
+                        val personToUpdate = requireNotNull(person)
+                        queries.update(
+                            first_name = personToUpdate.firstName,
+                            middle_name = personToUpdate.middleName,
+                            last_name = personToUpdate.lastName,
+                            id = personToUpdate.id.id,
+                        )
+                    },
+                    bumpRevisionOnly = { queries.bumpRevisionOnly(effectivePersonId.id) },
+                    selectRevision = { queries.selectRevisionById(effectivePersonId.id).executeAsOne() },
+                    selectCurrentTypeId = { id ->
+                        attributeQueries.selectById(id).executeAsOneOrNull()?.attribute_type_id
+                    },
+                    deleteById = { id -> attributeQueries.deleteById(id) },
+                    insertAttribute = { attr ->
+                        attributeQueries.insert(
+                            person_id = effectivePersonId.id,
+                            attribute_type_id = attr.typeId.id,
+                            attribute_value = attr.value,
+                        )
+                    },
+                    updateValue = { value, id -> attributeQueries.updateValue(value, id) },
+                )
             }
         }
 

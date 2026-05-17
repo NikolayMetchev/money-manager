@@ -333,73 +333,16 @@ fun TransactionEditDialog(
                     }
                 }
 
-                // Attributes Section
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Text(
-                        text = "Attributes",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-
-                    // Display editable attributes
-                    editableAttributes.forEach { (id, pair) ->
-                        val (typeName, value) = pair
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            // Attribute type selector
-                            AttributeTypeField(
-                                value = typeName,
-                                onValueChange = { newTypeName ->
-                                    editableAttributes = editableAttributes + (id to Pair(newTypeName, value))
-                                },
-                                existingTypes = existingAttributeTypes,
-                                enabled = !isSaving,
-                                modifier = Modifier.weight(0.4f),
-                            )
-                            // Attribute value field
-                            OutlinedTextField(
-                                value = value,
-                                onValueChange = { newValue ->
-                                    editableAttributes = editableAttributes + (id to Pair(typeName, newValue))
-                                },
-                                label = { Text("Value") },
-                                modifier = Modifier.weight(0.5f),
-                                singleLine = true,
-                                enabled = !isSaving,
-                            )
-                            // Delete button
-                            IconButton(
-                                onClick = {
-                                    editableAttributes = editableAttributes - id
-                                },
-                                enabled = !isSaving,
-                            ) {
-                                Text(
-                                    text = "X",
-                                    color = MaterialTheme.colorScheme.error,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                )
-                            }
-                        }
-                    }
-
-                    // Add new attribute button
-                    TextButton(
-                        onClick = {
-                            editableAttributes = editableAttributes + (nextTempId to Pair("", ""))
-                            nextTempId--
-                        },
-                        enabled = !isSaving,
-                    ) {
-                        Text("+ Add Attribute")
-                    }
-                }
+                EditableAttributesSection(
+                    editableAttributes = editableAttributes,
+                    existingAttributeTypes = existingAttributeTypes,
+                    isSaving = isSaving,
+                    onAttributesChange = { editableAttributes = it },
+                    onAddAttribute = {
+                        editableAttributes = editableAttributes + (nextTempId to Pair("", ""))
+                        nextTempId--
+                    },
+                )
 
                 errorMessage?.let { error ->
                     Text(

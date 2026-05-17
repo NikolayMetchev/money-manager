@@ -88,56 +88,38 @@ class AccountRepositoryImpl(
         newAttributes: List<NewAttribute>,
     ): Long =
         withContext(Dispatchers.Default) {
-            val hasAttributeChanges =
-                deletedAttributeIds.isNotEmpty() ||
-                    updatedAttributes.isNotEmpty() ||
-                    newAttributes.isNotEmpty()
-
             val effectiveAccountId = account?.id ?: accountId
 
             queries.transactionWithResult {
-                // Step 1: Update account fields or bump revision for attribute-only changes
-                if (account != null) {
-                    queries.update(
-                        name = account.name,
-                        category_id = account.categoryId,
-                        id = account.id.id,
-                    )
-                } else if (hasAttributeChanges) {
-                    queries.bumpRevisionOnly(effectiveAccountId.id)
-                }
-
-                // Step 2: Apply attribute changes inside creation mode so triggers record
-                // audit entries at the current revision without bumping it further
-                if (hasAttributeChanges) {
-                    applyAttributeChangesInCreationMode(
-                        database = database,
-                        deletedAttributeIds = deletedAttributeIds,
-                        updatedAttributes = updatedAttributes,
-                        newAttributes = newAttributes,
-                        selectCurrentTypeId = { id ->
-                            attributeQueries.selectById(id).executeAsOneOrNull()?.attribute_type_id
-                        },
-                        deleteById = { id -> attributeQueries.deleteById(id) },
-                        insertAttribute = { attr ->
-                            attributeQueries.insert(
-                                account_id = effectiveAccountId.id,
-                                attribute_type_id = attr.typeId.id,
-                                attribute_value = attr.value,
-                            )
-                        },
-                        insertAttributeForUpdatedType = { attr ->
-                            attributeQueries.insert(
-                                account_id = effectiveAccountId.id,
-                                attribute_type_id = attr.typeId.id,
-                                attribute_value = attr.value,
-                            )
-                        },
-                        updateValue = { value, id -> attributeQueries.updateValue(value, id) },
-                    )
-                }
-
-                queries.selectRevisionById(effectiveAccountId.id).executeAsOne()
+                updateEntityWithAttributes(
+                    database = database,
+                    hasEntityChanges = account != null,
+                    deletedAttributeIds = deletedAttributeIds,
+                    updatedAttributes = updatedAttributes,
+                    newAttributes = newAttributes,
+                    updateEntity = {
+                        val accountToUpdate = requireNotNull(account)
+                        queries.update(
+                            name = accountToUpdate.name,
+                            category_id = accountToUpdate.categoryId,
+                            id = accountToUpdate.id.id,
+                        )
+                    },
+                    bumpRevisionOnly = { queries.bumpRevisionOnly(effectiveAccountId.id) },
+                    selectRevision = { queries.selectRevisionById(effectiveAccountId.id).executeAsOne() },
+                    selectCurrentTypeId = { id ->
+                        attributeQueries.selectById(id).executeAsOneOrNull()?.attribute_type_id
+                    },
+                    deleteById = { id -> attributeQueries.deleteById(id) },
+                    insertAttribute = { attr ->
+                        attributeQueries.insert(
+                            account_id = effectiveAccountId.id,
+                            attribute_type_id = attr.typeId.id,
+                            attribute_value = attr.value,
+                        )
+                    },
+                    updateValue = { value, id -> attributeQueries.updateValue(value, id) },
+                )
             }
         }
 

@@ -73,6 +73,7 @@ import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.ui.components.ErrorMessageText
 import com.moneymanager.ui.components.LoadingTextButton
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -650,13 +651,7 @@ fun CreateCategoryDialogInCategories(
                     additionalExcludedIds = emptySet(),
                 )
 
-                errorMessage?.let { error ->
-                    Text(
-                        text = error,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
+                errorMessage?.let { error -> ErrorMessageText(error) }
             }
         },
         confirmButton = {
@@ -766,13 +761,7 @@ fun EditCategoryDialog(
                     }
                 }
 
-                errorMessage?.let { error ->
-                    Text(
-                        text = error,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
+                errorMessage?.let { error -> ErrorMessageText(error) }
             }
         },
         confirmButton = {
@@ -954,11 +943,7 @@ fun DeleteCategoryDialog(
                 )
                 errorMessage?.let { error ->
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = error,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
+                    ErrorMessageText(error)
                 }
             }
         },

@@ -788,14 +788,7 @@ class CsvTransferMapper(
         if (newTransfer.targetAccountId != existingTransfer.targetAccountId) return false
         if (newTransfer.amount != existingTransfer.amount) return false
 
-        // Compare attributes (order-independent comparison)
-        val newAttrMap = newAttributes.toMap()
-        val existingAttrMap = existingAttributes.toMap()
-
-        if (newAttrMap.size != existingAttrMap.size) return false
-        if (newAttrMap.keys != existingAttrMap.keys) return false
-
-        return newAttrMap.all { (key, value) -> existingAttrMap[key] == value }
+        return attributesAreIdentical(newAttributes, existingAttributes)
     }
 
     /**

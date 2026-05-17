@@ -16,7 +16,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -46,7 +45,7 @@ import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.screens.CreateCategoryDialog
-import com.moneymanager.ui.screens.transactions.AttributeTypeField
+import com.moneymanager.ui.screens.transactions.EditableAttributesSection
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
 
@@ -201,76 +200,18 @@ fun EditAccountDialog(
                     }
                 }
 
-                // Attributes Section
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Text(
-                        text = "Attributes",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                EditableAttributesSection(
+                    editableAttributes = editableAttributes,
+                    existingAttributeTypes = existingAttributeTypes,
+                    isSaving = isSaving,
+                    onAttributesChange = { editableAttributes = it },
+                    onAddAttribute = {
+                        editableAttributes = editableAttributes + (nextTempId to Pair("", ""))
+                        nextTempId--
+                    },
+                )
 
-                    editableAttributes.forEach { (id, pair) ->
-                        val (typeName, value) = pair
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            AttributeTypeField(
-                                value = typeName,
-                                onValueChange = { newTypeName ->
-                                    editableAttributes = editableAttributes + (id to Pair(newTypeName, value))
-                                },
-                                existingTypes = existingAttributeTypes,
-                                enabled = !isSaving,
-                                modifier = Modifier.weight(0.4f),
-                            )
-                            OutlinedTextField(
-                                value = value,
-                                onValueChange = { newValue ->
-                                    editableAttributes = editableAttributes + (id to Pair(typeName, newValue))
-                                },
-                                label = { Text("Value") },
-                                modifier = Modifier.weight(0.5f),
-                                singleLine = true,
-                                enabled = !isSaving,
-                            )
-                            IconButton(
-                                onClick = {
-                                    editableAttributes = editableAttributes - id
-                                },
-                                enabled = !isSaving,
-                            ) {
-                                Text(
-                                    text = "X",
-                                    color = MaterialTheme.colorScheme.error,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                )
-                            }
-                        }
-                    }
-
-                    TextButton(
-                        onClick = {
-                            editableAttributes = editableAttributes + (nextTempId to Pair("", ""))
-                            nextTempId--
-                        },
-                        enabled = !isSaving,
-                    ) {
-                        Text("+ Add Attribute")
-                    }
-                }
-
-                errorMessage?.let { error ->
-                    Text(
-                        text = error,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
+                errorMessage?.let { error -> ErrorMessageText(error) }
             }
         },
         confirmButton = {

@@ -874,19 +874,12 @@ fun AccountTransactionsScreen(
                                                     }
                                                 if (currencyIndex >= 0) {
                                                     // Each currency row: text + padding + spacing ≈ 28.dp
-                                                    val rowHeightPx = 28.dp.toPx()
-
-                                                    // Calculate viewport height (30% of container height - account header row - spacing)
-                                                    val matrixHeightPx = containerHeightDp.toPx() * 0.3f
-                                                    val accountHeaderHeightPx = 24.dp.toPx() // Account name header row
-                                                    val viewportHeightPx = matrixHeightPx - accountHeaderHeightPx
-
-                                                    // Calculate row position
-                                                    val rowStartPx = currencyIndex * rowHeightPx
-                                                    val rowCenterPx = rowStartPx + (rowHeightPx / 2)
-
-                                                    // Center the row in the viewport
-                                                    val targetScrollY = (rowCenterPx - (viewportHeightPx / 2)).coerceAtLeast(0f).toInt()
+                                                    val targetScrollY =
+                                                        verticalMatrixScrollTarget(
+                                                            currencyIndex = currencyIndex,
+                                                            containerHeightDp = containerHeightDp,
+                                                            density = density,
+                                                        )
 
                                                     // Animate both scrolls concurrently
                                                     launch { horizontalScrollState.animateScrollTo(targetScrollX) }
