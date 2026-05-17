@@ -9,5 +9,4 @@ enum class Platform {
 
     /** Android mobile application */
     ANDROID,
-    ;
 }
