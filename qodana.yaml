@@ -76,4 +76,5 @@ include:
   - name: CheckDependencyLicenses
 failureConditions:
   severityThresholds:
+    any: 0
     critical: 0
