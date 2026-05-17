@@ -102,46 +102,19 @@ fun CreateAccountDialog(
                     enabled = !isSaving,
                 )
 
-                ExposedDropdownMenuBox(
+                AccountCategorySelector(
+                    categories = categories,
+                    selectedCategoryId = selectedCategoryId,
+                    selectedCategoryName = selectedCategoryName,
                     expanded = expanded,
-                    onExpandedChange = { expanded = !expanded && !isSaving },
-                ) {
-                    OutlinedTextField(
-                        value =
-                            selectedCategoryName
-                                ?: categories.find { it.id == selectedCategoryId }?.name
-                                ?: "Uncategorized",
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Category") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                        modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
-                        enabled = !isSaving,
-                    )
-                    ExposedDropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { expanded = false },
-                    ) {
-                        categories.forEach { category ->
-                            DropdownMenuItem(
-                                text = { Text(category.name) },
-                                onClick = {
-                                    selectedCategoryId = category.id
-                                    selectedCategoryName = null
-                                    expanded = false
-                                },
-                            )
-                        }
-                        HorizontalDivider()
-                        DropdownMenuItem(
-                            text = { Text("+ Create New Category") },
-                            onClick = {
-                                expanded = false
-                                showCreateCategoryDialog = true
-                            },
-                        )
-                    }
-                }
+                    isSaving = isSaving,
+                    onExpandedChange = { expanded = it },
+                    onCategorySelected = { categoryId ->
+                        selectedCategoryId = categoryId
+                        selectedCategoryName = null
+                    },
+                    onCreateCategoryClick = { showCreateCategoryDialog = true },
+                )
 
                 Column(modifier = Modifier.fillMaxWidth()) {
                     Text(
