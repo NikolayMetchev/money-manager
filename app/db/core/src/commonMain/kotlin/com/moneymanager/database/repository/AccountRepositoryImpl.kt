@@ -110,36 +110,31 @@ class AccountRepositoryImpl(
                 // Step 2: Apply attribute changes inside creation mode so triggers record
                 // audit entries at the current revision without bumping it further
                 if (hasAttributeChanges) {
-                    database.beginCreationMode()
-                    try {
-                        deletedAttributeIds.forEach { id ->
-                            attributeQueries.deleteById(id)
-                        }
-
-                        updatedAttributes.forEach { (id, attr) ->
-                            val current = attributeQueries.selectById(id).executeAsOneOrNull()
-                            if (current != null && current.attribute_type_id != attr.typeId.id) {
-                                attributeQueries.deleteById(id)
-                                attributeQueries.insert(
-                                    account_id = effectiveAccountId.id,
-                                    attribute_type_id = attr.typeId.id,
-                                    attribute_value = attr.value,
-                                )
-                            } else {
-                                attributeQueries.updateValue(attr.value, id)
-                            }
-                        }
-
-                        newAttributes.forEach { attr ->
+                    applyAttributeChangesInCreationMode(
+                        database = database,
+                        deletedAttributeIds = deletedAttributeIds,
+                        updatedAttributes = updatedAttributes,
+                        newAttributes = newAttributes,
+                        selectCurrentTypeId = { id ->
+                            attributeQueries.selectById(id).executeAsOneOrNull()?.attribute_type_id
+                        },
+                        deleteById = { id -> attributeQueries.deleteById(id) },
+                        insertAttribute = { attr ->
                             attributeQueries.insert(
                                 account_id = effectiveAccountId.id,
                                 attribute_type_id = attr.typeId.id,
                                 attribute_value = attr.value,
                             )
-                        }
-                    } finally {
-                        database.endCreationMode()
-                    }
+                        },
+                        insertAttributeForUpdatedType = { attr ->
+                            attributeQueries.insert(
+                                account_id = effectiveAccountId.id,
+                                attribute_type_id = attr.typeId.id,
+                                attribute_value = attr.value,
+                            )
+                        },
+                        updateValue = { value, id -> attributeQueries.updateValue(value, id) },
+                    )
                 }
 
                 queries.selectRevisionById(effectiveAccountId.id).executeAsOne()
