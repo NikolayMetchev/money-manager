@@ -94,9 +94,8 @@ object CurrencyScaleFactors {
      * @param currencyCode The ISO 4217 currency code (e.g., "USD", "JPY", "BHD")
      * @return The number of decimal places for the currency (e.g., 2 for USD, 0 for JPY, 3 for BHD)
      */
-    fun getDecimalPlaces(currencyCode: String): Int {
-        val scaleFactor = getScaleFactor(currencyCode)
-        return when (scaleFactor) {
+    fun getDecimalPlaces(currencyCode: String): Int =
+        when (val scaleFactor = getScaleFactor(currencyCode)) {
             1 -> 0
             10 -> 1
             100 -> 2
@@ -113,5 +112,4 @@ object CurrencyScaleFactors {
                 places
             }
         }
-    }
 }

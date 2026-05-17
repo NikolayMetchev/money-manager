@@ -2,16 +2,20 @@
 
 package com.moneymanager.ui.components
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.Category
 
 @Composable
@@ -46,6 +50,28 @@ internal fun AccountBasicsFields(
         onCategorySelected = onCategorySelected,
         onCreateCategoryClick = onCreateCategoryClick,
     )
+}
+
+@Composable
+internal fun AccountOwnersSection(
+    hasPeople: Boolean,
+    content: @Composable () -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = "Owners",
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.padding(bottom = 8.dp),
+        )
+        if (!hasPeople) {
+            Text(
+                text = "No people available. Create one first.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        content()
+    }
 }
 
 @Composable

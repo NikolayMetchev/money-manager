@@ -137,41 +137,28 @@ fun EditAccountDialog(
                     onCreateCategoryClick = { accountState.showCreateCategoryDialog = true },
                 )
 
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = "Owners",
-                        style = MaterialTheme.typography.labelMedium,
-                        modifier = Modifier.padding(bottom = 8.dp),
-                    )
-                    if (people.isEmpty()) {
-                        Text(
-                            text = "No people available. Create one first.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    } else {
-                        people.forEach { person ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Checkbox(
-                                    checked = selectedOwnerIds.contains(person.id.id),
-                                    onCheckedChange = { checked ->
-                                        selectedOwnerIds =
-                                            if (checked) {
-                                                selectedOwnerIds + person.id.id
-                                            } else {
-                                                selectedOwnerIds - person.id.id
-                                            }
-                                    },
-                                    enabled = !accountState.isSaving,
-                                )
-                                Text(
-                                    text = person.fullName,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                )
-                            }
+                AccountOwnersSection(hasPeople = people.isNotEmpty()) {
+                    people.forEach { person ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Checkbox(
+                                checked = selectedOwnerIds.contains(person.id.id),
+                                onCheckedChange = { checked ->
+                                    selectedOwnerIds =
+                                        if (checked) {
+                                            selectedOwnerIds + person.id.id
+                                        } else {
+                                            selectedOwnerIds - person.id.id
+                                        }
+                                },
+                                enabled = !accountState.isSaving,
+                            )
+                            Text(
+                                text = person.fullName,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
                         }
                     }
                     TextButton(

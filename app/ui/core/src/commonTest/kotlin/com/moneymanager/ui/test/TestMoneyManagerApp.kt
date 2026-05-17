@@ -39,7 +39,7 @@ private sealed class TestDatabaseState {
  * This provides the same interface as the old MoneyManagerApp that handled database loading.
  */
 @Composable
-fun TestMoneyManagerApp(
+fun MoneyManagerTestApp(
     databaseManager: DatabaseManager,
     appVersion: AppVersion,
 ) {

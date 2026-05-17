@@ -3,6 +3,7 @@ package com.moneymanager.schemaspy
 import com.moneymanager.database.JvmDatabaseManager
 import com.moneymanager.domain.model.DbLocation
 import kotlin.io.path.Path
+import kotlin.system.exitProcess
 
 /**
  * Helper tool to create a physical SQLite database file for SchemaSpy documentation generation.
@@ -11,7 +12,7 @@ import kotlin.io.path.Path
 suspend fun main(args: Array<String>) {
     if (args.isEmpty()) {
         System.err.println("Usage: SchemaSpyDatabaseCreator <database-file-path>")
-        System.exit(1)
+        exitProcess(1)
     }
 
     val dbPath = args[0]

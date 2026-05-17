@@ -26,7 +26,7 @@ class CurrenciesScreenTest {
     private val stubEntitySource = createEntitySource()
 
     private fun createCurrencyRepository(currencies: List<Currency>): CurrencyRepository =
-        mock<CurrencyRepository>(MockMode.autoUnit) {
+        mock(MockMode.autoUnit) {
             every { getAllCurrencies() } returns flowOf(currencies)
             every { getCurrencyById(any()) } returns flowOf(null)
             every { getCurrencyByCode(any()) } returns flowOf(null)

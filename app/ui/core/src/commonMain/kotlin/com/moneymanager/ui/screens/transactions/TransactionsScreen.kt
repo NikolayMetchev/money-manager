@@ -159,11 +159,12 @@ fun AccountTransactionsScreen(
     // Fetch the actual transfer when transactionIdToEdit changes
     LaunchedEffect(transactionIdToEdit) {
         val id = transactionIdToEdit
-        if (id != null) {
-            transactionToEdit = transactionRepository.getTransactionById(id.id).first()
-        } else {
-            transactionToEdit = null
-        }
+        transactionToEdit =
+            if (id != null) {
+                transactionRepository.getTransactionById(id.id).first()
+            } else {
+                null
+            }
     }
 
     // Coroutine scope for scroll animations and pagination
@@ -866,25 +867,23 @@ fun AccountTransactionsScreen(
                                                     containerWidthDp = containerWidthDp,
                                                     density = density,
                                                 )
-                                            with(density) {
-                                                // Calculate vertical scroll position for the currency
-                                                val currencyIndex =
-                                                    uniqueCurrencyIds.indexOfFirst {
-                                                        it == runningBalance.transactionAmount.currency.id
-                                                    }
-                                                if (currencyIndex >= 0) {
-                                                    // Each currency row: text + padding + spacing ≈ 28.dp
-                                                    val targetScrollY =
-                                                        verticalMatrixScrollTarget(
-                                                            currencyIndex = currencyIndex,
-                                                            containerHeightDp = containerHeightDp,
-                                                            density = density,
-                                                        )
-
-                                                    // Animate both scrolls concurrently
-                                                    launch { horizontalScrollState.animateScrollTo(targetScrollX) }
-                                                    launch { verticalScrollState.animateScrollTo(targetScrollY) }
+                                            // Calculate vertical scroll position for the currency
+                                            val currencyIndex =
+                                                uniqueCurrencyIds.indexOfFirst {
+                                                    it == runningBalance.transactionAmount.currency.id
                                                 }
+                                            if (currencyIndex >= 0) {
+                                                // Each currency row: text + padding + spacing ≈ 28.dp
+                                                val targetScrollY =
+                                                    verticalMatrixScrollTarget(
+                                                        currencyIndex = currencyIndex,
+                                                        containerHeightDp = containerHeightDp,
+                                                        density = density,
+                                                    )
+
+                                                // Animate both scrolls concurrently
+                                                launch { horizontalScrollState.animateScrollTo(targetScrollX) }
+                                                launch { verticalScrollState.animateScrollTo(targetScrollY) }
                                             }
                                         }
                                     }

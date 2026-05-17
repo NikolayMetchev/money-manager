@@ -216,380 +216,382 @@ fun MoneyManagerApp(
                     },
                 ) { paddingValues ->
                     Box(modifier = Modifier.padding(paddingValues)) {
-                        when (val screen = currentScreen) {
-                            is Screen.Accounts -> {
-                                // Reset currentlyViewedAccountId and currentlyViewedCurrencyId when on other screens
-                                LaunchedEffect(Unit) {
-                                    currentlyViewedAccountId = null
-                                    currentlyViewedCurrencyId = null
+                        currentScreen.let { screen ->
+                            when (screen) {
+                                is Screen.Accounts -> {
+                                    // Reset currentlyViewedAccountId and currentlyViewedCurrencyId when on other screens
+                                    LaunchedEffect(Unit) {
+                                        currentlyViewedAccountId = null
+                                        currentlyViewedCurrencyId = null
+                                    }
+                                    AccountsScreen(
+                                        accountRepository = services.accounts.accountRepository,
+                                        accountAttributeRepository = services.accounts.accountAttributeRepository,
+                                        attributeTypeRepository = services.transactions.attributeTypeRepository,
+                                        categoryRepository = services.accounts.categoryRepository,
+                                        transactionRepository = services.transactions.transactionRepository,
+                                        personRepository = services.people.personRepository,
+                                        personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
+                                        maintenance = services.imports.maintenance,
+                                        entitySource = services.transactions.entitySource,
+                                        scrollToAccountId = screen.scrollToAccountId,
+                                        onAccountClick = { account ->
+                                            // Replace current screen with one that remembers the clicked account
+                                            // so that navigating back will scroll to this account
+                                            navigationHistory.replaceCurrentScreen(Screen.Accounts(scrollToAccountId = account.id))
+                                            navigationHistory.navigateTo(Screen.AccountTransactions(account.id, account.name))
+                                        },
+                                        onAuditClick = { account ->
+                                            navigationHistory.navigateTo(Screen.AccountAuditHistory(account.id, account.name))
+                                        },
+                                    )
                                 }
-                                AccountsScreen(
-                                    accountRepository = services.accounts.accountRepository,
-                                    accountAttributeRepository = services.accounts.accountAttributeRepository,
-                                    attributeTypeRepository = services.transactions.attributeTypeRepository,
-                                    categoryRepository = services.accounts.categoryRepository,
-                                    transactionRepository = services.transactions.transactionRepository,
-                                    personRepository = services.people.personRepository,
-                                    personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
-                                    maintenance = services.imports.maintenance,
-                                    entitySource = services.transactions.entitySource,
-                                    scrollToAccountId = screen.scrollToAccountId,
-                                    onAccountClick = { account ->
-                                        // Replace current screen with one that remembers the clicked account
-                                        // so that navigating back will scroll to this account
-                                        navigationHistory.replaceCurrentScreen(Screen.Accounts(scrollToAccountId = account.id))
-                                        navigationHistory.navigateTo(Screen.AccountTransactions(account.id, account.name))
-                                    },
-                                    onAuditClick = { account ->
-                                        navigationHistory.navigateTo(Screen.AccountAuditHistory(account.id, account.name))
-                                    },
-                                )
-                            }
-                            is Screen.Currencies -> {
-                                // Reset currentlyViewedAccountId and currentlyViewedCurrencyId when on other screens
-                                LaunchedEffect(Unit) {
-                                    currentlyViewedAccountId = null
-                                    currentlyViewedCurrencyId = null
+                                is Screen.Currencies -> {
+                                    // Reset currentlyViewedAccountId and currentlyViewedCurrencyId when on other screens
+                                    LaunchedEffect(Unit) {
+                                        currentlyViewedAccountId = null
+                                        currentlyViewedCurrencyId = null
+                                    }
+                                    CurrenciesScreen(
+                                        currencyRepository = services.accounts.currencyRepository,
+                                        entitySource = services.transactions.entitySource,
+                                        onAuditClick = { currency ->
+                                            navigationHistory.navigateTo(Screen.CurrencyAuditHistory(currency.id, currency.code))
+                                        },
+                                    )
                                 }
-                                CurrenciesScreen(
-                                    currencyRepository = services.accounts.currencyRepository,
-                                    entitySource = services.transactions.entitySource,
-                                    onAuditClick = { currency ->
-                                        navigationHistory.navigateTo(Screen.CurrencyAuditHistory(currency.id, currency.code))
-                                    },
-                                )
-                            }
-                            is Screen.Categories -> {
-                                // Reset currentlyViewedAccountId and currentlyViewedCurrencyId when on other screens
-                                LaunchedEffect(Unit) {
-                                    currentlyViewedAccountId = null
-                                    currentlyViewedCurrencyId = null
+                                is Screen.Categories -> {
+                                    // Reset currentlyViewedAccountId and currentlyViewedCurrencyId when on other screens
+                                    LaunchedEffect(Unit) {
+                                        currentlyViewedAccountId = null
+                                        currentlyViewedCurrencyId = null
+                                    }
+                                    CategoriesScreen(
+                                        categoryRepository = services.accounts.categoryRepository,
+                                        currencyRepository = services.accounts.currencyRepository,
+                                        onAuditClick = { category ->
+                                            navigationHistory.navigateTo(Screen.CategoryAuditHistory(category.id, category.name))
+                                        },
+                                    )
                                 }
-                                CategoriesScreen(
-                                    categoryRepository = services.accounts.categoryRepository,
-                                    currencyRepository = services.accounts.currencyRepository,
-                                    onAuditClick = { category ->
-                                        navigationHistory.navigateTo(Screen.CategoryAuditHistory(category.id, category.name))
-                                    },
-                                )
-                            }
-                            is Screen.People,
-                            is Screen.PeopleScroll,
-                            -> {
-                                // Reset currentlyViewedAccountId and currentlyViewedCurrencyId when on other screens
-                                LaunchedEffect(Unit) {
-                                    currentlyViewedAccountId = null
-                                    currentlyViewedCurrencyId = null
+                                is Screen.People,
+                                is Screen.PeopleScroll,
+                                -> {
+                                    // Reset currentlyViewedAccountId and currentlyViewedCurrencyId when on other screens
+                                    LaunchedEffect(Unit) {
+                                        currentlyViewedAccountId = null
+                                        currentlyViewedCurrencyId = null
+                                    }
+                                    PeopleScreen(
+                                        personRepository = services.people.personRepository,
+                                        personAttributeRepository = services.people.personAttributeRepository,
+                                        personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
+                                        entitySource = services.transactions.entitySource,
+                                        scrollToPersonId = (screen as? Screen.PeopleScroll)?.personId,
+                                        onAuditClick = { person ->
+                                            navigationHistory.navigateTo(Screen.PersonAuditHistory(person.id, person.fullName))
+                                        },
+                                    )
                                 }
-                                PeopleScreen(
-                                    personRepository = services.people.personRepository,
-                                    personAttributeRepository = services.people.personAttributeRepository,
-                                    personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
-                                    entitySource = services.transactions.entitySource,
-                                    scrollToPersonId = (screen as? Screen.PeopleScroll)?.personId,
-                                    onAuditClick = { person ->
-                                        navigationHistory.navigateTo(Screen.PersonAuditHistory(person.id, person.fullName))
-                                    },
-                                )
-                            }
-                            is Screen.Settings -> {
-                                // Reset currentlyViewedAccountId and currentlyViewedCurrencyId when on other screens
-                                LaunchedEffect(Unit) {
-                                    currentlyViewedAccountId = null
-                                    currentlyViewedCurrencyId = null
+                                is Screen.Settings -> {
+                                    // Reset currentlyViewedAccountId and currentlyViewedCurrencyId when on other screens
+                                    LaunchedEffect(Unit) {
+                                        currentlyViewedAccountId = null
+                                        currentlyViewedCurrencyId = null
+                                    }
+                                    SettingsScreen(
+                                        currencyRepository = services.accounts.currencyRepository,
+                                        categoryRepository = services.accounts.categoryRepository,
+                                        accountRepository = services.accounts.accountRepository,
+                                        personRepository = services.people.personRepository,
+                                        personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
+                                        attributeTypeRepository = services.transactions.attributeTypeRepository,
+                                        transactionRepository = services.transactions.transactionRepository,
+                                        settingsRepository = services.settings.settingsRepository,
+                                        maintenance = services.imports.maintenance,
+                                        entitySource = services.transactions.sampleEntitySource,
+                                    )
                                 }
-                                SettingsScreen(
-                                    currencyRepository = services.accounts.currencyRepository,
-                                    categoryRepository = services.accounts.categoryRepository,
-                                    accountRepository = services.accounts.accountRepository,
-                                    personRepository = services.people.personRepository,
-                                    personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
-                                    attributeTypeRepository = services.transactions.attributeTypeRepository,
-                                    transactionRepository = services.transactions.transactionRepository,
-                                    settingsRepository = services.settings.settingsRepository,
-                                    maintenance = services.imports.maintenance,
-                                    entitySource = services.transactions.sampleEntitySource,
-                                )
-                            }
-                            is Screen.AccountTransactions -> {
-                                // Initialize currentlyViewedAccountId when first entering the screen
-                                LaunchedEffect(screen.accountId) {
-                                    currentlyViewedAccountId = screen.accountId
-                                }
-                                AccountTransactionsScreen(
-                                    accountId = currentlyViewedAccountId ?: screen.accountId,
-                                    transactionRepository = services.transactions.transactionRepository,
-                                    transferSourceRepository = services.transactions.transferSourceRepository,
-                                    entitySource = services.transactions.entitySource,
-                                    accountRepository = services.accounts.accountRepository,
-                                    accountAttributeRepository = services.accounts.accountAttributeRepository,
-                                    categoryRepository = services.accounts.categoryRepository,
-                                    currencyRepository = services.accounts.currencyRepository,
-                                    attributeTypeRepository = services.transactions.attributeTypeRepository,
-                                    personRepository = services.people.personRepository,
-                                    personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
-                                    maintenance = services.imports.maintenance,
-                                    onAccountIdChange = { accountId ->
-                                        currentlyViewedAccountId = accountId
-                                    },
-                                    onCurrencyIdChange = { currencyId ->
-                                        currentlyViewedCurrencyId = currencyId
-                                    },
-                                    onAccountClick = { accountId, accountName, currencyId ->
-                                        navigationHistory.navigateTo(
-                                            Screen.AccountTransactions(
-                                                accountId = accountId,
-                                                accountName = accountName,
-                                                selectedCurrencyId = currencyId,
-                                            ),
-                                        )
-                                    },
-                                    onAuditClick = { transferId ->
-                                        navigationHistory.navigateTo(Screen.AuditHistory(transferId))
-                                    },
-                                    scrollToTransferId = screen.scrollToTransferId,
-                                    initialCurrencyId = screen.selectedCurrencyId,
-                                    externalRefreshTrigger = transactionRefreshTrigger,
-                                )
-                            }
-                            is Screen.Imports -> {
-                                LaunchedEffect(Unit) {
-                                    currentlyViewedAccountId = null
-                                    currentlyViewedCurrencyId = null
-                                }
-                                ImportsScreen(
-                                    selectedTab = screen.tab,
-                                    onTabSelected = { tab ->
-                                        navigationHistory.replaceCurrentScreen(Screen.Imports(tab))
-                                    },
-                                    csvImportRepository = services.imports.csvImportRepository,
-                                    apiSessionRepository = services.imports.apiSessionRepository,
-                                    apiImportStrategyRepository = services.imports.apiImportStrategyRepository,
-                                    attributeTypeRepository = services.transactions.attributeTypeRepository,
-                                    accountAttributeRepository = services.accounts.accountAttributeRepository,
-                                    accountRepository = services.accounts.accountRepository,
-                                    currencyRepository = services.accounts.currencyRepository,
-                                    transactionRepository = services.transactions.transactionRepository,
-                                    entitySource = services.transactions.entitySource,
-                                    maintenance = services.imports.maintenance,
-                                    personRepository = services.people.personRepository,
-                                    personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
-                                    personAttributeRepository = services.people.personAttributeRepository,
-                                    deviceId = services.deviceId,
-                                    onCsvImportClick = { importId ->
-                                        navigationHistory.navigateTo(Screen.CsvImportDetail(importId))
-                                    },
-                                    onCsvStrategiesClick = {
-                                        navigationHistory.navigateTo(Screen.CsvStrategies)
-                                    },
-                                    onAddCredentialClick = {
-                                        navigationHistory.navigateTo(Screen.MonzoConnect)
-                                    },
-                                    onApiStrategiesClick = {
-                                        navigationHistory.navigateTo(Screen.ApiStrategies)
-                                    },
-                                    onSessionClick = { session ->
-                                        navigationHistory.navigateTo(Screen.ApiSessionTraffic(session.id))
-                                    },
-                                    onTransactionsImported = {
-                                        transactionRefreshTrigger++
-                                    },
-                                )
-                            }
-                            is Screen.ApiStrategies -> {
-                                LaunchedEffect(Unit) {
-                                    currentlyViewedAccountId = null
-                                    currentlyViewedCurrencyId = null
-                                }
-                                ApiStrategiesScreen(
-                                    apiImportStrategyRepository = services.imports.apiImportStrategyRepository,
-                                    apiSessionRepository = services.imports.apiSessionRepository,
-                                    onBack = { navigationHistory.navigateBack() },
-                                )
-                            }
-                            is Screen.CsvImportDetail -> {
-                                CsvImportDetailScreen(
-                                    importId = screen.importId,
-                                    scrollToRowIndex = screen.scrollToRowIndex,
-                                    csvImportRepository = services.imports.csvImportRepository,
-                                    csvImportStrategyRepository = services.imports.csvImportStrategyRepository,
-                                    csvAccountMappingRepository = services.imports.csvAccountMappingRepository,
-                                    accountRepository = services.accounts.accountRepository,
-                                    categoryRepository = services.accounts.categoryRepository,
-                                    currencyRepository = services.accounts.currencyRepository,
-                                    transactionRepository = services.transactions.transactionRepository,
-                                    attributeTypeRepository = services.transactions.attributeTypeRepository,
-                                    personRepository = services.people.personRepository,
-                                    personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
-                                    maintenance = services.imports.maintenance,
-                                    transferSourceRepository = services.transactions.transferSourceRepository,
-                                    entitySource = services.transactions.entitySource,
-                                    onBack = { navigationHistory.navigateBack() },
-                                    onDeleted = { navigationHistory.navigateTo(Screen.Imports(ImportTab.CSV)) },
-                                    onCsvSourceClick = { importId, rowIndex ->
-                                        navigationHistory.navigateTo(Screen.CsvImportDetail(importId, rowIndex))
-                                    },
-                                    onTransferClick = { transferId, isPositiveAmount ->
-                                        scope.launch {
-                                            val transfer =
-                                                services.transactions.transactionRepository
-                                                    .getTransactionById(transferId.id)
-                                                    .first()
-                                                    ?: return@launch
-                                            // Navigate to target account if positive (money coming in),
-                                            // source account if negative (money going out)
-                                            val accountId =
-                                                if (isPositiveAmount) {
-                                                    transfer.targetAccountId
-                                                } else {
-                                                    transfer.sourceAccountId
-                                                }
-                                            val account = accounts.find { a -> a.id == accountId }
+                                is Screen.AccountTransactions -> {
+                                    // Initialize currentlyViewedAccountId when first entering the screen
+                                    LaunchedEffect(screen.accountId) {
+                                        currentlyViewedAccountId = screen.accountId
+                                    }
+                                    AccountTransactionsScreen(
+                                        accountId = currentlyViewedAccountId ?: screen.accountId,
+                                        transactionRepository = services.transactions.transactionRepository,
+                                        transferSourceRepository = services.transactions.transferSourceRepository,
+                                        entitySource = services.transactions.entitySource,
+                                        accountRepository = services.accounts.accountRepository,
+                                        accountAttributeRepository = services.accounts.accountAttributeRepository,
+                                        categoryRepository = services.accounts.categoryRepository,
+                                        currencyRepository = services.accounts.currencyRepository,
+                                        attributeTypeRepository = services.transactions.attributeTypeRepository,
+                                        personRepository = services.people.personRepository,
+                                        personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
+                                        maintenance = services.imports.maintenance,
+                                        onAccountIdChange = { accountId ->
+                                            currentlyViewedAccountId = accountId
+                                        },
+                                        onCurrencyIdChange = { currencyId ->
+                                            currentlyViewedCurrencyId = currencyId
+                                        },
+                                        onAccountClick = { accountId, accountName, currencyId ->
                                             navigationHistory.navigateTo(
                                                 Screen.AccountTransactions(
                                                     accountId = accountId,
-                                                    accountName = account?.name ?: accountId.toString(),
-                                                    scrollToTransferId = transferId,
+                                                    accountName = accountName,
+                                                    selectedCurrencyId = currencyId,
                                                 ),
                                             )
-                                        }
-                                    },
-                                )
-                            }
-                            is Screen.CsvStrategies -> {
-                                LaunchedEffect(Unit) {
-                                    currentlyViewedAccountId = null
-                                    currentlyViewedCurrencyId = null
+                                        },
+                                        onAuditClick = { transferId ->
+                                            navigationHistory.navigateTo(Screen.AuditHistory(transferId))
+                                        },
+                                        scrollToTransferId = screen.scrollToTransferId,
+                                        initialCurrencyId = screen.selectedCurrencyId,
+                                        externalRefreshTrigger = transactionRefreshTrigger,
+                                    )
                                 }
-                                CsvStrategiesScreen(
-                                    csvImportStrategyRepository = services.imports.csvImportStrategyRepository,
-                                    csvImportRepository = services.imports.csvImportRepository,
-                                    csvAccountMappingRepository = services.imports.csvAccountMappingRepository,
-                                    accountRepository = services.accounts.accountRepository,
-                                    categoryRepository = services.accounts.categoryRepository,
-                                    currencyRepository = services.accounts.currencyRepository,
-                                    attributeTypeRepository = services.transactions.attributeTypeRepository,
-                                    personRepository = services.people.personRepository,
-                                    personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
-                                    entitySource = services.transactions.entitySource,
-                                    csvStrategyImportExport = services.imports.csvStrategyImportExport,
-                                    appVersion = appVersion,
-                                    onBack = { navigationHistory.navigateBack() },
-                                )
-                            }
-                            is Screen.AuditHistory -> {
-                                TransactionAuditScreen(
-                                    transferId = screen.transferId,
-                                    auditRepository = services.audit.auditRepository,
-                                    accountRepository = services.accounts.accountRepository,
-                                    transactionRepository = services.transactions.transactionRepository,
-                                    currentDeviceId = services.deviceId,
-                                    onCsvSourceClick = { importId, rowIndex ->
-                                        navigationHistory.navigateTo(Screen.CsvImportDetail(importId, rowIndex))
-                                    },
-                                    onApiSourceClick = { sessionId, requestId, jsonPath ->
-                                        navigationHistory.navigateTo(
-                                            Screen.ApiSessionTraffic(
-                                                sessionId = sessionId,
-                                                highlightRequestId = requestId,
-                                                highlightJsonPath = jsonPath,
-                                            ),
-                                        )
-                                    },
-                                    onAccountClick = { accountId ->
-                                        val account = accounts.find { it.id == accountId }
-                                        navigationHistory.navigateTo(
-                                            Screen.AccountTransactions(
-                                                accountId = accountId,
-                                                accountName = account?.name ?: "#${accountId.id}",
-                                            ),
-                                        )
-                                    },
-                                    onBack = { navigationHistory.navigateBack() },
-                                )
-                            }
-                            is Screen.AccountAuditHistory -> {
-                                AccountAuditScreen(
-                                    accountId = screen.accountId,
-                                    auditRepository = services.audit.auditRepository,
-                                    accountRepository = services.accounts.accountRepository,
-                                    onApiSourceClick = { sessionId, requestId, jsonPath ->
-                                        navigationHistory.navigateTo(
-                                            Screen.ApiSessionTraffic(
-                                                sessionId = sessionId,
-                                                highlightRequestId = requestId,
-                                                highlightJsonPath = jsonPath,
-                                            ),
-                                        )
-                                    },
-                                    onOwnerClick = { personId ->
-                                        navigationHistory.navigateTo(
-                                            Screen.PeopleScroll(
-                                                personId = personId,
-                                            ),
-                                        )
-                                    },
-                                    onBack = { navigationHistory.navigateBack() },
-                                )
-                            }
-                            is Screen.PersonAuditHistory -> {
-                                PersonAuditScreen(
-                                    personId = screen.personId,
-                                    auditRepository = services.audit.auditRepository,
-                                    personRepository = services.people.personRepository,
-                                    onApiSourceClick = { sessionId, requestId, jsonPath ->
-                                        navigationHistory.navigateTo(
-                                            Screen.ApiSessionTraffic(
-                                                sessionId = sessionId,
-                                                highlightRequestId = requestId,
-                                                highlightJsonPath = jsonPath,
-                                            ),
-                                        )
-                                    },
-                                    onBack = { navigationHistory.navigateBack() },
-                                )
-                            }
-                            is Screen.CurrencyAuditHistory -> {
-                                CurrencyAuditScreen(
-                                    currencyId = screen.currencyId,
-                                    auditRepository = services.audit.auditRepository,
-                                    currencyRepository = services.accounts.currencyRepository,
-                                    onBack = { navigationHistory.navigateBack() },
-                                )
-                            }
-                            is Screen.CategoryAuditHistory -> {
-                                CategoryAuditScreen(
-                                    categoryId = screen.categoryId,
-                                    auditRepository = services.audit.auditRepository,
-                                    categoryRepository = services.accounts.categoryRepository,
-                                    onBack = { navigationHistory.navigateBack() },
-                                )
-                            }
-                            is Screen.MonzoConnect -> {
-                                LaunchedEffect(Unit) {
-                                    currentlyViewedAccountId = null
-                                    currentlyViewedCurrencyId = null
+                                is Screen.Imports -> {
+                                    LaunchedEffect(Unit) {
+                                        currentlyViewedAccountId = null
+                                        currentlyViewedCurrencyId = null
+                                    }
+                                    ImportsScreen(
+                                        selectedTab = screen.tab,
+                                        onTabSelected = { tab ->
+                                            navigationHistory.replaceCurrentScreen(Screen.Imports(tab))
+                                        },
+                                        csvImportRepository = services.imports.csvImportRepository,
+                                        apiSessionRepository = services.imports.apiSessionRepository,
+                                        apiImportStrategyRepository = services.imports.apiImportStrategyRepository,
+                                        attributeTypeRepository = services.transactions.attributeTypeRepository,
+                                        accountAttributeRepository = services.accounts.accountAttributeRepository,
+                                        accountRepository = services.accounts.accountRepository,
+                                        currencyRepository = services.accounts.currencyRepository,
+                                        transactionRepository = services.transactions.transactionRepository,
+                                        entitySource = services.transactions.entitySource,
+                                        maintenance = services.imports.maintenance,
+                                        personRepository = services.people.personRepository,
+                                        personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
+                                        personAttributeRepository = services.people.personAttributeRepository,
+                                        deviceId = services.deviceId,
+                                        onCsvImportClick = { importId ->
+                                            navigationHistory.navigateTo(Screen.CsvImportDetail(importId))
+                                        },
+                                        onCsvStrategiesClick = {
+                                            navigationHistory.navigateTo(Screen.CsvStrategies)
+                                        },
+                                        onAddCredentialClick = {
+                                            navigationHistory.navigateTo(Screen.MonzoConnect)
+                                        },
+                                        onApiStrategiesClick = {
+                                            navigationHistory.navigateTo(Screen.ApiStrategies)
+                                        },
+                                        onSessionClick = { session ->
+                                            navigationHistory.navigateTo(Screen.ApiSessionTraffic(session.id))
+                                        },
+                                        onTransactionsImported = {
+                                            transactionRefreshTrigger++
+                                        },
+                                    )
                                 }
-                                MonzoAuthScreen(
-                                    apiSessionRepository = services.imports.apiSessionRepository,
-                                    onCredentialSaved = {
-                                        navigationHistory.navigateBack()
-                                    },
-                                )
-                            }
+                                is Screen.ApiStrategies -> {
+                                    LaunchedEffect(Unit) {
+                                        currentlyViewedAccountId = null
+                                        currentlyViewedCurrencyId = null
+                                    }
+                                    ApiStrategiesScreen(
+                                        apiImportStrategyRepository = services.imports.apiImportStrategyRepository,
+                                        apiSessionRepository = services.imports.apiSessionRepository,
+                                        onBack = { navigationHistory.navigateBack() },
+                                    )
+                                }
+                                is Screen.CsvImportDetail -> {
+                                    CsvImportDetailScreen(
+                                        importId = screen.importId,
+                                        scrollToRowIndex = screen.scrollToRowIndex,
+                                        csvImportRepository = services.imports.csvImportRepository,
+                                        csvImportStrategyRepository = services.imports.csvImportStrategyRepository,
+                                        csvAccountMappingRepository = services.imports.csvAccountMappingRepository,
+                                        accountRepository = services.accounts.accountRepository,
+                                        categoryRepository = services.accounts.categoryRepository,
+                                        currencyRepository = services.accounts.currencyRepository,
+                                        transactionRepository = services.transactions.transactionRepository,
+                                        attributeTypeRepository = services.transactions.attributeTypeRepository,
+                                        personRepository = services.people.personRepository,
+                                        personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
+                                        maintenance = services.imports.maintenance,
+                                        transferSourceRepository = services.transactions.transferSourceRepository,
+                                        entitySource = services.transactions.entitySource,
+                                        onBack = { navigationHistory.navigateBack() },
+                                        onDeleted = { navigationHistory.navigateTo(Screen.Imports(ImportTab.CSV)) },
+                                        onCsvSourceClick = { importId, rowIndex ->
+                                            navigationHistory.navigateTo(Screen.CsvImportDetail(importId, rowIndex))
+                                        },
+                                        onTransferClick = { transferId, isPositiveAmount ->
+                                            scope.launch {
+                                                val transfer =
+                                                    services.transactions.transactionRepository
+                                                        .getTransactionById(transferId.id)
+                                                        .first()
+                                                        ?: return@launch
+                                                // Navigate to target account if positive (money coming in),
+                                                // source account if negative (money going out)
+                                                val accountId =
+                                                    if (isPositiveAmount) {
+                                                        transfer.targetAccountId
+                                                    } else {
+                                                        transfer.sourceAccountId
+                                                    }
+                                                val account = accounts.find { a -> a.id == accountId }
+                                                navigationHistory.navigateTo(
+                                                    Screen.AccountTransactions(
+                                                        accountId = accountId,
+                                                        accountName = account?.name ?: accountId.toString(),
+                                                        scrollToTransferId = transferId,
+                                                    ),
+                                                )
+                                            }
+                                        },
+                                    )
+                                }
+                                is Screen.CsvStrategies -> {
+                                    LaunchedEffect(Unit) {
+                                        currentlyViewedAccountId = null
+                                        currentlyViewedCurrencyId = null
+                                    }
+                                    CsvStrategiesScreen(
+                                        csvImportStrategyRepository = services.imports.csvImportStrategyRepository,
+                                        csvImportRepository = services.imports.csvImportRepository,
+                                        csvAccountMappingRepository = services.imports.csvAccountMappingRepository,
+                                        accountRepository = services.accounts.accountRepository,
+                                        categoryRepository = services.accounts.categoryRepository,
+                                        currencyRepository = services.accounts.currencyRepository,
+                                        attributeTypeRepository = services.transactions.attributeTypeRepository,
+                                        personRepository = services.people.personRepository,
+                                        personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
+                                        entitySource = services.transactions.entitySource,
+                                        csvStrategyImportExport = services.imports.csvStrategyImportExport,
+                                        appVersion = appVersion,
+                                        onBack = { navigationHistory.navigateBack() },
+                                    )
+                                }
+                                is Screen.AuditHistory -> {
+                                    TransactionAuditScreen(
+                                        transferId = screen.transferId,
+                                        auditRepository = services.audit.auditRepository,
+                                        accountRepository = services.accounts.accountRepository,
+                                        transactionRepository = services.transactions.transactionRepository,
+                                        currentDeviceId = services.deviceId,
+                                        onCsvSourceClick = { importId, rowIndex ->
+                                            navigationHistory.navigateTo(Screen.CsvImportDetail(importId, rowIndex))
+                                        },
+                                        onApiSourceClick = { sessionId, requestId, jsonPath ->
+                                            navigationHistory.navigateTo(
+                                                Screen.ApiSessionTraffic(
+                                                    sessionId = sessionId,
+                                                    highlightRequestId = requestId,
+                                                    highlightJsonPath = jsonPath,
+                                                ),
+                                            )
+                                        },
+                                        onAccountClick = { accountId ->
+                                            val account = accounts.find { it.id == accountId }
+                                            navigationHistory.navigateTo(
+                                                Screen.AccountTransactions(
+                                                    accountId = accountId,
+                                                    accountName = account?.name ?: "#${accountId.id}",
+                                                ),
+                                            )
+                                        },
+                                        onBack = { navigationHistory.navigateBack() },
+                                    )
+                                }
+                                is Screen.AccountAuditHistory -> {
+                                    AccountAuditScreen(
+                                        accountId = screen.accountId,
+                                        auditRepository = services.audit.auditRepository,
+                                        accountRepository = services.accounts.accountRepository,
+                                        onApiSourceClick = { sessionId, requestId, jsonPath ->
+                                            navigationHistory.navigateTo(
+                                                Screen.ApiSessionTraffic(
+                                                    sessionId = sessionId,
+                                                    highlightRequestId = requestId,
+                                                    highlightJsonPath = jsonPath,
+                                                ),
+                                            )
+                                        },
+                                        onOwnerClick = { personId ->
+                                            navigationHistory.navigateTo(
+                                                Screen.PeopleScroll(
+                                                    personId = personId,
+                                                ),
+                                            )
+                                        },
+                                        onBack = { navigationHistory.navigateBack() },
+                                    )
+                                }
+                                is Screen.PersonAuditHistory -> {
+                                    PersonAuditScreen(
+                                        personId = screen.personId,
+                                        auditRepository = services.audit.auditRepository,
+                                        personRepository = services.people.personRepository,
+                                        onApiSourceClick = { sessionId, requestId, jsonPath ->
+                                            navigationHistory.navigateTo(
+                                                Screen.ApiSessionTraffic(
+                                                    sessionId = sessionId,
+                                                    highlightRequestId = requestId,
+                                                    highlightJsonPath = jsonPath,
+                                                ),
+                                            )
+                                        },
+                                        onBack = { navigationHistory.navigateBack() },
+                                    )
+                                }
+                                is Screen.CurrencyAuditHistory -> {
+                                    CurrencyAuditScreen(
+                                        currencyId = screen.currencyId,
+                                        auditRepository = services.audit.auditRepository,
+                                        currencyRepository = services.accounts.currencyRepository,
+                                        onBack = { navigationHistory.navigateBack() },
+                                    )
+                                }
+                                is Screen.CategoryAuditHistory -> {
+                                    CategoryAuditScreen(
+                                        categoryId = screen.categoryId,
+                                        auditRepository = services.audit.auditRepository,
+                                        categoryRepository = services.accounts.categoryRepository,
+                                        onBack = { navigationHistory.navigateBack() },
+                                    )
+                                }
+                                is Screen.MonzoConnect -> {
+                                    LaunchedEffect(Unit) {
+                                        currentlyViewedAccountId = null
+                                        currentlyViewedCurrencyId = null
+                                    }
+                                    MonzoAuthScreen(
+                                        apiSessionRepository = services.imports.apiSessionRepository,
+                                        onCredentialSaved = {
+                                            navigationHistory.navigateBack()
+                                        },
+                                    )
+                                }
 
-                            is Screen.ApiSessionTraffic -> {
-                                LaunchedEffect(Unit) {
-                                    currentlyViewedAccountId = null
-                                    currentlyViewedCurrencyId = null
+                                is Screen.ApiSessionTraffic -> {
+                                    LaunchedEffect(Unit) {
+                                        currentlyViewedAccountId = null
+                                        currentlyViewedCurrencyId = null
+                                    }
+                                    ApiSessionTrafficScreen(
+                                        apiSessionRepository = services.imports.apiSessionRepository,
+                                        sessionId = screen.sessionId,
+                                        highlightRequestId = screen.highlightRequestId,
+                                        highlightJsonPath = screen.highlightJsonPath,
+                                        onBack = { navigationHistory.navigateBack() },
+                                    )
                                 }
-                                ApiSessionTrafficScreen(
-                                    apiSessionRepository = services.imports.apiSessionRepository,
-                                    sessionId = screen.sessionId,
-                                    highlightRequestId = screen.highlightRequestId,
-                                    highlightJsonPath = screen.highlightJsonPath,
-                                    onBack = { navigationHistory.navigateBack() },
-                                )
                             }
                         }
                         BackgroundTaskPanel(

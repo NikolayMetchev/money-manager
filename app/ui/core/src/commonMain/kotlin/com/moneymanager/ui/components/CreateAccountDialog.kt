@@ -99,19 +99,8 @@ fun CreateAccountDialog(
                     onCreateCategoryClick = { accountState.showCreateCategoryDialog = true },
                 )
 
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = "Owners",
-                        style = MaterialTheme.typography.labelMedium,
-                        modifier = Modifier.padding(bottom = 8.dp),
-                    )
-                    if (people.isEmpty()) {
-                        Text(
-                            text = "No people available. Create one first.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    } else {
+                AccountOwnersSection(hasPeople = people.isNotEmpty()) {
+                    if (people.isNotEmpty()) {
                         ExposedDropdownMenuBox(
                             expanded = ownerDropdownExpanded,
                             onExpandedChange = { ownerDropdownExpanded = !ownerDropdownExpanded && !accountState.isSaving },

@@ -26,7 +26,7 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
-import com.moneymanager.ui.test.TestMoneyManagerApp
+import com.moneymanager.ui.test.MoneyManagerTestApp
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import kotlinx.coroutines.runBlocking
 import kotlin.test.AfterTest
@@ -73,7 +73,7 @@ class ImportMonzoCsvE2ETest {
                 )
 
             setContent {
-                TestMoneyManagerApp(
+                MoneyManagerTestApp(
                     databaseManager = testDatabaseManager,
                     appVersion = AppVersion("1.0.0-test"),
                 )
@@ -127,7 +127,7 @@ class ImportMonzoCsvE2ETest {
                 )
 
             setContent {
-                TestMoneyManagerApp(
+                MoneyManagerTestApp(
                     databaseManager = testDatabaseManager,
                     appVersion = AppVersion("1.0.0-test"),
                 )
@@ -289,7 +289,7 @@ class ImportMonzoCsvE2ETest {
                 )
 
             setContent {
-                TestMoneyManagerApp(
+                MoneyManagerTestApp(
                     databaseManager = testDatabaseManager,
                     appVersion = AppVersion("1.0.0-test"),
                 )
@@ -379,7 +379,7 @@ class ImportMonzoCsvE2ETest {
                 )
 
             setContent {
-                TestMoneyManagerApp(
+                MoneyManagerTestApp(
                     databaseManager = testDatabaseManager,
                     appVersion = AppVersion("1.0.0-test"),
                 )
