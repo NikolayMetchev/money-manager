@@ -141,13 +141,14 @@ class CsvImportRepositoryImpl(
                     lastAppliedStrategyId = it.last_applied_strategy_id,
                     lastAppliedStrategyName = it.last_applied_strategy_name,
                     lastAppliedAtMs = it.last_applied_at,
-                    columns = columnEntities.map { col ->
-                        CsvColumn(
-                            id = CsvColumnId(Uuid.parse(col.id)),
-                            columnIndex = col.column_index.toInt(),
-                            originalName = col.original_name,
-                        )
-                    },
+                    columns =
+                        columnEntities.map { col ->
+                            CsvColumn(
+                                id = CsvColumnId(Uuid.parse(col.id)),
+                                columnIndex = col.column_index.toInt(),
+                                originalName = col.original_name,
+                            )
+                        },
                 )
             }
         }
