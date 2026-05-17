@@ -5,11 +5,8 @@
 
 package com.moneymanager.ui.components
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -116,27 +113,11 @@ fun EditAccountDialog(
         onDismissRequest = { if (!accountState.isSaving) onDismiss() },
         title = { Text("Edit Account") },
         text = {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState())
-                        .padding(vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+            AccountDialogContent(
+                accountState = accountState,
+                categories = categories,
+                modifier = Modifier.verticalScroll(rememberScrollState()),
             ) {
-                AccountBasicsFields(
-                    name = accountState.name,
-                    onNameChange = { accountState.name = it },
-                    categories = categories,
-                    selectedCategoryId = accountState.selectedCategoryId,
-                    selectedCategoryName = accountState.selectedCategoryName,
-                    expanded = accountState.categoryExpanded,
-                    isSaving = accountState.isSaving,
-                    onExpandedChange = { accountState.categoryExpanded = it },
-                    onCategorySelected = accountState::selectCategory,
-                    onCreateCategoryClick = { accountState.showCreateCategoryDialog = true },
-                )
-
                 AccountOwnersSection(hasPeople = people.isNotEmpty()) {
                     people.forEach { person ->
                         Row(
