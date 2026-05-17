@@ -452,9 +452,7 @@ class ImportMonzoCsvE2ETest {
         return result
     }
 
-    private fun createTestStrategy(
-        headers: List<String>,
-    ): CsvImportStrategy =
+    private fun createTestStrategy(headers: List<String>): CsvImportStrategy =
         CsvImportStrategy(
             id = CsvImportStrategyId(Uuid.random()),
             name = "Monzo",
