@@ -94,7 +94,6 @@ import com.moneymanager.ui.util.ContentCopyIcon
 import com.moneymanager.ui.util.displayDateTime
 import com.moneymanager.ui.util.setPlainText
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
@@ -909,8 +908,7 @@ fun ApiSessionTrafficScreen(
                         // do a second scroll to center it vertically in the viewport.
                         val nodeY =
                             snapshotFlow { highlightNodeRootY }
-                                .filter { it >= 0f }
-                                .first()
+                                .first { it >= 0f }
                         val viewportHeight = lazyListState.layoutInfo.viewportSize.height
                         val listStartY = lazyListState.layoutInfo.viewportStartOffset.toFloat()
                         val nodeOffsetInViewport = nodeY - listStartY

@@ -37,7 +37,7 @@ class ApiSessionsScreenLogicTest {
 
     @Test
     fun shouldHighlightPair_doesNotFallbackToRequestWhenJsonPathProvidedButUnmatched() {
-        val pair = ApiTrafficPair(request = request(42), response = null)
+        val pair = ApiTrafficPair(request = request(41), response = null)
         val highlighted =
             shouldHighlightPair(
                 pair = pair,
@@ -63,7 +63,7 @@ class ApiSessionsScreenLogicTest {
 
     @Test
     fun shouldHighlightPair_matchesByJsonPathPrefix() {
-        val pair = ApiTrafficPair(request = request(42), response = null)
+        val pair = ApiTrafficPair(request = request(43), response = null)
         val highlighted =
             shouldHighlightPair(
                 pair = pair,
