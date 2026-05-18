@@ -935,23 +935,13 @@ fun ApiSessionTrafficScreen(
                             val responseTransactions =
                                 pair.response?.let { responseTransactionsByResponseId[it.id] }
                                     ?: emptyList()
-                            val requestMatches = highlightRequestId == null || pair.request?.id == highlightRequestId
-                            val jsonPathMatches =
-                                highlightJsonPath != null &&
-                                    responseTransactions.any {
-                                        highlightJsonPath.startsWithJsonPath(it.jsonPath.value)
-                                    }
                             val isHighlighted =
-                                (highlightRequestId != null || highlightJsonPath != null) &&
-                                    requestMatches &&
-                                    (
-                                        // Highlight by specific jsonPath when available (transaction sources).
-                                        // Use prefix matching so sub-paths resolve to the containing response.
-                                        jsonPathMatches ||
-                                            // Highlight by requestId when jsonPath doesn't match any transaction
-                                            // (e.g. main account sources stored at $.accounts[0], not transaction paths)
-                                            (highlightRequestId != null && highlightJsonPath == null)
-                                    )
+                                shouldHighlightPair(
+                                    pair = pair,
+                                    responseTransactions = responseTransactions,
+                                    highlightRequestId = highlightRequestId,
+                                    highlightJsonPath = highlightJsonPath,
+                                )
                             ApiTrafficPairCard(
                                 pair = pair,
                                 responseTransactions = responseTransactions,
@@ -1197,7 +1187,7 @@ private fun JsonViewer(
  * Returns true if this path equals [prefix] or is a child of it
  * (e.g. "$.transactions[0].counterparty".startsWithJsonPath("$.transactions[0]") == true).
  */
-private fun String.startsWithJsonPath(prefix: String): Boolean =
+internal fun String.startsWithJsonPath(prefix: String): Boolean =
     this == prefix || this.startsWith("$prefix.") || this.startsWith("$prefix[")
 
 /**
@@ -1205,7 +1195,7 @@ private fun String.startsWithJsonPath(prefix: String): Boolean =
  * string segments (["transactions", "2"]) used to trace the highlight path
  * through the JSON tree.  Returns null when no highlight is needed.
  */
-private fun parseJsonPathSegments(jsonPath: String?): List<String>? {
+internal fun parseJsonPathSegments(jsonPath: String?): List<String>? {
     if (jsonPath == null) return null
     // Strip leading "$." prefix, then split on "." and "[…]"
     val stripped = jsonPath.removePrefix("$.").removePrefix("$")
@@ -1228,6 +1218,29 @@ private fun parseJsonPathSegments(jsonPath: String?): List<String>? {
     return segments.ifEmpty { null }
 }
 
+internal fun isHighlightTarget(remainingHighlightSegments: List<String>?): Boolean =
+    remainingHighlightSegments != null && remainingHighlightSegments.isEmpty()
+
+internal fun shouldHighlightPair(
+    pair: ApiTrafficPair,
+    responseTransactions: List<ApiResponseTransaction>,
+    highlightRequestId: ApiRequestId?,
+    highlightJsonPath: String?,
+): Boolean {
+    val requestMatches = highlightRequestId == null || pair.request?.id == highlightRequestId
+    val jsonPathMatches =
+        highlightJsonPath != null &&
+            responseTransactions.any {
+                highlightJsonPath.startsWithJsonPath(it.jsonPath.value)
+            }
+    return (highlightRequestId != null || highlightJsonPath != null) &&
+        requestMatches &&
+        (
+            jsonPathMatches ||
+                (highlightRequestId != null && highlightJsonPath == null)
+        )
+}
+
 @Composable
 private fun JsonTreeNode(
     label: String?,
@@ -1246,7 +1259,7 @@ private fun JsonTreeNode(
     val childCount = element.childCount()
     val expandable = childCount > 0
     // This node is the target only when a highlight path exists and all segments are consumed.
-    val isHighlightTarget = remainingHighlightSegments != null && remainingHighlightSegments.isEmpty()
+    val isHighlightTarget = isHighlightTarget(remainingHighlightSegments)
     // Force-expand the node if it's on the highlight path
     val forceExpandPath = !remainingHighlightSegments.isNullOrEmpty()
     val shouldForceExpand = forceExpandSubtree || forceExpandPath || isHighlightTarget
@@ -1425,7 +1438,7 @@ private fun jsonObjectChildPath(
         "$parentPath.$key"
     }
 
-private data class ApiTrafficPair(
+internal data class ApiTrafficPair(
     val request: ApiRequest?,
     val response: ApiResponse?,
 )
