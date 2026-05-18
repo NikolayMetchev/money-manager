@@ -7,13 +7,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -58,6 +56,7 @@ import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.domain.repository.TransferSourceRepository
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.CurrencyPicker
+import com.moneymanager.ui.components.LoadingTextButton
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -74,14 +73,14 @@ fun TransactionEditDialog(
     transaction: Transfer? = null,
     transactionRepository: TransactionRepository,
     transferSourceRepository: TransferSourceRepository,
-    EntitySource: EntitySource,
+    entitySource: EntitySource,
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
     attributeTypeRepository: AttributeTypeRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    Maintenance: Maintenance,
+    maintenance: Maintenance,
     preSelectedSourceAccountId: AccountId? = null,
     preSelectedCurrencyId: CurrencyId? = null,
     onDismiss: () -> Unit,
@@ -230,7 +229,7 @@ fun TransactionEditDialog(
                     categoryRepository = categoryRepository,
                     personRepository = personRepository,
                     personAccountOwnershipRepository = personAccountOwnershipRepository,
-                    entitySource = EntitySource,
+                    entitySource = entitySource,
                     enabled = !isSaving,
                     excludeAccountId = targetAccountId,
                 )
@@ -244,7 +243,7 @@ fun TransactionEditDialog(
                     categoryRepository = categoryRepository,
                     personRepository = personRepository,
                     personAccountOwnershipRepository = personAccountOwnershipRepository,
-                    entitySource = EntitySource,
+                    entitySource = entitySource,
                     enabled = !isSaving,
                     excludeAccountId = sourceAccountId,
                 )
@@ -259,66 +258,26 @@ fun TransactionEditDialog(
                 )
 
                 // Date and Time Pickers
-                val dateTimeTextStyle = MaterialTheme.typography.bodySmall
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    OutlinedTextField(
+                    PickerReadonlyField(
                         value = selectedDate.toString(),
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Date") },
-                        textStyle = dateTimeTextStyle,
-                        trailingIcon = {
-                            IconButton(
-                                onClick = { showDatePicker = true },
-                                enabled = !isSaving,
-                            ) {
-                                Text(
-                                    text = "\uD83D\uDCC5",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                )
-                            }
-                        },
+                        label = "Date",
+                        icon = "\uD83D\uDCC5",
+                        onIconClick = { showDatePicker = true },
+                        iconEnabled = !isSaving,
                         modifier = Modifier.weight(1.5f),
-                        enabled = false,
-                        singleLine = true,
-                        colors =
-                            OutlinedTextFieldDefaults.colors(
-                                disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                                disabledBorderColor = MaterialTheme.colorScheme.outline,
-                                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            ),
                     )
 
-                    val time = LocalTime(selectedHour, selectedMinute)
-                    OutlinedTextField(
-                        value = time.toString(),
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Time") },
-                        textStyle = dateTimeTextStyle,
-                        trailingIcon = {
-                            IconButton(
-                                onClick = { showTimePicker = true },
-                                enabled = !isSaving,
-                            ) {
-                                Text(
-                                    text = "\uD83D\uDD54",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                )
-                            }
-                        },
+                    PickerReadonlyField(
+                        value = LocalTime(selectedHour, selectedMinute).toString(),
+                        label = "Time",
+                        icon = "\uD83D\uDD54",
+                        onIconClick = { showTimePicker = true },
+                        iconEnabled = !isSaving,
                         modifier = Modifier.weight(1f),
-                        enabled = false,
-                        singleLine = true,
-                        colors =
-                            OutlinedTextFieldDefaults.colors(
-                                disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                                disabledBorderColor = MaterialTheme.colorScheme.outline,
-                                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            ),
                     )
                 }
 
@@ -374,73 +333,16 @@ fun TransactionEditDialog(
                     }
                 }
 
-                // Attributes Section
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Text(
-                        text = "Attributes",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-
-                    // Display editable attributes
-                    editableAttributes.forEach { (id, pair) ->
-                        val (typeName, value) = pair
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            // Attribute type selector
-                            AttributeTypeField(
-                                value = typeName,
-                                onValueChange = { newTypeName ->
-                                    editableAttributes = editableAttributes + (id to Pair(newTypeName, value))
-                                },
-                                existingTypes = existingAttributeTypes,
-                                enabled = !isSaving,
-                                modifier = Modifier.weight(0.4f),
-                            )
-                            // Attribute value field
-                            OutlinedTextField(
-                                value = value,
-                                onValueChange = { newValue ->
-                                    editableAttributes = editableAttributes + (id to Pair(typeName, newValue))
-                                },
-                                label = { Text("Value") },
-                                modifier = Modifier.weight(0.5f),
-                                singleLine = true,
-                                enabled = !isSaving,
-                            )
-                            // Delete button
-                            IconButton(
-                                onClick = {
-                                    editableAttributes = editableAttributes - id
-                                },
-                                enabled = !isSaving,
-                            ) {
-                                Text(
-                                    text = "X",
-                                    color = MaterialTheme.colorScheme.error,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                )
-                            }
-                        }
-                    }
-
-                    // Add new attribute button
-                    TextButton(
-                        onClick = {
-                            editableAttributes = editableAttributes + (nextTempId to Pair("", ""))
-                            nextTempId--
-                        },
-                        enabled = !isSaving,
-                    ) {
-                        Text("+ Add Attribute")
-                    }
-                }
+                EditableAttributesSection(
+                    editableAttributes = editableAttributes,
+                    existingAttributeTypes = existingAttributeTypes,
+                    isSaving = isSaving,
+                    onAttributesChange = { editableAttributes = it },
+                    onAddAttribute = {
+                        editableAttributes = editableAttributes + (nextTempId to Pair("", ""))
+                        nextTempId--
+                    },
+                )
 
                 errorMessage?.let { error ->
                     Text(
@@ -452,17 +354,16 @@ fun TransactionEditDialog(
             }
         },
         confirmButton = {
-            TextButton(
+            LoadingTextButton(
                 onClick = {
-                    val validAmount = parsedAmount
                     when {
                         sourceAccountId == null -> errorMessage = "Source account is required"
                         targetAccountId == null -> errorMessage = "Target account is required"
                         sourceAccountId == targetAccountId -> errorMessage = "Source and target accounts must be different"
                         currencyId == null -> errorMessage = "Currency is required"
                         amount.isBlank() -> errorMessage = "Amount is required"
-                        validAmount == null -> errorMessage = "Invalid amount"
-                        validAmount <= BigDecimal.ZERO -> errorMessage = "Amount must be greater than 0"
+                        parsedAmount == null -> errorMessage = "Invalid amount"
+                        parsedAmount <= BigDecimal.ZERO -> errorMessage = "Amount must be greater than 0"
                         description.isBlank() -> errorMessage = "Description is required"
                         else -> {
                             isSaving = true
@@ -486,7 +387,7 @@ fun TransactionEditDialog(
                                             sourceAccountId != transaction.sourceAccountId ||
                                                 targetAccountId != transaction.targetAccountId ||
                                                 currencyId != transaction.amount.currency.id ||
-                                                validAmount != transaction.amount.toDisplayValue() ||
+                                                parsedAmount != transaction.amount.toDisplayValue() ||
                                                 description.trim() != transaction.description ||
                                                 timestamp != transaction.timestamp
 
@@ -499,7 +400,7 @@ fun TransactionEditDialog(
                                                     description = description.trim(),
                                                     sourceAccountId = sourceAccountId!!,
                                                     targetAccountId = targetAccountId!!,
-                                                    amount = Money.fromDisplayValue(validAmount, currency),
+                                                    amount = Money.fromDisplayValue(parsedAmount, currency),
                                                 )
                                             } else {
                                                 null
@@ -574,7 +475,7 @@ fun TransactionEditDialog(
                                                 description = description.trim(),
                                                 sourceAccountId = sourceAccountId!!,
                                                 targetAccountId = targetAccountId!!,
-                                                amount = Money.fromDisplayValue(validAmount, currency),
+                                                amount = Money.fromDisplayValue(parsedAmount, currency),
                                             )
 
                                         // Build attributes to save (only non-blank ones)
@@ -593,11 +494,11 @@ fun TransactionEditDialog(
                                         transactionRepository.createTransfers(
                                             transfers = listOf(transfer),
                                             newAttributes = mapOf(transfer.id to attributesToSave),
-                                            sourceRecorder = EntitySource.manualRecorder(),
+                                            sourceRecorder = entitySource.manualRecorder(),
                                         )
                                     }
 
-                                    Maintenance.refreshMaterializedViews()
+                                    maintenance.refreshMaterializedViews()
 
                                     onSaved()
                                     onDismiss()
@@ -614,16 +515,9 @@ fun TransactionEditDialog(
                     }
                 },
                 enabled = !isSaving && hasChanges,
-            ) {
-                if (isSaving) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp,
-                    )
-                } else {
-                    Text(if (isEditMode) "Update" else "Create")
-                }
-            }
+                loading = isSaving,
+                label = if (isEditMode) "Update" else "Create",
+            )
         },
         dismissButton = {
             TextButton(
@@ -702,4 +596,42 @@ fun TransactionEditDialog(
             },
         )
     }
+}
+
+@Composable
+private fun PickerReadonlyField(
+    value: String,
+    label: String,
+    icon: String,
+    onIconClick: () -> Unit,
+    iconEnabled: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = {},
+        readOnly = true,
+        label = { Text(label) },
+        textStyle = MaterialTheme.typography.bodySmall,
+        trailingIcon = {
+            IconButton(
+                onClick = onIconClick,
+                enabled = iconEnabled,
+            ) {
+                Text(
+                    text = icon,
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+            }
+        },
+        modifier = modifier,
+        enabled = false,
+        singleLine = true,
+        colors =
+            OutlinedTextFieldDefaults.colors(
+                disabledTextColor = MaterialTheme.colorScheme.onSurface,
+                disabledBorderColor = MaterialTheme.colorScheme.outline,
+                disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            ),
+    )
 }

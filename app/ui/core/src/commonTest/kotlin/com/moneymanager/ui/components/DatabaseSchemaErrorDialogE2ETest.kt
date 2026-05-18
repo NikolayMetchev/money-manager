@@ -13,7 +13,7 @@ import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.test.database.copyDatabaseFromResources
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
-import com.moneymanager.ui.test.TestMoneyManagerApp
+import com.moneymanager.ui.test.MoneyManagerTestApp
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import kotlin.test.AfterTest
 import kotlin.test.Test
@@ -47,7 +47,7 @@ class DatabaseSchemaErrorDialogE2ETest {
 
             // When: MoneyManagerApp is initialized with the problematic database
             setContent {
-                TestMoneyManagerApp(
+                MoneyManagerTestApp(
                     databaseManager =
                         TestDatabaseManager(
                             databaseManager = databaseManager,
@@ -84,7 +84,7 @@ class DatabaseSchemaErrorDialogE2ETest {
             val databaseManager = createTestDatabaseManager()
 
             setContent {
-                TestMoneyManagerApp(
+                MoneyManagerTestApp(
                     databaseManager =
                         TestDatabaseManager(
                             databaseManager = databaseManager,
@@ -122,7 +122,7 @@ class DatabaseSchemaErrorDialogE2ETest {
             val databaseManager = createTestDatabaseManager()
 
             setContent {
-                TestMoneyManagerApp(
+                MoneyManagerTestApp(
                     databaseManager =
                         TestDatabaseManager(
                             databaseManager = databaseManager,

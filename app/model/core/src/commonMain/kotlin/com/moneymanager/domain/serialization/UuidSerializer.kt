@@ -17,12 +17,12 @@ object UuidSerializer : KSerializer<Uuid> {
     override fun serialize(
         encoder: Encoder,
         value: Uuid,
-    ) = encoder.encodeString(value.toString())
+    ): Unit = encoder.encodeString(value.toString())
 
     override fun deserialize(decoder: Decoder): Uuid = Uuid.parse(decoder.decodeString())
 }
 
-val UuidSerializersModule =
+val UuidSerializersModule: SerializersModule =
     SerializersModule {
         contextual(Uuid::class, UuidSerializer)
     }

@@ -189,6 +189,7 @@ object ColumnDetector {
         // Exclude columns unsuitable for account names
         val candidateColumns =
             columns
+                .asSequence()
                 .filter { it.originalName != primaryColumn }
                 .filter { !isExcludedForFallback(it.originalName) }
                 .map { col ->
@@ -203,6 +204,7 @@ object ColumnDetector {
                     compareByDescending<Triple<String, Int, Boolean>> { (_, _, preferred) -> preferred }
                         .thenByDescending { (_, count, _) -> count },
                 ).map { (name, _, _) -> name }
+                .toList()
 
         // Return top candidate(s) - typically just the best one
         return candidateColumns.take(1)

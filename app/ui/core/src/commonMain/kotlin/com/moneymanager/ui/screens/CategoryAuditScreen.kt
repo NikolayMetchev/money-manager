@@ -3,7 +3,6 @@
 package com.moneymanager.ui.screens
 
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.Category
@@ -14,9 +13,12 @@ import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.ui.audit.AuditDiffCard
 import com.moneymanager.ui.audit.AuditScreen
 import com.moneymanager.ui.audit.AuditScreenData
+import com.moneymanager.ui.audit.AuditSectionLabel
+import com.moneymanager.ui.audit.DeletedFinalValuesLabel
 import com.moneymanager.ui.audit.FieldChange
 import com.moneymanager.ui.audit.FieldChangeRow
 import com.moneymanager.ui.audit.FieldValueRow
+import com.moneymanager.ui.audit.NoVisibleChangesText
 import com.moneymanager.ui.audit.SourceInfoSection
 import kotlinx.coroutines.flow.first
 import kotlin.time.Instant
@@ -165,28 +167,16 @@ private fun CategoryAuditDiffCard(diff: CategoryAuditDiff) {
     ) {
         when (diff.auditType) {
             AuditType.INSERT -> {
-                Text(
-                    text = "Created with:",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                AuditSectionLabel("Created with:")
                 FieldValueRow("Name", diff.name.value())
                 FieldValueRow("Parent", diff.parent.value())
                 SourceInfoSection(diff.source)
             }
             AuditType.UPDATE -> {
                 if (!diff.hasChanges) {
-                    Text(
-                        text = "No visible changes recorded",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    NoVisibleChangesText()
                 } else {
-                    Text(
-                        text = "Changed:",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    AuditSectionLabel("Changed:")
                     val nameChange = diff.name
                     if (nameChange is FieldChange.Changed) {
                         FieldChangeRow("Name", nameChange.oldValue, nameChange.newValue)
@@ -200,11 +190,7 @@ private fun CategoryAuditDiffCard(diff: CategoryAuditDiff) {
             }
             AuditType.DELETE -> {
                 val errorColor = MaterialTheme.colorScheme.error
-                Text(
-                    text = "Deleted (final values):",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = errorColor.copy(alpha = 0.8f),
-                )
+                DeletedFinalValuesLabel(errorColor)
                 FieldValueRow("Name", diff.name.value(), errorColor)
                 FieldValueRow("Parent", diff.parent.value(), errorColor)
                 SourceInfoSection(diff.source, labelColor = errorColor.copy(alpha = 0.8f))

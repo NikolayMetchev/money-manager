@@ -5,14 +5,9 @@
 
 package com.moneymanager.ui.components
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -28,7 +23,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
@@ -64,17 +58,10 @@ fun CreateAccountDialog(
     onAccountCreated: ((AccountId) -> Unit)? = null,
     initialName: String = "",
 ) {
-    var name by remember(initialName) { mutableStateOf(initialName) }
-    var selectedCategoryId by remember { mutableStateOf(-1L) }
-    var selectedCategoryName by remember { mutableStateOf<String?>(null) }
-    var expanded by remember { mutableStateOf(false) }
-    var showCreateCategoryDialog by remember { mutableStateOf(false) }
-    var showCreatePersonDialog by remember { mutableStateOf(false) }
+    val accountState = rememberAccountDialogState(initialName = initialName, initialCategoryId = -1L)
     var selectedOwnerIds by remember { mutableStateOf(setOf<Long>()) }
     var selectedOwnerIdForAddition by remember { mutableStateOf<Long?>(null) }
     var ownerDropdownExpanded by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    var isSaving by remember { mutableStateOf(false) }
 
     val categories by categoryRepository
         .getAllCategories()
@@ -85,82 +72,18 @@ fun CreateAccountDialog(
     val scope = rememberSchemaAwareCoroutineScope()
 
     AlertDialog(
-        onDismissRequest = { if (!isSaving) onDismiss() },
+        onDismissRequest = { if (!accountState.isSaving) onDismiss() },
         title = { Text("Create New Account") },
         text = {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+            AccountDialogContent(
+                accountState = accountState,
+                categories = categories,
             ) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Account Name") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    enabled = !isSaving,
-                )
-
-                ExposedDropdownMenuBox(
-                    expanded = expanded,
-                    onExpandedChange = { expanded = !expanded && !isSaving },
-                ) {
-                    OutlinedTextField(
-                        value =
-                            selectedCategoryName
-                                ?: categories.find { it.id == selectedCategoryId }?.name
-                                ?: "Uncategorized",
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Category") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                        modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
-                        enabled = !isSaving,
-                    )
-                    ExposedDropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { expanded = false },
-                    ) {
-                        categories.forEach { category ->
-                            DropdownMenuItem(
-                                text = { Text(category.name) },
-                                onClick = {
-                                    selectedCategoryId = category.id
-                                    selectedCategoryName = null
-                                    expanded = false
-                                },
-                            )
-                        }
-                        HorizontalDivider()
-                        DropdownMenuItem(
-                            text = { Text("+ Create New Category") },
-                            onClick = {
-                                expanded = false
-                                showCreateCategoryDialog = true
-                            },
-                        )
-                    }
-                }
-
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = "Owners",
-                        style = MaterialTheme.typography.labelMedium,
-                        modifier = Modifier.padding(bottom = 8.dp),
-                    )
-                    if (people.isEmpty()) {
-                        Text(
-                            text = "No people available. Create one first.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    } else {
+                AccountOwnersSection(hasPeople = people.isNotEmpty()) {
+                    if (people.isNotEmpty()) {
                         ExposedDropdownMenuBox(
                             expanded = ownerDropdownExpanded,
-                            onExpandedChange = { ownerDropdownExpanded = !ownerDropdownExpanded && !isSaving },
+                            onExpandedChange = { ownerDropdownExpanded = !ownerDropdownExpanded && !accountState.isSaving },
                         ) {
                             OutlinedTextField(
                                 value = people.find { it.id.id == selectedOwnerIdForAddition }?.fullName ?: "Select owner",
@@ -171,7 +94,7 @@ fun CreateAccountDialog(
                                     ExposedDropdownMenuDefaults.TrailingIcon(expanded = ownerDropdownExpanded)
                                 },
                                 modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
-                                enabled = !isSaving && people.any { !selectedOwnerIds.contains(it.id.id) },
+                                enabled = !accountState.isSaving && people.any { !selectedOwnerIds.contains(it.id.id) },
                             )
                             ExposedDropdownMenu(
                                 expanded = ownerDropdownExpanded,
@@ -181,7 +104,7 @@ fun CreateAccountDialog(
                                     text = { Text("+ Create New Person") },
                                     onClick = {
                                         ownerDropdownExpanded = false
-                                        showCreatePersonDialog = true
+                                        accountState.showCreatePersonDialog = true
                                     },
                                 )
                                 HorizontalDivider()
@@ -205,7 +128,7 @@ fun CreateAccountDialog(
                                     selectedOwnerIdForAddition = null
                                 }
                             },
-                            enabled = !isSaving && selectedOwnerIdForAddition != null,
+                            enabled = !accountState.isSaving && selectedOwnerIdForAddition != null,
                         ) {
                             Text("+ Add Owner")
                         }
@@ -225,7 +148,7 @@ fun CreateAccountDialog(
                                     onClick = {
                                         selectedOwnerIds = selectedOwnerIds - person.id.id
                                     },
-                                    enabled = !isSaving,
+                                    enabled = !accountState.isSaving,
                                 ) {
                                     Text("Remove")
                                 }
@@ -234,32 +157,26 @@ fun CreateAccountDialog(
                     }
                 }
 
-                errorMessage?.let { error ->
-                    Text(
-                        text = error,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
+                accountState.errorMessage?.let { error -> ErrorMessageText(error) }
             }
         },
         confirmButton = {
-            TextButton(
+            LoadingTextButton(
                 onClick = {
-                    if (name.isBlank()) {
-                        errorMessage = "Account name is required"
+                    if (accountState.name.isBlank()) {
+                        accountState.errorMessage = "Account name is required"
                     } else {
-                        isSaving = true
-                        errorMessage = null
+                        accountState.isSaving = true
+                        accountState.errorMessage = null
                         scope.launch {
                             try {
                                 val now = Clock.System.now()
                                 val newAccount =
                                     Account(
                                         id = AccountId(0),
-                                        name = name.trim(),
+                                        name = accountState.name.trim(),
                                         openingDate = now,
-                                        categoryId = selectedCategoryId,
+                                        categoryId = accountState.selectedCategoryId,
                                     )
                                 val accountId = accountRepository.createAccount(newAccount)
                                 // Record source for audit trail
@@ -277,47 +194,36 @@ fun CreateAccountDialog(
                                 onDismiss()
                             } catch (expected: Exception) {
                                 logger.error(expected) { "Failed to create account: ${expected.message}" }
-                                errorMessage = "Failed to create account: ${expected.message}"
-                                isSaving = false
+                                accountState.errorMessage = "Failed to create account: ${expected.message}"
+                                accountState.isSaving = false
                             }
                         }
                     }
                 },
-                enabled = !isSaving,
-            ) {
-                if (isSaving) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp,
-                    )
-                } else {
-                    Text("Create")
-                }
-            }
+                enabled = !accountState.isSaving,
+                loading = accountState.isSaving,
+                label = "Create",
+            )
         },
         dismissButton = {
             TextButton(
                 onClick = onDismiss,
-                enabled = !isSaving,
+                enabled = !accountState.isSaving,
             ) {
                 Text("Cancel")
             }
         },
     )
 
-    if (showCreateCategoryDialog) {
+    if (accountState.showCreateCategoryDialog) {
         CreateCategoryDialog(
             categoryRepository = categoryRepository,
-            onCategoryCreated = { categoryId, categoryName ->
-                selectedCategoryId = categoryId
-                selectedCategoryName = categoryName
-                showCreateCategoryDialog = false
-            },
-            onDismiss = { showCreateCategoryDialog = false },
+            onCategoryCreated = accountState::selectCreatedCategory,
+            onDismiss = { accountState.showCreateCategoryDialog = false },
         )
     }
 
-    if (showCreatePersonDialog) {
+    if (accountState.showCreatePersonDialog) {
         EditPersonDialog(
             personToEdit = null,
             personRepository = personRepository,
@@ -326,7 +232,7 @@ fun CreateAccountDialog(
             onPersonCreated = { personId ->
                 selectedOwnerIdForAddition = personId.id
             },
-            onDismiss = { showCreatePersonDialog = false },
+            onDismiss = { accountState.showCreatePersonDialog = false },
         )
     }
 }

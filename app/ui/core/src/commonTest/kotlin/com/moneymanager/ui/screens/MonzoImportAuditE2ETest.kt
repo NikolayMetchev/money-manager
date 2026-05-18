@@ -25,7 +25,7 @@ import com.moneymanager.test.database.deleteTestDatabase
 import com.moneymanager.ui.api.downloadApiSessionAccounts
 import com.moneymanager.ui.api.downloadApiSessionTransactions
 import com.moneymanager.ui.api.importApiSessionTransactions
-import com.moneymanager.ui.test.TestMoneyManagerApp
+import com.moneymanager.ui.test.MoneyManagerTestApp
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -218,7 +218,7 @@ class MonzoImportAuditE2ETest {
                 )
 
             setContent {
-                TestMoneyManagerApp(
+                MoneyManagerTestApp(
                     databaseManager = testDatabaseManager,
                     appVersion = AppVersion("1.0.0-test"),
                 )

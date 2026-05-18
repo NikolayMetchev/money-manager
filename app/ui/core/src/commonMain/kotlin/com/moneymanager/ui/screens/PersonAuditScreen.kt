@@ -108,30 +108,7 @@ private fun computePersonAuditDiffs(
                     source = entry.source,
                 )
             AuditType.UPDATE -> {
-                val newFirstName =
-                    if (index == 0 && currentPerson != null) {
-                        currentPerson.firstName
-                    } else if (index > 0) {
-                        entries[index - 1].firstName
-                    } else {
-                        entry.firstName
-                    }
-                val newMiddleName =
-                    if (index == 0 && currentPerson != null) {
-                        currentPerson.middleName
-                    } else if (index > 0) {
-                        entries[index - 1].middleName
-                    } else {
-                        entry.middleName
-                    }
-                val newLastName =
-                    if (index == 0 && currentPerson != null) {
-                        currentPerson.lastName
-                    } else if (index > 0) {
-                        entries[index - 1].lastName
-                    } else {
-                        entry.lastName
-                    }
+                val previousEntry = entries.getOrNull(index - 1)
 
                 PersonAuditDiff(
                     id = entry.id,
@@ -139,23 +116,32 @@ private fun computePersonAuditDiffs(
                     auditType = entry.auditType,
                     revisionId = entry.revisionId,
                     firstName =
-                        if (entry.firstName != newFirstName) {
-                            FieldChange.Changed(entry.firstName, newFirstName)
-                        } else {
-                            FieldChange.Unchanged(entry.firstName)
-                        },
+                        resolveUpdateChange(
+                            index = index,
+                            currentEntry = currentPerson,
+                            previousEntry = previousEntry,
+                            entryValue = entry.firstName,
+                            currentValue = { it.firstName },
+                            previousValue = { it.firstName },
+                        ),
                     middleName =
-                        if (entry.middleName != newMiddleName) {
-                            FieldChange.Changed(entry.middleName, newMiddleName)
-                        } else {
-                            FieldChange.Unchanged(entry.middleName)
-                        },
+                        resolveUpdateChange(
+                            index = index,
+                            currentEntry = currentPerson,
+                            previousEntry = previousEntry,
+                            entryValue = entry.middleName,
+                            currentValue = { it.middleName },
+                            previousValue = { it.middleName },
+                        ),
                     lastName =
-                        if (entry.lastName != newLastName) {
-                            FieldChange.Changed(entry.lastName, newLastName)
-                        } else {
-                            FieldChange.Unchanged(entry.lastName)
-                        },
+                        resolveUpdateChange(
+                            index = index,
+                            currentEntry = currentPerson,
+                            previousEntry = previousEntry,
+                            entryValue = entry.lastName,
+                            currentValue = { it.lastName },
+                            previousValue = { it.lastName },
+                        ),
                     attributeChanges = revisionAttributes,
                     source = entry.source,
                 )

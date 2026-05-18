@@ -10,7 +10,6 @@ import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
-import com.moneymanager.domain.model.AccountRow
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.PageWithTargetIndex
 import com.moneymanager.domain.model.PagingInfo
@@ -475,11 +474,11 @@ class AccountsScreenTest {
             every { getTransactionsByAccountAndDateRange(any(), any(), any()) } returns flowOf(emptyList())
             every { getAccountBalances() } returns flowOf(emptyList())
             everySuspend { getRunningBalanceByAccountPaginated(any(), any(), any()) } returns
-                PagingResult(emptyList<AccountRow>(), PagingInfo(null, null, false))
+                PagingResult(emptyList(), PagingInfo(null, null, false))
             everySuspend { getRunningBalanceByAccountPaginatedBackward(any(), any(), any(), any()) } returns
-                PagingResult(emptyList<AccountRow>(), PagingInfo(null, null, false))
+                PagingResult(emptyList(), PagingInfo(null, null, false))
             everySuspend { getPageContainingTransaction(any(), any(), any()) } returns
-                PageWithTargetIndex(emptyList<AccountRow>(), -1, PagingInfo(null, null, false), false)
+                PageWithTargetIndex(emptyList(), -1, PagingInfo(null, null, false), false)
         }
 
     private fun createCategoryRepository(): CategoryRepository =

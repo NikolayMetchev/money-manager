@@ -16,7 +16,7 @@ import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
-import com.moneymanager.ui.test.TestMoneyManagerApp
+import com.moneymanager.ui.test.MoneyManagerTestApp
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import kotlin.test.AfterTest
 import kotlin.test.Test
@@ -52,7 +52,7 @@ class CreateAccountWithNewCategoryE2ETest {
             val databaseManager = createTestDatabaseManager()
 
             setContent {
-                TestMoneyManagerApp(
+                MoneyManagerTestApp(
                     databaseManager =
                         TestDatabaseManager(
                             databaseManager = databaseManager,

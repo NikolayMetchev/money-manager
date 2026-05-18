@@ -30,9 +30,12 @@ import com.moneymanager.domain.repository.AuditRepository
 import com.moneymanager.ui.audit.AuditDiffCard
 import com.moneymanager.ui.audit.AuditScreen
 import com.moneymanager.ui.audit.AuditScreenData
+import com.moneymanager.ui.audit.AuditSectionLabel
+import com.moneymanager.ui.audit.DeletedFinalValuesLabel
 import com.moneymanager.ui.audit.FieldChange
 import com.moneymanager.ui.audit.FieldChangeRow
 import com.moneymanager.ui.audit.FieldValueRow
+import com.moneymanager.ui.audit.NoVisibleChangesText
 import com.moneymanager.ui.audit.SourceInfoSection
 import kotlinx.coroutines.flow.first
 import kotlinx.datetime.TimeZone
@@ -160,22 +163,7 @@ private fun computeAccountAuditDiffs(
                     source = effectiveSource,
                 )
             AuditType.UPDATE -> {
-                val newName =
-                    if (index == 0 && currentAccount != null) {
-                        currentAccount.name
-                    } else if (index > 0) {
-                        entries[index - 1].name
-                    } else {
-                        entry.name
-                    }
-                val newCategoryName =
-                    if (index == 0 && currentAccount != null) {
-                        entries.getOrNull(index - 1)?.categoryName ?: entry.categoryName
-                    } else if (index > 0) {
-                        entries[index - 1].categoryName
-                    } else {
-                        entry.categoryName
-                    }
+                val previousEntry = entries.getOrNull(index - 1)
 
                 AccountAuditDiff(
                     id = entry.id,
@@ -183,18 +171,22 @@ private fun computeAccountAuditDiffs(
                     auditType = entry.auditType,
                     revisionId = entry.revisionId,
                     name =
-                        if (entry.name != newName) {
-                            FieldChange.Changed(entry.name, newName)
-                        } else {
-                            FieldChange.Unchanged(entry.name)
-                        },
+                        resolveUpdateChange(
+                            index = index,
+                            currentEntry = currentAccount,
+                            previousEntry = previousEntry,
+                            entryValue = entry.name,
+                            currentValue = { it.name },
+                            previousValue = { it.name },
+                        ),
                     openingDate = FieldChange.Unchanged(entry.openingDate),
                     categoryName =
-                        if (entry.categoryName != newCategoryName) {
-                            FieldChange.Changed(entry.categoryName, newCategoryName)
-                        } else {
-                            FieldChange.Unchanged(entry.categoryName)
-                        },
+                        resolveUpdateChange(
+                            index = index,
+                            previousEntry = previousEntry,
+                            entryValue = entry.categoryName,
+                            previousValue = { it.categoryName },
+                        ),
                     ownersAdded = ownershipChanges.ownersAdded,
                     ownersRemoved = ownershipChanges.ownersRemoved,
                     attributeChanges = entry.attributeChanges,
@@ -218,11 +210,7 @@ private fun AccountAuditDiffCard(
     ) {
         when (diff.auditType) {
             AuditType.INSERT -> {
-                Text(
-                    text = "Created with:",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                AuditSectionLabel("Created with:")
                 FieldValueRow("Name", diff.name.value())
                 val openingDate = diff.openingDate.value().toLocalDateTime(TimeZone.currentSystemDefault())
                 FieldValueRow("Opening Date", "${openingDate.date}")
@@ -233,17 +221,9 @@ private fun AccountAuditDiffCard(
             }
             AuditType.UPDATE -> {
                 if (!diff.hasChanges) {
-                    Text(
-                        text = "No visible changes recorded",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    NoVisibleChangesText()
                 } else {
-                    Text(
-                        text = "Changed:",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    AuditSectionLabel("Changed:")
                     val nameChange = diff.name
                     if (nameChange is FieldChange.Changed) {
                         FieldChangeRow("Name", nameChange.oldValue, nameChange.newValue)
@@ -263,11 +243,7 @@ private fun AccountAuditDiffCard(
             }
             AuditType.DELETE -> {
                 val errorColor = MaterialTheme.colorScheme.error
-                Text(
-                    text = "Deleted (final values):",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = errorColor.copy(alpha = 0.8f),
-                )
+                DeletedFinalValuesLabel(errorColor)
                 FieldValueRow("Name", diff.name.value(), errorColor)
                 val openingDate = diff.openingDate.value().toLocalDateTime(TimeZone.currentSystemDefault())
                 FieldValueRow("Opening Date", "${openingDate.date}", errorColor)

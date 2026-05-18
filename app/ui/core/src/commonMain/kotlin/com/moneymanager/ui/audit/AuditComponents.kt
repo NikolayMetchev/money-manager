@@ -96,6 +96,33 @@ fun FieldChangeRow(
 }
 
 @Composable
+fun AuditSectionLabel(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+@Composable
+fun NoVisibleChangesText() {
+    Text(
+        text = "No visible changes recorded",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+@Composable
+fun DeletedFinalValuesLabel(errorColor: Color) {
+    Text(
+        text = "Deleted (final values):",
+        style = MaterialTheme.typography.labelMedium,
+        color = errorColor.copy(alpha = 0.8f),
+    )
+}
+
+@Composable
 fun SourceInfoSection(
     source: EntitySource?,
     labelColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -121,16 +148,14 @@ fun SourceInfoSection(
         } else {
             when (source.sourceType) {
                 SourceType.MANUAL -> {
-                    val deviceInfo = source.deviceInfo
-                    when (deviceInfo) {
+                    when (val deviceInfo = source.deviceInfo) {
                         is DeviceInfo.Jvm -> {
                             FieldValueRow("Origin", "Manual (Desktop)", labelWidth = labelWidth)
-                            FieldValueRow("Machine", deviceInfo.machineName, labelWidth = labelWidth)
-                            FieldValueRow("OS", deviceInfo.osName, labelWidth = labelWidth)
+                            DeviceInfoRows(deviceInfo, labelWidth)
                         }
                         is DeviceInfo.Android -> {
                             FieldValueRow("Origin", "Manual (Android)", labelWidth = labelWidth)
-                            FieldValueRow("Device", "${deviceInfo.deviceMake} ${deviceInfo.deviceModel}", labelWidth = labelWidth)
+                            DeviceInfoRows(deviceInfo, labelWidth)
                         }
                         null -> {
                             FieldValueRow("Origin", "Manual", labelWidth = labelWidth)
@@ -140,27 +165,17 @@ fun SourceInfoSection(
                 SourceType.CSV_IMPORT -> {
                     val deviceInfo = source.deviceInfo
                     FieldValueRow("Origin", "CSV Import", labelWidth = labelWidth)
-                    when (deviceInfo) {
-                        is DeviceInfo.Jvm -> {
-                            FieldValueRow("Machine", deviceInfo.machineName, labelWidth = labelWidth)
-                            FieldValueRow("OS", deviceInfo.osName, labelWidth = labelWidth)
-                        }
-                        is DeviceInfo.Android -> {
-                            FieldValueRow("Device", "${deviceInfo.deviceMake} ${deviceInfo.deviceModel}", labelWidth = labelWidth)
-                        }
-                        null -> {}
-                    }
+                    DeviceInfoRows(deviceInfo, labelWidth)
                 }
                 SourceType.SAMPLE_GENERATOR -> {
                     when (val deviceInfo = source.deviceInfo) {
                         is DeviceInfo.Jvm -> {
                             FieldValueRow("Origin", "Sample Generator (Desktop)", labelWidth = labelWidth)
-                            FieldValueRow("Machine", deviceInfo.machineName, labelWidth = labelWidth)
-                            FieldValueRow("OS", deviceInfo.osName, labelWidth = labelWidth)
+                            DeviceInfoRows(deviceInfo, labelWidth)
                         }
                         is DeviceInfo.Android -> {
                             FieldValueRow("Origin", "Sample Generator (Android)", labelWidth = labelWidth)
-                            FieldValueRow("Device", "${deviceInfo.deviceMake} ${deviceInfo.deviceModel}", labelWidth = labelWidth)
+                            DeviceInfoRows(deviceInfo, labelWidth)
                         }
                         null -> {
                             FieldValueRow("Origin", "Sample Generator", labelWidth = labelWidth)
@@ -175,8 +190,6 @@ fun SourceInfoSection(
                     val apiSource = source.apiSource
                     if (apiSource != null && onApiSourceClick != null) {
                         ApiSourceLinkRow(
-                            label = "Origin",
-                            value = "API Import",
                             sessionId = apiSource.sessionId,
                             requestId = apiSource.requestId,
                             jsonPath = apiSource.jsonPath.value,
@@ -186,16 +199,7 @@ fun SourceInfoSection(
                     } else {
                         FieldValueRow("Origin", "API Import", labelWidth = labelWidth)
                     }
-                    when (deviceInfo) {
-                        is DeviceInfo.Jvm -> {
-                            FieldValueRow("Machine", deviceInfo.machineName, labelWidth = labelWidth)
-                            FieldValueRow("OS", deviceInfo.osName, labelWidth = labelWidth)
-                        }
-                        is DeviceInfo.Android -> {
-                            FieldValueRow("Device", "${deviceInfo.deviceMake} ${deviceInfo.deviceModel}", labelWidth = labelWidth)
-                        }
-                        null -> {}
-                    }
+                    DeviceInfoRows(deviceInfo, labelWidth)
                 }
             }
         }
@@ -203,9 +207,24 @@ fun SourceInfoSection(
 }
 
 @Composable
+private fun DeviceInfoRows(
+    deviceInfo: DeviceInfo?,
+    labelWidth: Dp,
+) {
+    when (deviceInfo) {
+        is DeviceInfo.Jvm -> {
+            FieldValueRow("Machine", deviceInfo.machineName, labelWidth = labelWidth)
+            FieldValueRow("OS", deviceInfo.osName, labelWidth = labelWidth)
+        }
+        is DeviceInfo.Android -> {
+            FieldValueRow("Device", "${deviceInfo.deviceMake} ${deviceInfo.deviceModel}", labelWidth = labelWidth)
+        }
+        null -> {}
+    }
+}
+
+@Composable
 private fun ApiSourceLinkRow(
-    label: String,
-    value: String,
     sessionId: ApiSessionId,
     requestId: ApiRequestId,
     jsonPath: String,
@@ -218,7 +237,7 @@ private fun ApiSourceLinkRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = "$label:",
+            text = "Origin:",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.width(labelWidth),
@@ -227,7 +246,7 @@ private fun ApiSourceLinkRow(
             onClick = { onApiSourceClick(sessionId, requestId, jsonPath) },
             contentPadding = PaddingValues(0.dp),
         ) {
-            Text(value)
+            Text("API Import")
         }
     }
 }

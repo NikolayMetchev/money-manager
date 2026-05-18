@@ -62,7 +62,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import nl.jacobras.humanreadable.HumanReadable
 
-@Suppress("UnusedParameter") // onStrategyClick retained for future extensibility
 @Composable
 fun CsvStrategiesScreen(
     csvImportStrategyRepository: CsvImportStrategyRepository,
@@ -268,6 +267,7 @@ fun CsvStrategiesScreen(
                                 strategy = strategy,
                                 csvImportStrategyRepository = csvImportStrategyRepository,
                                 onEditClick = {
+                                    onStrategyClick(strategy)
                                     strategyToEdit = strategy
                                     showSelectCsvDialog = true
                                 },

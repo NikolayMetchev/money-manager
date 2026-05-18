@@ -6,10 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -43,13 +40,12 @@ fun CreateCurrencyDialog(
 ) {
     var code by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    var isSaving by remember { mutableStateOf(false) }
+    val saveState = rememberDialogSaveState()
 
     val scope = rememberSchemaAwareCoroutineScope()
 
     AlertDialog(
-        onDismissRequest = { if (!isSaving) onDismiss() },
+        onDismissRequest = { if (!saveState.isSaving) onDismiss() },
         title = { Text("Create New Currency") },
         text = {
             Column(
@@ -65,7 +61,7 @@ fun CreateCurrencyDialog(
                     label = { Text("Currency Code (e.g., USD)") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    enabled = !isSaving,
+                    enabled = !saveState.isSaving,
                 )
 
                 OutlinedTextField(
@@ -74,57 +70,44 @@ fun CreateCurrencyDialog(
                     label = { Text("Currency Name (e.g., US Dollar)") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    enabled = !isSaving,
+                    enabled = !saveState.isSaving,
                 )
 
-                errorMessage?.let { error ->
-                    Text(
-                        text = error,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
+                saveState.errorMessage?.let { error -> ErrorMessageText(error) }
             }
         },
         confirmButton = {
-            TextButton(
+            LoadingTextButton(
                 onClick = {
                     when {
-                        code.isBlank() -> errorMessage = "Currency code is required"
-                        code.length != 3 -> errorMessage = "Currency code must be 3 characters"
-                        name.isBlank() -> errorMessage = "Currency name is required"
+                        code.isBlank() -> saveState.errorMessage = "Currency code is required"
+                        code.length != 3 -> saveState.errorMessage = "Currency code must be 3 characters"
+                        name.isBlank() -> saveState.errorMessage = "Currency name is required"
                         else -> {
-                            isSaving = true
-                            errorMessage = null
+                            saveState.isSaving = true
+                            saveState.errorMessage = null
                             scope.launch {
                                 try {
                                     val currencyId = currencyRepository.upsertCurrencyByCode(code.trim(), name.trim())
                                     onCurrencyCreated(currencyId)
                                 } catch (expected: Exception) {
                                     logger.error(expected) { "Failed to create currency: ${expected.message}" }
-                                    errorMessage = "Failed to create currency: ${expected.message}"
-                                    isSaving = false
+                                    saveState.errorMessage = "Failed to create currency: ${expected.message}"
+                                    saveState.isSaving = false
                                 }
                             }
                         }
                     }
                 },
-                enabled = !isSaving,
-            ) {
-                if (isSaving) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp,
-                    )
-                } else {
-                    Text("Create")
-                }
-            }
+                enabled = !saveState.isSaving,
+                loading = saveState.isSaving,
+                label = "Create",
+            )
         },
         dismissButton = {
             TextButton(
                 onClick = onDismiss,
-                enabled = !isSaving,
+                enabled = !saveState.isSaving,
             ) {
                 Text("Cancel")
             }

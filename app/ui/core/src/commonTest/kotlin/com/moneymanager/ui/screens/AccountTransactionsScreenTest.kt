@@ -132,7 +132,7 @@ class AccountTransactionsScreenTest {
                         accountId = currentAccountId,
                         transactionRepository = transactionRepository,
                         transferSourceRepository = transferSourceRepository,
-                        EntitySource = entitySource,
+                        entitySource = entitySource,
                         accountRepository = accountRepository,
                         accountAttributeRepository = createAccountAttributeRepository(),
                         categoryRepository = categoryRepository,
@@ -140,7 +140,7 @@ class AccountTransactionsScreenTest {
                         attributeTypeRepository = attributeTypeRepository,
                         personRepository = personRepository,
                         personAccountOwnershipRepository = personAccountOwnershipRepository,
-                        Maintenance = maintenance,
+                        maintenance = maintenance,
                         onAccountIdChange = { currentAccountId = it },
                         onCurrencyIdChange = {},
                     )
@@ -228,7 +228,7 @@ class AccountTransactionsScreenTest {
                         accountId = currentAccountId,
                         transactionRepository = transactionRepository,
                         transferSourceRepository = transferSourceRepository,
-                        EntitySource = entitySource,
+                        entitySource = entitySource,
                         accountRepository = accountRepository,
                         accountAttributeRepository = createAccountAttributeRepository(),
                         categoryRepository = categoryRepository,
@@ -236,7 +236,7 @@ class AccountTransactionsScreenTest {
                         attributeTypeRepository = attributeTypeRepository,
                         personRepository = personRepository,
                         personAccountOwnershipRepository = personAccountOwnershipRepository,
-                        Maintenance = maintenance,
+                        maintenance = maintenance,
                         onAccountIdChange = { currentAccountId = it },
                         onCurrencyIdChange = {},
                     )
@@ -351,7 +351,7 @@ class AccountTransactionsScreenTest {
                                 accountId = currentAccountId,
                                 transactionRepository = repositories.transactionRepository,
                                 transferSourceRepository = repositories.transferSourceRepository,
-                                EntitySource = createDbEntitySource(repositories),
+                                entitySource = createDbEntitySource(repositories),
                                 accountRepository = repositories.accountRepository,
                                 accountAttributeRepository = repositories.accountAttributeRepository,
                                 categoryRepository = repositories.categoryRepository,
@@ -359,7 +359,7 @@ class AccountTransactionsScreenTest {
                                 attributeTypeRepository = repositories.attributeTypeRepository,
                                 personRepository = repositories.personRepository,
                                 personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                                Maintenance = createDbMaintenance(repositories),
+                                maintenance = createDbMaintenance(repositories),
                                 onAccountIdChange = { currentAccountId = it },
                                 onCurrencyIdChange = {},
                                 onAuditClick = { auditTransferId = it },
@@ -560,7 +560,7 @@ class AccountTransactionsScreenTest {
                                 accountId = currentAccountId,
                                 transactionRepository = repositories.transactionRepository,
                                 transferSourceRepository = repositories.transferSourceRepository,
-                                EntitySource = createDbEntitySource(repositories),
+                                entitySource = createDbEntitySource(repositories),
                                 accountRepository = repositories.accountRepository,
                                 accountAttributeRepository = repositories.accountAttributeRepository,
                                 categoryRepository = repositories.categoryRepository,
@@ -568,7 +568,7 @@ class AccountTransactionsScreenTest {
                                 attributeTypeRepository = repositories.attributeTypeRepository,
                                 personRepository = repositories.personRepository,
                                 personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                                Maintenance = createDbMaintenance(repositories),
+                                maintenance = createDbMaintenance(repositories),
                                 onAccountIdChange = { currentAccountId = it },
                                 onCurrencyIdChange = {},
                                 onAuditClick = { auditTransferId = it },
@@ -739,7 +739,7 @@ class AccountTransactionsScreenTest {
                                 accountId = currentAccountId,
                                 transactionRepository = repositories.transactionRepository,
                                 transferSourceRepository = repositories.transferSourceRepository,
-                                EntitySource = createDbEntitySource(repositories),
+                                entitySource = createDbEntitySource(repositories),
                                 accountRepository = repositories.accountRepository,
                                 accountAttributeRepository = repositories.accountAttributeRepository,
                                 categoryRepository = repositories.categoryRepository,
@@ -747,7 +747,7 @@ class AccountTransactionsScreenTest {
                                 attributeTypeRepository = repositories.attributeTypeRepository,
                                 personRepository = repositories.personRepository,
                                 personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                                Maintenance = createDbMaintenance(repositories),
+                                maintenance = createDbMaintenance(repositories),
                                 onAccountIdChange = { currentAccountId = it },
                                 onCurrencyIdChange = {},
                                 onAuditClick = { auditTransferId = it },
@@ -872,7 +872,7 @@ class AccountTransactionsScreenTest {
                     )
                 }
             everySuspend { getRunningBalanceByAccountPaginatedBackward(any(), any(), any(), any()) } returns
-                PagingResult(emptyList<AccountRow>(), PagingInfo(null, null, false))
+                PagingResult(emptyList(), PagingInfo(null, null, false))
             everySuspend { getPageContainingTransaction(any(), any(), any()) } calls
                 { (accountId: AccountId, transactionId: TransferId, pageSize: Int) ->
                     val allRows = buildAccountRows(transfers, accountId)

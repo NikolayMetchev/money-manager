@@ -4,7 +4,6 @@ import com.moneymanager.domain.model.csvstrategy.AttributeColumnMapping
 import com.moneymanager.domain.model.csvstrategy.FieldMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.serialization.UuidSerializersModule
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 /**

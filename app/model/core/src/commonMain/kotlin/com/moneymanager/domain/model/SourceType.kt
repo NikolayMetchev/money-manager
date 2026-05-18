@@ -24,8 +24,6 @@ enum class SourceType(
     ;
 
     companion object {
-        fun fromId(id: Int): SourceType = entries.first { it.id == id }
-
         fun fromName(name: String): SourceType = valueOf(name.uppercase())
     }
 }

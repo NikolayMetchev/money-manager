@@ -9,9 +9,4 @@ enum class Platform {
 
     /** Android mobile application */
     ANDROID,
-    ;
-
-    companion object {
-        fun fromName(name: String): Platform = valueOf(name.uppercase())
-    }
 }

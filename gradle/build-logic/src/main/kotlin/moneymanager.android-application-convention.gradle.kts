@@ -4,10 +4,12 @@ import org.jetbrains.kotlin.compose.compiler.gradle.ComposeCompilerGradlePluginE
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinAndroidProjectExtension
 
-apply(plugin = "com.android.application")
-apply(plugin = "moneymanager.kotlin-convention")
-apply(plugin = "org.jetbrains.compose")
-apply(plugin = "org.jetbrains.kotlin.plugin.compose")
+plugins {
+    id("com.android.application")
+    id("moneymanager.kotlin-convention")
+    id("org.jetbrains.compose")
+    id("org.jetbrains.kotlin.plugin.compose")
+}
 
 val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
 val jvmTargetVersion = libs.findVersion("jvm-target").get().toString()

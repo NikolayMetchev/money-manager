@@ -49,6 +49,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.EntitySource
@@ -87,6 +88,7 @@ import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.CurrencyPicker
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.ui.screens.transactions.AttributeTypeField
 import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
 import kotlin.time.Clock
@@ -1230,18 +1232,10 @@ private fun ColumnDropdown(
             columns.sortedBy { it.columnIndex }.forEach { column ->
                 DropdownMenuItem(
                     text = {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                        ) {
-                            Text(column.originalName)
-                            if (column.originalName == selectedColumn) {
-                                Text(
-                                    "✓",
-                                    color = MaterialTheme.colorScheme.primary,
-                                )
-                            }
-                        }
+                        DropdownSelectionRow(
+                            text = column.originalName,
+                            selected = column.originalName == selectedColumn,
+                        )
                     },
                     onClick = {
                         onColumnSelected(column.originalName)
@@ -1294,21 +1288,11 @@ private fun OptionalColumnDropdown(
         ) {
             DropdownMenuItem(
                 text = {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                    ) {
-                        Text(
-                            "None",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        if (selectedColumn == null) {
-                            Text(
-                                "✓",
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                        }
-                    }
+                    DropdownSelectionRow(
+                        text = "None",
+                        selected = selectedColumn == null,
+                        textColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 },
                 onClick = {
                     onColumnSelected(null)
@@ -1318,18 +1302,10 @@ private fun OptionalColumnDropdown(
             columns.sortedBy { it.columnIndex }.forEach { column ->
                 DropdownMenuItem(
                     text = {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                        ) {
-                            Text(column.originalName)
-                            if (column.originalName == selectedColumn) {
-                                Text(
-                                    "✓",
-                                    color = MaterialTheme.colorScheme.primary,
-                                )
-                            }
-                        }
+                        DropdownSelectionRow(
+                            text = column.originalName,
+                            selected = column.originalName == selectedColumn,
+                        )
                     },
                     onClick = {
                         onColumnSelected(column.originalName)
@@ -1337,6 +1313,29 @@ private fun OptionalColumnDropdown(
                     },
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun DropdownSelectionRow(
+    text: String,
+    selected: Boolean,
+    textColor: Color = MaterialTheme.colorScheme.onSurface,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(
+            text = text,
+            color = textColor,
+        )
+        if (selected) {
+            Text(
+                text = "\u2713",
+                color = MaterialTheme.colorScheme.primary,
+            )
         }
     }
 }
@@ -1607,10 +1606,10 @@ private fun AttributeColumnMappingRow(
             exit = shrinkVertically(),
         ) {
             Column(modifier = Modifier.padding(start = 40.dp, top = 4.dp, bottom = 4.dp)) {
-                AttributeTypeSelector(
-                    selectedTypeName = attributeTypeName,
-                    existingAttributeTypes = existingAttributeTypes,
-                    onTypeNameChanged = onAttributeTypeChanged,
+                AttributeTypeField(
+                    value = attributeTypeName,
+                    onValueChange = onAttributeTypeChanged,
+                    existingTypes = existingAttributeTypes,
                     enabled = enabled,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -1638,98 +1637,6 @@ private fun AttributeColumnMappingRow(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                }
-            }
-        }
-    }
-}
-
-/**
- * Dropdown/text field for selecting or entering an attribute type name.
- */
-@Composable
-private fun AttributeTypeSelector(
-    selectedTypeName: String,
-    existingAttributeTypes: List<AttributeType>,
-    onTypeNameChanged: (String) -> Unit,
-    enabled: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    var expanded by remember { mutableStateOf(false) }
-    var textValue by remember(selectedTypeName) { mutableStateOf(selectedTypeName) }
-
-    // Combine existing types with filtered suggestions
-    val suggestions =
-        remember(textValue, existingAttributeTypes) {
-            if (textValue.isBlank()) {
-                existingAttributeTypes.map { it.name }
-            } else {
-                existingAttributeTypes
-                    .map { it.name }
-                    .filter { it.contains(textValue, ignoreCase = true) }
-            }
-        }
-
-    ExposedDropdownMenuBox(
-        expanded = expanded && suggestions.isNotEmpty(),
-        onExpandedChange = { if (enabled) expanded = !expanded },
-        modifier = modifier,
-    ) {
-        OutlinedTextField(
-            value = textValue,
-            onValueChange = { newValue ->
-                textValue = newValue
-                onTypeNameChanged(newValue)
-                expanded = true
-            },
-            label = { Text("Attribute Type") },
-            trailingIcon = {
-                if (existingAttributeTypes.isNotEmpty()) {
-                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
-                }
-            },
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable),
-            enabled = enabled,
-            singleLine = true,
-            supportingText = {
-                if (existingAttributeTypes.isEmpty()) {
-                    Text("Enter attribute type name")
-                } else {
-                    Text("Select existing or enter new")
-                }
-            },
-        )
-
-        if (suggestions.isNotEmpty()) {
-            ExposedDropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false },
-            ) {
-                suggestions.forEach { typeName ->
-                    DropdownMenuItem(
-                        text = {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                            ) {
-                                Text(typeName)
-                                if (typeName == selectedTypeName) {
-                                    Text(
-                                        "✓",
-                                        color = MaterialTheme.colorScheme.primary,
-                                    )
-                                }
-                            }
-                        },
-                        onClick = {
-                            textValue = typeName
-                            onTypeNameChanged(typeName)
-                            expanded = false
-                        },
-                    )
                 }
             }
         }

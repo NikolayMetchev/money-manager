@@ -26,7 +26,7 @@ import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
-import com.moneymanager.ui.test.TestMoneyManagerApp
+import com.moneymanager.ui.test.MoneyManagerTestApp
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import kotlinx.coroutines.runBlocking
 import kotlin.test.AfterTest
@@ -73,7 +73,7 @@ class ImportMonzoCsvE2ETest {
                 )
 
             setContent {
-                TestMoneyManagerApp(
+                MoneyManagerTestApp(
                     databaseManager = testDatabaseManager,
                     appVersion = AppVersion("1.0.0-test"),
                 )
@@ -127,7 +127,7 @@ class ImportMonzoCsvE2ETest {
                 )
 
             setContent {
-                TestMoneyManagerApp(
+                MoneyManagerTestApp(
                     databaseManager = testDatabaseManager,
                     appVersion = AppVersion("1.0.0-test"),
                 )
@@ -269,7 +269,6 @@ class ImportMonzoCsvE2ETest {
 
                 val strategy =
                     createTestStrategy(
-                        name = "Monzo",
                         headers = headers,
                     )
                 databaseComponent.csvImportStrategyRepository.createStrategy(strategy)
@@ -290,7 +289,7 @@ class ImportMonzoCsvE2ETest {
                 )
 
             setContent {
-                TestMoneyManagerApp(
+                MoneyManagerTestApp(
                     databaseManager = testDatabaseManager,
                     appVersion = AppVersion("1.0.0-test"),
                 )
@@ -345,7 +344,6 @@ class ImportMonzoCsvE2ETest {
                 val rows = lines.drop(1).take(2).map { parseCsvLine(it) }
                 val strategy =
                     createTestStrategy(
-                        name = "Monzo",
                         headers = headers,
                     )
                 databaseComponent.csvImportStrategyRepository.createStrategy(strategy)
@@ -381,7 +379,7 @@ class ImportMonzoCsvE2ETest {
                 )
 
             setContent {
-                TestMoneyManagerApp(
+                MoneyManagerTestApp(
                     databaseManager = testDatabaseManager,
                     appVersion = AppVersion("1.0.0-test"),
                 )
@@ -454,13 +452,10 @@ class ImportMonzoCsvE2ETest {
         return result
     }
 
-    private fun createTestStrategy(
-        name: String,
-        headers: List<String>,
-    ): CsvImportStrategy =
+    private fun createTestStrategy(headers: List<String>): CsvImportStrategy =
         CsvImportStrategy(
             id = CsvImportStrategyId(Uuid.random()),
-            name = name,
+            name = "Monzo",
             identificationColumns = headers.toSet(),
             fieldMappings = emptyMap(),
             createdAt = Clock.System.now(),

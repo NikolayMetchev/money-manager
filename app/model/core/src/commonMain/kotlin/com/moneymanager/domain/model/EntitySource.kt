@@ -15,11 +15,6 @@ enum class EntityType(
     CURRENCY(3),
     PERSON_ACCOUNT_OWNERSHIP(4),
     CATEGORY(5),
-    ;
-
-    companion object {
-        fun fromId(id: Long): EntityType = entries.first { it.id == id }
-    }
 }
 
 /**

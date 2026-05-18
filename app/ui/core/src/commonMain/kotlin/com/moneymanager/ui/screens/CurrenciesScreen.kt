@@ -16,6 +16,7 @@ import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.ui.components.CreateCurrencyDialog
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.launch
@@ -94,7 +95,10 @@ fun CurrenciesScreen(
         if (showCreateDialog) {
             CreateCurrencyDialog(
                 currencyRepository = currencyRepository,
-                entitySource = entitySource,
+                onCurrencyCreated = { currencyId ->
+                    entitySource.record(EntityType.CURRENCY, currencyId.id, 1L)
+                    showCreateDialog = false
+                },
                 onDismiss = { showCreateDialog = false },
             )
         }
@@ -158,105 +162,6 @@ fun CurrencyCard(
             onDismiss = { showDeleteDialog = false },
         )
     }
-}
-
-@Composable
-fun CreateCurrencyDialog(
-    currencyRepository: CurrencyRepository,
-    entitySource: EntitySource,
-    onDismiss: () -> Unit,
-) {
-    var code by remember { mutableStateOf("") }
-    var name by remember { mutableStateOf("") }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    var isSaving by remember { mutableStateOf(false) }
-
-    val scope = rememberSchemaAwareCoroutineScope()
-
-    AlertDialog(
-        onDismissRequest = { if (!isSaving) onDismiss() },
-        title = { Text("Create New Currency") },
-        text = {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                OutlinedTextField(
-                    value = code,
-                    onValueChange = { code = it.uppercase().take(3) },
-                    label = { Text("Currency Code (e.g., USD)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    enabled = !isSaving,
-                )
-
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Currency Name (e.g., US Dollar)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    enabled = !isSaving,
-                )
-
-                errorMessage?.let { error ->
-                    Text(
-                        text = error,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    when {
-                        code.isBlank() -> errorMessage = "Currency code is required"
-                        code.length != 3 -> errorMessage = "Currency code must be 3 characters"
-                        name.isBlank() -> errorMessage = "Currency name is required"
-                        else -> {
-                            isSaving = true
-                            errorMessage = null
-                            scope.launch {
-                                try {
-                                    val currencyId = currencyRepository.upsertCurrencyByCode(code.trim(), name.trim())
-                                    // Record source for audit trail
-                                    entitySource.record(EntityType.CURRENCY, currencyId.id, 1L)
-                                    onDismiss()
-                                } catch (expected: Exception) {
-                                    logger.error(expected) { "Failed to create currency: ${expected.message}" }
-                                    errorMessage = "Failed to create currency: ${expected.message}"
-                                    isSaving = false
-                                }
-                            }
-                        }
-                    }
-                },
-                enabled = !isSaving,
-            ) {
-                if (isSaving) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp,
-                    )
-                } else {
-                    Text("Create")
-                }
-            }
-        },
-        dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                enabled = !isSaving,
-            ) {
-                Text("Cancel")
-            }
-        },
-    )
 }
 
 @Composable

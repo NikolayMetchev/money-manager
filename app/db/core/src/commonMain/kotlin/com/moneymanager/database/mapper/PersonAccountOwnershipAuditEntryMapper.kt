@@ -21,22 +21,3 @@ object PersonAccountOwnershipAuditEntryMapper :
                 )
         }
 }
-
-private fun buildPersonFullName(
-    firstName: String?,
-    middleName: String?,
-    lastName: String?,
-): String? {
-    if (firstName == null) return null
-    return buildString {
-        append(firstName)
-        if (!middleName.isNullOrBlank()) {
-            append(" ")
-            append(middleName)
-        }
-        if (!lastName.isNullOrBlank()) {
-            append(" ")
-            append(lastName)
-        }
-    }
-}

@@ -5,25 +5,13 @@
 
 package com.moneymanager.ui.components
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExposedDropdownMenuAnchorType
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -34,7 +22,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AttributeType
@@ -51,7 +38,7 @@ import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.screens.CreateCategoryDialog
-import com.moneymanager.ui.screens.transactions.AttributeTypeField
+import com.moneymanager.ui.screens.transactions.EditableAttributesSection
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
 
@@ -73,14 +60,7 @@ fun EditAccountDialog(
     entitySource: EntitySource,
     onDismiss: () -> Unit,
 ) {
-    var name by remember { mutableStateOf(account.name) }
-    var selectedCategoryId by remember { mutableStateOf(account.categoryId) }
-    var selectedCategoryName by remember { mutableStateOf<String?>(null) }
-    var expanded by remember { mutableStateOf(false) }
-    var showCreateCategoryDialog by remember { mutableStateOf(false) }
-    var showCreatePersonDialog by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    var isSaving by remember { mutableStateOf(false) }
+    val accountState = rememberAccountDialogState(initialName = account.name, initialCategoryId = account.categoryId)
 
     val categories by categoryRepository
         .getAllCategories()
@@ -127,201 +107,80 @@ fun EditAccountDialog(
     val scope = rememberSchemaAwareCoroutineScope()
 
     AlertDialog(
-        onDismissRequest = { if (!isSaving) onDismiss() },
+        onDismissRequest = { if (!accountState.isSaving) onDismiss() },
         title = { Text("Edit Account") },
         text = {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState())
-                        .padding(vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+            AccountDialogContent(
+                accountState = accountState,
+                categories = categories,
+                modifier = Modifier.verticalScroll(rememberScrollState()),
             ) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Account Name") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    enabled = !isSaving,
-                )
-
-                ExposedDropdownMenuBox(
-                    expanded = expanded,
-                    onExpandedChange = { expanded = !expanded && !isSaving },
-                ) {
-                    OutlinedTextField(
-                        value =
-                            selectedCategoryName
-                                ?: categories.find { it.id == selectedCategoryId }?.name
-                                ?: "Uncategorized",
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Category") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                        modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
-                        enabled = !isSaving,
-                    )
-                    ExposedDropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { expanded = false },
-                    ) {
-                        categories.forEach { category ->
-                            DropdownMenuItem(
-                                text = { Text(category.name) },
-                                onClick = {
-                                    selectedCategoryId = category.id
-                                    selectedCategoryName = null
-                                    expanded = false
+                AccountOwnersSection(hasPeople = people.isNotEmpty()) {
+                    people.forEach { person ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Checkbox(
+                                checked = selectedOwnerIds.contains(person.id.id),
+                                onCheckedChange = { checked ->
+                                    selectedOwnerIds =
+                                        if (checked) {
+                                            selectedOwnerIds + person.id.id
+                                        } else {
+                                            selectedOwnerIds - person.id.id
+                                        }
                                 },
+                                enabled = !accountState.isSaving,
                             )
-                        }
-                        HorizontalDivider()
-                        DropdownMenuItem(
-                            text = { Text("+ Create New Category") },
-                            onClick = {
-                                expanded = false
-                                showCreateCategoryDialog = true
-                            },
-                        )
-                    }
-                }
-
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = "Owners",
-                        style = MaterialTheme.typography.labelMedium,
-                        modifier = Modifier.padding(bottom = 8.dp),
-                    )
-                    if (people.isEmpty()) {
-                        Text(
-                            text = "No people available. Create one first.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    } else {
-                        people.forEach { person ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Checkbox(
-                                    checked = selectedOwnerIds.contains(person.id.id),
-                                    onCheckedChange = { checked ->
-                                        selectedOwnerIds =
-                                            if (checked) {
-                                                selectedOwnerIds + person.id.id
-                                            } else {
-                                                selectedOwnerIds - person.id.id
-                                            }
-                                    },
-                                    enabled = !isSaving,
-                                )
-                                Text(
-                                    text = person.fullName,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                )
-                            }
+                            Text(
+                                text = person.fullName,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
                         }
                     }
                     TextButton(
-                        onClick = { showCreatePersonDialog = true },
-                        enabled = !isSaving,
+                        onClick = { accountState.showCreatePersonDialog = true },
+                        enabled = !accountState.isSaving,
                     ) {
                         Text("+ Add New Person")
                     }
                 }
 
-                // Attributes Section
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Text(
-                        text = "Attributes",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                EditableAttributesSection(
+                    editableAttributes = editableAttributes,
+                    existingAttributeTypes = existingAttributeTypes,
+                    isSaving = accountState.isSaving,
+                    onAttributesChange = { editableAttributes = it },
+                    onAddAttribute = {
+                        editableAttributes = editableAttributes + (nextTempId to Pair("", ""))
+                        nextTempId--
+                    },
+                )
 
-                    editableAttributes.forEach { (id, pair) ->
-                        val (typeName, value) = pair
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            AttributeTypeField(
-                                value = typeName,
-                                onValueChange = { newTypeName ->
-                                    editableAttributes = editableAttributes + (id to Pair(newTypeName, value))
-                                },
-                                existingTypes = existingAttributeTypes,
-                                enabled = !isSaving,
-                                modifier = Modifier.weight(0.4f),
-                            )
-                            OutlinedTextField(
-                                value = value,
-                                onValueChange = { newValue ->
-                                    editableAttributes = editableAttributes + (id to Pair(typeName, newValue))
-                                },
-                                label = { Text("Value") },
-                                modifier = Modifier.weight(0.5f),
-                                singleLine = true,
-                                enabled = !isSaving,
-                            )
-                            IconButton(
-                                onClick = {
-                                    editableAttributes = editableAttributes - id
-                                },
-                                enabled = !isSaving,
-                            ) {
-                                Text(
-                                    text = "X",
-                                    color = MaterialTheme.colorScheme.error,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                )
-                            }
-                        }
-                    }
-
-                    TextButton(
-                        onClick = {
-                            editableAttributes = editableAttributes + (nextTempId to Pair("", ""))
-                            nextTempId--
-                        },
-                        enabled = !isSaving,
-                    ) {
-                        Text("+ Add Attribute")
-                    }
-                }
-
-                errorMessage?.let { error ->
-                    Text(
-                        text = error,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
+                accountState.errorMessage?.let { error -> ErrorMessageText(error) }
             }
         },
         confirmButton = {
-            TextButton(
+            LoadingTextButton(
                 onClick = {
-                    if (name.isBlank()) {
-                        errorMessage = "Account name is required"
+                    if (accountState.name.isBlank()) {
+                        accountState.errorMessage = "Account name is required"
                     } else {
-                        isSaving = true
-                        errorMessage = null
+                        accountState.isSaving = true
+                        accountState.errorMessage = null
                         scope.launch {
                             try {
                                 // Determine if account fields actually changed
                                 val accountFieldsChanged =
-                                    name.trim() != account.name ||
-                                        selectedCategoryId != account.categoryId
+                                    accountState.name.trim() != account.name ||
+                                        accountState.selectedCategoryId != account.categoryId
                                 val updatedAccount =
                                     if (accountFieldsChanged) {
-                                        account.copy(name = name.trim(), categoryId = selectedCategoryId)
+                                        account.copy(
+                                            name = accountState.name.trim(),
+                                            categoryId = accountState.selectedCategoryId,
+                                        )
                                     } else {
                                         null
                                     }
@@ -390,53 +249,42 @@ fun EditAccountDialog(
                                 onDismiss()
                             } catch (expected: Exception) {
                                 logger.error(expected) { "Failed to update account: ${expected.message}" }
-                                errorMessage = "Failed to update account: ${expected.message}"
-                                isSaving = false
+                                accountState.errorMessage = "Failed to update account: ${expected.message}"
+                                accountState.isSaving = false
                             }
                         }
                     }
                 },
-                enabled = !isSaving,
-            ) {
-                if (isSaving) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp,
-                    )
-                } else {
-                    Text("Save")
-                }
-            }
+                enabled = !accountState.isSaving,
+                loading = accountState.isSaving,
+                label = "Save",
+            )
         },
         dismissButton = {
             TextButton(
                 onClick = onDismiss,
-                enabled = !isSaving,
+                enabled = !accountState.isSaving,
             ) {
                 Text("Cancel")
             }
         },
     )
 
-    if (showCreateCategoryDialog) {
+    if (accountState.showCreateCategoryDialog) {
         CreateCategoryDialog(
             categoryRepository = categoryRepository,
-            onCategoryCreated = { categoryId, categoryName ->
-                selectedCategoryId = categoryId
-                selectedCategoryName = categoryName
-                showCreateCategoryDialog = false
-            },
-            onDismiss = { showCreateCategoryDialog = false },
+            onCategoryCreated = accountState::selectCreatedCategory,
+            onDismiss = { accountState.showCreateCategoryDialog = false },
         )
     }
 
-    if (showCreatePersonDialog) {
+    if (accountState.showCreatePersonDialog) {
         EditPersonDialog(
             personToEdit = null,
             personRepository = personRepository,
             personAttributeRepository = personAttributeRepository,
             entitySource = entitySource,
-            onDismiss = { showCreatePersonDialog = false },
+            onDismiss = { accountState.showCreatePersonDialog = false },
         )
     }
 }

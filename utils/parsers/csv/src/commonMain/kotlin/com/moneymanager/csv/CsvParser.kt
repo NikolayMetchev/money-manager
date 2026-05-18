@@ -77,8 +77,8 @@ class CsvParser {
             val char = content[i]
             val nextChar = content.getOrNull(i + 1)
 
-            when {
-                char == options.quoteChar -> {
+            when (char) {
+                options.quoteChar -> {
                     if (inQuotes && nextChar == options.quoteChar) {
                         currentField.append(options.quoteChar)
                         i++ // Skip the next quote
@@ -87,31 +87,40 @@ class CsvParser {
                     }
                 }
                 // Handle delimiter outside quotes
-                char == options.delimiter && !inQuotes -> {
-                    currentRow.add(currentField.toString())
-                    currentField.clear()
-                }
+                options.delimiter ->
+                    if (!inQuotes) {
+                        currentRow.add(currentField.toString())
+                        currentField.clear()
+                    } else {
+                        currentField.append(char)
+                    }
                 // Handle newline outside quotes (end of row)
-                char == '\n' && !inQuotes -> {
-                    currentRow.add(currentField.toString())
-                    currentField.clear()
-                    if (currentRow.isNotEmpty()) {
-                        result.add(currentRow.toList())
+                '\n' ->
+                    if (!inQuotes) {
+                        currentRow.add(currentField.toString())
+                        currentField.clear()
+                        if (currentRow.isNotEmpty()) {
+                            result.add(currentRow.toList())
+                        }
+                        currentRow.clear()
+                    } else {
+                        currentField.append(char)
                     }
-                    currentRow.clear()
-                }
                 // Handle CR outside quotes (CRLF or old Mac format)
-                char == '\r' && !inQuotes -> {
-                    currentRow.add(currentField.toString())
-                    currentField.clear()
-                    if (currentRow.isNotEmpty()) {
-                        result.add(currentRow.toList())
+                '\r' ->
+                    if (!inQuotes) {
+                        currentRow.add(currentField.toString())
+                        currentField.clear()
+                        if (currentRow.isNotEmpty()) {
+                            result.add(currentRow.toList())
+                        }
+                        currentRow.clear()
+                        if (nextChar == '\n') {
+                            i++ // Skip the \n in CRLF
+                        }
+                    } else {
+                        currentField.append(char)
                     }
-                    currentRow.clear()
-                    if (nextChar == '\n') {
-                        i++ // Skip the \n in CRLF
-                    }
-                }
                 // Regular character (including newlines inside quotes)
                 else -> {
                     currentField.append(char)
@@ -177,9 +186,9 @@ class CsvParser {
         var inQuotes = false
 
         for (char in line) {
-            when {
-                char == '"' -> inQuotes = !inQuotes
-                char == delimiter && !inQuotes -> count++
+            when (char) {
+                '"' -> inQuotes = !inQuotes
+                delimiter -> if (!inQuotes) count++
             }
         }
 

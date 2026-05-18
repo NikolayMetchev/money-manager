@@ -94,7 +94,7 @@ class BackgroundTaskManager(
 
         scope.launch(Dispatchers.Default) {
             try {
-                val finalDetail = controller.block()
+                val finalDetail = block(controller)
                 updateTask(taskId) { task ->
                     task.copy(detail = finalDetail, status = BackgroundTaskStatus.SUCCEEDED)
                 }

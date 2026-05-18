@@ -91,30 +91,7 @@ private fun computeCurrencyAuditDiffs(
                     source = entry.source,
                 )
             AuditType.UPDATE -> {
-                val newCode =
-                    if (index == 0 && currentCurrency != null) {
-                        currentCurrency.code
-                    } else if (index > 0) {
-                        entries[index - 1].code
-                    } else {
-                        entry.code
-                    }
-                val newName =
-                    if (index == 0 && currentCurrency != null) {
-                        currentCurrency.name
-                    } else if (index > 0) {
-                        entries[index - 1].name
-                    } else {
-                        entry.name
-                    }
-                val newScaleFactor =
-                    if (index == 0 && currentCurrency != null) {
-                        currentCurrency.scaleFactor
-                    } else if (index > 0) {
-                        entries[index - 1].scaleFactor
-                    } else {
-                        entry.scaleFactor
-                    }
+                val previousEntry = entries.getOrNull(index - 1)
 
                 CurrencyAuditDiff(
                     id = entry.id,
@@ -122,23 +99,32 @@ private fun computeCurrencyAuditDiffs(
                     auditType = entry.auditType,
                     revisionId = entry.revisionId,
                     code =
-                        if (entry.code != newCode) {
-                            FieldChange.Changed(entry.code, newCode)
-                        } else {
-                            FieldChange.Unchanged(entry.code)
-                        },
+                        resolveUpdateChange(
+                            index = index,
+                            currentEntry = currentCurrency,
+                            previousEntry = previousEntry,
+                            entryValue = entry.code,
+                            currentValue = { it.code },
+                            previousValue = { it.code },
+                        ),
                     name =
-                        if (entry.name != newName) {
-                            FieldChange.Changed(entry.name, newName)
-                        } else {
-                            FieldChange.Unchanged(entry.name)
-                        },
+                        resolveUpdateChange(
+                            index = index,
+                            currentEntry = currentCurrency,
+                            previousEntry = previousEntry,
+                            entryValue = entry.name,
+                            currentValue = { it.name },
+                            previousValue = { it.name },
+                        ),
                     scaleFactor =
-                        if (entry.scaleFactor != newScaleFactor) {
-                            FieldChange.Changed(entry.scaleFactor, newScaleFactor)
-                        } else {
-                            FieldChange.Unchanged(entry.scaleFactor)
-                        },
+                        resolveUpdateChange(
+                            index = index,
+                            currentEntry = currentCurrency,
+                            previousEntry = previousEntry,
+                            entryValue = entry.scaleFactor,
+                            currentValue = { it.scaleFactor },
+                            previousValue = { it.scaleFactor },
+                        ),
                     source = entry.source,
                 )
             }

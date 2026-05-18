@@ -687,17 +687,7 @@ private fun collectCounterpartiesFromResponses(
 private suspend fun loadCounterpartyIdIndex(
     accountRepository: AccountRepository,
     accountAttributeRepository: AccountAttributeRepository,
-): Map<String, AccountId> {
-    val index = mutableMapOf<String, AccountId>()
-    for (account in accountRepository.getAllAccounts().first()) {
-        accountAttributeRepository
-            .getByAccount(account.id)
-            .first()
-            .firstOrNull { it.attributeType.id == ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID }
-            ?.let { index[it.value] = account.id }
-    }
-    return index
-}
+): Map<String, AccountId> = loadAccountExternalIdIndex(accountRepository, accountAttributeRepository)
 
 private suspend fun loadAccountExternalIdIndex(
     accountRepository: AccountRepository,

@@ -5,6 +5,7 @@
 package com.moneymanager.ui.screens.transactions
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.DropdownMenuItem
@@ -12,14 +13,17 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -71,6 +75,72 @@ internal fun formatTimeDiff(
     val duration = newTimestamp - oldTimestamp
     val sign = if (duration.isPositive()) "+" else "-"
     return "$sign${HumanReadable.duration(duration.absoluteValue)}"
+}
+
+@Composable
+internal fun EditableAttributesSection(
+    editableAttributes: Map<Long, Pair<String, String>>,
+    existingAttributeTypes: List<AttributeType>,
+    isSaving: Boolean,
+    onAttributesChange: (Map<Long, Pair<String, String>>) -> Unit,
+    onAddAttribute: () -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = "Attributes",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        editableAttributes.forEach { (id, pair) ->
+            val (typeName, value) = pair
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                AttributeTypeField(
+                    value = typeName,
+                    onValueChange = { newTypeName ->
+                        onAttributesChange(editableAttributes + (id to Pair(newTypeName, value)))
+                    },
+                    existingTypes = existingAttributeTypes,
+                    enabled = !isSaving,
+                    modifier = Modifier.weight(0.4f),
+                )
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = { newValue ->
+                        onAttributesChange(editableAttributes + (id to Pair(typeName, newValue)))
+                    },
+                    label = { Text("Value") },
+                    modifier = Modifier.weight(0.5f),
+                    singleLine = true,
+                    enabled = !isSaving,
+                )
+                IconButton(
+                    onClick = { onAttributesChange(editableAttributes - id) },
+                    enabled = !isSaving,
+                ) {
+                    Text(
+                        text = "X",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                }
+            }
+        }
+
+        TextButton(
+            onClick = onAddAttribute,
+            enabled = !isSaving,
+        ) {
+            Text("+ Add Attribute")
+        }
+    }
 }
 
 /**

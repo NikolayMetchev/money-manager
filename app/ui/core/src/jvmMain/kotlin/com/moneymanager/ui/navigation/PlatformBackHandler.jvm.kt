@@ -6,4 +6,7 @@ import androidx.compose.runtime.Composable
 actual fun PlatformBackHandler(
     enabled: Boolean,
     onBack: () -> Unit,
-) = Unit
+) {
+    if (!enabled) return
+    // JVM desktop has no platform back gesture.
+}

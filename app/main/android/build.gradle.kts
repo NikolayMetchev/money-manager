@@ -20,6 +20,7 @@ android {
 
 // Copy VERSION file to Android assets
 tasks.register<Copy>("copyVersionToAssets") {
+    description = "Copies the project VERSION file into Android assets."
     from(rootProject.file("VERSION"))
     into("src/main/assets")
     inputs.file(rootProject.file("VERSION"))

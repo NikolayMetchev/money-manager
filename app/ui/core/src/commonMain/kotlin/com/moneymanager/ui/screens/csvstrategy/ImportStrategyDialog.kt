@@ -885,10 +885,9 @@ internal fun AccountMappingEditorDialog(
                         scope.launch {
                             try {
                                 val pattern = Regex(patternText, RegexOption.IGNORE_CASE)
-                                val mapping = existingMapping
-                                if (mapping != null) {
+                                if (existingMapping != null) {
                                     csvAccountMappingRepository.updateMapping(
-                                        mapping.copy(
+                                        existingMapping.copy(
                                             columnName = columnName,
                                             valuePattern = pattern,
                                             accountId = accountId,

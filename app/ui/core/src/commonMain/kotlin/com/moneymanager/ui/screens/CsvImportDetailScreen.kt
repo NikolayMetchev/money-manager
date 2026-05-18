@@ -68,9 +68,9 @@ fun CsvImportDetailScreen(
     attributeTypeRepository: AttributeTypeRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    Maintenance: Maintenance,
+    maintenance: Maintenance,
     transferSourceRepository: TransferSourceRepository,
-    EntitySource: EntitySource,
+    entitySource: EntitySource,
     onBack: () -> Unit,
     onDeleted: () -> Unit,
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
@@ -235,30 +235,28 @@ fun CsvImportDetailScreen(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        when {
-            import == null && isLoading -> {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    CircularProgressIndicator()
+        when (val currentImport = import) {
+            null ->
+                if (isLoading) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                } else {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = "Import not found",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
                 }
-            }
-            import == null -> {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = "Import not found",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-            }
             else -> {
-                val currentImport = import!!
-
                 // File info header
                 Column {
                     Text(
@@ -415,8 +413,8 @@ fun CsvImportDetailScreen(
             transactionRepository = transactionRepository,
             csvImportRepository = csvImportRepository,
             attributeTypeRepository = attributeTypeRepository,
-            maintenance = Maintenance,
-            entitySource = EntitySource,
+            maintenance = maintenance,
+            entitySource = entitySource,
             transferSourceRepository = transferSourceRepository,
             onDismiss = { showApplyStrategyDialog = false },
             onImportComplete = { result ->
@@ -443,7 +441,7 @@ fun CsvImportDetailScreen(
             attributeTypeRepository = attributeTypeRepository,
             personRepository = personRepository,
             personAccountOwnershipRepository = personAccountOwnershipRepository,
-            entitySource = EntitySource,
+            entitySource = entitySource,
             csvColumns = import!!.columns,
             rows = rows,
             onDismiss = { showCreateStrategyDialog = false },

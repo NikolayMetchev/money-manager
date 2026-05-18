@@ -81,59 +81,17 @@ class CsvImportRepositoryImpl(
 
     override fun getAllImports(): Flow<List<CsvImport>> =
         csvImportQueries
-            .selectAllImports()
+            .selectAllImports(::toCsvImportRecord)
             .asFlow()
             .mapToList(coroutineContext)
             .map { imports ->
-                imports.map { import ->
-                    val columns =
-                        csvImportQueries
-                            .selectColumnsByImportId(import.id)
-                            .executeAsList()
-                            .map { col ->
-                                CsvColumn(
-                                    id = CsvColumnId(Uuid.parse(col.id)),
-                                    columnIndex = col.column_index.toInt(),
-                                    originalName = col.original_name,
-                                )
-                            }
-
-                    CsvImport(
-                        id = CsvImportId(Uuid.parse(import.id)),
-                        tableName = import.table_name,
-                        originalFileName = import.original_file_name,
-                        importTimestamp = Instant.fromEpochMilliseconds(import.import_timestamp),
-                        rowCount = import.row_count.toInt(),
-                        columnCount = import.column_count.toInt(),
-                        columns = columns,
-                        deviceInfo =
-                            DeviceRepositoryImpl.createDeviceInfo(
-                                platformName = import.platform_name,
-                                osName = import.os_name,
-                                machineName = import.machine_name,
-                                deviceMake = import.device_make,
-                                deviceModel = import.device_model,
-                            ),
-                        fileChecksum = import.file_checksum,
-                        fileLastModified = Instant.fromEpochMilliseconds(import.file_last_modified),
-                        applicationCount = import.application_count.toInt(),
-                        lastAppliedStrategyId =
-                            import.last_applied_strategy_id?.let { strategyId ->
-                                CsvImportStrategyId(Uuid.parse(strategyId))
-                            },
-                        lastAppliedStrategyName = import.last_applied_strategy_name,
-                        lastAppliedAt =
-                            import.last_applied_at?.let { appliedAt ->
-                                Instant.fromEpochMilliseconds(appliedAt)
-                            },
-                    )
-                }
+                imports.map { import -> toCsvImport(import) }
             }
 
     override fun getImport(id: CsvImportId): Flow<CsvImport?> {
         val importFlow =
             csvImportQueries
-                .selectImportById(id.id.toString())
+                .selectImportById(id.id.toString(), ::toCsvImportRecord)
                 .asFlow()
                 .mapToOneOrNull(coroutineContext)
 
@@ -145,42 +103,15 @@ class CsvImportRepositoryImpl(
 
         return combine(importFlow, columnsFlow) { import, columnEntities ->
             import?.let {
-                val columns =
-                    columnEntities.map { col ->
-                        CsvColumn(
-                            id = CsvColumnId(Uuid.parse(col.id)),
-                            columnIndex = col.column_index.toInt(),
-                            originalName = col.original_name,
-                        )
-                    }
-
-                CsvImport(
-                    id = CsvImportId(Uuid.parse(it.id)),
-                    tableName = it.table_name,
-                    originalFileName = it.original_file_name,
-                    importTimestamp = Instant.fromEpochMilliseconds(it.import_timestamp),
-                    rowCount = it.row_count.toInt(),
-                    columnCount = it.column_count.toInt(),
-                    columns = columns,
-                    deviceInfo =
-                        DeviceRepositoryImpl.createDeviceInfo(
-                            platformName = it.platform_name,
-                            osName = it.os_name,
-                            machineName = it.machine_name,
-                            deviceMake = it.device_make,
-                            deviceModel = it.device_model,
-                        ),
-                    fileChecksum = it.file_checksum,
-                    fileLastModified = Instant.fromEpochMilliseconds(it.file_last_modified),
-                    applicationCount = it.application_count.toInt(),
-                    lastAppliedStrategyId =
-                        it.last_applied_strategy_id?.let { strategyId ->
-                            CsvImportStrategyId(Uuid.parse(strategyId))
-                        },
-                    lastAppliedStrategyName = it.last_applied_strategy_name,
-                    lastAppliedAt =
-                        it.last_applied_at?.let { appliedAt ->
-                            Instant.fromEpochMilliseconds(appliedAt)
+                toCsvImport(
+                    record = it,
+                    columns =
+                        columnEntities.map { col ->
+                            CsvColumn(
+                                id = CsvColumnId(Uuid.parse(col.id)),
+                                columnIndex = col.column_index.toInt(),
+                                originalName = col.original_name,
+                            )
                         },
                 )
             }
@@ -306,48 +237,162 @@ class CsvImportRepositoryImpl(
 
     override suspend fun findImportsByChecksum(checksum: String): List<CsvImport> =
         withContext(coroutineContext) {
-            csvImportQueries.selectImportsByChecksum(checksum).executeAsList().map { import ->
-                val columns =
-                    csvImportQueries
-                        .selectColumnsByImportId(import.id)
-                        .executeAsList()
-                        .map { col ->
-                            CsvColumn(
-                                id = CsvColumnId(Uuid.parse(col.id)),
-                                columnIndex = col.column_index.toInt(),
-                                originalName = col.original_name,
-                            )
-                        }
-
-                CsvImport(
-                    id = CsvImportId(Uuid.parse(import.id)),
-                    tableName = import.table_name,
-                    originalFileName = import.original_file_name,
-                    importTimestamp = Instant.fromEpochMilliseconds(import.import_timestamp),
-                    rowCount = import.row_count.toInt(),
-                    columnCount = import.column_count.toInt(),
-                    columns = columns,
-                    deviceInfo =
-                        DeviceRepositoryImpl.createDeviceInfo(
-                            platformName = import.platform_name,
-                            osName = import.os_name,
-                            machineName = import.machine_name,
-                            deviceMake = import.device_make,
-                            deviceModel = import.device_model,
-                        ),
-                    fileChecksum = import.file_checksum,
-                    fileLastModified = Instant.fromEpochMilliseconds(import.file_last_modified),
-                    applicationCount = import.application_count.toInt(),
-                    lastAppliedStrategyId =
-                        import.last_applied_strategy_id?.let { strategyId ->
-                            CsvImportStrategyId(Uuid.parse(strategyId))
-                        },
-                    lastAppliedStrategyName = import.last_applied_strategy_name,
-                    lastAppliedAt =
-                        import.last_applied_at?.let { appliedAt ->
-                            Instant.fromEpochMilliseconds(appliedAt)
-                        },
-                )
+            csvImportQueries.selectImportsByChecksum(checksum, ::toCsvImportRecord).executeAsList().map { import ->
+                toCsvImport(import)
             }
         }
+
+    private data class CsvImportRecord(
+        val importId: String,
+        val tableName: String,
+        val originalFileName: String,
+        val importTimestampMs: Long,
+        val rowCount: Int,
+        val columnCount: Int,
+        val deviceId: Long,
+        val platformName: String,
+        val osName: String?,
+        val machineName: String?,
+        val deviceMake: String?,
+        val deviceModel: String?,
+        val fileChecksum: String,
+        val fileLastModifiedMs: Long,
+        val applicationCount: Int,
+        val lastAppliedStrategyId: String?,
+        val lastAppliedStrategyName: String?,
+        val lastAppliedAtMs: Long?,
+    )
+
+    private fun toCsvImportRecord(
+        importId: String,
+        tableName: String,
+        originalFileName: String,
+        importTimestampMs: Long,
+        rowCount: Long,
+        columnCount: Long,
+        deviceId: Long,
+        fileChecksum: String,
+        fileLastModifiedMs: Long,
+        applicationCount: Long,
+        lastAppliedStrategyId: String?,
+        lastAppliedStrategyName: String?,
+        lastAppliedAtMs: Long?,
+        platformName: String,
+        osName: String?,
+        machineName: String?,
+        deviceMake: String?,
+        deviceModel: String?,
+    ): CsvImportRecord =
+        CsvImportRecord(
+            importId = importId,
+            tableName = tableName,
+            originalFileName = originalFileName,
+            importTimestampMs = importTimestampMs,
+            rowCount = rowCount.toIntChecked("rowCount"),
+            columnCount = columnCount.toIntChecked("columnCount"),
+            deviceId = deviceId,
+            platformName = platformName,
+            osName = osName,
+            machineName = machineName,
+            deviceMake = deviceMake,
+            deviceModel = deviceModel,
+            fileChecksum = fileChecksum,
+            fileLastModifiedMs = fileLastModifiedMs,
+            applicationCount = applicationCount.toIntChecked("applicationCount"),
+            lastAppliedStrategyId = lastAppliedStrategyId,
+            lastAppliedStrategyName = lastAppliedStrategyName,
+            lastAppliedAtMs = lastAppliedAtMs,
+        )
+
+    private fun Long.toIntChecked(field: String): Int {
+        require(this in Int.MIN_VALUE..Int.MAX_VALUE) { "$field out of Int range: $this" }
+        return toInt()
+    }
+
+    private fun toCsvImport(
+        record: CsvImportRecord,
+        columns: List<CsvColumn> = emptyList(),
+    ): CsvImport =
+        toCsvImport(
+            importId = record.importId,
+            tableName = record.tableName,
+            originalFileName = record.originalFileName,
+            importTimestampMs = record.importTimestampMs,
+            rowCount = record.rowCount,
+            columnCount = record.columnCount,
+            platformName = record.platformName,
+            osName = record.osName,
+            machineName = record.machineName,
+            deviceMake = record.deviceMake,
+            deviceModel = record.deviceModel,
+            fileChecksum = record.fileChecksum,
+            fileLastModifiedMs = record.fileLastModifiedMs,
+            applicationCount = record.applicationCount,
+            lastAppliedStrategyId = record.lastAppliedStrategyId,
+            lastAppliedStrategyName = record.lastAppliedStrategyName,
+            lastAppliedAtMs = record.lastAppliedAtMs,
+            columns = columns,
+        )
+
+    private fun toCsvImport(
+        importId: String,
+        tableName: String,
+        originalFileName: String,
+        importTimestampMs: Long,
+        rowCount: Int,
+        columnCount: Int,
+        platformName: String,
+        osName: String?,
+        machineName: String?,
+        deviceMake: String?,
+        deviceModel: String?,
+        fileChecksum: String,
+        fileLastModifiedMs: Long,
+        applicationCount: Int,
+        lastAppliedStrategyId: String?,
+        lastAppliedStrategyName: String?,
+        lastAppliedAtMs: Long?,
+        columns: List<CsvColumn> = loadColumns(importId),
+    ): CsvImport =
+        CsvImport(
+            id = CsvImportId(Uuid.parse(importId)),
+            tableName = tableName,
+            originalFileName = originalFileName,
+            importTimestamp = Instant.fromEpochMilliseconds(importTimestampMs),
+            rowCount = rowCount,
+            columnCount = columnCount,
+            columns = columns,
+            deviceInfo =
+                DeviceRepositoryImpl.createDeviceInfo(
+                    platformName = platformName,
+                    osName = osName,
+                    machineName = machineName,
+                    deviceMake = deviceMake,
+                    deviceModel = deviceModel,
+                ),
+            fileChecksum = fileChecksum,
+            fileLastModified = Instant.fromEpochMilliseconds(fileLastModifiedMs),
+            applicationCount = applicationCount,
+            lastAppliedStrategyId =
+                lastAppliedStrategyId?.let { strategyId ->
+                    CsvImportStrategyId(Uuid.parse(strategyId))
+                },
+            lastAppliedStrategyName = lastAppliedStrategyName,
+            lastAppliedAt =
+                lastAppliedAtMs?.let { appliedAt ->
+                    Instant.fromEpochMilliseconds(appliedAt)
+                },
+        )
+
+    private fun loadColumns(importId: String): List<CsvColumn> =
+        csvImportQueries
+            .selectColumnsByImportId(importId)
+            .executeAsList()
+            .map { col ->
+                CsvColumn(
+                    id = CsvColumnId(Uuid.parse(col.id)),
+                    columnIndex = col.column_index.toInt(),
+                    originalName = col.original_name,
+                )
+            }
 }
