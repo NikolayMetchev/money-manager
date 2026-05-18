@@ -17,6 +17,7 @@ import com.moneymanager.ui.MoneyManagerApp
 import com.moneymanager.ui.components.DatabaseSchemaErrorDialog
 import com.moneymanager.ui.error.GlobalSchemaErrorState
 import com.moneymanager.ui.toAppServices
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -54,10 +55,15 @@ internal object MoneyManagerTestApp {
             component.deviceId
             // Set a default currency to avoid the init dialog blocking E2E tests
             val currencies = component.currencyRepository.getAllCurrencies().first()
-            if (currencies.isNotEmpty()) {
+            val defaultCurrencyId = component.settingsRepository.getDefaultCurrencyId().first()
+            if (currencies.isNotEmpty() && defaultCurrencyId == null) {
                 component.settingsRepository.setDefaultCurrencyId(currencies.first().id)
             }
             return TestDatabaseState.Loaded(location, component)
+        }
+
+        fun Throwable.rethrowIfCancellation() {
+            if (this is CancellationException) throw this
         }
 
         LaunchedEffect(Unit) {
@@ -65,6 +71,7 @@ internal object MoneyManagerTestApp {
             try {
                 databaseState = openAndPrimeDatabase(location)
             } catch (expected: Exception) {
+                expected.rethrowIfCancellation()
                 databaseState = TestDatabaseState.Error(location, expected)
             }
         }
@@ -113,6 +120,7 @@ internal object MoneyManagerTestApp {
                             databaseManager.deleteDatabase(location)
                             databaseState = openAndPrimeDatabase(location)
                         } catch (expected: Exception) {
+                            expected.rethrowIfCancellation()
                             databaseState = TestDatabaseState.Error(location, expected)
                         }
                     }
@@ -126,6 +134,7 @@ internal object MoneyManagerTestApp {
                             databaseManager.deleteDatabase(location)
                             databaseState = openAndPrimeDatabase(location)
                         } catch (expected: Exception) {
+                            expected.rethrowIfCancellation()
                             databaseState = TestDatabaseState.Error(location, expected)
                         }
                     }

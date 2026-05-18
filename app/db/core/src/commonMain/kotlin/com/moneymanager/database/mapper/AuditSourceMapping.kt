@@ -1,4 +1,4 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
+@file:OptIn(ExperimentalTime::class)
 
 package com.moneymanager.database.mapper
 
@@ -10,6 +10,7 @@ import com.moneymanager.domain.model.EntitySource
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.SourceType
+import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 internal fun auditDeviceInfo(

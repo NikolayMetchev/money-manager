@@ -24,7 +24,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuBoxScope
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -38,6 +37,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -828,7 +828,7 @@ private fun StrategySelector(
             ReadonlyDropdownField(
                 value = selectedStrategy?.name ?: "No strategy selected",
                 expanded = expanded,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
                 enabled = enabled,
             )
             ExposedDropdownMenu(
@@ -968,7 +968,7 @@ private fun NewAccountResolutionRow(
             ReadonlyDropdownField(
                 value = dropdownLabel,
                 expanded = expanded,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
                 enabled = enabled,
             )
             ExposedDropdownMenu(
@@ -1249,7 +1249,7 @@ private data class PendingAccountMappingKey(
 private fun StatCard(
     label: String,
     count: Int,
-    color: androidx.compose.ui.graphics.Color,
+    color: Color,
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -1277,7 +1277,7 @@ private fun StatCard(
 private data class StatCardData(
     val label: String,
     val count: Int,
-    val color: androidx.compose.ui.graphics.Color,
+    val color: Color,
 )
 
 @Composable
@@ -1359,7 +1359,7 @@ private fun TableCell(
 }
 
 @Composable
-private fun ExposedDropdownMenuBoxScope.ReadonlyDropdownField(
+private fun ReadonlyDropdownField(
     value: String,
     expanded: Boolean,
     modifier: Modifier = Modifier,
@@ -1370,7 +1370,7 @@ private fun ExposedDropdownMenuBoxScope.ReadonlyDropdownField(
         onValueChange = {},
         readOnly = true,
         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-        modifier = modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+        modifier = modifier,
         enabled = enabled,
     )
 }

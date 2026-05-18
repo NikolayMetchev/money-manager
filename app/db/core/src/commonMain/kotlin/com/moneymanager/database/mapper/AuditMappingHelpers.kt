@@ -1,9 +1,11 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
+@file:OptIn(ExperimentalTime::class, ExperimentalUuidApi::class)
 
 package com.moneymanager.database.mapper
 
 import com.moneymanager.domain.model.EntitySource
 import com.moneymanager.domain.model.EntityType
+import kotlin.time.ExperimentalTime
+import kotlin.uuid.ExperimentalUuidApi
 
 internal fun buildPersonFullName(
     firstName: String?,
