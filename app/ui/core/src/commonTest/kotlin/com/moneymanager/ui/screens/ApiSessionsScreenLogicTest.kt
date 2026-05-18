@@ -1,15 +1,18 @@
 package com.moneymanager.ui.screens
 
+import com.moneymanager.domain.model.ApiRequest
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiResponseId
 import com.moneymanager.domain.model.ApiResponseTransaction
 import com.moneymanager.domain.model.ApiResponseTransactionId
 import com.moneymanager.domain.model.ApiResponseTransactionState
+import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.JsonPath
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Instant
 
 class ApiSessionsScreenLogicTest {
     @Test
@@ -82,12 +85,10 @@ class ApiSessionsScreenLogicTest {
     }
 
     private fun request(id: Long) =
-        com.moneymanager.domain.model.ApiRequest(
+        ApiRequest(
             id = ApiRequestId(id),
-            sessionId =
-                com.moneymanager.domain.model
-                    .ApiSessionId(1),
-            requestedAt = kotlin.time.Instant.DISTANT_PAST,
+            sessionId = ApiSessionId(1),
+            requestedAt = Instant.DISTANT_PAST,
             method = "GET",
             url = "https://example.com",
             headers = emptyList(),
