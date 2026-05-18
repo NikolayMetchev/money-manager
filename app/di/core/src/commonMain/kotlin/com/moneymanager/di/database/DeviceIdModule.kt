@@ -1,3 +1,5 @@
+@file:Suppress("unused")
+
 package com.moneymanager.di.database
 
 import com.moneymanager.di.DatabaseScope
