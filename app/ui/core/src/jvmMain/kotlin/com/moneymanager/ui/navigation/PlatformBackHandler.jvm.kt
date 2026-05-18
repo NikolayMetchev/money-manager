@@ -8,5 +8,6 @@ actual fun PlatformBackHandler(
     onBack: () -> Unit,
 ) {
     if (!enabled) return
+    onBack.hashCode()
     // JVM desktop has no platform back gesture.
 }

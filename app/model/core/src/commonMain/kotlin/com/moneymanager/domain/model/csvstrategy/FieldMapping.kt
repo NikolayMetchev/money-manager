@@ -142,7 +142,7 @@ data class DirectColumnMapping(
  */
 @Serializable
 data class AmountParsingMapping(
-    override val id: FieldMappingId,
+    @Suppress("unused") override val id: FieldMappingId,
     override val fieldType: TransferField,
     val mode: AmountMode,
     val amountColumnName: String? = null,
