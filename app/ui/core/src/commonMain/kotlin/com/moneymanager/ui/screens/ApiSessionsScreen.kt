@@ -94,6 +94,7 @@ import com.moneymanager.ui.util.ContentCopyIcon
 import com.moneymanager.ui.util.displayDateTime
 import com.moneymanager.ui.util.setPlainText
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
@@ -906,16 +907,15 @@ fun ApiSessionTrafficScreen(
                         lazyListState.animateScrollToItem(highlightedPairIndex)
                         // Wait for the highlighted node's position to be reported, then
                         // do a second scroll to center it vertically in the viewport.
-                        snapshotFlow { highlightNodeRootY }
-                            .collect { nodeY ->
-                                if (nodeY >= 0f) {
-                                    val viewportHeight = lazyListState.layoutInfo.viewportSize.height
-                                    val listStartY = lazyListState.layoutInfo.viewportStartOffset.toFloat()
-                                    val nodeOffsetInViewport = nodeY - listStartY
-                                    val delta = nodeOffsetInViewport - viewportHeight / 2f
-                                    lazyListState.scroll { scrollBy(delta) }
-                                }
-                            }
+                        val nodeY =
+                            snapshotFlow { highlightNodeRootY }
+                                .filter { it >= 0f }
+                                .first()
+                        val viewportHeight = lazyListState.layoutInfo.viewportSize.height
+                        val listStartY = lazyListState.layoutInfo.viewportStartOffset.toFloat()
+                        val nodeOffsetInViewport = nodeY - listStartY
+                        val delta = nodeOffsetInViewport - viewportHeight / 2f
+                        lazyListState.scroll { scrollBy(delta) }
                     }
                 }
 
@@ -936,21 +936,21 @@ fun ApiSessionTrafficScreen(
                                 pair.response?.let { responseTransactionsByResponseId[it.id] }
                                     ?: emptyList()
                             val requestMatches = highlightRequestId == null || pair.request?.id == highlightRequestId
+                            val jsonPathMatches =
+                                highlightJsonPath != null &&
+                                    responseTransactions.any {
+                                        highlightJsonPath.startsWithJsonPath(it.jsonPath.value)
+                                    }
                             val isHighlighted =
                                 (highlightRequestId != null || highlightJsonPath != null) &&
                                     requestMatches &&
                                     (
                                         // Highlight by specific jsonPath when available (transaction sources).
                                         // Use prefix matching so sub-paths resolve to the containing response.
-                                        (
-                                            highlightJsonPath != null &&
-                                                responseTransactions.any {
-                                                    highlightJsonPath.startsWithJsonPath(it.jsonPath.value)
-                                                }
-                                        ) ||
+                                        jsonPathMatches ||
                                             // Highlight by requestId when jsonPath doesn't match any transaction
                                             // (e.g. main account sources stored at $.accounts[0], not transaction paths)
-                                            highlightRequestId != null
+                                            (highlightRequestId != null && highlightJsonPath == null)
                                     )
                             ApiTrafficPairCard(
                                 pair = pair,
@@ -1245,8 +1245,8 @@ private fun JsonTreeNode(
 ) {
     val childCount = element.childCount()
     val expandable = childCount > 0
-    // This node is the target if all highlight segments have been consumed
-    val isHighlightTarget = remainingHighlightSegments.isNullOrEmpty()
+    // This node is the target only when a highlight path exists and all segments are consumed.
+    val isHighlightTarget = remainingHighlightSegments != null && remainingHighlightSegments.isEmpty()
     // Force-expand the node if it's on the highlight path
     val forceExpandPath = !remainingHighlightSegments.isNullOrEmpty()
     val shouldForceExpand = forceExpandSubtree || forceExpandPath || isHighlightTarget
@@ -1271,7 +1271,6 @@ private fun JsonTreeNode(
         }
 
     val nodeTransaction = latestTransactionByJsonPath[jsonPath]
-    val isInHighlightedSubtree = highlightSubtree || isHighlightTarget
     val highlightBackground =
         when {
             isHighlightTarget -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.85f)
@@ -1280,7 +1279,7 @@ private fun JsonTreeNode(
             else -> Color.Transparent
         }
     val highlightTextColor =
-        if (isInHighlightedSubtree) {
+        if (isHighlightTarget) {
             MaterialTheme.colorScheme.onTertiaryContainer
         } else {
             MaterialTheme.colorScheme.onSurface
@@ -1355,7 +1354,7 @@ private fun JsonTreeNode(
                         latestTransactionByJsonPath = latestTransactionByJsonPath,
                         remainingHighlightSegments = nextSegments,
                         forceExpandSubtree = forceExpandSubtree || isHighlightTarget,
-                        highlightSubtree = isInHighlightedSubtree,
+                        highlightSubtree = highlightSubtree || isHighlightTarget,
                         onHighlightPositioned = onHighlightPositioned,
                     )
                 }
@@ -1380,7 +1379,7 @@ private fun JsonTreeNode(
                         latestTransactionByJsonPath = latestTransactionByJsonPath,
                         remainingHighlightSegments = nextSegments,
                         forceExpandSubtree = forceExpandSubtree || isHighlightTarget,
-                        highlightSubtree = isInHighlightedSubtree,
+                        highlightSubtree = highlightSubtree || isHighlightTarget,
                         onHighlightPositioned = onHighlightPositioned,
                     )
                 }
