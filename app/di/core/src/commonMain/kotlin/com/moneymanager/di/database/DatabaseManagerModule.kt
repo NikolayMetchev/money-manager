@@ -1,5 +1,3 @@
-@file:Suppress("unused")
-
 package com.moneymanager.di.database
 
 import com.moneymanager.database.DatabaseManager
@@ -22,3 +20,4 @@ interface DatabaseManagerModule {
     @SingleIn(AppScope::class)
     fun provideDatabaseManager(params: AppComponentParams): DatabaseManager = createDatabaseManager(params)
 }
+

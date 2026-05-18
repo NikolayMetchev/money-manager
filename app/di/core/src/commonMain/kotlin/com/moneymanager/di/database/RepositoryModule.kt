@@ -1,5 +1,3 @@
-@file:Suppress("unused")
-
 package com.moneymanager.di.database
 
 import com.moneymanager.database.DatabaseMaintenanceService
@@ -168,3 +166,4 @@ interface RepositoryModule {
         deviceRepository: DeviceRepository,
     ): TransferSourceRepository = TransferSourceRepositoryImpl(database, deviceRepository)
 }
+

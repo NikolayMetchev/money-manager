@@ -1,5 +1,3 @@
-@file:Suppress("unused")
-
 package com.moneymanager.di.database
 
 import com.moneymanager.di.DatabaseScope
@@ -20,3 +18,4 @@ interface DeviceIdModule {
     @SingleIn(DatabaseScope::class)
     fun provideDeviceId(deviceRepository: DeviceRepository): DeviceId = deviceRepository.getOrCreateDevice(getDeviceInfo())
 }
+

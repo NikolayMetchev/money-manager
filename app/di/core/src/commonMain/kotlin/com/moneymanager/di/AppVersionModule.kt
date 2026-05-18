@@ -1,5 +1,3 @@
-@file:Suppress("unused")
-
 package com.moneymanager.di
 
 import com.moneymanager.domain.model.AppVersion
