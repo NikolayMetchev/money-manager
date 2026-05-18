@@ -20,4 +20,3 @@ interface DatabaseManagerModule {
     @SingleIn(AppScope::class)
     fun provideDatabaseManager(params: AppComponentParams): DatabaseManager = createDatabaseManager(params)
 }
-

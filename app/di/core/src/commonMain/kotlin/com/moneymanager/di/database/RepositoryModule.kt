@@ -166,4 +166,3 @@ interface RepositoryModule {
         deviceRepository: DeviceRepository,
     ): TransferSourceRepository = TransferSourceRepositoryImpl(database, deviceRepository)
 }
-

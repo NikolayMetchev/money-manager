@@ -18,4 +18,3 @@ interface DeviceIdModule {
     @SingleIn(DatabaseScope::class)
     fun provideDeviceId(deviceRepository: DeviceRepository): DeviceId = deviceRepository.getOrCreateDevice(getDeviceInfo())
 }
-
