@@ -84,11 +84,12 @@ class ApiSessionsScreenLogicTest {
     private fun request(id: Long) =
         com.moneymanager.domain.model.ApiRequest(
             id = ApiRequestId(id),
-            sessionId = com.moneymanager.domain.model.ApiSessionId(1),
+            sessionId =
+                com.moneymanager.domain.model
+                    .ApiSessionId(1),
             requestedAt = kotlin.time.Instant.DISTANT_PAST,
             method = "GET",
             url = "https://example.com",
             headers = emptyList(),
         )
 }
-
