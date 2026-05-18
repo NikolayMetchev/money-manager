@@ -32,6 +32,10 @@ exclude:
       - app/di/core/src/jvmMain/kotlin/com/moneymanager/di/database/CreateDatabaseManager.jvm.kt
   - name: UnusedSymbol
     paths:
+      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/AppVersionModule.kt
+      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/database/DatabaseManagerModule.kt
+      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/database/DeviceIdModule.kt
+      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/database/RepositoryModule.kt
       - app/di/core/src/commonMain/kotlin/com/moneymanager/di/AppComponent.kt
       - app/di/core/src/commonMain/kotlin/com/moneymanager/di/database/DatabaseComponent.kt
       - test/app/db/src/commonMain/kotlin/com/moneymanager/test/database/DbTest.kt
