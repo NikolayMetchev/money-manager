@@ -16,8 +16,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
-      contents: write
-      pull-requests: write
+      contents: read
+      pull-requests: read
       checks: write
       security-events: write
     steps:
@@ -42,7 +42,6 @@ jobs:
         with:
           pr-mode: false
           use-caches: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/releases/') }}
-          push-fixes: branch
         env:
           QODANA_TOKEN: ${{ secrets.QODANA_TOKEN_1874207222 }}
           QODANA_ENDPOINT: 'https://qodana.cloud'
