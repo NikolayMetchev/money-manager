@@ -5,7 +5,4 @@ import com.moneymanager.database.JvmDatabaseManager
 import com.moneymanager.di.AppComponentParams
 
 @Suppress("ktlint:standard:function-naming")
-actual fun createDatabaseManager(params: AppComponentParams): DatabaseManager {
-    params.hashCode()
-    return JvmDatabaseManager()
-}
+actual fun createDatabaseManager(params: AppComponentParams): DatabaseManager = JvmDatabaseManager()

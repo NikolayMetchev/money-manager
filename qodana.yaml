@@ -31,6 +31,9 @@ exclude:
       - app/di/core/src/commonMain/kotlin/com/moneymanager/di/database/DatabaseManagerModule.kt
       - app/di/core/src/commonMain/kotlin/com/moneymanager/di/database/DeviceIdModule.kt
       - app/di/core/src/commonMain/kotlin/com/moneymanager/di/database/RepositoryModule.kt
+      - app/ui/core/src/jvmMain/kotlin/com/moneymanager/ui/navigation/PlatformBackHandler.jvm.kt
+      - app/model/core/src/commonMain/kotlin/com/moneymanager/domain/model/csvstrategy/FieldMapping.kt
+      - app/di/core/src/jvmMain/kotlin/com/moneymanager/di/database/CreateDatabaseManager.jvm.kt
   - name: UnusedSymbol
     paths:
       - app/di/core/src/commonMain/kotlin/com/moneymanager/di/AppVersionModule.kt
