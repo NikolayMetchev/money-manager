@@ -355,9 +355,7 @@ private suspend fun setupImportSession(
 
     // Pre-create transaction attribute types before the concurrent section so that
     // no two coroutines race to write the same type, which causes SQLITE_BUSY.
-    // The well-known types (account-external-id, built-in type) are seeded with stable IDs
-    // and do not need to be looked up.
-    attributeTypeCache.getOrCreate(MONZO_TRANSACTION_ID_ATTRIBUTE_NAME)
+    // Pre-create configured attribute types before concurrent import starts.
     for (fieldName in customTxFields.keys) attributeTypeCache.getOrCreate(fieldName)
 
     // Build the counterparty ID index (externalId → AccountId) from existing account attributes
@@ -1359,6 +1357,8 @@ private data class ApiTransactionPageItem(
     val counterpartyName: String?,
     val declineReason: String?,
     val rawJson: JsonObject? = null,
+    val localAmountMinorUnits: Long? = null,
+    val localCurrencyCode: String? = null,
 )
 
 private data class ApiImportPageResult(
@@ -1405,12 +1405,16 @@ private suspend fun importTransactionPage(
     val responseId = ApiResponseId(response.responseId)
     val requestId = ApiRequestId(response.requestId)
     val existingTransfers = transactionRepository.getTransactionsByAccount(ownAccountId).first().toMutableList()
+    val transactionIdAttributeName = customTxFields.entries.firstOrNull { it.value == "id" }?.key
     val existingTransfersByApiId =
         existingTransfers
             .mapNotNull { transfer ->
-                transfer.attributes.firstOrNull { it.attributeType.name == MONZO_TRANSACTION_ID_ATTRIBUTE_NAME }?.value?.let { apiId ->
-                    apiId to transfer
-                }
+                transactionIdAttributeName
+                    ?.let { attributeName ->
+                        transfer.attributes.firstOrNull { it.attributeType.name == attributeName }?.value
+                    }?.let { apiId ->
+                        apiId to transfer
+                    }
             }.toMap()
 
     // Index existing transfers by their unique-identifier attribute values for O(1) lookup
@@ -1487,6 +1491,8 @@ private suspend fun importTransactionItem(
     transactionRepository: TransactionRepository,
     entitySource: EntitySource,
 ): ApiResponseTransactionState {
+    // Keep transfer money in the account transaction currency (CSV parity).
+    // Local/original FX values are stored separately as attributes.
     val currency = currencyCache.getCurrency(item.currencyCode)
     if (currency == null) {
         apiSessionRepository.recordTransactionError(
@@ -1613,8 +1619,28 @@ private suspend fun importValidTransactionItem(
                     add(NewAttribute(typeId = attributeTypeCache.getOrCreate(fieldName), value = value))
                 }
             }
-            if (transactionApiId != null) {
-                add(NewAttribute(typeId = attributeTypeCache.getOrCreate(MONZO_TRANSACTION_ID_ATTRIBUTE_NAME), value = transactionApiId))
+            val transactionIdAttributeName = customTxFields.entries.firstOrNull { it.value == "id" }?.key
+            if (transactionApiId != null && transactionIdAttributeName != null) {
+                add(NewAttribute(typeId = attributeTypeCache.getOrCreate(transactionIdAttributeName), value = transactionApiId))
+            }
+            val localAmountAttributeName =
+                strategyAttributeNameForJsonPath(customTxFields, strategyPath = "local_amount")
+            if (item.localAmountMinorUnits != null) {
+                if (localAmountAttributeName != null) {
+                    add(
+                        NewAttribute(
+                            typeId = attributeTypeCache.getOrCreate(localAmountAttributeName),
+                            value = item.localAmountMinorUnits.toString(),
+                        ),
+                    )
+                }
+            }
+            val localCurrencyAttributeName =
+                strategyAttributeNameForJsonPath(customTxFields, strategyPath = "local_currency")
+            if (!item.localCurrencyCode.isNullOrBlank()) {
+                if (localCurrencyAttributeName != null) {
+                    add(NewAttribute(typeId = attributeTypeCache.getOrCreate(localCurrencyAttributeName), value = item.localCurrencyCode))
+                }
             }
         }
     transactionRepository.createTransfers(
@@ -1656,6 +1682,8 @@ private fun parseTransactionsWithPath(
                 val amount = obj.resolveJsonPath(mappings.amountField)?.toLongOrNull()
                 val currency = obj.resolveJsonPath(mappings.currencyField)
                 val declineReason = mappings.declineReasonField?.let { obj.resolveJsonPath(it) }
+                val localAmount = mappings.localAmountField?.let { obj.resolveJsonPath(it) }?.toLongOrNull()
+                val localCurrency = mappings.localCurrencyField?.let { obj.resolveJsonPath(it) }
                 if (created != null && amount != null && currency != null) {
                     ApiTransactionPageItem(
                         amountMinorUnits = amount,
@@ -1667,6 +1695,8 @@ private fun parseTransactionsWithPath(
                         counterpartyName = mappings.counterpartyNameField?.let { obj.resolveJsonPath(it) },
                         declineReason = declineReason,
                         rawJson = obj,
+                        localAmountMinorUnits = localAmount,
+                        localCurrencyCode = localCurrency?.uppercase(),
                     )
                 } else {
                     logger.error {
@@ -1992,7 +2022,10 @@ private fun Transfer.matches(other: Transfer): Boolean =
                 (sourceAccountId == other.targetAccountId && targetAccountId == other.sourceAccountId)
         )
 
-private const val MONZO_TRANSACTION_ID_ATTRIBUTE_NAME = "Monzo Transaction Id"
+private fun strategyAttributeNameForJsonPath(
+    customTxFields: Map<String, String>,
+    strategyPath: String,
+): String? = customTxFields.entries.firstOrNull { it.value == strategyPath }?.key
 
 private suspend fun ApiSessionRepository.recordTransactionError(
     responseId: ApiResponseId,

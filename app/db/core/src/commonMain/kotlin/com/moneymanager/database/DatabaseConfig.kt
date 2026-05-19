@@ -840,6 +840,8 @@ object DatabaseConfig {
                         counterpartyNameField = "counterparty.name",
                         counterpartyIdField = "counterparty.id",
                         declineReasonField = "decline_reason",
+                        localAmountField = "local_amount",
+                        localCurrencyField = "local_currency",
                     ),
                 accountNamePrefix = "Monzo: ",
                 counterpartyPrefix = "Monzo Counterparty: ",
