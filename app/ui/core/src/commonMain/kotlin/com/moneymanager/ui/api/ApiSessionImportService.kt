@@ -1495,8 +1495,8 @@ private suspend fun importTransactionItem(
         item.localCurrencyCode != null &&
             item.localAmountMinorUnits != null &&
             item.localCurrencyCode != item.currencyCode
-    val effectiveCurrencyCode = if (useLocal) item.localCurrencyCode!! else item.currencyCode
-    val effectiveAmount = if (useLocal) item.localAmountMinorUnits!! else item.amountMinorUnits
+    val effectiveCurrencyCode = if (useLocal) item.localCurrencyCode else item.currencyCode
+    val effectiveAmount = if (useLocal) item.localAmountMinorUnits else item.amountMinorUnits
 
     val currency = currencyCache.getCurrency(effectiveCurrencyCode)
     if (currency == null) {
