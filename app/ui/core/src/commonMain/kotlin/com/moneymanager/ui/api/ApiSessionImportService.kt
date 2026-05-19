@@ -619,34 +619,43 @@ private suspend fun precreateCounterparties(
     if (counterpartyIdField == null) return
 
     val counterparties =
-        transactionResponses
-            .flatMap { response ->
-                val request = requestsById[response.requestId] ?: return@flatMap emptyList()
-                parseTransactionsWithPath(response.json, strategy).mapNotNull { item ->
-                    val counterpartyId =
-                        item.rawJson?.resolveCounterpartyIdentity(counterpartyIdField, strategy.peopleMappings)
-                            ?: return@mapNotNull null
-                    val downloadedName = item.cleanCounterpartyName(nameMappings) ?: item.counterpartyName(nameMappings)
-                    CounterpartyImportCandidate(
-                        counterpartyId = counterpartyId,
-                        downloadedName = downloadedName,
-                        apiSource = AccountApiSource(sessionId, request.id, JsonPath("${item.jsonPath.value}.counterparty")),
-                    )
-                }
-            }.groupBy { it.counterpartyId }
+        coroutineScope {
+            transactionResponses
+                .map { response ->
+                    async {
+                        val request = requestsById[response.requestId] ?: return@async emptyList()
+                        parseTransactionsWithPath(response.json, strategy).mapNotNull { item ->
+                            val counterpartyId =
+                                item.rawJson?.resolveCounterpartyIdentity(counterpartyIdField, strategy.peopleMappings)
+                                    ?: return@mapNotNull null
+                            val downloadedName = item.cleanCounterpartyName(nameMappings) ?: item.counterpartyName(nameMappings)
+                            CounterpartyImportCandidate(
+                                counterpartyId = counterpartyId,
+                                downloadedName = downloadedName,
+                                apiSource = AccountApiSource(sessionId, request.id, JsonPath("${item.jsonPath.value}.counterparty")),
+                            )
+                        }
+                    }
+                }.awaitAll()
+                .flatten()
+                .groupBy { it.counterpartyId }
+        }
 
-    for ((counterpartyId, candidates) in counterparties) {
-        val accountName =
-            counterpartyAccountNames[counterpartyId]
-                ?.trim()
-                ?.takeIf { it.isNotBlank() }
-                ?: (strategy.counterpartyPrefix + suggestCounterpartyName(candidates.map { it.downloadedName }))
-        accountCache.getOrCreateCounterpartyAccountId(
-            counterpartyId = counterpartyId,
-            builtInType = null,
-            name = accountName,
-            apiSource = candidates.first().apiSource,
-        )
+    coroutineScope {
+        val requests =
+            counterparties.map { (counterpartyId, candidates) ->
+                val accountName =
+                    counterpartyAccountNames[counterpartyId]
+                        ?.trim()
+                        ?.takeIf { it.isNotBlank() }
+                        ?: (strategy.counterpartyPrefix + suggestCounterpartyName(candidates.map { it.downloadedName }))
+                CounterpartyBatchCreateRequest(
+                    counterpartyId = counterpartyId,
+                    name = accountName,
+                    apiSource = candidates.first().apiSource,
+                )
+            }
+        accountCache.precreateCounterpartyAccountsBatch(requests)
     }
 }
 
@@ -793,6 +802,12 @@ private fun suggestCounterpartyName(names: List<String>): String =
 private data class CounterpartyImportCandidate(
     val counterpartyId: String,
     val downloadedName: String,
+    val apiSource: AccountApiSource,
+)
+
+private data class CounterpartyBatchCreateRequest(
+    val counterpartyId: String,
+    val name: String,
     val apiSource: AccountApiSource,
 )
 
@@ -2001,6 +2016,54 @@ private class AccountCache(
             }
             accountId
         }
+
+    suspend fun precreateCounterpartyAccountsBatch(requests: List<CounterpartyBatchCreateRequest>) {
+        if (requests.isEmpty()) return
+
+        var createdCount = 0
+        mutex.withLock {
+            val accountMap = loadAccounts().toMutableMap()
+            val toCreate = mutableListOf<CounterpartyBatchCreateRequest>()
+
+            for (request in requests) {
+                counterpartyIdIndex[request.counterpartyId]?.let { continue }
+                val existingByName = accountMap[request.name]
+                if (existingByName != null) {
+                    counterpartyIdIndex[request.counterpartyId] = existingByName.id
+                    continue
+                }
+                toCreate += request
+            }
+
+            if (toCreate.isEmpty()) return@withLock
+
+            val now = Clock.System.now()
+            val accountsToCreate =
+                toCreate.map { request ->
+                    Account(id = AccountId(0L), name = request.name.ifBlank { "Unknown" }, openingDate = now)
+                }
+            val createdIds = accountRepository.createAccountsBatch(accountsToCreate)
+
+            toCreate.zip(createdIds).forEach { (request, accountId) ->
+                counterpartyIdIndex[request.counterpartyId] = accountId
+                val createdAccount = Account(id = accountId, name = request.name.ifBlank { "Unknown" }, openingDate = now)
+                accountMap[createdAccount.name] = createdAccount
+                accountAttributeRepository.insertInCreationMode(accountId, ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID, request.counterpartyId)
+                entitySource.recordFromApi(
+                    entityType = EntityType.ACCOUNT,
+                    entityId = accountId.id,
+                    revisionId = 1L,
+                    sessionId = request.apiSource.sessionId,
+                    requestId = request.apiSource.requestId,
+                    jsonPath = request.apiSource.jsonPath,
+                )
+            }
+            accountsByName = accountMap
+            createdCount = toCreate.size
+        }
+
+        repeat(createdCount) { onAccountCreated(false) }
+    }
 
     private suspend fun findBuiltInTypeAccountId(builtInType: BuiltInCounterpartyType): AccountId? {
         val accounts = accountRepository.getAllAccounts().first()
