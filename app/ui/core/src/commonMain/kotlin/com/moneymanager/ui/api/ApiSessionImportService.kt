@@ -1409,11 +1409,12 @@ private suspend fun importTransactionPage(
     val existingTransfersByApiId =
         existingTransfers
             .mapNotNull { transfer ->
-                transactionIdAttributeName?.let { attributeName ->
-                    transfer.attributes.firstOrNull { it.attributeType.name == attributeName }?.value
-                }?.let { apiId ->
-                    apiId to transfer
-                }
+                transactionIdAttributeName
+                    ?.let { attributeName ->
+                        transfer.attributes.firstOrNull { it.attributeType.name == attributeName }?.value
+                    }?.let { apiId ->
+                        apiId to transfer
+                    }
             }.toMap()
 
     // Index existing transfers by their unique-identifier attribute values for O(1) lookup
@@ -1626,7 +1627,12 @@ private suspend fun importValidTransactionItem(
                 strategyAttributeNameForJsonPath(customTxFields, strategyPath = "local_amount")
             if (item.localAmountMinorUnits != null) {
                 if (localAmountAttributeName != null) {
-                    add(NewAttribute(typeId = attributeTypeCache.getOrCreate(localAmountAttributeName), value = item.localAmountMinorUnits.toString()))
+                    add(
+                        NewAttribute(
+                            typeId = attributeTypeCache.getOrCreate(localAmountAttributeName),
+                            value = item.localAmountMinorUnits.toString(),
+                        ),
+                    )
                 }
             }
             val localCurrencyAttributeName =
