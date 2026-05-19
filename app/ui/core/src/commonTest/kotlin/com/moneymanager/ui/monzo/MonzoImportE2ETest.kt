@@ -6,6 +6,8 @@ import com.moneymanager.database.port.DbEntitySource
 import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.JsonPath
+import com.moneymanager.domain.model.Person
+import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.SourceType
 import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.createApiClient
@@ -241,6 +243,30 @@ private val TRANSACTIONS_WITH_PERSONAL_COUNTERPARTY_JSON =
         "name": "John Q. Doe",
         "sort_code": "050505",
         "user_id": "anonuser_95515c2ea95c19a58aad7b"
+      }
+    }
+  ]
+}
+    """.trimIndent()
+
+private val TRANSACTIONS_WITH_MIDDLE_NAME_COUNTERPARTY_JSON =
+    """
+{
+  "transactions": [
+    {
+      "id": "tx_00009TEST000000000042",
+      "account_id": "$ACCOUNT_ID",
+      "created": "2024-06-08T09:15:00.000Z",
+      "amount": 1250,
+      "currency": "GBP",
+      "description": "Received from Nikolay",
+      "merchant": null,
+      "counterparty": {
+        "account_number": "11223344",
+        "beneficiary_account_type": "Personal",
+        "name": "NIKOLAY IVANOV METCHEV",
+        "sort_code": "060606",
+        "user_id": "anonuser_middle_name_variant"
       }
     }
   ]
@@ -1097,6 +1123,101 @@ class MonzoImportE2ETest : DbTest() {
                 },
                 "Expected the second personal counterparty account attributes to be preserved",
             )
+        }
+
+    @Test
+    fun `personal counterparty import matches existing person ignoring middle names`() =
+        runTest {
+            repositories.personRepository.createPerson(
+                Person(
+                    id = PersonId(0L),
+                    firstName = "Nikolay",
+                    middleName = null,
+                    lastName = "Metchev",
+                ),
+            )
+            val deviceId =
+                repositories.deviceRepository.getOrCreateDevice(
+                    DeviceInfo.Jvm("test-machine", "Test OS"),
+                )
+            val sessionId =
+                repositories.apiSessionRepository.createSession(
+                    token = "test-monzo-token",
+                    deviceId = deviceId,
+                    createdAt = Instant.fromEpochMilliseconds(1_700_000_000_000L),
+                    expiresAt = null,
+                )
+            val mockEngine =
+                MockEngine { request ->
+                    val url = request.url.toString()
+                    val json =
+                        when {
+                            url.contains("/accounts") -> ACCOUNTS_JSON
+                            url.contains("/transactions") && !url.contains("before=") -> TRANSACTIONS_WITH_MIDDLE_NAME_COUNTERPARTY_JSON
+                            url.contains("/transactions") && url.contains("before=") -> EMPTY_TRANSACTIONS_JSON
+                            else -> error("Unexpected request: $url")
+                        }
+                    respond(
+                        content = json,
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                    )
+                }
+            val apiClient =
+                createApiClient(
+                    trafficRecorder = ApiSessionTrafficRecorder(sessionId, repositories.apiSessionRepository),
+                    engine = mockEngine,
+                )
+            val strategy =
+                repositories.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .single()
+                    .let { strategy ->
+                        strategy.copy(
+                            transactionMappings =
+                                strategy.transactionMappings.copy(
+                                    counterpartyIdField = "counterparty.id",
+                                ),
+                        )
+                    }
+
+            downloadApiSessionAccounts(
+                token = "test-monzo-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+            downloadApiSessionTransactions(
+                token = "test-monzo-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+
+            val importResult =
+                importApiSessionTransactions(
+                    apiSessionRepository = repositories.apiSessionRepository,
+                    accountRepository = repositories.accountRepository,
+                    currencyRepository = repositories.currencyRepository,
+                    transactionRepository = repositories.transactionRepository,
+                    entitySource = DbEntitySource(repositories.entitySourceQueries, repositories.transferSourceQueries, deviceId),
+                    personRepository = repositories.personRepository,
+                    personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
+                    personAttributeRepository = repositories.personAttributeRepository,
+                    attributeTypeRepository = repositories.attributeTypeRepository,
+                    accountAttributeRepository = repositories.accountAttributeRepository,
+                    deviceId = deviceId,
+                    sessionId = sessionId,
+                    strategy = strategy,
+                )
+
+            assertEquals(0, importResult.personCount, "Middle-name variants should match the existing first/last person")
+            val people = repositories.personRepository.getAllPeople().first()
+            assertEquals(1, people.size)
+            assertEquals("Nikolay Metchev", people.single().fullName)
         }
 
     @Test

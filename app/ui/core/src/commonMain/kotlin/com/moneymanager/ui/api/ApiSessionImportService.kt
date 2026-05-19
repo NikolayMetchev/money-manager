@@ -1056,28 +1056,26 @@ private data class IndexedPerson(
 ) {
     val fullName: String
         get() = person.fullName
+
+    val importNameKey: String?
+        get() = person.importNameKey()
 }
 
 private class MutablePeopleIndex private constructor(
     private val peopleByExternalId: MutableMap<String, IndexedPerson>,
     private val peopleByBankKey: MutableMap<String, IndexedPerson>,
-    private val peopleByFullName: MutableMap<String, MutableList<IndexedPerson>>,
+    private val peopleByImportNameKey: MutableMap<String, MutableList<IndexedPerson>>,
 ) {
     fun find(
         externalId: String?,
         bankKey: String?,
         fullName: String,
-    ): IndexedPerson? =
-        externalId?.let { peopleByExternalId[it] }
+    ): IndexedPerson? {
+        val nameKey = fullName.importNameKey()
+        return externalId?.let { peopleByExternalId[it] }
             ?: bankKey?.let { peopleByBankKey[it] }
-            ?: if (externalId == null) {
-                peopleByFullName[fullName]?.firstOrNull()
-            } else {
-                // When an API supplies an external id, only fall back to same-name people that do
-                // not already have their own external id. This avoids merging two distinct people
-                // who happen to share a name but are represented by different upstream ids.
-                peopleByFullName[fullName]?.firstOrNull { it.externalId == null }
-            }
+            ?: nameKey?.let { peopleByImportNameKey[it]?.firstOrNull() }
+    }
 
     fun add(
         person: Person,
@@ -1087,18 +1085,19 @@ private class MutablePeopleIndex private constructor(
         val indexedPerson = IndexedPerson(person, externalId, bankKey)
         externalId?.let { peopleByExternalId[it] = indexedPerson }
         bankKey?.let { peopleByBankKey[it] = indexedPerson }
-        peopleByFullName.getOrPut(person.fullName) { mutableListOf() }.add(indexedPerson)
+        person.importNameKey()?.let { peopleByImportNameKey.getOrPut(it) { mutableListOf() }.add(indexedPerson) }
     }
 
     fun replace(
         person: Person,
         externalId: String?,
     ) {
-        val existing = peopleByFullName[person.fullName]?.firstOrNull { it.person.id == person.id }
+        val nameKey = person.importNameKey() ?: return
+        val existing = peopleByImportNameKey[nameKey]?.firstOrNull { it.person.id == person.id }
         val indexedPerson = IndexedPerson(person, externalId, existing?.bankKey)
         externalId?.let { peopleByExternalId[it] = indexedPerson }
         existing?.bankKey?.let { peopleByBankKey[it] = indexedPerson }
-        val people = peopleByFullName[person.fullName] ?: return
+        val people = peopleByImportNameKey[nameKey] ?: return
         val index = people.indexOfFirst { it.person.id == person.id }
         if (index >= 0) {
             people[index] = indexedPerson
@@ -1118,13 +1117,22 @@ private class MutablePeopleIndex private constructor(
                     }
                 }
             val byBankKey = mutableMapOf<String, IndexedPerson>()
-            val byFullName =
+            val byImportNameKey =
                 indexedPeople
-                    .groupByTo(mutableMapOf()) { it.fullName }
+                    .mapNotNull { person -> person.importNameKey?.let { it to person } }
+                    .groupByTo(mutableMapOf(), keySelector = { it.first }, valueTransform = { it.second })
                     .mapValuesTo(mutableMapOf()) { (_, group) -> group.toMutableList() }
-            return MutablePeopleIndex(byExternalId, byBankKey, byFullName)
+            return MutablePeopleIndex(byExternalId, byBankKey, byImportNameKey)
         }
     }
+}
+
+private fun Person.importNameKey(): String? = fullName.importNameKey()
+
+private fun String.importNameKey(): String? {
+    val parts = trim().lowercase().split(Regex("\\s+")).filter { it.isNotBlank() }
+    if (parts.isEmpty()) return null
+    return if (parts.size == 1) parts.single() else "${parts.first()} ${parts.last()}"
 }
 
 private suspend fun fetchResponse(
