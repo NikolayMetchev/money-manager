@@ -63,7 +63,8 @@ class ApiSessionsScreenLogicTest {
 
     @Test
     fun shouldHighlightPair_matchesByJsonPathPrefix() {
-        val pair = ApiTrafficPair(request = request(43), response = null)
+        val requestId = 43L
+        val pair = ApiTrafficPair(request = request(requestId), response = null)
         val highlighted =
             shouldHighlightPair(
                 pair = pair,
@@ -78,7 +79,7 @@ class ApiSessionsScreenLogicTest {
                             errorMessage = null,
                         ),
                     ),
-                highlightRequestId = ApiRequestId(42),
+                highlightRequestId = ApiRequestId(requestId),
                 highlightJsonPath = "$.transactions[0].counterparty.name",
             )
         assertTrue(highlighted)
