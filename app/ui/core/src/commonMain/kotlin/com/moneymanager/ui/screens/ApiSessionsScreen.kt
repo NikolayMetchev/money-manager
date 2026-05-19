@@ -251,6 +251,7 @@ fun ApiSessionsScreen(
             }
             else -> {
                 val lazyListState = rememberLazyListState()
+                var listRootY by remember { mutableFloatStateOf(0f) }
                 Box(modifier = Modifier.fillMaxSize()) {
                     LazyColumn(state = lazyListState, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         items(credentials) { credential ->
@@ -863,6 +864,7 @@ fun ApiSessionTrafficScreen(
             }
             else -> {
                 val lazyListState = rememberLazyListState()
+                var listRootY by remember { mutableFloatStateOf(0f) }
                 // Absolute Y (in root coordinates) of the highlighted JSON node, reported
                 // by JsonTreeNode once it is laid out, so we can center it in the viewport.
                 var highlightNodeRootY by remember(highlightJsonPath) { mutableFloatStateOf(-1f) }
@@ -901,23 +903,30 @@ fun ApiSessionTrafficScreen(
                         }
                     }
 
-                LaunchedEffect(highlightedPairIndex) {
+                LaunchedEffect(highlightedPairIndex, highlightJsonPath) {
                     if (highlightedPairIndex >= 0) {
                         lazyListState.animateScrollToItem(highlightedPairIndex)
-                        // Wait for the highlighted node's position to be reported, then
-                        // do a second scroll to center it vertically in the viewport.
-                        val nodeY =
-                            snapshotFlow { highlightNodeRootY }
-                                .first { it >= 0f }
-                        val viewportHeight = lazyListState.layoutInfo.viewportSize.height
-                        val listStartY = lazyListState.layoutInfo.viewportStartOffset.toFloat()
-                        val nodeOffsetInViewport = nodeY - listStartY
-                        val delta = nodeOffsetInViewport - viewportHeight / 2f
-                        lazyListState.scroll { scrollBy(delta) }
+                        if (highlightJsonPath != null) {
+                            // Wait for the highlighted node's position to be reported, then
+                            // do a second scroll to center it vertically in the viewport.
+                            val nodeY =
+                                snapshotFlow { highlightNodeRootY }
+                                    .first { it >= 0f }
+                            val viewportHeight = lazyListState.layoutInfo.viewportSize.height
+                            val listStartY = lazyListState.layoutInfo.viewportStartOffset.toFloat()
+                            val nodeOffsetInViewport = nodeY - listRootY - listStartY
+                            val delta = nodeOffsetInViewport - viewportHeight / 2f
+                            lazyListState.scroll { scrollBy(delta) }
+                        }
                     }
                 }
 
-                Box(modifier = Modifier.fillMaxSize()) {
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .onGloballyPositioned { coords -> listRootY = coords.positionInRoot().y },
+                ) {
                     LazyColumn(
                         state = lazyListState,
                         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -943,8 +952,14 @@ fun ApiSessionTrafficScreen(
                             ApiTrafficPairCard(
                                 pair = pair,
                                 responseTransactions = responseTransactions,
+                                isHighlighted = isHighlighted,
                                 highlightJsonPath = if (isHighlighted) highlightJsonPath else null,
-                                onHighlightPositioned = if (isHighlighted) { y -> highlightNodeRootY = y } else null,
+                                onHighlightPositioned =
+                                    if (isHighlighted && highlightJsonPath != null) {
+                                        { y -> highlightNodeRootY = y }
+                                    } else {
+                                        null
+                                    },
                             )
                         }
                     }
@@ -962,10 +977,10 @@ fun ApiSessionTrafficScreen(
 private fun ApiTrafficPairCard(
     pair: ApiTrafficPair,
     responseTransactions: List<ApiResponseTransaction> = emptyList(),
+    isHighlighted: Boolean = false,
     highlightJsonPath: String? = null,
     onHighlightPositioned: ((Float) -> Unit)? = null,
 ) {
-    val isHighlighted = highlightJsonPath != null
     val cardContainerColor =
         if (isHighlighted) {
             MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
@@ -1225,7 +1240,10 @@ internal fun shouldHighlightPair(
     highlightRequestId: ApiRequestId?,
     highlightJsonPath: String?,
 ): Boolean {
-    val requestMatches = highlightRequestId == null || pair.request?.id == highlightRequestId
+    val requestMatches =
+        highlightRequestId == null ||
+            pair.request?.id == highlightRequestId ||
+            pair.response?.requestId == highlightRequestId
     val jsonPathMatches =
         highlightJsonPath != null &&
             responseTransactions.any {
