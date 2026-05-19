@@ -251,7 +251,6 @@ fun ApiSessionsScreen(
             }
             else -> {
                 val lazyListState = rememberLazyListState()
-                var listRootY by remember { mutableFloatStateOf(0f) }
                 Box(modifier = Modifier.fillMaxSize()) {
                     LazyColumn(state = lazyListState, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         items(credentials) { credential ->
