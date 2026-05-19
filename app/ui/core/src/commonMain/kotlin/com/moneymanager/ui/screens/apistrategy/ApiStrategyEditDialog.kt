@@ -117,6 +117,8 @@ fun ApiStrategyEditDialog(
     var txCounterpartyNameField by remember { mutableStateOf(strategy?.transactionMappings?.counterpartyNameField ?: "") }
     var txCounterpartyIdField by remember { mutableStateOf(strategy?.transactionMappings?.counterpartyIdField ?: "") }
     var txDeclineReasonField by remember { mutableStateOf(strategy?.transactionMappings?.declineReasonField ?: "") }
+    var txLocalAmountField by remember { mutableStateOf(strategy?.transactionMappings?.localAmountField ?: "") }
+    var txLocalCurrencyField by remember { mutableStateOf(strategy?.transactionMappings?.localCurrencyField ?: "") }
     var peopleCounterpartyObjectField by remember { mutableStateOf(strategy?.peopleMappings?.counterpartyObjectField ?: "counterparty") }
     var peopleBeneficiaryAccountTypeField by remember {
         mutableStateOf(
@@ -514,6 +516,26 @@ fun ApiStrategyEditDialog(
                         pickingForSetter = setter
                     },
                 )
+                FieldMappingRow(
+                    label = "Local Amount (optional, minor units)",
+                    value = txLocalAmountField,
+                    onValueChange = { txLocalAmountField = it },
+                    paths = txJsonPaths,
+                    onPickRequest = { setter ->
+                        pickingPaths = txJsonPaths
+                        pickingForSetter = setter
+                    },
+                )
+                FieldMappingRow(
+                    label = "Local Currency (optional, ISO 4217)",
+                    value = txLocalCurrencyField,
+                    onValueChange = { txLocalCurrencyField = it },
+                    paths = txJsonPaths,
+                    onPickRequest = { setter ->
+                        pickingPaths = txJsonPaths
+                        pickingForSetter = setter
+                    },
+                )
                 Spacer(Modifier.height(4.dp))
                 HorizontalDivider()
                 SectionHeader("People Mappings")
@@ -654,6 +676,8 @@ fun ApiStrategyEditDialog(
                                     counterpartyNameField = txCounterpartyNameField.trim().ifBlank { null },
                                     counterpartyIdField = txCounterpartyIdField.trim().ifBlank { null },
                                     declineReasonField = txDeclineReasonField.trim().ifBlank { null },
+                                    localAmountField = txLocalAmountField.trim().ifBlank { null },
+                                    localCurrencyField = txLocalCurrencyField.trim().ifBlank { null },
                                     customFields =
                                         customTxFields
                                             .filter { it.name.isNotBlank() }

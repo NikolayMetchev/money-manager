@@ -97,6 +97,12 @@ data class ApiAccountMappings(
  *                                 (e.g. "counterparty.name"); fallback when merchant is absent
  * @property declineReasonField Optional field containing the decline reason for declined
  *                               transactions (e.g. "decline_reason")
+ * @property localAmountField Optional field containing the local/original amount in minor units
+ *                            (e.g. "local_amount"). When set together with [localCurrencyField],
+ *                            the local amount and currency are used when the local currency differs
+ *                            from the account currency (i.e. for foreign-currency transactions).
+ * @property localCurrencyField Optional field containing the local/original ISO-4217 currency code
+ *                              (e.g. "local_currency"). See [localAmountField].
  */
 @Serializable
 data class ApiTransactionMappings(
@@ -108,6 +114,8 @@ data class ApiTransactionMappings(
     val counterpartyNameField: String? = null,
     val counterpartyIdField: String? = null,
     val declineReasonField: String? = null,
+    val localAmountField: String? = null,
+    val localCurrencyField: String? = null,
     val customFields: Map<String, String> = emptyMap(),
     val uniqueIdentifierFields: Set<String> = emptySet(),
 )

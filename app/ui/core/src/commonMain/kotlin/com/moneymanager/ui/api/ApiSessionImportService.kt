@@ -1359,6 +1359,8 @@ private data class ApiTransactionPageItem(
     val counterpartyName: String?,
     val declineReason: String?,
     val rawJson: JsonObject? = null,
+    val localAmountMinorUnits: Long? = null,
+    val localCurrencyCode: String? = null,
 )
 
 private data class ApiImportPageResult(
@@ -1487,19 +1489,28 @@ private suspend fun importTransactionItem(
     transactionRepository: TransactionRepository,
     entitySource: EntitySource,
 ): ApiResponseTransactionState {
-    val currency = currencyCache.getCurrency(item.currencyCode)
+    // Use local amount/currency when the local currency differs from the account currency,
+    // so that foreign-currency transactions are stored in their original currency.
+    val useLocal =
+        item.localCurrencyCode != null &&
+            item.localAmountMinorUnits != null &&
+            item.localCurrencyCode != item.currencyCode
+    val effectiveCurrencyCode = if (useLocal) item.localCurrencyCode!! else item.currencyCode
+    val effectiveAmount = if (useLocal) item.localAmountMinorUnits!! else item.amountMinorUnits
+
+    val currency = currencyCache.getCurrency(effectiveCurrencyCode)
     if (currency == null) {
         apiSessionRepository.recordTransactionError(
             responseId = responseId,
             jsonPath = item.jsonPath,
-            message = "Currency not found: ${item.currencyCode}",
+            message = "Currency not found: $effectiveCurrencyCode",
         )
         return ApiResponseTransactionState.ERROR
     }
 
     return try {
         importValidTransactionItem(
-            item = item,
+            item = item.copy(amountMinorUnits = effectiveAmount, currencyCode = effectiveCurrencyCode),
             ownAccountId = ownAccountId,
             currency = currency,
             responseId = responseId,
@@ -1656,6 +1667,8 @@ private fun parseTransactionsWithPath(
                 val amount = obj.resolveJsonPath(mappings.amountField)?.toLongOrNull()
                 val currency = obj.resolveJsonPath(mappings.currencyField)
                 val declineReason = mappings.declineReasonField?.let { obj.resolveJsonPath(it) }
+                val localAmount = mappings.localAmountField?.let { obj.resolveJsonPath(it)?.toLongOrNull() }
+                val localCurrency = mappings.localCurrencyField?.let { obj.resolveJsonPath(it) }
                 if (created != null && amount != null && currency != null) {
                     ApiTransactionPageItem(
                         amountMinorUnits = amount,
@@ -1667,6 +1680,8 @@ private fun parseTransactionsWithPath(
                         counterpartyName = mappings.counterpartyNameField?.let { obj.resolveJsonPath(it) },
                         declineReason = declineReason,
                         rawJson = obj,
+                        localAmountMinorUnits = localAmount,
+                        localCurrencyCode = localCurrency?.uppercase(),
                     )
                 } else {
                     logger.error {

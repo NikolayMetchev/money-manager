@@ -413,6 +413,46 @@ private val SETTLED_AFTER_DECLINED_PAGE_JSON =
 }
     """.trimIndent()
 
+/**
+ * A page with two transactions containing local_amount / local_currency fields:
+ *   tx_foreign – spent €14.47 abroad; account charged £12.50 (local != account currency)
+ *   tx_domestic – a domestic GBP transaction where local_currency == currency
+ *
+ * Used to verify that the API importer uses the local amount/currency when they differ
+ * from the account currency, matching the behaviour of the CSV import.
+ */
+private val TRANSACTIONS_WITH_LOCAL_CURRENCY_JSON =
+    """
+{
+  "transactions": [
+    {
+      "id": "tx_00009TEST_FOREIGN_001",
+      "account_id": "$ACCOUNT_ID",
+      "created": "2024-07-01T10:00:00.000Z",
+      "amount": -1250,
+      "currency": "GBP",
+      "local_amount": -1447,
+      "local_currency": "EUR",
+      "description": "FOREIGN SPEND",
+      "merchant": { "name": "Paris Cafe" },
+      "counterparty": {}
+    },
+    {
+      "id": "tx_00009TEST_DOMESTIC_001",
+      "account_id": "$ACCOUNT_ID",
+      "created": "2024-07-02T10:00:00.000Z",
+      "amount": -5000,
+      "currency": "GBP",
+      "local_amount": -5000,
+      "local_currency": "GBP",
+      "description": "DOMESTIC SPEND",
+      "merchant": { "name": "London Shop" },
+      "counterparty": {}
+    }
+  ]
+}
+    """.trimIndent()
+
 class MonzoImportE2ETest : DbTest() {
     @Test
     fun `downloaded transactions are imported with correct API audit source on accounts and transfers`() =
@@ -1444,5 +1484,114 @@ class MonzoImportE2ETest : DbTest() {
                 "Expected the ATM import to preserve the renamed account and the follow-up import shape",
             )
             assertTrue(atmAccounts.any { it.name == "Monzo Counterparty: Renamed ATM" })
+        }
+
+    @Test
+    fun `foreign currency transactions use local amount and local currency when configured`() =
+        runTest {
+            val deviceId =
+                repositories.deviceRepository.getOrCreateDevice(
+                    DeviceInfo.Jvm("test-machine", "Test OS"),
+                )
+            val sessionId =
+                repositories.apiSessionRepository.createSession(
+                    token = "test-monzo-token",
+                    deviceId = deviceId,
+                    createdAt = Instant.fromEpochMilliseconds(1_700_000_000_000L),
+                    expiresAt = null,
+                )
+
+            // Ensure EUR currency exists in the database
+            repositories.currencyRepository.upsertCurrencyByCode("EUR", "Euro")
+
+            val mockEngine =
+                MockEngine { request ->
+                    val url = request.url.toString()
+                    val json =
+                        when {
+                            url.contains("/accounts") -> ACCOUNTS_JSON
+                            url.contains("/transactions") && !url.contains("before=") -> TRANSACTIONS_WITH_LOCAL_CURRENCY_JSON
+                            url.contains("/transactions") && url.contains("before=") -> EMPTY_TRANSACTIONS_JSON
+                            else -> error("Unexpected request: $url")
+                        }
+                    respond(
+                        content = json,
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                    )
+                }
+            val apiClient =
+                createApiClient(
+                    trafficRecorder = ApiSessionTrafficRecorder(sessionId, repositories.apiSessionRepository),
+                    engine = mockEngine,
+                )
+            // Configure the strategy to use local_amount / local_currency fields
+            val strategy =
+                repositories.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .single()
+                    .let { baseStrategy ->
+                        baseStrategy.copy(
+                            transactionMappings =
+                                baseStrategy.transactionMappings.copy(
+                                    localAmountField = "local_amount",
+                                    localCurrencyField = "local_currency",
+                                ),
+                        )
+                    }
+
+            downloadApiSessionAccounts(
+                token = "test-monzo-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+            downloadApiSessionTransactions(
+                token = "test-monzo-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+
+            val importResult =
+                importApiSessionTransactions(
+                    apiSessionRepository = repositories.apiSessionRepository,
+                    accountRepository = repositories.accountRepository,
+                    currencyRepository = repositories.currencyRepository,
+                    transactionRepository = repositories.transactionRepository,
+                    entitySource = DbEntitySource(repositories.entitySourceQueries, repositories.transferSourceQueries, deviceId),
+                    personRepository = repositories.personRepository,
+                    personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
+                    personAttributeRepository = repositories.personAttributeRepository,
+                    attributeTypeRepository = repositories.attributeTypeRepository,
+                    accountAttributeRepository = repositories.accountAttributeRepository,
+                    deviceId = deviceId,
+                    sessionId = sessionId,
+                    strategy = strategy,
+                )
+
+            assertEquals(2, importResult.transactionCount, "Both transactions should be imported")
+            assertEquals(0, importResult.errorCount, "Should have no import errors")
+
+            val allAccounts = repositories.accountRepository.getAllAccounts().first()
+            val monzoAccount = allAccounts.single { it.name == "Monzo: $ACCOUNT_DESCRIPTION" }
+            val transfers =
+                repositories.transactionRepository
+                    .getTransactionsByAccount(monzoAccount.id)
+                    .first()
+            assertEquals(2, transfers.size)
+
+            // Foreign transaction: local_currency (EUR) differs from account currency (GBP),
+            // so the import must use local_amount (-1447) and local_currency (EUR).
+            val foreignTransfer = transfers.single { it.amount.currency.code == "EUR" }
+            assertEquals(1447L, foreignTransfer.amount.amount, "Foreign transfer should use the local amount in EUR")
+
+            // Domestic transaction: local_currency (GBP) equals the account currency (GBP),
+            // so the import falls back to the main amount/currency.
+            val domesticTransfer = transfers.single { it.amount.currency.code == "GBP" }
+            assertEquals(5000L, domesticTransfer.amount.amount, "Domestic transfer should use the main GBP amount")
         }
 }
