@@ -358,6 +358,8 @@ private suspend fun setupImportSession(
     // The well-known types (account-external-id, built-in type) are seeded with stable IDs
     // and do not need to be looked up.
     attributeTypeCache.getOrCreate(MONZO_TRANSACTION_ID_ATTRIBUTE_NAME)
+    attributeTypeCache.getOrCreate(MONZO_LOCAL_AMOUNT_ATTRIBUTE_NAME)
+    attributeTypeCache.getOrCreate(MONZO_LOCAL_CURRENCY_ATTRIBUTE_NAME)
     for (fieldName in customTxFields.keys) attributeTypeCache.getOrCreate(fieldName)
 
     // Build the counterparty ID index (externalId → AccountId) from existing account attributes
@@ -1489,28 +1491,21 @@ private suspend fun importTransactionItem(
     transactionRepository: TransactionRepository,
     entitySource: EntitySource,
 ): ApiResponseTransactionState {
-    // Use local amount/currency when the local currency differs from the account currency,
-    // so that foreign-currency transactions are stored in their original currency.
-    val useLocal =
-        item.localCurrencyCode != null &&
-            item.localAmountMinorUnits != null &&
-            item.localCurrencyCode != item.currencyCode
-    val effectiveCurrencyCode = if (useLocal) item.localCurrencyCode else item.currencyCode
-    val effectiveAmount = if (useLocal) item.localAmountMinorUnits else item.amountMinorUnits
-
-    val currency = currencyCache.getCurrency(effectiveCurrencyCode)
+    // Keep transfer money in the account transaction currency (CSV parity).
+    // Local/original FX values are stored separately as attributes.
+    val currency = currencyCache.getCurrency(item.currencyCode)
     if (currency == null) {
         apiSessionRepository.recordTransactionError(
             responseId = responseId,
             jsonPath = item.jsonPath,
-            message = "Currency not found: $effectiveCurrencyCode",
+            message = "Currency not found: ${item.currencyCode}",
         )
         return ApiResponseTransactionState.ERROR
     }
 
     return try {
         importValidTransactionItem(
-            item = item.copy(amountMinorUnits = effectiveAmount, currencyCode = effectiveCurrencyCode),
+            item = item,
             ownAccountId = ownAccountId,
             currency = currency,
             responseId = responseId,
@@ -1627,6 +1622,22 @@ private suspend fun importValidTransactionItem(
             if (transactionApiId != null) {
                 add(NewAttribute(typeId = attributeTypeCache.getOrCreate(MONZO_TRANSACTION_ID_ATTRIBUTE_NAME), value = transactionApiId))
             }
+            if (item.localAmountMinorUnits != null) {
+                add(
+                    NewAttribute(
+                        typeId = attributeTypeCache.getOrCreate(MONZO_LOCAL_AMOUNT_ATTRIBUTE_NAME),
+                        value = item.localAmountMinorUnits.toString(),
+                    ),
+                )
+            }
+            if (!item.localCurrencyCode.isNullOrBlank()) {
+                add(
+                    NewAttribute(
+                        typeId = attributeTypeCache.getOrCreate(MONZO_LOCAL_CURRENCY_ATTRIBUTE_NAME),
+                        value = item.localCurrencyCode,
+                    ),
+                )
+            }
         }
     transactionRepository.createTransfers(
         transfers = listOf(transfer),
@@ -1667,8 +1678,10 @@ private fun parseTransactionsWithPath(
                 val amount = obj.resolveJsonPath(mappings.amountField)?.toLongOrNull()
                 val currency = obj.resolveJsonPath(mappings.currencyField)
                 val declineReason = mappings.declineReasonField?.let { obj.resolveJsonPath(it) }
-                val localAmount = mappings.localAmountField?.let { obj.resolveJsonPath(it)?.toLongOrNull() }
-                val localCurrency = mappings.localCurrencyField?.let { obj.resolveJsonPath(it) }
+                val localAmount =
+                    (mappings.localAmountField?.let { obj.resolveJsonPath(it) } ?: obj.resolveJsonPath("local_amount"))
+                        ?.toLongOrNull()
+                val localCurrency = mappings.localCurrencyField?.let { obj.resolveJsonPath(it) } ?: obj.resolveJsonPath("local_currency")
                 if (created != null && amount != null && currency != null) {
                     ApiTransactionPageItem(
                         amountMinorUnits = amount,
@@ -2008,6 +2021,8 @@ private fun Transfer.matches(other: Transfer): Boolean =
         )
 
 private const val MONZO_TRANSACTION_ID_ATTRIBUTE_NAME = "Monzo Transaction Id"
+private const val MONZO_LOCAL_AMOUNT_ATTRIBUTE_NAME = "Monzo Local Amount"
+private const val MONZO_LOCAL_CURRENCY_ATTRIBUTE_NAME = "Monzo Local Currency"
 
 private suspend fun ApiSessionRepository.recordTransactionError(
     responseId: ApiResponseId,
