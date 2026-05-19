@@ -21,6 +21,14 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
 import kotlin.time.Instant
 
+data class ApiResponseTransactionInsert(
+    val responseId: ApiResponseId,
+    val jsonPath: JsonPath,
+    val state: ApiResponseTransactionState,
+    val transactionId: TransferId?,
+    val errorMessage: String?,
+)
+
 interface ApiSessionRepository {
     /**
      * Creates a new credential (saved token). Returns the existing credential ID if the token
@@ -148,6 +156,11 @@ interface ApiSessionRepository {
         transactionId: TransferId?,
         errorMessage: String?,
     ): ApiResponseTransactionId
+
+    /**
+     * Records import states for many transaction entries in one database transaction.
+     */
+    suspend fun insertResponseTransactions(transactions: List<ApiResponseTransactionInsert>)
 
     /**
      * Returns all [ApiResponseTransaction] records for the given response, ordered by id.

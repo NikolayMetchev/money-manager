@@ -9,6 +9,7 @@ import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.apistrategy.ApiPeopleMappings
 import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
+import com.moneymanager.domain.repository.ApiResponseTransactionInsert
 import com.moneymanager.domain.repository.ApiSessionRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CurrencyRepository
@@ -20,6 +21,8 @@ import com.moneymanager.rest.ApiClient
 import com.moneymanager.rest.ApiHttpResponse
 import com.moneymanager.ui.screens.transactions.logger
 import io.ktor.http.*
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
@@ -459,39 +462,32 @@ private suspend fun precreateAndFlushCounterparties(
 }
 
 private suspend fun importTransactionsConcurrently(setup: ImportSetup) {
-    coroutineScope {
-        setup.transactionResponses.forEach { response ->
-            val request = setup.requestsById[response.requestId] ?: return@forEach
-            val account = setup.accountsById[request.accountIdParameter(setup.strategy)] ?: return@forEach
-            val ownAccountId = setup.accountCache.getOrCreateAccountId(account.id, account.displayName(setup.strategy))
-            val pageResult =
-                importTransactionPage(
-                    response = response.toApiHttpResponse(),
-                    strategy = setup.strategy,
-                    ownAccountId = ownAccountId,
-                    sessionId = setup.sessionId,
-                    accountCache = setup.accountCache,
-                    currencyCache = setup.currencyCache,
-                    attributeTypeCache = setup.attributeTypeCache,
-                    customTxFields = setup.customTxFields,
-                    uniqueIdTxFields = setup.uniqueIdTxFields,
-                    counterpartyIdField = setup.counterpartyIdField,
-                    nameMappings = setup.nameMappings,
-                    apiSessionRepository = setup.apiSessionRepository,
-                    transactionRepository = setup.transactionRepository,
-                    entitySource = setup.entitySource,
-                )
-            val progressMessage =
-                setup.progressMutex.withLock {
-                    setup.counts.totalImported += pageResult.importedCount
-                    setup.counts.totalDuplicates += pageResult.duplicateCount
-                    setup.counts.totalErrors += pageResult.errorCount
-                    setup.counts.totalExcluded += pageResult.excludedCount
-                    ++setup.counts.completedCount
-                    setup.counts.progressMessage()
-                }
-            setup.onProgress(progressMessage)
-        }
+    val pageContexts = mutableListOf<ApiImportPageContext>()
+    setup.transactionResponses.forEachIndexed { index, response ->
+        val request = setup.requestsById[response.requestId] ?: return@forEachIndexed
+        val account = setup.accountsById[request.accountIdParameter(setup.strategy)] ?: return@forEachIndexed
+        val ownAccountId = setup.accountCache.getOrCreateAccountId(account.id, account.displayName(setup.strategy))
+        pageContexts +=
+            ApiImportPageContext(
+                index = index,
+                response = response.toApiHttpResponse(),
+                requestId = request.id,
+                ownAccountId = ownAccountId,
+            )
+    }
+
+    val pageResults = importTransactionPages(pageContexts, setup)
+    pageResults.forEach { pageResult ->
+        val progressMessage =
+            setup.progressMutex.withLock {
+                setup.counts.totalImported += pageResult.importedCount
+                setup.counts.totalDuplicates += pageResult.duplicateCount
+                setup.counts.totalErrors += pageResult.errorCount
+                setup.counts.totalExcluded += pageResult.excludedCount
+                ++setup.counts.completedCount
+                setup.counts.progressMessage()
+            }
+        setup.onProgress(progressMessage)
     }
 }
 
@@ -1361,15 +1357,6 @@ private data class ApiTransactionPageItem(
     val localCurrencyCode: String? = null,
 )
 
-private data class ApiImportPageResult(
-    val importedCount: Int,
-    val duplicateCount: Int,
-    val errorCount: Int,
-    val excludedCount: Int,
-    val before: Instant?,
-    val hasTransactions: Boolean,
-)
-
 private data class CounterpartyNameMappings(
     val merchantNameField: String?,
     val counterpartyNameField: String?,
@@ -1385,286 +1372,420 @@ private data class CounterpartyNameMappings(
     }
 }
 
-private suspend fun importTransactionPage(
-    response: ApiHttpResponse,
-    strategy: ApiImportStrategy,
-    ownAccountId: AccountId,
-    sessionId: ApiSessionId,
-    accountCache: AccountCache,
-    currencyCache: CurrencyCache,
-    attributeTypeCache: AttributeTypeCache,
-    customTxFields: Map<String, String>,
-    uniqueIdTxFields: Set<String>,
-    counterpartyIdField: String?,
-    nameMappings: CounterpartyNameMappings,
-    apiSessionRepository: ApiSessionRepository,
-    transactionRepository: TransactionRepository,
-    entitySource: EntitySource,
-): ApiImportPageResult {
-    val transactions = parseTransactionsWithPath(response.body, strategy)
-    val responseId = ApiResponseId(response.responseId)
-    val requestId = ApiRequestId(response.requestId)
-    val existingTransfers = transactionRepository.getTransactionsByAccount(ownAccountId).first().toMutableList()
-    val transactionIdAttributeName = customTxFields.entries.firstOrNull { it.value == "id" }?.key
-    val existingTransfersByApiId =
-        existingTransfers
-            .mapNotNull { transfer ->
-                transactionIdAttributeName
-                    ?.let { attributeName ->
-                        transfer.attributes.firstOrNull { it.attributeType.name == attributeName }?.value
-                    }?.let { apiId ->
-                        apiId to transfer
-                    }
-            }.toMap()
+private data class ApiImportPageContext(
+    val index: Int,
+    val response: ApiHttpResponse,
+    val requestId: ApiRequestId,
+    val ownAccountId: AccountId,
+)
 
-    // Index existing transfers by their unique-identifier attribute values for O(1) lookup
-    val existingByUniqueId: Map<Map<String, String>, TransferId> =
-        if (uniqueIdTxFields.isNotEmpty()) {
-            existingTransfers
-                .mapNotNull { t ->
-                    val key =
-                        uniqueIdTxFields.associateWith { fieldName ->
-                            t.attributes.firstOrNull { it.attributeType.name == fieldName }?.value ?: return@mapNotNull null
+private data class ApiImportPageResult(
+    val importedCount: Int,
+    val duplicateCount: Int,
+    val errorCount: Int,
+    val excludedCount: Int,
+)
+
+private data class PreparedApiTransaction(
+    val pageIndex: Int,
+    val itemIndex: Int,
+    val responseId: ApiResponseId,
+    val requestId: ApiRequestId,
+    val ownAccountId: AccountId,
+    val item: ApiTransactionPageItem,
+    val transfer: Transfer,
+    val attributes: List<NewAttribute>,
+    val transactionApiId: String?,
+    val uniqueKey: Map<String, String>?,
+)
+
+private data class ApiTransactionSource(
+    val requestId: ApiRequestId,
+    val jsonPath: JsonPath,
+)
+
+private data class ResponseTransactionImportRecord(
+    val pageIndex: Int,
+    val itemIndex: Int,
+    val responseId: ApiResponseId,
+    val jsonPath: JsonPath,
+    val state: ApiResponseTransactionState,
+    val transactionId: TransferId?,
+    val errorMessage: String?,
+    val excludedFromBalances: Boolean = false,
+) {
+    fun resolve(generatedIdsByTempId: Map<TransferId, TransferId>): ResponseTransactionImportRecord =
+        copy(transactionId = transactionId?.let { generatedIdsByTempId[it] ?: it })
+
+    fun toInsert(): ApiResponseTransactionInsert =
+        ApiResponseTransactionInsert(
+            responseId = responseId,
+            jsonPath = jsonPath,
+            state = state,
+            transactionId = transactionId,
+            errorMessage = errorMessage,
+        )
+}
+
+private sealed class ApiTransactionPreparation {
+    data class Prepared(
+        val transaction: PreparedApiTransaction,
+    ) : ApiTransactionPreparation()
+
+    data class Failed(
+        val record: ResponseTransactionImportRecord,
+    ) : ApiTransactionPreparation()
+}
+
+private class OrderedApiImportSourceRecorder(
+    private val entitySource: EntitySource,
+    private val sessionId: ApiSessionId,
+    private val sources: List<ApiTransactionSource>,
+) : SourceRecorder {
+    private var nextIndex = 0
+
+    override fun insert(transfer: Transfer) {
+        val source =
+            sources.getOrNull(nextIndex++)
+                ?: error("Missing API source metadata for imported transfer ${transfer.id}")
+        entitySource
+            .apiImportRecorder(
+                sessionId = sessionId,
+                requestId = source.requestId,
+                jsonPath = source.jsonPath,
+            ).insert(transfer)
+    }
+}
+
+private suspend fun importTransactionPages(
+    pageContexts: List<ApiImportPageContext>,
+    setup: ImportSetup,
+): List<ApiImportPageResult> {
+    val pageItems =
+        pageContexts.map { context ->
+            context to parseTransactionsWithPath(context.response.body, setup.strategy)
+        }
+    val preparations =
+        coroutineScope {
+            pageItems
+                .flatMap { (context, transactions) ->
+                    transactions.mapIndexed { itemIndex, item ->
+                        async {
+                            prepareTransactionItem(
+                                context = context,
+                                itemIndex = itemIndex,
+                                item = item,
+                                setup = setup,
+                            )
                         }
-                    key to t.id
-                }.toMap()
-        } else {
-            emptyMap()
+                    }
+                }.awaitAll()
         }
 
-    val states =
-        transactions.map { item ->
-            importTransactionItem(
-                item = item,
-                ownAccountId = ownAccountId,
-                responseId = responseId,
-                requestId = requestId,
-                sessionId = sessionId,
-                accountCache = accountCache,
-                currencyCache = currencyCache,
-                attributeTypeCache = attributeTypeCache,
-                customTxFields = customTxFields,
-                uniqueIdTxFields = uniqueIdTxFields,
-                counterpartyIdField = counterpartyIdField,
-                peopleMappings = strategy.peopleMappings,
-                nameMappings = nameMappings,
-                existingByUniqueId = existingByUniqueId,
-                existingTransfersByApiId = existingTransfersByApiId,
-                existingTransfers = existingTransfers,
-                apiSessionRepository = apiSessionRepository,
-                transactionRepository = transactionRepository,
-                entitySource = entitySource,
+    val responseRecords = mutableListOf<ResponseTransactionImportRecord>()
+    val preparedTransactions = mutableListOf<PreparedApiTransaction>()
+    preparations.forEach { preparation ->
+        when (preparation) {
+            is ApiTransactionPreparation.Prepared -> preparedTransactions += preparation.transaction
+            is ApiTransactionPreparation.Failed -> responseRecords += preparation.record
+        }
+    }
+
+    val transactionIdAttributeName =
+        setup.customTxFields.entries
+            .firstOrNull { it.value == "id" }
+            ?.key
+    val importsToCreate = mutableListOf<PreparedApiTransaction>()
+    var nextTemporaryTransferId = -1L
+
+    preparedTransactions
+        .sortedWith(compareBy<PreparedApiTransaction> { it.pageIndex }.thenBy { it.itemIndex })
+        .groupBy { it.ownAccountId }
+        .forEach { (ownAccountId, accountTransactions) ->
+            val existingTransfers =
+                setup.transactionRepository
+                    .getTransactionsByAccount(ownAccountId)
+                    .first()
+                    .toMutableList()
+            val existingTransfersByApiId = existingTransfers.indexByApiTransactionId(transactionIdAttributeName)
+            val existingByUniqueId = existingTransfers.indexByUniqueTransactionFields(setup.uniqueIdTxFields)
+
+            accountTransactions.forEach { transaction ->
+                val duplicateTransferId =
+                    transaction.transactionApiId?.let { existingTransfersByApiId[it]?.id }
+                        ?: transaction.uniqueKey?.let { existingByUniqueId[it] }
+                        ?: existingTransfers.firstOrNull { it.matches(transaction.transfer) }?.id
+
+                if (duplicateTransferId != null) {
+                    responseRecords +=
+                        transaction.responseRecord(
+                            state = ApiResponseTransactionState.DUPLICATE,
+                            transactionId = duplicateTransferId,
+                        )
+                    return@forEach
+                }
+
+                val tempTransferId = TransferId(nextTemporaryTransferId--)
+                val importTransaction = transaction.copy(transfer = transaction.transfer.copy(id = tempTransferId))
+                importsToCreate += importTransaction
+                existingTransfers += importTransaction.transfer
+                transaction.transactionApiId?.let { existingTransfersByApiId[it] = importTransaction.transfer }
+                transaction.uniqueKey?.let { existingByUniqueId[it] = tempTransferId }
+                responseRecords +=
+                    importTransaction.responseRecord(
+                        state = ApiResponseTransactionState.IMPORTED,
+                        transactionId = tempTransferId,
+                        excludedFromBalances = !transaction.item.declineReason.isNullOrBlank(),
+                    )
+            }
+        }
+
+    val orderedImports = importsToCreate.sortedWith(compareBy<PreparedApiTransaction> { it.pageIndex }.thenBy { it.itemIndex })
+    val generatedIds =
+        if (orderedImports.isEmpty()) {
+            emptyList()
+        } else {
+            setup.transactionRepository.createTransfers(
+                transfers = orderedImports.map { it.transfer },
+                newAttributes =
+                    orderedImports
+                        .filter { it.attributes.isNotEmpty() }
+                        .associate { it.transfer.id to it.attributes },
+                sourceRecorder =
+                    OrderedApiImportSourceRecorder(
+                        entitySource = setup.entitySource,
+                        sessionId = setup.sessionId,
+                        sources = orderedImports.map { ApiTransactionSource(it.requestId, it.item.jsonPath) },
+                    ),
             )
         }
 
-    return ApiImportPageResult(
-        importedCount = states.count { it == ApiResponseTransactionState.IMPORTED },
-        duplicateCount = states.count { it == ApiResponseTransactionState.DUPLICATE },
-        errorCount = states.count { it == ApiResponseTransactionState.ERROR },
-        excludedCount =
-            transactions.zip(states).count { (item, state) ->
-                state == ApiResponseTransactionState.IMPORTED && !item.declineReason.isNullOrBlank()
-            },
-        before = transactions.minOfOrNull { it.created },
-        hasTransactions = transactions.isNotEmpty(),
+    check(generatedIds.size == orderedImports.size) {
+        "Expected ${orderedImports.size} generated transfer IDs, got ${generatedIds.size}"
+    }
+
+    val generatedIdsByTempId =
+        orderedImports.zip(generatedIds).associate { (transaction, generatedId) ->
+            transaction.transfer.id to generatedId
+        }
+    setup.apiSessionRepository.insertResponseTransactions(
+        responseRecords
+            .sortedWith(compareBy<ResponseTransactionImportRecord> { it.pageIndex }.thenBy { it.itemIndex })
+            .map { it.resolve(generatedIdsByTempId).toInsert() },
     )
+
+    val recordsByPage = responseRecords.groupBy { it.pageIndex }
+    return pageContexts.map { context ->
+        val pageRecords = recordsByPage[context.index].orEmpty()
+        ApiImportPageResult(
+            importedCount = pageRecords.count { it.state == ApiResponseTransactionState.IMPORTED },
+            duplicateCount = pageRecords.count { it.state == ApiResponseTransactionState.DUPLICATE },
+            errorCount = pageRecords.count { it.state == ApiResponseTransactionState.ERROR },
+            excludedCount = pageRecords.count { it.excludedFromBalances },
+        )
+    }
 }
 
-private suspend fun importTransactionItem(
+private suspend fun prepareTransactionItem(
+    context: ApiImportPageContext,
+    itemIndex: Int,
     item: ApiTransactionPageItem,
-    ownAccountId: AccountId,
-    responseId: ApiResponseId,
-    requestId: ApiRequestId,
-    sessionId: ApiSessionId,
-    accountCache: AccountCache,
-    currencyCache: CurrencyCache,
-    attributeTypeCache: AttributeTypeCache,
-    customTxFields: Map<String, String>,
-    uniqueIdTxFields: Set<String>,
-    counterpartyIdField: String?,
-    peopleMappings: ApiPeopleMappings,
-    nameMappings: CounterpartyNameMappings,
-    existingByUniqueId: Map<Map<String, String>, TransferId>,
-    existingTransfersByApiId: Map<String, Transfer>,
-    existingTransfers: MutableList<Transfer>,
-    apiSessionRepository: ApiSessionRepository,
-    transactionRepository: TransactionRepository,
-    entitySource: EntitySource,
-): ApiResponseTransactionState {
-    // Keep transfer money in the account transaction currency (CSV parity).
-    // Local/original FX values are stored separately as attributes.
-    val currency = currencyCache.getCurrency(item.currencyCode)
+    setup: ImportSetup,
+): ApiTransactionPreparation {
+    val responseId = ApiResponseId(context.response.responseId)
+    val currency = setup.currencyCache.getCurrency(item.currencyCode)
     if (currency == null) {
-        apiSessionRepository.recordTransactionError(
-            responseId = responseId,
-            jsonPath = item.jsonPath,
-            message = "Currency not found: ${item.currencyCode}",
+        return ApiTransactionPreparation.Failed(
+            record =
+                item.errorRecord(
+                    pageIndex = context.index,
+                    itemIndex = itemIndex,
+                    responseId = responseId,
+                    message = "Currency not found: ${item.currencyCode}",
+                ),
         )
-        return ApiResponseTransactionState.ERROR
     }
 
     return try {
-        importValidTransactionItem(
-            item = item,
-            ownAccountId = ownAccountId,
-            currency = currency,
-            responseId = responseId,
-            requestId = requestId,
-            sessionId = sessionId,
-            accountCache = accountCache,
-            attributeTypeCache = attributeTypeCache,
-            customTxFields = customTxFields,
-            uniqueIdTxFields = uniqueIdTxFields,
-            counterpartyIdField = counterpartyIdField,
-            peopleMappings = peopleMappings,
-            nameMappings = nameMappings,
-            existingByUniqueId = existingByUniqueId,
-            existingTransfersByApiId = existingTransfersByApiId,
-            existingTransfers = existingTransfers,
-            apiSessionRepository = apiSessionRepository,
-            transactionRepository = transactionRepository,
-            entitySource = entitySource,
-            declineReason = item.declineReason,
-        )
+        val prepared =
+            prepareValidTransactionItem(
+                context = context,
+                itemIndex = itemIndex,
+                item = item,
+                currency = currency,
+                responseId = responseId,
+                setup = setup,
+            )
+        ApiTransactionPreparation.Prepared(prepared)
     } catch (expected: Exception) {
         logger.error(expected) { "Error importing API transaction: ${expected.message}" }
-        apiSessionRepository.recordTransactionError(
-            responseId = responseId,
-            jsonPath = item.jsonPath,
-            message = expected.message ?: "Unknown import error",
+        ApiTransactionPreparation.Failed(
+            record =
+                item.errorRecord(
+                    pageIndex = context.index,
+                    itemIndex = itemIndex,
+                    responseId = responseId,
+                    message = expected.message ?: "Unknown import error",
+                ),
         )
-        ApiResponseTransactionState.ERROR
     }
 }
 
-private suspend fun importValidTransactionItem(
+private suspend fun prepareValidTransactionItem(
+    context: ApiImportPageContext,
+    itemIndex: Int,
     item: ApiTransactionPageItem,
-    ownAccountId: AccountId,
     currency: Currency,
     responseId: ApiResponseId,
-    requestId: ApiRequestId,
-    sessionId: ApiSessionId,
-    accountCache: AccountCache,
-    attributeTypeCache: AttributeTypeCache,
-    customTxFields: Map<String, String>,
-    uniqueIdTxFields: Set<String>,
-    counterpartyIdField: String?,
-    peopleMappings: ApiPeopleMappings,
-    nameMappings: CounterpartyNameMappings,
-    existingByUniqueId: Map<Map<String, String>, TransferId>,
-    existingTransfersByApiId: Map<String, Transfer>,
-    existingTransfers: MutableList<Transfer>,
-    apiSessionRepository: ApiSessionRepository,
-    transactionRepository: TransactionRepository,
-    entitySource: EntitySource,
-    declineReason: String? = null,
-): ApiResponseTransactionState {
-    val counterpartyApiSource = AccountApiSource(sessionId, requestId, JsonPath("${item.jsonPath.value}.counterparty"))
+    setup: ImportSetup,
+): PreparedApiTransaction {
+    val counterpartyApiSource =
+        AccountApiSource(
+            sessionId = setup.sessionId,
+            requestId = context.requestId,
+            jsonPath = JsonPath("${item.jsonPath.value}.counterparty"),
+        )
     val counterpartyAccountId =
         if (item.amountMinorUnits == 0L) {
-            accountCache.getOrCreateAccountId(name = nameMappings.counterpartyPrefix + "Void", transactionApiSource = counterpartyApiSource)
+            setup.accountCache.getOrCreateAccountId(
+                name = setup.nameMappings.counterpartyPrefix + "Void",
+                transactionApiSource = counterpartyApiSource,
+            )
         } else {
             val builtInCounterpartyType = item.rawJson?.resolveBuiltInCounterpartyType(item.amountMinorUnits)
-            val counterpartyId = item.rawJson?.resolveCounterpartyIdentity(counterpartyIdField, peopleMappings)
-            val personalCounterpartyIdentity = item.rawJson?.personalCounterpartyIdentity(peopleMappings)
-            accountCache.getOrCreateCounterpartyAccountId(
+            val counterpartyId = item.rawJson?.resolveCounterpartyIdentity(setup.counterpartyIdField, setup.strategy.peopleMappings)
+            val personalCounterpartyIdentity = item.rawJson?.personalCounterpartyIdentity(setup.strategy.peopleMappings)
+            setup.accountCache.getOrCreateCounterpartyAccountId(
                 counterpartyId = counterpartyId,
                 dedupeKey = personalCounterpartyIdentity?.dedupeKey,
                 builtInType = builtInCounterpartyType,
                 name =
-                    nameMappings.counterpartyPrefix +
-                        (builtInCounterpartyType?.defaultCounterpartyName ?: item.counterpartyName(nameMappings)),
+                    setup.nameMappings.counterpartyPrefix +
+                        (builtInCounterpartyType?.defaultCounterpartyName ?: item.counterpartyName(setup.nameMappings)),
                 apiSource = counterpartyApiSource,
                 personalIdentity = personalCounterpartyIdentity,
             )
         }
-    val transfer = item.toTransfer(ownAccountId, counterpartyAccountId, currency)
+    val transfer = item.toTransfer(context.ownAccountId, counterpartyAccountId, currency)
     val transactionApiId = item.rawJson?.resolveJsonPath("id")?.takeIf { it.isNotBlank() }
+    val uniqueKey =
+        if (setup.uniqueIdTxFields.isNotEmpty() && item.rawJson != null) {
+            setup.uniqueIdTxFields.associateWith { fieldName ->
+                setup.customTxFields[fieldName]?.let { item.rawJson.resolveJsonPath(it) } ?: ""
+            }
+        } else {
+            null
+        }
 
-    // Prefer a stable API transaction id when present; then configured unique IDs; then
-    // fall back to a field-by-field match.
-    val duplicateTransferId: TransferId? =
-        transactionApiId?.let { existingTransfersByApiId[it]?.id }
-            ?: if (uniqueIdTxFields.isNotEmpty() && item.rawJson != null) {
-                val key =
-                    uniqueIdTxFields.associateWith { fieldName ->
-                        customTxFields[fieldName]?.let { item.rawJson.resolveJsonPath(it) } ?: ""
-                    }
-                existingByUniqueId[key]
-            } else {
-                existingTransfers.firstOrNull { it.matches(transfer) }?.id
-            }
+    return PreparedApiTransaction(
+        pageIndex = context.index,
+        itemIndex = itemIndex,
+        responseId = responseId,
+        requestId = context.requestId,
+        ownAccountId = context.ownAccountId,
+        item = item,
+        transfer = transfer,
+        attributes =
+            buildApiTransferAttributes(
+                item = item,
+                transactionApiId = transactionApiId,
+                customTxFields = setup.customTxFields,
+                attributeTypeCache = setup.attributeTypeCache,
+            ),
+        transactionApiId = transactionApiId,
+        uniqueKey = uniqueKey,
+    )
+}
 
-    if (duplicateTransferId != null) {
-        apiSessionRepository.insertResponseTransaction(
-            responseId = responseId,
-            jsonPath = item.jsonPath,
-            state = ApiResponseTransactionState.DUPLICATE,
-            transactionId = duplicateTransferId,
-            errorMessage = null,
-        )
-        return ApiResponseTransactionState.DUPLICATE
-    }
-
-    val sourceRecorder =
-        entitySource.apiImportRecorder(sessionId = sessionId, requestId = requestId, jsonPath = item.jsonPath)
-    val attributes =
-        buildList {
-            if (!declineReason.isNullOrBlank()) {
-                add(NewAttribute(typeId = AttributeTypeId(-1), value = "declined: $declineReason"))
-            }
-            if (customTxFields.isNotEmpty() && item.rawJson != null) {
-                for ((fieldName, jsonPath) in customTxFields) {
-                    val value = item.rawJson.resolveJsonPath(jsonPath) ?: continue
-                    add(NewAttribute(typeId = attributeTypeCache.getOrCreate(fieldName), value = value))
-                }
-            }
-            val transactionIdAttributeName = customTxFields.entries.firstOrNull { it.value == "id" }?.key
-            if (transactionApiId != null && transactionIdAttributeName != null) {
-                add(NewAttribute(typeId = attributeTypeCache.getOrCreate(transactionIdAttributeName), value = transactionApiId))
-            }
-            val localAmountAttributeName =
-                strategyAttributeNameForJsonPath(customTxFields, strategyPath = "local_amount")
-            if (item.localAmountMinorUnits != null) {
-                if (localAmountAttributeName != null) {
-                    add(
-                        NewAttribute(
-                            typeId = attributeTypeCache.getOrCreate(localAmountAttributeName),
-                            value = item.localAmountMinorUnits.toString(),
-                        ),
-                    )
-                }
-            }
-            val localCurrencyAttributeName =
-                strategyAttributeNameForJsonPath(customTxFields, strategyPath = "local_currency")
-            if (!item.localCurrencyCode.isNullOrBlank()) {
-                if (localCurrencyAttributeName != null) {
-                    add(NewAttribute(typeId = attributeTypeCache.getOrCreate(localCurrencyAttributeName), value = item.localCurrencyCode))
-                }
+private suspend fun buildApiTransferAttributes(
+    item: ApiTransactionPageItem,
+    transactionApiId: String?,
+    customTxFields: Map<String, String>,
+    attributeTypeCache: AttributeTypeCache,
+): List<NewAttribute> =
+    buildList {
+        if (!item.declineReason.isNullOrBlank()) {
+            add(NewAttribute(typeId = AttributeTypeId(-1), value = "declined: ${item.declineReason}"))
+        }
+        if (customTxFields.isNotEmpty() && item.rawJson != null) {
+            for ((fieldName, jsonPath) in customTxFields) {
+                val value = item.rawJson.resolveJsonPath(jsonPath) ?: continue
+                add(NewAttribute(typeId = attributeTypeCache.getOrCreate(fieldName), value = value))
             }
         }
-    transactionRepository.createTransfers(
-        transfers = listOf(transfer),
-        newAttributes = if (attributes.isNotEmpty()) mapOf(transfer.id to attributes) else emptyMap(),
-        sourceRecorder = sourceRecorder,
-    )
-    val importedTransferId =
-        transactionRepository
-            .getTransactionsByAccount(ownAccountId)
-            .first()
-            .firstOrNull { candidate ->
-                candidate.matches(transfer) && existingTransfers.none { it.id == candidate.id }
-            }?.id ?: transfer.id
-    existingTransfers.add(transfer.copy(id = importedTransferId))
-    apiSessionRepository.insertResponseTransaction(
+        val transactionIdAttributeName = customTxFields.entries.firstOrNull { it.value == "id" }?.key
+        if (transactionApiId != null && transactionIdAttributeName != null) {
+            add(NewAttribute(typeId = attributeTypeCache.getOrCreate(transactionIdAttributeName), value = transactionApiId))
+        }
+        val localAmountAttributeName = strategyAttributeNameForJsonPath(customTxFields, strategyPath = "local_amount")
+        if (item.localAmountMinorUnits != null && localAmountAttributeName != null) {
+            add(
+                NewAttribute(
+                    typeId = attributeTypeCache.getOrCreate(localAmountAttributeName),
+                    value = item.localAmountMinorUnits.toString(),
+                ),
+            )
+        }
+        val localCurrencyAttributeName = strategyAttributeNameForJsonPath(customTxFields, strategyPath = "local_currency")
+        if (!item.localCurrencyCode.isNullOrBlank() && localCurrencyAttributeName != null) {
+            add(NewAttribute(typeId = attributeTypeCache.getOrCreate(localCurrencyAttributeName), value = item.localCurrencyCode))
+        }
+    }
+
+private fun List<Transfer>.indexByApiTransactionId(transactionIdAttributeName: String?): MutableMap<String, Transfer> =
+    mapNotNull { transfer ->
+        transactionIdAttributeName
+            ?.let { attributeName ->
+                transfer.attributes.firstOrNull { it.attributeType.name == attributeName }?.value
+            }?.let { apiId ->
+                apiId to transfer
+            }
+    }.toMap().toMutableMap()
+
+private fun List<Transfer>.indexByUniqueTransactionFields(uniqueIdTxFields: Set<String>): MutableMap<Map<String, String>, TransferId> =
+    if (uniqueIdTxFields.isEmpty()) {
+        mutableMapOf()
+    } else {
+        mapNotNull { transfer ->
+            val key =
+                uniqueIdTxFields.associateWith { fieldName ->
+                    transfer.attributes.firstOrNull { it.attributeType.name == fieldName }?.value ?: return@mapNotNull null
+                }
+            key to transfer.id
+        }.toMap().toMutableMap()
+    }
+
+private fun PreparedApiTransaction.responseRecord(
+    state: ApiResponseTransactionState,
+    transactionId: TransferId,
+    excludedFromBalances: Boolean = false,
+): ResponseTransactionImportRecord =
+    ResponseTransactionImportRecord(
+        pageIndex = pageIndex,
+        itemIndex = itemIndex,
         responseId = responseId,
         jsonPath = item.jsonPath,
-        state = ApiResponseTransactionState.IMPORTED,
-        transactionId = importedTransferId,
+        state = state,
+        transactionId = transactionId,
         errorMessage = null,
+        excludedFromBalances = excludedFromBalances,
     )
-    return ApiResponseTransactionState.IMPORTED
-}
+
+private fun ApiTransactionPageItem.errorRecord(
+    pageIndex: Int,
+    itemIndex: Int,
+    responseId: ApiResponseId,
+    message: String,
+): ResponseTransactionImportRecord =
+    ResponseTransactionImportRecord(
+        pageIndex = pageIndex,
+        itemIndex = itemIndex,
+        responseId = responseId,
+        jsonPath = jsonPath,
+        state = ApiResponseTransactionState.ERROR,
+        transactionId = null,
+        errorMessage = message,
+    )
 
 private fun parseTransactionsWithPath(
     json: String,
@@ -2026,20 +2147,6 @@ private fun strategyAttributeNameForJsonPath(
     customTxFields: Map<String, String>,
     strategyPath: String,
 ): String? = customTxFields.entries.firstOrNull { it.value == strategyPath }?.key
-
-private suspend fun ApiSessionRepository.recordTransactionError(
-    responseId: ApiResponseId,
-    jsonPath: JsonPath,
-    message: String,
-) {
-    insertResponseTransaction(
-        responseId = responseId,
-        jsonPath = jsonPath,
-        state = ApiResponseTransactionState.ERROR,
-        transactionId = null,
-        errorMessage = message,
-    )
-}
 
 private fun JsonObject.stringOrNull(key: String): String? = this[key]?.jsonPrimitive?.contentOrNull
 

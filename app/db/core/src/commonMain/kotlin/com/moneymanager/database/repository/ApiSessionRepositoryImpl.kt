@@ -22,6 +22,7 @@ import com.moneymanager.domain.model.MonzoCredential
 import com.moneymanager.domain.model.MonzoCredentialId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
+import com.moneymanager.domain.repository.ApiResponseTransactionInsert
 import com.moneymanager.domain.repository.ApiSessionRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -216,6 +217,23 @@ class ApiSessionRepositoryImpl(
                     queries.lastInsertApiResponseTransactionId().executeAsOne()
                 }
             ApiResponseTransactionId(id)
+        }
+
+    override suspend fun insertResponseTransactions(transactions: List<ApiResponseTransactionInsert>): Unit =
+        withContext(Dispatchers.Default) {
+            if (transactions.isEmpty()) return@withContext
+
+            queries.transaction {
+                transactions.forEach { transaction ->
+                    queries.insertResponseTransaction(
+                        response_id = transaction.responseId.id,
+                        json_path = transaction.jsonPath.value,
+                        state = transaction.state.id.toLong(),
+                        transaction_id = transaction.transactionId?.id,
+                        error_message = transaction.errorMessage,
+                    )
+                }
+            }
         }
 
     override suspend fun getResponseTransactions(responseId: ApiResponseId): List<ApiResponseTransaction> =

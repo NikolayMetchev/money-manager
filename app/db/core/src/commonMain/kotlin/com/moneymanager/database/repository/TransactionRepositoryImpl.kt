@@ -285,9 +285,10 @@ class TransactionRepositoryImpl(
         newAttributes: Map<TransferId, List<NewAttribute>>,
         sourceRecorder: SourceRecorder,
         onProgress: (suspend (created: Int, total: Int) -> Unit)?,
-    ): Unit =
+    ): List<TransferId> =
         withContext(Dispatchers.Default) {
             val total = transfers.size
+            val createdIds = mutableListOf<TransferId>()
 
             // Process in batches of 1000 to avoid holding transaction too long
             val batchSize = 1000
@@ -306,6 +307,7 @@ class TransactionRepositoryImpl(
                             // Generate new transaction ID (triggers INSERT audit)
                             transactionIdQueries.insert()
                             val generatedId = transactionIdQueries.lastInsertedId().executeAsOne()
+                            createdIds += TransferId(generatedId)
 
                             // Create transfer with generated ID
                             transferQueries.insert(
@@ -343,6 +345,8 @@ class TransactionRepositoryImpl(
                 created += batch.size
                 onProgress?.invoke(created, total)
             }
+
+            createdIds
         }
 
     override suspend fun updateTransfer(

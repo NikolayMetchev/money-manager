@@ -81,13 +81,14 @@ interface TransactionRepository {
      * @param newAttributes Map of transfer ID to attributes to create (attributes don't have IDs yet)
      * @param sourceRecorder Strategy for recording source information (includes device info)
      * @param onProgress Optional callback for batch progress (called after each batch of ~1000)
+     * @return Generated transaction IDs in the same order as [transfers]
      */
     suspend fun createTransfers(
         transfers: List<Transfer>,
         newAttributes: Map<TransferId, List<NewAttribute>> = emptyMap(),
         sourceRecorder: SourceRecorder,
         onProgress: (suspend (created: Int, total: Int) -> Unit)? = null,
-    )
+    ): List<TransferId>
 
     /**
      * Updates a transfer and its attributes atomically, creating only ONE revision bump.
