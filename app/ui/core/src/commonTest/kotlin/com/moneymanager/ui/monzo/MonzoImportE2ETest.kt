@@ -1586,11 +1586,13 @@ class MonzoImportE2ETest : DbTest() {
 
             // Foreign transaction: local_currency (EUR) differs from account currency (GBP),
             // so the import must use local_amount (-1447) and local_currency (EUR).
+            // Money.amount stores the absolute value, so we expect 1447 (not -1447).
             val foreignTransfer = transfers.single { it.amount.currency.code == "EUR" }
             assertEquals(1447L, foreignTransfer.amount.amount, "Foreign transfer should use the local amount in EUR")
 
             // Domestic transaction: local_currency (GBP) equals the account currency (GBP),
             // so the import falls back to the main amount/currency.
+            // Money.amount stores the absolute value, so we expect 5000 (not -5000).
             val domesticTransfer = transfers.single { it.amount.currency.code == "GBP" }
             assertEquals(5000L, domesticTransfer.amount.amount, "Domestic transfer should use the main GBP amount")
         }
