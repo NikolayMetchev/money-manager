@@ -13,6 +13,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 @OptIn(ExperimentalTestApi::class)
 class BackgroundTasksTest {
@@ -86,4 +87,23 @@ class BackgroundTasksTest {
             onNodeWithText("Elapsed", substring = true).assertIsDisplayed()
             onAllNodesWithText("Elapsed", substring = true).assertCountEquals(1)
         }
+
+    @Test
+    fun startTask_setsStartedAtMillisWhenTaskStarts() {
+        val manager = BackgroundTaskManager(CoroutineScope(Dispatchers.Main))
+        val beforeStartMillis = System.currentTimeMillis()
+
+        manager.startTask(
+            key = "import",
+            title = "Import",
+            initialDetail = "Starting",
+        ) {
+            "Done"
+        }
+        val afterStartMillis = System.currentTimeMillis()
+
+        assertTrue(manager.tasks.isNotEmpty())
+        val startedAtMillis = manager.tasks.first().startedAtMillis
+        assertTrue(startedAtMillis in beforeStartMillis..afterStartMillis)
+    }
 }

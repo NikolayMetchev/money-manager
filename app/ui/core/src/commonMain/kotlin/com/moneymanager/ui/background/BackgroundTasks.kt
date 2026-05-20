@@ -164,8 +164,10 @@ fun BackgroundTaskPanel(
         key1 = hasRunningTask,
     ) {
         while (hasRunningTask) {
-            value = currentTimeMillisProvider()
             delay(1_000)
+            if (hasRunningTask) {
+                value = currentTimeMillisProvider()
+            }
         }
     }
     val latestTaskId = visibleTasks.lastOrNull()?.id
@@ -318,10 +320,11 @@ internal fun formatElapsedTime(elapsedMillis: Long): String {
     val hours = totalSeconds / 3_600
     val minutes = (totalSeconds % 3_600) / 60
     val seconds = totalSeconds % 60
-    fun Long.twoDigits(): String = toString().padStart(2, '0')
     return if (hours > 0) {
-        "$hours:${minutes.twoDigits()}:${seconds.twoDigits()}"
+        "$hours:${minutes.formatTwoDigits()}:${seconds.formatTwoDigits()}"
     } else {
-        "${minutes.twoDigits()}:${seconds.twoDigits()}"
+        "${minutes.formatTwoDigits()}:${seconds.formatTwoDigits()}"
     }
 }
+
+private fun Long.formatTwoDigits(): String = toString().padStart(2, '0')
