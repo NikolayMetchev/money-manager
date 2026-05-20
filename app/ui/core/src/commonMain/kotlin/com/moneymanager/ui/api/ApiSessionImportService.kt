@@ -2075,18 +2075,19 @@ private class AccountCache(
                     continue
                 }
                 val existingByName = accountMap[request.name]
-                val shouldCreate = if (existingByName != null) {
-                    val existingExternalIdForAccount =
-                        counterpartyIdIndex.entries.firstOrNull { it.value == existingByName.id }?.key
-                    if (existingExternalIdForAccount == request.counterpartyId) {
-                        counterpartyIdIndex[request.counterpartyId] = existingByName.id
-                        false
+                val shouldCreate =
+                    if (existingByName != null) {
+                        val existingExternalIdForAccount =
+                            counterpartyIdIndex.entries.firstOrNull { it.value == existingByName.id }?.key
+                        if (existingExternalIdForAccount == request.counterpartyId) {
+                            counterpartyIdIndex[request.counterpartyId] = existingByName.id
+                            false
+                        } else {
+                            true
+                        }
                     } else {
                         true
                     }
-                } else {
-                    true
-                }
                 if (shouldCreate) {
                     toCreate += request
                 }
