@@ -988,14 +988,17 @@ private suspend fun importOwnersForAccount(
             val ownershipId = personAccountOwnershipRepository.createOwnership(person.id, accountId)
             if (entitySource != null && sessionId != null && requestId != null) {
                 entitySource.recordFromApi(
-                    entityType = EntityType.PERSON_ACCOUNT_OWNERSHIP,
-                    entityId = ownershipId,
-                    revisionId = 1L,
-                    sessionId = sessionId,
-                    requestId = requestId,
-                    jsonPath = (
-                        jsonPath
-                            ?: owner.jsonPath
+                    ApiEntitySourceRecord(
+                        entityType = EntityType.PERSON_ACCOUNT_OWNERSHIP,
+                        entityId = ownershipId,
+                        revisionId = 1L,
+                        sessionId = sessionId,
+                        requestId = requestId,
+                        jsonPath =
+                            (
+                                jsonPath
+                                    ?: owner.jsonPath
+                            ),
                     ),
                 )
             }
@@ -1049,12 +1052,14 @@ private suspend fun resolveOrCreatePerson(
     }
     if (entitySource != null && sessionId != null && requestId != null) {
         entitySource.recordFromApi(
-            entityType = EntityType.PERSON,
-            entityId = createdPerson.id.id,
-            revisionId = 1L,
-            sessionId = sessionId,
-            requestId = requestId,
-            jsonPath = owner.jsonPath,
+            ApiEntitySourceRecord(
+                entityType = EntityType.PERSON,
+                entityId = createdPerson.id.id,
+                revisionId = 1L,
+                sessionId = sessionId,
+                requestId = requestId,
+                jsonPath = owner.jsonPath,
+            ),
         )
     }
     peopleIndex.add(createdPerson, externalId, bankKey)
@@ -2154,12 +2159,14 @@ private class AccountCache(
         val resolvedSource = externalId?.let { accountApiSourceByExternalId[it] } ?: apiSource
         if (resolvedSource != null) {
             entitySource.recordFromApi(
-                entityType = EntityType.ACCOUNT,
-                entityId = newId.id,
-                revisionId = 1L,
-                sessionId = resolvedSource.sessionId,
-                requestId = resolvedSource.requestId,
-                jsonPath = resolvedSource.jsonPath,
+                ApiEntitySourceRecord(
+                    entityType = EntityType.ACCOUNT,
+                    entityId = newId.id,
+                    revisionId = 1L,
+                    sessionId = resolvedSource.sessionId,
+                    requestId = resolvedSource.requestId,
+                    jsonPath = resolvedSource.jsonPath,
+                ),
             )
         }
         return newId

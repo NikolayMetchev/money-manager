@@ -30,6 +30,7 @@ import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.SourceRecorder
+import com.moneymanager.domain.model.SourceType
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
@@ -82,55 +83,18 @@ class DbEntitySource(
         recorder.insert(entityType, entityId, revisionId)
     }
 
-    override fun recordFromApi(
-        entityType: EntityType,
-        entityId: Long,
-        revisionId: Long,
-        sessionId: ApiSessionId,
-        requestId: ApiRequestId,
-        jsonPath: JsonPath,
-    ) {
-        ApiEntitySourceRecorder(entitySourceQueries, deviceId, sessionId, requestId, jsonPath).insert(entityType, entityId, revisionId)
+    override fun recordFromApi(record: ApiEntitySourceRecord) {
+        ApiEntitySourceRecorder(
+            entitySourceQueries,
+            deviceId,
+            record.sessionId,
+            record.requestId,
+            record.jsonPath,
+        ).insert(record.entityType, record.entityId, record.revisionId)
     }
 
     override fun recordFromApiBatch(records: List<ApiEntitySourceRecord>) {
-        if (records.isEmpty()) return
-        entitySourceQueries.transaction {
-            records.forEach { record ->
-                entitySourceQueries.insertSource(
-                    entity_type_id = record.entityType.id,
-                    entity_id = record.entityId,
-                    revision_id = record.revisionId,
-                    source_type_id =
-                        com.moneymanager.domain.model.SourceType.API.id
-                            .toLong(),
-                    device_id = deviceId.id,
-                )
-                val entitySource =
-                    entitySourceQueries
-                        .selectEntitySourceForRevision(
-                            entity_type_id = record.entityType.id,
-                            entity_id = record.entityId,
-                            revision_id = record.revisionId,
-                        ).executeAsOne()
-                if (entitySource.source_type_id !=
-                    com.moneymanager.domain.model.SourceType.API.id
-                        .toLong()
-                ) {
-                    return@forEach
-                }
-                val entitySourceId = entitySource.id
-                if (entitySourceQueries.selectApiEntitySourceId(id = entitySourceId).executeAsOneOrNull() != null) {
-                    return@forEach
-                }
-                entitySourceQueries.insertApiSource(
-                    id = entitySourceId,
-                    api_session_id = record.sessionId.id,
-                    api_request_id = record.requestId.id,
-                    json_path = record.jsonPath.value,
-                )
-            }
-        }
+        recordFromApiBatchInternal(entitySourceQueries, deviceId, records)
     }
 
     override fun manualRecorder(): SourceRecorder = ManualSourceRecorder(transferSourceQueries, deviceId)
@@ -177,55 +141,18 @@ class DbSampleEntitySource(
         recorder.insert(entityType, entityId, revisionId)
     }
 
-    override fun recordFromApi(
-        entityType: EntityType,
-        entityId: Long,
-        revisionId: Long,
-        sessionId: ApiSessionId,
-        requestId: ApiRequestId,
-        jsonPath: JsonPath,
-    ) {
-        ApiEntitySourceRecorder(entitySourceQueries, deviceId, sessionId, requestId, jsonPath).insert(entityType, entityId, revisionId)
+    override fun recordFromApi(record: ApiEntitySourceRecord) {
+        ApiEntitySourceRecorder(
+            entitySourceQueries,
+            deviceId,
+            record.sessionId,
+            record.requestId,
+            record.jsonPath,
+        ).insert(record.entityType, record.entityId, record.revisionId)
     }
 
     override fun recordFromApiBatch(records: List<ApiEntitySourceRecord>) {
-        if (records.isEmpty()) return
-        entitySourceQueries.transaction {
-            records.forEach { record ->
-                entitySourceQueries.insertSource(
-                    entity_type_id = record.entityType.id,
-                    entity_id = record.entityId,
-                    revision_id = record.revisionId,
-                    source_type_id =
-                        com.moneymanager.domain.model.SourceType.API.id
-                            .toLong(),
-                    device_id = deviceId.id,
-                )
-                val entitySource =
-                    entitySourceQueries
-                        .selectEntitySourceForRevision(
-                            entity_type_id = record.entityType.id,
-                            entity_id = record.entityId,
-                            revision_id = record.revisionId,
-                        ).executeAsOne()
-                if (entitySource.source_type_id !=
-                    com.moneymanager.domain.model.SourceType.API.id
-                        .toLong()
-                ) {
-                    return@forEach
-                }
-                val entitySourceId = entitySource.id
-                if (entitySourceQueries.selectApiEntitySourceId(id = entitySourceId).executeAsOneOrNull() != null) {
-                    return@forEach
-                }
-                entitySourceQueries.insertApiSource(
-                    id = entitySourceId,
-                    api_session_id = record.sessionId.id,
-                    api_request_id = record.requestId.id,
-                    json_path = record.jsonPath.value,
-                )
-            }
-        }
+        recordFromApiBatchInternal(entitySourceQueries, deviceId, records)
     }
 
     override fun manualRecorder(): SourceRecorder = ManualSourceRecorder(transferSourceQueries, deviceId)
@@ -299,3 +226,38 @@ private fun CsvResolution.toDb(): Resolution =
         is CsvResolution.MapToExisting -> Resolution.MapToExisting(id)
         is CsvResolution.MapToExistingCurrency -> Resolution.MapToExistingCurrency(id)
     }
+
+private fun recordFromApiBatchInternal(
+    queries: EntitySourceQueries,
+    deviceId: DeviceId,
+    records: List<ApiEntitySourceRecord>,
+) {
+    if (records.isEmpty()) return
+    queries.transaction {
+        records.forEach { record ->
+            queries.insertSource(
+                entity_type_id = record.entityType.id,
+                entity_id = record.entityId,
+                revision_id = record.revisionId,
+                source_type_id = SourceType.API.id.toLong(),
+                device_id = deviceId.id,
+            )
+            val entitySource =
+                queries
+                    .selectEntitySourceForRevision(
+                        entity_type_id = record.entityType.id,
+                        entity_id = record.entityId,
+                        revision_id = record.revisionId,
+                    ).executeAsOne()
+            if (entitySource.source_type_id != SourceType.API.id.toLong()) return@forEach
+            val entitySourceId = entitySource.id
+            if (queries.selectApiEntitySourceId(id = entitySourceId).executeAsOneOrNull() != null) return@forEach
+            queries.insertApiSource(
+                id = entitySourceId,
+                api_session_id = record.sessionId.id,
+                api_request_id = record.requestId.id,
+                json_path = record.jsonPath.value,
+            )
+        }
+    }
+}
