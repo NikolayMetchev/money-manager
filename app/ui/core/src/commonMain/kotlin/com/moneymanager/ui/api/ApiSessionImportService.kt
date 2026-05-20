@@ -1746,7 +1746,6 @@ private suspend fun prepareValidTransactionItem(
         attributes =
             buildApiTransferAttributes(
                 item = item,
-                transactionApiId = transactionApiId,
                 customTxFields = setup.customTxFields,
                 attributeTypeCache = setup.attributeTypeCache,
             ),
@@ -1757,7 +1756,6 @@ private suspend fun prepareValidTransactionItem(
 
 private suspend fun buildApiTransferAttributes(
     item: ApiTransactionPageItem,
-    transactionApiId: String?,
     customTxFields: Map<String, String>,
     attributeTypeCache: AttributeTypeCache,
 ): List<NewAttribute> =
@@ -2072,17 +2070,26 @@ private class AccountCache(
             val toCreate = mutableListOf<CounterpartyBatchCreateRequest>()
 
             for (request in requests) {
-                counterpartyIdIndex[request.counterpartyId]?.let { continue }
+                val existingByCounterpartyId = counterpartyIdIndex[request.counterpartyId]
+                if (existingByCounterpartyId != null) {
+                    continue
+                }
                 val existingByName = accountMap[request.name]
-                if (existingByName != null) {
+                val shouldCreate = if (existingByName != null) {
                     val existingExternalIdForAccount =
                         counterpartyIdIndex.entries.firstOrNull { it.value == existingByName.id }?.key
                     if (existingExternalIdForAccount == request.counterpartyId) {
                         counterpartyIdIndex[request.counterpartyId] = existingByName.id
-                        continue
+                        false
+                    } else {
+                        true
                     }
+                } else {
+                    true
                 }
-                toCreate += request
+                if (shouldCreate) {
+                    toCreate += request
+                }
             }
 
             if (toCreate.isEmpty()) return@withLock
