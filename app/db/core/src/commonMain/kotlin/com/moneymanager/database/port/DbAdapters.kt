@@ -15,13 +15,13 @@ import com.moneymanager.database.service.Resolution
 import com.moneymanager.database.service.UnresolvedReference
 import com.moneymanager.database.sql.EntitySourceQueries
 import com.moneymanager.database.sql.TransferSourceQueries
+import com.moneymanager.domain.ApiEntitySourceRecord
 import com.moneymanager.domain.CsvImportParseResult
 import com.moneymanager.domain.CsvReferenceType
 import com.moneymanager.domain.CsvResolution
 import com.moneymanager.domain.CsvStrategyImportExport
 import com.moneymanager.domain.CsvUnresolvedReference
 import com.moneymanager.domain.EntitySource
-import com.moneymanager.domain.ApiEntitySourceRecord
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiSessionId
@@ -101,7 +101,9 @@ class DbEntitySource(
                     entity_type_id = record.entityType.id,
                     entity_id = record.entityId,
                     revision_id = record.revisionId,
-                    source_type_id = com.moneymanager.domain.model.SourceType.API.id.toLong(),
+                    source_type_id =
+                        com.moneymanager.domain.model.SourceType.API.id
+                            .toLong(),
                     device_id = deviceId.id,
                 )
                 val entitySource =
@@ -111,7 +113,10 @@ class DbEntitySource(
                             entity_id = record.entityId,
                             revision_id = record.revisionId,
                         ).executeAsOne()
-                if (entitySource.source_type_id != com.moneymanager.domain.model.SourceType.API.id.toLong()) {
+                if (entitySource.source_type_id !=
+                    com.moneymanager.domain.model.SourceType.API.id
+                        .toLong()
+                ) {
                     return@forEach
                 }
                 val entitySourceId = entitySource.id
@@ -191,7 +196,9 @@ class DbSampleEntitySource(
                     entity_type_id = record.entityType.id,
                     entity_id = record.entityId,
                     revision_id = record.revisionId,
-                    source_type_id = com.moneymanager.domain.model.SourceType.API.id.toLong(),
+                    source_type_id =
+                        com.moneymanager.domain.model.SourceType.API.id
+                            .toLong(),
                     device_id = deviceId.id,
                 )
                 val entitySource =
@@ -201,7 +208,10 @@ class DbSampleEntitySource(
                             entity_id = record.entityId,
                             revision_id = record.revisionId,
                         ).executeAsOne()
-                if (entitySource.source_type_id != com.moneymanager.domain.model.SourceType.API.id.toLong()) {
+                if (entitySource.source_type_id !=
+                    com.moneymanager.domain.model.SourceType.API.id
+                        .toLong()
+                ) {
                     return@forEach
                 }
                 val entitySourceId = entitySource.id

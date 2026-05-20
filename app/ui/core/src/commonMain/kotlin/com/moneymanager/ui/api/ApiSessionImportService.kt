@@ -8,8 +8,8 @@ import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.model.*
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.apistrategy.ApiPeopleMappings
-import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountAttributeCreateInput
+import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.ApiResponseTransactionInsert
 import com.moneymanager.domain.repository.ApiSessionRepository
@@ -996,7 +996,7 @@ private suspend fun importOwnersForAccount(
                     jsonPath = (
                         jsonPath
                             ?: owner.jsonPath
-                        ),
+                    ),
                 )
             }
         }

@@ -81,8 +81,8 @@ import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.createApiClient
 import com.moneymanager.ui.api.ApiAccountsDownloadResult
 import com.moneymanager.ui.api.ApiCounterpartySuggestion
-import com.moneymanager.ui.api.ApiSessionImportResult
 import com.moneymanager.ui.api.ApiSessionImportProgress
+import com.moneymanager.ui.api.ApiSessionImportResult
 import com.moneymanager.ui.api.ApiTransactionsDownloadProgress
 import com.moneymanager.ui.api.ApiTransactionsDownloadResult
 import com.moneymanager.ui.api.discoverApiCounterpartiesToCreate
