@@ -21,6 +21,7 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -28,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
 
@@ -45,6 +47,7 @@ data class BackgroundTask(
     val title: String,
     val detail: String,
     val status: BackgroundTaskStatus,
+    val startedAtMillis: Long = 0L,
 )
 
 class BackgroundTaskController internal constructor(
@@ -84,6 +87,7 @@ class BackgroundTaskManager(
                 title = title,
                 detail = initialDetail,
                 status = BackgroundTaskStatus.RUNNING,
+                startedAtMillis = System.currentTimeMillis(),
             ),
         )
 
@@ -148,12 +152,22 @@ fun rememberBackgroundTaskManager(scope: CoroutineScope): BackgroundTaskManager 
 @Composable
 fun BackgroundTaskPanel(
     manager: BackgroundTaskManager,
+    currentTimeMillisProvider: () -> Long = System::currentTimeMillis,
     modifier: Modifier = Modifier,
 ) {
     val visibleTasks = manager.tasks.takeLast(3)
     if (visibleTasks.isEmpty()) return
 
     val hasRunningTask = visibleTasks.any { task -> task.status == BackgroundTaskStatus.RUNNING }
+    val currentTimeMillis by produceState(
+        initialValue = currentTimeMillisProvider(),
+        key1 = hasRunningTask,
+    ) {
+        while (hasRunningTask) {
+            value = currentTimeMillisProvider()
+            delay(1_000)
+        }
+    }
     val latestTaskId = visibleTasks.lastOrNull()?.id
     var expanded by remember { mutableStateOf(hasRunningTask) }
     var lastSeenTaskId by remember { mutableStateOf<Long?>(null) }
@@ -229,6 +243,11 @@ fun BackgroundTaskPanel(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     if (task.status == BackgroundTaskStatus.RUNNING) {
+                        Text(
+                            text = "Elapsed ${formatElapsedTime(currentTimeMillis - task.startedAtMillis)}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                         LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                     }
                 }
@@ -292,3 +311,17 @@ private fun BackgroundTaskStatus.label(): String =
         BackgroundTaskStatus.SUCCEEDED -> "Done"
         BackgroundTaskStatus.FAILED -> "Failed"
     }
+
+internal fun formatElapsedTime(elapsedMillis: Long): String {
+    val safeElapsedMillis = elapsedMillis.coerceAtLeast(0L)
+    val totalSeconds = safeElapsedMillis / 1_000
+    val hours = totalSeconds / 3_600
+    val minutes = (totalSeconds % 3_600) / 60
+    val seconds = totalSeconds % 60
+    fun Long.twoDigits(): String = toString().padStart(2, '0')
+    return if (hours > 0) {
+        "$hours:${minutes.twoDigits()}:${seconds.twoDigits()}"
+    } else {
+        "${minutes.twoDigits()}:${seconds.twoDigits()}"
+    }
+}
