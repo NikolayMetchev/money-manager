@@ -23,9 +23,9 @@ import com.moneymanager.rest.ApiClient
 import com.moneymanager.rest.ApiHttpResponse
 import com.moneymanager.ui.screens.transactions.logger
 import io.ktor.http.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
@@ -1773,7 +1773,10 @@ private suspend fun buildApiTransferAttributes(
         }
         val transactionIdAttributeName = customTxFields.entries.firstOrNull { it.value == "id" }?.key
         val localAmountAttributeName = strategyAttributeNameForJsonPath(customTxFields, strategyPath = "local_amount")
-        if (item.localAmountMinorUnits != null && localAmountAttributeName != null && customTxFields.entries.none { it.value == "local_amount" }) {
+        if (item.localAmountMinorUnits != null &&
+            localAmountAttributeName != null &&
+            customTxFields.entries.none { it.value == "local_amount" }
+        ) {
             add(
                 NewAttribute(
                     typeId = attributeTypeCache.getOrCreate(localAmountAttributeName),
@@ -1782,7 +1785,10 @@ private suspend fun buildApiTransferAttributes(
             )
         }
         val localCurrencyAttributeName = strategyAttributeNameForJsonPath(customTxFields, strategyPath = "local_currency")
-        if (!item.localCurrencyCode.isNullOrBlank() && localCurrencyAttributeName != null && customTxFields.entries.none { it.value == "local_currency" }) {
+        if (!item.localCurrencyCode.isNullOrBlank() &&
+            localCurrencyAttributeName != null &&
+            customTxFields.entries.none { it.value == "local_currency" }
+        ) {
             add(NewAttribute(typeId = attributeTypeCache.getOrCreate(localCurrencyAttributeName), value = item.localCurrencyCode))
         }
     }
