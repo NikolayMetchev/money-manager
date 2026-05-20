@@ -44,14 +44,18 @@ data class BackgroundTask(
     val key: String,
     val title: String,
     val detail: String,
+    val progress: Float? = null,
     val status: BackgroundTaskStatus,
 )
 
 class BackgroundTaskController internal constructor(
-    private val updateDetail: (String) -> Unit,
+    private val updateDetail: (String, Float?) -> Unit,
 ) {
-    fun update(detail: String) {
-        updateDetail(detail)
+    fun update(
+        detail: String,
+        progress: Float? = null,
+    ) {
+        updateDetail(detail, progress)
     }
 }
 
@@ -88,8 +92,8 @@ class BackgroundTaskManager(
         )
 
         val controller =
-            BackgroundTaskController { detail ->
-                updateTask(taskId) { task -> task.copy(detail = detail) }
+            BackgroundTaskController { detail, progress ->
+                updateTask(taskId) { task -> task.copy(detail = detail, progress = progress) }
             }
 
         scope.launch(Dispatchers.Default) {
@@ -229,7 +233,12 @@ fun BackgroundTaskPanel(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     if (task.status == BackgroundTaskStatus.RUNNING) {
-                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        val progress = task.progress
+                        if (progress == null) {
+                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        } else {
+                            LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+                        }
                     }
                 }
             }

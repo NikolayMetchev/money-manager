@@ -21,6 +21,7 @@ import com.moneymanager.domain.CsvResolution
 import com.moneymanager.domain.CsvStrategyImportExport
 import com.moneymanager.domain.CsvUnresolvedReference
 import com.moneymanager.domain.EntitySource
+import com.moneymanager.domain.ApiEntitySourceRecord
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiSessionId
@@ -92,6 +93,41 @@ class DbEntitySource(
         ApiEntitySourceRecorder(entitySourceQueries, deviceId, sessionId, requestId, jsonPath).insert(entityType, entityId, revisionId)
     }
 
+    override fun recordFromApiBatch(records: List<ApiEntitySourceRecord>) {
+        if (records.isEmpty()) return
+        entitySourceQueries.transaction {
+            records.forEach { record ->
+                entitySourceQueries.insertSource(
+                    entity_type_id = record.entityType.id,
+                    entity_id = record.entityId,
+                    revision_id = record.revisionId,
+                    source_type_id = com.moneymanager.domain.model.SourceType.API.id.toLong(),
+                    device_id = deviceId.id,
+                )
+                val entitySource =
+                    entitySourceQueries
+                        .selectEntitySourceForRevision(
+                            entity_type_id = record.entityType.id,
+                            entity_id = record.entityId,
+                            revision_id = record.revisionId,
+                        ).executeAsOne()
+                if (entitySource.source_type_id != com.moneymanager.domain.model.SourceType.API.id.toLong()) {
+                    return@forEach
+                }
+                val entitySourceId = entitySource.id
+                if (entitySourceQueries.selectApiEntitySourceId(id = entitySourceId).executeAsOneOrNull() != null) {
+                    return@forEach
+                }
+                entitySourceQueries.insertApiSource(
+                    id = entitySourceId,
+                    api_session_id = record.sessionId.id,
+                    api_request_id = record.requestId.id,
+                    json_path = record.jsonPath.value,
+                )
+            }
+        }
+    }
+
     override fun manualRecorder(): SourceRecorder = ManualSourceRecorder(transferSourceQueries, deviceId)
 
     override fun sampleGeneratorRecorder(): SourceRecorder = SampleGeneratorSourceRecorder(transferSourceQueries, deviceId)
@@ -145,6 +181,41 @@ class DbSampleEntitySource(
         jsonPath: JsonPath,
     ) {
         ApiEntitySourceRecorder(entitySourceQueries, deviceId, sessionId, requestId, jsonPath).insert(entityType, entityId, revisionId)
+    }
+
+    override fun recordFromApiBatch(records: List<ApiEntitySourceRecord>) {
+        if (records.isEmpty()) return
+        entitySourceQueries.transaction {
+            records.forEach { record ->
+                entitySourceQueries.insertSource(
+                    entity_type_id = record.entityType.id,
+                    entity_id = record.entityId,
+                    revision_id = record.revisionId,
+                    source_type_id = com.moneymanager.domain.model.SourceType.API.id.toLong(),
+                    device_id = deviceId.id,
+                )
+                val entitySource =
+                    entitySourceQueries
+                        .selectEntitySourceForRevision(
+                            entity_type_id = record.entityType.id,
+                            entity_id = record.entityId,
+                            revision_id = record.revisionId,
+                        ).executeAsOne()
+                if (entitySource.source_type_id != com.moneymanager.domain.model.SourceType.API.id.toLong()) {
+                    return@forEach
+                }
+                val entitySourceId = entitySource.id
+                if (entitySourceQueries.selectApiEntitySourceId(id = entitySourceId).executeAsOneOrNull() != null) {
+                    return@forEach
+                }
+                entitySourceQueries.insertApiSource(
+                    id = entitySourceId,
+                    api_session_id = record.sessionId.id,
+                    api_request_id = record.requestId.id,
+                    json_path = record.jsonPath.value,
+                )
+            }
+        }
     }
 
     override fun manualRecorder(): SourceRecorder = ManualSourceRecorder(transferSourceQueries, deviceId)

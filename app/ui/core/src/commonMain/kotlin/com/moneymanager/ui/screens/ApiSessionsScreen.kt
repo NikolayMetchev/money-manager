@@ -82,6 +82,7 @@ import com.moneymanager.rest.createApiClient
 import com.moneymanager.ui.api.ApiAccountsDownloadResult
 import com.moneymanager.ui.api.ApiCounterpartySuggestion
 import com.moneymanager.ui.api.ApiSessionImportResult
+import com.moneymanager.ui.api.ApiSessionImportProgress
 import com.moneymanager.ui.api.ApiTransactionsDownloadProgress
 import com.moneymanager.ui.api.ApiTransactionsDownloadResult
 import com.moneymanager.ui.api.discoverApiCounterpartiesToCreate
@@ -136,7 +137,7 @@ fun ApiSessionsScreen(
     // Per-session import state
     var importResultBySession by remember { mutableStateOf<Map<ApiSessionId, ApiSessionImportResult>>(emptyMap()) }
     var importErrorBySession by remember { mutableStateOf<Map<ApiSessionId, String>>(emptyMap()) }
-    var importProgressBySession by remember { mutableStateOf<Map<ApiSessionId, String>>(emptyMap()) }
+    var importProgressBySession by remember { mutableStateOf<Map<ApiSessionId, ApiSessionImportProgress>>(emptyMap()) }
 
     // Per-credential download result state (cleared when a new download starts)
     var accountsDownloadResultByCredential by remember { mutableStateOf<Map<MonzoCredentialId, ApiAccountsDownloadResult>>(emptyMap()) }
@@ -202,7 +203,7 @@ fun ApiSessionsScreen(
                     counterpartyAccountNames = counterpartyAccountNames,
                     onProgress = { progress ->
                         importProgressBySession = importProgressBySession + (session.id to progress)
-                        update(progress)
+                        update(progress.detail, progress.progress)
                     },
                 )
             apiSessionRepository.markSessionImported(session.id, Clock.System.now())
@@ -519,7 +520,7 @@ private fun CredentialCard(
     downloadProgress: ApiTransactionsDownloadProgress?,
     importResultBySession: Map<ApiSessionId, ApiSessionImportResult>,
     importErrorBySession: Map<ApiSessionId, String>,
-    importProgressBySession: Map<ApiSessionId, String>,
+    importProgressBySession: Map<ApiSessionId, ApiSessionImportProgress>,
     importedSessionIds: Set<ApiSessionId>,
     isImportingSession: (ApiSessionId) -> Boolean,
     onDownloadAccounts: () -> Unit,
@@ -629,7 +630,7 @@ private fun SessionRow(
     isAlreadyImported: Boolean,
     importResult: ApiSessionImportResult?,
     importError: String?,
-    importProgress: String?,
+    importProgress: ApiSessionImportProgress?,
     onImport: () -> Unit,
     onOpenTraffic: () -> Unit,
     onCopyError: (String) -> Unit,
@@ -691,7 +692,12 @@ private fun SessionRow(
                 }
             Text(text = importLabel, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             importProgress?.let {
-                Text(text = it, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                val percent = it.progress?.let { p -> " (${(p * 100).toInt().coerceIn(0, 100)}%)" }.orEmpty()
+                Text(
+                    text = it.detail + percent,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                )
             }
         }
 

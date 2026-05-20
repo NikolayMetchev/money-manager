@@ -87,6 +87,7 @@ interface TransactionRepository {
         transfers: List<Transfer>,
         newAttributes: Map<TransferId, List<NewAttribute>> = emptyMap(),
         sourceRecorder: SourceRecorder,
+        batchSize: Int = 1000,
         onProgress: (suspend (created: Int, total: Int) -> Unit)? = null,
     ): List<TransferId>
 

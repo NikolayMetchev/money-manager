@@ -24,6 +24,19 @@ interface EntitySource {
         jsonPath: JsonPath,
     )
 
+    fun recordFromApiBatch(records: List<ApiEntitySourceRecord>) {
+        records.forEach { record ->
+            recordFromApi(
+                entityType = record.entityType,
+                entityId = record.entityId,
+                revisionId = record.revisionId,
+                sessionId = record.sessionId,
+                requestId = record.requestId,
+                jsonPath = record.jsonPath,
+            )
+        }
+    }
+
     fun manualRecorder(): SourceRecorder
 
     fun sampleGeneratorRecorder(): SourceRecorder
@@ -39,3 +52,12 @@ interface EntitySource {
         jsonPath: JsonPath,
     ): SourceRecorder
 }
+
+data class ApiEntitySourceRecord(
+    val entityType: EntityType,
+    val entityId: Long,
+    val revisionId: Long,
+    val sessionId: ApiSessionId,
+    val requestId: ApiRequestId,
+    val jsonPath: JsonPath,
+)

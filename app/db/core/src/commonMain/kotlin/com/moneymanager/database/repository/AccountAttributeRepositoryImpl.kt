@@ -7,6 +7,7 @@ import com.moneymanager.domain.model.AccountAttribute
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.AttributeTypeId
+import com.moneymanager.domain.repository.AccountAttributeCreateInput
 import com.moneymanager.domain.repository.AccountAttributeRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -69,6 +70,25 @@ class AccountAttributeRepositoryImpl(
                         value,
                     )
                     queries.selectLastInsertedId().executeAsOne()
+                } finally {
+                    database.endCreationMode()
+                }
+            }
+        }
+
+    override suspend fun insertInCreationModeBatch(attributes: List<AccountAttributeCreateInput>): Unit =
+        withContext(Dispatchers.Default) {
+            if (attributes.isEmpty()) return@withContext
+            queries.transaction {
+                database.beginCreationMode()
+                try {
+                    attributes.forEach { input ->
+                        queries.insert(
+                            input.accountId.id,
+                            input.attributeTypeId.id,
+                            input.value,
+                        )
+                    }
                 } finally {
                     database.endCreationMode()
                 }

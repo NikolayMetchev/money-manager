@@ -3,11 +3,13 @@
 package com.moneymanager.ui.api
 
 import com.moneymanager.database.DatabaseConfig
+import com.moneymanager.domain.ApiEntitySourceRecord
 import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.model.*
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.apistrategy.ApiPeopleMappings
 import com.moneymanager.domain.repository.AccountAttributeRepository
+import com.moneymanager.domain.repository.AccountAttributeCreateInput
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.ApiResponseTransactionInsert
 import com.moneymanager.domain.repository.ApiSessionRepository
@@ -38,6 +40,7 @@ private val BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID = AttributeTypeId(DatabaseCo
 private val PERSON_EXTERNAL_ID_ATTR_TYPE_ID = AttributeTypeId(DatabaseConfig.PERSON_EXTERNAL_ID_ATTR_TYPE_ID)
 private val ACCOUNT_SORT_CODE_ATTR_TYPE_ID = AttributeTypeId(DatabaseConfig.ACCOUNT_SORT_CODE_ATTR_TYPE_ID)
 private val ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID = AttributeTypeId(DatabaseConfig.ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID)
+private const val API_IMPORT_TRANSACTION_WRITE_BATCH_SIZE = 100
 
 data class ApiSessionImportResult(
     val accountCount: Int,
@@ -46,6 +49,11 @@ data class ApiSessionImportResult(
     val duplicateCount: Int = 0,
     val errorCount: Int = 0,
     val excludedCount: Int = 0,
+)
+
+data class ApiSessionImportProgress(
+    val detail: String,
+    val progress: Float? = null,
 )
 
 data class ApiCounterpartySuggestion(
@@ -211,7 +219,7 @@ suspend fun importApiSessionTransactions(
     accountsSessionId: ApiSessionId? = null,
     strategy: ApiImportStrategy,
     counterpartyAccountNames: Map<String, String> = emptyMap(),
-    onProgress: (String) -> Unit = {},
+    onProgress: (ApiSessionImportProgress) -> Unit = {},
 ): ApiSessionImportResult {
     val setup =
         setupImportSession(
@@ -231,11 +239,16 @@ suspend fun importApiSessionTransactions(
             strategy,
             onProgress,
         )
+    onProgress(ApiSessionImportProgress(detail = "Preparing import session...", progress = 0.05f))
     precreateAndFlushCounterparties(setup, counterpartyAccountNames)
+    onProgress(ApiSessionImportProgress(detail = "Counterparties prepared.", progress = 0.2f))
     importTransactionsConcurrently(setup)
+    onProgress(ApiSessionImportProgress(detail = "Transactions imported. Processing people...", progress = 0.82f))
     flushPostTransactionAttributes(setup)
     val totalPeople = importPeopleFromSession(setup)
+    onProgress(ApiSessionImportProgress(detail = "People imported. Finalizing...", progress = 0.92f))
     flushPostImportAttributes(setup)
+    onProgress(ApiSessionImportProgress(detail = "Import finalized.", progress = 0.98f))
     return ApiSessionImportResult(
         accountCount = setup.accountsById.size,
         transactionCount = setup.counts.totalImported,
@@ -258,15 +271,28 @@ private class ImportCounts(
     var sourceAccountsCreated = 0
     var counterpartyAccountsCreated = 0
 
-    fun progressMessage() =
+    fun detailMessage() =
         buildString {
-            append("Imported $completedCount/$totalResponses responses")
-            if (totalImported > 0) append(". $totalImported imported transaction(s)")
+            if (totalResponses > 0) {
+                append("Importing transaction responses: $completedCount/$totalResponses")
+            } else {
+                append("Importing accounts and related data")
+            }
+            if (totalImported > 0) append(". $totalImported imported")
             if (totalDuplicates > 0) append(". $totalDuplicates duplicate(s)")
             if (totalErrors > 0) append(". $totalErrors error(s)")
             if (sourceAccountsCreated > 0) append(". $sourceAccountsCreated source account(s) created")
             if (counterpartyAccountsCreated > 0) append(". $counterpartyAccountsCreated counterparty account(s) created")
             append(".")
+        }
+
+    fun progressFraction(): Float? =
+        if (totalResponses <= 0) {
+            null
+        } else {
+            // Keep most of the bar for transaction-page import itself.
+            val responseFraction = completedCount.toFloat() / totalResponses.toFloat()
+            0.2f + (responseFraction * 0.6f)
         }
 }
 
@@ -287,7 +313,7 @@ private data class ImportSetup(
     val attributeTypeCache: AttributeTypeCache,
     val counts: ImportCounts,
     val progressMutex: Mutex,
-    val onProgress: (String) -> Unit,
+    val onProgress: (ApiSessionImportProgress) -> Unit,
     val apiSessionRepository: ApiSessionRepository,
     val accountAttributeRepository: AccountAttributeRepository,
     val transactionRepository: TransactionRepository,
@@ -312,7 +338,7 @@ private suspend fun setupImportSession(
     sessionId: ApiSessionId,
     accountsSessionId: ApiSessionId?,
     strategy: ApiImportStrategy,
-    onProgress: (String) -> Unit,
+    onProgress: (ApiSessionImportProgress) -> Unit,
 ): ImportSetup {
     val requestsById = apiSessionRepository.getRequestsBySession(sessionId).associateBy { it.id }
     val responses = apiSessionRepository.getResponsesBySession(sessionId)
@@ -404,13 +430,13 @@ private suspend fun setupImportSession(
                 val message =
                     progressMutex.withLock {
                         if (isSourceAccount) ++counts.sourceAccountsCreated else ++counts.counterpartyAccountsCreated
-                        counts.progressMessage()
+                        counts.detailMessage()
                     }
-                onProgress(message)
+                onProgress(ApiSessionImportProgress(detail = message, progress = counts.progressFraction()))
             },
         )
 
-    onProgress(counts.progressMessage())
+    onProgress(ApiSessionImportProgress(detail = counts.detailMessage(), progress = counts.progressFraction()))
 
     return ImportSetup(
         strategy = strategy,
@@ -478,16 +504,19 @@ private suspend fun importTransactionsConcurrently(setup: ImportSetup) {
 
     val pageResults = importTransactionPages(pageContexts, setup)
     pageResults.forEach { pageResult ->
-        val progressMessage =
+        val progressUpdate =
             setup.progressMutex.withLock {
                 setup.counts.totalImported += pageResult.importedCount
                 setup.counts.totalDuplicates += pageResult.duplicateCount
                 setup.counts.totalErrors += pageResult.errorCount
                 setup.counts.totalExcluded += pageResult.excludedCount
                 ++setup.counts.completedCount
-                setup.counts.progressMessage()
+                ApiSessionImportProgress(
+                    detail = setup.counts.detailMessage(),
+                    progress = setup.counts.progressFraction(),
+                )
             }
-        setup.onProgress(progressMessage)
+        setup.onProgress(progressUpdate)
     }
 }
 
@@ -967,18 +996,9 @@ private suspend fun importOwnersForAccount(
                     jsonPath = (
                         jsonPath
                             ?: owner.jsonPath
-                    ),
+                        ),
                 )
             }
-        } else if (entitySource != null && sessionId != null && requestId != null) {
-            entitySource.recordFromApi(
-                entityType = EntityType.PERSON_ACCOUNT_OWNERSHIP,
-                entityId = existingOwnership.id,
-                revisionId = existingOwnership.revisionId,
-                sessionId = sessionId,
-                requestId = requestId,
-                jsonPath = (jsonPath ?: owner.jsonPath),
-            )
         }
         if (wasCreated) {
             newPeopleCount++
@@ -1566,12 +1586,22 @@ private suspend fun importTransactionPages(
                     orderedImports
                         .filter { it.attributes.isNotEmpty() }
                         .associate { it.transfer.id to it.attributes },
+                batchSize = minOf(API_IMPORT_TRANSACTION_WRITE_BATCH_SIZE, orderedImports.size).coerceAtLeast(1),
                 sourceRecorder =
                     OrderedApiImportSourceRecorder(
                         entitySource = setup.entitySource,
                         sessionId = setup.sessionId,
                         sources = orderedImports.map { ApiTransactionSource(it.requestId, it.item.jsonPath) },
                     ),
+                onProgress = { created, total ->
+                    val writeProgress = if (total <= 0) 0f else created.toFloat() / total.toFloat()
+                    setup.onProgress(
+                        ApiSessionImportProgress(
+                            detail = "Writing imported transactions: $created/$total",
+                            progress = 0.2f + (writeProgress * 0.6f),
+                        ),
+                    )
+                },
             )
         }
 
@@ -2043,21 +2073,31 @@ private class AccountCache(
                     Account(id = AccountId(0L), name = request.name.ifBlank { "Unknown" }, openingDate = now)
                 }
             val createdIds = accountRepository.createAccountsBatch(accountsToCreate)
+            val counterpartyAttributeWrites = mutableListOf<AccountAttributeCreateInput>()
+            val counterpartySourceWrites = mutableListOf<ApiEntitySourceRecord>()
 
             toCreate.zip(createdIds).forEach { (request, accountId) ->
                 counterpartyIdIndex[request.counterpartyId] = accountId
                 val createdAccount = Account(id = accountId, name = request.name.ifBlank { "Unknown" }, openingDate = now)
                 accountMap[createdAccount.name] = createdAccount
-                accountAttributeRepository.insertInCreationMode(accountId, ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID, request.counterpartyId)
-                entitySource.recordFromApi(
-                    entityType = EntityType.ACCOUNT,
-                    entityId = accountId.id,
-                    revisionId = 1L,
-                    sessionId = request.apiSource.sessionId,
-                    requestId = request.apiSource.requestId,
-                    jsonPath = request.apiSource.jsonPath,
-                )
+                counterpartyAttributeWrites +=
+                    AccountAttributeCreateInput(
+                        accountId = accountId,
+                        attributeTypeId = ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID,
+                        value = request.counterpartyId,
+                    )
+                counterpartySourceWrites +=
+                    ApiEntitySourceRecord(
+                        entityType = EntityType.ACCOUNT,
+                        entityId = accountId.id,
+                        revisionId = 1L,
+                        sessionId = request.apiSource.sessionId,
+                        requestId = request.apiSource.requestId,
+                        jsonPath = request.apiSource.jsonPath,
+                    )
             }
+            accountAttributeRepository.insertInCreationModeBatch(counterpartyAttributeWrites)
+            entitySource.recordFromApiBatch(counterpartySourceWrites)
             accountsByName = accountMap
             createdCount = toCreate.size
         }
