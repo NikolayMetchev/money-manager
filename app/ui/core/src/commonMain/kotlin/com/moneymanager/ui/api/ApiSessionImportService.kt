@@ -25,6 +25,7 @@ import com.moneymanager.ui.screens.transactions.logger
 import io.ktor.http.*
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
@@ -506,14 +507,16 @@ private suspend fun importTransactionsConcurrently(setup: ImportSetup) {
     pageResults.forEach { pageResult ->
         val progressUpdate =
             setup.progressMutex.withLock {
+                val previousProgress = 0.8f
                 setup.counts.totalImported += pageResult.importedCount
                 setup.counts.totalDuplicates += pageResult.duplicateCount
                 setup.counts.totalErrors += pageResult.errorCount
                 setup.counts.totalExcluded += pageResult.excludedCount
                 ++setup.counts.completedCount
+                val newProgress = maxOf(previousProgress, setup.counts.progressFraction() ?: previousProgress)
                 ApiSessionImportProgress(
                     detail = setup.counts.detailMessage(),
-                    progress = setup.counts.progressFraction(),
+                    progress = newProgress,
                 )
             }
         setup.onProgress(progressUpdate)
@@ -654,6 +657,9 @@ private suspend fun precreateCounterparties(
                     async {
                         val request = requestsById[response.requestId] ?: return@async emptyList()
                         parseTransactionsWithPath(response.json, strategy).mapNotNull { item ->
+                            if (item.rawJson?.resolveBuiltInCounterpartyType(item.amountMinorUnits) != null) {
+                                return@mapNotNull null
+                            }
                             val counterpartyId =
                                 item.rawJson?.resolveCounterpartyIdentity(counterpartyIdField, strategy.peopleMappings)
                                     ?: return@mapNotNull null
@@ -1667,6 +1673,8 @@ private suspend fun prepareTransactionItem(
                 setup = setup,
             )
         ApiTransactionPreparation.Prepared(prepared)
+    } catch (cancelled: CancellationException) {
+        throw cancelled
     } catch (expected: Exception) {
         logger.error(expected) { "Error importing API transaction: ${expected.message}" }
         ApiTransactionPreparation.Failed(
@@ -1764,11 +1772,8 @@ private suspend fun buildApiTransferAttributes(
             }
         }
         val transactionIdAttributeName = customTxFields.entries.firstOrNull { it.value == "id" }?.key
-        if (transactionApiId != null && transactionIdAttributeName != null) {
-            add(NewAttribute(typeId = attributeTypeCache.getOrCreate(transactionIdAttributeName), value = transactionApiId))
-        }
         val localAmountAttributeName = strategyAttributeNameForJsonPath(customTxFields, strategyPath = "local_amount")
-        if (item.localAmountMinorUnits != null && localAmountAttributeName != null) {
+        if (item.localAmountMinorUnits != null && localAmountAttributeName != null && customTxFields.entries.none { it.value == "local_amount" }) {
             add(
                 NewAttribute(
                     typeId = attributeTypeCache.getOrCreate(localAmountAttributeName),
@@ -1777,7 +1782,7 @@ private suspend fun buildApiTransferAttributes(
             )
         }
         val localCurrencyAttributeName = strategyAttributeNameForJsonPath(customTxFields, strategyPath = "local_currency")
-        if (!item.localCurrencyCode.isNullOrBlank() && localCurrencyAttributeName != null) {
+        if (!item.localCurrencyCode.isNullOrBlank() && localCurrencyAttributeName != null && customTxFields.entries.none { it.value == "local_currency" }) {
             add(NewAttribute(typeId = attributeTypeCache.getOrCreate(localCurrencyAttributeName), value = item.localCurrencyCode))
         }
     }
@@ -2064,8 +2069,12 @@ private class AccountCache(
                 counterpartyIdIndex[request.counterpartyId]?.let { continue }
                 val existingByName = accountMap[request.name]
                 if (existingByName != null) {
-                    counterpartyIdIndex[request.counterpartyId] = existingByName.id
-                    continue
+                    val existingExternalIdForAccount =
+                        counterpartyIdIndex.entries.firstOrNull { it.value == existingByName.id }?.key
+                    if (existingExternalIdForAccount == request.counterpartyId) {
+                        counterpartyIdIndex[request.counterpartyId] = existingByName.id
+                        continue
+                    }
                 }
                 toCreate += request
             }

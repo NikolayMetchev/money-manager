@@ -93,27 +93,33 @@ class BackgroundTaskManager(
 
         val controller =
             BackgroundTaskController { detail, progress ->
-                updateTask(taskId) { task -> task.copy(detail = detail, progress = progress) }
+                scope.launch(Dispatchers.Main) {
+                    updateTask(taskId) { task -> task.copy(detail = detail, progress = progress) }
+                }
             }
 
         scope.launch(Dispatchers.Default) {
             try {
                 val finalDetail = block(controller)
-                updateTask(taskId) { task ->
-                    task.copy(detail = finalDetail, status = BackgroundTaskStatus.SUCCEEDED)
+                scope.launch(Dispatchers.Main) {
+                    updateTask(taskId) { task ->
+                        task.copy(detail = finalDetail, status = BackgroundTaskStatus.SUCCEEDED)
+                    }
+                    pruneCompletedTasks()
                 }
-                pruneCompletedTasks()
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (expected: Exception) {
                 logger.error(expected) { "Background task failed: ${expected.message}" }
-                updateTask(taskId) { task ->
-                    task.copy(
-                        detail = expected.message ?: "Task failed.",
-                        status = BackgroundTaskStatus.FAILED,
-                    )
+                scope.launch(Dispatchers.Main) {
+                    updateTask(taskId) { task ->
+                        task.copy(
+                            detail = expected.message ?: "Task failed.",
+                            status = BackgroundTaskStatus.FAILED,
+                        )
+                    }
+                    pruneCompletedTasks()
                 }
-                pruneCompletedTasks()
             }
         }
     }
