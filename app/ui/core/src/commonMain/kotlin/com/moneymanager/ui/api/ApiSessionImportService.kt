@@ -1649,18 +1649,17 @@ private suspend fun prepareTransactionItem(
     setup: ImportSetup,
 ): ApiTransactionPreparation {
     val responseId = ApiResponseId(context.response.responseId)
-    val currency = setup.currencyCache.getCurrency(item.currencyCode)
-    if (currency == null) {
-        return ApiTransactionPreparation.Failed(
-            record =
-                item.errorRecord(
-                    pageIndex = context.index,
-                    itemIndex = itemIndex,
-                    responseId = responseId,
-                    message = "Currency not found: ${item.currencyCode}",
-                ),
-        )
-    }
+    val currency =
+        setup.currencyCache.getCurrency(item.currencyCode)
+            ?: return ApiTransactionPreparation.Failed(
+                record =
+                    item.errorRecord(
+                        pageIndex = context.index,
+                        itemIndex = itemIndex,
+                        responseId = responseId,
+                        message = "Currency not found: ${item.currencyCode}",
+                    ),
+            )
 
     return try {
         val prepared =
@@ -1765,15 +1764,14 @@ private suspend fun buildApiTransferAttributes(
         }
         if (customTxFields.isNotEmpty() && item.rawJson != null) {
             for ((fieldName, jsonPath) in customTxFields) {
-                val value = item.rawJson.resolveJsonPath(jsonPath) ?: continue
-                add(NewAttribute(typeId = attributeTypeCache.getOrCreate(fieldName), value = value))
+                if (jsonPath != "local_amount" && jsonPath != "local_currency") {
+                    val value = item.rawJson.resolveJsonPath(jsonPath) ?: continue
+                    add(NewAttribute(typeId = attributeTypeCache.getOrCreate(fieldName), value = value))
+                }
             }
         }
         val localAmountAttributeName = strategyAttributeNameForJsonPath(customTxFields, strategyPath = "local_amount")
-        if (item.localAmountMinorUnits != null &&
-            localAmountAttributeName != null &&
-            customTxFields.entries.none { it.value == "local_amount" }
-        ) {
+        if (item.localAmountMinorUnits != null && localAmountAttributeName != null) {
             add(
                 NewAttribute(
                     typeId = attributeTypeCache.getOrCreate(localAmountAttributeName),
@@ -1782,10 +1780,7 @@ private suspend fun buildApiTransferAttributes(
             )
         }
         val localCurrencyAttributeName = strategyAttributeNameForJsonPath(customTxFields, strategyPath = "local_currency")
-        if (!item.localCurrencyCode.isNullOrBlank() &&
-            localCurrencyAttributeName != null &&
-            customTxFields.entries.none { it.value == "local_currency" }
-        ) {
+        if (!item.localCurrencyCode.isNullOrBlank() && localCurrencyAttributeName != null) {
             add(NewAttribute(typeId = attributeTypeCache.getOrCreate(localCurrencyAttributeName), value = item.localCurrencyCode))
         }
     }

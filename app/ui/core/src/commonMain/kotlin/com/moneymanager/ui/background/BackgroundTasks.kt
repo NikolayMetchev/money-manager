@@ -94,7 +94,13 @@ class BackgroundTaskManager(
         val controller =
             BackgroundTaskController { detail, progress ->
                 scope.launch(Dispatchers.Main) {
-                    updateTask(taskId) { task -> task.copy(detail = detail, progress = progress) }
+                    updateTask(taskId) { task ->
+                        if (task.status == BackgroundTaskStatus.RUNNING) {
+                            task.copy(detail = detail, progress = progress)
+                        } else {
+                            task
+                        }
+                    }
                 }
             }
 

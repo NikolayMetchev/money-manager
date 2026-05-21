@@ -17,28 +17,8 @@ interface EntitySource {
 
     fun recordFromApi(record: ApiEntitySourceRecord)
 
-    fun recordFromApi(
-        entityType: EntityType,
-        entityId: Long,
-        revisionId: Long,
-        sessionId: ApiSessionId,
-        requestId: ApiRequestId,
-        jsonPath: JsonPath,
-    ) = recordFromApi(
-        ApiEntitySourceRecord(
-            entityType = entityType,
-            entityId = entityId,
-            revisionId = revisionId,
-            sessionId = sessionId,
-            requestId = requestId,
-            jsonPath = jsonPath,
-        ),
-    )
-
     fun recordFromApiBatch(records: List<ApiEntitySourceRecord>) {
-        records.forEach { record ->
-            recordFromApi(record)
-        }
+        records.forEach(::recordFromApi)
     }
 
     fun manualRecorder(): SourceRecorder

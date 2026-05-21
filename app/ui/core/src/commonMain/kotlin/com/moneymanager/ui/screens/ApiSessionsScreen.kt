@@ -95,6 +95,7 @@ import com.moneymanager.ui.util.ContentCopyIcon
 import com.moneymanager.ui.util.displayDateTime
 import com.moneymanager.ui.util.setPlainText
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
@@ -202,7 +203,9 @@ fun ApiSessionsScreen(
                     strategy = strategy,
                     counterpartyAccountNames = counterpartyAccountNames,
                     onProgress = { progress ->
-                        importProgressBySession = importProgressBySession + (session.id to progress)
+                        scope.launch(Dispatchers.Main) {
+                            importProgressBySession = importProgressBySession + (session.id to progress)
+                        }
                         update(progress.detail, progress.progress)
                     },
                 )
