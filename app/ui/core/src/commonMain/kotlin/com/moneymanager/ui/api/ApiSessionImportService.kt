@@ -2152,8 +2152,6 @@ private class AccountCache(
         externalId: String?,
         normalizedName: String,
         apiSource: AccountApiSource?,
-        sourceSortCode: String? = null,
-        sourceAccountNumber: String? = null,
     ): AccountId {
         val now = Clock.System.now()
         val newId =
@@ -2165,13 +2163,6 @@ private class AccountCache(
         if (externalId != null) {
             accountAttributeRepository.insertInCreationMode(newId, ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID, externalId)
             sourceAccountExternalIdIndex[externalId] = newId
-        }
-        if (!sourceSortCode.isNullOrBlank() || !sourceAccountNumber.isNullOrBlank()) {
-            accountAttributeRepository.ensureCounterpartyPersonalAttributesInCreationMode(
-                accountId = newId,
-                sortCode = sourceSortCode,
-                accountNumber = sourceAccountNumber,
-            )
         }
         val resolvedSource = externalId?.let { accountApiSourceByExternalId[it] } ?: apiSource
         if (resolvedSource != null) {
