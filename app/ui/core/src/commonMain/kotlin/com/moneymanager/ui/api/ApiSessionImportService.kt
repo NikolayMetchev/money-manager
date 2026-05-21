@@ -1769,7 +1769,6 @@ private suspend fun buildApiTransferAttributes(
                 add(NewAttribute(typeId = attributeTypeCache.getOrCreate(fieldName), value = value))
             }
         }
-        val transactionIdAttributeName = customTxFields.entries.firstOrNull { it.value == "id" }?.key
         val localAmountAttributeName = strategyAttributeNameForJsonPath(customTxFields, strategyPath = "local_amount")
         if (item.localAmountMinorUnits != null &&
             localAmountAttributeName != null &&
