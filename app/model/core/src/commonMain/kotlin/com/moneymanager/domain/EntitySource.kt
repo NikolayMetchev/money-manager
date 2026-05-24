@@ -15,14 +15,11 @@ interface EntitySource {
         revisionId: Long,
     )
 
-    fun recordFromApi(
-        entityType: EntityType,
-        entityId: Long,
-        revisionId: Long,
-        sessionId: ApiSessionId,
-        requestId: ApiRequestId,
-        jsonPath: JsonPath,
-    )
+    fun recordFromApi(record: ApiEntitySourceRecord)
+
+    fun recordFromApiBatch(records: List<ApiEntitySourceRecord>) {
+        records.forEach(::recordFromApi)
+    }
 
     fun manualRecorder(): SourceRecorder
 
@@ -39,3 +36,12 @@ interface EntitySource {
         jsonPath: JsonPath,
     ): SourceRecorder
 }
+
+data class ApiEntitySourceRecord(
+    val entityType: EntityType,
+    val entityId: Long,
+    val revisionId: Long,
+    val sessionId: ApiSessionId,
+    val requestId: ApiRequestId,
+    val jsonPath: JsonPath,
+)

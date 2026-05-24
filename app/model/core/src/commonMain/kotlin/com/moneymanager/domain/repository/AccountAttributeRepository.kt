@@ -34,6 +34,20 @@ interface AccountAttributeRepository {
     ): Long
 
     /**
+     * Inserts many attributes in creation mode.
+     * Default implementation preserves behavior by delegating one-by-one.
+     */
+    suspend fun insertInCreationModeBatch(attributes: List<AccountAttributeCreateInput>) {
+        attributes.forEach { input ->
+            insertInCreationMode(
+                accountId = input.accountId,
+                attributeTypeId = input.attributeTypeId,
+                value = input.value,
+            )
+        }
+    }
+
+    /**
      * Updates an attribute's value. This will trigger the attribute UPDATE trigger
      * which bumps the account revision and records to audit.
      */
@@ -48,3 +62,9 @@ interface AccountAttributeRepository {
      */
     suspend fun delete(id: Long)
 }
+
+data class AccountAttributeCreateInput(
+    val accountId: AccountId,
+    val attributeTypeId: AttributeTypeId,
+    val value: String,
+)
