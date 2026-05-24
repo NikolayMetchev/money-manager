@@ -1,5 +1,21 @@
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
+val projectVersion = System.getProperty("version")
+    ?: providers.gradleProperty("version").orNull
+    ?: layout.settingsDirectory.file("VERSION").asFile.readText().trim()
+
+gradle.beforeProject {
+    version = projectVersion
+}
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
 pluginManagement {
     includeBuild("gradle/build-logic")
     repositories {
@@ -29,7 +45,6 @@ buildscript {
 }
 
 plugins {
-    id("com.pablisco.gradle.auto.include") version "1.3"
     id("com.gradle.develocity") version "4.4.1"
     id("com.autonomousapps.build-health") version "3.12.0"
 
@@ -46,8 +61,17 @@ develocity {
     }
 }
 
-autoInclude {
-    ignore(":gradle:build-logic")
-}
-
 rootProject.name = "money-manager"
+
+rootDir.walkTopDown()
+    .mapNotNull { file ->
+        file.takeIf { it.name == "build.gradle.kts" }
+            ?.parentFile
+            ?.takeUnless { it == rootDir }
+            ?.takeUnless { moduleDir ->
+                moduleDir.toRelativeString(rootDir).replace('\\', '/') == "gradle/build-logic"
+            }
+    }
+    .forEach { moduleDir ->
+        include(moduleDir.relativeTo(rootDir).path.replace('/', ':').replace('\\', ':'))
+    }

@@ -50,7 +50,7 @@ tasks {
 }
 
 detekt {
-    config.setFrom(rootProject.file("detekt.yml"))
+    config.setFrom(rootDir.resolve("detekt.yml"))
     buildUponDefaultConfig = true
     allRules = false
 }
