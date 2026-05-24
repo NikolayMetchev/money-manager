@@ -37,8 +37,6 @@ import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExport
 
-private const val API_ENTITY_SOURCE_REVISION_ID = 1L
-
 class DbMaintenance(
     private val delegate: DatabaseMaintenanceService,
 ) : Maintenance {
@@ -92,7 +90,7 @@ class DbEntitySource(
             record.sessionId,
             record.requestId,
             record.jsonPath,
-        ).insert(record.entityType, record.entityId, API_ENTITY_SOURCE_REVISION_ID)
+        ).insert(record.entityType, record.entityId, record.revisionId)
     }
 
     override fun recordFromApiBatch(records: List<ApiEntitySourceRecord>) {
@@ -150,7 +148,7 @@ class DbSampleEntitySource(
             record.sessionId,
             record.requestId,
             record.jsonPath,
-        ).insert(record.entityType, record.entityId, API_ENTITY_SOURCE_REVISION_ID)
+        ).insert(record.entityType, record.entityId, record.revisionId)
     }
 
     override fun recordFromApiBatch(records: List<ApiEntitySourceRecord>) {
@@ -240,7 +238,7 @@ private fun recordFromApiBatchInternal(
             queries.insertSource(
                 entity_type_id = record.entityType.id,
                 entity_id = record.entityId,
-                revision_id = API_ENTITY_SOURCE_REVISION_ID,
+                revision_id = record.revisionId,
                 source_type_id = SourceType.API.id.toLong(),
                 device_id = deviceId.id,
             )
@@ -249,7 +247,7 @@ private fun recordFromApiBatchInternal(
                     .selectEntitySourceForRevision(
                         entity_type_id = record.entityType.id,
                         entity_id = record.entityId,
-                        revision_id = API_ENTITY_SOURCE_REVISION_ID,
+                        revision_id = record.revisionId,
                     ).executeAsOne()
             if (entitySource.source_type_id != SourceType.API.id.toLong()) return@forEach
             val entitySourceId = entitySource.id

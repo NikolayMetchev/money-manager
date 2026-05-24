@@ -40,6 +40,7 @@ interface EntitySource {
 data class ApiEntitySourceRecord(
     val entityType: EntityType,
     val entityId: Long,
+    val revisionId: Long,
     val sessionId: ApiSessionId,
     val requestId: ApiRequestId,
     val jsonPath: JsonPath,
