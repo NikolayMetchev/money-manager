@@ -997,7 +997,6 @@ private suspend fun importOwnersForAccount(
                     ApiEntitySourceRecord(
                         entityType = EntityType.PERSON_ACCOUNT_OWNERSHIP,
                         entityId = ownershipId,
-                        revisionId = 1L,
                         sessionId = sessionId,
                         requestId = requestId,
                         jsonPath =
@@ -1061,7 +1060,6 @@ private suspend fun resolveOrCreatePerson(
             ApiEntitySourceRecord(
                 entityType = EntityType.PERSON,
                 entityId = createdPerson.id.id,
-                revisionId = 1L,
                 sessionId = sessionId,
                 requestId = requestId,
                 jsonPath = owner.jsonPath,
@@ -2112,7 +2110,6 @@ private class AccountCache(
                     ApiEntitySourceRecord(
                         entityType = EntityType.ACCOUNT,
                         entityId = accountId.id,
-                        revisionId = 1L,
                         sessionId = request.apiSource.sessionId,
                         requestId = request.apiSource.requestId,
                         jsonPath = request.apiSource.jsonPath,
@@ -2170,7 +2167,6 @@ private class AccountCache(
                 ApiEntitySourceRecord(
                     entityType = EntityType.ACCOUNT,
                     entityId = newId.id,
-                    revisionId = 1L,
                     sessionId = resolvedSource.sessionId,
                     requestId = resolvedSource.requestId,
                     jsonPath = resolvedSource.jsonPath,
