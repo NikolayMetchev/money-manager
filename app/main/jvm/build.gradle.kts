@@ -5,6 +5,8 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
 }
 
+val versionFile = rootDir.resolve("VERSION")
+
 dependencies {
     api(libs.androidx.compose.runtime.desktop)
     api(libs.compose.ui.desktop)
@@ -24,7 +26,7 @@ dependencies {
 
 // Copy VERSION file to resources
 tasks.named<ProcessResources>("processResources") {
-    from(rootProject.file("VERSION")) {
+    from(versionFile) {
         into(".")
     }
 }

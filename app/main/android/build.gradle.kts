@@ -2,6 +2,8 @@ plugins {
     id("moneymanager.android-application-convention")
 }
 
+val versionFile = rootDir.resolve("VERSION")
+
 android {
     namespace = "com.moneymanager.android"
 
@@ -21,9 +23,9 @@ android {
 // Copy VERSION file to Android assets
 tasks.register<Copy>("copyVersionToAssets") {
     description = "Copies the project VERSION file into Android assets."
-    from(rootProject.file("VERSION"))
+    from(versionFile)
     into("src/main/assets")
-    inputs.file(rootProject.file("VERSION"))
+    inputs.file(versionFile)
     outputs.file("src/main/assets/VERSION")
 }
 
