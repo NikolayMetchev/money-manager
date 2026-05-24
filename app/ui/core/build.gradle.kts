@@ -5,7 +5,7 @@ plugins {
 }
 
 if (providers.gradleProperty("org.gradle.unsafe.isolated-projects").orNull != "true") {
-    apply(plugin = "dev.mokkery")
+    pluginManager.apply("dev.mokkery")
 }
 
 kotlin {

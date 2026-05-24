@@ -63,19 +63,15 @@ develocity {
 
 rootProject.name = "money-manager"
 
-include(
-    ":app:db:core",
-    ":app:db:schemaspy",
-    ":app:di:core",
-    ":app:main:android",
-    ":app:main:jvm",
-    ":app:model:core",
-    ":app:ui:core",
-    ":test:app:db",
-    ":utils:bigdecimal",
-    ":utils:compose:filePicker",
-    ":utils:compose:scrollbar",
-    ":utils:currency",
-    ":utils:parsers:csv",
-    ":utils:rest",
-)
+rootDir.walkTopDown()
+    .mapNotNull { file ->
+        file.takeIf { it.name == "build.gradle.kts" }
+            ?.parentFile
+            ?.takeUnless { it == rootDir }
+            ?.takeUnless { moduleDir ->
+                moduleDir.toRelativeString(rootDir).replace('\\', '/') == "gradle/build-logic"
+            }
+    }
+    .forEach { moduleDir ->
+        include(moduleDir.relativeTo(rootDir).path.replace('/', ':').replace('\\', ':'))
+    }

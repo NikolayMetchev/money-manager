@@ -17,7 +17,7 @@ val projectVersion = System.getProperty("version")
 version = projectVersion
 
 if (providers.gradleProperty("org.gradle.unsafe.isolated-projects").orNull != "true") {
-    apply(plugin = "com.osacky.doctor")
+    pluginManager.apply("com.osacky.doctor")
 }
 
 tasks.register("build") {
