@@ -332,17 +332,13 @@ private fun BackgroundTaskStatus.label(): String =
         BackgroundTaskStatus.FAILED -> "Failed"
     }
 
-internal fun formatElapsedTime(elapsed: Duration): String {
-    val safeElapsed = if (elapsed.isNegative()) Duration.ZERO else elapsed
-    val totalSeconds = safeElapsed.inWholeSeconds
-    val hours = totalSeconds / 3_600
-    val minutes = (totalSeconds % 3_600) / 60
-    val secs = totalSeconds % 60
-    return if (hours > 0) {
-        "$hours:${minutes.formatTwoDigits()}:${secs.formatTwoDigits()}"
-    } else {
-        "${minutes.formatTwoDigits()}:${secs.formatTwoDigits()}"
+internal fun formatElapsedTime(elapsed: Duration): String =
+    maxOf(elapsed, Duration.ZERO).toComponents { hours, minutes, seconds, _ ->
+        if (hours > 0) {
+            "$hours:${minutes.formatTwoDigits()}:${seconds.formatTwoDigits()}"
+        } else {
+            "${minutes.formatTwoDigits()}:${seconds.formatTwoDigits()}"
+        }
     }
-}
 
-private fun Long.formatTwoDigits(): String = toString().padStart(2, '0')
+private fun Number.formatTwoDigits(): String = toString().padStart(2, '0')
