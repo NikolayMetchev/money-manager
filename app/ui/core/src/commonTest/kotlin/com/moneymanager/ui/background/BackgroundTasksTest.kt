@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithText
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -73,7 +74,8 @@ class BackgroundTasksTest {
 
     @Test
     fun startTask_setsStartedAtMillisWhenTaskStarts() {
-        val manager = BackgroundTaskManager(CoroutineScope(Dispatchers.Main))
+        val scope = CoroutineScope(Dispatchers.Default)
+        val manager = BackgroundTaskManager(scope)
         val beforeStartMillis = System.currentTimeMillis()
 
         manager.startTask(
@@ -88,5 +90,7 @@ class BackgroundTasksTest {
         assertTrue(manager.tasks.isNotEmpty())
         val startedAtMillis = manager.tasks.first().startedAtMillis
         assertTrue(startedAtMillis in beforeStartMillis..afterStartMillis)
+
+        scope.cancel()
     }
 }
