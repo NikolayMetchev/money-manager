@@ -26,6 +26,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -168,7 +171,6 @@ fun rememberBackgroundTaskManager(scope: CoroutineScope): BackgroundTaskManager 
 @Composable
 fun BackgroundTaskPanel(
     manager: BackgroundTaskManager,
-    currentTimeMillisProvider: () -> Long = System::currentTimeMillis,
     modifier: Modifier = Modifier,
 ) {
     val visibleTasks = manager.tasks.takeLast(3)
@@ -176,13 +178,13 @@ fun BackgroundTaskPanel(
 
     val hasRunningTask = visibleTasks.any { task -> task.status == BackgroundTaskStatus.RUNNING }
     val currentTimeMillis by produceState(
-        initialValue = currentTimeMillisProvider(),
+        initialValue = System.currentTimeMillis(),
         key1 = hasRunningTask,
     ) {
         while (hasRunningTask) {
-            delay(1_000)
+            delay(1.seconds)
             if (hasRunningTask) {
-                value = currentTimeMillisProvider()
+                value = System.currentTimeMillis()
             }
         }
     }
@@ -262,7 +264,7 @@ fun BackgroundTaskPanel(
                     )
                     if (task.status == BackgroundTaskStatus.RUNNING) {
                         Text(
-                            text = "Elapsed ${formatElapsedTime(currentTimeMillis - task.startedAtMillis)}",
+                            text = "Elapsed ${formatElapsedTime((currentTimeMillis - task.startedAtMillis).milliseconds)}",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -330,16 +332,16 @@ private fun BackgroundTaskStatus.label(): String =
         BackgroundTaskStatus.FAILED -> "Failed"
     }
 
-internal fun formatElapsedTime(elapsedMillis: Long): String {
-    val safeElapsedMillis = elapsedMillis.coerceAtLeast(0L)
-    val totalSeconds = safeElapsedMillis / 1_000
+internal fun formatElapsedTime(elapsed: Duration): String {
+    val safeElapsed = if (elapsed.isNegative()) Duration.ZERO else elapsed
+    val totalSeconds = safeElapsed.inWholeSeconds
     val hours = totalSeconds / 3_600
     val minutes = (totalSeconds % 3_600) / 60
-    val seconds = totalSeconds % 60
+    val secs = totalSeconds % 60
     return if (hours > 0) {
-        "$hours:${minutes.formatTwoDigits()}:${seconds.formatTwoDigits()}"
+        "$hours:${minutes.formatTwoDigits()}:${secs.formatTwoDigits()}"
     } else {
-        "${minutes.formatTwoDigits()}:${seconds.formatTwoDigits()}"
+        "${minutes.formatTwoDigits()}:${secs.formatTwoDigits()}"
     }
 }
 
