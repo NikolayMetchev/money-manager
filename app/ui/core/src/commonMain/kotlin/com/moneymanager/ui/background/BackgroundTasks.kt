@@ -52,6 +52,7 @@ data class BackgroundTask(
     val progress: Float? = null,
     val status: BackgroundTaskStatus,
     val startedAtMillis: Long = 0L,
+    val completedAtMillis: Long? = null,
 )
 
 class BackgroundTaskController internal constructor(
@@ -114,9 +115,10 @@ class BackgroundTaskManager(
         scope.launch(Dispatchers.Default) {
             try {
                 val finalDetail = block(controller)
+                val completedAt = System.currentTimeMillis()
                 scope.launch {
                     updateTask(taskId) { task ->
-                        task.copy(detail = finalDetail, status = BackgroundTaskStatus.SUCCEEDED)
+                        task.copy(detail = finalDetail, status = BackgroundTaskStatus.SUCCEEDED, completedAtMillis = completedAt)
                     }
                     pruneCompletedTasks()
                 }
@@ -124,11 +126,13 @@ class BackgroundTaskManager(
                 throw cancelled
             } catch (expected: Exception) {
                 logger.error(expected) { "Background task failed: ${expected.message}" }
+                val completedAt = System.currentTimeMillis()
                 scope.launch {
                     updateTask(taskId) { task ->
                         task.copy(
                             detail = expected.message ?: "Task failed.",
                             status = BackgroundTaskStatus.FAILED,
+                            completedAtMillis = completedAt,
                         )
                     }
                     pruneCompletedTasks()
@@ -262,13 +266,24 @@ fun BackgroundTaskPanel(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    if (task.status == BackgroundTaskStatus.RUNNING) {
-                        Text(
-                            text = "Elapsed ${formatElapsedTime((currentTimeMillis - task.startedAtMillis).milliseconds)}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    when (task.status) {
+                        BackgroundTaskStatus.RUNNING -> {
+                            Text(
+                                text = "Elapsed ${formatElapsedTime((currentTimeMillis - task.startedAtMillis).milliseconds)}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        }
+                        BackgroundTaskStatus.SUCCEEDED, BackgroundTaskStatus.FAILED -> {
+                            task.completedAtMillis?.let { completedAt ->
+                                Text(
+                                    text = "Took ${formatElapsedTime((completedAt - task.startedAtMillis).milliseconds)}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
                     }
                 }
             }
