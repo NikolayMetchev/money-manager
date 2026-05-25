@@ -97,7 +97,7 @@ class BackgroundTaskManager(
 
         val controller =
             BackgroundTaskController { detail, progress ->
-                scope.launch(Dispatchers.Main) {
+                scope.launch {
                     updateTask(taskId) { task ->
                         if (task.status == BackgroundTaskStatus.RUNNING) {
                             task.copy(detail = detail, progress = progress)
@@ -111,7 +111,7 @@ class BackgroundTaskManager(
         scope.launch(Dispatchers.Default) {
             try {
                 val finalDetail = block(controller)
-                scope.launch(Dispatchers.Main) {
+                scope.launch {
                     updateTask(taskId) { task ->
                         task.copy(detail = finalDetail, status = BackgroundTaskStatus.SUCCEEDED)
                     }
@@ -121,7 +121,7 @@ class BackgroundTaskManager(
                 throw cancelled
             } catch (expected: Exception) {
                 logger.error(expected) { "Background task failed: ${expected.message}" }
-                scope.launch(Dispatchers.Main) {
+                scope.launch {
                     updateTask(taskId) { task ->
                         task.copy(
                             detail = expected.message ?: "Task failed.",

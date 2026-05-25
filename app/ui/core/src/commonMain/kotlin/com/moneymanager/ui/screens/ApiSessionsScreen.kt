@@ -203,7 +203,7 @@ fun ApiSessionsScreen(
                     strategy = strategy,
                     counterpartyAccountNames = counterpartyAccountNames,
                     onProgress = { progress ->
-                        scope.launch(Dispatchers.Main) {
+                        scope.launch {
                             importProgressBySession = importProgressBySession + (session.id to progress)
                         }
                         update(progress.detail, progress.progress)
