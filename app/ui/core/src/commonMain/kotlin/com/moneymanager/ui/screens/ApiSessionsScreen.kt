@@ -1375,8 +1375,7 @@ private fun JsonTreeNode(
                 element.entries.forEach { (key, value) ->
                     val nextSegments =
                         when {
-                            remainingHighlightSegments == null -> null
-                            remainingHighlightSegments.isEmpty() -> null
+                            remainingHighlightSegments.isNullOrEmpty() -> null
                             remainingHighlightSegments.first() == key -> remainingHighlightSegments.drop(1)
                             else -> null
                         }
@@ -1400,8 +1399,7 @@ private fun JsonTreeNode(
                 element.forEachIndexed { index, value ->
                     val nextSegments =
                         when {
-                            remainingHighlightSegments == null -> null
-                            remainingHighlightSegments.isEmpty() -> null
+                            remainingHighlightSegments.isNullOrEmpty() -> null
                             remainingHighlightSegments.first() == index.toString() -> remainingHighlightSegments.drop(1)
                             else -> null
                         }
