@@ -1,11 +1,11 @@
 plugins {
-    alias(libs.plugins.gradle.doctor)
+    alias(libs.plugins.gradle.doctor) apply false
     alias(libs.plugins.kover)
 }
 
 // Read version from system property, project property, or VERSION file
 // Priority: -Dversion=X > -Pversion=X > VERSION file > "unspecified"
-val versionFile = rootProject.file("VERSION")
+val versionFile = rootDir.resolve("VERSION")
 val projectVersion = System.getProperty("version")
     ?: (project.findProperty("version") as? String)?.takeIf { it != "unspecified" }
     ?: if (versionFile.exists()) {
@@ -14,27 +14,15 @@ val projectVersion = System.getProperty("version")
         "unspecified"
     }
 
-allprojects {
-    version = projectVersion
+version = projectVersion
 
-    repositories {
-        google()
-        mavenCentral()
-    }
+if (providers.gradleProperty("org.gradle.unsafe.isolated-projects").orNull != "true") {
+    pluginManager.apply("com.osacky.doctor")
 }
 
-subprojects {
-    // Make check task depend on detekt to run it as part of the build
-    tasks.matching { it.name == "check" }.configureEach {
-        dependsOn(tasks.matching { it.name == "detekt" })
-    }
-}
-
-// Create root build task that builds all subprojects and runs buildHealth
 tasks.register("build") {
     description = "Builds all subprojects and runs buildHealth"
     group = "build"
-    dependsOn(subprojects.mapNotNull { it.tasks.findByName("build") })
     dependsOn("buildHealth")
     dependsOn("koverXmlReport")
 }
@@ -42,8 +30,6 @@ tasks.register("build") {
 tasks.register("lintFormat") {
     description = "Runs all formatting tasks"
     group = "formatting"
-    dependsOn(subprojects.mapNotNull { it.tasks.findByName("sortDependencies") })
-    dependsOn(subprojects.mapNotNull { it.tasks.findByName("ktlintFormat") })
 }
 
 dependencyAnalysis {

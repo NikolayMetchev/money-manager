@@ -1,7 +1,11 @@
 plugins {
     id("moneymanager.compose-multiplatform-convention")
     alias(libs.plugins.compose.compiler)
-    alias(libs.plugins.mokkery)
+    alias(libs.plugins.mokkery) apply false
+}
+
+if (providers.gradleProperty("org.gradle.unsafe.isolated-projects").orNull != "true") {
+    pluginManager.apply("dev.mokkery")
 }
 
 kotlin {
