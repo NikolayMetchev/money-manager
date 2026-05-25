@@ -184,5 +184,6 @@ interface ApiSessionRepository {
     suspend fun markSessionImported(
         id: ApiSessionId,
         importedAt: Instant,
+        importDurationMillis: Long? = null,
     ): Long
 }

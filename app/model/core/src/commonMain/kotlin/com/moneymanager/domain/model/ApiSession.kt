@@ -43,6 +43,7 @@ data class ApiSession(
     val expiresAt: Instant?,
     val credentialId: MonzoCredentialId?,
     val kind: ApiSessionKind?,
+    val importDurationMillis: Long? = null,
 )
 
 enum class ApiSessionType(

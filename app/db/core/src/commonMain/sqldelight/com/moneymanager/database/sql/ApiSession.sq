@@ -30,6 +30,7 @@ CREATE TABLE api_session (
     credential_id INTEGER,
     kind TEXT,
     imported_at INTEGER,
+    import_duration_millis INTEGER,
     FOREIGN KEY (type_id) REFERENCES api_session_type(id),
     FOREIGN KEY (device_id) REFERENCES device(id),
     FOREIGN KEY (credential_id) REFERENCES api_credential(id) ON DELETE CASCADE
@@ -184,7 +185,7 @@ selectImportedSessionIds:
 SELECT id FROM api_session WHERE imported_at IS NOT NULL;
 
 markSessionImported:
-UPDATE api_session SET imported_at = ? WHERE id = ?;
+UPDATE api_session SET imported_at = ?, import_duration_millis = ? WHERE id = ?;
 
 lastInsertApiResponseTransactionId:
 SELECT last_insert_rowid();

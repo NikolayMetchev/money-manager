@@ -90,6 +90,7 @@ import com.moneymanager.ui.api.downloadApiSessionAccounts
 import com.moneymanager.ui.api.downloadApiSessionTransactions
 import com.moneymanager.ui.api.importApiSessionTransactions
 import com.moneymanager.ui.background.LocalBackgroundTaskManager
+import com.moneymanager.ui.background.formatElapsedTime
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.util.ContentCopyIcon
 import com.moneymanager.ui.util.displayDateTime
@@ -104,6 +105,7 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
 
 @Composable
@@ -184,6 +186,7 @@ fun ApiSessionsScreen(
             title = importLabel,
             initialDetail = "Starting $importLabel for session #${session.id}.",
         ) {
+            val importStartedAt = System.currentTimeMillis()
             val result =
                 importApiSessionTransactions(
                     apiSessionRepository = apiSessionRepository,
@@ -208,7 +211,8 @@ fun ApiSessionsScreen(
                         update(progress.detail, progress.progress)
                     },
                 )
-            apiSessionRepository.markSessionImported(session.id, Clock.System.now())
+            val importDurationMillis = System.currentTimeMillis() - importStartedAt
+            apiSessionRepository.markSessionImported(session.id, Clock.System.now(), importDurationMillis)
             maintenance.refreshMaterializedViews()
             importResultBySession = importResultBySession + (session.id to result)
             importProgressBySession = importProgressBySession - session.id
@@ -680,6 +684,14 @@ private fun SessionRow(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+
+        session.importDurationMillis?.let { durationMillis ->
+            Text(
+                text = "Import took: ${formatElapsedTime(durationMillis.milliseconds)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
 
         importResult?.let {
             Text(text = it.displaySummary(), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
