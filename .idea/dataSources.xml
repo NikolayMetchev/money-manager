@@ -1,21 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="DataSourceManagerImpl" format="xml" multifile-model="true">
-    <data-source source="LOCAL" name="default.db" connection-mode="Multiple" uuid="9679d342-fbb4-4305-86df-60c13e34b0f0">
+    <data-source source="LOCAL" name="default.db" uuid="9679d342-fbb4-4305-86df-60c13e34b0f0">
       <driver-ref>sqlite.xerial</driver-ref>
       <synchronize>true</synchronize>
       <jdbc-driver>org.sqlite.JDBC</jdbc-driver>
       <jdbc-url>jdbc:sqlite:$USER_HOME$/.dbmanager/default.db</jdbc-url>
       <working-dir>$ProjectFileDir$</working-dir>
     </data-source>
-    <data-source source="LOCAL" name="money_manager.db" connection-mode="Multiple" uuid="42147222-7eb0-4849-9ee6-1b646251106e">
+    <data-source source="LOCAL" name="money_manager.db" uuid="42147222-7eb0-4849-9ee6-1b646251106e">
       <driver-ref>sqlite.xerial</driver-ref>
       <synchronize>true</synchronize>
       <jdbc-driver>org.sqlite.JDBC</jdbc-driver>
       <jdbc-url>jdbc:sqlite:$USER_HOME$/.moneymanager/money_manager.db</jdbc-url>
       <working-dir>$ProjectFileDir$</working-dir>
     </data-source>
-    <data-source source="LOCAL" name="money_manager-old - Copy.db" connection-mode="Multiple" uuid="95fe7662-5446-4f6e-af23-06425552765f">
+    <data-source source="LOCAL" name="money_manager-old - Copy.db" uuid="95fe7662-5446-4f6e-af23-06425552765f">
       <driver-ref>sqlite.xerial</driver-ref>
       <synchronize>true</synchronize>
       <jdbc-driver>org.sqlite.JDBC</jdbc-driver>
