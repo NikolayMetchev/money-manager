@@ -58,6 +58,7 @@ kotlin {
                 implementation(libs.androidx.compose.ui.graphics)
                 implementation(libs.androidx.compose.ui.text)
                 implementation(libs.diamondedge.logging)
+                implementation(libs.kotlinx.coroutines.android)
                 implementation(libs.kotlinx.serialization.core)
                 implementation(libs.ktor.client.core)
                 implementation(libs.ktor.http)
@@ -66,7 +67,7 @@ kotlin {
         val jvmMain by getting {
             dependsOn(jvmAndroidMain)
             dependencies {
-                api(libs.androidx.compose.runtime.desktop)
+                api(libs.compose.runtime.desktop)
                 api(libs.compose.foundation.desktop)
                 api(libs.compose.foundation.layout.desktop)
                 api(libs.compose.ui.desktop)
@@ -86,6 +87,7 @@ kotlin {
                 implementation(libs.compose.ui.text.desktop)
                 implementation(libs.compose.ui.util.desktop)
                 implementation(libs.diamondedge.logging)
+                implementation(libs.kotlinx.coroutines.swing)
                 implementation(libs.kotlinx.serialization.core)
                 implementation(libs.ktor.client.core)
                 implementation(libs.ktor.http)
@@ -96,7 +98,7 @@ kotlin {
                 implementation(kotlin("test"))
                 // Skiko native libraries for desktop UI tests
                 implementation(compose.desktop.currentOs)
-                implementation(libs.androidx.compose.runtime.desktop)
+                implementation(libs.compose.runtime.desktop)
                 implementation(libs.compose.ui.test.desktop)
                 implementation(libs.mokkery.core)
                 implementation(projects.app.di.core)

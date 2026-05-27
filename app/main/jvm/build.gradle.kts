@@ -8,13 +8,14 @@ plugins {
 val versionFile = rootDir.resolve("VERSION")
 
 dependencies {
-    api(libs.androidx.compose.runtime.desktop)
+    api(libs.compose.runtime.desktop)
     api(libs.compose.ui.desktop)
 
     implementation(libs.compose.ui.graphics.desktop)
     implementation(libs.compose.ui.unit.desktop)
     implementation(libs.diamondedge.logging)
     implementation(libs.kmlogging)
+    implementation(libs.kotlinx.coroutines.swing)
     implementation(projects.app.db.core)
     implementation(projects.app.di.core)
     implementation(projects.app.ui.core)
