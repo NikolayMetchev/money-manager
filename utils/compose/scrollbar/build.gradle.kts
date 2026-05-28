@@ -21,6 +21,7 @@ kotlin {
                 api(libs.androidx.compose.runtime.desktop)
                 api(libs.compose.foundation.desktop)
                 api(libs.compose.ui.desktop)
+                runtimeOnly(libs.kotlinx.coroutines.swing)
             }
         }
 

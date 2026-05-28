@@ -61,6 +61,8 @@ kotlin {
                 implementation(libs.kotlinx.serialization.core)
                 implementation(libs.ktor.client.core)
                 implementation(libs.ktor.http)
+
+                runtimeOnly(libs.kotlinx.coroutines.android)
             }
         }
         val jvmMain by getting {
@@ -89,6 +91,8 @@ kotlin {
                 implementation(libs.kotlinx.serialization.core)
                 implementation(libs.ktor.client.core)
                 implementation(libs.ktor.http)
+
+                runtimeOnly(libs.kotlinx.coroutines.swing)
             }
         }
         val jvmTest by getting {

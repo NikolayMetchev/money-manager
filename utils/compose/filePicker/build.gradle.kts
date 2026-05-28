@@ -20,6 +20,7 @@ kotlin {
             dependencies {
                 api(libs.androidx.compose.runtime.desktop)
                 implementation(libs.kotlinx.coroutines.core)
+                runtimeOnly(libs.kotlinx.coroutines.swing)
             }
         }
 

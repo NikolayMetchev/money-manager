@@ -15,6 +15,8 @@ dependencies {
     implementation(libs.compose.ui.unit.desktop)
     implementation(libs.diamondedge.logging)
     implementation(libs.kmlogging)
+    implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.coroutines.swing)
     implementation(projects.app.db.core)
     implementation(projects.app.di.core)
     implementation(projects.app.ui.core)

@@ -13,5 +13,15 @@ configure<KotlinMultiplatformExtension> {
                 implementation(libs.findLibrary("kotlinx-coroutines-core").get())
             }
         }
+        val jvmMain by getting {
+            dependencies {
+                runtimeOnly(libs.findLibrary("kotlinx-coroutines-swing").get())
+            }
+        }
+        val androidMain by getting {
+            dependencies {
+                runtimeOnly(libs.findLibrary("kotlinx-coroutines-android").get())
+            }
+        }
     }
 }
