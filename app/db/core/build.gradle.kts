@@ -105,8 +105,10 @@ tasks.matching { it.name == "testAndroidHostTest" }.configureEach {
 
 val monzoApiFixtureToolClass = "com.moneymanager.database.tools.MonzoApiSessionFixtureToolKt"
 val monzoApiFixtureArchiveToolClass = "com.moneymanager.database.tools.MonzoApiSessionFixtureArchiveToolKt"
+val monzoBalanceFixtureToolClass = "com.moneymanager.database.tools.MonzoBalanceFixtureToolKt"
 val moneyManagerDbPath = File(System.getProperty("user.home"), ".moneymanager/money_manager.db")
 val monzoFixtureDir = layout.projectDirectory.dir("src/commonTest/resources/monzo/sample-apis").asFile
+val monzoBalancesFixtureFile = monzoFixtureDir.resolve("balances.json")
 val monzoEncryptedFixtureFile =
     layout.projectDirectory
         .dir("src/commonTest/resources/monzo")
@@ -162,5 +164,18 @@ tasks.register<JavaExec>("importMonzoApiSessionFixtures") {
         "import",
         moneyManagerDbPath.absolutePath,
         monzoFixtureDir.absolutePath,
+    )
+}
+
+tasks.register<JavaExec>("generateMonzoBalanceFixtures") {
+    group = "verification"
+    description = "Generates Monzo balances.json fixture from the default Money Manager database."
+    dependsOn("compileTestKotlinJvm")
+    mainClass.set(monzoBalanceFixtureToolClass)
+    classpath = sourceSets["jvmTest"].runtimeClasspath
+    args(
+        "generate",
+        moneyManagerDbPath.absolutePath,
+        monzoBalancesFixtureFile.absolutePath,
     )
 }
