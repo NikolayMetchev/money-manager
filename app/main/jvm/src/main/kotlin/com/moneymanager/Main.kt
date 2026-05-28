@@ -14,12 +14,17 @@ import com.moneymanager.ui.AppStartupHost
 import com.moneymanager.ui.error.GlobalSchemaErrorState
 import com.moneymanager.ui.error.SchemaErrorDetector
 import com.moneymanager.ui.toAppServices
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.swing.Swing
 import org.lighthousegames.logging.logging
 
 private val logger = logging()
 
 fun main() {
     logger.info { "Starting Money Manager application" }
+
+    // Desktop runs need the Swing Main dispatcher provider on the application classpath.
+    Dispatchers.Swing
 
     // Set up global exception handler for schema errors
     val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()

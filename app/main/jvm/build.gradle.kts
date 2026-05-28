@@ -15,11 +15,12 @@ dependencies {
     implementation(libs.compose.ui.unit.desktop)
     implementation(libs.diamondedge.logging)
     implementation(libs.kmlogging)
+    implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.coroutines.swing)
     implementation(projects.app.db.core)
     implementation(projects.app.di.core)
     implementation(projects.app.ui.core)
 
-    runtimeOnly(libs.kotlinx.coroutines.swing)
     runtimeOnly(compose.desktop.currentOs)
     runtimeOnly(libs.log4j.core)
     runtimeOnly(libs.log4j.slf4j2.impl)
