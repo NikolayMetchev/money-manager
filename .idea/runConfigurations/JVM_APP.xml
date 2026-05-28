@@ -4,6 +4,13 @@
     <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="true" />
     <option name="MAIN_CLASS_NAME" value="com.moneymanager.MainKt" />
     <module name="money-manager.app.main.jvm.main" />
+    <classpathModifications>
+      <entry path="/home/nikolaym/.gradle/caches/modules-2/files-2.1/androidx.lifecycle/lifecycle-common-jvm/2.9.4/ab739bccdb3541983385af169565c7c035d897e7/lifecycle-common-jvm-2.9.4.jar" />
+      <entry path="/home/nikolaym/.gradle/caches/modules-2/files-2.1/app.cash.sqldelight/coroutines-extensions-jvm/2.3.2/d173c66e5dac733184a7c23a7809f93330ffd3b7/sqldelight-coroutines-extensions-jvm-2.3.2.jar" />
+      <entry path="/home/nikolaym/.gradle/caches/modules-2/files-2.1/app.cash.sqldelight/async-extensions-jvm/2.3.2/e5f111fd2538f59c6b7bf770edc9f05912ed95ae/sqldelight-async-extensions-jvm-2.3.2.jar" />
+      <entry path="/home/nikolaym/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlinx/kotlinx-datetime-jvm/0.8.0/316346a7d44778581ff91154f72dfa576bce4ee2/kotlinx-datetime-jvm-0.8.0.jar" />
+      <entry path="/home/nikolaym/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlinx/kotlinx-serialization-json-jvm/1.11.0/e7e045e99e56f07599bb9ccb708c2190e2af0606/kotlinx-serialization-json-jvm-1.11.0.jar" />
+    </classpathModifications>
     <shortenClasspath name="NONE" />
     <method v="2">
       <option name="Make" enabled="true" />
