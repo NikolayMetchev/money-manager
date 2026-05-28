@@ -61,17 +61,26 @@ fun KotlinMultiplatformExtension.configureAndroidTarget() {
 kotlin {
     jvm()
 
-    configureAndroidTarget()
-
     jvmToolchain(libs.findVersion("jvm-toolchain").get().toString().toInt())
 
+    compilerOptions {
+        freeCompilerArgs.add("-Xexpect-actual-classes")
+    }
+
     sourceSets {
+        val jvmMain by getting {
+            dependencies {
+                runtimeOnly(libs.findLibrary("kotlinx-coroutines-swing").get())
+            }
+        }
         val commonTest by getting {
             dependencies {
                 implementation(kotlin("test"))
             }
         }
     }
+
+    configureAndroidTarget()
 }
 
 // Override ktlint android setting for Android modules

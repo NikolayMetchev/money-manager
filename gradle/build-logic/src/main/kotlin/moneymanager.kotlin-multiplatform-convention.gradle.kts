@@ -12,6 +12,14 @@ configure<KotlinMultiplatformExtension> {
 
     jvmToolchain(libs.findVersion("jvm-toolchain").get().toString().toInt())
 
+    sourceSets {
+        val jvmMain by getting {
+            dependencies {
+                runtimeOnly(libs.findLibrary("kotlinx-coroutines-swing").get())
+            }
+        }
+    }
+
     compilerOptions {
         freeCompilerArgs.add("-Xexpect-actual-classes")
     }
