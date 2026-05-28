@@ -18,10 +18,10 @@ kotlin {
 
         jvmMain {
             dependencies {
-                api(libs.compose.runtime.desktop)
+                api(libs.androidx.compose.runtime.desktop)
                 api(libs.compose.foundation.desktop)
                 api(libs.compose.ui.desktop)
-                implementation(libs.kotlinx.coroutines.swing)
+                runtimeOnly(libs.kotlinx.coroutines.swing)
             }
         }
 
