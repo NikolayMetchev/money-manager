@@ -21,6 +21,7 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -28,8 +29,12 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 private val logger = logging()
 
@@ -46,6 +51,8 @@ data class BackgroundTask(
     val detail: String,
     val progress: Float? = null,
     val status: BackgroundTaskStatus,
+    val startedAtMillis: Long = 0L,
+    val completedAtMillis: Long? = null,
 )
 
 class BackgroundTaskController internal constructor(
@@ -88,12 +95,13 @@ class BackgroundTaskManager(
                 title = title,
                 detail = initialDetail,
                 status = BackgroundTaskStatus.RUNNING,
+                startedAtMillis = System.currentTimeMillis(),
             ),
         )
 
         val controller =
             BackgroundTaskController { detail, progress ->
-                scope.launch(Dispatchers.Main) {
+                scope.launch {
                     updateTask(taskId) { task ->
                         if (task.status == BackgroundTaskStatus.RUNNING) {
                             task.copy(detail = detail, progress = progress)
@@ -107,9 +115,10 @@ class BackgroundTaskManager(
         scope.launch(Dispatchers.Default) {
             try {
                 val finalDetail = block(controller)
-                scope.launch(Dispatchers.Main) {
+                val completedAt = System.currentTimeMillis()
+                scope.launch {
                     updateTask(taskId) { task ->
-                        task.copy(detail = finalDetail, status = BackgroundTaskStatus.SUCCEEDED)
+                        task.copy(detail = finalDetail, status = BackgroundTaskStatus.SUCCEEDED, completedAtMillis = completedAt)
                     }
                     pruneCompletedTasks()
                 }
@@ -117,11 +126,13 @@ class BackgroundTaskManager(
                 throw cancelled
             } catch (expected: Exception) {
                 logger.error(expected) { "Background task failed: ${expected.message}" }
-                scope.launch(Dispatchers.Main) {
+                val completedAt = System.currentTimeMillis()
+                scope.launch {
                     updateTask(taskId) { task ->
                         task.copy(
                             detail = expected.message ?: "Task failed.",
                             status = BackgroundTaskStatus.FAILED,
+                            completedAtMillis = completedAt,
                         )
                     }
                     pruneCompletedTasks()
@@ -170,6 +181,17 @@ fun BackgroundTaskPanel(
     if (visibleTasks.isEmpty()) return
 
     val hasRunningTask = visibleTasks.any { task -> task.status == BackgroundTaskStatus.RUNNING }
+    val currentTimeMillis by produceState(
+        initialValue = System.currentTimeMillis(),
+        key1 = hasRunningTask,
+    ) {
+        while (hasRunningTask) {
+            delay(1.seconds)
+            if (hasRunningTask) {
+                value = System.currentTimeMillis()
+            }
+        }
+    }
     val latestTaskId = visibleTasks.lastOrNull()?.id
     var expanded by remember { mutableStateOf(hasRunningTask) }
     var lastSeenTaskId by remember { mutableStateOf<Long?>(null) }
@@ -244,12 +266,23 @@ fun BackgroundTaskPanel(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    if (task.status == BackgroundTaskStatus.RUNNING) {
-                        val progress = task.progress
-                        if (progress == null) {
+                    when (task.status) {
+                        BackgroundTaskStatus.RUNNING -> {
+                            Text(
+                                text = "Elapsed ${formatElapsedTime((currentTimeMillis - task.startedAtMillis).milliseconds)}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                        } else {
-                            LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
+                        }
+                        BackgroundTaskStatus.SUCCEEDED, BackgroundTaskStatus.FAILED -> {
+                            task.completedAtMillis?.let { completedAt ->
+                                Text(
+                                    text = "Took ${formatElapsedTime((completedAt - task.startedAtMillis).milliseconds)}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         }
                     }
                 }
@@ -313,3 +346,14 @@ private fun BackgroundTaskStatus.label(): String =
         BackgroundTaskStatus.SUCCEEDED -> "Done"
         BackgroundTaskStatus.FAILED -> "Failed"
     }
+
+internal fun formatElapsedTime(elapsed: Duration): String =
+    maxOf(elapsed, Duration.ZERO).toComponents { hours, minutes, seconds, _ ->
+        if (hours > 0) {
+            "$hours:${minutes.formatTwoDigits()}:${seconds.formatTwoDigits()}"
+        } else {
+            "${minutes.formatTwoDigits()}:${seconds.formatTwoDigits()}"
+        }
+    }
+
+private fun Number.formatTwoDigits(): String = toString().padStart(2, '0')

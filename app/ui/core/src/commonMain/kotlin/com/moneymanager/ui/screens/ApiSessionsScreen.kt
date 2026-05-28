@@ -90,12 +90,12 @@ import com.moneymanager.ui.api.downloadApiSessionAccounts
 import com.moneymanager.ui.api.downloadApiSessionTransactions
 import com.moneymanager.ui.api.importApiSessionTransactions
 import com.moneymanager.ui.background.LocalBackgroundTaskManager
+import com.moneymanager.ui.background.formatElapsedTime
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.util.ContentCopyIcon
 import com.moneymanager.ui.util.displayDateTime
 import com.moneymanager.ui.util.setPlainText
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
@@ -105,6 +105,7 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
 
 @Composable
@@ -185,6 +186,7 @@ fun ApiSessionsScreen(
             title = importLabel,
             initialDetail = "Starting $importLabel for session #${session.id}.",
         ) {
+            val importStartedAt = System.currentTimeMillis()
             val result =
                 importApiSessionTransactions(
                     apiSessionRepository = apiSessionRepository,
@@ -203,13 +205,14 @@ fun ApiSessionsScreen(
                     strategy = strategy,
                     counterpartyAccountNames = counterpartyAccountNames,
                     onProgress = { progress ->
-                        scope.launch(Dispatchers.Main) {
+                        scope.launch {
                             importProgressBySession = importProgressBySession + (session.id to progress)
                         }
                         update(progress.detail, progress.progress)
                     },
                 )
-            apiSessionRepository.markSessionImported(session.id, Clock.System.now())
+            val importDurationMillis = System.currentTimeMillis() - importStartedAt
+            apiSessionRepository.markSessionImported(session.id, Clock.System.now(), importDurationMillis)
             maintenance.refreshMaterializedViews()
             importResultBySession = importResultBySession + (session.id to result)
             importProgressBySession = importProgressBySession - session.id
@@ -681,6 +684,14 @@ private fun SessionRow(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+
+        session.importDurationMillis?.let { durationMillis ->
+            Text(
+                text = "Import took: ${formatElapsedTime(durationMillis.milliseconds)}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
 
         importResult?.let {
             Text(text = it.displaySummary(), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
@@ -1375,8 +1386,7 @@ private fun JsonTreeNode(
                 element.entries.forEach { (key, value) ->
                     val nextSegments =
                         when {
-                            remainingHighlightSegments == null -> null
-                            remainingHighlightSegments.isEmpty() -> null
+                            remainingHighlightSegments.isNullOrEmpty() -> null
                             remainingHighlightSegments.first() == key -> remainingHighlightSegments.drop(1)
                             else -> null
                         }
@@ -1400,8 +1410,7 @@ private fun JsonTreeNode(
                 element.forEachIndexed { index, value ->
                     val nextSegments =
                         when {
-                            remainingHighlightSegments == null -> null
-                            remainingHighlightSegments.isEmpty() -> null
+                            remainingHighlightSegments.isNullOrEmpty() -> null
                             remainingHighlightSegments.first() == index.toString() -> remainingHighlightSegments.drop(1)
                             else -> null
                         }

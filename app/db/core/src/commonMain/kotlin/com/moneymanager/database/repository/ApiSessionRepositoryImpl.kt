@@ -276,9 +276,10 @@ class ApiSessionRepositoryImpl(
     override suspend fun markSessionImported(
         id: ApiSessionId,
         importedAt: Instant,
+        importDurationMillis: Long?,
     ): Long =
         withContext(Dispatchers.Default) {
-            queries.markSessionImported(importedAt.toEpochMilliseconds(), id.id).await()
+            queries.markSessionImported(importedAt.toEpochMilliseconds(), importDurationMillis, id.id).await()
         }
 
     private fun com.moneymanager.database.sql.Api_request.toApiRequest(
@@ -329,6 +330,7 @@ class ApiSessionRepositoryImpl(
             expiresAt = expires_at?.let { Instant.fromEpochMilliseconds(it) },
             credentialId = credential_id?.let { MonzoCredentialId(it) },
             kind = ApiSessionKind.fromValueOrNull(kind),
+            importDurationMillis = import_duration_millis,
         )
 
     private fun <K, V> Map<K, List<V>>.getValueOrDefault(key: K): List<V> = get(key).orEmpty()
