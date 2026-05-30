@@ -81,6 +81,7 @@ class MoneyManagerDatabaseWrapper(
             "transfer_attribute_audit",
             "account_attribute_audit",
             "api_import_strategy_audit",
+            "api_import_strategy_source",
             "account_balance_materialized_view",
             "running_balance_materialized_view",
             "pending_materialized_view_changes",

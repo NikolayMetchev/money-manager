@@ -6,6 +6,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import com.moneymanager.domain.model.ApiImportStrategyAuditEntry
 import com.moneymanager.domain.model.AuditType
+import com.moneymanager.domain.model.EntitySource
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
 import com.moneymanager.domain.repository.ApiImportStrategyRepository
 import com.moneymanager.domain.repository.AuditRepository
@@ -17,6 +18,7 @@ import com.moneymanager.ui.audit.FieldChange
 import com.moneymanager.ui.audit.FieldChangeRow
 import com.moneymanager.ui.audit.FieldValueRow
 import com.moneymanager.ui.audit.NoVisibleChangesText
+import com.moneymanager.ui.audit.SourceInfoSection
 import com.moneymanager.ui.screens.changedOrUnchanged
 import kotlinx.coroutines.flow.first
 import kotlin.time.Instant
@@ -54,6 +56,7 @@ private data class ApiImportStrategyAuditDiff(
     val revisionId: Long,
     val name: FieldChange<String>,
     val configChanged: Boolean,
+    val source: EntitySource?,
 ) {
     val hasChanges: Boolean
         get() = name is FieldChange.Changed || configChanged
@@ -73,6 +76,7 @@ private fun computeApiImportStrategyAuditDiffs(
                     revisionId = entry.revisionId,
                     name = FieldChange.Created(entry.name),
                     configChanged = false,
+                    source = entry.source,
                 )
             AuditType.DELETE ->
                 ApiImportStrategyAuditDiff(
@@ -82,6 +86,7 @@ private fun computeApiImportStrategyAuditDiffs(
                     revisionId = entry.revisionId,
                     name = FieldChange.Deleted(entry.name),
                     configChanged = false,
+                    source = entry.source,
                 )
             AuditType.UPDATE -> {
                 val previousEntry = entries.getOrNull(index - 1)
@@ -103,6 +108,7 @@ private fun computeApiImportStrategyAuditDiffs(
                     revisionId = entry.revisionId,
                     name = changedOrUnchanged(entry.name, newName),
                     configChanged = entry.configJson != newConfigJson,
+                    source = entry.source,
                 )
             }
         }
@@ -119,6 +125,7 @@ private fun ApiImportStrategyAuditDiffCard(diff: ApiImportStrategyAuditDiff) {
             AuditType.INSERT -> {
                 AuditSectionLabel("Created with:")
                 FieldValueRow("Name", diff.name.value())
+                SourceInfoSection(diff.source)
             }
             AuditType.UPDATE -> {
                 if (!diff.hasChanges) {
@@ -137,11 +144,13 @@ private fun ApiImportStrategyAuditDiffCard(diff: ApiImportStrategyAuditDiff) {
                         )
                     }
                 }
+                SourceInfoSection(diff.source)
             }
             AuditType.DELETE -> {
                 val errorColor = MaterialTheme.colorScheme.error
                 AuditSectionLabel("Deleted (final values):")
                 FieldValueRow("Name", diff.name.value(), errorColor)
+                SourceInfoSection(diff.source, labelColor = errorColor.copy(alpha = 0.8f))
             }
         }
     }

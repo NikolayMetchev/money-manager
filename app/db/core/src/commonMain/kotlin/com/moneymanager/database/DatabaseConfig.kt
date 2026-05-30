@@ -734,13 +734,17 @@ object DatabaseConfig {
             // Seed API session type lookup table
             apiSessionQueries.insertSessionType(id = 1, name = "Monzo")
 
-            // Seed the built-in Monzo API import strategy
-            seedMonzoStrategy()
-
             // Seed Platform lookup table
             platformQueries.insert(id = 0, name = "SYSTEM")
             platformQueries.insert(id = 1, name = "JVM")
             platformQueries.insert(id = 2, name = "ANDROID")
+
+            // Create system device now (before any seeded entities that need source attribution).
+            // Platform 0 = SYSTEM must already exist above.
+            deviceQueries.insertSystemDevice(platform_id = 0)
+            val systemDeviceId =
+                deviceQueries.selectSystemDevice(platform_id = 0).executeAsOneOrNull()
+                    ?: deviceQueries.lastInsertRowId().executeAsOne()
 
             // Create triggers for incremental materialized view refresh
             createIncrementalRefreshTriggers()
@@ -772,6 +776,13 @@ object DatabaseConfig {
                 name = "Uncategorized",
                 parent_id = null,
             )
+            entitySourceQueries.insertSource(
+                entity_type_id = EntityType.CATEGORY.id,
+                entity_id = -1L,
+                revision_id = 1,
+                source_type_id = SourceType.SYSTEM.id.toLong(),
+                device_id = systemDeviceId,
+            )
 
             // Seed well-known attribute types with stable negative IDs so importers can
             // reference them without a DB lookup.
@@ -782,12 +793,9 @@ object DatabaseConfig {
             attributeTypeQueries.insertWithId(id = ACCOUNT_SORT_CODE_ATTR_TYPE_ID, name = "account-sort-code")
             attributeTypeQueries.insertWithId(id = ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID, name = "account-account-number")
 
-            // Create system device for system-generated source tracking
-            // Platform 0 = SYSTEM, no os/machine/make/model needed
-            deviceQueries.insertSystemDevice(platform_id = 0)
-            val systemDeviceId =
-                deviceQueries.selectSystemDevice(platform_id = 0).executeAsOneOrNull()
-                    ?: deviceQueries.lastInsertRowId().executeAsOne()
+            // Seed the built-in Monzo API import strategy (after triggers and system device are
+            // created so the INSERT trigger records the initial audit entry and source is attributed)
+            seedMonzoStrategy(systemDeviceId)
 
             // Seed currencies with source tracking
             allCurrencies.forEach { currency ->
@@ -810,7 +818,7 @@ object DatabaseConfig {
      * Seeds the built-in Monzo API import strategy.
      * Called once during new-database initialisation.
      */
-    private fun MoneyManagerDatabaseWrapper.seedMonzoStrategy() {
+    private fun MoneyManagerDatabaseWrapper.seedMonzoStrategy(systemDeviceId: Long) {
         val config =
             ApiStrategyConfigJson(
                 baseUrl = "https://api.monzo.com",
@@ -853,6 +861,12 @@ object DatabaseConfig {
             config_json = ApiStrategyJsonCodec.encode(config),
             created_at = now,
             updated_at = now,
+        )
+        apiImportStrategyQueries.insertSource(
+            strategy_id = monzoStrategyId.toString(),
+            revision_id = 1,
+            source_type_id = SourceType.SYSTEM.id.toLong(),
+            device_id = systemDeviceId,
         )
     }
 }

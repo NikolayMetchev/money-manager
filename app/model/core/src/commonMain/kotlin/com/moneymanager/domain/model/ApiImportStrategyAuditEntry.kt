@@ -29,4 +29,5 @@ data class ApiImportStrategyAuditEntry(
     val configJson: String,
     val createdAt: Instant,
     val updatedAt: Instant,
+    val source: EntitySource? = null,
 )

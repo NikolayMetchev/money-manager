@@ -260,6 +260,7 @@ CREATE INDEX IF NOT EXISTS idx_person_account_ownership_audit_type ON person_acc
 CREATE INDEX IF NOT EXISTS idx_person_account_ownership_audit_person_account_ownership_id_timestamp ON person_account_ownership_audit(person_account_ownership_id, audit_timestamp DESC);
 
 -- Get audit history for a person account ownership
+-- entity_type_id = 4 for PERSON_ACCOUNT_OWNERSHIP
 selectAuditHistoryForPersonAccountOwnership:
 SELECT
     person_account_ownership_audit.id,
@@ -272,11 +273,31 @@ SELECT
     person.first_name AS person_first_name,
     person.middle_name AS person_middle_name,
     person.last_name AS person_last_name,
-    account.name AS account_name
+    account.name AS account_name,
+    -- Source information
+    entity_source.id AS source_id,
+    entity_source.device_id AS source_device_id,
+    source_type.id AS source_type_id,
+    source_type.name AS source_type_name,
+    device_view.platform_name AS source_platform_name,
+    device_view.os_name AS source_os_name,
+    device_view.machine_name AS source_machine_name,
+    device_view.device_make AS source_device_make,
+    device_view.device_model AS source_device_model,
+    entity_source.created_at AS source_created_at,
+    api_entity_source.api_session_id AS source_api_session_id,
+    api_entity_source.api_request_id AS source_api_request_id,
+    api_entity_source.json_path AS source_api_json_path
 FROM person_account_ownership_audit
 JOIN audit_type ON person_account_ownership_audit.audit_type_id = audit_type.id
 LEFT JOIN person ON person_account_ownership_audit.person_id = person.id
 LEFT JOIN account ON person_account_ownership_audit.account_id = account.id
+LEFT JOIN entity_source ON person_account_ownership_audit.person_account_ownership_id = entity_source.entity_id
+    AND person_account_ownership_audit.revision_id = entity_source.revision_id
+    AND entity_source.entity_type_id = 4
+LEFT JOIN source_type ON entity_source.source_type_id = source_type.id
+LEFT JOIN device_view ON entity_source.device_id = device_view.id
+LEFT JOIN api_entity_source ON entity_source.id = api_entity_source.id
 WHERE person_account_ownership_audit.person_account_ownership_id = ?
 ORDER BY person_account_ownership_audit.audit_timestamp DESC, person_account_ownership_audit.id DESC;
 
@@ -494,8 +515,23 @@ SELECT
     api_import_strategy_audit.name,
     api_import_strategy_audit.config_json,
     api_import_strategy_audit.created_at,
-    api_import_strategy_audit.updated_at
+    api_import_strategy_audit.updated_at,
+    -- Source information
+    api_import_strategy_source.id AS source_id,
+    api_import_strategy_source.device_id AS source_device_id,
+    source_type.id AS source_type_id,
+    source_type.name AS source_type_name,
+    device_view.platform_name AS source_platform_name,
+    device_view.os_name AS source_os_name,
+    device_view.machine_name AS source_machine_name,
+    device_view.device_make AS source_device_make,
+    device_view.device_model AS source_device_model,
+    api_import_strategy_source.created_at AS source_created_at
 FROM api_import_strategy_audit
 JOIN audit_type ON api_import_strategy_audit.audit_type_id = audit_type.id
+LEFT JOIN api_import_strategy_source ON api_import_strategy_audit.api_import_strategy_id = api_import_strategy_source.strategy_id
+    AND api_import_strategy_audit.revision_id = api_import_strategy_source.revision_id
+LEFT JOIN source_type ON api_import_strategy_source.source_type_id = source_type.id
+LEFT JOIN device_view ON api_import_strategy_source.device_id = device_view.id
 WHERE api_import_strategy_audit.api_import_strategy_id = ?
 ORDER BY api_import_strategy_audit.audit_timestamp DESC, api_import_strategy_audit.id DESC;
