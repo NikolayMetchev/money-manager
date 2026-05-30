@@ -463,3 +463,39 @@ LEFT JOIN source_type ON entity_source.source_type_id = source_type.id
 LEFT JOIN device_view ON entity_source.device_id = device_view.id
 WHERE category_audit.category_id = ?
 ORDER BY category_audit.audit_timestamp DESC, category_audit.id DESC;
+
+-- api_import_strategy_audit: Audit trail for api_import_strategy table
+CREATE TABLE api_import_strategy_audit (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    audit_timestamp INTEGER NOT NULL,
+    audit_type_id INTEGER NOT NULL,
+    api_import_strategy_id TEXT NOT NULL,
+    revision_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    config_json TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    FOREIGN KEY (audit_type_id) REFERENCES audit_type(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_api_import_strategy_audit_strategy_id ON api_import_strategy_audit(api_import_strategy_id);
+CREATE INDEX IF NOT EXISTS idx_api_import_strategy_audit_timestamp ON api_import_strategy_audit(audit_timestamp);
+CREATE INDEX IF NOT EXISTS idx_api_import_strategy_audit_type ON api_import_strategy_audit(audit_type_id);
+CREATE INDEX IF NOT EXISTS idx_api_import_strategy_audit_strategy_id_timestamp ON api_import_strategy_audit(api_import_strategy_id, audit_timestamp DESC);
+
+-- Get audit history for an api import strategy
+selectAuditHistoryForApiImportStrategy:
+SELECT
+    api_import_strategy_audit.id,
+    api_import_strategy_audit.audit_timestamp,
+    audit_type.name AS audit_type,
+    api_import_strategy_audit.api_import_strategy_id,
+    api_import_strategy_audit.revision_id,
+    api_import_strategy_audit.name,
+    api_import_strategy_audit.config_json,
+    api_import_strategy_audit.created_at,
+    api_import_strategy_audit.updated_at
+FROM api_import_strategy_audit
+JOIN audit_type ON api_import_strategy_audit.audit_type_id = audit_type.id
+WHERE api_import_strategy_audit.api_import_strategy_id = ?
+ORDER BY api_import_strategy_audit.audit_timestamp DESC, api_import_strategy_audit.id DESC;

@@ -46,6 +46,7 @@ fun ApiStrategiesScreen(
     apiImportStrategyRepository: ApiImportStrategyRepository,
     apiSessionRepository: ApiSessionRepository,
     onBack: () -> Unit = {},
+    onAuditHistoryClick: ((ApiImportStrategy) -> Unit)? = null,
 ) {
     val strategies by apiImportStrategyRepository
         .getAllStrategies()
@@ -98,6 +99,7 @@ fun ApiStrategiesScreen(
                                 strategy = strategy,
                                 onClick = { strategyToEdit = strategy },
                                 onDelete = { strategyPendingDelete = strategy },
+                                onAuditHistory = onAuditHistoryClick?.let { handler -> { handler(strategy) } },
                             )
                         }
                     }
@@ -168,6 +170,7 @@ private fun StrategyCard(
     strategy: ApiImportStrategy,
     onClick: () -> Unit,
     onDelete: () -> Unit,
+    onAuditHistory: (() -> Unit)? = null,
 ) {
     Card(
         modifier =
@@ -202,11 +205,21 @@ private fun StrategyCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Button(
-                onClick = onClick,
-                modifier = Modifier.align(Alignment.End),
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Edit")
+                if (onAuditHistory != null) {
+                    TextButton(onClick = onAuditHistory) {
+                        Text("Audit History")
+                    }
+                }
+                Button(
+                    onClick = onClick,
+                ) {
+                    Text("Edit")
+                }
             }
         }
     }

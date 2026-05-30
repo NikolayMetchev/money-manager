@@ -2,6 +2,7 @@
 -- and people. The full strategy configuration is stored as JSON.
 CREATE TABLE api_import_strategy (
     id TEXT PRIMARY KEY NOT NULL,
+    revision_id INTEGER NOT NULL DEFAULT 1,
     name TEXT NOT NULL UNIQUE,
     config_json TEXT NOT NULL,
     created_at INTEGER NOT NULL,
@@ -30,7 +31,7 @@ VALUES (?, ?, ?, ?, ?);
 -- Update an existing strategy
 update:
 UPDATE api_import_strategy
-SET name = ?, config_json = ?, updated_at = ?
+SET revision_id = revision_id + 1, name = ?, config_json = ?, updated_at = ?
 WHERE id = ?;
 
 -- Delete a strategy by ID

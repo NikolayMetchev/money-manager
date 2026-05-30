@@ -56,6 +56,7 @@ import com.moneymanager.ui.screens.MonzoAuthScreen
 import com.moneymanager.ui.screens.PeopleScreen
 import com.moneymanager.ui.screens.PersonAuditScreen
 import com.moneymanager.ui.screens.SettingsScreen
+import com.moneymanager.ui.screens.apistrategy.ApiImportStrategyAuditScreen
 import com.moneymanager.ui.screens.apistrategy.ApiStrategiesScreen
 import com.moneymanager.ui.screens.csvstrategy.CsvStrategiesScreen
 import com.moneymanager.ui.screens.transactions.AccountTransactionsScreen
@@ -406,6 +407,11 @@ fun MoneyManagerApp(
                                         apiImportStrategyRepository = services.imports.apiImportStrategyRepository,
                                         apiSessionRepository = services.imports.apiSessionRepository,
                                         onBack = { navigationHistory.navigateBack() },
+                                        onAuditHistoryClick = { strategy ->
+                                            navigationHistory.navigateTo(
+                                                Screen.ApiStrategyAuditHistory(strategy.id, strategy.name),
+                                            )
+                                        },
                                     )
                                 }
                                 is Screen.CsvImportDetail -> {
@@ -563,6 +569,14 @@ fun MoneyManagerApp(
                                         categoryId = screen.categoryId,
                                         auditRepository = services.audit.auditRepository,
                                         categoryRepository = services.accounts.categoryRepository,
+                                        onBack = { navigationHistory.navigateBack() },
+                                    )
+                                }
+                                is Screen.ApiStrategyAuditHistory -> {
+                                    ApiImportStrategyAuditScreen(
+                                        strategyId = screen.strategyId,
+                                        auditRepository = services.audit.auditRepository,
+                                        apiImportStrategyRepository = services.imports.apiImportStrategyRepository,
                                         onBack = { navigationHistory.navigateBack() },
                                     )
                                 }
