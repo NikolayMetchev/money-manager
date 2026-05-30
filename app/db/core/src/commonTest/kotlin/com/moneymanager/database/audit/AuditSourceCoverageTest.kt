@@ -110,7 +110,7 @@ class AuditSourceCoverageTest : DbTest() {
             // Category
             val categoryId =
                 repositories.categoryRepository.createCategory(
-                    Category(id = -1, name = "Test Category", parentId = null),
+                    Category(id = -1, name = "Test Category"),
                 )
             recorder.insert(EntityType.CATEGORY, categoryId, revisionId = 1)
             assertAllHaveSource(
