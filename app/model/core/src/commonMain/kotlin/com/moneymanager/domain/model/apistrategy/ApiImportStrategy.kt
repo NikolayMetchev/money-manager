@@ -34,4 +34,6 @@ data class ApiImportStrategy(
     val peopleMappings: ApiPeopleMappings = ApiPeopleMappings(),
     val createdAt: Instant,
     val updatedAt: Instant,
+    val revisionId: Long = 1,
+    val configJson: String = "",
 )

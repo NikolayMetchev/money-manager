@@ -74,8 +74,10 @@ interface RepositoryModule {
 
     @Provides
     @SingleIn(DatabaseScope::class)
-    fun provideApiImportStrategyRepository(database: MoneyManagerDatabaseWrapper): ApiImportStrategyRepository =
-        ApiImportStrategyRepositoryImpl(database)
+    fun provideApiImportStrategyRepository(
+        database: MoneyManagerDatabaseWrapper,
+        deviceId: DeviceId,
+    ): ApiImportStrategyRepository = ApiImportStrategyRepositoryImpl(database, deviceId)
 
     @Provides
     @SingleIn(DatabaseScope::class)

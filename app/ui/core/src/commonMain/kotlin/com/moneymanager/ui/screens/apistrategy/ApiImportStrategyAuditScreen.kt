@@ -37,7 +37,12 @@ fun ApiImportStrategyAuditScreen(
         loadData = {
             val entries = auditRepository.getAuditHistoryForApiImportStrategy(strategyId)
             val currentStrategy = apiImportStrategyRepository.getStrategyById(strategyId).first()
-            val diffs = computeApiImportStrategyAuditDiffs(entries, currentStrategy?.name)
+            val diffs =
+                computeApiImportStrategyAuditDiffs(
+                    entries = entries,
+                    currentName = currentStrategy?.name,
+                    currentConfigJson = currentStrategy?.configJson,
+                )
             AuditScreenData(
                 title = "API Strategy Audit: ${currentStrategy?.name ?: strategyId}",
                 diffs = diffs,
@@ -65,6 +70,7 @@ private data class ApiImportStrategyAuditDiff(
 private fun computeApiImportStrategyAuditDiffs(
     entries: List<ApiImportStrategyAuditEntry>,
     currentName: String?,
+    currentConfigJson: String?,
 ): List<ApiImportStrategyAuditDiff> =
     entries.mapIndexed { index, entry ->
         when (entry.auditType) {
@@ -98,6 +104,7 @@ private fun computeApiImportStrategyAuditDiffs(
                     }
                 val newConfigJson =
                     when {
+                        index == 0 && currentConfigJson != null -> currentConfigJson
                         index > 0 && previousEntry != null -> previousEntry.configJson
                         else -> entry.configJson
                     }
