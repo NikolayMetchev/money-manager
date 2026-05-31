@@ -82,6 +82,7 @@ class MoneyManagerDatabaseWrapper(
             "account_attribute_audit",
             "api_import_strategy_audit",
             "api_import_strategy_source",
+            "android_metadata",
             "account_balance_materialized_view",
             "running_balance_materialized_view",
             "pending_materialized_view_changes",
