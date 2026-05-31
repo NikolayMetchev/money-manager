@@ -42,7 +42,6 @@ import kotlin.uuid.Uuid
  * 3. Add its audit table name to `coveredTables`.
  */
 class AuditSourceCoverageTest : DbTest() {
-
     companion object {
         // Attribute sub-tables track field-level changes; provenance is inherited from the
         // parent entity's revision and is not stored per-row. Excluded from the source check.
