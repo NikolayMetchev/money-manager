@@ -4,10 +4,12 @@ package com.moneymanager.ui.screens.apistrategy
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.ApiImportStrategyAuditEntry
 import com.moneymanager.domain.model.AuditType
-import com.moneymanager.domain.model.EntitySource
+import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
+import com.moneymanager.domain.model.apistrategy.ApiStrategyConfig
 import com.moneymanager.domain.repository.ApiImportStrategyRepository
 import com.moneymanager.domain.repository.AuditRepository
 import com.moneymanager.ui.audit.AuditDiffCard
@@ -37,11 +39,25 @@ fun ApiImportStrategyAuditScreen(
         loadData = {
             val entries = auditRepository.getAuditHistoryForApiImportStrategy(strategyId)
             val currentStrategy = apiImportStrategyRepository.getStrategyById(strategyId).first()
+            val currentConfig =
+                currentStrategy?.let {
+                    ApiStrategyConfig(
+                        baseUrl = it.baseUrl,
+                        authType = it.authType,
+                        accountsEndpoint = it.accountsEndpoint,
+                        transactionsEndpoint = it.transactionsEndpoint,
+                        accountMappings = it.accountMappings,
+                        transactionMappings = it.transactionMappings,
+                        accountNamePrefix = it.accountNamePrefix,
+                        counterpartyPrefix = it.counterpartyPrefix,
+                        peopleMappings = it.peopleMappings,
+                    )
+                }
             val diffs =
                 computeApiImportStrategyAuditDiffs(
                     entries = entries,
                     currentName = currentStrategy?.name,
-                    currentConfigJson = currentStrategy?.configJson,
+                    currentConfig = currentConfig,
                 )
             AuditScreenData(
                 title = "API Strategy Audit: ${currentStrategy?.name ?: strategyId}",
@@ -54,23 +70,27 @@ fun ApiImportStrategyAuditScreen(
     )
 }
 
+// ─── Diff model ──────────────────────────────────────────────────────────────
+
 private data class ApiImportStrategyAuditDiff(
     val id: Long,
     val auditTimestamp: Instant,
     val auditType: AuditType,
     val revisionId: Long,
     val name: FieldChange<String>,
-    val configChanged: Boolean,
-    val source: EntitySource?,
+    val configChanges: List<Pair<String, FieldChange<String>>>,
+    val source: com.moneymanager.domain.model.EntitySource?,
 ) {
     val hasChanges: Boolean
-        get() = name is FieldChange.Changed || configChanged
+        get() = name is FieldChange.Changed || configChanges.isNotEmpty()
 }
+
+// ─── Diff computation ─────────────────────────────────────────────────────────
 
 private fun computeApiImportStrategyAuditDiffs(
     entries: List<ApiImportStrategyAuditEntry>,
     currentName: String?,
-    currentConfigJson: String?,
+    currentConfig: ApiStrategyConfig?,
 ): List<ApiImportStrategyAuditDiff> =
     entries.mapIndexed { index, entry ->
         when (entry.auditType) {
@@ -81,9 +101,10 @@ private fun computeApiImportStrategyAuditDiffs(
                     auditType = entry.auditType,
                     revisionId = entry.revisionId,
                     name = FieldChange.Created(entry.name),
-                    configChanged = false,
+                    configChanges = emptyList(),
                     source = entry.source,
                 )
+
             AuditType.DELETE ->
                 ApiImportStrategyAuditDiff(
                     id = entry.id,
@@ -91,9 +112,10 @@ private fun computeApiImportStrategyAuditDiffs(
                     auditType = entry.auditType,
                     revisionId = entry.revisionId,
                     name = FieldChange.Deleted(entry.name),
-                    configChanged = false,
+                    configChanges = emptyList(),
                     source = entry.source,
                 )
+
             AuditType.UPDATE -> {
                 val previousEntry = entries.getOrNull(index - 1)
                 val newName =
@@ -102,11 +124,10 @@ private fun computeApiImportStrategyAuditDiffs(
                         index > 0 && previousEntry != null -> previousEntry.name
                         else -> entry.name
                     }
-                val newConfigJson =
+                val newConfig =
                     when {
-                        index == 0 && currentConfigJson != null -> currentConfigJson
-                        index > 0 && previousEntry != null -> previousEntry.configJson
-                        else -> entry.configJson
+                        index == 0 -> currentConfig
+                        else -> previousEntry?.config
                     }
                 ApiImportStrategyAuditDiff(
                     id = entry.id,
@@ -114,12 +135,92 @@ private fun computeApiImportStrategyAuditDiffs(
                     auditType = entry.auditType,
                     revisionId = entry.revisionId,
                     name = changedOrUnchanged(entry.name, newName),
-                    configChanged = entry.configJson != newConfigJson,
+                    configChanges = if (newConfig != null) diffConfigs(entry.config, newConfig) else emptyList(),
                     source = entry.source,
                 )
             }
         }
     }
+
+/**
+ * Flattens two configs to label→value maps and returns only the fields that differ.
+ * [oldConfig] is the state *before* this change; [newConfig] is the state *after*.
+ */
+private fun diffConfigs(
+    oldConfig: ApiStrategyConfig,
+    newConfig: ApiStrategyConfig,
+): List<Pair<String, FieldChange<String>>> {
+    val old = flattenConfig(oldConfig)
+    val new = flattenConfig(newConfig)
+    return old.keys
+        .union(new.keys)
+        .sorted()
+        .mapNotNull { key ->
+            val o = old[key] ?: ""
+            val n = new[key] ?: ""
+            if (o != n) key to FieldChange.Changed(o, n) else null
+        }
+}
+
+private fun flattenConfig(config: ApiStrategyConfig): Map<String, String> =
+    buildMap {
+        put("Base URL", config.baseUrl)
+        put("Auth type", config.authType.name)
+        put("Account name prefix", config.accountNamePrefix)
+        put("Counterparty prefix", config.counterpartyPrefix)
+        flattenEndpoint("Accounts endpoint", config.accountsEndpoint, this)
+        flattenEndpoint("Transactions endpoint", config.transactionsEndpoint, this)
+        put("Account ID field", config.accountMappings.idField)
+        put("Account description field", config.accountMappings.descriptionField)
+        config.accountMappings.ownerNameField?.let { put("Account owner name field", it) }
+        if (config.accountMappings.customFields.isNotEmpty()) {
+            put(
+                "Account custom fields",
+                config.accountMappings.customFields.entries
+                    .joinToString { "${it.key}=${it.value}" },
+            )
+        }
+        put("Transaction amount field", config.transactionMappings.amountField)
+        put("Transaction timestamp field", config.transactionMappings.timestampField)
+        put("Transaction currency field", config.transactionMappings.currencyField)
+        put("Transaction description field", config.transactionMappings.descriptionField)
+        config.transactionMappings.merchantNameField?.let { put("Merchant name field", it) }
+        config.transactionMappings.counterpartyNameField?.let { put("Counterparty name field", it) }
+        config.transactionMappings.counterpartyIdField?.let { put("Counterparty ID field", it) }
+        config.transactionMappings.declineReasonField?.let { put("Decline reason field", it) }
+        config.transactionMappings.localAmountField?.let { put("Local amount field", it) }
+        config.transactionMappings.localCurrencyField?.let { put("Local currency field", it) }
+        if (config.transactionMappings.customFields.isNotEmpty()) {
+            put(
+                "Transaction custom fields",
+                config.transactionMappings.customFields.entries
+                    .joinToString { "${it.key}=${it.value}" },
+            )
+        }
+    }
+
+private fun flattenEndpoint(
+    prefix: String,
+    endpoint: ApiEndpointConfig,
+    map: MutableMap<String, String>,
+) {
+    map["$prefix path"] = endpoint.path
+    map["$prefix response key"] = endpoint.responseArrayKey
+    if (endpoint.queryParams.isNotEmpty()) {
+        map["$prefix query params"] =
+            endpoint.queryParams.joinToString { p ->
+                "${p.name}=${p.value ?: p.dynamicSource ?: ""}"
+            }
+    }
+    endpoint.pagination?.let { pag ->
+        map["$prefix pagination limit param"] = pag.limitParam
+        map["$prefix pagination limit"] = pag.limitValue.toString()
+        map["$prefix pagination cursor param"] = pag.cursorParam
+        map["$prefix pagination cursor field"] = pag.cursorResponseField
+    }
+}
+
+// ─── Diff card ────────────────────────────────────────────────────────────────
 
 @Composable
 private fun ApiImportStrategyAuditDiffCard(diff: ApiImportStrategyAuditDiff) {
@@ -134,6 +235,7 @@ private fun ApiImportStrategyAuditDiffCard(diff: ApiImportStrategyAuditDiff) {
                 FieldValueRow("Name", diff.name.value())
                 SourceInfoSection(diff.source)
             }
+
             AuditType.UPDATE -> {
                 if (!diff.hasChanges) {
                     NoVisibleChangesText()
@@ -141,18 +243,17 @@ private fun ApiImportStrategyAuditDiffCard(diff: ApiImportStrategyAuditDiff) {
                     AuditSectionLabel("Changed:")
                     val nameChange = diff.name
                     if (nameChange is FieldChange.Changed) {
-                        FieldChangeRow("Name", nameChange.oldValue, nameChange.newValue)
+                        FieldChangeRow("Name", nameChange.oldValue, nameChange.newValue, labelWidth = 200.dp)
                     }
-                    if (diff.configChanged) {
-                        FieldValueRow(
-                            "Configuration",
-                            "modified",
-                            valueColor = MaterialTheme.colorScheme.primary,
-                        )
+                    diff.configChanges.forEach { (label, change) ->
+                        if (change is FieldChange.Changed) {
+                            FieldChangeRow(label, change.oldValue, change.newValue, labelWidth = 200.dp)
+                        }
                     }
                 }
                 SourceInfoSection(diff.source)
             }
+
             AuditType.DELETE -> {
                 val errorColor = MaterialTheme.colorScheme.error
                 AuditSectionLabel("Deleted (final values):")

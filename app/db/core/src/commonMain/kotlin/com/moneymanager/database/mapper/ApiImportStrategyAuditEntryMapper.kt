@@ -2,11 +2,13 @@
 
 package com.moneymanager.database.mapper
 
+import com.moneymanager.database.json.ApiStrategyJsonCodec
 import com.moneymanager.database.sql.SelectAuditHistoryForApiImportStrategy
 import com.moneymanager.domain.model.ApiImportStrategyAuditEntry
 import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
+import com.moneymanager.domain.model.apistrategy.ApiStrategyConfig
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
@@ -31,6 +33,19 @@ object ApiImportStrategyAuditEntryMapper {
                 revisionId = from.revision_id,
                 deviceInfo = deviceInfo,
             )
+        val raw = ApiStrategyJsonCodec.decode(from.config_json)
+        val config =
+            ApiStrategyConfig(
+                baseUrl = raw.baseUrl,
+                authType = raw.authType,
+                accountsEndpoint = raw.accountsEndpoint,
+                transactionsEndpoint = raw.transactionsEndpoint,
+                accountMappings = raw.accountMappings,
+                transactionMappings = raw.transactionMappings,
+                accountNamePrefix = raw.accountNamePrefix,
+                counterpartyPrefix = raw.counterpartyPrefix,
+                peopleMappings = raw.peopleMappings,
+            )
         return ApiImportStrategyAuditEntry(
             id = from.id,
             auditTimestamp = Instant.fromEpochMilliseconds(from.audit_timestamp),
@@ -38,7 +53,7 @@ object ApiImportStrategyAuditEntryMapper {
             strategyId = ApiImportStrategyId(Uuid.parse(from.api_import_strategy_id)),
             revisionId = from.revision_id,
             name = from.name,
-            configJson = from.config_json,
+            config = config,
             createdAt = Instant.fromEpochMilliseconds(from.created_at),
             updatedAt = Instant.fromEpochMilliseconds(from.updated_at),
             source = source,
