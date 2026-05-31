@@ -77,8 +77,9 @@ kotlin {
 
                 runtimeOnly(libs.androidx.test.runner)
             }
-            // Include repository tests from commonTest (not the expect declarations file)
+            // Include test packages from commonTest (not the expect declarations file)
             kotlin.srcDir("src/commonTest/kotlin/com/moneymanager/database/repository")
+            kotlin.srcDir("src/commonTest/kotlin/com/moneymanager/database/audit")
         }
     }
 }
