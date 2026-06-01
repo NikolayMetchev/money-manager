@@ -29,8 +29,6 @@ CREATE TABLE api_session (
     expires_at INTEGER,
     credential_id INTEGER,
     kind TEXT,
-    imported_at INTEGER,
-    import_duration_millis INTEGER,
     FOREIGN KEY (type_id) REFERENCES api_session_type(id),
     FOREIGN KEY (device_id) REFERENCES device(id),
     FOREIGN KEY (credential_id) REFERENCES api_credential(id) ON DELETE CASCADE
@@ -38,6 +36,34 @@ CREATE TABLE api_session (
 
 CREATE INDEX idx_api_session_type ON api_session(type_id);
 CREATE INDEX idx_api_session_device ON api_session(device_id);
+
+CREATE TABLE api_import (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL,
+    revision_id INTEGER NOT NULL,
+    imported_at INTEGER NOT NULL,
+    import_duration_millis INTEGER,
+    FOREIGN KEY (session_id) REFERENCES api_session(id) ON DELETE CASCADE,
+    UNIQUE (session_id, revision_id)
+);
+
+CREATE INDEX idx_api_import_session ON api_import(session_id);
+CREATE INDEX idx_api_import_revision ON api_import(session_id, revision_id);
+CREATE INDEX idx_api_import_imported_at ON api_import(imported_at);
+
+CREATE VIEW api_session_with_latest_import AS
+SELECT
+    api_session.*,
+    latest_import.imported_at AS imported_at,
+    latest_import.import_duration_millis AS import_duration_millis
+FROM api_session
+LEFT JOIN api_import AS latest_import ON latest_import.id = (
+    SELECT ai.id
+    FROM api_import AS ai
+    WHERE ai.session_id = api_session.id
+    ORDER BY ai.imported_at DESC, ai.id DESC
+    LIMIT 1
+);
 
 CREATE TABLE api_request (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -89,19 +115,19 @@ selectAllCredentials:
 SELECT * FROM api_credential ORDER BY created_at DESC;
 
 selectById:
-SELECT * FROM api_session WHERE id = ?;
+SELECT * FROM api_session_with_latest_import WHERE id = ?;
 
 selectByToken:
-SELECT * FROM api_session WHERE token = ? ORDER BY created_at DESC LIMIT 1;
+SELECT * FROM api_session_with_latest_import WHERE token = ? ORDER BY created_at DESC LIMIT 1;
 
 selectByDeviceId:
-SELECT * FROM api_session WHERE device_id = ? ORDER BY created_at DESC;
+SELECT * FROM api_session_with_latest_import WHERE device_id = ? ORDER BY created_at DESC;
 
 selectByCredentialId:
-SELECT * FROM api_session WHERE credential_id = ? ORDER BY created_at DESC;
+SELECT * FROM api_session_with_latest_import WHERE credential_id = ? ORDER BY created_at DESC;
 
 selectSessions:
-SELECT * FROM api_session
+SELECT * FROM api_session_with_latest_import
 WHERE (expires_at IS NULL OR expires_at > ?)
 ORDER BY created_at DESC;
 
@@ -182,10 +208,17 @@ WHERE api_response.session_id = ?
 ORDER BY api_response_transaction.response_id, api_response_transaction.id;
 
 selectImportedSessionIds:
-SELECT id FROM api_session WHERE imported_at IS NOT NULL;
+SELECT DISTINCT session_id FROM api_import;
+
+selectImportedSessionRevisions:
+SELECT session_id, revision_id FROM api_import;
 
 markSessionImported:
-UPDATE api_session SET imported_at = ?, import_duration_millis = ? WHERE id = ?;
+INSERT INTO api_import(session_id, revision_id, imported_at, import_duration_millis)
+VALUES (?, ?, ?, ?)
+ON CONFLICT(session_id, revision_id) DO UPDATE SET
+    imported_at = excluded.imported_at,
+    import_duration_millis = excluded.import_duration_millis;
 
 lastInsertApiResponseTransactionId:
 SELECT last_insert_rowid();

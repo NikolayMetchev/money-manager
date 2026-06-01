@@ -5,6 +5,7 @@ package com.moneymanager.database.repository
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.JsonPath
+import com.moneymanager.domain.repository.ApiSessionImportRevision
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -444,6 +445,57 @@ class ApiSessionRepositoryImplTest : DbTest() {
             // After cascading delete, response_transaction records should be gone
             val entries = repositories.apiSessionRepository.getResponseTransactions(responseId)
             assertTrue(entries.isEmpty())
+        }
+
+    @Test
+    fun `markSessionImported tracks imported revision`() =
+        runTest {
+            val deviceId = deviceId()
+            val sessionId = repositories.apiSessionRepository.createSession(token, deviceId, now, null)
+
+            repositories.apiSessionRepository.markSessionImported(
+                id = sessionId,
+                revisionId = 3,
+                importedAt = now,
+                importDurationMillis = 1500L,
+            )
+
+            assertEquals(
+                setOf(ApiSessionImportRevision(sessionId, 3)),
+                repositories.apiSessionRepository.getImportedSessionRevisions(),
+            )
+            val session = repositories.apiSessionRepository.getSessionById(sessionId)
+            assertEquals(1500L, session?.importDurationMillis)
+        }
+
+    @Test
+    fun `markSessionImported allows re-import for newer revision`() =
+        runTest {
+            val deviceId = deviceId()
+            val sessionId = repositories.apiSessionRepository.createSession(token, deviceId, now, null)
+
+            repositories.apiSessionRepository.markSessionImported(
+                id = sessionId,
+                revisionId = 1,
+                importedAt = now,
+                importDurationMillis = 1000L,
+            )
+            repositories.apiSessionRepository.markSessionImported(
+                id = sessionId,
+                revisionId = 2,
+                importedAt = now + 1.seconds,
+                importDurationMillis = 2000L,
+            )
+
+            assertEquals(
+                setOf(
+                    ApiSessionImportRevision(sessionId, 1),
+                    ApiSessionImportRevision(sessionId, 2),
+                ),
+                repositories.apiSessionRepository.getImportedSessionRevisions(),
+            )
+            val session = repositories.apiSessionRepository.getSessionById(sessionId)
+            assertEquals(2000L, session?.importDurationMillis)
         }
 
     private fun assertTimestampBetween(

@@ -116,6 +116,7 @@ class MoneyManagerDatabaseWrapper(
             "api_session_type",
             "api_credential",
             "api_session",
+            "api_import",
             "api_request",
             "api_request_header",
             "api_response",

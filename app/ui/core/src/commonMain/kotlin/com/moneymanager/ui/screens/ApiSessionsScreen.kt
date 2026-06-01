@@ -70,6 +70,7 @@ import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.ApiImportStrategyRepository
+import com.moneymanager.domain.repository.ApiSessionImportRevision
 import com.moneymanager.domain.repository.ApiSessionRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CurrencyRepository
@@ -134,7 +135,8 @@ fun ApiSessionsScreen(
 
     var credentials by remember { mutableStateOf<List<MonzoCredential>>(emptyList()) }
     var sessionsByCredential by remember { mutableStateOf<Map<MonzoCredentialId, List<ApiSession>>>(emptyMap()) }
-    var importedSessionIds by remember { mutableStateOf<Set<ApiSessionId>>(emptySet()) }
+    var importedSessionRevisions by remember { mutableStateOf<Set<ApiSessionImportRevision>>(emptySet()) }
+    var currentStrategyRevisionByCredential by remember { mutableStateOf<Map<MonzoCredentialId, Long?>>(emptyMap()) }
     var isLoading by remember { mutableStateOf(true) }
     // Per-session import state
     var importResultBySession by remember { mutableStateOf<Map<ApiSessionId, ApiSessionImportResult>>(emptyMap()) }
@@ -162,7 +164,18 @@ fun ApiSessionsScreen(
                     allSessions
                         .filter { it.credentialId != null }
                         .groupBy { it.credentialId!! }
-                importedSessionIds = apiSessionRepository.getImportedSessionIds()
+                val allStrategies = apiImportStrategyRepository.getAllStrategies().first()
+                val strategyById = allStrategies.associateBy { it.id }
+                val fallbackStrategyRevision = allStrategies.firstOrNull()?.revisionId
+                currentStrategyRevisionByCredential =
+                    allCredentials.associate { credential ->
+                        credential.id to (
+                            credential.strategyId
+                                ?.let { strategyById[it]?.revisionId }
+                                ?: fallbackStrategyRevision
+                        )
+                    }
+                importedSessionRevisions = apiSessionRepository.getImportedSessionRevisions()
             } finally {
                 isLoading = false
             }
@@ -212,7 +225,12 @@ fun ApiSessionsScreen(
                     },
                 )
             val importDurationMillis = System.currentTimeMillis() - importStartedAt
-            apiSessionRepository.markSessionImported(session.id, Clock.System.now(), importDurationMillis)
+            apiSessionRepository.markSessionImported(
+                id = session.id,
+                revisionId = strategy.revisionId.toLong(),
+                importedAt = Clock.System.now(),
+                importDurationMillis = importDurationMillis,
+            )
             maintenance.refreshMaterializedViews()
             importResultBySession = importResultBySession + (session.id to result)
             importProgressBySession = importProgressBySession - session.id
@@ -275,7 +293,8 @@ fun ApiSessionsScreen(
                                 importResultBySession = importResultBySession,
                                 importErrorBySession = importErrorBySession,
                                 importProgressBySession = importProgressBySession,
-                                importedSessionIds = importedSessionIds,
+                                importedSessionRevisions = importedSessionRevisions,
+                                selectedStrategyRevision = currentStrategyRevisionByCredential[credential.id],
                                 isImportingSession = { sessionId -> backgroundTasks.isRunning(monzoImportTaskKey(sessionId)) },
                                 onDownloadAccounts = {
                                     accountsDownloadResultByCredential = accountsDownloadResultByCredential - credential.id
@@ -527,7 +546,8 @@ private fun CredentialCard(
     importResultBySession: Map<ApiSessionId, ApiSessionImportResult>,
     importErrorBySession: Map<ApiSessionId, String>,
     importProgressBySession: Map<ApiSessionId, ApiSessionImportProgress>,
-    importedSessionIds: Set<ApiSessionId>,
+    importedSessionRevisions: Set<ApiSessionImportRevision>,
+    selectedStrategyRevision: Long?,
     isImportingSession: (ApiSessionId) -> Boolean,
     onDownloadAccounts: () -> Unit,
     onDownloadTransactions: () -> Unit,
@@ -615,7 +635,10 @@ private fun CredentialCard(
                     SessionRow(
                         session = session,
                         isImporting = isImportingSession(session.id),
-                        isAlreadyImported = session.id in importedSessionIds,
+                        isAlreadyImported =
+                            selectedStrategyRevision?.let { revision ->
+                                ApiSessionImportRevision(session.id, revision) in importedSessionRevisions
+                            } == true,
                         importResult = importResultBySession[session.id],
                         importError = importErrorBySession[session.id],
                         importProgress = importProgressBySession[session.id],

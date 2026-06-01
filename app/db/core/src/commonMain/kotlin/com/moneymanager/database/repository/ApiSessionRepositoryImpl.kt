@@ -23,6 +23,7 @@ import com.moneymanager.domain.model.MonzoCredentialId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
 import com.moneymanager.domain.repository.ApiResponseTransactionInsert
+import com.moneymanager.domain.repository.ApiSessionImportRevision
 import com.moneymanager.domain.repository.ApiSessionRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -264,22 +265,23 @@ class ApiSessionRepositoryImpl(
             }
         }
 
-    override suspend fun getImportedSessionIds(): Set<ApiSessionId> =
+    override suspend fun getImportedSessionRevisions(): Set<ApiSessionImportRevision> =
         withContext(Dispatchers.Default) {
             queries
-                .selectImportedSessionIds()
+                .selectImportedSessionRevisions()
                 .executeAsList()
-                .map { ApiSessionId(it) }
+                .map { ApiSessionImportRevision(ApiSessionId(it.session_id), it.revision_id) }
                 .toSet()
         }
 
     override suspend fun markSessionImported(
         id: ApiSessionId,
+        revisionId: Long,
         importedAt: Instant,
         importDurationMillis: Long?,
     ): Long =
         withContext(Dispatchers.Default) {
-            queries.markSessionImported(importedAt.toEpochMilliseconds(), importDurationMillis, id.id).await()
+            queries.markSessionImported(id.id, revisionId, importedAt.toEpochMilliseconds(), importDurationMillis).await()
         }
 
     private fun com.moneymanager.database.sql.Api_request.toApiRequest(
@@ -320,7 +322,7 @@ class ApiSessionRepositoryImpl(
             strategyId = strategy_id?.let { ApiImportStrategyId(Uuid.parse(it)) },
         )
 
-    private fun com.moneymanager.database.sql.Api_session.toApiSession(): ApiSession =
+    private fun com.moneymanager.database.sql.Api_session_with_latest_import.toApiSession(): ApiSession =
         ApiSession(
             id = ApiSessionId(id),
             type = ApiSessionType.fromId(type_id),

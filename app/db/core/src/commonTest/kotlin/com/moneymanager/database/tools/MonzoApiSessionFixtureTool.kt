@@ -74,7 +74,15 @@ private fun exportFixtures(
                 expiresAt = row.getLongOrNull("expires_at"),
                 credentialId = row.getLongOrNull("credential_id"),
                 kind = row.getStringOrNull("kind"),
-                importedAt = row.getLongOrNull("imported_at"),
+            )
+        }
+        exportTable(connection, outputDir, "api_import", "api_import.json", ApiImportRow.serializer()) { row ->
+            ApiImportRow(
+                id = row.getLong("id"),
+                sessionId = row.getLong("session_id"),
+                revisionId = row.getLong("revision_id"),
+                importedAt = row.getLong("imported_at"),
+                importDurationMillis = row.getLongOrNull("import_duration_millis"),
             )
         }
         exportTable(connection, outputDir, "api_request", "api_request.json", ApiRequestRow.serializer()) { row ->
@@ -154,7 +162,7 @@ private fun importFixtures(
             insertTable(inputDir, "api_session.json", ApiSessionRow.serializer()) { row ->
                 connection
                     .prepareStatement(
-                        "INSERT OR IGNORE INTO api_session(id, type_id, token, device_id, created_at, expires_at, credential_id, kind, imported_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        "INSERT OR IGNORE INTO api_session(id, type_id, token, device_id, created_at, expires_at, credential_id, kind) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                     ).use { ps ->
                         ps.setLong(1, row.id)
                         ps.setLong(2, row.typeId)
@@ -164,7 +172,19 @@ private fun importFixtures(
                         if (row.expiresAt == null) ps.setNull(6, java.sql.Types.INTEGER) else ps.setLong(6, row.expiresAt)
                         if (row.credentialId == null) ps.setNull(7, java.sql.Types.INTEGER) else ps.setLong(7, row.credentialId)
                         if (row.kind == null) ps.setNull(8, java.sql.Types.VARCHAR) else ps.setString(8, row.kind)
-                        if (row.importedAt == null) ps.setNull(9, java.sql.Types.INTEGER) else ps.setLong(9, row.importedAt)
+                        ps.executeUpdate()
+                    }
+            }
+            insertTable(inputDir, "api_import.json", ApiImportRow.serializer()) { row ->
+                connection
+                    .prepareStatement(
+                        "INSERT OR IGNORE INTO api_import(id, session_id, revision_id, imported_at, import_duration_millis) VALUES (?, ?, ?, ?, ?)",
+                    ).use { ps ->
+                        ps.setLong(1, row.id)
+                        ps.setLong(2, row.sessionId)
+                        ps.setLong(3, row.revisionId)
+                        ps.setLong(4, row.importedAt)
+                        if (row.importDurationMillis == null) ps.setNull(5, java.sql.Types.INTEGER) else ps.setLong(5, row.importDurationMillis)
                         ps.executeUpdate()
                     }
             }
@@ -311,7 +331,15 @@ private data class ApiSessionRow(
     val expiresAt: Long? = null,
     val credentialId: Long? = null,
     val kind: String? = null,
-    val importedAt: Long? = null,
+)
+
+@Serializable
+private data class ApiImportRow(
+    val id: Long,
+    val sessionId: Long,
+    val revisionId: Long,
+    val importedAt: Long,
+    val importDurationMillis: Long? = null,
 )
 
 @Serializable
