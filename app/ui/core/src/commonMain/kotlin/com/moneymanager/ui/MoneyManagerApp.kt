@@ -173,6 +173,7 @@ fun MoneyManagerApp(
                                         currentScreen is Screen.CsvImportDetail ||
                                         currentScreen is Screen.CsvStrategies ||
                                         currentScreen is Screen.ApiStrategies ||
+                                        currentScreen is Screen.ApiStrategyAuditHistory ||
                                         currentScreen is Screen.ApiSessionTraffic ||
                                         currentScreen is Screen.MonzoConnect,
                                 onClick = {
@@ -180,7 +181,7 @@ fun MoneyManagerApp(
                                         Screen.Imports(
                                             when (currentScreen) {
                                                 is Screen.ApiSessionTraffic, is Screen.MonzoConnect,
-                                                is Screen.ApiStrategies,
+                                                is Screen.ApiStrategies, is Screen.ApiStrategyAuditHistory,
                                                 -> ImportTab.API
                                                 is Screen.Imports -> currentScreen.tab
                                                 else -> ImportTab.CSV

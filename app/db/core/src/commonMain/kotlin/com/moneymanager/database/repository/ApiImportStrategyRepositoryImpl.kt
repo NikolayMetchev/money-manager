@@ -24,7 +24,7 @@ import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 class ApiImportStrategyRepositoryImpl(
-    database: MoneyManagerDatabaseWrapper,
+    private val database: MoneyManagerDatabaseWrapper,
     private val deviceId: DeviceId,
     private val coroutineContext: CoroutineContext = Dispatchers.Default,
 ) : ApiImportStrategyRepository {
@@ -76,18 +76,28 @@ class ApiImportStrategyRepositoryImpl(
     override suspend fun updateStrategy(strategy: ApiImportStrategy): Unit =
         withContext(coroutineContext) {
             val now = Clock.System.now()
-            queries.update(
-                name = strategy.name,
-                config_json = ApiStrategyJsonCodec.encode(strategy.toConfigJson()),
-                updated_at = now.toEpochMilliseconds(),
-                id = strategy.id.id.toString(),
-            )
-            queries.insertSource(
-                strategy_id = strategy.id.id.toString(),
-                revision_id = strategy.revisionId + 1,
-                source_type_id = SourceType.MANUAL.id.toLong(),
-                device_id = deviceId.id,
-            )
+            // Wrap the update and its source attribution in a single transaction so the
+            // revision_id read back below reflects exactly this update and cannot interleave
+            // with a concurrent writer.
+            database.transaction {
+                queries.update(
+                    name = strategy.name,
+                    config_json = ApiStrategyJsonCodec.encode(strategy.toConfigJson()),
+                    updated_at = now.toEpochMilliseconds(),
+                    id = strategy.id.id.toString(),
+                )
+                // The UPDATE statement increments revision_id in the database, so read the
+                // persisted value back instead of deriving it from the (possibly stale) snapshot.
+                // This keeps the source row aligned with the audit row the update trigger writes.
+                val persistedRevisionId =
+                    queries.selectById(strategy.id.id.toString()).executeAsOne().revision_id
+                queries.insertSource(
+                    strategy_id = strategy.id.id.toString(),
+                    revision_id = persistedRevisionId,
+                    source_type_id = SourceType.MANUAL.id.toLong(),
+                    device_id = deviceId.id,
+                )
+            }
         }
 
     override suspend fun deleteStrategy(id: ApiImportStrategyId): Unit =

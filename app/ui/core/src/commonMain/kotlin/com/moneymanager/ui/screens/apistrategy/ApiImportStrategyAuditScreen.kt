@@ -177,6 +177,7 @@ private fun flattenConfig(config: ApiStrategyConfig): Map<String, String> =
             put(
                 "Account custom fields",
                 config.accountMappings.customFields.entries
+                    .sortedBy { it.key }
                     .joinToString { "${it.key}=${it.value}" },
             )
         }
@@ -194,9 +195,20 @@ private fun flattenConfig(config: ApiStrategyConfig): Map<String, String> =
             put(
                 "Transaction custom fields",
                 config.transactionMappings.customFields.entries
+                    .sortedBy { it.key }
                     .joinToString { "${it.key}=${it.value}" },
             )
         }
+        val people = config.peopleMappings
+        put("Counterparty object field", people.counterpartyObjectField)
+        put("Beneficiary account type field", people.beneficiaryAccountTypeField)
+        put("Personal beneficiary account type value", people.personalBeneficiaryAccountTypeValue)
+        put("Counterparty name field (people)", people.counterpartyNameField)
+        put("Counterparty user ID field", people.counterpartyUserIdField)
+        put("Counterparty sort code field", people.counterpartySortCodeField)
+        put("Counterparty account number field", people.counterpartyAccountNumberField)
+        put("Counterparty service user number field", people.counterpartyServiceUserNumberField)
+        put("Fallback counterparty account ID suffix", people.fallbackCounterpartyAccountIdSuffix)
     }
 
 private fun flattenEndpoint(
