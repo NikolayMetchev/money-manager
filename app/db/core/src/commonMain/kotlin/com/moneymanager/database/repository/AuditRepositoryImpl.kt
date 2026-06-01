@@ -3,6 +3,7 @@
 package com.moneymanager.database.repository
 
 import com.moneymanager.database.mapper.AccountAuditEntryMapper
+import com.moneymanager.database.mapper.ApiImportStrategyAuditEntryMapper
 import com.moneymanager.database.mapper.CategoryAuditEntryMapper
 import com.moneymanager.database.mapper.CurrencyAuditEntryMapper
 import com.moneymanager.database.mapper.OwnershipAuditHistoryForAccountMapper
@@ -14,6 +15,7 @@ import com.moneymanager.database.sql.MoneyManagerDatabase
 import com.moneymanager.domain.model.AccountAttributeAuditEntry
 import com.moneymanager.domain.model.AccountAuditEntry
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.ApiImportStrategyAuditEntry
 import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.AuditType
@@ -27,6 +29,7 @@ import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.TransferAttributeAuditEntry
 import com.moneymanager.domain.model.TransferAuditEntry
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
 import com.moneymanager.domain.repository.AuditRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -109,6 +112,14 @@ class AuditRepositoryImpl(
     override suspend fun getAttributeAuditByPerson(personId: PersonId): List<PersonAttributeAuditEntry> =
         withContext(Dispatchers.Default) {
             fetchPersonAttributeAudit(personId)
+        }
+
+    override suspend fun getAuditHistoryForApiImportStrategy(strategyId: ApiImportStrategyId): List<ApiImportStrategyAuditEntry> =
+        withContext(Dispatchers.Default) {
+            queries
+                .selectAuditHistoryForApiImportStrategy(strategyId.id.toString())
+                .executeAsList()
+                .map(ApiImportStrategyAuditEntryMapper::map)
         }
 
     private fun fetchAccountAttributeAudit(accountId: AccountId): List<AccountAttributeAuditEntry> =

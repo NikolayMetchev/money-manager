@@ -5,6 +5,7 @@ package com.moneymanager.domain.repository
 import com.moneymanager.domain.model.AccountAttributeAuditEntry
 import com.moneymanager.domain.model.AccountAuditEntry
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.ApiImportStrategyAuditEntry
 import com.moneymanager.domain.model.CategoryAuditEntry
 import com.moneymanager.domain.model.CurrencyAuditEntry
 import com.moneymanager.domain.model.CurrencyId
@@ -14,6 +15,7 @@ import com.moneymanager.domain.model.PersonAuditEntry
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.TransferAuditEntry
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
 
 interface AuditRepository {
     /**
@@ -104,4 +106,13 @@ interface AuditRepository {
      * @return List of attribute audit entries
      */
     suspend fun getAttributeAuditByAccount(accountId: AccountId): List<AccountAttributeAuditEntry>
+
+    /**
+     * Gets the audit history for a specific API import strategy.
+     * Returns entries ordered by audit timestamp descending (most recent first).
+     *
+     * @param strategyId The ID of the strategy to get audit history for
+     * @return List of audit entries for the strategy
+     */
+    suspend fun getAuditHistoryForApiImportStrategy(strategyId: ApiImportStrategyId): List<ApiImportStrategyAuditEntry>
 }

@@ -9,6 +9,8 @@ import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.json.ApiStrategyConfigJson
 import com.moneymanager.database.json.ApiStrategyJsonCodec
 import com.moneymanager.database.sql.Api_import_strategy
+import com.moneymanager.domain.model.DeviceId
+import com.moneymanager.domain.model.SourceType
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
 import com.moneymanager.domain.repository.ApiImportStrategyRepository
@@ -22,7 +24,8 @@ import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 class ApiImportStrategyRepositoryImpl(
-    database: MoneyManagerDatabaseWrapper,
+    private val database: MoneyManagerDatabaseWrapper,
+    private val deviceId: DeviceId,
     private val coroutineContext: CoroutineContext = Dispatchers.Default,
 ) : ApiImportStrategyRepository {
     private val queries = database.apiImportStrategyQueries
@@ -61,18 +64,40 @@ class ApiImportStrategyRepositoryImpl(
                 created_at = now.toEpochMilliseconds(),
                 updated_at = now.toEpochMilliseconds(),
             )
+            queries.insertSource(
+                strategy_id = strategy.id.id.toString(),
+                revision_id = 1,
+                source_type_id = SourceType.MANUAL.id.toLong(),
+                device_id = deviceId.id,
+            )
             strategy.id
         }
 
     override suspend fun updateStrategy(strategy: ApiImportStrategy): Unit =
         withContext(coroutineContext) {
             val now = Clock.System.now()
-            queries.update(
-                name = strategy.name,
-                config_json = ApiStrategyJsonCodec.encode(strategy.toConfigJson()),
-                updated_at = now.toEpochMilliseconds(),
-                id = strategy.id.id.toString(),
-            )
+            // Wrap the update and its source attribution in a single transaction so the
+            // revision_id read back below reflects exactly this update and cannot interleave
+            // with a concurrent writer.
+            database.transaction {
+                queries.update(
+                    name = strategy.name,
+                    config_json = ApiStrategyJsonCodec.encode(strategy.toConfigJson()),
+                    updated_at = now.toEpochMilliseconds(),
+                    id = strategy.id.id.toString(),
+                )
+                // The UPDATE statement increments revision_id in the database, so read the
+                // persisted value back instead of deriving it from the (possibly stale) snapshot.
+                // This keeps the source row aligned with the audit row the update trigger writes.
+                val persistedRevisionId =
+                    queries.selectById(strategy.id.id.toString()).executeAsOne().revision_id
+                queries.insertSource(
+                    strategy_id = strategy.id.id.toString(),
+                    revision_id = persistedRevisionId,
+                    source_type_id = SourceType.MANUAL.id.toLong(),
+                    device_id = deviceId.id,
+                )
+            }
         }
 
     override suspend fun deleteStrategy(id: ApiImportStrategyId): Unit =
@@ -96,6 +121,8 @@ class ApiImportStrategyRepositoryImpl(
             peopleMappings = config.peopleMappings,
             createdAt = Instant.fromEpochMilliseconds(entity.created_at),
             updatedAt = Instant.fromEpochMilliseconds(entity.updated_at),
+            revisionId = entity.revision_id,
+            configJson = entity.config_json,
         )
     }
 

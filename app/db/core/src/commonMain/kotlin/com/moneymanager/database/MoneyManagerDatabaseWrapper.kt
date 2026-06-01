@@ -80,6 +80,9 @@ class MoneyManagerDatabaseWrapper(
             "person_account_ownership_audit",
             "transfer_attribute_audit",
             "account_attribute_audit",
+            "api_import_strategy_audit",
+            "api_import_strategy_source",
+            "android_metadata",
             "account_balance_materialized_view",
             "running_balance_materialized_view",
             "pending_materialized_view_changes",
@@ -117,7 +120,6 @@ class MoneyManagerDatabaseWrapper(
             "api_request_header",
             "api_response",
             "api_response_transaction",
-            "api_import_strategy",
         )
 
     /**

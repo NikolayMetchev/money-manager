@@ -15,6 +15,7 @@ enum class EntityType(
     CURRENCY(3),
     PERSON_ACCOUNT_OWNERSHIP(4),
     CATEGORY(5),
+    API_IMPORT_STRATEGY(6),
 }
 
 /**

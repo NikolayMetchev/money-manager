@@ -8,6 +8,7 @@ import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
 import com.moneymanager.domain.model.csv.CsvImportId
 
 enum class ImportTab { CSV, API }
@@ -74,6 +75,11 @@ sealed class Screen(
         val categoryId: Long,
         val categoryName: String,
     ) : Screen("Category Audit: $categoryName")
+
+    data class ApiStrategyAuditHistory(
+        val strategyId: ApiImportStrategyId,
+        val strategyName: String,
+    ) : Screen("API Strategy Audit: $strategyName")
 
     data object MonzoConnect : Screen("Monzo Connection")
 

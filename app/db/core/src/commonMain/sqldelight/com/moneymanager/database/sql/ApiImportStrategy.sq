@@ -2,6 +2,7 @@
 -- and people. The full strategy configuration is stored as JSON.
 CREATE TABLE api_import_strategy (
     id TEXT PRIMARY KEY NOT NULL,
+    revision_id INTEGER NOT NULL DEFAULT 1,
     name TEXT NOT NULL UNIQUE,
     config_json TEXT NOT NULL,
     created_at INTEGER NOT NULL,
@@ -30,9 +31,31 @@ VALUES (?, ?, ?, ?, ?);
 -- Update an existing strategy
 update:
 UPDATE api_import_strategy
-SET name = ?, config_json = ?, updated_at = ?
+SET revision_id = revision_id + 1, name = ?, config_json = ?, updated_at = ?
 WHERE id = ?;
 
 -- Delete a strategy by ID
 deleteById:
 DELETE FROM api_import_strategy WHERE id = ?;
+
+-- Source attribution for api_import_strategy revisions.
+-- Uses TEXT strategy_id because api_import_strategy.id is a UUID, unlike the INTEGER entity_id
+-- used by the generic entity_source table.
+CREATE TABLE api_import_strategy_source (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    strategy_id TEXT NOT NULL,
+    revision_id INTEGER NOT NULL,
+    source_type_id INTEGER NOT NULL,
+    device_id INTEGER NOT NULL,
+    created_at INTEGER NOT NULL DEFAULT (CAST(strftime('%s', 'now') AS INTEGER) * 1000),
+    FOREIGN KEY (source_type_id) REFERENCES source_type(id),
+    FOREIGN KEY (device_id) REFERENCES device(id),
+    UNIQUE (strategy_id, revision_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_api_import_strategy_source_strategy ON api_import_strategy_source(strategy_id);
+CREATE INDEX IF NOT EXISTS idx_api_import_strategy_source_revision ON api_import_strategy_source(strategy_id, revision_id);
+
+insertSource:
+INSERT OR IGNORE INTO api_import_strategy_source (strategy_id, revision_id, source_type_id, device_id)
+VALUES (?, ?, ?, ?);

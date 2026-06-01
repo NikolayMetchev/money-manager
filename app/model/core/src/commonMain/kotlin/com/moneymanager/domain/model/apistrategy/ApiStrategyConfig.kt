@@ -132,3 +132,19 @@ data class ApiPeopleMappings(
     val counterpartyServiceUserNumberField: String = "service_user_number",
     val fallbackCounterpartyAccountIdSuffix: String = ".account_id",
 )
+
+/**
+ * Decoded, domain-level view of an API import strategy's full configuration.
+ * Stored as JSON in the database; decoded by the db layer for use across all layers.
+ */
+data class ApiStrategyConfig(
+    val baseUrl: String,
+    val authType: ApiAuthType,
+    val accountsEndpoint: ApiEndpointConfig,
+    val transactionsEndpoint: ApiEndpointConfig,
+    val accountMappings: ApiAccountMappings,
+    val transactionMappings: ApiTransactionMappings,
+    val accountNamePrefix: String,
+    val counterpartyPrefix: String,
+    val peopleMappings: ApiPeopleMappings,
+)
