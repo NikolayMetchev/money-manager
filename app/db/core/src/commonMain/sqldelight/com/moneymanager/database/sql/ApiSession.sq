@@ -207,9 +207,6 @@ JOIN api_response ON api_response_transaction.response_id = api_response.id
 WHERE api_response.session_id = ?
 ORDER BY api_response_transaction.response_id, api_response_transaction.id;
 
-selectImportedSessionIds:
-SELECT DISTINCT session_id FROM api_import;
-
 selectImportedSessionRevisions:
 SELECT session_id, revision_id FROM api_import;
 

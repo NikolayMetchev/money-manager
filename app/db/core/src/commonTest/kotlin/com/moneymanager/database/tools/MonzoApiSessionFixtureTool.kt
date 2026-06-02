@@ -184,7 +184,11 @@ private fun importFixtures(
                         ps.setLong(2, row.sessionId)
                         ps.setLong(3, row.revisionId)
                         ps.setLong(4, row.importedAt)
-                        if (row.importDurationMillis == null) ps.setNull(5, java.sql.Types.INTEGER) else ps.setLong(5, row.importDurationMillis)
+                        if (row.importDurationMillis == null) {
+                            ps.setNull(5, java.sql.Types.INTEGER)
+                        } else {
+                            ps.setLong(5, row.importDurationMillis)
+                        }
                         ps.executeUpdate()
                     }
             }
