@@ -227,7 +227,7 @@ fun ApiSessionsScreen(
             val importDurationMillis = System.currentTimeMillis() - importStartedAt
             apiSessionRepository.markSessionImported(
                 id = session.id,
-                revisionId = strategy.revisionId.toLong(),
+                revisionId = strategy.revisionId,
                 importedAt = Clock.System.now(),
                 importDurationMillis = importDurationMillis,
             )
