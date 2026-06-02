@@ -281,7 +281,13 @@ class ApiSessionRepositoryImpl(
         importDurationMillis: Long?,
     ): Long =
         withContext(Dispatchers.Default) {
-            queries.markSessionImported(id.id, revisionId, importedAt.toEpochMilliseconds(), importDurationMillis).await()
+            queries
+                .markSessionImported(
+                    session_id = id.id,
+                    revision_id = revisionId,
+                    imported_at = importedAt.toEpochMilliseconds(),
+                    import_duration_millis = importDurationMillis,
+                ).await()
         }
 
     private fun com.moneymanager.database.sql.Api_request.toApiRequest(

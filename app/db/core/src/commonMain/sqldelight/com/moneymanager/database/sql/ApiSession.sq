@@ -48,7 +48,6 @@ CREATE TABLE api_import (
 );
 
 CREATE INDEX idx_api_import_session ON api_import(session_id);
-CREATE INDEX idx_api_import_revision ON api_import(session_id, revision_id);
 CREATE INDEX idx_api_import_imported_at ON api_import(imported_at);
 
 CREATE VIEW api_session_with_latest_import AS
@@ -212,7 +211,7 @@ SELECT session_id, revision_id FROM api_import;
 
 markSessionImported:
 INSERT INTO api_import(session_id, revision_id, imported_at, import_duration_millis)
-VALUES (?, ?, ?, ?)
+VALUES (:session_id, :revision_id, :imported_at, :import_duration_millis)
 ON CONFLICT(session_id, revision_id) DO UPDATE SET
     imported_at = excluded.imported_at,
     import_duration_millis = excluded.import_duration_millis;
