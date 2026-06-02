@@ -89,6 +89,7 @@ sqldelight {
         create("MoneyManagerDatabase") {
             packageName.set("com.moneymanager.database.sql")
             verifyMigrations.set(false)
+            dialect(libs.sqldelight.dialect.sqlite)
         }
     }
 }

@@ -29,6 +29,11 @@ data class ApiResponseTransactionInsert(
     val errorMessage: String?,
 )
 
+data class ApiSessionImportRevision(
+    val sessionId: ApiSessionId,
+    val revisionId: Long,
+)
+
 interface ApiSessionRepository {
     /**
      * Creates a new credential (saved token). Returns the existing credential ID if the token
@@ -173,9 +178,9 @@ interface ApiSessionRepository {
     suspend fun getResponseTransactionsBySession(sessionId: ApiSessionId): List<ApiResponseTransaction>
 
     /**
-     * Returns the set of session IDs that have been marked as imported.
+     * Returns all imported (session, revision) pairs.
      */
-    suspend fun getImportedSessionIds(): Set<ApiSessionId>
+    suspend fun getImportedSessionRevisions(): Set<ApiSessionImportRevision>
 
     /**
      * Marks the given session as imported at the given timestamp.
@@ -183,6 +188,7 @@ interface ApiSessionRepository {
      */
     suspend fun markSessionImported(
         id: ApiSessionId,
+        revisionId: Long,
         importedAt: Instant,
         importDurationMillis: Long? = null,
     ): Long
