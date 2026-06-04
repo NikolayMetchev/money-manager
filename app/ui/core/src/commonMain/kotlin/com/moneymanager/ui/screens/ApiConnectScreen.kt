@@ -1,4 +1,4 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
+@file:OptIn(kotlin.time.ExperimentalTime::class, androidx.compose.material3.ExperimentalMaterial3Api::class)
 
 package com.moneymanager.ui.screens
 
@@ -15,10 +15,15 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -26,21 +31,43 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
+import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
+import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
+import com.moneymanager.domain.repository.ApiImportStrategyRepository
 import com.moneymanager.domain.repository.ApiSessionRepository
+import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
 
-private const val MONZO_DEVELOPER_PORTAL_URL = "https://developers.monzo.com/"
-
+/**
+ * Generic "connect an API account" screen. Lists the available import strategies (Monzo, Wise, and
+ * any user-defined ones), lets the user pick one and paste a bearer token, then stores a credential
+ * linked to that strategy. No provider-specific behaviour lives here beyond an optional convenience
+ * link to a known provider's token page.
+ */
 @Composable
-fun MonzoAuthScreen(
+fun ApiConnectScreen(
     apiSessionRepository: ApiSessionRepository,
+    apiImportStrategyRepository: ApiImportStrategyRepository,
     onCredentialSaved: () -> Unit = {},
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
     val uriHandler = LocalUriHandler.current
 
+    val strategies by apiImportStrategyRepository
+        .getAllStrategies()
+        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+
+    var selectedStrategyId by remember { mutableStateOf<ApiImportStrategyId?>(null) }
+    LaunchedEffect(strategies) {
+        if (selectedStrategyId == null || strategies.none { it.id == selectedStrategyId }) {
+            selectedStrategyId = strategies.firstOrNull()?.id
+        }
+    }
+    val selectedStrategy = strategies.find { it.id == selectedStrategyId }
+
+    var strategyMenuExpanded by remember { mutableStateOf(false) }
     var tokenInput by remember { mutableStateOf("") }
     var isSaving by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -54,7 +81,7 @@ fun MonzoAuthScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(
-            text = "Monzo Connection",
+            text = "Connect API Account",
             style = MaterialTheme.typography.headlineMedium,
         )
 
@@ -66,23 +93,48 @@ fun MonzoAuthScreen(
                         .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Text(
-                    text = "How to connect your Monzo account",
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                Text(text = "1. Open the Monzo Developer Playground in your browser.", style = MaterialTheme.typography.bodyMedium)
-                Text(text = "2. Log in with your Monzo account credentials.", style = MaterialTheme.typography.bodyMedium)
-                Text(
-                    text = "3. Monzo will send a magic link to your email or app. Approve the login.",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Text(text = "4. Copy the access token shown on the playground page.", style = MaterialTheme.typography.bodyMedium)
-                Text(text = "5. Paste the token below and tap \"Save Token\".", style = MaterialTheme.typography.bodyMedium)
-                Button(
-                    onClick = { uriHandler.openUri(MONZO_DEVELOPER_PORTAL_URL) },
-                    modifier = Modifier.fillMaxWidth(),
+                Text(text = "Choose a provider", style = MaterialTheme.typography.titleMedium)
+
+                ExposedDropdownMenuBox(
+                    expanded = strategyMenuExpanded,
+                    onExpandedChange = { strategyMenuExpanded = it },
                 ) {
-                    Text("Open Monzo Developer Playground")
+                    OutlinedTextField(
+                        value = selectedStrategy?.name.orEmpty(),
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Provider") },
+                        placeholder = { Text("Select a provider") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = strategyMenuExpanded) },
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+                        singleLine = true,
+                    )
+                    ExposedDropdownMenu(
+                        expanded = strategyMenuExpanded,
+                        onDismissRequest = { strategyMenuExpanded = false },
+                    ) {
+                        strategies.forEach { strategy ->
+                            DropdownMenuItem(
+                                text = { Text(strategy.name) },
+                                onClick = {
+                                    selectedStrategyId = strategy.id
+                                    strategyMenuExpanded = false
+                                },
+                            )
+                        }
+                    }
+                }
+
+                providerTokenPageUrl(selectedStrategy)?.let { url ->
+                    Button(
+                        onClick = { uriHandler.openUri(url) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("Open ${selectedStrategy?.name} token page")
+                    }
                 }
             }
         }
@@ -104,7 +156,7 @@ fun MonzoAuthScreen(
                         errorMessage = null
                     },
                     label = { Text("Access Token") },
-                    placeholder = { Text("Paste your Monzo access token here") },
+                    placeholder = { Text("Paste your ${selectedStrategy?.name ?: "API"} access token here") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = false,
                     maxLines = 4,
@@ -122,8 +174,13 @@ fun MonzoAuthScreen(
                 Button(
                     onClick = {
                         val trimmedToken = tokenInput.trim()
+                        val strategyId = selectedStrategyId
                         if (trimmedToken.isBlank()) {
                             errorMessage = "Token cannot be empty."
+                            return@Button
+                        }
+                        if (strategyId == null) {
+                            errorMessage = "Select a provider first."
                             return@Button
                         }
                         isSaving = true
@@ -133,6 +190,7 @@ fun MonzoAuthScreen(
                                 apiSessionRepository.createCredential(
                                     token = trimmedToken,
                                     createdAt = Clock.System.now(),
+                                    strategyId = strategyId,
                                 )
                                 onCredentialSaved()
                             } catch (expected: Exception) {
@@ -142,7 +200,7 @@ fun MonzoAuthScreen(
                             }
                         }
                     },
-                    enabled = !isSaving && tokenInput.isNotBlank(),
+                    enabled = !isSaving && tokenInput.isNotBlank() && selectedStrategyId != null,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     if (isSaving) {
@@ -155,5 +213,16 @@ fun MonzoAuthScreen(
         }
 
         Spacer(modifier = Modifier.height(16.dp))
+    }
+}
+
+/** Convenience deep-link to a known provider's API-token page, derived from the strategy base URL. */
+private fun providerTokenPageUrl(strategy: ApiImportStrategy?): String? {
+    val baseUrl = strategy?.baseUrl?.lowercase() ?: return null
+    return when {
+        "monzo" in baseUrl -> "https://developers.monzo.com/"
+        "wise" in baseUrl || "transferwise" in baseUrl ->
+            "https://wise.com/your-account/integrations-and-tools/api-tokens"
+        else -> null
     }
 }

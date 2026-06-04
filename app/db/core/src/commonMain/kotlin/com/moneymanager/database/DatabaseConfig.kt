@@ -802,8 +802,7 @@ object DatabaseConfig {
 
             // Seed the built-in Monzo and Wise API import strategies (after triggers and system
             // device are created so the INSERT trigger records the initial audit entry and source)
-            seedMonzoStrategy(systemDeviceId)
-            seedWiseStrategy(systemDeviceId)
+            ensureBuiltInApiStrategies(systemDeviceId)
 
             // Seed currencies with source tracking
             allCurrencies.forEach { currency ->
@@ -819,14 +818,32 @@ object DatabaseConfig {
         }
     }
 
+    /**
+     * Inserts any missing built-in API import strategies (Monzo, Wise). Idempotent and safe to run
+     * on every database open, so databases created before a built-in strategy was added pick it up
+     * on the next launch. Skips silently if the system device is missing.
+     */
+    suspend fun ensureBuiltInApiStrategies(database: MoneyManagerDatabaseWrapper) {
+        with(database) {
+            val systemDeviceId =
+                deviceQueries.selectSystemDevice(platform_id = 0).executeAsOneOrNull() ?: return
+            ensureBuiltInApiStrategies(systemDeviceId)
+        }
+    }
+
+    private fun MoneyManagerDatabaseWrapper.ensureBuiltInApiStrategies(systemDeviceId: Long) {
+        seedMonzoStrategy(systemDeviceId)
+        seedWiseStrategy(systemDeviceId)
+    }
+
     /** Fixed UUID for the built-in Monzo strategy so it can be referenced reliably. */
     private val monzoStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000001")
 
     /**
-     * Seeds the built-in Monzo API import strategy.
-     * Called once during new-database initialisation.
+     * Inserts the built-in Monzo API import strategy if it is not already present (idempotent).
      */
     private fun MoneyManagerDatabaseWrapper.seedMonzoStrategy(systemDeviceId: Long) {
+        if (apiImportStrategyQueries.selectById(monzoStrategyId.toString()).executeAsOneOrNull() != null) return
         val config =
             ApiStrategyConfigJson(
                 baseUrl = "https://api.monzo.com",
@@ -919,9 +936,10 @@ object DatabaseConfig {
      * Seeds the built-in Wise API import strategy. Wise has a three-level hierarchy
      * (profiles → balances → statements): profiles are fetched as an ancestor endpoint and their id
      * is templated into the balances and statement paths; amounts are decimal with the direction in
-     * a separate `type` field; statements are fetched in date windows.
+     * a separate `type` field; statements are fetched in date windows. Idempotent.
      */
     private fun MoneyManagerDatabaseWrapper.seedWiseStrategy(systemDeviceId: Long) {
+        if (apiImportStrategyQueries.selectById(wiseStrategyId.toString()).executeAsOneOrNull() != null) return
         val config =
             ApiStrategyConfigJson(
                 baseUrl = "https://api.transferwise.com",

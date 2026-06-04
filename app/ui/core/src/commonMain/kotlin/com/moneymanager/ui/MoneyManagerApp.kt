@@ -45,6 +45,7 @@ import com.moneymanager.ui.navigation.Screen
 import com.moneymanager.ui.navigation.mouseButtonNavigation
 import com.moneymanager.ui.screens.AccountAuditScreen
 import com.moneymanager.ui.screens.AccountsScreen
+import com.moneymanager.ui.screens.ApiConnectScreen
 import com.moneymanager.ui.screens.ApiSessionTrafficScreen
 import com.moneymanager.ui.screens.CategoriesScreen
 import com.moneymanager.ui.screens.CategoryAuditScreen
@@ -52,7 +53,6 @@ import com.moneymanager.ui.screens.CsvImportDetailScreen
 import com.moneymanager.ui.screens.CurrenciesScreen
 import com.moneymanager.ui.screens.CurrencyAuditScreen
 import com.moneymanager.ui.screens.ImportsScreen
-import com.moneymanager.ui.screens.MonzoAuthScreen
 import com.moneymanager.ui.screens.PeopleScreen
 import com.moneymanager.ui.screens.PersonAuditScreen
 import com.moneymanager.ui.screens.SettingsScreen
@@ -175,12 +175,12 @@ fun MoneyManagerApp(
                                         currentScreen is Screen.ApiStrategies ||
                                         currentScreen is Screen.ApiStrategyAuditHistory ||
                                         currentScreen is Screen.ApiSessionTraffic ||
-                                        currentScreen is Screen.MonzoConnect,
+                                        currentScreen is Screen.ConnectApi,
                                 onClick = {
                                     navigationHistory.navigateTo(
                                         Screen.Imports(
                                             when (currentScreen) {
-                                                is Screen.ApiSessionTraffic, is Screen.MonzoConnect,
+                                                is Screen.ApiSessionTraffic, is Screen.ConnectApi,
                                                 is Screen.ApiStrategies, is Screen.ApiStrategyAuditHistory,
                                                 -> ImportTab.API
                                                 is Screen.Imports -> currentScreen.tab
@@ -386,7 +386,7 @@ fun MoneyManagerApp(
                                             navigationHistory.navigateTo(Screen.CsvStrategies)
                                         },
                                         onAddCredentialClick = {
-                                            navigationHistory.navigateTo(Screen.MonzoConnect)
+                                            navigationHistory.navigateTo(Screen.ConnectApi)
                                         },
                                         onApiStrategiesClick = {
                                             navigationHistory.navigateTo(Screen.ApiStrategies)
@@ -581,13 +581,14 @@ fun MoneyManagerApp(
                                         onBack = { navigationHistory.navigateBack() },
                                     )
                                 }
-                                is Screen.MonzoConnect -> {
+                                is Screen.ConnectApi -> {
                                     LaunchedEffect(Unit) {
                                         currentlyViewedAccountId = null
                                         currentlyViewedCurrencyId = null
                                     }
-                                    MonzoAuthScreen(
+                                    ApiConnectScreen(
                                         apiSessionRepository = services.imports.apiSessionRepository,
+                                        apiImportStrategyRepository = services.imports.apiImportStrategyRepository,
                                         onCredentialSaved = {
                                             navigationHistory.navigateBack()
                                         },
