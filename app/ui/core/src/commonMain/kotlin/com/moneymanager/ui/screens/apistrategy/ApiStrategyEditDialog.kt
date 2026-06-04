@@ -88,7 +88,7 @@ fun ApiStrategyEditDialog(
         )
     }
 
-    // Pagination
+    // Pagination — this dialog edits before-cursor pagination only.
     var paginationEnabled by remember { mutableStateOf(strategy?.transactionsEndpoint?.pagination != null) }
     val defaultPagination = strategy?.transactionsEndpoint?.pagination ?: ApiPaginationConfig()
     var paginationLimitParam by remember { mutableStateOf(defaultPagination.limitParam) }

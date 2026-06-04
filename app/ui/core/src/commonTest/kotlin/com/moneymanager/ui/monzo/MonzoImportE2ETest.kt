@@ -502,7 +502,7 @@ class MonzoImportE2ETest : DbTest() {
                 repositories.apiImportStrategyRepository
                     .getAllStrategies()
                     .first()
-                    .single()
+                    .single { it.name == "Monzo" }
 
             // WHEN — download then import
             downloadApiSessionAccounts(
@@ -692,7 +692,7 @@ class MonzoImportE2ETest : DbTest() {
                 repositories.apiImportStrategyRepository
                     .getAllStrategies()
                     .first()
-                    .single()
+                    .single { it.name == "Monzo" }
 
             downloadApiSessionAccounts(
                 token = "test-monzo-token",
@@ -783,7 +783,7 @@ class MonzoImportE2ETest : DbTest() {
                 repositories.apiImportStrategyRepository
                     .getAllStrategies()
                     .first()
-                    .single()
+                    .single { it.name == "Monzo" }
                     .let { strategy ->
                         strategy.copy(
                             transactionMappings =
@@ -876,7 +876,7 @@ class MonzoImportE2ETest : DbTest() {
                 repositories.apiImportStrategyRepository
                     .getAllStrategies()
                     .first()
-                    .single()
+                    .single { it.name == "Monzo" }
 
             downloadApiSessionAccounts(
                 token = "test-monzo-token",
@@ -967,7 +967,7 @@ class MonzoImportE2ETest : DbTest() {
                 repositories.apiImportStrategyRepository
                     .getAllStrategies()
                     .first()
-                    .single()
+                    .single { it.name == "Monzo" }
                     .let { strategy ->
                         strategy.copy(
                             transactionMappings =
@@ -1058,7 +1058,7 @@ class MonzoImportE2ETest : DbTest() {
                 repositories.apiImportStrategyRepository
                     .getAllStrategies()
                     .first()
-                    .single()
+                    .single { it.name == "Monzo" }
                     .let { strategy ->
                         strategy.copy(
                             transactionMappings =
@@ -1212,7 +1212,7 @@ class MonzoImportE2ETest : DbTest() {
                 repositories.apiImportStrategyRepository
                     .getAllStrategies()
                     .first()
-                    .single()
+                    .single { it.name == "Monzo" }
                     .let { strategy ->
                         strategy.copy(
                             transactionMappings =
@@ -1271,7 +1271,7 @@ class MonzoImportE2ETest : DbTest() {
                 repositories.apiImportStrategyRepository
                     .getAllStrategies()
                     .first()
-                    .single()
+                    .single { it.name == "Monzo" }
                     .let { strategy ->
                         strategy.copy(
                             transactionMappings =
@@ -1373,7 +1373,7 @@ class MonzoImportE2ETest : DbTest() {
                 repositories.apiImportStrategyRepository
                     .getAllStrategies()
                     .first()
-                    .single()
+                    .single { it.name == "Monzo" }
 
             suspend fun importAtmTransactions(
                 sessionToken: String,
@@ -1530,7 +1530,7 @@ class MonzoImportE2ETest : DbTest() {
                 repositories.apiImportStrategyRepository
                     .getAllStrategies()
                     .first()
-                    .single()
+                    .single { it.name == "Monzo" }
                     .let { baseStrategy ->
                         baseStrategy.copy(
                             transactionMappings =

@@ -17,6 +17,10 @@ import kotlin.time.Instant
  * @property accountNamePrefix Prefix prepended to account names on import (e.g. "Monzo: ")
  * @property counterpartyPrefix Prefix prepended to counterparty account names (e.g. "Monzo Counterparty: ")
  * @property peopleMappings JSON field paths/values for people and personal counterparties
+ * @property ancestorEndpoints Resource endpoints fetched before accounts whose items supply context
+ *                             for templating descendant endpoint paths/params (e.g. Wise "profiles")
+ * @property builtInCounterpartyRules Declarative rules routing matching transactions to a single
+ *                                    consolidated built-in counterparty account (e.g. ATM)
  * @property createdAt Timestamp when this strategy was created
  * @property updatedAt Timestamp when this strategy was last modified
  */
@@ -32,6 +36,8 @@ data class ApiImportStrategy(
     val accountNamePrefix: String,
     val counterpartyPrefix: String,
     val peopleMappings: ApiPeopleMappings = ApiPeopleMappings(),
+    val ancestorEndpoints: List<ApiEndpointConfig> = emptyList(),
+    val builtInCounterpartyRules: List<BuiltInCounterpartyRule> = emptyList(),
     val createdAt: Instant,
     val updatedAt: Instant,
     val revisionId: Long = 1,

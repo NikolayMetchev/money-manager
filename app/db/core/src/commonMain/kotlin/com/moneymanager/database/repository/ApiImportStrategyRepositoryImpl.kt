@@ -119,6 +119,8 @@ class ApiImportStrategyRepositoryImpl(
             accountNamePrefix = config.accountNamePrefix,
             counterpartyPrefix = config.counterpartyPrefix,
             peopleMappings = config.peopleMappings,
+            ancestorEndpoints = config.ancestorEndpoints,
+            builtInCounterpartyRules = config.builtInCounterpartyRules,
             createdAt = Instant.fromEpochMilliseconds(entity.created_at),
             updatedAt = Instant.fromEpochMilliseconds(entity.updated_at),
             revisionId = entity.revision_id,
@@ -137,5 +139,7 @@ class ApiImportStrategyRepositoryImpl(
             accountNamePrefix = accountNamePrefix,
             counterpartyPrefix = counterpartyPrefix,
             peopleMappings = peopleMappings,
+            ancestorEndpoints = ancestorEndpoints,
+            builtInCounterpartyRules = builtInCounterpartyRules,
         )
 }

@@ -8,11 +8,18 @@ import com.moneymanager.database.json.ApiStrategyJsonCodec
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.SourceType
 import com.moneymanager.domain.model.apistrategy.ApiAccountMappings
+import com.moneymanager.domain.model.apistrategy.ApiAmountFormat
 import com.moneymanager.domain.model.apistrategy.ApiAuthType
 import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
 import com.moneymanager.domain.model.apistrategy.ApiPaginationConfig
 import com.moneymanager.domain.model.apistrategy.ApiQueryParam
+import com.moneymanager.domain.model.apistrategy.ApiSignSource
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
+import com.moneymanager.domain.model.apistrategy.BuiltInCounterpartyRule
+import com.moneymanager.domain.model.apistrategy.PaginationMode
+import com.moneymanager.domain.model.apistrategy.PredicateOp
+import com.moneymanager.domain.model.apistrategy.RulePredicate
+import com.moneymanager.domain.model.apistrategy.RuleSign
 import com.moneymanager.domain.repository.CurrencyRepository
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
@@ -793,9 +800,10 @@ object DatabaseConfig {
             attributeTypeQueries.insertWithId(id = ACCOUNT_SORT_CODE_ATTR_TYPE_ID, name = "account-sort-code")
             attributeTypeQueries.insertWithId(id = ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID, name = "account-account-number")
 
-            // Seed the built-in Monzo API import strategy (after triggers and system device are
-            // created so the INSERT trigger records the initial audit entry and source is attributed)
+            // Seed the built-in Monzo and Wise API import strategies (after triggers and system
+            // device are created so the INSERT trigger records the initial audit entry and source)
             seedMonzoStrategy(systemDeviceId)
+            seedWiseStrategy(systemDeviceId)
 
             // Seed currencies with source tracking
             allCurrencies.forEach { currency ->
@@ -853,6 +861,7 @@ object DatabaseConfig {
                     ),
                 accountNamePrefix = "Monzo: ",
                 counterpartyPrefix = "Monzo Counterparty: ",
+                builtInCounterpartyRules = monzoAtmRules,
             )
         val now = Clock.System.now().toEpochMilliseconds()
         apiImportStrategyQueries.insert(
@@ -864,6 +873,120 @@ object DatabaseConfig {
         )
         apiImportStrategyQueries.insertSource(
             strategy_id = monzoStrategyId.toString(),
+            revision_id = 1,
+            source_type_id = SourceType.SYSTEM.id.toLong(),
+            device_id = systemDeviceId,
+        )
+    }
+
+    /**
+     * Monzo ATM-detection expressed declaratively (moved out of the import engine). Each rule routes
+     * matching outgoing transactions to a single consolidated "ATM" counterparty account.
+     */
+    private val monzoAtmRules: List<BuiltInCounterpartyRule> =
+        listOf(
+            BuiltInCounterpartyRule(
+                name = "ATM",
+                onlyWhenSign = RuleSign.NEGATIVE,
+                predicates = listOf(RulePredicate(path = "atm_fees_detailed", op = PredicateOp.EXISTS)),
+            ),
+            BuiltInCounterpartyRule(
+                name = "ATM",
+                onlyWhenSign = RuleSign.NEGATIVE,
+                predicates = listOf(RulePredicate(path = "labels", op = PredicateOp.ARRAY_ANY_STARTS_WITH, value = "withdrawal.atm")),
+            ),
+            BuiltInCounterpartyRule(
+                name = "ATM",
+                onlyWhenSign = RuleSign.NEGATIVE,
+                predicates = listOf(RulePredicate(path = "metadata.mcc", op = PredicateOp.EQUALS, value = "6011")),
+            ),
+            BuiltInCounterpartyRule(
+                name = "ATM",
+                onlyWhenSign = RuleSign.NEGATIVE,
+                predicates =
+                    listOf(
+                        RulePredicate(path = "category", op = PredicateOp.EQUALS_IGNORE_CASE, value = "cash"),
+                        RulePredicate(path = "merchant", op = PredicateOp.OBJECT_EMPTY),
+                        RulePredicate(path = "counterparty", op = PredicateOp.OBJECT_EMPTY),
+                    ),
+            ),
+        )
+
+    /** Fixed UUID for the built-in Wise strategy so it can be referenced reliably. */
+    private val wiseStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000002")
+
+    /**
+     * Seeds the built-in Wise API import strategy. Wise has a three-level hierarchy
+     * (profiles → balances → statements): profiles are fetched as an ancestor endpoint and their id
+     * is templated into the balances and statement paths; amounts are decimal with the direction in
+     * a separate `type` field; statements are fetched in date windows.
+     */
+    private fun MoneyManagerDatabaseWrapper.seedWiseStrategy(systemDeviceId: Long) {
+        val config =
+            ApiStrategyConfigJson(
+                baseUrl = "https://api.transferwise.com",
+                authType = ApiAuthType.BEARER_TOKEN,
+                ancestorEndpoints =
+                    listOf(
+                        ApiEndpointConfig(path = "/v1/profiles", responseArrayKey = ""),
+                    ),
+                accountsEndpoint =
+                    ApiEndpointConfig(
+                        path = "/v4/profiles/{ancestor[0].id}/balances",
+                        responseArrayKey = "",
+                        queryParams = listOf(ApiQueryParam(name = "types", value = "STANDARD")),
+                    ),
+                transactionsEndpoint =
+                    ApiEndpointConfig(
+                        path = "/v1/profiles/{ancestor[0].id}/balance-statements/{account.id}/statement.json",
+                        responseArrayKey = "transactions",
+                        queryParams =
+                            listOf(
+                                ApiQueryParam(name = "currency", dynamicSource = "account.currency"),
+                                ApiQueryParam(name = "type", value = "FLAT"),
+                            ),
+                        pagination =
+                            ApiPaginationConfig(
+                                mode = PaginationMode.DATE_WINDOW,
+                                startParam = "intervalStart",
+                                endParam = "intervalEnd",
+                                windowDays = 469,
+                            ),
+                    ),
+                accountMappings =
+                    ApiAccountMappings(
+                        idField = "id",
+                        descriptionField = "name",
+                        ownersArrayField = null,
+                        currencyField = "currency",
+                    ),
+                transactionMappings =
+                    ApiTransactionMappings(
+                        amountField = "amount.value",
+                        currencyField = "amount.currency",
+                        timestampField = "date",
+                        descriptionField = "details.description",
+                        amountFormat = ApiAmountFormat.DECIMAL_MAJOR_UNITS,
+                        signSource = ApiSignSource.FIELD,
+                        signField = "type",
+                        creditValues = setOf("CREDIT"),
+                        idField = "referenceNumber",
+                        merchantNameField = "details.merchant.name",
+                        counterpartyNameField = "details.senderName",
+                    ),
+                accountNamePrefix = "Wise: ",
+                counterpartyPrefix = "Wise Counterparty: ",
+            )
+        val now = Clock.System.now().toEpochMilliseconds()
+        apiImportStrategyQueries.insert(
+            id = wiseStrategyId.toString(),
+            name = "Wise",
+            config_json = ApiStrategyJsonCodec.encode(config),
+            created_at = now,
+            updated_at = now,
+        )
+        apiImportStrategyQueries.insertSource(
+            strategy_id = wiseStrategyId.toString(),
             revision_id = 1,
             source_type_id = SourceType.SYSTEM.id.toLong(),
             device_id = systemDeviceId,
