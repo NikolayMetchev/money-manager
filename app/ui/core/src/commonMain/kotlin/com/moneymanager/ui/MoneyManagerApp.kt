@@ -288,6 +288,7 @@ fun MoneyManagerApp(
                                         personRepository = services.people.personRepository,
                                         personAttributeRepository = services.people.personAttributeRepository,
                                         personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
+                                        attributeTypeRepository = services.transactions.attributeTypeRepository,
                                         entitySource = services.transactions.entitySource,
                                         scrollToPersonId = (screen as? Screen.PeopleScroll)?.personId,
                                         onAuditClick = { person ->

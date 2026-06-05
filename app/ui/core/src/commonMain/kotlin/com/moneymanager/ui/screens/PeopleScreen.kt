@@ -42,6 +42,7 @@ import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonAccountOwnership
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
+import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.PersonAttributeRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.ui.components.DeletePersonConfirmationDialog
@@ -53,6 +54,7 @@ fun PeopleScreen(
     personRepository: PersonRepository,
     personAttributeRepository: PersonAttributeRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
+    attributeTypeRepository: AttributeTypeRepository,
     entitySource: EntitySource,
     scrollToPersonId: PersonId? = null,
     onAuditClick: (Person) -> Unit = {},
@@ -137,6 +139,7 @@ fun PeopleScreen(
             entitySource = entitySource,
             onDismiss = { showCreateDialog = false },
             personAttributeRepository = personAttributeRepository,
+            attributeTypeRepository = attributeTypeRepository,
         )
     }
 
@@ -148,6 +151,7 @@ fun PeopleScreen(
             entitySource = entitySource,
             onDismiss = { personToEdit = null },
             personAttributeRepository = personAttributeRepository,
+            attributeTypeRepository = attributeTypeRepository,
         )
     }
 
