@@ -530,8 +530,10 @@ fun ApiSessionsScreen(
                                 onImport = { session ->
                                     importResultBySession = importResultBySession - session.id
                                     importErrorBySession = importErrorBySession - session.id
+                                    // Transactions and People imports both correlate against the
+                                    // accounts session (to attach transactions / link owners to accounts).
                                     val accountsSession =
-                                        if (session.kind == ApiSessionKind.TRANSACTIONS) {
+                                        if (session.kind == ApiSessionKind.TRANSACTIONS || session.kind == ApiSessionKind.PEOPLE) {
                                             credentialSessions.firstOrNull { it.kind == ApiSessionKind.ACCOUNTS }
                                         } else {
                                             null
