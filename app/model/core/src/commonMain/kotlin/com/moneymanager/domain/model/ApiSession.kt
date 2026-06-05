@@ -13,6 +13,9 @@ data class MonzoCredential(
     val token: String,
     val createdAt: Instant,
     val strategyId: ApiImportStrategyId? = null,
+    /** PEM-encoded RSA keys for request signing (e.g. Wise SCA); null when not configured. */
+    val privateKey: String? = null,
+    val publicKey: String? = null,
 )
 
 @JvmInline

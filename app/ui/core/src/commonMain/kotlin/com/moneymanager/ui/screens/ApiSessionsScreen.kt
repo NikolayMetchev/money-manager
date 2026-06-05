@@ -79,6 +79,7 @@ import com.moneymanager.domain.repository.PersonAttributeRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.rest.ApiSessionTrafficRecorder
+import com.moneymanager.rest.ScaParams
 import com.moneymanager.rest.createApiClient
 import com.moneymanager.ui.api.ApiAccountsDownloadResult
 import com.moneymanager.ui.api.ApiCounterpartySuggestion
@@ -90,6 +91,8 @@ import com.moneymanager.ui.api.discoverApiCounterpartiesToCreate
 import com.moneymanager.ui.api.downloadApiSessionAccounts
 import com.moneymanager.ui.api.downloadApiSessionTransactions
 import com.moneymanager.ui.api.importApiSessionTransactions
+import com.moneymanager.ui.api.sca.generateScaKeyPair
+import com.moneymanager.ui.api.sca.signScaChallenge
 import com.moneymanager.ui.background.LocalBackgroundTaskManager
 import com.moneymanager.ui.background.formatElapsedTime
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -98,7 +101,9 @@ import com.moneymanager.ui.util.displayDateTime
 import com.moneymanager.ui.util.setPlainText
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -138,6 +143,7 @@ fun ApiSessionsScreen(
     var importedSessionRevisions by remember { mutableStateOf<Set<ApiSessionImportRevision>>(emptySet()) }
     var currentStrategyRevisionByCredential by remember { mutableStateOf<Map<MonzoCredentialId, Long?>>(emptyMap()) }
     var strategyNameByCredential by remember { mutableStateOf<Map<MonzoCredentialId, String>>(emptyMap()) }
+    var requiresSigningByCredential by remember { mutableStateOf<Map<MonzoCredentialId, Boolean>>(emptyMap()) }
     var isLoading by remember { mutableStateOf(true) }
     // Per-session import state
     var importResultBySession by remember { mutableStateOf<Map<ApiSessionId, ApiSessionImportResult>>(emptyMap()) }
@@ -154,6 +160,22 @@ fun ApiSessionsScreen(
         credential.strategyId
             ?.let { apiImportStrategyRepository.getStrategyById(it).first() }
             ?: apiImportStrategyRepository.getAllStrategies().first().firstOrNull()
+
+    // Builds the SCA request-signing params when the strategy is SCA-protected and the credential
+    // has a signing key (e.g. Wise statements). Null disables signing (e.g. Monzo).
+    fun scaParamsFor(
+        strategy: ApiImportStrategy,
+        credential: MonzoCredential,
+    ): ScaParams? {
+        val signing = strategy.signing ?: return null
+        val privateKey = credential.privateKey ?: return null
+        return ScaParams(
+            challengeHeader = signing.challengeHeader,
+            signatureHeader = signing.signatureHeader,
+            triggerStatus = signing.triggerStatus,
+            sign = { oneTimeToken -> signScaChallenge(privateKey, oneTimeToken) },
+        )
+    }
 
     fun refresh() {
         scope.launch {
@@ -178,14 +200,19 @@ fun ApiSessionsScreen(
                     }
                 // Label each credential by its linked strategy (the actual provider), not the legacy
                 // session type which is always "Monzo".
-                val fallbackStrategyName = allStrategies.firstOrNull()?.name
+                val fallbackStrategy = allStrategies.firstOrNull()
                 strategyNameByCredential =
                     allCredentials.mapNotNull { credential ->
                         val name =
                             credential.strategyId?.let { strategyById[it]?.name }
-                                ?: fallbackStrategyName
+                                ?: fallbackStrategy?.name
                         name?.let { credential.id to it }
                     }.toMap()
+                requiresSigningByCredential =
+                    allCredentials.associate { credential ->
+                        val strategy = credential.strategyId?.let { strategyById[it] } ?: fallbackStrategy
+                        credential.id to (strategy?.signing != null)
+                    }
                 importedSessionRevisions = apiSessionRepository.getImportedSessionRevisions()
             } finally {
                 isLoading = false
@@ -296,6 +323,19 @@ fun ApiSessionsScreen(
                             CredentialCard(
                                 credential = credential,
                                 providerLabel = strategyNameByCredential[credential.id],
+                                requiresSigning = requiresSigningByCredential[credential.id] == true,
+                                onGenerateSigningKey = {
+                                    scope.launch {
+                                        val keyPair = withContext(Dispatchers.Default) { generateScaKeyPair() }
+                                        apiSessionRepository.updateCredentialKeys(
+                                            credentialId = credential.id,
+                                            privateKey = keyPair.privateKeyPem,
+                                            publicKey = keyPair.publicKeyPem,
+                                        )
+                                        refresh()
+                                    }
+                                },
+                                onCopyText = { text -> scope.launch { clipboard.setPlainText(text) } },
                                 sessions = credentialSessions,
                                 isDownloadingAccounts = isDownloadingAccounts,
                                 isDownloadingTransactions = isDownloadingTransactions,
@@ -342,6 +382,7 @@ fun ApiSessionsScreen(
                                                     apiSessionRepository = apiSessionRepository,
                                                     sessionId = newSessionId,
                                                     strategy = strategy,
+                                                    sca = scaParamsFor(strategy, credential),
                                                 )
                                             accountsDownloadResultByCredential =
                                                 accountsDownloadResultByCredential + (credential.id to result)
@@ -386,6 +427,7 @@ fun ApiSessionsScreen(
                                                     sessionId = newSessionId,
                                                     strategy = strategy,
                                                     accountsSessionId = accountsSession?.id,
+                                                    sca = scaParamsFor(strategy, credential),
                                                     onProgress = { progress ->
                                                         downloadProgressByCredential =
                                                             downloadProgressByCredential + (credential.id to progress)
@@ -547,9 +589,49 @@ private fun CounterpartyConfirmationDialog(
 }
 
 @Composable
+private fun SigningKeySection(
+    publicKey: String?,
+    onGenerateSigningKey: () -> Unit,
+    onCopyText: (String) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(text = "Request signing (SCA)", style = MaterialTheme.typography.labelLarge)
+        if (publicKey == null) {
+            Text(
+                text =
+                    "This provider protects statements with Strong Customer Authentication. Generate a " +
+                        "signing key, then register its public key in your provider account.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Button(onClick = onGenerateSigningKey) { Text("Generate signing key") }
+        } else {
+            Text(
+                text = "Public key generated. Register it in your provider account (e.g. Wise → Settings → API tokens → Manage public keys).",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = publicKey,
+                style = MaterialTheme.typography.bodySmall,
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { onCopyText(publicKey) }) { Text("Copy public key") }
+                TextButton(onClick = onGenerateSigningKey) { Text("Regenerate") }
+            }
+        }
+    }
+}
+
+@Composable
 private fun CredentialCard(
     credential: MonzoCredential,
     providerLabel: String?,
+    requiresSigning: Boolean,
+    onGenerateSigningKey: () -> Unit,
+    onCopyText: (String) -> Unit,
     sessions: List<ApiSession>,
     isDownloadingAccounts: Boolean,
     isDownloadingTransactions: Boolean,
@@ -599,6 +681,14 @@ private fun CredentialCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+
+            if (requiresSigning) {
+                SigningKeySection(
+                    publicKey = credential.publicKey,
+                    onGenerateSigningKey = onGenerateSigningKey,
+                    onCopyText = onCopyText,
+                )
+            }
 
             accountsDownloadResult?.let {
                 Text(text = it.displaySummary(), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)

@@ -256,6 +256,23 @@ data class BuiltInCounterpartyRule(
 )
 
 /**
+ * Strong Customer Authentication (request-signing) parameters for a provider that protects some
+ * endpoints behind a challenge-response signature (e.g. Wise balance statements). When a request is
+ * rejected with [triggerStatus] and returns a one-time token in [challengeHeader], the importer signs
+ * the token with the credential's private key and retries with the signature in [signatureHeader].
+ *
+ * @property challengeHeader Response header carrying the one-time token (e.g. "x-2fa-approval")
+ * @property signatureHeader Request header for the Base64 signature on retry (e.g. "X-Signature")
+ * @property triggerStatus HTTP status that signals a signing challenge (e.g. 403)
+ */
+@Serializable
+data class ApiSigningConfig(
+    val challengeHeader: String = "x-2fa-approval",
+    val signatureHeader: String = "X-Signature",
+    val triggerStatus: Int = 403,
+)
+
+/**
  * Decoded, domain-level view of an API import strategy's full configuration.
  * Stored as JSON in the database; decoded by the db layer for use across all layers.
  *
@@ -277,4 +294,5 @@ data class ApiStrategyConfig(
     val peopleMappings: ApiPeopleMappings,
     val ancestorEndpoints: List<ApiEndpointConfig> = emptyList(),
     val builtInCounterpartyRules: List<BuiltInCounterpartyRule> = emptyList(),
+    val signing: ApiSigningConfig? = null,
 )

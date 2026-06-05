@@ -12,6 +12,9 @@ CREATE TABLE api_credential (
     token TEXT NOT NULL UNIQUE CHECK(length(trim(token)) > 0),
     created_at INTEGER NOT NULL,
     strategy_id TEXT,
+    -- PEM-encoded RSA key pair for request signing (e.g. Wise SCA); null when not configured.
+    private_key TEXT,
+    public_key TEXT,
     FOREIGN KEY (type_id) REFERENCES api_session_type(id),
     FOREIGN KEY (strategy_id) REFERENCES api_import_strategy(id) ON DELETE SET NULL
 );
@@ -101,14 +104,17 @@ CREATE INDEX idx_api_response_session ON api_response(session_id);
 CREATE INDEX idx_api_response_responded_at ON api_response(responded_at);
 
 insertCredential:
-INSERT INTO api_credential(type_id, token, created_at, strategy_id)
-VALUES (?, ?, ?, ?);
+INSERT INTO api_credential(type_id, token, created_at, strategy_id, private_key, public_key)
+VALUES (?, ?, ?, ?, ?, ?);
 
 lastInsertCredentialRowId:
 SELECT last_insert_rowid();
 
 updateCredentialStrategy:
 UPDATE api_credential SET strategy_id = ? WHERE id = ?;
+
+updateCredentialKeys:
+UPDATE api_credential SET private_key = ?, public_key = ? WHERE id = ?;
 
 selectAllCredentials:
 SELECT * FROM api_credential ORDER BY created_at DESC;

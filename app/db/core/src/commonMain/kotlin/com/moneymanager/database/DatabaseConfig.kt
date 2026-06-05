@@ -14,6 +14,7 @@ import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
 import com.moneymanager.domain.model.apistrategy.ApiPaginationConfig
 import com.moneymanager.domain.model.apistrategy.ApiQueryParam
 import com.moneymanager.domain.model.apistrategy.ApiSignSource
+import com.moneymanager.domain.model.apistrategy.ApiSigningConfig
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
 import com.moneymanager.domain.model.apistrategy.BuiltInCounterpartyRule
 import com.moneymanager.domain.model.apistrategy.PaginationMode
@@ -973,6 +974,9 @@ object DatabaseConfig {
                     ),
                 accountNamePrefix = "Wise: ",
                 counterpartyPrefix = "Wise Counterparty: ",
+                // Wise balance statements are SCA-protected: a 403 returns an x-2fa-approval one-time
+                // token that must be signed with the credential's private key and replayed.
+                signing = ApiSigningConfig(),
             )
         val now = Clock.System.now().toEpochMilliseconds()
         apiImportStrategyQueries.insert(

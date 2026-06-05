@@ -46,6 +46,8 @@ interface ApiSessionRepository {
         createdAt: Instant,
         type: ApiSessionType = ApiSessionType.MONZO,
         strategyId: ApiImportStrategyId? = null,
+        privateKey: String? = null,
+        publicKey: String? = null,
     ): MonzoCredentialId
 
     /**
@@ -54,6 +56,15 @@ interface ApiSessionRepository {
     suspend fun updateCredentialStrategy(
         credentialId: MonzoCredentialId,
         strategyId: ApiImportStrategyId?,
+    )
+
+    /**
+     * Stores (or replaces) the PEM-encoded RSA signing key pair on a credential.
+     */
+    suspend fun updateCredentialKeys(
+        credentialId: MonzoCredentialId,
+        privateKey: String?,
+        publicKey: String?,
     )
 
     /**

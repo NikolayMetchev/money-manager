@@ -33,6 +33,7 @@ import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.rest.ApiClient
 import com.moneymanager.rest.ApiHttpResponse
+import com.moneymanager.rest.ScaParams
 import com.moneymanager.ui.screens.transactions.logger
 import io.ktor.http.*
 import kotlinx.coroutines.CancellationException
@@ -103,6 +104,7 @@ suspend fun downloadApiSessionAccounts(
     apiSessionRepository: ApiSessionRepository,
     sessionId: ApiSessionId,
     strategy: ApiImportStrategy,
+    sca: ScaParams? = null,
 ): ApiAccountsDownloadResult {
     val existingRequests = apiSessionRepository.getRequestsBySession(sessionId)
     val existingResponses = apiSessionRepository.getResponsesBySession(sessionId)
@@ -112,7 +114,7 @@ suspend fun downloadApiSessionAccounts(
     // Resolve ancestor resources (e.g. Wise profiles) first; for a flat API (Monzo) this is a
     // single empty context so the accounts endpoint is fetched exactly once.
     val ancestorContexts =
-        fetchAncestorContexts(token, apiClient, strategy, existingRequestsByUrl, existingResponsesByRequestId)
+        fetchAncestorContexts(token, apiClient, strategy, existingRequestsByUrl, existingResponsesByRequestId, sca)
 
     var totalAccounts = 0
     var anyFetched = false
@@ -125,7 +127,7 @@ suspend fun downloadApiSessionAccounts(
                 existingResponse.json
             } else {
                 anyFetched = true
-                fetchResponse(url = url, token = token, apiClient = apiClient).body
+                fetchResponse(url = url, token = token, apiClient = apiClient, sca = sca).body
             }
         totalAccounts += parseAccounts(json, strategy).size
     }
@@ -143,6 +145,7 @@ private suspend fun fetchAncestorContexts(
     strategy: ApiImportStrategy,
     existingRequestsByUrl: Map<String, ApiRequest>,
     existingResponsesByRequestId: Map<ApiRequestId, ApiResponse>,
+    sca: ScaParams?,
 ): List<List<JsonObject>> {
     var contexts: List<List<JsonObject>> = listOf(emptyList())
     strategy.ancestorEndpoints.forEach { endpoint ->
@@ -150,7 +153,7 @@ private suspend fun fetchAncestorContexts(
         for (ancestors in contexts) {
             val url = buildEndpointRequestUrl(strategy.baseUrl, endpoint, ImportUrlContext(ancestorItems = ancestors))
             val existingResponse = existingRequestsByUrl[url]?.let { existingResponsesByRequestId[it.id] }
-            val json = existingResponse?.json ?: fetchResponse(url = url, token = token, apiClient = apiClient).body
+            val json = existingResponse?.json ?: fetchResponse(url = url, token = token, apiClient = apiClient, sca = sca).body
             for (item in responseItemsArray(json, endpoint.responseArrayKey).orEmpty()) {
                 (item as? JsonObject)?.let { next += ancestors + it }
             }
@@ -173,6 +176,7 @@ suspend fun downloadApiSessionTransactions(
     sessionId: ApiSessionId,
     strategy: ApiImportStrategy,
     accountsSessionId: ApiSessionId? = null,
+    sca: ScaParams? = null,
     onProgress: (ApiTransactionsDownloadProgress) -> Unit = {},
 ): ApiTransactionsDownloadResult {
     val existingRequests = apiSessionRepository.getRequestsBySession(sessionId)
@@ -231,7 +235,7 @@ suspend fun downloadApiSessionTransactions(
                 )
                 val existingResponse = existingRequestsByUrl[url]?.let { existingResponsesByRequestId[it.id] }
                 if (existingResponse == null) {
-                    fetchResponse(url = url, token = token, apiClient = apiClient)
+                    fetchResponse(url = url, token = token, apiClient = apiClient, sca = sca)
                     transactionResponseCount += 1
                 }
             }
@@ -259,7 +263,7 @@ suspend fun downloadApiSessionTransactions(
                     if (existingResponse != null) {
                         parseTransactionsWithPath(existingResponse.json, strategy)
                     } else {
-                        val response = fetchResponse(url = url, token = token, apiClient = apiClient)
+                        val response = fetchResponse(url = url, token = token, apiClient = apiClient, sca = sca)
                         transactionResponseCount += 1
                         parseTransactionsWithPath(response.body, strategy)
                     }
@@ -1258,8 +1262,9 @@ private suspend fun fetchResponse(
     url: String,
     token: String,
     apiClient: ApiClient,
+    sca: ScaParams? = null,
 ): ApiHttpResponse {
-    val response = apiClient.get(url = url, bearerToken = token)
+    val response = apiClient.get(url = url, bearerToken = token, sca = sca)
     if (response.statusCode != 200) {
         throw ApiSessionImportException("HTTP ${response.statusCode}: ${response.body}")
     }

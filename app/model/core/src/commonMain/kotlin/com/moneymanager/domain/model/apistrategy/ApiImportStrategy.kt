@@ -38,6 +38,7 @@ data class ApiImportStrategy(
     val peopleMappings: ApiPeopleMappings = ApiPeopleMappings(),
     val ancestorEndpoints: List<ApiEndpointConfig> = emptyList(),
     val builtInCounterpartyRules: List<BuiltInCounterpartyRule> = emptyList(),
+    val signing: ApiSigningConfig? = null,
     val createdAt: Instant,
     val updatedAt: Instant,
     val revisionId: Long = 1,

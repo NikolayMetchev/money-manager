@@ -6,9 +6,24 @@ import io.ktor.client.plugins.HttpSend
 import io.ktor.client.plugins.plugin
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
+import io.ktor.client.request.header
+import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
 import io.ktor.util.AttributeKey
+
+/**
+ * Strong Customer Authentication challenge-signing parameters. When a request is rejected with
+ * [triggerStatus] and carries a [challengeHeader] one-time token, the token is signed via [sign] and
+ * the request is retried once with the challenge echoed back plus the signature in [signatureHeader].
+ * This is generic; the header names and status come from the provider's strategy config.
+ */
+class ScaParams(
+    val challengeHeader: String,
+    val signatureHeader: String,
+    val triggerStatus: Int,
+    val sign: (oneTimeToken: String) -> String,
+)
 
 class ApiClient(
     private val httpClient: HttpClient,
@@ -16,24 +31,35 @@ class ApiClient(
     suspend fun get(
         url: String,
         bearerToken: String,
+        sca: ScaParams? = null,
     ): ApiHttpResponse {
         val response =
             httpClient.get(url) {
                 bearerAuth(bearerToken)
             }
-        val body =
-            response.call.attributes.getOrNull(apiResponseBodyKey)
-                ?: response.bodyAsText()
-        val responseId = response.call.attributes[apiResponseIdKey]
-        val requestId = response.call.attributes[apiRequestIdKey]
-
-        return ApiHttpResponse(
-            statusCode = response.status.value,
-            body = body,
-            responseId = responseId,
-            requestId = requestId,
-        )
+        if (sca != null && response.status.value == sca.triggerStatus) {
+            val oneTimeToken = response.headers[sca.challengeHeader]
+            if (!oneTimeToken.isNullOrBlank()) {
+                val signature = sca.sign(oneTimeToken)
+                val signed =
+                    httpClient.get(url) {
+                        bearerAuth(bearerToken)
+                        header(sca.challengeHeader, oneTimeToken)
+                        header(sca.signatureHeader, signature)
+                    }
+                return signed.toApiHttpResponse()
+            }
+        }
+        return response.toApiHttpResponse()
     }
+
+    private suspend fun HttpResponse.toApiHttpResponse(): ApiHttpResponse =
+        ApiHttpResponse(
+            statusCode = status.value,
+            body = call.attributes.getOrNull(apiResponseBodyKey) ?: bodyAsText(),
+            responseId = call.attributes[apiResponseIdKey],
+            requestId = call.attributes[apiRequestIdKey],
+        )
 }
 
 data class ApiHttpResponse(
