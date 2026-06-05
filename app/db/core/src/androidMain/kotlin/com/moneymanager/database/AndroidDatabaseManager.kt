@@ -88,9 +88,6 @@ class AndroidDatabaseManager(
                 onProgress(DatabaseInitializationProgress("Preparing repositories...", 5, 6))
             }
 
-            // Idempotent: adds any built-in API strategies missing from existing databases.
-            DatabaseConfig.ensureBuiltInApiStrategies(database)
-
             onProgress(DatabaseInitializationProgress("Finishing database startup...", 6, 6))
             database
         }

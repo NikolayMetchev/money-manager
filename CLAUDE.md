@@ -69,6 +69,12 @@ Money Manager is a Kotlin Multiplatform personal finance app targeting JVM and A
 
 **SQLDelight** schema files: `app/db/core/src/commonMain/sqldelight/com/moneymanager/database/`
 
+**BETA — no DB versioning yet**: The app is in BETA and database versioning/migrations are not
+implemented (tracked in [issue #426](https://github.com/NikolayMetchev/money-manager/issues/426)).
+Until that lands, **do not make backward-compatible DB changes or write migration code**. The
+database is recreated from scratch on schema changes (seeding runs only on fresh-database creation),
+so existing local databases are expected to be deleted/recreated rather than migrated.
+
 **Important**: Store booleans as INTEGER (0/1). Don't use `AS Boolean` in .sq files.
 
 **Mappie** generates type-safe mappers from database entities to domain models. Annotate mapper interfaces with `@Mapper`.

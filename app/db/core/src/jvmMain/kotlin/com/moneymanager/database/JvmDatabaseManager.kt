@@ -77,9 +77,6 @@ class JvmDatabaseManager : DatabaseManager {
                 onProgress(DatabaseInitializationProgress("Preparing repositories...", 6, 7))
             }
 
-            // Idempotent: adds any built-in API strategies missing from existing databases.
-            DatabaseConfig.ensureBuiltInApiStrategies(database)
-
             onProgress(DatabaseInitializationProgress("Finishing database startup...", 7, 7))
             database
         }

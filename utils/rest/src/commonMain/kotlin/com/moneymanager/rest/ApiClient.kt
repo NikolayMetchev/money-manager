@@ -76,7 +76,10 @@ fun createApiClient(
 
         val call = execute(request)
         val responseBody = call.response.bodyAsText()
-        val responseId = trafficRecorder.recordResponse(requestId, responseBody)
+        // Only persist non-blank bodies: the api_response.json column rejects empty values, and an
+        // empty body (e.g. an error or no-content response) carries nothing importable. The caller
+        // still sees the status code and can surface a meaningful error.
+        val responseId = if (responseBody.isNotBlank()) trafficRecorder.recordResponse(requestId, responseBody) else NO_RESPONSE_ID
         call.attributes.put(apiResponseBodyKey, responseBody)
         call.attributes.put(apiResponseIdKey, responseId)
         call.attributes.put(apiRequestIdKey, requestId)
@@ -86,6 +89,9 @@ fun createApiClient(
 
     return ApiClient(httpClient)
 }
+
+/** Sentinel response id used when an empty body is not persisted (see the traffic interceptor). */
+const val NO_RESPONSE_ID: Long = -1L
 
 private val apiResponseBodyKey = AttributeKey<String>("ApiResponseBody")
 private val apiResponseIdKey = AttributeKey<Long>("ApiResponseId")

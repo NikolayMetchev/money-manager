@@ -137,6 +137,7 @@ fun ApiSessionsScreen(
     var sessionsByCredential by remember { mutableStateOf<Map<MonzoCredentialId, List<ApiSession>>>(emptyMap()) }
     var importedSessionRevisions by remember { mutableStateOf<Set<ApiSessionImportRevision>>(emptySet()) }
     var currentStrategyRevisionByCredential by remember { mutableStateOf<Map<MonzoCredentialId, Long?>>(emptyMap()) }
+    var strategyNameByCredential by remember { mutableStateOf<Map<MonzoCredentialId, String>>(emptyMap()) }
     var isLoading by remember { mutableStateOf(true) }
     // Per-session import state
     var importResultBySession by remember { mutableStateOf<Map<ApiSessionId, ApiSessionImportResult>>(emptyMap()) }
@@ -175,6 +176,16 @@ fun ApiSessionsScreen(
                                 ?: fallbackStrategyRevision
                         )
                     }
+                // Label each credential by its linked strategy (the actual provider), not the legacy
+                // session type which is always "Monzo".
+                val fallbackStrategyName = allStrategies.firstOrNull()?.name
+                strategyNameByCredential =
+                    allCredentials.mapNotNull { credential ->
+                        val name =
+                            credential.strategyId?.let { strategyById[it]?.name }
+                                ?: fallbackStrategyName
+                        name?.let { credential.id to it }
+                    }.toMap()
                 importedSessionRevisions = apiSessionRepository.getImportedSessionRevisions()
             } finally {
                 isLoading = false
@@ -284,6 +295,7 @@ fun ApiSessionsScreen(
                             val isDownloadingTransactions = backgroundTasks.isRunning(monzoTransactionsDownloadTaskKey(credential.id))
                             CredentialCard(
                                 credential = credential,
+                                providerLabel = strategyNameByCredential[credential.id],
                                 sessions = credentialSessions,
                                 isDownloadingAccounts = isDownloadingAccounts,
                                 isDownloadingTransactions = isDownloadingTransactions,
@@ -537,6 +549,7 @@ private fun CounterpartyConfirmationDialog(
 @Composable
 private fun CredentialCard(
     credential: MonzoCredential,
+    providerLabel: String?,
     sessions: List<ApiSession>,
     isDownloadingAccounts: Boolean,
     isDownloadingTransactions: Boolean,
@@ -568,9 +581,12 @@ private fun CredentialCard(
             Text(
                 text =
                     "Credential · " +
-                        credential.type.name
-                            .lowercase()
-                            .replaceFirstChar { it.uppercase() },
+                        (
+                            providerLabel
+                                ?: credential.type.name
+                                    .lowercase()
+                                    .replaceFirstChar { it.uppercase() }
+                        ),
                 style = MaterialTheme.typography.titleMedium,
             )
             Text(
