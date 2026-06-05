@@ -11,8 +11,8 @@ import com.moneymanager.rest.createApiClient
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.ui.api.downloadApiSessionAccounts
 import com.moneymanager.ui.api.downloadApiSessionPeople
-import com.moneymanager.ui.api.importApiSessionPeople
 import com.moneymanager.ui.api.downloadApiSessionTransactions
+import com.moneymanager.ui.api.importApiSessionPeople
 import com.moneymanager.ui.api.importApiSessionTransactions
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -210,7 +210,11 @@ class WiseImportE2ETest : DbTest() {
                 }
             val apiClient =
                 createApiClient(
-                    trafficRecorder = ApiSessionTrafficRecorder(sessionId = sessionId, apiSessionRepository = repositories.apiSessionRepository),
+                    trafficRecorder =
+                        ApiSessionTrafficRecorder(
+                            sessionId = sessionId,
+                            apiSessionRepository = repositories.apiSessionRepository,
+                        ),
                     engine = mockEngine,
                 )
             val strategy =
@@ -277,14 +281,24 @@ class WiseImportE2ETest : DbTest() {
 
             fun clientFor(sessionId: com.moneymanager.domain.model.ApiSessionId) =
                 createApiClient(
-                    trafficRecorder = ApiSessionTrafficRecorder(sessionId = sessionId, apiSessionRepository = repositories.apiSessionRepository),
+                    trafficRecorder =
+                        ApiSessionTrafficRecorder(
+                            sessionId = sessionId,
+                            apiSessionRepository = repositories.apiSessionRepository,
+                        ),
                     engine = engine(),
                 )
 
             // 1. Download + import accounts so the GBP balance exists as an account.
             val accountsSessionId =
                 repositories.apiSessionRepository.createSession("test-wise-token", deviceId, now, null)
-            downloadApiSessionAccounts("test-wise-token", clientFor(accountsSessionId), repositories.apiSessionRepository, accountsSessionId, strategy)
+            downloadApiSessionAccounts(
+                token = "test-wise-token",
+                apiClient = clientFor(accountsSessionId),
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = accountsSessionId,
+                strategy = strategy,
+            )
             importApiSessionTransactions(
                 apiSessionRepository = repositories.apiSessionRepository,
                 accountRepository = repositories.accountRepository,
@@ -305,7 +319,13 @@ class WiseImportE2ETest : DbTest() {
             val peopleSessionId =
                 repositories.apiSessionRepository.createSession("test-wise-token", deviceId, now, null)
             val downloadResult =
-                downloadApiSessionPeople("test-wise-token", clientFor(peopleSessionId), repositories.apiSessionRepository, peopleSessionId, strategy)
+                downloadApiSessionPeople(
+                    token = "test-wise-token",
+                    apiClient = clientFor(peopleSessionId),
+                    apiSessionRepository = repositories.apiSessionRepository,
+                    sessionId = peopleSessionId,
+                    strategy = strategy,
+                )
             assertEquals(1, downloadResult.personCount, "One profile holder downloaded")
 
             val importResult =
@@ -328,7 +348,11 @@ class WiseImportE2ETest : DbTest() {
             val people = repositories.personRepository.getAllPeople().first()
             val ada = people.single { it.firstName == "Ada" && it.lastName == "Lovelace" }
 
-            val gbpAccount = repositories.accountRepository.getAllAccounts().first().single { it.name == "Wise: GBP" }
+            val gbpAccount =
+                repositories.accountRepository
+                    .getAllAccounts()
+                    .first()
+                    .single { it.name == "Wise: GBP" }
             val owners =
                 repositories.personAccountOwnershipRepository
                     .getOwnershipsByAccount(gbpAccount.id)
@@ -358,7 +382,11 @@ class WiseImportE2ETest : DbTest() {
             val peopleSessionId = repositories.apiSessionRepository.createSession("test-wise-token", deviceId, now, null)
             val client =
                 createApiClient(
-                    trafficRecorder = ApiSessionTrafficRecorder(sessionId = peopleSessionId, apiSessionRepository = repositories.apiSessionRepository),
+                    trafficRecorder =
+                        ApiSessionTrafficRecorder(
+                            sessionId = peopleSessionId,
+                            apiSessionRepository = repositories.apiSessionRepository,
+                        ),
                     engine =
                         MockEngine { _ ->
                             respond(PROFILES_JSON, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
@@ -379,7 +407,11 @@ class WiseImportE2ETest : DbTest() {
             )
 
             // No duplicate: matched the existing Ada by name and added the Wise id alongside the Monzo id.
-            val matches = repositories.personRepository.getAllPeople().first().filter { it.firstName == "Ada" && it.lastName == "Lovelace" }
+            val matches =
+                repositories.personRepository
+                    .getAllPeople()
+                    .first()
+                    .filter { it.firstName == "Ada" && it.lastName == "Lovelace" }
             assertEquals(1, matches.size, "Ada must be matched by name, not duplicated")
             val attributes =
                 repositories.personAttributeRepository

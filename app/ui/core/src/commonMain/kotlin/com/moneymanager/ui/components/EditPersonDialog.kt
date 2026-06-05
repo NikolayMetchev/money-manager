@@ -214,7 +214,11 @@ private suspend fun savePersonAttributes(
     attributeTypeRepository: AttributeTypeRepository,
 ) {
     val keptIds = editableAttributes.keys.filter { it > 0 }.toSet()
-    originalAttributeList.map { it.id }.toSet().minus(keptIds).forEach { personAttributeRepository.delete(it) }
+    originalAttributeList
+        .map { it.id }
+        .toSet()
+        .minus(keptIds)
+        .forEach { personAttributeRepository.delete(it) }
 
     editableAttributes.filterKeys { it > 0 }.forEach { (id, pair) ->
         val typeName = pair.first.trim()

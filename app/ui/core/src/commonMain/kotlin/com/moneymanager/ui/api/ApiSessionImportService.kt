@@ -425,8 +425,9 @@ private fun JsonObject.toPersonOwner(
     index: Int,
 ): ApiImportAccountOwner? {
     val externalId = resolveJsonPath(config.externalIdField)?.takeIf { it.isNotBlank() }
-    val first = config.preferredNameField?.let { resolveJsonPath(it) }?.takeIf { it.isNotBlank() }
-        ?: resolveJsonPath(config.firstNameField)?.takeIf { it.isNotBlank() }
+    val first =
+        config.preferredNameField?.let { resolveJsonPath(it) }?.takeIf { it.isNotBlank() }
+            ?: resolveJsonPath(config.firstNameField)?.takeIf { it.isNotBlank() }
     val last = config.lastNameField?.let { resolveJsonPath(it) }?.takeIf { it.isNotBlank() }
     val fallback = config.fallbackNameField?.let { resolveJsonPath(it) }?.takeIf { it.isNotBlank() }
     val name = listOfNotNull(first, last).joinToString(" ").ifBlank { fallback ?: return null }

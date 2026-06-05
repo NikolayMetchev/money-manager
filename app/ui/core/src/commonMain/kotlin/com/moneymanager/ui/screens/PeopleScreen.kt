@@ -41,8 +41,8 @@ import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonAccountOwnership
 import com.moneymanager.domain.model.PersonId
-import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
+import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonAttributeRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.ui.components.DeletePersonConfirmationDialog

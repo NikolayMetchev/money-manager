@@ -90,21 +90,21 @@ import com.moneymanager.ui.api.ApiTransactionsDownloadResult
 import com.moneymanager.ui.api.discoverApiCounterpartiesToCreate
 import com.moneymanager.ui.api.downloadApiSessionAccounts
 import com.moneymanager.ui.api.downloadApiSessionPeople
-import com.moneymanager.ui.api.importApiSessionPeople
 import com.moneymanager.ui.api.downloadApiSessionTransactions
+import com.moneymanager.ui.api.importApiSessionPeople
 import com.moneymanager.ui.api.importApiSessionTransactions
 import com.moneymanager.ui.api.sca.generateScaKeyPair
 import com.moneymanager.ui.api.sca.signScaChallenge
 import com.moneymanager.ui.background.LocalBackgroundTaskManager
 import com.moneymanager.ui.background.formatElapsedTime
-import com.moneymanager.ui.util.currentCountryCode
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.util.ContentCopyIcon
+import com.moneymanager.ui.util.currentCountryCode
 import com.moneymanager.ui.util.displayDateTime
 import com.moneymanager.ui.util.setPlainText
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -207,12 +207,13 @@ fun ApiSessionsScreen(
                 // session type which is always "Monzo".
                 val fallbackStrategy = allStrategies.firstOrNull()
                 strategyNameByCredential =
-                    allCredentials.mapNotNull { credential ->
-                        val name =
-                            credential.strategyId?.let { strategyById[it]?.name }
-                                ?: fallbackStrategy?.name
-                        name?.let { credential.id to it }
-                    }.toMap()
+                    allCredentials
+                        .mapNotNull { credential ->
+                            val name =
+                                credential.strategyId?.let { strategyById[it]?.name }
+                                    ?: fallbackStrategy?.name
+                            name?.let { credential.id to it }
+                        }.toMap()
                 requiresSigningByCredential =
                     allCredentials.associate { credential ->
                         val strategy = credential.strategyId?.let { strategyById[it] } ?: fallbackStrategy
@@ -225,19 +226,20 @@ fun ApiSessionsScreen(
                     }
                 val country = currentCountryCode()
                 transactionsBlockReasonByCredential =
-                    allCredentials.mapNotNull { credential ->
-                        val strategy = credential.strategyId?.let { strategyById[it] } ?: fallbackStrategy
-                        val countries = strategy?.signing?.statementCountries.orEmpty()
-                        if (countries.isNotEmpty() && (country == null || country !in countries)) {
-                            credential.id to
-                                "Transaction download isn't available for your region" +
-                                (country?.let { " ($it)" } ?: "") +
-                                ". ${strategy?.name ?: "This provider"} only supports statements for: " +
-                                countries.sorted().joinToString(", ") + "."
-                        } else {
-                            null
-                        }
-                    }.toMap()
+                    allCredentials
+                        .mapNotNull { credential ->
+                            val strategy = credential.strategyId?.let { strategyById[it] } ?: fallbackStrategy
+                            val countries = strategy?.signing?.statementCountries.orEmpty()
+                            if (countries.isNotEmpty() && (country == null || country !in countries)) {
+                                credential.id to
+                                    "Transaction download isn't available for your region" +
+                                    (country?.let { " ($it)" } ?: "") +
+                                    ". ${strategy?.name ?: "This provider"} only supports statements for: " +
+                                    countries.sorted().joinToString(", ") + "."
+                            } else {
+                                null
+                            }
+                        }.toMap()
                 importedSessionRevisions = apiSessionRepository.getImportedSessionRevisions()
             } finally {
                 isLoading = false
@@ -696,7 +698,9 @@ private fun SigningKeySection(
             Button(onClick = onGenerateSigningKey) { Text("Generate signing key") }
         } else {
             Text(
-                text = "Public key generated. Register it in your provider account (e.g. Wise → Settings → API tokens → Manage public keys).",
+                text =
+                    "Public key generated. Register it in your provider account " +
+                        "(e.g. Wise → Settings → API tokens → Manage public keys).",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
