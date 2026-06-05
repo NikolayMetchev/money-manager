@@ -43,9 +43,6 @@ class ApiStrategyJsonCodecTest {
             config(
                 ApiPaginationConfig(
                     mode = PaginationMode.DATE_WINDOW,
-                    startParam = "intervalStart",
-                    endParam = "intervalEnd",
-                    windowDays = 469,
                     extraParams = listOf(ApiQueryParam(name = "type", value = "FLAT")),
                 ),
             )

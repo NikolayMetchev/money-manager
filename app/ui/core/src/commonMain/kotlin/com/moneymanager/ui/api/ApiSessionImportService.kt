@@ -310,12 +310,7 @@ suspend fun downloadApiSessionPeople(
 
     val url = buildEndpointRequestUrl(strategy.baseUrl, config.endpoint, ImportUrlContext())
     val existingResponse = existingRequestsByUrl[url]?.let { existingResponsesByRequestId[it.id] }
-    val json =
-        if (existingResponse != null) {
-            existingResponse.json
-        } else {
-            fetchResponse(url = url, token = token, apiClient = apiClient, sca = sca).body
-        }
+    val json = existingResponse?.json ?: fetchResponse(url = url, token = token, apiClient = apiClient, sca = sca).body
     val count = responseItemsArray(json, config.endpoint.responseArrayKey)?.count { it is JsonObject } ?: 0
     return ApiPeopleDownloadResult(personCount = count, skipped = existingResponse != null)
 }
@@ -2864,7 +2859,7 @@ private fun JsonObject.evaluatePredicate(predicate: RulePredicate): Boolean {
             (resolveJsonElementPath(predicate.path) as? JsonArray)?.any { element ->
                 element.jsonPrimitive.contentOrNull?.startsWith(operand, ignoreCase = true) == true
             } == true
-        PredicateOp.OBJECT_EMPTY -> resolveJsonObjectPath(predicate.path).let { it == null || it.isEmpty() }
+        PredicateOp.OBJECT_EMPTY -> resolveJsonObjectPath(predicate.path).isNullOrEmpty()
         PredicateOp.OBJECT_NON_EMPTY -> resolveJsonObjectPath(predicate.path)?.isNotEmpty() == true
     }
 }

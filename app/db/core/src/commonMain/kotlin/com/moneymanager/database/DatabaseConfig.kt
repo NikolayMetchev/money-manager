@@ -941,17 +941,12 @@ object DatabaseConfig {
                                 ApiQueryParam(name = "currency", dynamicSource = "account.currency"),
                                 ApiQueryParam(name = "type", value = "FLAT"),
                             ),
-                        pagination =
-                            ApiPaginationConfig(
-                                mode = PaginationMode.DATE_WINDOW,
-                                startParam = "intervalStart",
-                                endParam = "intervalEnd",
-                                windowDays = 469,
-                            ),
+                        // startParam/endParam/windowDays default to Wise's values (intervalStart,
+                        // intervalEnd, 469).
+                        pagination = ApiPaginationConfig(mode = PaginationMode.DATE_WINDOW),
                     ),
                 accountMappings =
                     ApiAccountMappings(
-                        idField = "id",
                         descriptionField = "name",
                         ownersArrayField = null,
                         currencyField = "currency",
@@ -984,7 +979,6 @@ object DatabaseConfig {
                 peopleDownload =
                     ApiPersonImportConfig(
                         endpoint = ApiEndpointConfig(path = "/v1/profiles", responseArrayKey = ""),
-                        externalIdField = "id",
                         firstNameField = "details.firstName",
                         lastNameField = "details.lastName",
                         preferredNameField = "details.preferredName",

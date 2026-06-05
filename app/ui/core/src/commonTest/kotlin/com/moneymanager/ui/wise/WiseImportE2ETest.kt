@@ -376,7 +376,6 @@ class WiseImportE2ETest : DbTest() {
                 entitySource = DbEntitySource(repositories.entitySourceQueries, repositories.transferSourceQueries, deviceId),
                 sessionId = peopleSessionId,
                 strategy = strategy,
-                accountsSessionId = null,
             )
 
             // No duplicate: matched the existing Ada by name and added the Wise id alongside the Monzo id.

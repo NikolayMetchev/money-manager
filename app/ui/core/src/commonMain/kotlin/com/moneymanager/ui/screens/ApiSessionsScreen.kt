@@ -88,7 +88,6 @@ import com.moneymanager.ui.api.ApiSessionImportResult
 import com.moneymanager.ui.api.ApiTransactionsDownloadProgress
 import com.moneymanager.ui.api.ApiTransactionsDownloadResult
 import com.moneymanager.ui.api.discoverApiCounterpartiesToCreate
-import com.moneymanager.ui.api.ApiPeopleDownloadResult
 import com.moneymanager.ui.api.downloadApiSessionAccounts
 import com.moneymanager.ui.api.downloadApiSessionPeople
 import com.moneymanager.ui.api.importApiSessionPeople
