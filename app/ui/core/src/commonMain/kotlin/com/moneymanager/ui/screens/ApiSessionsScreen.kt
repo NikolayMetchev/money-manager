@@ -274,6 +274,7 @@ fun ApiSessionsScreen(
                             personRepository = personRepository,
                             personAccountOwnershipRepository = personAccountOwnershipRepository,
                             personAttributeRepository = personAttributeRepository,
+                            attributeTypeRepository = attributeTypeRepository,
                             entitySource = entitySource,
                             sessionId = session.id,
                             strategy = strategy,

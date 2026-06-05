@@ -328,4 +328,11 @@ data class ApiStrategyConfig(
     val builtInCounterpartyRules: List<BuiltInCounterpartyRule> = emptyList(),
     val signing: ApiSigningConfig? = null,
     val peopleDownload: ApiPersonImportConfig? = null,
+    /**
+     * Name of the person-attribute type that stores this provider's external id for an imported
+     * person (e.g. "monzo-external-id", "wise-external-id"). Per-provider so the same person can carry
+     * a distinct id from each provider; people are matched across providers by name, with the missing
+     * provider id backfilled. Null disables external-id storage.
+     */
+    val personExternalIdAttribute: String? = null,
 )

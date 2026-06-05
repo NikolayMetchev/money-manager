@@ -52,7 +52,6 @@ import kotlin.time.Instant
 
 private val ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID = AttributeTypeId(DatabaseConfig.ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID)
 private val BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID = AttributeTypeId(DatabaseConfig.BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID)
-private val PERSON_EXTERNAL_ID_ATTR_TYPE_ID = AttributeTypeId(DatabaseConfig.PERSON_EXTERNAL_ID_ATTR_TYPE_ID)
 private val ACCOUNT_SORT_CODE_ATTR_TYPE_ID = AttributeTypeId(DatabaseConfig.ACCOUNT_SORT_CODE_ATTR_TYPE_ID)
 private val ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID = AttributeTypeId(DatabaseConfig.ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID)
 private const val API_IMPORT_TRANSACTION_WRITE_BATCH_SIZE = 100
@@ -333,12 +332,14 @@ suspend fun importApiSessionPeople(
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     personAttributeRepository: PersonAttributeRepository,
+    attributeTypeRepository: AttributeTypeRepository,
     entitySource: EntitySource,
     sessionId: ApiSessionId,
     strategy: ApiImportStrategy,
     accountsSessionId: ApiSessionId? = null,
 ): ApiPeopleImportResult {
     val config = strategy.peopleDownload ?: return ApiPeopleImportResult(personCount = 0, ownershipCount = 0)
+    val externalIdAttributeTypeId = strategy.personExternalIdAttribute?.let { attributeTypeRepository.getOrCreate(it) }
     val requestsById = apiSessionRepository.getRequestsBySession(sessionId).associateBy { it.id }
     val peopleResponses =
         apiSessionRepository.getResponsesBySession(sessionId).filter { response ->
@@ -347,7 +348,7 @@ suspend fun importApiSessionPeople(
         }
     val ownedAccountsByProfile =
         buildProfileAccountMap(apiSessionRepository, accountRepository, accountAttributeRepository, accountsSessionId, strategy, config)
-    val peopleIndex = loadPeopleIndex(personRepository, personAttributeRepository)
+    val peopleIndex = loadPeopleIndex(personRepository, personAttributeRepository, externalIdAttributeTypeId)
 
     var personCount = 0
     var ownershipCount = 0
@@ -365,6 +366,7 @@ suspend fun importApiSessionPeople(
                             peopleIndex = peopleIndex,
                             personRepository = personRepository,
                             personAttributeRepository = personAttributeRepository,
+                            externalIdAttributeTypeId = externalIdAttributeTypeId,
                             entitySource = entitySource,
                             sessionId = sessionId,
                             requestId = requestId,
@@ -380,6 +382,7 @@ suspend fun importApiSessionPeople(
                                 personRepository = personRepository,
                                 personAccountOwnershipRepository = personAccountOwnershipRepository,
                                 personAttributeRepository = personAttributeRepository,
+                                externalIdAttributeTypeId = externalIdAttributeTypeId,
                                 entitySource = entitySource,
                                 sessionId = sessionId,
                                 requestId = requestId,
@@ -773,8 +776,10 @@ private suspend fun importTransactionsConcurrently(setup: ImportSetup) {
     }
 }
 
-private suspend fun importPeopleFromSession(setup: ImportSetup): Int =
-    importPeopleFromAccounts(
+private suspend fun importPeopleFromSession(setup: ImportSetup): Int {
+    val externalIdAttributeTypeId =
+        setup.strategy.personExternalIdAttribute?.let { setup.attributeTypeCache.getOrCreate(it) }
+    return importPeopleFromAccounts(
         accountsById = setup.accountsById,
         accountCache = setup.accountCache,
         strategy = setup.strategy,
@@ -785,6 +790,7 @@ private suspend fun importPeopleFromSession(setup: ImportSetup): Int =
         entitySource = setup.entitySource,
         accountApiSourceByExternalId = setup.accountCache.accountApiSourceByExternalId,
         sessionId = setup.sessionId,
+        externalIdAttributeTypeId = externalIdAttributeTypeId,
     ) +
         importPeopleFromCounterparties(
             transactionResponses = setup.transactionResponses,
@@ -799,7 +805,9 @@ private suspend fun importPeopleFromSession(setup: ImportSetup): Int =
             personRepository = setup.personRepository,
             personAccountOwnershipRepository = setup.personAccountOwnershipRepository,
             personAttributeRepository = setup.personAttributeRepository,
+            externalIdAttributeTypeId = externalIdAttributeTypeId,
         )
+}
 
 private suspend fun flushPostTransactionAttributes(setup: ImportSetup) {
     if (setup.counterpartyIdField != null) {
@@ -1107,8 +1115,9 @@ private suspend fun importPeopleFromAccounts(
     entitySource: EntitySource? = null,
     accountApiSourceByExternalId: Map<String, AccountApiSource> = emptyMap(),
     sessionId: ApiSessionId? = null,
+    externalIdAttributeTypeId: AttributeTypeId? = null,
 ): Int {
-    val peopleIndex = loadPeopleIndex(personRepository, personAttributeRepository)
+    val peopleIndex = loadPeopleIndex(personRepository, personAttributeRepository, externalIdAttributeTypeId)
     var newPeopleCount = 0
 
     for (account in accountsById.values) {
@@ -1136,6 +1145,7 @@ private suspend fun importPeopleFromAccounts(
                 personRepository = personRepository,
                 personAccountOwnershipRepository = personAccountOwnershipRepository,
                 personAttributeRepository = personAttributeRepository,
+                externalIdAttributeTypeId = externalIdAttributeTypeId,
                 entitySource = entitySource,
                 sessionId = sessionId,
                 requestId = accountApiSourceByExternalId[account.id]?.requestId,
@@ -1159,8 +1169,9 @@ private suspend fun importPeopleFromCounterparties(
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     personAttributeRepository: PersonAttributeRepository,
     entitySource: EntitySource,
+    externalIdAttributeTypeId: AttributeTypeId?,
 ): Int {
-    val peopleIndex = loadPeopleIndex(personRepository, personAttributeRepository)
+    val peopleIndex = loadPeopleIndex(personRepository, personAttributeRepository, externalIdAttributeTypeId)
     var newPeopleCount = 0
 
     for (response in transactionResponses) {
@@ -1199,6 +1210,7 @@ private suspend fun importPeopleFromCounterparties(
                     personRepository = personRepository,
                     personAccountOwnershipRepository = personAccountOwnershipRepository,
                     personAttributeRepository = personAttributeRepository,
+                    externalIdAttributeTypeId = externalIdAttributeTypeId,
                     entitySource = entitySource,
                     sessionId = sessionId,
                     requestId = request.id,
@@ -1216,6 +1228,7 @@ private suspend fun importOwnersForAccount(
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     personAttributeRepository: PersonAttributeRepository,
+    externalIdAttributeTypeId: AttributeTypeId?,
     entitySource: EntitySource? = null,
     sessionId: ApiSessionId? = null,
     requestId: ApiRequestId? = null,
@@ -1235,6 +1248,7 @@ private suspend fun importOwnersForAccount(
                 peopleIndex = peopleIndex,
                 personRepository = personRepository,
                 personAttributeRepository = personAttributeRepository,
+                externalIdAttributeTypeId = externalIdAttributeTypeId,
                 entitySource = entitySource,
                 sessionId = sessionId,
                 requestId = requestId,
@@ -1273,20 +1287,24 @@ private suspend fun resolveOrCreatePerson(
     peopleIndex: MutablePeopleIndex,
     personRepository: PersonRepository,
     personAttributeRepository: PersonAttributeRepository,
+    externalIdAttributeTypeId: AttributeTypeId?,
     entitySource: EntitySource? = null,
     sessionId: ApiSessionId? = null,
     requestId: ApiRequestId? = null,
 ): Pair<Person, Boolean>? {
-    val externalId = owner.userId.trim().ifBlank { null }
     val bankKey = owner.bankKey()
     val name = owner.preferredName?.trim().orEmpty()
-    val displayName = name.ifBlank { bankKey ?: externalId ?: return null }
+    val rawExternalId = owner.userId.trim().ifBlank { null }
+    val displayName = name.ifBlank { bankKey ?: rawExternalId ?: return null }
+    // Only match/store the provider id when this provider declares an attribute for it.
+    val externalId = if (externalIdAttributeTypeId != null) rawExternalId else null
 
     peopleIndex.find(externalId = externalId, bankKey = bankKey, fullName = displayName)?.let { existing ->
-        if (externalId != null && existing.externalId == null) {
+        // Matched (typically by name across providers): backfill this provider's external id if absent.
+        if (externalIdAttributeTypeId != null && externalId != null && existing.externalId == null) {
             logger.info { "Backfilling external id for imported person '${existing.fullName}'" }
             runCatching {
-                personAttributeRepository.insert(existing.person.id, PERSON_EXTERNAL_ID_ATTR_TYPE_ID, externalId)
+                personAttributeRepository.insert(existing.person.id, externalIdAttributeTypeId, externalId)
             }
             peopleIndex.replace(existing.person, externalId)
             return existing.person to false
@@ -1304,8 +1322,8 @@ private suspend fun resolveOrCreatePerson(
         )
     val newId = personRepository.createPerson(person)
     val createdPerson = person.copy(id = newId)
-    if (externalId != null) {
-        personAttributeRepository.insertInCreationMode(createdPerson.id, PERSON_EXTERNAL_ID_ATTR_TYPE_ID, externalId)
+    if (externalIdAttributeTypeId != null && externalId != null) {
+        personAttributeRepository.insertInCreationMode(createdPerson.id, externalIdAttributeTypeId, externalId)
     }
     if (entitySource != null && sessionId != null && requestId != null) {
         entitySource.recordFromApi(
@@ -1326,16 +1344,21 @@ private suspend fun resolveOrCreatePerson(
 private suspend fun loadPeopleIndex(
     personRepository: PersonRepository,
     personAttributeRepository: PersonAttributeRepository,
+    externalIdAttributeTypeId: AttributeTypeId?,
 ): MutablePeopleIndex {
     val people = personRepository.getAllPeople().first()
+    // External ids are loaded for the current provider only, so cross-provider matches fall through
+    // to name matching and the missing provider id is backfilled.
     val externalIdsByPersonId =
         people.associate { person ->
             person.id to
-                personAttributeRepository
-                    .getByPerson(person.id)
-                    .first()
-                    .firstOrNull { it.attributeType.id == PERSON_EXTERNAL_ID_ATTR_TYPE_ID }
-                    ?.value
+                externalIdAttributeTypeId?.let { typeId ->
+                    personAttributeRepository
+                        .getByPerson(person.id)
+                        .first()
+                        .firstOrNull { it.attributeType.id == typeId }
+                        ?.value
+                }
         }
     return MutablePeopleIndex.from(people, externalIdsByPersonId)
 }

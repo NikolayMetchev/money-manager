@@ -839,7 +839,7 @@ class MonzoImportE2ETest : DbTest() {
         }
 
     @Test
-    fun `account owners with same external user id create one person with person-external-id attribute`() =
+    fun `account owners with same external user id create one person with monzo-external-id attribute`() =
         runTest {
             val deviceId =
                 repositories.deviceRepository.getOrCreateDevice(
@@ -918,7 +918,7 @@ class MonzoImportE2ETest : DbTest() {
                 repositories.personAttributeRepository
                     .getByPerson(allPeople.single().id)
                     .first()
-                    .single { it.attributeType.name == "person-external-id" }
+                    .single { it.attributeType.name == "monzo-external-id" }
             assertEquals("user_shared_001", personExternalIdAttr.value)
 
             val ownerships =
@@ -1109,7 +1109,7 @@ class MonzoImportE2ETest : DbTest() {
                     repositories.personAttributeRepository
                         .getByPerson(person.id)
                         .first()
-                        .any { it.attributeType.name == "person-external-id" && it.value == "anonuser_95515c2ea95c19a58aad7b" }
+                        .any { it.attributeType.name == "monzo-external-id" && it.value == "anonuser_95515c2ea95c19a58aad7b" }
                 }
             assertTrue(matchingPeople.isNotEmpty())
             val person = matchingPeople.first()
@@ -1118,8 +1118,8 @@ class MonzoImportE2ETest : DbTest() {
                 repositories.personAttributeRepository
                     .getByPerson(person.id)
                     .first()
-                    .singleOrNull { it.attributeType.name == "person-external-id" }
-                    ?: error("Expected person-external-id on imported person, but found none")
+                    .singleOrNull { it.attributeType.name == "monzo-external-id" }
+                    ?: error("Expected monzo-external-id on imported person, but found none")
             assertEquals("anonuser_95515c2ea95c19a58aad7b", personExternalId.value)
 
             val ownerships =

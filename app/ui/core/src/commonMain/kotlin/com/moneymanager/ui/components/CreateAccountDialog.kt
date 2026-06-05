@@ -227,7 +227,6 @@ fun CreateAccountDialog(
         EditPersonDialog(
             personToEdit = null,
             personRepository = personRepository,
-            personAttributeRepository = personAttributeRepository,
             entitySource = entitySource,
             onPersonCreated = { personId ->
                 selectedOwnerIdForAddition = personId.id

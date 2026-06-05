@@ -123,6 +123,7 @@ class ApiImportStrategyRepositoryImpl(
             builtInCounterpartyRules = config.builtInCounterpartyRules,
             signing = config.signing,
             peopleDownload = config.peopleDownload,
+            personExternalIdAttribute = config.personExternalIdAttribute,
             createdAt = Instant.fromEpochMilliseconds(entity.created_at),
             updatedAt = Instant.fromEpochMilliseconds(entity.updated_at),
             revisionId = entity.revision_id,
@@ -145,5 +146,6 @@ class ApiImportStrategyRepositoryImpl(
             builtInCounterpartyRules = builtInCounterpartyRules,
             signing = signing,
             peopleDownload = peopleDownload,
+            personExternalIdAttribute = personExternalIdAttribute,
         )
 }

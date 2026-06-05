@@ -4,6 +4,8 @@ package com.moneymanager.ui.wise
 
 import com.moneymanager.database.port.DbEntitySource
 import com.moneymanager.domain.model.DeviceInfo
+import com.moneymanager.domain.model.Person
+import com.moneymanager.domain.model.PersonId
 import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.createApiClient
 import com.moneymanager.test.database.DbTest
@@ -314,6 +316,7 @@ class WiseImportE2ETest : DbTest() {
                     personRepository = repositories.personRepository,
                     personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                     personAttributeRepository = repositories.personAttributeRepository,
+                    attributeTypeRepository = repositories.attributeTypeRepository,
                     entitySource = DbEntitySource(repositories.entitySourceQueries, repositories.transferSourceQueries, deviceId),
                     sessionId = peopleSessionId,
                     strategy = strategy,
@@ -331,5 +334,60 @@ class WiseImportE2ETest : DbTest() {
                     .getOwnershipsByAccount(gbpAccount.id)
                     .first()
             assertTrue(owners.any { it.personId == ada.id }, "Ada should own the Wise GBP balance")
+        }
+
+    @Test
+    fun `wise people import matches an existing person by name and adds the wise external id`() =
+        runTest {
+            val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
+            val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
+            val strategy =
+                repositories.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .single { it.name == "Wise" }
+
+            // Pre-create the person as if she had already been imported from Monzo.
+            val adaId =
+                repositories.personRepository.createPerson(
+                    Person(id = PersonId(0L), firstName = "Ada", middleName = null, lastName = "Lovelace"),
+                )
+            val monzoAttribute = repositories.attributeTypeRepository.getOrCreate("monzo-external-id")
+            repositories.personAttributeRepository.insert(adaId, monzoAttribute, "monzo-123")
+
+            val peopleSessionId = repositories.apiSessionRepository.createSession("test-wise-token", deviceId, now, null)
+            val client =
+                createApiClient(
+                    trafficRecorder = ApiSessionTrafficRecorder(sessionId = peopleSessionId, apiSessionRepository = repositories.apiSessionRepository),
+                    engine =
+                        MockEngine { _ ->
+                            respond(PROFILES_JSON, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
+                        },
+                )
+            downloadApiSessionPeople("test-wise-token", client, repositories.apiSessionRepository, peopleSessionId, strategy)
+            importApiSessionPeople(
+                apiSessionRepository = repositories.apiSessionRepository,
+                accountRepository = repositories.accountRepository,
+                accountAttributeRepository = repositories.accountAttributeRepository,
+                personRepository = repositories.personRepository,
+                personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
+                personAttributeRepository = repositories.personAttributeRepository,
+                attributeTypeRepository = repositories.attributeTypeRepository,
+                entitySource = DbEntitySource(repositories.entitySourceQueries, repositories.transferSourceQueries, deviceId),
+                sessionId = peopleSessionId,
+                strategy = strategy,
+                accountsSessionId = null,
+            )
+
+            // No duplicate: matched the existing Ada by name and added the Wise id alongside the Monzo id.
+            val matches = repositories.personRepository.getAllPeople().first().filter { it.firstName == "Ada" && it.lastName == "Lovelace" }
+            assertEquals(1, matches.size, "Ada must be matched by name, not duplicated")
+            val attributes =
+                repositories.personAttributeRepository
+                    .getByPerson(matches.single().id)
+                    .first()
+                    .associate { it.attributeType.name to it.value }
+            assertEquals("monzo-123", attributes["monzo-external-id"], "the Monzo id is preserved")
+            assertEquals(PROFILE_ID, attributes["wise-external-id"], "the Wise id is backfilled")
         }
 }

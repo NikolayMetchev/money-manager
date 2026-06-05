@@ -30,6 +30,7 @@ data class ApiStrategyConfigJson(
     val builtInCounterpartyRules: List<BuiltInCounterpartyRule> = emptyList(),
     val signing: ApiSigningConfig? = null,
     val peopleDownload: ApiPersonImportConfig? = null,
+    val personExternalIdAttribute: String? = null,
 )
 
 /**

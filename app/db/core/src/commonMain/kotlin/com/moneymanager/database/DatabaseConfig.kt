@@ -40,9 +40,6 @@ object DatabaseConfig {
     /** Stable ID for the "built-in type" attribute type used by built-in counterparty accounts. */
     const val BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID: Long = -3
 
-    /** Stable ID for the "person-external-id" attribute type (e.g. Monzo userId value). */
-    const val PERSON_EXTERNAL_ID_ATTR_TYPE_ID: Long = -4
-
     /** Stable ID for the "sort code" account attribute type used for personal counterparties. */
     const val ACCOUNT_SORT_CODE_ATTR_TYPE_ID: Long = -5
 
@@ -798,7 +795,6 @@ object DatabaseConfig {
             attributeTypeQueries.insertWithId(id = EXCLUDED_ATTR_TYPE_ID, name = "excluded")
             attributeTypeQueries.insertWithId(id = ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID, name = "account-external-id")
             attributeTypeQueries.insertWithId(id = BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID, name = "built-in type")
-            attributeTypeQueries.insertWithId(id = PERSON_EXTERNAL_ID_ATTR_TYPE_ID, name = "person-external-id")
             attributeTypeQueries.insertWithId(id = ACCOUNT_SORT_CODE_ATTR_TYPE_ID, name = "account-sort-code")
             attributeTypeQueries.insertWithId(id = ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID, name = "account-account-number")
 
@@ -861,6 +857,7 @@ object DatabaseConfig {
                 accountNamePrefix = "Monzo: ",
                 counterpartyPrefix = "Monzo Counterparty: ",
                 builtInCounterpartyRules = monzoAtmRules,
+                personExternalIdAttribute = "monzo-external-id",
             )
         val now = Clock.System.now().toEpochMilliseconds()
         apiImportStrategyQueries.insert(
@@ -994,6 +991,7 @@ object DatabaseConfig {
                         fallbackNameField = "details.name",
                         accountOwnerAncestorExpr = "ancestor[0].id",
                     ),
+                personExternalIdAttribute = "wise-external-id",
             )
         val now = Clock.System.now().toEpochMilliseconds()
         apiImportStrategyQueries.insert(

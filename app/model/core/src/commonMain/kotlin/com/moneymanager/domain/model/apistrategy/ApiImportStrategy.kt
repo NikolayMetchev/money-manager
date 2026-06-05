@@ -40,6 +40,7 @@ data class ApiImportStrategy(
     val builtInCounterpartyRules: List<BuiltInCounterpartyRule> = emptyList(),
     val signing: ApiSigningConfig? = null,
     val peopleDownload: ApiPersonImportConfig? = null,
+    val personExternalIdAttribute: String? = null,
     val createdAt: Instant,
     val updatedAt: Instant,
     val revisionId: Long = 1,

@@ -134,7 +134,6 @@ fun PeopleScreen(
         EditPersonDialog(
             personToEdit = null,
             personRepository = personRepository,
-            personAttributeRepository = personAttributeRepository,
             entitySource = entitySource,
             onDismiss = { showCreateDialog = false },
         )
@@ -145,7 +144,6 @@ fun PeopleScreen(
         EditPersonDialog(
             personToEdit = currentPersonToEdit,
             personRepository = personRepository,
-            personAttributeRepository = personAttributeRepository,
             entitySource = entitySource,
             onDismiss = { personToEdit = null },
         )
