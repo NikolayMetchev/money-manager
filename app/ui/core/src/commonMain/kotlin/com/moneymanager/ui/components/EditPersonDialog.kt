@@ -9,10 +9,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -22,9 +24,12 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.Person
+import com.moneymanager.domain.model.PersonAttribute
 import com.moneymanager.domain.model.PersonId
+import com.moneymanager.domain.repository.PersonAttributeRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
 
@@ -37,13 +42,24 @@ fun EditPersonDialog(
     entitySource: EntitySource,
     onDismiss: () -> Unit,
     onPersonCreated: ((PersonId) -> Unit)? = null,
+    personAttributeRepository: PersonAttributeRepository? = null,
 ) {
     var firstName by remember { mutableStateOf(personToEdit?.firstName.orEmpty()) }
     var middleName by remember { mutableStateOf(personToEdit?.middleName.orEmpty()) }
     var lastName by remember { mutableStateOf(personToEdit?.lastName.orEmpty()) }
+    var attributes by remember { mutableStateOf<List<PersonAttribute>>(emptyList()) }
     val saveState = rememberDialogSaveState()
 
     val scope = rememberSchemaAwareCoroutineScope()
+
+    LaunchedEffect(personToEdit?.id) {
+        attributes =
+            if (personAttributeRepository != null && personToEdit != null) {
+                personAttributeRepository.getByPerson(personToEdit.id).first()
+            } else {
+                emptyList()
+            }
+    }
 
     AlertDialog(
         onDismissRequest = { if (!saveState.isSaving) onDismiss() },
@@ -82,6 +98,17 @@ fun EditPersonDialog(
                     singleLine = true,
                     enabled = !saveState.isSaving,
                 )
+
+                if (attributes.isNotEmpty()) {
+                    Text(text = "Identifiers", style = MaterialTheme.typography.labelLarge)
+                    attributes.sortedBy { it.attributeType.name }.forEach { attribute ->
+                        Text(
+                            text = "${attribute.attributeType.name}: ${attribute.value}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
 
                 saveState.errorMessage?.let { error -> ErrorMessageText(error) }
             }

@@ -284,6 +284,7 @@ fun EditAccountDialog(
             personRepository = personRepository,
             entitySource = entitySource,
             onDismiss = { accountState.showCreatePersonDialog = false },
+            personAttributeRepository = personAttributeRepository,
         )
     }
 }

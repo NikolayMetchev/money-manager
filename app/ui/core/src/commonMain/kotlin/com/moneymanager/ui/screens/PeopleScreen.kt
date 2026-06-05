@@ -136,6 +136,7 @@ fun PeopleScreen(
             personRepository = personRepository,
             entitySource = entitySource,
             onDismiss = { showCreateDialog = false },
+            personAttributeRepository = personAttributeRepository,
         )
     }
 
@@ -146,6 +147,7 @@ fun PeopleScreen(
             personRepository = personRepository,
             entitySource = entitySource,
             onDismiss = { personToEdit = null },
+            personAttributeRepository = personAttributeRepository,
         )
     }
 

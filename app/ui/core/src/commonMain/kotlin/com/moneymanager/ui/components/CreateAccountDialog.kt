@@ -232,6 +232,7 @@ fun CreateAccountDialog(
                 selectedOwnerIdForAddition = personId.id
             },
             onDismiss = { accountState.showCreatePersonDialog = false },
+            personAttributeRepository = personAttributeRepository,
         )
     }
 }
