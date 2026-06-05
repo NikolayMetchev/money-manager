@@ -2243,8 +2243,10 @@ private fun responseItemsArray(
     }
 
 private const val MILLIS_PER_DAY = 86_400_000L
-// The closing brace is escaped because Android's regex engine rejects a bare '}'.
-private val PATH_TEMPLATE_REGEX = Regex("\\{([^}]+)\\}")
+
+// '}' is matched via a character class because Android's regex engine rejects a bare '}'
+// while the JVM flags an escaped '\}' as redundant.
+private val PATH_TEMPLATE_REGEX = Regex("\\{([^}]+)[}]")
 
 /**
  * Resolves [ApiQueryParam.dynamicSource] / path-template expressions against the data available
