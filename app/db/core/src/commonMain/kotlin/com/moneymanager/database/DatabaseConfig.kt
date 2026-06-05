@@ -12,6 +12,7 @@ import com.moneymanager.domain.model.apistrategy.ApiAmountFormat
 import com.moneymanager.domain.model.apistrategy.ApiAuthType
 import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
 import com.moneymanager.domain.model.apistrategy.ApiPaginationConfig
+import com.moneymanager.domain.model.apistrategy.ApiPersonImportConfig
 import com.moneymanager.domain.model.apistrategy.ApiQueryParam
 import com.moneymanager.domain.model.apistrategy.ApiSignSource
 import com.moneymanager.domain.model.apistrategy.ApiSigningConfig
@@ -980,6 +981,18 @@ object DatabaseConfig {
                 signing =
                     ApiSigningConfig(
                         statementCountries = setOf("US", "CA", "AU", "NZ", "SG", "MY"),
+                    ),
+                // The account holder lives on the profile (the ancestor), not the balance, so people
+                // are downloaded/imported separately from the /v1/profiles endpoint.
+                peopleDownload =
+                    ApiPersonImportConfig(
+                        endpoint = ApiEndpointConfig(path = "/v1/profiles", responseArrayKey = ""),
+                        externalIdField = "id",
+                        firstNameField = "details.firstName",
+                        lastNameField = "details.lastName",
+                        preferredNameField = "details.preferredName",
+                        fallbackNameField = "details.name",
+                        accountOwnerAncestorExpr = "ancestor[0].id",
                     ),
             )
         val now = Clock.System.now().toEpochMilliseconds()

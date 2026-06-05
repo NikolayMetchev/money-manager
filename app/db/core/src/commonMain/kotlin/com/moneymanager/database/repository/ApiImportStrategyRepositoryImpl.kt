@@ -122,6 +122,7 @@ class ApiImportStrategyRepositoryImpl(
             ancestorEndpoints = config.ancestorEndpoints,
             builtInCounterpartyRules = config.builtInCounterpartyRules,
             signing = config.signing,
+            peopleDownload = config.peopleDownload,
             createdAt = Instant.fromEpochMilliseconds(entity.created_at),
             updatedAt = Instant.fromEpochMilliseconds(entity.updated_at),
             revisionId = entity.revision_id,
@@ -143,5 +144,6 @@ class ApiImportStrategyRepositoryImpl(
             ancestorEndpoints = ancestorEndpoints,
             builtInCounterpartyRules = builtInCounterpartyRules,
             signing = signing,
+            peopleDownload = peopleDownload,
         )
 }

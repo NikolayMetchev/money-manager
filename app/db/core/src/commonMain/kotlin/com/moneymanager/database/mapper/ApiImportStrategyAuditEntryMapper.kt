@@ -48,6 +48,7 @@ object ApiImportStrategyAuditEntryMapper {
                 ancestorEndpoints = raw.ancestorEndpoints,
                 builtInCounterpartyRules = raw.builtInCounterpartyRules,
                 signing = raw.signing,
+                peopleDownload = raw.peopleDownload,
             )
         return ApiImportStrategyAuditEntry(
             id = from.id,

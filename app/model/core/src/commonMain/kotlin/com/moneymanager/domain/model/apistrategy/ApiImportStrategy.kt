@@ -39,6 +39,7 @@ data class ApiImportStrategy(
     val ancestorEndpoints: List<ApiEndpointConfig> = emptyList(),
     val builtInCounterpartyRules: List<BuiltInCounterpartyRule> = emptyList(),
     val signing: ApiSigningConfig? = null,
+    val peopleDownload: ApiPersonImportConfig? = null,
     val createdAt: Instant,
     val updatedAt: Instant,
     val revisionId: Long = 1,

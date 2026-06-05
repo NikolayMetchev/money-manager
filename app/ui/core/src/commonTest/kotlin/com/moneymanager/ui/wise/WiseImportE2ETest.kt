@@ -8,6 +8,8 @@ import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.createApiClient
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.ui.api.downloadApiSessionAccounts
+import com.moneymanager.ui.api.downloadApiSessionPeople
+import com.moneymanager.ui.api.importApiSessionPeople
 import com.moneymanager.ui.api.downloadApiSessionTransactions
 import com.moneymanager.ui.api.importApiSessionTransactions
 import io.ktor.client.engine.mock.MockEngine
@@ -36,7 +38,7 @@ private const val BALANCE_ID = "222"
 private val PROFILES_JSON =
     """
 [
-  { "id": $PROFILE_ID, "type": "personal" }
+  { "id": $PROFILE_ID, "type": "personal", "details": { "firstName": "Ada", "lastName": "Lovelace" } }
 ]
     """.trimIndent()
 
@@ -246,5 +248,88 @@ class WiseImportE2ETest : DbTest() {
                 accounts.singleOrNull { it.name == "Wise: GBP" },
                 "The Wise balance must be created as an account even with no owners and no transactions",
             )
+        }
+
+    @Test
+    fun `download and import people creates the profile holder and links them to their accounts`() =
+        runTest {
+            val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
+            val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
+            val strategy =
+                repositories.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .single { it.name == "Wise" }
+
+            fun engine() =
+                MockEngine { request ->
+                    val url = request.url.toString()
+                    val json =
+                        when {
+                            url.contains("/balances") -> BALANCES_JSON
+                            url.contains("/v1/profiles") -> PROFILES_JSON
+                            else -> error("Unexpected request: $url")
+                        }
+                    respond(content = json, status = HttpStatusCode.OK, headers = headersOf(HttpHeaders.ContentType, "application/json"))
+                }
+
+            fun clientFor(sessionId: com.moneymanager.domain.model.ApiSessionId) =
+                createApiClient(
+                    trafficRecorder = ApiSessionTrafficRecorder(sessionId = sessionId, apiSessionRepository = repositories.apiSessionRepository),
+                    engine = engine(),
+                )
+
+            // 1. Download + import accounts so the GBP balance exists as an account.
+            val accountsSessionId =
+                repositories.apiSessionRepository.createSession("test-wise-token", deviceId, now, null)
+            downloadApiSessionAccounts("test-wise-token", clientFor(accountsSessionId), repositories.apiSessionRepository, accountsSessionId, strategy)
+            importApiSessionTransactions(
+                apiSessionRepository = repositories.apiSessionRepository,
+                accountRepository = repositories.accountRepository,
+                currencyRepository = repositories.currencyRepository,
+                transactionRepository = repositories.transactionRepository,
+                entitySource = DbEntitySource(repositories.entitySourceQueries, repositories.transferSourceQueries, deviceId),
+                personRepository = repositories.personRepository,
+                personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
+                personAttributeRepository = repositories.personAttributeRepository,
+                attributeTypeRepository = repositories.attributeTypeRepository,
+                accountAttributeRepository = repositories.accountAttributeRepository,
+                deviceId = deviceId,
+                sessionId = accountsSessionId,
+                strategy = strategy,
+            )
+
+            // 2. Download + import people from the profiles endpoint.
+            val peopleSessionId =
+                repositories.apiSessionRepository.createSession("test-wise-token", deviceId, now, null)
+            val downloadResult =
+                downloadApiSessionPeople("test-wise-token", clientFor(peopleSessionId), repositories.apiSessionRepository, peopleSessionId, strategy)
+            assertEquals(1, downloadResult.personCount, "One profile holder downloaded")
+
+            val importResult =
+                importApiSessionPeople(
+                    apiSessionRepository = repositories.apiSessionRepository,
+                    accountRepository = repositories.accountRepository,
+                    accountAttributeRepository = repositories.accountAttributeRepository,
+                    personRepository = repositories.personRepository,
+                    personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
+                    personAttributeRepository = repositories.personAttributeRepository,
+                    entitySource = DbEntitySource(repositories.entitySourceQueries, repositories.transferSourceQueries, deviceId),
+                    sessionId = peopleSessionId,
+                    strategy = strategy,
+                    accountsSessionId = accountsSessionId,
+                )
+
+            assertEquals(1, importResult.personCount, "The profile holder is created as a person")
+
+            val people = repositories.personRepository.getAllPeople().first()
+            val ada = people.single { it.firstName == "Ada" && it.lastName == "Lovelace" }
+
+            val gbpAccount = repositories.accountRepository.getAllAccounts().first().single { it.name == "Wise: GBP" }
+            val owners =
+                repositories.personAccountOwnershipRepository
+                    .getOwnershipsByAccount(gbpAccount.id)
+                    .first()
+            assertTrue(owners.any { it.personId == ada.id }, "Ada should own the Wise GBP balance")
         }
 }

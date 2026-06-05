@@ -278,6 +278,33 @@ data class ApiSigningConfig(
 )
 
 /**
+ * Configuration for downloading and importing the account holder(s) — the person whose credentials
+ * are used — from a dedicated endpoint (e.g. Wise `/v1/profiles`). Present only for providers that
+ * expose owner identity separately from the accounts; null disables the "Download People" feature.
+ *
+ * @property endpoint The people/profiles endpoint to fetch
+ * @property externalIdField Dot-path to the person's stable external id (e.g. "id")
+ * @property firstNameField Dot-path to the first name (e.g. "details.firstName")
+ * @property lastNameField Optional dot-path to the last name (e.g. "details.lastName")
+ * @property preferredNameField Optional dot-path to a preferred name
+ * @property fallbackNameField Optional dot-path to a single display name used when the name fields
+ *                             are blank (e.g. business profiles: "details.name")
+ * @property accountOwnerAncestorExpr When set, links each imported person to the accounts fetched
+ *                                    under the matching ancestor value (e.g. "ancestor[0].id" links a
+ *                                    profile to the balances fetched under that profile id).
+ */
+@Serializable
+data class ApiPersonImportConfig(
+    val endpoint: ApiEndpointConfig,
+    val externalIdField: String = "id",
+    val firstNameField: String,
+    val lastNameField: String? = null,
+    val preferredNameField: String? = null,
+    val fallbackNameField: String? = null,
+    val accountOwnerAncestorExpr: String? = null,
+)
+
+/**
  * Decoded, domain-level view of an API import strategy's full configuration.
  * Stored as JSON in the database; decoded by the db layer for use across all layers.
  *
@@ -300,4 +327,5 @@ data class ApiStrategyConfig(
     val ancestorEndpoints: List<ApiEndpointConfig> = emptyList(),
     val builtInCounterpartyRules: List<BuiltInCounterpartyRule> = emptyList(),
     val signing: ApiSigningConfig? = null,
+    val peopleDownload: ApiPersonImportConfig? = null,
 )

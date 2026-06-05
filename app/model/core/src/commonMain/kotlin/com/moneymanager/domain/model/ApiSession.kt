@@ -30,6 +30,7 @@ enum class ApiSessionKind(
 ) {
     ACCOUNTS("ACCOUNTS"),
     TRANSACTIONS("TRANSACTIONS"),
+    PEOPLE("PEOPLE"),
     ;
 
     companion object {

@@ -12,6 +12,7 @@ import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.apistrategy.ApiPaginationConfig
 import com.moneymanager.domain.model.apistrategy.ApiPeopleMappings
+import com.moneymanager.domain.model.apistrategy.ApiPersonImportConfig
 import com.moneymanager.domain.model.apistrategy.ApiQueryParam
 import com.moneymanager.domain.model.apistrategy.ApiSignSource
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
@@ -84,6 +85,16 @@ data class ApiAccountsDownloadResult(
 data class ApiTransactionsDownloadResult(
     val accountCount: Int,
     val transactionResponseCount: Int,
+)
+
+data class ApiPeopleDownloadResult(
+    val personCount: Int,
+    val skipped: Boolean = false,
+)
+
+data class ApiPeopleImportResult(
+    val personCount: Int,
+    val ownershipCount: Int,
 )
 
 data class ApiTransactionsDownloadProgress(
@@ -278,6 +289,151 @@ suspend fun downloadApiSessionTransactions(
     return ApiTransactionsDownloadResult(
         accountCount = accountEntries.size,
         transactionResponseCount = transactionResponseCount,
+    )
+}
+
+/**
+ * Downloads the people/profiles endpoint (the account holder identity) into [sessionId]. Only
+ * applies to strategies with [com.moneymanager.domain.model.apistrategy.ApiPersonImportConfig]
+ * configured (e.g. Wise); a no-op otherwise.
+ */
+suspend fun downloadApiSessionPeople(
+    token: String,
+    apiClient: ApiClient,
+    apiSessionRepository: ApiSessionRepository,
+    sessionId: ApiSessionId,
+    strategy: ApiImportStrategy,
+    sca: ScaParams? = null,
+): ApiPeopleDownloadResult {
+    val config = strategy.peopleDownload ?: return ApiPeopleDownloadResult(personCount = 0, skipped = true)
+    val existingRequestsByUrl = apiSessionRepository.getRequestsBySession(sessionId).associateBy { it.url }
+    val existingResponsesByRequestId = apiSessionRepository.getResponsesBySession(sessionId).associateBy { it.requestId }
+
+    val url = buildEndpointRequestUrl(strategy.baseUrl, config.endpoint, ImportUrlContext())
+    val existingResponse = existingRequestsByUrl[url]?.let { existingResponsesByRequestId[it.id] }
+    val json =
+        if (existingResponse != null) {
+            existingResponse.json
+        } else {
+            fetchResponse(url = url, token = token, apiClient = apiClient, sca = sca).body
+        }
+    val count = responseItemsArray(json, config.endpoint.responseArrayKey)?.count { it is JsonObject } ?: 0
+    return ApiPeopleDownloadResult(personCount = count, skipped = existingResponse != null)
+}
+
+/**
+ * Imports people from a people-download session: creates a [Person] for each profile holder and, when
+ * [accountsSessionId] is provided, links each person as an owner of the accounts fetched under their
+ * profile (via [ApiPersonImportConfig.accountOwnerAncestorExpr]).
+ */
+suspend fun importApiSessionPeople(
+    apiSessionRepository: ApiSessionRepository,
+    accountRepository: AccountRepository,
+    accountAttributeRepository: AccountAttributeRepository,
+    personRepository: PersonRepository,
+    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
+    personAttributeRepository: PersonAttributeRepository,
+    entitySource: EntitySource,
+    sessionId: ApiSessionId,
+    strategy: ApiImportStrategy,
+    accountsSessionId: ApiSessionId? = null,
+): ApiPeopleImportResult {
+    val config = strategy.peopleDownload ?: return ApiPeopleImportResult(personCount = 0, ownershipCount = 0)
+    val requestsById = apiSessionRepository.getRequestsBySession(sessionId).associateBy { it.id }
+    val peopleResponses =
+        apiSessionRepository.getResponsesBySession(sessionId).filter { response ->
+            val path = requestsById[response.requestId]?.encodedPath() ?: return@filter false
+            extractPathVariables(config.endpoint.path, path) != null
+        }
+    val ownedAccountsByProfile =
+        buildProfileAccountMap(apiSessionRepository, accountRepository, accountAttributeRepository, accountsSessionId, strategy, config)
+    val peopleIndex = loadPeopleIndex(personRepository, personAttributeRepository)
+
+    var personCount = 0
+    var ownershipCount = 0
+    for (response in peopleResponses) {
+        val requestId = requestsById[response.requestId]?.id
+        responseItemsArray(response.json, config.endpoint.responseArrayKey)
+            ?.forEachIndexed { index, element ->
+                val obj = element as? JsonObject ?: return@forEachIndexed
+                val owner = obj.toPersonOwner(config, index) ?: return@forEachIndexed
+                val ownedAccounts = ownedAccountsByProfile[owner.userId].orEmpty()
+                if (ownedAccounts.isEmpty()) {
+                    val created =
+                        resolveOrCreatePerson(
+                            owner = owner,
+                            peopleIndex = peopleIndex,
+                            personRepository = personRepository,
+                            personAttributeRepository = personAttributeRepository,
+                            entitySource = entitySource,
+                            sessionId = sessionId,
+                            requestId = requestId,
+                        )?.second == true
+                    if (created) personCount++
+                } else {
+                    for (accountId in ownedAccounts) {
+                        personCount +=
+                            importOwnersForAccount(
+                                owners = listOf(owner),
+                                accountId = accountId,
+                                peopleIndex = peopleIndex,
+                                personRepository = personRepository,
+                                personAccountOwnershipRepository = personAccountOwnershipRepository,
+                                personAttributeRepository = personAttributeRepository,
+                                entitySource = entitySource,
+                                sessionId = sessionId,
+                                requestId = requestId,
+                            )
+                        ownershipCount++
+                    }
+                }
+            }
+    }
+    return ApiPeopleImportResult(personCount = personCount, ownershipCount = ownershipCount)
+}
+
+/** Builds a map of profile external id → the [AccountId]s fetched under that profile. */
+private suspend fun buildProfileAccountMap(
+    apiSessionRepository: ApiSessionRepository,
+    accountRepository: AccountRepository,
+    accountAttributeRepository: AccountAttributeRepository,
+    accountsSessionId: ApiSessionId?,
+    strategy: ApiImportStrategy,
+    config: ApiPersonImportConfig,
+): Map<String, List<AccountId>> {
+    val ancestorExpr = config.accountOwnerAncestorExpr ?: return emptyMap()
+    if (accountsSessionId == null) return emptyMap()
+    val accountIdByExternalId = loadAccountExternalIdIndex(accountRepository, accountAttributeRepository)
+    val requestsById = apiSessionRepository.getRequestsBySession(accountsSessionId).associateBy { it.id }
+    val result = mutableMapOf<String, MutableList<AccountId>>()
+    for (response in apiSessionRepository.getResponsesBySession(accountsSessionId)) {
+        val request = requestsById[response.requestId] ?: continue
+        if (!request.isAccountsRequest(strategy)) continue
+        val profileId = request.ancestorVars(strategy)[ancestorExpr] ?: continue
+        for (account in parseAccounts(response.json, strategy)) {
+            accountIdByExternalId[account.id]?.let { result.getOrPut(profileId) { mutableListOf() }.add(it) }
+        }
+    }
+    return result
+}
+
+/** Maps a profile object to an owner; returns null when no usable name can be derived. */
+private fun JsonObject.toPersonOwner(
+    config: ApiPersonImportConfig,
+    index: Int,
+): ApiImportAccountOwner? {
+    val externalId = resolveJsonPath(config.externalIdField)?.takeIf { it.isNotBlank() }
+    val first = config.preferredNameField?.let { resolveJsonPath(it) }?.takeIf { it.isNotBlank() }
+        ?: resolveJsonPath(config.firstNameField)?.takeIf { it.isNotBlank() }
+    val last = config.lastNameField?.let { resolveJsonPath(it) }?.takeIf { it.isNotBlank() }
+    val fallback = config.fallbackNameField?.let { resolveJsonPath(it) }?.takeIf { it.isNotBlank() }
+    val name = listOfNotNull(first, last).joinToString(" ").ifBlank { fallback ?: return null }
+    return ApiImportAccountOwner(
+        userId = externalId.orEmpty(),
+        preferredName = name,
+        sortCode = null,
+        accountNumber = null,
+        jsonPath = arrayItemJsonPath(config.endpoint.responseArrayKey, index),
     )
 }
 
