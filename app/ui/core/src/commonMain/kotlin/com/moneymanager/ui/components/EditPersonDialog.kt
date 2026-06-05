@@ -139,7 +139,7 @@ fun EditPersonDialog(
                         saveState.errorMessage = null
                         scope.launch {
                             try {
-                                val personId =
+                                val newPersonId =
                                     if (personToEdit != null) {
                                         personRepository.updatePerson(
                                             personToEdit.copy(
@@ -148,21 +148,18 @@ fun EditPersonDialog(
                                                 lastName = lastName.trim().ifBlank { null },
                                             ),
                                         )
-                                        personToEdit.id
+                                        null
                                     } else {
-                                        val newId =
-                                            personRepository.createPerson(
-                                                Person(
-                                                    id = PersonId(0),
-                                                    firstName = firstName.trim(),
-                                                    middleName = middleName.trim().ifBlank { null },
-                                                    lastName = lastName.trim().ifBlank { null },
-                                                ),
-                                            )
-                                        entitySource.record(EntityType.PERSON, newId.id, 1L)
-                                        onPersonCreated?.invoke(newId)
-                                        newId
+                                        personRepository.createPerson(
+                                            Person(
+                                                id = PersonId(0),
+                                                firstName = firstName.trim(),
+                                                middleName = middleName.trim().ifBlank { null },
+                                                lastName = lastName.trim().ifBlank { null },
+                                            ),
+                                        )
                                     }
+                                val personId = newPersonId ?: personToEdit!!.id
                                 if (personAttributeRepository != null && attributeTypeRepository != null) {
                                     savePersonAttributes(
                                         personId = personId,
@@ -171,6 +168,12 @@ fun EditPersonDialog(
                                         personAttributeRepository = personAttributeRepository,
                                         attributeTypeRepository = attributeTypeRepository,
                                     )
+                                }
+                                // Only announce the new person once the full save (row + attributes)
+                                // has succeeded, so the parent never selects a half-saved person.
+                                if (newPersonId != null) {
+                                    entitySource.record(EntityType.PERSON, newPersonId.id, 1L)
+                                    onPersonCreated?.invoke(newPersonId)
                                 }
                                 onDismiss()
                             } catch (expected: Exception) {

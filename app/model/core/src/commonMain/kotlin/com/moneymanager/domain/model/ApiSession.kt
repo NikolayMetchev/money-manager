@@ -16,7 +16,12 @@ data class MonzoCredential(
     /** PEM-encoded RSA keys for request signing (e.g. Wise SCA); null when not configured. */
     val privateKey: String? = null,
     val publicKey: String? = null,
-)
+) {
+    override fun toString(): String =
+        "MonzoCredential(id=$id, type=$type, token=<redacted>, createdAt=$createdAt, " +
+            "strategyId=$strategyId, privateKey=${if (privateKey != null) "<redacted>" else "null"}, " +
+            "publicKey=${if (publicKey != null) "<redacted>" else "null"})"
+}
 
 @JvmInline
 value class MonzoCredentialId(

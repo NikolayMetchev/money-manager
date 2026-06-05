@@ -13,8 +13,10 @@ CREATE TABLE api_credential (
     created_at INTEGER NOT NULL,
     strategy_id TEXT,
     -- PEM-encoded RSA key pair for request signing (e.g. Wise SCA); null when not configured.
+    -- A signing key is only meaningful as a pair, so enforce both-null or both-present.
     private_key TEXT,
     public_key TEXT,
+    CHECK ((private_key IS NULL) = (public_key IS NULL)),
     FOREIGN KEY (type_id) REFERENCES api_session_type(id),
     FOREIGN KEY (strategy_id) REFERENCES api_import_strategy(id) ON DELETE SET NULL
 );

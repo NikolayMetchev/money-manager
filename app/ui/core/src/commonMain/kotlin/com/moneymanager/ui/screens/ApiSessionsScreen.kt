@@ -164,7 +164,7 @@ fun ApiSessionsScreen(
     suspend fun resolveStrategy(credential: MonzoCredential): ApiImportStrategy? =
         credential.strategyId
             ?.let { apiImportStrategyRepository.getStrategyById(it).first() }
-            ?: apiImportStrategyRepository.getAllStrategies().first().firstOrNull()
+            ?: legacyDefaultStrategy(apiImportStrategyRepository.getAllStrategies().first())
 
     // Builds the SCA request-signing params when the strategy is SCA-protected and the credential
     // has a signing key (e.g. Wise statements). Null disables signing (e.g. Monzo).
@@ -194,7 +194,11 @@ fun ApiSessionsScreen(
                         .groupBy { it.credentialId!! }
                 val allStrategies = apiImportStrategyRepository.getAllStrategies().first()
                 val strategyById = allStrategies.associateBy { it.id }
-                val fallbackStrategyRevision = allStrategies.firstOrNull()?.revisionId
+                // Credentials created before strategy linking are, by definition, Monzo. Resolve them
+                // to the Monzo strategy by name rather than relying on repository ordering, which can
+                // change once additional providers (e.g. Wise) are seeded.
+                val fallbackStrategy = legacyDefaultStrategy(allStrategies)
+                val fallbackStrategyRevision = fallbackStrategy?.revisionId
                 currentStrategyRevisionByCredential =
                     allCredentials.associate { credential ->
                         credential.id to (
@@ -205,7 +209,6 @@ fun ApiSessionsScreen(
                     }
                 // Label each credential by its linked strategy (the actual provider), not the legacy
                 // session type which is always "Monzo".
-                val fallbackStrategy = allStrategies.firstOrNull()
                 strategyNameByCredential =
                     allCredentials
                         .mapNotNull { credential ->
@@ -1801,6 +1804,17 @@ private fun ApiSessionImportResult.displaySummary(): String =
         }
         append(".")
     }
+
+/** Legacy provider name for credentials created before strategy linking existed. */
+private const val LEGACY_DEFAULT_STRATEGY_NAME = "Monzo"
+
+/**
+ * Resolves the strategy for credentials with no linked [MonzoCredential.strategyId]. These predate
+ * strategy linking and are always Monzo, so match by name rather than relying on repository ordering,
+ * which is not stable once additional providers are seeded.
+ */
+private fun legacyDefaultStrategy(strategies: List<ApiImportStrategy>): ApiImportStrategy? =
+    strategies.firstOrNull { it.name == LEGACY_DEFAULT_STRATEGY_NAME }
 
 private fun monzoAccountsDownloadTaskKey(credentialId: MonzoCredentialId): String = "monzo-accounts-download-cred-${credentialId.id}"
 

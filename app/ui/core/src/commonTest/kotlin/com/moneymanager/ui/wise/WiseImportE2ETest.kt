@@ -3,6 +3,7 @@
 package com.moneymanager.ui.wise
 
 import com.moneymanager.database.port.DbEntitySource
+import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonId
@@ -279,7 +280,7 @@ class WiseImportE2ETest : DbTest() {
                     respond(content = json, status = HttpStatusCode.OK, headers = headersOf(HttpHeaders.ContentType, "application/json"))
                 }
 
-            fun clientFor(sessionId: com.moneymanager.domain.model.ApiSessionId) =
+            fun clientFor(sessionId: ApiSessionId) =
                 createApiClient(
                     trafficRecorder =
                         ApiSessionTrafficRecorder(

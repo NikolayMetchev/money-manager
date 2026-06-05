@@ -97,7 +97,7 @@ fun createApiClient(
                     request.headers
                         .entries()
                         .associate { (key, values) -> key to values.joinToString(",") }
-                        .filterKeys { it != HttpHeaders.Authorization },
+                        .filterKeys { !isSensitiveHeader(it) },
             )
 
         val call = execute(request)
@@ -118,6 +118,18 @@ fun createApiClient(
 
 /** Sentinel response id used when an empty body is not persisted (see the traffic interceptor). */
 const val NO_RESPONSE_ID: Long = -1L
+
+/**
+ * Headers that may carry secrets and must never be persisted to the recorded request log:
+ * the bearer token plus any one-time SCA challenge/signature headers (e.g. Wise's
+ * `x-2fa-approval` / `X-Signature`). Matched by substring so provider-specific header names
+ * configured in strategies are still covered without coupling this layer to that config.
+ */
+private fun isSensitiveHeader(key: String): Boolean {
+    if (key.equals(HttpHeaders.Authorization, ignoreCase = true)) return true
+    val lower = key.lowercase()
+    return lower.contains("signature") || lower.contains("2fa") || lower.contains("approval")
+}
 
 private val apiResponseBodyKey = AttributeKey<String>("ApiResponseBody")
 private val apiResponseIdKey = AttributeKey<Long>("ApiResponseId")

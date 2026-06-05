@@ -343,6 +343,13 @@ suspend fun importApiSessionPeople(
         }
     val ownedAccountsByProfile =
         buildProfileAccountMap(apiSessionRepository, accountRepository, accountAttributeRepository, accountsSessionId, strategy, config)
+    // Ownership links can only be created against accounts that already exist. When people are
+    // imported before their accounts (no accounts session, or accounts not yet imported), the
+    // profile→account map is empty and people are created without ownerships; flag that so the
+    // empty-ownership outcome isn't mistaken for a successful link.
+    if (config.accountOwnerAncestorExpr != null && ownedAccountsByProfile.isEmpty()) {
+        logger.warn { "Importing people with no imported accounts to link; ownerships will not be created. Import accounts first." }
+    }
     val peopleIndex = loadPeopleIndex(personRepository, personAttributeRepository, externalIdAttributeTypeId)
 
     var personCount = 0
@@ -369,7 +376,7 @@ suspend fun importApiSessionPeople(
                     if (created) personCount++
                 } else {
                     for (accountId in ownedAccounts) {
-                        personCount +=
+                        val counts =
                             importOwnersForAccount(
                                 owners = listOf(owner),
                                 accountId = accountId,
@@ -382,7 +389,8 @@ suspend fun importApiSessionPeople(
                                 sessionId = sessionId,
                                 requestId = requestId,
                             )
-                        ownershipCount++
+                        personCount += counts.newPeople
+                        ownershipCount += counts.newOwnerships
                     }
                 }
             }
@@ -1150,7 +1158,7 @@ private suspend fun importPeopleFromAccounts(
                 sessionId = sessionId,
                 requestId = accountApiSourceByExternalId[account.id]?.requestId,
                 jsonPath = accountApiSourceByExternalId[account.id]?.jsonPath,
-            )
+            ).newPeople
     }
 
     return newPeopleCount
@@ -1214,7 +1222,7 @@ private suspend fun importPeopleFromCounterparties(
                     entitySource = entitySource,
                     sessionId = sessionId,
                     requestId = request.id,
-                )
+                ).newPeople
         }
     }
 
@@ -1233,13 +1241,14 @@ private suspend fun importOwnersForAccount(
     sessionId: ApiSessionId? = null,
     requestId: ApiRequestId? = null,
     jsonPath: JsonPath? = null,
-): Int {
+): OwnerImportCounts {
     val existingOwnerPersonIds =
         personAccountOwnershipRepository
             .getOwnershipsByAccount(accountId)
             .first()
             .associateBy { it.personId }
     var newPeopleCount = 0
+    var newOwnershipCount = 0
 
     for (owner in owners) {
         val (person, wasCreated) =
@@ -1257,6 +1266,7 @@ private suspend fun importOwnersForAccount(
         val existingOwnership = existingOwnerPersonIds[person.id]
         if (existingOwnership == null) {
             val ownershipId = personAccountOwnershipRepository.createOwnership(person.id, accountId)
+            newOwnershipCount++
             if (entitySource != null && sessionId != null && requestId != null) {
                 entitySource.recordFromApi(
                     ApiEntitySourceRecord(
@@ -1279,8 +1289,14 @@ private suspend fun importOwnersForAccount(
         }
     }
 
-    return newPeopleCount
+    return OwnerImportCounts(newPeople = newPeopleCount, newOwnerships = newOwnershipCount)
 }
+
+/** Counts of newly created people and account ownerships produced by [importOwnersForAccount]. */
+private data class OwnerImportCounts(
+    val newPeople: Int,
+    val newOwnerships: Int,
+)
 
 private suspend fun resolveOrCreatePerson(
     owner: ApiImportAccountOwner,
@@ -1388,7 +1404,21 @@ private class MutablePeopleIndex private constructor(
         val nameKey = fullName.importNameKey()
         return externalId?.let { peopleByExternalId[it] }
             ?: bankKey?.let { peopleByBankKey[it] }
-            ?: nameKey?.let { peopleByImportNameKey[it]?.firstOrNull() }
+            // Name matching is a heuristic across providers, so only accept it when it's
+            // unambiguous. If two distinct people share a first+last name, picking one arbitrarily
+            // would merge them and backfill the wrong provider id, so treat it as no match and let
+            // the caller create a fresh person instead.
+            ?: nameKey?.let { key ->
+                val candidates = peopleByImportNameKey[key]
+                when {
+                    candidates.isNullOrEmpty() -> null
+                    candidates.size == 1 -> candidates.single()
+                    else -> {
+                        logger.warn { "Ambiguous name match for '$fullName' (${candidates.size} people); not merging" }
+                        null
+                    }
+                }
+            }
     }
 
     fun add(
@@ -2191,22 +2221,29 @@ private fun parseAmount(
         ApiAmountFormat.MINOR_UNITS_INTEGER -> {
             val value = raw.toLongOrNull() ?: return null
             val magnitudeSign = value.compareTo(0L).coerceIn(-1, 1)
-            ParsedAmount(minorUnits = value, decimalMajor = null, sign = resolveSign(obj, mappings, magnitudeSign))
+            val sign = resolveSign(obj, mappings, magnitudeSign) ?: return null
+            ParsedAmount(minorUnits = value, decimalMajor = null, sign = sign)
         }
         ApiAmountFormat.DECIMAL_MAJOR_UNITS -> {
             val decimal = runCatching { BigDecimal(raw) }.getOrNull() ?: return null
             val magnitudeSign = decimal.compareTo(BigDecimal.ZERO).coerceIn(-1, 1)
-            ParsedAmount(minorUnits = null, decimalMajor = decimal.abs(), sign = resolveSign(obj, mappings, magnitudeSign))
+            val sign = resolveSign(obj, mappings, magnitudeSign) ?: return null
+            ParsedAmount(minorUnits = null, decimalMajor = decimal.abs(), sign = sign)
         }
     }
 }
 
-/** Resolves the transaction sign (-1/0/1) from either the amount magnitude or a dedicated field. */
+/**
+ * Resolves the transaction sign (-1/0/1) from either the amount magnitude or a dedicated field.
+ * Returns null when [ApiSignSource.FIELD] is configured but the sign field is absent: a missing
+ * direction indicator is unexpected data, so the caller skips the item rather than silently
+ * defaulting it to a debit. A present value that is simply not in [creditValues] is a debit.
+ */
 private fun resolveSign(
     obj: JsonObject,
     mappings: ApiTransactionMappings,
     magnitudeSign: Int,
-): Int =
+): Int? =
     when (mappings.signSource) {
         ApiSignSource.EMBEDDED -> magnitudeSign
         ApiSignSource.FIELD -> {
@@ -2214,7 +2251,14 @@ private fun resolveSign(
                 0
             } else {
                 val signValue = mappings.signField?.let { obj.resolveJsonPath(it) }
-                if (signValue != null && signValue in mappings.creditValues) 1 else -1
+                when {
+                    signValue == null -> {
+                        logger.warn { "Sign field '${mappings.signField}' missing from transaction; skipping item" }
+                        null
+                    }
+                    signValue in mappings.creditValues -> 1
+                    else -> -1
+                }
             }
         }
     }

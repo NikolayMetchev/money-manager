@@ -64,10 +64,13 @@ class ApiSessionRepositoryImpl(
         strategyId: ApiImportStrategyId?,
     ): Unit =
         withContext(Dispatchers.Default) {
-            queries.updateCredentialStrategy(
-                strategy_id = strategyId?.id?.toString(),
-                id = credentialId.id,
-            )
+            val affected =
+                queries
+                    .updateCredentialStrategy(
+                        strategy_id = strategyId?.id?.toString(),
+                        id = credentialId.id,
+                    ).await()
+            check(affected == 1L) { "Expected to update one credential ($credentialId) strategy, but $affected rows matched" }
         }
 
     override suspend fun updateCredentialKeys(
@@ -76,11 +79,14 @@ class ApiSessionRepositoryImpl(
         publicKey: String?,
     ): Unit =
         withContext(Dispatchers.Default) {
-            queries.updateCredentialKeys(
-                private_key = privateKey,
-                public_key = publicKey,
-                id = credentialId.id,
-            )
+            val affected =
+                queries
+                    .updateCredentialKeys(
+                        private_key = privateKey,
+                        public_key = publicKey,
+                        id = credentialId.id,
+                    ).await()
+            check(affected == 1L) { "Expected to update one credential ($credentialId) keys, but $affected rows matched" }
         }
 
     override suspend fun getAllCredentials(): List<MonzoCredential> =

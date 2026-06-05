@@ -4,4 +4,6 @@ package com.moneymanager.ui.api.sca
 data class ScaKeyPair(
     val privateKeyPem: String,
     val publicKeyPem: String,
-)
+) {
+    override fun toString(): String = "ScaKeyPair(privateKeyPem=<redacted>, publicKeyPem=<redacted>)"
+}

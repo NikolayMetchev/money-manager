@@ -30,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
@@ -179,8 +180,8 @@ fun ApiConnectScreen(
                     label = { Text("Access Token") },
                     placeholder = { Text("Paste your ${selectedStrategy?.name ?: "API"} access token here") },
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = false,
-                    maxLines = 4,
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
                     isError = errorMessage != null,
                 )
 
