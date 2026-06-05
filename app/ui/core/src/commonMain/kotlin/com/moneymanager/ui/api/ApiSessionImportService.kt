@@ -2250,13 +2250,12 @@ private fun resolveSign(
             if (magnitudeSign == 0) {
                 0
             } else {
-                val signValue = mappings.signField?.let { obj.resolveJsonPath(it) }
-                when {
-                    signValue == null -> {
+                when (val signValue = mappings.signField?.let { obj.resolveJsonPath(it) }) {
+                    null -> {
                         logger.warn { "Sign field '${mappings.signField}' missing from transaction; skipping item" }
                         null
                     }
-                    signValue in mappings.creditValues -> 1
+                    in mappings.creditValues -> 1
                     else -> -1
                 }
             }
