@@ -405,11 +405,15 @@ private suspend fun buildProfileAccountMap(
     val requestsById = apiSessionRepository.getRequestsBySession(accountsSessionId).associateBy { it.id }
     val result = mutableMapOf<String, MutableList<AccountId>>()
     for (response in apiSessionRepository.getResponsesBySession(accountsSessionId)) {
-        val request = requestsById[response.requestId] ?: continue
-        if (!request.isAccountsRequest(strategy)) continue
-        val profileId = request.ancestorVars(strategy)[ancestorExpr] ?: continue
-        for (account in parseAccounts(response.json, strategy)) {
-            accountIdByExternalId[account.id]?.let { result.getOrPut(profileId) { mutableListOf() }.add(it) }
+        val profileId =
+            requestsById[response.requestId]
+                ?.takeIf { it.isAccountsRequest(strategy) }
+                ?.ancestorVars(strategy)
+                ?.get(ancestorExpr)
+        if (profileId != null) {
+            for (account in parseAccounts(response.json, strategy)) {
+                accountIdByExternalId[account.id]?.let { result.getOrPut(profileId) { mutableListOf() }.add(it) }
+            }
         }
     }
     return result
