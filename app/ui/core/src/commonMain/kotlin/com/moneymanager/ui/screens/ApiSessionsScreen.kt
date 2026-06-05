@@ -95,6 +95,7 @@ import com.moneymanager.ui.api.sca.generateScaKeyPair
 import com.moneymanager.ui.api.sca.signScaChallenge
 import com.moneymanager.ui.background.LocalBackgroundTaskManager
 import com.moneymanager.ui.background.formatElapsedTime
+import com.moneymanager.ui.util.currentCountryCode
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.util.ContentCopyIcon
 import com.moneymanager.ui.util.displayDateTime
@@ -144,6 +145,7 @@ fun ApiSessionsScreen(
     var currentStrategyRevisionByCredential by remember { mutableStateOf<Map<MonzoCredentialId, Long?>>(emptyMap()) }
     var strategyNameByCredential by remember { mutableStateOf<Map<MonzoCredentialId, String>>(emptyMap()) }
     var requiresSigningByCredential by remember { mutableStateOf<Map<MonzoCredentialId, Boolean>>(emptyMap()) }
+    var transactionsBlockReasonByCredential by remember { mutableStateOf<Map<MonzoCredentialId, String>>(emptyMap()) }
     var isLoading by remember { mutableStateOf(true) }
     // Per-session import state
     var importResultBySession by remember { mutableStateOf<Map<ApiSessionId, ApiSessionImportResult>>(emptyMap()) }
@@ -213,6 +215,21 @@ fun ApiSessionsScreen(
                         val strategy = credential.strategyId?.let { strategyById[it] } ?: fallbackStrategy
                         credential.id to (strategy?.signing != null)
                     }
+                val country = currentCountryCode()
+                transactionsBlockReasonByCredential =
+                    allCredentials.mapNotNull { credential ->
+                        val strategy = credential.strategyId?.let { strategyById[it] } ?: fallbackStrategy
+                        val countries = strategy?.signing?.statementCountries.orEmpty()
+                        if (countries.isNotEmpty() && (country == null || country !in countries)) {
+                            credential.id to
+                                "Transaction download isn't available for your region" +
+                                (country?.let { " ($it)" } ?: "") +
+                                ". ${strategy?.name ?: "This provider"} only supports statements for: " +
+                                countries.sorted().joinToString(", ") + "."
+                        } else {
+                            null
+                        }
+                    }.toMap()
                 importedSessionRevisions = apiSessionRepository.getImportedSessionRevisions()
             } finally {
                 isLoading = false
@@ -324,6 +341,7 @@ fun ApiSessionsScreen(
                                 credential = credential,
                                 providerLabel = strategyNameByCredential[credential.id],
                                 requiresSigning = requiresSigningByCredential[credential.id] == true,
+                                transactionsBlockReason = transactionsBlockReasonByCredential[credential.id],
                                 onGenerateSigningKey = {
                                     scope.launch {
                                         val keyPair = withContext(Dispatchers.Default) { generateScaKeyPair() }
@@ -630,6 +648,7 @@ private fun CredentialCard(
     credential: MonzoCredential,
     providerLabel: String?,
     requiresSigning: Boolean,
+    transactionsBlockReason: String?,
     onGenerateSigningKey: () -> Unit,
     onCopyText: (String) -> Unit,
     sessions: List<ApiSession>,
@@ -726,13 +745,24 @@ private fun CredentialCard(
                         Text("Download Accounts")
                     }
                 }
-                Button(onClick = onDownloadTransactions, enabled = !isCredentialBusy, modifier = Modifier.weight(1f)) {
+                Button(
+                    onClick = onDownloadTransactions,
+                    enabled = !isCredentialBusy && transactionsBlockReason == null,
+                    modifier = Modifier.weight(1f),
+                ) {
                     if (isDownloadingTransactions) {
                         CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                     } else {
                         Text("Download Transactions")
                     }
                 }
+            }
+            transactionsBlockReason?.let { reason ->
+                Text(
+                    text = reason,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
             }
 
             if (sessions.isNotEmpty()) {

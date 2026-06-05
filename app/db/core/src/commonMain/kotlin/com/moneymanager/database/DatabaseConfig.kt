@@ -975,8 +975,12 @@ object DatabaseConfig {
                 accountNamePrefix = "Wise: ",
                 counterpartyPrefix = "Wise Counterparty: ",
                 // Wise balance statements are SCA-protected: a 403 returns an x-2fa-approval one-time
-                // token that must be signed with the credential's private key and replayed.
-                signing = ApiSigningConfig(),
+                // token that must be signed with the credential's private key and replayed. Statements
+                // are only available via the API for accounts based in these countries.
+                signing =
+                    ApiSigningConfig(
+                        statementCountries = setOf("US", "CA", "AU", "NZ", "SG", "MY"),
+                    ),
             )
         val now = Clock.System.now().toEpochMilliseconds()
         apiImportStrategyQueries.insert(

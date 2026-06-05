@@ -318,6 +318,7 @@ suspend fun importApiSessionTransactions(
             onProgress,
         )
     onProgress(ApiSessionImportProgress(detail = "Preparing import session...", progress = 0.05f))
+    ensureSourceAccounts(setup)
     precreateAndFlushCounterparties(setup, counterpartyAccountNames)
     onProgress(ApiSessionImportProgress(detail = "Counterparties prepared.", progress = 0.2f))
     importTransactionsConcurrently(setup)
@@ -335,6 +336,17 @@ suspend fun importApiSessionTransactions(
         errorCount = setup.counts.totalErrors,
         excludedCount = setup.counts.totalExcluded,
     )
+}
+
+/**
+ * Materialises an [com.moneymanager.domain.model.Account] for every downloaded account up front, so
+ * accounts exist even when they have no owners and no transactions (e.g. Wise balances). Account
+ * creation is otherwise only a side effect of importing transactions or owners. Idempotent.
+ */
+private suspend fun ensureSourceAccounts(setup: ImportSetup) {
+    for (account in setup.accountsById.values) {
+        setup.accountCache.getOrCreateAccountId(account.id, account.displayName(setup.strategy))
+    }
 }
 
 /** Mutable progress counters shared between the setup, parallel import, and progress callback. */

@@ -178,4 +178,73 @@ class WiseImportE2ETest : DbTest() {
 
             assertTrue(credit.amount.amount > 0 && debit.amount.amount > 0, "Stored magnitudes are positive")
         }
+
+    @Test
+    fun `importing an accounts-only session creates accounts without any transactions`() =
+        runTest {
+            val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
+            val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
+            val sessionId =
+                repositories.apiSessionRepository.createSession(
+                    token = "test-wise-token",
+                    deviceId = deviceId,
+                    createdAt = now,
+                    expiresAt = null,
+                )
+
+            // Only profiles + balances are served; statements are never requested for this session.
+            val mockEngine =
+                MockEngine { request ->
+                    val url = request.url.toString()
+                    val json =
+                        when {
+                            url.contains("/balances") -> BALANCES_JSON
+                            url.contains("/v1/profiles") -> PROFILES_JSON
+                            else -> error("Unexpected request: $url")
+                        }
+                    respond(content = json, status = HttpStatusCode.OK, headers = headersOf(HttpHeaders.ContentType, "application/json"))
+                }
+            val apiClient =
+                createApiClient(
+                    trafficRecorder = ApiSessionTrafficRecorder(sessionId = sessionId, apiSessionRepository = repositories.apiSessionRepository),
+                    engine = mockEngine,
+                )
+            val strategy =
+                repositories.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .single { it.name == "Wise" }
+
+            downloadApiSessionAccounts(
+                token = "test-wise-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+
+            val importResult =
+                importApiSessionTransactions(
+                    apiSessionRepository = repositories.apiSessionRepository,
+                    accountRepository = repositories.accountRepository,
+                    currencyRepository = repositories.currencyRepository,
+                    transactionRepository = repositories.transactionRepository,
+                    entitySource = DbEntitySource(repositories.entitySourceQueries, repositories.transferSourceQueries, deviceId),
+                    personRepository = repositories.personRepository,
+                    personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
+                    personAttributeRepository = repositories.personAttributeRepository,
+                    attributeTypeRepository = repositories.attributeTypeRepository,
+                    accountAttributeRepository = repositories.accountAttributeRepository,
+                    deviceId = deviceId,
+                    sessionId = sessionId,
+                    strategy = strategy,
+                )
+
+            assertEquals(0, importResult.transactionCount, "No transactions are downloaded for an accounts-only session")
+            val accounts = repositories.accountRepository.getAllAccounts().first()
+            assertNotNull(
+                accounts.singleOrNull { it.name == "Wise: GBP" },
+                "The Wise balance must be created as an account even with no owners and no transactions",
+            )
+        }
 }

@@ -264,12 +264,17 @@ data class BuiltInCounterpartyRule(
  * @property challengeHeader Response header carrying the one-time token (e.g. "x-2fa-approval")
  * @property signatureHeader Request header for the Base64 signature on retry (e.g. "X-Signature")
  * @property triggerStatus HTTP status that signals a signing challenge (e.g. 403)
+ * @property statementCountries ISO 3166-1 alpha-2 country codes whose accounts can retrieve
+ *                             statements/transactions via the API. Empty means no restriction; when
+ *                             non-empty the UI disables transaction download for other locales (Wise
+ *                             only supports statements for US/CA/AU/NZ/SG/MY).
  */
 @Serializable
 data class ApiSigningConfig(
     val challengeHeader: String = "x-2fa-approval",
     val signatureHeader: String = "X-Signature",
     val triggerStatus: Int = 403,
+    val statementCountries: Set<String> = emptySet(),
 )
 
 /**
