@@ -81,7 +81,7 @@ sealed class Screen(
         val strategyName: String,
     ) : Screen("API Strategy Audit: $strategyName")
 
-    data object MonzoConnect : Screen("Monzo Connection")
+    data object ConnectApi : Screen("Connect API Account")
 
     data class ApiSessionTraffic(
         val sessionId: ApiSessionId,

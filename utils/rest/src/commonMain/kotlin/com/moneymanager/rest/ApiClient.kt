@@ -6,9 +6,24 @@ import io.ktor.client.plugins.HttpSend
 import io.ktor.client.plugins.plugin
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
+import io.ktor.client.request.header
+import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
 import io.ktor.util.AttributeKey
+
+/**
+ * Strong Customer Authentication challenge-signing parameters. When a request is rejected with
+ * [triggerStatus] and carries a [challengeHeader] one-time token, the token is signed via [sign] and
+ * the request is retried once with the challenge echoed back plus the signature in [signatureHeader].
+ * This is generic; the header names and status come from the provider's strategy config.
+ */
+class ScaParams(
+    val challengeHeader: String,
+    val signatureHeader: String,
+    val triggerStatus: Int,
+    val sign: (oneTimeToken: String) -> String,
+)
 
 class ApiClient(
     private val httpClient: HttpClient,
@@ -16,24 +31,35 @@ class ApiClient(
     suspend fun get(
         url: String,
         bearerToken: String,
+        sca: ScaParams? = null,
     ): ApiHttpResponse {
         val response =
             httpClient.get(url) {
                 bearerAuth(bearerToken)
             }
-        val body =
-            response.call.attributes.getOrNull(apiResponseBodyKey)
-                ?: response.bodyAsText()
-        val responseId = response.call.attributes[apiResponseIdKey]
-        val requestId = response.call.attributes[apiRequestIdKey]
-
-        return ApiHttpResponse(
-            statusCode = response.status.value,
-            body = body,
-            responseId = responseId,
-            requestId = requestId,
-        )
+        if (sca != null && response.status.value == sca.triggerStatus) {
+            val oneTimeToken = response.headers[sca.challengeHeader]
+            if (!oneTimeToken.isNullOrBlank()) {
+                val signature = sca.sign(oneTimeToken)
+                val signed =
+                    httpClient.get(url) {
+                        bearerAuth(bearerToken)
+                        header(sca.challengeHeader, oneTimeToken)
+                        header(sca.signatureHeader, signature)
+                    }
+                return signed.toApiHttpResponse()
+            }
+        }
+        return response.toApiHttpResponse()
     }
+
+    private suspend fun HttpResponse.toApiHttpResponse(): ApiHttpResponse =
+        ApiHttpResponse(
+            statusCode = status.value,
+            body = call.attributes.getOrNull(apiResponseBodyKey) ?: bodyAsText(),
+            responseId = call.attributes[apiResponseIdKey],
+            requestId = call.attributes[apiRequestIdKey],
+        )
 }
 
 data class ApiHttpResponse(
@@ -71,12 +97,15 @@ fun createApiClient(
                     request.headers
                         .entries()
                         .associate { (key, values) -> key to values.joinToString(",") }
-                        .filterKeys { it != HttpHeaders.Authorization },
+                        .filterKeys { !isSensitiveHeader(it) },
             )
 
         val call = execute(request)
         val responseBody = call.response.bodyAsText()
-        val responseId = trafficRecorder.recordResponse(requestId, responseBody)
+        // Only persist non-blank bodies: the api_response.json column rejects empty values, and an
+        // empty body (e.g. an error or no-content response) carries nothing importable. The caller
+        // still sees the status code and can surface a meaningful error.
+        val responseId = if (responseBody.isNotBlank()) trafficRecorder.recordResponse(requestId, responseBody) else NO_RESPONSE_ID
         call.attributes.put(apiResponseBodyKey, responseBody)
         call.attributes.put(apiResponseIdKey, responseId)
         call.attributes.put(apiRequestIdKey, requestId)
@@ -85,6 +114,21 @@ fun createApiClient(
     }
 
     return ApiClient(httpClient)
+}
+
+/** Sentinel response id used when an empty body is not persisted (see the traffic interceptor). */
+const val NO_RESPONSE_ID: Long = -1L
+
+/**
+ * Headers that may carry secrets and must never be persisted to the recorded request log:
+ * the bearer token plus any one-time SCA challenge/signature headers (e.g. Wise's
+ * `x-2fa-approval` / `X-Signature`). Matched by substring so provider-specific header names
+ * configured in strategies are still covered without coupling this layer to that config.
+ */
+private fun isSensitiveHeader(key: String): Boolean {
+    if (key.equals(HttpHeaders.Authorization, ignoreCase = true)) return true
+    val lower = key.lowercase()
+    return lower.contains("signature") || lower.contains("2fa") || lower.contains("approval")
 }
 
 private val apiResponseBodyKey = AttributeKey<String>("ApiResponseBody")

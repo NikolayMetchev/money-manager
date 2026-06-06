@@ -36,8 +36,10 @@ data class ApiSessionImportRevision(
 
 interface ApiSessionRepository {
     /**
-     * Creates a new credential (saved token). Returns the existing credential ID if the token
-     * is already saved.
+     * Creates a new credential (saved token), carrying its own [strategyId] and optional signing
+     * keys, and returns its generated ID. A credential's identity is this generated ID, not the raw
+     * token; the token column is globally unique, so attempting to save the same token twice fails
+     * rather than merging into — or silently overwriting the strategy/keys of — an existing row.
      *
      * @param strategyId Optional link to the API import strategy this credential uses.
      */
@@ -46,6 +48,8 @@ interface ApiSessionRepository {
         createdAt: Instant,
         type: ApiSessionType = ApiSessionType.MONZO,
         strategyId: ApiImportStrategyId? = null,
+        privateKey: String? = null,
+        publicKey: String? = null,
     ): MonzoCredentialId
 
     /**
@@ -54,6 +58,15 @@ interface ApiSessionRepository {
     suspend fun updateCredentialStrategy(
         credentialId: MonzoCredentialId,
         strategyId: ApiImportStrategyId?,
+    )
+
+    /**
+     * Stores (or replaces) the PEM-encoded RSA signing key pair on a credential.
+     */
+    suspend fun updateCredentialKeys(
+        credentialId: MonzoCredentialId,
+        privateKey: String?,
+        publicKey: String?,
     )
 
     /**

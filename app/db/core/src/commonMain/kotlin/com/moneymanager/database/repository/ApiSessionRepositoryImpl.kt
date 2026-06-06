@@ -40,6 +40,8 @@ class ApiSessionRepositoryImpl(
         createdAt: Instant,
         type: ApiSessionType,
         strategyId: ApiImportStrategyId?,
+        privateKey: String?,
+        publicKey: String?,
     ): MonzoCredentialId =
         withContext(Dispatchers.Default) {
             val id =
@@ -49,6 +51,8 @@ class ApiSessionRepositoryImpl(
                         token = token,
                         created_at = createdAt.toEpochMilliseconds(),
                         strategy_id = strategyId?.id?.toString(),
+                        private_key = privateKey,
+                        public_key = publicKey,
                     )
                     queries.lastInsertCredentialRowId().executeAsOne()
                 }
@@ -60,10 +64,29 @@ class ApiSessionRepositoryImpl(
         strategyId: ApiImportStrategyId?,
     ): Unit =
         withContext(Dispatchers.Default) {
-            queries.updateCredentialStrategy(
-                strategy_id = strategyId?.id?.toString(),
-                id = credentialId.id,
-            )
+            val affected =
+                queries
+                    .updateCredentialStrategy(
+                        strategy_id = strategyId?.id?.toString(),
+                        id = credentialId.id,
+                    ).await()
+            check(affected == 1L) { "Expected to update one credential ($credentialId) strategy, but $affected rows matched" }
+        }
+
+    override suspend fun updateCredentialKeys(
+        credentialId: MonzoCredentialId,
+        privateKey: String?,
+        publicKey: String?,
+    ): Unit =
+        withContext(Dispatchers.Default) {
+            val affected =
+                queries
+                    .updateCredentialKeys(
+                        private_key = privateKey,
+                        public_key = publicKey,
+                        id = credentialId.id,
+                    ).await()
+            check(affected == 1L) { "Expected to update one credential ($credentialId) keys, but $affected rows matched" }
         }
 
     override suspend fun getAllCredentials(): List<MonzoCredential> =
@@ -326,6 +349,8 @@ class ApiSessionRepositoryImpl(
             token = token,
             createdAt = Instant.fromEpochMilliseconds(created_at),
             strategyId = strategy_id?.let { ApiImportStrategyId(Uuid.parse(it)) },
+            privateKey = private_key,
+            publicKey = public_key,
         )
 
     private fun com.moneymanager.database.sql.Api_session_with_latest_import.toApiSession(): ApiSession =

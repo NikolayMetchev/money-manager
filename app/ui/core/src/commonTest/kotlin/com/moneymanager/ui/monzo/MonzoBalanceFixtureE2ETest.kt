@@ -118,7 +118,7 @@ class MonzoBalanceFixtureE2ETest : DbTest() {
                 repositories.apiImportStrategyRepository
                     .getAllStrategies()
                     .first()
-                    .first()
+                    .single { it.name == "Monzo" }
 
             importApiSessionTransactions(
                 apiSessionRepository = repositories.apiSessionRepository,

@@ -4,7 +4,10 @@ import com.moneymanager.domain.model.apistrategy.ApiAccountMappings
 import com.moneymanager.domain.model.apistrategy.ApiAuthType
 import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
 import com.moneymanager.domain.model.apistrategy.ApiPeopleMappings
+import com.moneymanager.domain.model.apistrategy.ApiPersonImportConfig
+import com.moneymanager.domain.model.apistrategy.ApiSigningConfig
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
+import com.moneymanager.domain.model.apistrategy.BuiltInCounterpartyRule
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -23,6 +26,11 @@ data class ApiStrategyConfigJson(
     val accountNamePrefix: String,
     val counterpartyPrefix: String,
     val peopleMappings: ApiPeopleMappings = ApiPeopleMappings(),
+    val ancestorEndpoints: List<ApiEndpointConfig> = emptyList(),
+    val builtInCounterpartyRules: List<BuiltInCounterpartyRule> = emptyList(),
+    val signing: ApiSigningConfig? = null,
+    val peopleDownload: ApiPersonImportConfig? = null,
+    val personExternalIdAttribute: String? = null,
 )
 
 /**

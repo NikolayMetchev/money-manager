@@ -2,12 +2,25 @@
 
 package com.moneymanager.ui.api
 
+import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.database.DatabaseConfig
 import com.moneymanager.domain.ApiEntitySourceRecord
 import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.model.*
+import com.moneymanager.domain.model.apistrategy.ApiAmountFormat
+import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
+import com.moneymanager.domain.model.apistrategy.ApiPaginationConfig
 import com.moneymanager.domain.model.apistrategy.ApiPeopleMappings
+import com.moneymanager.domain.model.apistrategy.ApiPersonImportConfig
+import com.moneymanager.domain.model.apistrategy.ApiQueryParam
+import com.moneymanager.domain.model.apistrategy.ApiSignSource
+import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
+import com.moneymanager.domain.model.apistrategy.BuiltInCounterpartyRule
+import com.moneymanager.domain.model.apistrategy.PaginationMode
+import com.moneymanager.domain.model.apistrategy.PredicateOp
+import com.moneymanager.domain.model.apistrategy.RulePredicate
+import com.moneymanager.domain.model.apistrategy.RuleSign
 import com.moneymanager.domain.repository.AccountAttributeCreateInput
 import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
@@ -21,6 +34,7 @@ import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.rest.ApiClient
 import com.moneymanager.rest.ApiHttpResponse
+import com.moneymanager.rest.ScaParams
 import com.moneymanager.ui.screens.transactions.logger
 import io.ktor.http.*
 import kotlinx.coroutines.CancellationException
@@ -38,7 +52,6 @@ import kotlin.time.Instant
 
 private val ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID = AttributeTypeId(DatabaseConfig.ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID)
 private val BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID = AttributeTypeId(DatabaseConfig.BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID)
-private val PERSON_EXTERNAL_ID_ATTR_TYPE_ID = AttributeTypeId(DatabaseConfig.PERSON_EXTERNAL_ID_ATTR_TYPE_ID)
 private val ACCOUNT_SORT_CODE_ATTR_TYPE_ID = AttributeTypeId(DatabaseConfig.ACCOUNT_SORT_CODE_ATTR_TYPE_ID)
 private val ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID = AttributeTypeId(DatabaseConfig.ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID)
 private const val API_IMPORT_TRANSACTION_WRITE_BATCH_SIZE = 100
@@ -73,6 +86,16 @@ data class ApiTransactionsDownloadResult(
     val transactionResponseCount: Int,
 )
 
+data class ApiPeopleDownloadResult(
+    val personCount: Int,
+    val skipped: Boolean = false,
+)
+
+data class ApiPeopleImportResult(
+    val personCount: Int,
+    val ownershipCount: Int,
+)
+
 data class ApiTransactionsDownloadProgress(
     val accountIndex: Int,
     val accountCount: Int,
@@ -91,26 +114,63 @@ suspend fun downloadApiSessionAccounts(
     apiSessionRepository: ApiSessionRepository,
     sessionId: ApiSessionId,
     strategy: ApiImportStrategy,
+    sca: ScaParams? = null,
 ): ApiAccountsDownloadResult {
-    val accountsUrl = buildEndpointUrl(strategy.baseUrl, strategy.accountsEndpoint.path)
     val existingRequests = apiSessionRepository.getRequestsBySession(sessionId)
+    val existingResponses = apiSessionRepository.getResponsesBySession(sessionId)
+    val existingResponsesByRequestId = existingResponses.associateBy { it.requestId }
+    val existingRequestsByUrl = existingRequests.associateBy { it.url }
 
-    // Incremental: skip only when both the request and its response are already stored.
-    // If the request exists but has no response (interrupted prior run), fall through and re-fetch.
-    val existingAccountsRequest = existingRequests.firstOrNull { it.url == accountsUrl }
-    if (existingAccountsRequest != null) {
-        val existingResponse =
-            apiSessionRepository
-                .getResponsesBySession(sessionId)
-                .firstOrNull { it.requestId == existingAccountsRequest.id }
-        if (existingResponse != null) {
-            return ApiAccountsDownloadResult(accountCount = parseAccounts(existingResponse.json, strategy).size, skipped = true)
-        }
+    // Resolve ancestor resources (e.g. Wise profiles) first; for a flat API (Monzo) this is a
+    // single empty context so the accounts endpoint is fetched exactly once.
+    val ancestorContexts =
+        fetchAncestorContexts(token, apiClient, strategy, existingRequestsByUrl, existingResponsesByRequestId, sca)
+
+    var totalAccounts = 0
+    var anyFetched = false
+    for (ancestors in ancestorContexts) {
+        val url = buildAccountsUrl(strategy, ImportUrlContext(ancestorItems = ancestors))
+        // Incremental: reuse a stored response only when both request and response are present.
+        val existingResponse = existingRequestsByUrl[url]?.let { existingResponsesByRequestId[it.id] }
+        val json =
+            if (existingResponse != null) {
+                existingResponse.json
+            } else {
+                anyFetched = true
+                fetchResponse(url = url, token = token, apiClient = apiClient, sca = sca).body
+            }
+        totalAccounts += parseAccounts(json, strategy).size
     }
+    return ApiAccountsDownloadResult(accountCount = totalAccounts, skipped = !anyFetched)
+}
 
-    val response = fetchResponse(url = accountsUrl, token = token, apiClient = apiClient)
-    val accounts = parseAccounts(response.body, strategy)
-    return ApiAccountsDownloadResult(accountCount = accounts.size)
+/**
+ * Fetches each configured ancestor endpoint in order, expanding the context tree so every leaf is
+ * a full chain of ancestor items used to template the accounts/transactions endpoints. Returns a
+ * single empty chain when the strategy has no ancestor endpoints.
+ */
+private suspend fun fetchAncestorContexts(
+    token: String,
+    apiClient: ApiClient,
+    strategy: ApiImportStrategy,
+    existingRequestsByUrl: Map<String, ApiRequest>,
+    existingResponsesByRequestId: Map<ApiRequestId, ApiResponse>,
+    sca: ScaParams?,
+): List<List<JsonObject>> {
+    var contexts: List<List<JsonObject>> = listOf(emptyList())
+    strategy.ancestorEndpoints.forEach { endpoint ->
+        val next = mutableListOf<List<JsonObject>>()
+        for (ancestors in contexts) {
+            val url = buildEndpointRequestUrl(strategy.baseUrl, endpoint, ImportUrlContext(ancestorItems = ancestors))
+            val existingResponse = existingRequestsByUrl[url]?.let { existingResponsesByRequestId[it.id] }
+            val json = existingResponse?.json ?: fetchResponse(url = url, token = token, apiClient = apiClient, sca = sca).body
+            for (item in responseItemsArray(json, endpoint.responseArrayKey).orEmpty()) {
+                (item as? JsonObject)?.let { next += ancestors + it }
+            }
+        }
+        contexts = next
+    }
+    return contexts
 }
 
 /**
@@ -126,6 +186,7 @@ suspend fun downloadApiSessionTransactions(
     sessionId: ApiSessionId,
     strategy: ApiImportStrategy,
     accountsSessionId: ApiSessionId? = null,
+    sca: ScaParams? = null,
     onProgress: (ApiTransactionsDownloadProgress) -> Unit = {},
 ): ApiTransactionsDownloadResult {
     val existingRequests = apiSessionRepository.getRequestsBySession(sessionId)
@@ -133,8 +194,7 @@ suspend fun downloadApiSessionTransactions(
     val existingResponsesByRequestId = existingResponses.associateBy { it.requestId }
     val existingRequestsByUrl = existingRequests.associateBy { it.url }
 
-    // Read accounts from a separate accounts session if provided, otherwise from this session
-    val accountsUrl = buildEndpointUrl(strategy.baseUrl, strategy.accountsEndpoint.path)
+    // Read accounts from a separate accounts session if provided, otherwise from this session.
     val resolvedAccountsSessionId = accountsSessionId ?: sessionId
     val accountsRequests =
         if (accountsSessionId != null && accountsSessionId != sessionId) {
@@ -148,59 +208,243 @@ suspend fun downloadApiSessionTransactions(
         } else {
             existingResponses
         }
-    val accountsRequestIds = accountsRequests.filter { it.url == accountsUrl }.map { it.id }.toSet()
-    val apiAccounts =
-        accountsResponses
-            .filter { it.requestId in accountsRequestIds }
-            .flatMap { response -> parseAccounts(response.json, strategy) }
+    val accountsRequestsById = accountsRequests.associateBy { it.id }
+
+    // Each account is paired with the ancestor context (e.g. profile id) recovered from the path of
+    // the accounts request that produced it, so its transaction URLs can be templated.
+    val accountEntries: List<Pair<ApiImportAccount, Map<String, String>>> =
+        accountsResponses.flatMap { response ->
+            val request = accountsRequestsById[response.requestId] ?: return@flatMap emptyList()
+            if (!request.isAccountsRequest(strategy)) return@flatMap emptyList()
+            val ancestorVars = request.ancestorVars(strategy)
+            parseAccounts(response.json, strategy).map { it to ancestorVars }
+        }
 
     var transactionResponseCount = 0
+    val pagination = strategy.transactionsEndpoint.pagination
+    val now = Clock.System.now()
 
-    for ((index, account) in apiAccounts.withIndex()) {
-        var before: Instant? = null
-        var page = 1
-        var hasTransactions: Boolean
-        do {
-            onProgress(
-                ApiTransactionsDownloadProgress(
-                    accountIndex = index + 1,
-                    accountCount = apiAccounts.size,
-                    page = page,
-                    downloadedResponsePageCount = transactionResponseCount,
-                ),
-            )
-            val url = buildTransactionUrl(strategy, account.id, before)
-
-            // Incremental: reuse a stored response only when both request and response are present.
-            // An orphan request (response missing from an interrupted prior run) is treated as a
-            // cache miss so pagination can make progress on retry.
-            val existingResponse = existingRequestsByUrl[url]?.let { existingResponsesByRequestId[it.id] }
-            val transactions: List<ApiTransactionPageItem> =
-                if (existingResponse != null) {
-                    parseTransactionsWithPath(existingResponse.json, strategy)
-                } else {
-                    val response = fetchResponse(url = url, token = token, apiClient = apiClient)
+    accountEntries.forEachIndexed { index, (account, ancestorVars) ->
+        if (pagination?.mode == PaginationMode.DATE_WINDOW) {
+            dateWindows(pagination, now).forEachIndexed { windowIndex, window ->
+                val ctx =
+                    ImportUrlContext(
+                        account = account,
+                        ancestorVars = ancestorVars,
+                        windowStart = window.start.toString(),
+                        windowEnd = window.end.toString(),
+                    )
+                val url = buildDateWindowTransactionUrl(strategy, pagination, ctx, window)
+                onProgress(
+                    ApiTransactionsDownloadProgress(
+                        accountIndex = index + 1,
+                        accountCount = accountEntries.size,
+                        page = windowIndex + 1,
+                        downloadedResponsePageCount = transactionResponseCount,
+                    ),
+                )
+                val existingResponse = existingRequestsByUrl[url]?.let { existingResponsesByRequestId[it.id] }
+                if (existingResponse == null) {
+                    fetchResponse(url = url, token = token, apiClient = apiClient, sca = sca)
                     transactionResponseCount += 1
-                    parseTransactionsWithPath(response.body, strategy)
                 }
+            }
+        } else {
+            var before: Instant? = null
+            var page = 1
+            var hasTransactions: Boolean
+            do {
+                val ctx = ImportUrlContext(account = account, ancestorVars = ancestorVars)
+                onProgress(
+                    ApiTransactionsDownloadProgress(
+                        accountIndex = index + 1,
+                        accountCount = accountEntries.size,
+                        page = page,
+                        downloadedResponsePageCount = transactionResponseCount,
+                    ),
+                )
+                val url = buildCursorTransactionUrl(strategy, ctx, before)
 
-            before = transactions.minOfOrNull { it.created }
-            hasTransactions = transactions.isNotEmpty()
-            onProgress(
-                ApiTransactionsDownloadProgress(
-                    accountIndex = index + 1,
-                    accountCount = apiAccounts.size,
-                    page = page,
-                    downloadedResponsePageCount = transactionResponseCount,
-                ),
-            )
-            page += 1
-        } while (hasTransactions)
+                // Incremental: reuse a stored response only when both request and response are present.
+                // An orphan request (response missing from an interrupted prior run) is treated as a
+                // cache miss so pagination can make progress on retry.
+                val existingResponse = existingRequestsByUrl[url]?.let { existingResponsesByRequestId[it.id] }
+                val transactions: List<ApiTransactionPageItem> =
+                    if (existingResponse != null) {
+                        parseTransactionsWithPath(existingResponse.json, strategy)
+                    } else {
+                        val response = fetchResponse(url = url, token = token, apiClient = apiClient, sca = sca)
+                        transactionResponseCount += 1
+                        parseTransactionsWithPath(response.body, strategy)
+                    }
+
+                before = transactions.minOfOrNull { it.created }
+                hasTransactions = transactions.isNotEmpty()
+                page += 1
+            } while (hasTransactions)
+        }
     }
 
     return ApiTransactionsDownloadResult(
-        accountCount = apiAccounts.size,
+        accountCount = accountEntries.size,
         transactionResponseCount = transactionResponseCount,
+    )
+}
+
+/**
+ * Downloads the people/profiles endpoint (the account holder identity) into [sessionId]. Only
+ * applies to strategies with [com.moneymanager.domain.model.apistrategy.ApiPersonImportConfig]
+ * configured (e.g. Wise); a no-op otherwise.
+ */
+suspend fun downloadApiSessionPeople(
+    token: String,
+    apiClient: ApiClient,
+    apiSessionRepository: ApiSessionRepository,
+    sessionId: ApiSessionId,
+    strategy: ApiImportStrategy,
+    sca: ScaParams? = null,
+): ApiPeopleDownloadResult {
+    val config = strategy.peopleDownload ?: return ApiPeopleDownloadResult(personCount = 0, skipped = true)
+    val existingRequestsByUrl = apiSessionRepository.getRequestsBySession(sessionId).associateBy { it.url }
+    val existingResponsesByRequestId = apiSessionRepository.getResponsesBySession(sessionId).associateBy { it.requestId }
+
+    val url = buildEndpointRequestUrl(strategy.baseUrl, config.endpoint, ImportUrlContext())
+    val existingResponse = existingRequestsByUrl[url]?.let { existingResponsesByRequestId[it.id] }
+    val json = existingResponse?.json ?: fetchResponse(url = url, token = token, apiClient = apiClient, sca = sca).body
+    val count = responseItemsArray(json, config.endpoint.responseArrayKey)?.count { it is JsonObject } ?: 0
+    return ApiPeopleDownloadResult(personCount = count, skipped = existingResponse != null)
+}
+
+/**
+ * Imports people from a people-download session: creates a [Person] for each profile holder and, when
+ * [accountsSessionId] is provided, links each person as an owner of the accounts fetched under their
+ * profile (via [ApiPersonImportConfig.accountOwnerAncestorExpr]).
+ */
+suspend fun importApiSessionPeople(
+    apiSessionRepository: ApiSessionRepository,
+    accountRepository: AccountRepository,
+    accountAttributeRepository: AccountAttributeRepository,
+    personRepository: PersonRepository,
+    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
+    personAttributeRepository: PersonAttributeRepository,
+    attributeTypeRepository: AttributeTypeRepository,
+    entitySource: EntitySource,
+    sessionId: ApiSessionId,
+    strategy: ApiImportStrategy,
+    accountsSessionId: ApiSessionId? = null,
+): ApiPeopleImportResult {
+    val config = strategy.peopleDownload ?: return ApiPeopleImportResult(personCount = 0, ownershipCount = 0)
+    val externalIdAttributeTypeId = strategy.personExternalIdAttribute?.let { attributeTypeRepository.getOrCreate(it) }
+    val requestsById = apiSessionRepository.getRequestsBySession(sessionId).associateBy { it.id }
+    val peopleResponses =
+        apiSessionRepository.getResponsesBySession(sessionId).filter { response ->
+            val path = requestsById[response.requestId]?.encodedPath() ?: return@filter false
+            extractPathVariables(config.endpoint.path, path) != null
+        }
+    val ownedAccountsByProfile =
+        buildProfileAccountMap(apiSessionRepository, accountRepository, accountAttributeRepository, accountsSessionId, strategy, config)
+    // Ownership links can only be created against accounts that already exist. When people are
+    // imported before their accounts (no accounts session, or accounts not yet imported), the
+    // profile→account map is empty and people are created without ownerships; flag that so the
+    // empty-ownership outcome isn't mistaken for a successful link.
+    if (config.accountOwnerAncestorExpr != null && ownedAccountsByProfile.isEmpty()) {
+        logger.warn { "Importing people with no imported accounts to link; ownerships will not be created. Import accounts first." }
+    }
+    val peopleIndex = loadPeopleIndex(personRepository, personAttributeRepository, externalIdAttributeTypeId)
+
+    var personCount = 0
+    var ownershipCount = 0
+    for (response in peopleResponses) {
+        val requestId = requestsById[response.requestId]?.id
+        responseItemsArray(response.json, config.endpoint.responseArrayKey)
+            ?.forEachIndexed { index, element ->
+                val obj = element as? JsonObject ?: return@forEachIndexed
+                val owner = obj.toPersonOwner(config, index) ?: return@forEachIndexed
+                val ownedAccounts = ownedAccountsByProfile[owner.userId].orEmpty()
+                if (ownedAccounts.isEmpty()) {
+                    val created =
+                        resolveOrCreatePerson(
+                            owner = owner,
+                            peopleIndex = peopleIndex,
+                            personRepository = personRepository,
+                            personAttributeRepository = personAttributeRepository,
+                            externalIdAttributeTypeId = externalIdAttributeTypeId,
+                            entitySource = entitySource,
+                            sessionId = sessionId,
+                            requestId = requestId,
+                        )?.second == true
+                    if (created) personCount++
+                } else {
+                    for (accountId in ownedAccounts) {
+                        val counts =
+                            importOwnersForAccount(
+                                owners = listOf(owner),
+                                accountId = accountId,
+                                peopleIndex = peopleIndex,
+                                personRepository = personRepository,
+                                personAccountOwnershipRepository = personAccountOwnershipRepository,
+                                personAttributeRepository = personAttributeRepository,
+                                externalIdAttributeTypeId = externalIdAttributeTypeId,
+                                entitySource = entitySource,
+                                sessionId = sessionId,
+                                requestId = requestId,
+                            )
+                        personCount += counts.newPeople
+                        ownershipCount += counts.newOwnerships
+                    }
+                }
+            }
+    }
+    return ApiPeopleImportResult(personCount = personCount, ownershipCount = ownershipCount)
+}
+
+/** Builds a map of profile external id → the [AccountId]s fetched under that profile. */
+private suspend fun buildProfileAccountMap(
+    apiSessionRepository: ApiSessionRepository,
+    accountRepository: AccountRepository,
+    accountAttributeRepository: AccountAttributeRepository,
+    accountsSessionId: ApiSessionId?,
+    strategy: ApiImportStrategy,
+    config: ApiPersonImportConfig,
+): Map<String, List<AccountId>> {
+    val ancestorExpr = config.accountOwnerAncestorExpr ?: return emptyMap()
+    if (accountsSessionId == null) return emptyMap()
+    val accountIdByExternalId = loadAccountExternalIdIndex(accountRepository, accountAttributeRepository)
+    val requestsById = apiSessionRepository.getRequestsBySession(accountsSessionId).associateBy { it.id }
+    val result = mutableMapOf<String, MutableList<AccountId>>()
+    for (response in apiSessionRepository.getResponsesBySession(accountsSessionId)) {
+        val profileId =
+            requestsById[response.requestId]
+                ?.takeIf { it.isAccountsRequest(strategy) }
+                ?.ancestorVars(strategy)
+                ?.get(ancestorExpr)
+        if (profileId != null) {
+            for (account in parseAccounts(response.json, strategy)) {
+                accountIdByExternalId[account.id]?.let { result.getOrPut(profileId) { mutableListOf() }.add(it) }
+            }
+        }
+    }
+    return result
+}
+
+/** Maps a profile object to an owner; returns null when no usable name can be derived. */
+private fun JsonObject.toPersonOwner(
+    config: ApiPersonImportConfig,
+    index: Int,
+): ApiImportAccountOwner? {
+    val externalId = resolveJsonPath(config.externalIdField)?.takeIf { it.isNotBlank() }
+    val first =
+        config.preferredNameField?.let { resolveJsonPath(it) }?.takeIf { it.isNotBlank() }
+            ?: resolveJsonPath(config.firstNameField)?.takeIf { it.isNotBlank() }
+    val last = config.lastNameField?.let { resolveJsonPath(it) }?.takeIf { it.isNotBlank() }
+    val fallback = config.fallbackNameField?.let { resolveJsonPath(it) }?.takeIf { it.isNotBlank() }
+    val name = listOfNotNull(first, last).joinToString(" ").ifBlank { fallback ?: return null }
+    return ApiImportAccountOwner(
+        userId = externalId.orEmpty(),
+        preferredName = name,
+        sortCode = null,
+        accountNumber = null,
+        jsonPath = arrayItemJsonPath(config.endpoint.responseArrayKey, index),
     )
 }
 
@@ -241,6 +485,7 @@ suspend fun importApiSessionTransactions(
             onProgress,
         )
     onProgress(ApiSessionImportProgress(detail = "Preparing import session...", progress = 0.05f))
+    ensureSourceAccounts(setup)
     precreateAndFlushCounterparties(setup, counterpartyAccountNames)
     onProgress(ApiSessionImportProgress(detail = "Counterparties prepared.", progress = 0.2f))
     importTransactionsConcurrently(setup)
@@ -258,6 +503,17 @@ suspend fun importApiSessionTransactions(
         errorCount = setup.counts.totalErrors,
         excludedCount = setup.counts.totalExcluded,
     )
+}
+
+/**
+ * Materialises an [com.moneymanager.domain.model.Account] for every downloaded account up front, so
+ * accounts exist even when they have no owners and no transactions (e.g. Wise balances). Account
+ * creation is otherwise only a side effect of importing transactions or owners. Idempotent.
+ */
+private suspend fun ensureSourceAccounts(setup: ImportSetup) {
+    for (account in setup.accountsById.values) {
+        setup.accountCache.getOrCreateAccountId(account.id, account.displayName(setup.strategy))
+    }
 }
 
 /** Mutable progress counters shared between the setup, parallel import, and progress callback. */
@@ -359,10 +615,15 @@ private suspend fun setupImportSession(
             responses
         }
 
+    // Only responses produced by the accounts endpoint are parsed as accounts; ancestor responses
+    // (e.g. Wise profiles) and transaction responses are excluded.
+    val accountOnlyResponses =
+        accountsResponses.filter { accountsRequestsById[it.requestId]?.isAccountsRequest(strategy) == true }
+
     // Build a map from external account ID to the accounts-list source (request + jsonPath)
     // so newly created accounts can be linked back to their API origin.
     val accountApiSourceByExternalId =
-        accountsResponses
+        accountOnlyResponses
             .flatMap { response ->
                 val requestId = accountsRequestsById[response.requestId]?.id ?: return@flatMap emptyList()
                 parseAccountsWithPaths(response.json, strategy).map { (account, jsonPath) ->
@@ -371,10 +632,10 @@ private suspend fun setupImportSession(
             }.toMap()
 
     val accountsById =
-        accountsResponses
+        accountOnlyResponses
             .flatMap { response -> parseAccounts(response.json, strategy) }
             .associateBy { it.id }
-    val transactionResponses = responses.filter { requestsById[it.requestId]?.accountIdParameter(strategy) != null }
+    val transactionResponses = responses.filter { requestsById[it.requestId]?.resolveAccountExternalId(strategy) != null }
 
     val currencyCache = CurrencyCache(currencyRepository)
     val attributeTypeCache = AttributeTypeCache(attributeTypeRepository)
@@ -404,7 +665,7 @@ private suspend fun setupImportSession(
             accountRepository = accountRepository,
             accountAttributeRepository = accountAttributeRepository,
         ).toMutableMap()
-    val builtInTypeIndex: MutableMap<BuiltInCounterpartyType, AccountId> =
+    val builtInTypeIndex: MutableMap<String, AccountId> =
         loadBuiltInTypeIndex(
             accountRepository = accountRepository,
             accountAttributeRepository = accountAttributeRepository,
@@ -492,7 +753,7 @@ private suspend fun importTransactionsConcurrently(setup: ImportSetup) {
     val pageContexts = mutableListOf<ApiImportPageContext>()
     setup.transactionResponses.forEachIndexed { index, response ->
         val request = setup.requestsById[response.requestId] ?: return@forEachIndexed
-        val account = setup.accountsById[request.accountIdParameter(setup.strategy)] ?: return@forEachIndexed
+        val account = setup.accountsById[request.resolveAccountExternalId(setup.strategy)] ?: return@forEachIndexed
         val ownAccountId = setup.accountCache.getOrCreateAccountId(account.id, account.displayName(setup.strategy))
         pageContexts +=
             ApiImportPageContext(
@@ -523,8 +784,10 @@ private suspend fun importTransactionsConcurrently(setup: ImportSetup) {
     }
 }
 
-private suspend fun importPeopleFromSession(setup: ImportSetup): Int =
-    importPeopleFromAccounts(
+private suspend fun importPeopleFromSession(setup: ImportSetup): Int {
+    val externalIdAttributeTypeId =
+        setup.strategy.personExternalIdAttribute?.let { setup.attributeTypeCache.getOrCreate(it) }
+    return importPeopleFromAccounts(
         accountsById = setup.accountsById,
         accountCache = setup.accountCache,
         strategy = setup.strategy,
@@ -535,6 +798,7 @@ private suspend fun importPeopleFromSession(setup: ImportSetup): Int =
         entitySource = setup.entitySource,
         accountApiSourceByExternalId = setup.accountCache.accountApiSourceByExternalId,
         sessionId = setup.sessionId,
+        externalIdAttributeTypeId = externalIdAttributeTypeId,
     ) +
         importPeopleFromCounterparties(
             transactionResponses = setup.transactionResponses,
@@ -549,7 +813,9 @@ private suspend fun importPeopleFromSession(setup: ImportSetup): Int =
             personRepository = setup.personRepository,
             personAccountOwnershipRepository = setup.personAccountOwnershipRepository,
             personAttributeRepository = setup.personAttributeRepository,
+            externalIdAttributeTypeId = externalIdAttributeTypeId,
         )
+}
 
 private suspend fun flushPostTransactionAttributes(setup: ImportSetup) {
     if (setup.counterpartyIdField != null) {
@@ -621,7 +887,7 @@ suspend fun discoverApiCounterpartiesToCreate(
     val transactionResponses =
         apiSessionRepository
             .getResponsesBySession(sessionId)
-            .filter { requestsById[it.requestId]?.accountIdParameter(strategy) != null }
+            .filter { requestsById[it.requestId]?.resolveAccountExternalId(strategy) != null }
 
     return collectCounterpartiesFromResponses(
         responses = transactionResponses,
@@ -657,7 +923,7 @@ private suspend fun precreateCounterparties(
                     async {
                         val request = requestsById[response.requestId] ?: return@async emptyList()
                         parseTransactionsWithPath(response.json, strategy).mapNotNull { item ->
-                            if (item.rawJson?.resolveBuiltInCounterpartyType(item.amountMinorUnits) != null) {
+                            if (item.rawJson?.resolveBuiltInCounterpartyType(strategy.builtInCounterpartyRules, item.amountSign) != null) {
                                 return@mapNotNull null
                             }
                             val counterpartyId =
@@ -705,7 +971,7 @@ private fun collectCounterpartiesFromResponses(
             parseTransactionsWithPath(response.json, strategy).mapNotNull { item ->
                 // Skip transactions handled by built-in type logic — their counterpartyId is
                 // irrelevant because they all route to a single built-in account.
-                if (item.rawJson?.resolveBuiltInCounterpartyType(item.amountMinorUnits) != null) {
+                if (item.rawJson?.resolveBuiltInCounterpartyType(strategy.builtInCounterpartyRules, item.amountSign) != null) {
                     return@mapNotNull null
                 }
                 val counterpartyId =
@@ -745,15 +1011,15 @@ private suspend fun loadAccountExternalIdIndex(
 private suspend fun loadBuiltInTypeIndex(
     accountRepository: AccountRepository,
     accountAttributeRepository: AccountAttributeRepository,
-): Map<BuiltInCounterpartyType, AccountId> {
-    val index = mutableMapOf<BuiltInCounterpartyType, AccountId>()
+): Map<String, AccountId> {
+    val index = mutableMapOf<String, AccountId>()
     for (account in accountRepository.getAllAccounts().first()) {
         accountAttributeRepository
             .getByAccount(account.id)
             .first()
             .firstOrNull { it.attributeType.id == BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID }
             ?.let { attribute ->
-                BuiltInCounterpartyType.fromAttributeValue(attribute.value)?.let { index[it] = account.id }
+                index[attribute.value] = account.id
             }
     }
     return index
@@ -811,14 +1077,14 @@ private suspend fun flushPendingBuiltInTypeAttributes(
     accountAttributeRepository: AccountAttributeRepository,
 ) {
     val pending = accountCache.drainPendingBuiltInTypeAttributes()
-    val seen = mutableSetOf<BuiltInCounterpartyType>()
+    val seen = mutableSetOf<String>()
     for ((accountId, builtInType) in pending) {
         if (seen.add(builtInType)) {
             runCatching {
                 accountAttributeRepository.insertInCreationMode(
                     accountId = accountId,
                     attributeTypeId = BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID,
-                    value = builtInType.attributeValue,
+                    value = builtInType,
                 )
             }
         }
@@ -857,8 +1123,9 @@ private suspend fun importPeopleFromAccounts(
     entitySource: EntitySource? = null,
     accountApiSourceByExternalId: Map<String, AccountApiSource> = emptyMap(),
     sessionId: ApiSessionId? = null,
+    externalIdAttributeTypeId: AttributeTypeId? = null,
 ): Int {
-    val peopleIndex = loadPeopleIndex(personRepository, personAttributeRepository)
+    val peopleIndex = loadPeopleIndex(personRepository, personAttributeRepository, externalIdAttributeTypeId)
     var newPeopleCount = 0
 
     for (account in accountsById.values) {
@@ -866,10 +1133,10 @@ private suspend fun importPeopleFromAccounts(
 
         val accountId = accountCache.getOrCreateAccountId(account.id, account.displayName(strategy))
         val sortCode =
-            account.rawJson?.stringOrNull("sort_code")?.takeIf { it.isNotBlank() }
+            account.rawJson?.stringOrNull(strategy.accountMappings.sortCodeField)?.takeIf { it.isNotBlank() }
                 ?: account.owners.firstOrNull { !it.sortCode.isNullOrBlank() }?.sortCode
         val accountNumber =
-            account.rawJson?.stringOrNull("account_number")?.takeIf { it.isNotBlank() }
+            account.rawJson?.stringOrNull(strategy.accountMappings.accountNumberField)?.takeIf { it.isNotBlank() }
                 ?: account.owners.firstOrNull { !it.accountNumber.isNullOrBlank() }?.accountNumber
         if (sortCode != null || accountNumber != null) {
             accountAttributeRepository.ensureCounterpartyPersonalAttributesInCreationMode(
@@ -886,11 +1153,12 @@ private suspend fun importPeopleFromAccounts(
                 personRepository = personRepository,
                 personAccountOwnershipRepository = personAccountOwnershipRepository,
                 personAttributeRepository = personAttributeRepository,
+                externalIdAttributeTypeId = externalIdAttributeTypeId,
                 entitySource = entitySource,
                 sessionId = sessionId,
                 requestId = accountApiSourceByExternalId[account.id]?.requestId,
                 jsonPath = accountApiSourceByExternalId[account.id]?.jsonPath,
-            )
+            ).newPeople
     }
 
     return newPeopleCount
@@ -909,15 +1177,17 @@ private suspend fun importPeopleFromCounterparties(
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     personAttributeRepository: PersonAttributeRepository,
     entitySource: EntitySource,
+    externalIdAttributeTypeId: AttributeTypeId?,
 ): Int {
-    val peopleIndex = loadPeopleIndex(personRepository, personAttributeRepository)
+    val peopleIndex = loadPeopleIndex(personRepository, personAttributeRepository, externalIdAttributeTypeId)
     var newPeopleCount = 0
 
     for (response in transactionResponses) {
         val request = requestsById[response.requestId] ?: continue
         val personalCounterpartyItems = mutableListOf<Triple<ApiTransactionPageItem, ApiImportAccountOwner, PersonalCounterpartyIdentity>>()
         for (item in parseTransactionsWithPath(response.json, strategy)) {
-            if (item.amountMinorUnits != 0L && item.rawJson?.resolveBuiltInCounterpartyType(item.amountMinorUnits) == null) {
+            val isBuiltIn = item.rawJson?.resolveBuiltInCounterpartyType(strategy.builtInCounterpartyRules, item.amountSign) != null
+            if (!item.isZeroAmount && !isBuiltIn) {
                 val owner = item.personalCounterpartyOwner(strategy.peopleMappings)
                 val personalCounterpartyIdentity = owner?.personalCounterpartyIdentity()
                 if (owner != null && personalCounterpartyIdentity != null) {
@@ -948,10 +1218,11 @@ private suspend fun importPeopleFromCounterparties(
                     personRepository = personRepository,
                     personAccountOwnershipRepository = personAccountOwnershipRepository,
                     personAttributeRepository = personAttributeRepository,
+                    externalIdAttributeTypeId = externalIdAttributeTypeId,
                     entitySource = entitySource,
                     sessionId = sessionId,
                     requestId = request.id,
-                )
+                ).newPeople
         }
     }
 
@@ -965,17 +1236,19 @@ private suspend fun importOwnersForAccount(
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     personAttributeRepository: PersonAttributeRepository,
+    externalIdAttributeTypeId: AttributeTypeId?,
     entitySource: EntitySource? = null,
     sessionId: ApiSessionId? = null,
     requestId: ApiRequestId? = null,
     jsonPath: JsonPath? = null,
-): Int {
+): OwnerImportCounts {
     val existingOwnerPersonIds =
         personAccountOwnershipRepository
             .getOwnershipsByAccount(accountId)
             .first()
-            .associateBy { it.personId }
+            .mapTo(mutableSetOf()) { it.personId }
     var newPeopleCount = 0
+    var newOwnershipCount = 0
 
     for (owner in owners) {
         val (person, wasCreated) =
@@ -984,14 +1257,17 @@ private suspend fun importOwnersForAccount(
                 peopleIndex = peopleIndex,
                 personRepository = personRepository,
                 personAttributeRepository = personAttributeRepository,
+                externalIdAttributeTypeId = externalIdAttributeTypeId,
                 entitySource = entitySource,
                 sessionId = sessionId,
                 requestId = requestId,
             ) ?: continue
 
-        val existingOwnership = existingOwnerPersonIds[person.id]
-        if (existingOwnership == null) {
+        if (person.id !in existingOwnerPersonIds) {
             val ownershipId = personAccountOwnershipRepository.createOwnership(person.id, accountId)
+            // Track the new link so duplicate owner entries in the same payload don't re-insert it.
+            existingOwnerPersonIds += person.id
+            newOwnershipCount++
             if (entitySource != null && sessionId != null && requestId != null) {
                 entitySource.recordFromApi(
                     ApiEntitySourceRecord(
@@ -1014,28 +1290,38 @@ private suspend fun importOwnersForAccount(
         }
     }
 
-    return newPeopleCount
+    return OwnerImportCounts(newPeople = newPeopleCount, newOwnerships = newOwnershipCount)
 }
+
+/** Counts of newly created people and account ownerships produced by [importOwnersForAccount]. */
+private data class OwnerImportCounts(
+    val newPeople: Int,
+    val newOwnerships: Int,
+)
 
 private suspend fun resolveOrCreatePerson(
     owner: ApiImportAccountOwner,
     peopleIndex: MutablePeopleIndex,
     personRepository: PersonRepository,
     personAttributeRepository: PersonAttributeRepository,
+    externalIdAttributeTypeId: AttributeTypeId?,
     entitySource: EntitySource? = null,
     sessionId: ApiSessionId? = null,
     requestId: ApiRequestId? = null,
 ): Pair<Person, Boolean>? {
-    val externalId = owner.userId.trim().ifBlank { null }
     val bankKey = owner.bankKey()
     val name = owner.preferredName?.trim().orEmpty()
-    val displayName = name.ifBlank { bankKey ?: externalId ?: return null }
+    val rawExternalId = owner.userId.trim().ifBlank { null }
+    val displayName = name.ifBlank { bankKey ?: rawExternalId ?: return null }
+    // Only match/store the provider id when this provider declares an attribute for it.
+    val externalId = if (externalIdAttributeTypeId != null) rawExternalId else null
 
     peopleIndex.find(externalId = externalId, bankKey = bankKey, fullName = displayName)?.let { existing ->
-        if (externalId != null && existing.externalId == null) {
+        // Matched (typically by name across providers): backfill this provider's external id if absent.
+        if (externalIdAttributeTypeId != null && externalId != null && existing.externalId == null) {
             logger.info { "Backfilling external id for imported person '${existing.fullName}'" }
             runCatching {
-                personAttributeRepository.insert(existing.person.id, PERSON_EXTERNAL_ID_ATTR_TYPE_ID, externalId)
+                personAttributeRepository.insert(existing.person.id, externalIdAttributeTypeId, externalId)
             }
             peopleIndex.replace(existing.person, externalId)
             return existing.person to false
@@ -1053,8 +1339,8 @@ private suspend fun resolveOrCreatePerson(
         )
     val newId = personRepository.createPerson(person)
     val createdPerson = person.copy(id = newId)
-    if (externalId != null) {
-        personAttributeRepository.insertInCreationMode(createdPerson.id, PERSON_EXTERNAL_ID_ATTR_TYPE_ID, externalId)
+    if (externalIdAttributeTypeId != null && externalId != null) {
+        personAttributeRepository.insertInCreationMode(createdPerson.id, externalIdAttributeTypeId, externalId)
     }
     if (entitySource != null && sessionId != null && requestId != null) {
         entitySource.recordFromApi(
@@ -1075,16 +1361,21 @@ private suspend fun resolveOrCreatePerson(
 private suspend fun loadPeopleIndex(
     personRepository: PersonRepository,
     personAttributeRepository: PersonAttributeRepository,
+    externalIdAttributeTypeId: AttributeTypeId?,
 ): MutablePeopleIndex {
     val people = personRepository.getAllPeople().first()
+    // External ids are loaded for the current provider only, so cross-provider matches fall through
+    // to name matching and the missing provider id is backfilled.
     val externalIdsByPersonId =
         people.associate { person ->
             person.id to
-                personAttributeRepository
-                    .getByPerson(person.id)
-                    .first()
-                    .firstOrNull { it.attributeType.id == PERSON_EXTERNAL_ID_ATTR_TYPE_ID }
-                    ?.value
+                externalIdAttributeTypeId?.let { typeId ->
+                    personAttributeRepository
+                        .getByPerson(person.id)
+                        .first()
+                        .firstOrNull { it.attributeType.id == typeId }
+                        ?.value
+                }
         }
     return MutablePeopleIndex.from(people, externalIdsByPersonId)
 }
@@ -1114,7 +1405,21 @@ private class MutablePeopleIndex private constructor(
         val nameKey = fullName.importNameKey()
         return externalId?.let { peopleByExternalId[it] }
             ?: bankKey?.let { peopleByBankKey[it] }
-            ?: nameKey?.let { peopleByImportNameKey[it]?.firstOrNull() }
+            // Name matching is a heuristic across providers, so only accept it when it's
+            // unambiguous. If two distinct people share a first+last name, picking one arbitrarily
+            // would merge them and backfill the wrong provider id, so treat it as no match and let
+            // the caller create a fresh person instead.
+            ?: nameKey?.let { key ->
+                val candidates = peopleByImportNameKey[key]
+                when {
+                    candidates.isNullOrEmpty() -> null
+                    candidates.size == 1 -> candidates.single()
+                    else -> {
+                        logger.warn { "Ambiguous name match for '$fullName' (${candidates.size} people); not merging" }
+                        null
+                    }
+                }
+            }
     }
 
     fun add(
@@ -1179,8 +1484,9 @@ private suspend fun fetchResponse(
     url: String,
     token: String,
     apiClient: ApiClient,
+    sca: ScaParams? = null,
 ): ApiHttpResponse {
-    val response = apiClient.get(url = url, bearerToken = token)
+    val response = apiClient.get(url = url, bearerToken = token, sca = sca)
     if (response.statusCode != 200) {
         throw ApiSessionImportException("HTTP ${response.statusCode}: ${response.body}")
     }
@@ -1313,21 +1619,10 @@ private fun parseAccounts(
     strategy: ApiImportStrategy,
 ): List<ApiImportAccount> =
     try {
-        Json
-            .parseToJsonElement(json)
-            .jsonObject[strategy.accountsEndpoint.responseArrayKey]
-            ?.jsonArray
+        responseItemsArray(json, strategy.accountsEndpoint.responseArrayKey)
             ?.mapIndexedNotNull { index, element ->
-                val account = element.jsonObject
-                val id = account.resolveJsonPath(strategy.accountMappings.idField) ?: return@mapIndexedNotNull null
-                ApiImportAccount(
-                    id = id,
-                    description = account.resolveJsonPath(strategy.accountMappings.descriptionField).orEmpty(),
-                    owners = parseAccountOwners(account, strategy, JsonPath("$.${strategy.accountsEndpoint.responseArrayKey}[$index]")),
-                    sortCode = account.stringOrNull("sort_code"),
-                    accountNumber = account.stringOrNull("account_number"),
-                    rawJson = account,
-                )
+                val account = element as? JsonObject ?: return@mapIndexedNotNull null
+                parseAccount(account, strategy, accountsItemJsonPath(strategy, index))
             }
             ?: emptyList()
     } catch (e: SerializationException) {
@@ -1335,62 +1630,83 @@ private fun parseAccounts(
         emptyList()
     }
 
+private fun accountsItemJsonPath(
+    strategy: ApiImportStrategy,
+    index: Int,
+): JsonPath = arrayItemJsonPath(strategy.accountsEndpoint.responseArrayKey, index)
+
+private fun parseAccount(
+    account: JsonObject,
+    strategy: ApiImportStrategy,
+    accountJsonPath: JsonPath,
+): ApiImportAccount? {
+    val mappings = strategy.accountMappings
+    val id = account.resolveJsonPath(mappings.idField) ?: return null
+    return ApiImportAccount(
+        id = id,
+        description = account.resolveJsonPath(mappings.descriptionField).orEmpty(),
+        owners = parseAccountOwners(account, strategy, accountJsonPath),
+        sortCode = account.stringOrNull(mappings.sortCodeField),
+        accountNumber = account.stringOrNull(mappings.accountNumberField),
+        rawJson = account,
+    )
+}
+
 private fun parseAccountOwners(
     account: JsonObject,
     strategy: ApiImportStrategy,
     accountJsonPath: JsonPath,
-): List<ApiImportAccountOwner> =
-    account["owners"]
+): List<ApiImportAccountOwner> {
+    val mappings = strategy.accountMappings
+    val ownersField = mappings.ownersArrayField ?: return emptyList()
+    return account[ownersField]
         ?.jsonArray
         ?.mapNotNull { element ->
             val owner = element as? JsonObject ?: return@mapNotNull null
-            val userId = owner["user_id"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+            val userId = owner.stringOrNull(mappings.ownerUserIdField) ?: return@mapNotNull null
             val preferredName =
-                strategy.accountMappings.ownerNameField
+                mappings.ownerNameField
                     ?.let { owner.resolveJsonPath(it) }
                     ?.takeIf { it.isNotBlank() }
-                    ?: owner.stringOrNull("name")?.takeIf { it.isNotBlank() }
+                    ?: owner.stringOrNull(mappings.ownerNameFallbackField)?.takeIf { it.isNotBlank() }
             val sortCode =
-                owner.stringOrNull("sort_code")?.takeIf { it.isNotBlank() }
-                    ?: account.stringOrNull("sort_code")?.takeIf { it.isNotBlank() }
+                owner.stringOrNull(mappings.sortCodeField)?.takeIf { it.isNotBlank() }
+                    ?: account.stringOrNull(mappings.sortCodeField)?.takeIf { it.isNotBlank() }
             val accountNumber =
-                owner.stringOrNull("account_number")?.takeIf { it.isNotBlank() }
-                    ?: account.stringOrNull("account_number")?.takeIf { it.isNotBlank() }
+                owner.stringOrNull(mappings.accountNumberField)?.takeIf { it.isNotBlank() }
+                    ?: account.stringOrNull(mappings.accountNumberField)?.takeIf { it.isNotBlank() }
             ApiImportAccountOwner(
                 userId = userId,
                 preferredName = preferredName,
                 sortCode = sortCode,
                 accountNumber = accountNumber,
-                jsonPath = JsonPath("${accountJsonPath.value}.owners"),
+                jsonPath = JsonPath("${accountJsonPath.value}.$ownersField"),
             )
         }
         ?: emptyList()
+}
 
 private fun parseAccountsWithPaths(
     json: String,
     strategy: ApiImportStrategy,
 ): List<Pair<ApiImportAccount, JsonPath>> =
-    Json
-        .parseToJsonElement(json)
-        .jsonObject[strategy.accountsEndpoint.responseArrayKey]
-        ?.jsonArray
+    responseItemsArray(json, strategy.accountsEndpoint.responseArrayKey)
         ?.mapIndexedNotNull { index, element ->
-            val account = element.jsonObject
-            val id = account.resolveJsonPath(strategy.accountMappings.idField) ?: return@mapIndexedNotNull null
-            val jsonPath = JsonPath("$.${strategy.accountsEndpoint.responseArrayKey}[$index]")
-            ApiImportAccount(
-                id = id,
-                description = account.resolveJsonPath(strategy.accountMappings.descriptionField).orEmpty(),
-                owners = parseAccountOwners(account, strategy, jsonPath),
-                sortCode = account.stringOrNull("sort_code"),
-                accountNumber = account.stringOrNull("account_number"),
-                rawJson = account,
-            ) to jsonPath
+            val account = element as? JsonObject ?: return@mapIndexedNotNull null
+            val jsonPath = accountsItemJsonPath(strategy, index)
+            parseAccount(account, strategy, jsonPath)?.let { it to jsonPath }
         }
         ?: emptyList()
 
+/**
+ * A parsed transaction page item. The amount is normalized into exactly one of [amountMinorUnits]
+ * (integer minor-units format) or [amountDecimalMajor] (decimal major-units format, magnitude only),
+ * with [amountSign] (-1/0/1) carrying the direction independently of how the amount was encoded.
+ */
 private data class ApiTransactionPageItem(
-    val amountMinorUnits: Long,
+    val amountMinorUnits: Long?,
+    val amountDecimalMajor: BigDecimal?,
+    val amountSign: Int,
     val created: Instant,
     val currencyCode: String,
     val description: String,
@@ -1401,7 +1717,10 @@ private data class ApiTransactionPageItem(
     val rawJson: JsonObject? = null,
     val localAmountMinorUnits: Long? = null,
     val localCurrencyCode: String? = null,
-)
+) {
+    val isZeroAmount: Boolean get() = amountSign == 0
+    val isIncoming: Boolean get() = amountSign > 0
+}
 
 private data class CounterpartyNameMappings(
     val merchantNameField: String?,
@@ -1703,13 +2022,14 @@ private suspend fun prepareValidTransactionItem(
             jsonPath = JsonPath("${item.jsonPath.value}.counterparty"),
         )
     val counterpartyAccountId =
-        if (item.amountMinorUnits == 0L) {
+        if (item.isZeroAmount) {
             setup.accountCache.getOrCreateAccountId(
                 name = setup.nameMappings.counterpartyPrefix + "Void",
                 transactionApiSource = counterpartyApiSource,
             )
         } else {
-            val builtInCounterpartyType = item.rawJson?.resolveBuiltInCounterpartyType(item.amountMinorUnits)
+            val builtInCounterpartyType =
+                item.rawJson?.resolveBuiltInCounterpartyType(setup.strategy.builtInCounterpartyRules, item.amountSign)
             val counterpartyId = item.rawJson?.resolveCounterpartyIdentity(setup.counterpartyIdField, setup.strategy.peopleMappings)
             val personalCounterpartyIdentity = item.rawJson?.personalCounterpartyIdentity(setup.strategy.peopleMappings)
             setup.accountCache.getOrCreateCounterpartyAccountId(
@@ -1718,13 +2038,13 @@ private suspend fun prepareValidTransactionItem(
                 builtInType = builtInCounterpartyType,
                 name =
                     setup.nameMappings.counterpartyPrefix +
-                        (builtInCounterpartyType?.defaultCounterpartyName ?: item.counterpartyName(setup.nameMappings)),
+                        (builtInCounterpartyType ?: item.counterpartyName(setup.nameMappings)),
                 apiSource = counterpartyApiSource,
                 personalIdentity = personalCounterpartyIdentity,
             )
         }
     val transfer = item.toTransfer(context.ownAccountId, counterpartyAccountId, currency)
-    val transactionApiId = item.rawJson?.resolveJsonPath("id")?.takeIf { it.isNotBlank() }
+    val transactionApiId = item.rawJson?.resolveJsonPath(setup.strategy.transactionMappings.idField)?.takeIf { it.isNotBlank() }
     val uniqueKey =
         if (setup.uniqueIdTxFields.isNotEmpty() && item.rawJson != null) {
             setup.uniqueIdTxFields.associateWith { fieldName ->
@@ -1846,25 +2166,24 @@ private fun parseTransactionsWithPath(
 ): List<ApiTransactionPageItem> =
     try {
         val mappings = strategy.transactionMappings
-        Json
-            .parseToJsonElement(json)
-            .jsonObject[strategy.transactionsEndpoint.responseArrayKey]
-            ?.jsonArray
+        responseItemsArray(json, strategy.transactionsEndpoint.responseArrayKey)
             ?.mapIndexedNotNull { index, element ->
-                val obj = element.jsonObject
+                val obj = element as? JsonObject ?: return@mapIndexedNotNull null
                 val created = obj.resolveJsonPath(mappings.timestampField)?.let { Instant.parse(it) }
-                val amount = obj.resolveJsonPath(mappings.amountField)?.toLongOrNull()
+                val amount = parseAmount(obj, mappings)
                 val currency = obj.resolveJsonPath(mappings.currencyField)
                 val declineReason = mappings.declineReasonField?.let { obj.resolveJsonPath(it) }
                 val localAmount = mappings.localAmountField?.let { obj.resolveJsonPath(it) }?.toLongOrNull()
                 val localCurrency = mappings.localCurrencyField?.let { obj.resolveJsonPath(it) }
                 if (created != null && amount != null && currency != null) {
                     ApiTransactionPageItem(
-                        amountMinorUnits = amount,
+                        amountMinorUnits = amount.minorUnits,
+                        amountDecimalMajor = amount.decimalMajor,
+                        amountSign = amount.sign,
                         created = created,
                         currencyCode = currency.uppercase(),
                         description = obj.resolveJsonPath(mappings.descriptionField).orEmpty(),
-                        jsonPath = JsonPath("$.${strategy.transactionsEndpoint.responseArrayKey}[$index]"),
+                        jsonPath = arrayItemJsonPath(strategy.transactionsEndpoint.responseArrayKey, index),
                         merchantName = mappings.merchantNameField?.let { obj.resolveJsonPath(it) },
                         counterpartyName = mappings.counterpartyNameField?.let { obj.resolveJsonPath(it) },
                         declineReason = declineReason,
@@ -1874,7 +2193,8 @@ private fun parseTransactionsWithPath(
                     )
                 } else {
                     logger.error {
-                        "Skipping API transaction at index $index: missing required fields (created=$created, amount=$amount, currency=$currency)"
+                        "Skipping API transaction at index $index: missing required fields " +
+                            "(created=$created, amount=$amount, currency=$currency)"
                     }
                     null
                 }
@@ -1885,31 +2205,240 @@ private fun parseTransactionsWithPath(
         emptyList()
     }
 
-private fun buildTransactionUrl(
+/** Normalized amount: exactly one of [minorUnits]/[decimalMajor] is set; [sign] is the direction. */
+private data class ParsedAmount(
+    val minorUnits: Long?,
+    val decimalMajor: BigDecimal?,
+    val sign: Int,
+)
+
+/** Parses a transaction amount per the strategy's amount format and sign source. */
+private fun parseAmount(
+    obj: JsonObject,
+    mappings: ApiTransactionMappings,
+): ParsedAmount? {
+    val raw = obj.resolveJsonPath(mappings.amountField) ?: return null
+    return when (mappings.amountFormat) {
+        ApiAmountFormat.MINOR_UNITS_INTEGER -> {
+            val value = raw.toLongOrNull() ?: return null
+            val magnitudeSign = value.compareTo(0L).coerceIn(-1, 1)
+            val sign = resolveSign(obj, mappings, magnitudeSign) ?: return null
+            ParsedAmount(minorUnits = value, decimalMajor = null, sign = sign)
+        }
+        ApiAmountFormat.DECIMAL_MAJOR_UNITS -> {
+            val decimal = runCatching { BigDecimal(raw) }.getOrNull() ?: return null
+            val magnitudeSign = decimal.compareTo(BigDecimal.ZERO).coerceIn(-1, 1)
+            val sign = resolveSign(obj, mappings, magnitudeSign) ?: return null
+            ParsedAmount(minorUnits = null, decimalMajor = decimal.abs(), sign = sign)
+        }
+    }
+}
+
+/**
+ * Resolves the transaction sign (-1/0/1) from either the amount magnitude or a dedicated field.
+ * Returns null when [ApiSignSource.FIELD] is configured but the sign field is absent: a missing
+ * direction indicator is unexpected data, so the caller skips the item rather than silently
+ * defaulting it to a debit. A present value that is simply not in [creditValues] is a debit.
+ */
+private fun resolveSign(
+    obj: JsonObject,
+    mappings: ApiTransactionMappings,
+    magnitudeSign: Int,
+): Int? =
+    when (mappings.signSource) {
+        ApiSignSource.EMBEDDED -> magnitudeSign
+        ApiSignSource.FIELD -> {
+            if (magnitudeSign == 0) {
+                0
+            } else {
+                when (val signValue = mappings.signField?.let { obj.resolveJsonPath(it) }) {
+                    null -> {
+                        logger.warn { "Sign field '${mappings.signField}' missing from transaction; skipping item" }
+                        null
+                    }
+                    in mappings.creditValues -> 1
+                    else -> -1
+                }
+            }
+        }
+    }
+
+/** JSON path for the [index]-th item of a response array, accounting for a blank (root-array) key. */
+private fun arrayItemJsonPath(
+    responseArrayKey: String,
+    index: Int,
+): JsonPath = if (responseArrayKey.isBlank()) JsonPath("$[$index]") else JsonPath("$.$responseArrayKey[$index]")
+
+/** Extracts the items array from a response body; a blank [responseArrayKey] means the body is the array. */
+private fun responseItemsArray(
+    json: String,
+    responseArrayKey: String,
+): JsonArray? =
+    try {
+        val root = Json.parseToJsonElement(json)
+        if (responseArrayKey.isBlank()) {
+            root as? JsonArray
+        } else {
+            (root as? JsonObject)?.get(responseArrayKey)?.jsonArray
+        }
+    } catch (e: SerializationException) {
+        logger.error(e) { "Failed to parse API response array (key='$responseArrayKey')" }
+        null
+    }
+
+private const val MILLIS_PER_DAY = 86_400_000L
+
+// '}' is matched via a character class because Android's regex engine rejects a bare '}'
+// while the JVM flags an escaped '\}' as redundant.
+private val PATH_TEMPLATE_REGEX = Regex("\\{([^}]+)[}]")
+
+/**
+ * Resolves [ApiQueryParam.dynamicSource] / path-template expressions against the data available
+ * while building a request URL. Supported expressions are documented on [ApiQueryParam.dynamicSource].
+ */
+private class ImportUrlContext(
+    private val account: ApiImportAccount? = null,
+    private val ancestorItems: List<JsonObject>? = null,
+    private val ancestorVars: Map<String, String> = emptyMap(),
+    private val windowStart: String? = null,
+    private val windowEnd: String? = null,
+) {
+    fun resolve(expr: String): String? =
+        when {
+            expr == "account.id" -> account?.id
+            expr.startsWith("account.") -> account?.rawJson?.resolveJsonPath(expr.removePrefix("account."))
+            expr == "window.start" -> windowStart
+            expr == "window.end" -> windowEnd
+            expr == "parent.id" ->
+                ancestorVars.entries.lastOrNull { it.key.endsWith(".id") }?.value
+                    ?: ancestorItems?.lastOrNull()?.resolveJsonPath("id")
+            expr.startsWith("ancestor[") -> resolveAncestor(expr)
+            else -> ancestorVars[expr]
+        }
+
+    private fun resolveAncestor(expr: String): String? {
+        ancestorVars[expr]?.let { return it }
+        val index = expr.substringAfter('[').substringBefore(']').toIntOrNull() ?: return null
+        val field = expr.substringAfter("].", missingDelimiterValue = "id")
+        return ancestorItems?.getOrNull(index)?.resolveJsonPath(field)
+    }
+}
+
+/** Substitutes `{expression}` placeholders in [path] using [ctx]; unresolved placeholders are kept. */
+private fun applyPathTemplate(
+    path: String,
+    ctx: ImportUrlContext,
+): String = PATH_TEMPLATE_REGEX.replace(path) { match -> ctx.resolve(match.groupValues[1]) ?: match.value }
+
+/**
+ * Inverse of [applyPathTemplate]: matches a concrete [actualPath] against a [template] and returns
+ * each placeholder expression mapped to its captured value, or null when the path does not match.
+ */
+private fun extractPathVariables(
+    template: String,
+    actualPath: String,
+): Map<String, String>? {
+    val exprs = mutableListOf<String>()
+    val pattern =
+        buildString {
+            append('^')
+            var last = 0
+            for (match in PATH_TEMPLATE_REGEX.findAll(template)) {
+                append(Regex.escape(template.substring(last, match.range.first)))
+                append("([^/]+)")
+                exprs += match.groupValues[1]
+                last = match.range.last + 1
+            }
+            append(Regex.escape(template.substring(last)))
+            append('$')
+        }
+    val match = Regex(pattern).matchEntire(actualPath) ?: return null
+    return exprs.mapIndexed { index, expr -> expr to match.groupValues[index + 1] }.toMap()
+}
+
+/** Appends static and dynamic [queryParams] to this URL builder, resolving each against [ctx]. */
+private fun URLBuilder.appendQueryParams(
+    queryParams: List<ApiQueryParam>,
+    ctx: ImportUrlContext,
+) {
+    for (queryParam in queryParams) {
+        val value = queryParam.value ?: queryParam.dynamicSource?.let { ctx.resolve(it) }
+        if (value != null) parameters.append(queryParam.name, value)
+    }
+}
+
+/** Builds a fully-templated URL for [endpoint] (path placeholders + query params) using [ctx]. */
+private fun buildEndpointRequestUrl(
+    baseUrl: String,
+    endpoint: ApiEndpointConfig,
+    ctx: ImportUrlContext,
+): String =
+    URLBuilder(buildEndpointUrl(baseUrl, applyPathTemplate(endpoint.path, ctx)))
+        .apply { appendQueryParams(endpoint.queryParams, ctx) }
+        .buildString()
+
+/** Builds the accounts-endpoint URL for the given ancestor [ctx]. */
+private fun buildAccountsUrl(
     strategy: ApiImportStrategy,
-    accountId: String,
+    ctx: ImportUrlContext,
+): String = buildEndpointRequestUrl(strategy.baseUrl, strategy.accountsEndpoint, ctx)
+
+/** Builds a before-cursor transaction page URL (Monzo-style). */
+private fun buildCursorTransactionUrl(
+    strategy: ApiImportStrategy,
+    ctx: ImportUrlContext,
     before: Instant?,
 ): String =
-    URLBuilder(buildEndpointUrl(strategy.baseUrl, strategy.transactionsEndpoint.path))
+    URLBuilder(buildEndpointUrl(strategy.baseUrl, applyPathTemplate(strategy.transactionsEndpoint.path, ctx)))
         .apply {
-            for (queryParam in strategy.transactionsEndpoint.queryParams) {
-                val value =
-                    when (queryParam.dynamicSource) {
-                        "account.id" -> accountId
-                        null -> queryParam.value
-                        else -> null
-                    }
-                if (value != null) {
-                    parameters.append(queryParam.name, value)
-                }
-            }
+            appendQueryParams(strategy.transactionsEndpoint.queryParams, ctx)
             strategy.transactionsEndpoint.pagination?.let { pagination ->
                 parameters.append(pagination.limitParam, pagination.limitValue.toString())
-                if (before != null) {
-                    parameters.append(pagination.cursorParam, before.toString())
-                }
+                if (before != null) parameters.append(pagination.cursorParam, before.toString())
             }
         }.buildString()
+
+/** Builds a date-window transaction URL bounded by the window carried in [ctx]. */
+private fun buildDateWindowTransactionUrl(
+    strategy: ApiImportStrategy,
+    pagination: ApiPaginationConfig,
+    ctx: ImportUrlContext,
+    window: ApiDateWindow,
+): String =
+    URLBuilder(buildEndpointUrl(strategy.baseUrl, applyPathTemplate(strategy.transactionsEndpoint.path, ctx)))
+        .apply {
+            appendQueryParams(strategy.transactionsEndpoint.queryParams, ctx)
+            appendQueryParams(pagination.extraParams, ctx)
+            parameters.append(pagination.startParam, window.start.toString())
+            parameters.append(pagination.endParam, window.end.toString())
+        }.buildString()
+
+private data class ApiDateWindow(
+    val start: Instant,
+    val end: Instant,
+)
+
+/**
+ * Produces the date windows to fetch, anchored to fixed epoch boundaries so earlier windows yield
+ * stable, cacheable URLs across re-imports; only the final window (ending [now]) shifts.
+ */
+private fun dateWindows(
+    pagination: ApiPaginationConfig,
+    now: Instant,
+): List<ApiDateWindow> {
+    val windowMillis = pagination.windowDays.toLong() * MILLIS_PER_DAY
+    if (windowMillis <= 0L) return emptyList()
+    val nowMillis = now.toEpochMilliseconds()
+    val rawStart = nowMillis - pagination.lookbackDays.toLong() * MILLIS_PER_DAY
+    var start = (rawStart / windowMillis) * windowMillis
+    val windows = mutableListOf<ApiDateWindow>()
+    while (start < nowMillis) {
+        val end = minOf(start + windowMillis, nowMillis)
+        windows += ApiDateWindow(Instant.fromEpochMilliseconds(start), Instant.fromEpochMilliseconds(end))
+        start += windowMillis
+    }
+    return windows
+}
 
 private fun buildEndpointUrl(
     baseUrl: String,
@@ -1924,14 +2453,33 @@ private fun ApiResponse.toApiHttpResponse(): ApiHttpResponse =
         requestId = requestId.id,
     )
 
-private fun ApiRequest.accountIdParameter(strategy: ApiImportStrategy): String? {
+private fun ApiRequest.encodedPath(): String = runCatching { URLBuilder(url).encodedPath }.getOrNull().orEmpty()
+
+/**
+ * Recovers the current account's external id from a stored transaction request. Uses the
+ * `account.id` query parameter when the strategy injects the id that way (Monzo); otherwise matches
+ * the request path against the transactions-endpoint path template and captures the `{account.id}`
+ * segment (Wise). Returns null for requests that are not transaction requests.
+ */
+private fun ApiRequest.resolveAccountExternalId(strategy: ApiImportStrategy): String? {
     val accountIdParamName =
         strategy.transactionsEndpoint.queryParams
             .firstOrNull { it.dynamicSource == "account.id" }
             ?.name
-            ?: return null
-    return runCatching { URLBuilder(url).parameters[accountIdParamName] }.getOrNull()
+    if (accountIdParamName != null) {
+        return runCatching { URLBuilder(url).parameters[accountIdParamName] }.getOrNull()
+    }
+    return extractPathVariables(strategy.transactionsEndpoint.path, encodedPath())?.get("account.id")
 }
+
+/** True when this request targets the accounts endpoint (path matches the accounts path template). */
+private fun ApiRequest.isAccountsRequest(strategy: ApiImportStrategy): Boolean =
+    extractPathVariables(strategy.accountsEndpoint.path, encodedPath()) != null &&
+        resolveAccountExternalId(strategy) == null
+
+/** Ancestor placeholder values substituted into this accounts request's path (e.g. profile id). */
+private fun ApiRequest.ancestorVars(strategy: ApiImportStrategy): Map<String, String> =
+    extractPathVariables(strategy.accountsEndpoint.path, encodedPath()).orEmpty()
 
 private data class AccountApiSource(
     val sessionId: ApiSessionId,
@@ -1948,7 +2496,7 @@ private class AccountCache(
     // Pre-built by the caller in the serial section before concurrent import starts
     private val counterpartyIdIndex: MutableMap<String, AccountId>,
     private val personalCounterpartyKeyIndex: MutableMap<String, AccountId>,
-    private val builtInTypeIndex: MutableMap<BuiltInCounterpartyType, AccountId>,
+    private val builtInTypeIndex: MutableMap<String, AccountId>,
     private val onAccountCreated: suspend (isSourceAccount: Boolean) -> Unit = {},
 ) {
     private val mutex = Mutex()
@@ -1961,7 +2509,7 @@ private class AccountCache(
      */
     private val pendingCounterpartyAttributes: MutableList<Pair<AccountId, String>> = mutableListOf()
     private val pendingPersonalCounterpartyAttributes: MutableList<Pair<AccountId, PersonalCounterpartyIdentity>> = mutableListOf()
-    private val pendingBuiltInTypeAttributes: MutableList<Pair<AccountId, BuiltInCounterpartyType>> = mutableListOf()
+    private val pendingBuiltInTypeAttributes: MutableList<Pair<AccountId, String>> = mutableListOf()
 
     suspend fun drainPendingCounterpartyAttributes(): List<Pair<AccountId, String>> =
         mutex.withLock {
@@ -1973,7 +2521,7 @@ private class AccountCache(
             pendingPersonalCounterpartyAttributes.toList().also { pendingPersonalCounterpartyAttributes.clear() }
         }
 
-    suspend fun drainPendingBuiltInTypeAttributes(): List<Pair<AccountId, BuiltInCounterpartyType>> =
+    suspend fun drainPendingBuiltInTypeAttributes(): List<Pair<AccountId, String>> =
         mutex.withLock {
             pendingBuiltInTypeAttributes.toList().also { pendingBuiltInTypeAttributes.clear() }
         }
@@ -2003,7 +2551,7 @@ private class AccountCache(
     suspend fun getOrCreateCounterpartyAccountId(
         counterpartyId: String?,
         dedupeKey: String? = null,
-        builtInType: BuiltInCounterpartyType?,
+        builtInType: String?,
         name: String,
         apiSource: AccountApiSource,
         personalIdentity: PersonalCounterpartyIdentity? = null,
@@ -2127,14 +2675,14 @@ private class AccountCache(
         repeat(createdCount) { onAccountCreated(false) }
     }
 
-    private suspend fun findBuiltInTypeAccountId(builtInType: BuiltInCounterpartyType): AccountId? {
+    private suspend fun findBuiltInTypeAccountId(builtInType: String): AccountId? {
         val accounts = accountRepository.getAllAccounts().first()
         for (account in accounts) {
             val attributes = accountAttributeRepository.getByAccount(account.id).first()
             if (
                 attributes.any {
                     it.attributeType.id == BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID &&
-                        it.value == builtInType.attributeValue
+                        it.value == builtInType
                 }
             ) {
                 return account.id
@@ -2237,8 +2785,13 @@ private fun ApiTransactionPageItem.toTransfer(
     counterpartyAccountId: AccountId,
     currency: Currency,
 ): Transfer {
-    val money = Money(amountMinorUnits.absoluteValue, currency)
-    val isIncoming = amountMinorUnits > 0
+    val money =
+        when {
+            amountMinorUnits != null -> Money(amountMinorUnits.absoluteValue, currency)
+            amountDecimalMajor != null -> Money.fromDisplayValue(amountDecimalMajor, currency)
+            else -> Money(0L, currency)
+        }
+    val isIncoming = this.isIncoming
     return Transfer(
         id = TransferId(0L),
         timestamp = created,
@@ -2324,44 +2877,52 @@ private fun JsonObject.resolveJsonObjectPath(dotPath: String): JsonObject? {
     return current as? JsonObject
 }
 
-private enum class BuiltInCounterpartyType(
-    val attributeValue: String,
-    val defaultCounterpartyName: String,
-) {
-    ATM(
-        attributeValue = "ATM",
-        defaultCounterpartyName = "ATM",
-    ),
-    ;
+/**
+ * Evaluates the strategy's declarative [rules] against this transaction's raw JSON, returning the
+ * name of the first matching built-in counterparty type (e.g. "ATM"), or null when none match.
+ * [amountSign] (-1/0/1) drives each rule's sign gate.
+ */
+private fun JsonObject.resolveBuiltInCounterpartyType(
+    rules: List<BuiltInCounterpartyRule>,
+    amountSign: Int,
+): String? {
+    for (rule in rules) {
+        if (!rule.onlyWhenSign.matches(amountSign)) continue
+        if (rule.predicates.all { evaluatePredicate(it) }) return rule.name
+    }
+    return null
+}
 
-    companion object {
-        fun fromAttributeValue(value: String): BuiltInCounterpartyType? = entries.firstOrNull { it.attributeValue == value }
+private fun RuleSign.matches(sign: Int): Boolean =
+    when (this) {
+        RuleSign.ANY -> true
+        RuleSign.NEGATIVE -> sign < 0
+        RuleSign.POSITIVE -> sign > 0
+    }
+
+private fun JsonObject.evaluatePredicate(predicate: RulePredicate): Boolean {
+    val operand = predicate.value.orEmpty()
+    return when (predicate.op) {
+        PredicateOp.EXISTS -> resolveJsonElementPath(predicate.path) != null
+        PredicateOp.EQUALS -> resolveJsonPath(predicate.path) == predicate.value
+        PredicateOp.EQUALS_IGNORE_CASE -> resolveJsonPath(predicate.path)?.equals(predicate.value, ignoreCase = true) == true
+        PredicateOp.STARTS_WITH -> resolveJsonPath(predicate.path)?.startsWith(operand) == true
+        PredicateOp.ARRAY_ANY_STARTS_WITH ->
+            (resolveJsonElementPath(predicate.path) as? JsonArray)?.any { element ->
+                element.jsonPrimitive.contentOrNull?.startsWith(operand, ignoreCase = true) == true
+            } == true
+        PredicateOp.OBJECT_EMPTY -> resolveJsonObjectPath(predicate.path).isNullOrEmpty()
+        PredicateOp.OBJECT_NON_EMPTY -> resolveJsonObjectPath(predicate.path)?.isNotEmpty() == true
     }
 }
 
-private fun JsonObject.resolveBuiltInCounterpartyType(amountMinorUnits: Long): BuiltInCounterpartyType? {
-    if (amountMinorUnits >= 0L) return null
-    if (this["atm_fees_detailed"] is JsonObject) return BuiltInCounterpartyType.ATM
-    val hasAtmLabel =
-        this["labels"]
-            ?.let { it as? JsonArray }
-            ?.any { label ->
-                label
-                    .jsonPrimitive
-                    .contentOrNull
-                    ?.startsWith("withdrawal.atm", ignoreCase = true) == true
-            } == true
-    if (hasAtmLabel) return BuiltInCounterpartyType.ATM
-    val mcc = (this["metadata"] as? JsonObject)?.stringOrNull("mcc")
-    if (mcc == "6011") return BuiltInCounterpartyType.ATM
-    if (stringOrNull("category")?.equals("cash", ignoreCase = true) == true) {
-        val hasMerchant = (this["merchant"] as? JsonObject)?.isNotEmpty() == true
-        val hasCounterpartyDetails = (this["counterparty"] as? JsonObject)?.isNotEmpty() == true
-        if (!hasMerchant && !hasCounterpartyDetails) {
-            return BuiltInCounterpartyType.ATM
-        }
+/** Resolves a dot-notation path to its [JsonElement] (object, array, or primitive), or null. */
+private fun JsonObject.resolveJsonElementPath(dotPath: String): JsonElement? {
+    var current: JsonElement = this
+    for (part in dotPath.split(".")) {
+        current = (current as? JsonObject)?.get(part) ?: return null
     }
-    return null
+    return current
 }
 
 private class AttributeTypeCache(

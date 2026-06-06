@@ -52,6 +52,7 @@ import com.moneymanager.domain.model.apistrategy.ApiPaginationConfig
 import com.moneymanager.domain.model.apistrategy.ApiPeopleMappings
 import com.moneymanager.domain.model.apistrategy.ApiQueryParam
 import com.moneymanager.domain.model.apistrategy.ApiTransactionMappings
+import com.moneymanager.domain.model.apistrategy.PaginationMode
 import com.moneymanager.domain.repository.ApiSessionRepository
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
@@ -88,7 +89,7 @@ fun ApiStrategyEditDialog(
         )
     }
 
-    // Pagination
+    // Pagination — this dialog edits before-cursor pagination only.
     var paginationEnabled by remember { mutableStateOf(strategy?.transactionsEndpoint?.pagination != null) }
     val defaultPagination = strategy?.transactionsEndpoint?.pagination ?: ApiPaginationConfig()
     var paginationLimitParam by remember { mutableStateOf(defaultPagination.limitParam) }
@@ -616,16 +617,23 @@ fun ApiStrategyEditDialog(
             TextButton(
                 onClick = {
                     val now = Clock.System.now()
+                    val originalPagination = strategy?.transactionsEndpoint?.pagination
                     val pagination =
-                        if (paginationEnabled) {
-                            ApiPaginationConfig(
-                                limitParam = paginationLimitParam,
-                                limitValue = paginationLimitValue.toIntOrNull() ?: 100,
-                                cursorParam = paginationCursorParam,
-                                cursorResponseField = paginationCursorField,
-                            )
-                        } else {
-                            null
+                        when {
+                            // The toggle always wins: switching pagination off clears any config.
+                            !paginationEnabled -> null
+                            // This dialog only exposes cursor-mode fields. For other modes (e.g. Wise's
+                            // DATE_WINDOW) preserve the original config verbatim so saving doesn't
+                            // silently downgrade it to cursor pagination and lose its settings.
+                            originalPagination != null && originalPagination.mode != PaginationMode.CURSOR ->
+                                originalPagination
+                            else ->
+                                ApiPaginationConfig(
+                                    limitParam = paginationLimitParam,
+                                    limitValue = paginationLimitValue.toIntOrNull() ?: 100,
+                                    cursorParam = paginationCursorParam,
+                                    cursorResponseField = paginationCursorField,
+                                )
                         }
                     val accountIdQueryParam =
                         if (transactionsAccountIdParam.isNotBlank()) {

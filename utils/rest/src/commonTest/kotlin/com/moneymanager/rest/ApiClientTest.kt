@@ -80,6 +80,68 @@ class ApiClientTest {
         }
 
     @Test
+    fun `get signs the one-time token and retries on an sca challenge`() =
+        runTest {
+            val recorder = FakeTrafficRecorder(testRequestId, testResponseId)
+            var requestCount = 0
+            val engine =
+                MockEngine { request ->
+                    requestCount++
+                    if (request.headers["X-Signature"] == null) {
+                        // First call: challenge with a one-time token, empty body.
+                        respond(
+                            content = "",
+                            status = HttpStatusCode.Forbidden,
+                            headers = headersOf("x-2fa-approval", "ott-123"),
+                        )
+                    } else {
+                        respond(
+                            content = testBody,
+                            status = HttpStatusCode.OK,
+                            headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                        )
+                    }
+                }
+            val client = createApiClient(recorder, engine)
+            var signedToken: String? = null
+            val sca =
+                ScaParams(
+                    challengeHeader = "x-2fa-approval",
+                    signatureHeader = "X-Signature",
+                    triggerStatus = 403,
+                    sign = { oneTimeToken ->
+                        signedToken = oneTimeToken
+                        "signature-of-$oneTimeToken"
+                    },
+                )
+
+            val result = client.get(testUrl, testToken, sca)
+
+            assertEquals(200, result.statusCode)
+            assertEquals(testBody, result.body)
+            assertEquals("ott-123", signedToken, "the one-time token from the challenge header is signed")
+            assertEquals(2, requestCount, "the request is retried once with the signature")
+        }
+
+    @Test
+    fun `get does not retry when no sca params are provided`() =
+        runTest {
+            val recorder = FakeTrafficRecorder(testRequestId, testResponseId)
+            var requestCount = 0
+            val engine =
+                MockEngine { _ ->
+                    requestCount++
+                    respond(content = "", status = HttpStatusCode.Forbidden, headers = headersOf("x-2fa-approval", "ott-123"))
+                }
+            val client = createApiClient(recorder, engine)
+
+            val result = client.get(testUrl, testToken)
+
+            assertEquals(403, result.statusCode)
+            assertEquals(1, requestCount)
+        }
+
+    @Test
     fun `get does not record Authorization header`() =
         runTest {
             val recorder = FakeTrafficRecorder(testRequestId, testResponseId)

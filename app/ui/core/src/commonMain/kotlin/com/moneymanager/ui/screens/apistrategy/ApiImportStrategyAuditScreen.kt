@@ -10,6 +10,7 @@ import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
 import com.moneymanager.domain.model.apistrategy.ApiStrategyConfig
+import com.moneymanager.domain.model.apistrategy.PaginationMode
 import com.moneymanager.domain.repository.ApiImportStrategyRepository
 import com.moneymanager.domain.repository.AuditRepository
 import com.moneymanager.ui.audit.AuditDiffCard
@@ -225,10 +226,21 @@ private fun flattenEndpoint(
             }
     }
     endpoint.pagination?.let { pag ->
-        map["$prefix pagination limit param"] = pag.limitParam
-        map["$prefix pagination limit"] = pag.limitValue.toString()
-        map["$prefix pagination cursor param"] = pag.cursorParam
-        map["$prefix pagination cursor field"] = pag.cursorResponseField
+        map["$prefix pagination mode"] = pag.mode.name
+        when (pag.mode) {
+            PaginationMode.CURSOR -> {
+                map["$prefix pagination limit param"] = pag.limitParam
+                map["$prefix pagination limit"] = pag.limitValue.toString()
+                map["$prefix pagination cursor param"] = pag.cursorParam
+                map["$prefix pagination cursor field"] = pag.cursorResponseField
+            }
+            PaginationMode.DATE_WINDOW -> {
+                map["$prefix pagination start param"] = pag.startParam
+                map["$prefix pagination end param"] = pag.endParam
+                map["$prefix pagination window days"] = pag.windowDays.toString()
+                map["$prefix pagination lookback days"] = pag.lookbackDays.toString()
+            }
+        }
     }
 }
 

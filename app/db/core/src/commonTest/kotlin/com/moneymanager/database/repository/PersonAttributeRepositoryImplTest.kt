@@ -2,8 +2,6 @@
 
 package com.moneymanager.database.repository
 
-import com.moneymanager.database.DatabaseConfig
-import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonId
@@ -28,9 +26,10 @@ class PersonAttributeRepositoryImplTest : DbTest() {
                     ),
                 )
 
+            val attributeTypeId = repositories.attributeTypeRepository.getOrCreate("monzo-external-id")
             repositories.personAttributeRepository.insertInCreationMode(
                 personId = personId,
-                attributeTypeId = AttributeTypeId(DatabaseConfig.PERSON_EXTERNAL_ID_ATTR_TYPE_ID),
+                attributeTypeId = attributeTypeId,
                 value = "user_001",
             )
 
@@ -39,7 +38,7 @@ class PersonAttributeRepositoryImplTest : DbTest() {
 
             val attrs = repositories.personAttributeRepository.getByPerson(personId).first()
             assertEquals(1, attrs.size)
-            assertEquals("person-external-id", attrs.single().attributeType.name)
+            assertEquals("monzo-external-id", attrs.single().attributeType.name)
             assertEquals("user_001", attrs.single().value)
 
             val auditEntries = repositories.auditRepository.getAttributeAuditByPerson(personId)

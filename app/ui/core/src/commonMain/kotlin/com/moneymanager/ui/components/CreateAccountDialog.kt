@@ -29,6 +29,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.repository.AccountRepository
+import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonAttributeRepository
@@ -52,6 +53,7 @@ fun CreateAccountDialog(
     categoryRepository: CategoryRepository,
     personRepository: PersonRepository,
     personAttributeRepository: PersonAttributeRepository? = null,
+    attributeTypeRepository: AttributeTypeRepository? = null,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     entitySource: EntitySource,
     onDismiss: () -> Unit,
@@ -227,12 +229,13 @@ fun CreateAccountDialog(
         EditPersonDialog(
             personToEdit = null,
             personRepository = personRepository,
-            personAttributeRepository = personAttributeRepository,
             entitySource = entitySource,
             onPersonCreated = { personId ->
                 selectedOwnerIdForAddition = personId.id
             },
             onDismiss = { accountState.showCreatePersonDialog = false },
+            personAttributeRepository = personAttributeRepository,
+            attributeTypeRepository = attributeTypeRepository,
         )
     }
 }
