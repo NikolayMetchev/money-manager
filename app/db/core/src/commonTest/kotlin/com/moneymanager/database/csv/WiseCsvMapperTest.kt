@@ -177,9 +177,7 @@ class WiseCsvMapperTest {
         val row =
             wiseRow(
                 id = "BALANCE-1",
-                sourceName = "Nikolay Metchev",
                 sourceAmount = "100.00",
-                sourceCurrency = "EUR",
                 targetName = "Nikolay Metchev",
                 targetAmount = "85.00",
                 targetCurrency = "GBP",
@@ -202,10 +200,8 @@ class WiseCsvMapperTest {
                 sourceName = "",
                 sourceAmount = "0.06",
                 sourceFee = "",
-                sourceCurrency = "EUR",
                 targetName = "TransferWise",
                 targetAmount = "0.06",
-                targetCurrency = "EUR",
                 reference = "Assets fee 18326272",
             )
         val result = mapper().mapRow(row)
@@ -263,7 +259,6 @@ class WiseCsvMapperTest {
         val row =
             wiseRow(
                 id = "TRANSFER-876114969",
-                sourceName = "Nikolay Metchev",
                 sourceAmount = "89.19",
                 sourceFee = "1.18",
                 sourceCurrency = "GBP",
@@ -400,7 +395,7 @@ class WiseCsvMapperTest {
     fun `prepareImport collects new accounts from both sides`() {
         val rows =
             listOf(
-                wiseRow(rowIndex = 1, id = "TRANSFER-1", targetName = "Avolta - Tenerife"),
+                wiseRow(),
                 wiseRow(
                     rowIndex = 2,
                     id = "TRANSFER-2",
