@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Money Manager — a Kotlin Multiplatform personal finance app for desktop and Android.">
+  <title>Money Manager</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --fg: #1f2328;
+      --muted: #59636e;
+      --accent: #1a7f37;
+      --accent-soft: #dafbe1;
+      --border: #d1d9e0;
+      --code-bg: #f6f8fa;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0d1117;
+        --fg: #e6edf3;
+        --muted: #9198a1;
+        --accent: #3fb950;
+        --accent-soft: #12261e;
+        --border: #30363d;
+        --code-bg: #161b22;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      line-height: 1.6;
+    }
+    header {
+      border-bottom: 1px solid var(--border);
+      padding: 3rem 1.5rem;
+      text-align: center;
+    }
+    header h1 { margin: 0 0 0.5rem; font-size: 2.5rem; }
+    header p.tagline { margin: 0 auto 1rem; max-width: 40rem; color: var(--muted); font-size: 1.15rem; }
+    .badge {
+      display: inline-block;
+      background: var(--accent-soft);
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      border-radius: 2em;
+      padding: 0.15em 0.9em;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+    .links { margin-top: 1.25rem; }
+    .links a {
+      display: inline-block;
+      margin: 0 0.4rem;
+      padding: 0.5em 1.2em;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--fg);
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .links a.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .links a:hover { border-color: var(--accent); }
+    main { max-width: 56rem; margin: 0 auto; padding: 1.5rem; }
+    section { margin: 2.5rem 0; }
+    h2 {
+      font-size: 1.5rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.3em;
+    }
+    a { color: var(--accent); }
+    code, pre {
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+      background: var(--code-bg);
+      border-radius: 6px;
+    }
+    code { padding: 0.15em 0.4em; font-size: 0.9em; }
+    pre {
+      padding: 1em;
+      overflow-x: auto;
+      border: 1px solid var(--border);
+    }
+    pre code { padding: 0; background: none; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+      gap: 1rem;
+    }
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+    }
+    .card h3 { margin-top: 0; font-size: 1.05rem; }
+    .card ul { margin: 0; padding-left: 1.2rem; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid var(--border); padding: 0.5em 0.8em; text-align: left; }
+    th { background: var(--code-bg); }
+    footer {
+      border-top: 1px solid var(--border);
+      margin-top: 3rem;
+      padding: 1.5rem;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>💰 Money Manager</h1>
+    <p class="tagline">A personal finance app built with Kotlin Multiplatform and Compose Multiplatform — running natively on desktop and Android.</p>
+    <span class="badge">BETA</span>
+    <div class="links">
+      <a class="primary" href="https://github.com/NikolayMetchev/money-manager">View on GitHub</a>
+      <a href="https://github.com/NikolayMetchev/money-manager/releases">Releases</a>
+    </div>
+  </header>
+
+  <main>
+    <section id="about">
+      <h2>About</h2>
+      <p>
+        Money Manager is an open-source personal finance application. Its goal is to support
+        every type of account a person can have — banking, pensions, investments, crypto — while
+        <strong>automating data entry as much as possible</strong>, which is intended to be its
+        distinguishing feature.
+      </p>
+      <p>
+        It is also an exploration of what can be achieved with
+        <a href="https://kotlinlang.org/docs/multiplatform.html">Kotlin Multiplatform</a> and
+        <a href="https://www.jetbrains.com/compose-multiplatform/">Compose Multiplatform</a>:
+        a single codebase that ships a desktop (JVM) app and an Android app.
+      </p>
+    </section>
+
+    <section id="features">
+      <h2>Features</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>✅ Working today</h3>
+          <ul>
+            <li>Accounts, categories and transactions</li>
+            <li>Basic transfers between accounts</li>
+            <li>Basic CSV importing</li>
+            <li>Audit history</li>
+            <li>Desktop (JVM) app</li>
+            <li>Android app</li>
+            <li>Automated deploys</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>🚧 Planned</h3>
+          <ul>
+            <li>Google Drive integration</li>
+            <li>Charting and data exploration</li>
+            <li>Forecasting and budgeting</li>
+            <li>Multi-user support</li>
+            <li>Reconciliation support</li>
+            <li>iOS and Web (JS/WASM) versions</li>
+            <li>AI classification of transactions</li>
+            <li>Export to GnuCash</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="concepts">
+      <h2>Core concepts</h2>
+      <table>
+        <tr><th>Entity</th><th>Description</th></tr>
+        <tr><td><strong>Account</strong></td><td>Financial accounts — checking, savings, credit card, cash, investment</td></tr>
+        <tr><td><strong>Category</strong></td><td>Transaction categories with a parent/child hierarchy</td></tr>
+        <tr><td><strong>Transaction</strong></td><td>Income, expense, and transfer records</td></tr>
+      </table>
+      <p>
+        Monetary amounts are handled with exact arithmetic only — never floating point.
+        Values are stored as integers scaled per currency, and all parsing and calculation
+        goes through <code>BigDecimal</code>, so amounts are always precise.
+      </p>
+    </section>
+
+    <section id="tech">
+      <h2>Technology stack</h2>
+      <table>
+        <tr><th>Area</th><th>Technology</th></tr>
+        <tr><td>Language</td><td>Kotlin (Multiplatform)</td></tr>
+        <tr><td>UI</td><td>Compose Multiplatform with Material 3</td></tr>
+        <tr><td>Database</td><td>SQLite via SQLDelight</td></tr>
+        <tr><td>Dependency injection</td><td>Metro (compile-time DI)</td></tr>
+        <tr><td>Object mapping</td><td>Mappie</td></tr>
+        <tr><td>Build</td><td>Gradle (JDK 25 toolchain)</td></tr>
+        <tr><td>Code quality</td><td>Detekt, ktlint, dependency-analysis</td></tr>
+      </table>
+    </section>
+
+    <section id="getting-started">
+      <h2>Getting started</h2>
+      <p>Clone the repository and build (requires JDK 25):</p>
+      <pre><code>git clone https://github.com/NikolayMetchev/money-manager.git
+cd money-manager
+./gradlew build --console=plain</code></pre>
+      <p>Run the desktop app:</p>
+      <pre><code>./gradlew :app:main:jvm:run --console=plain</code></pre>
+      <p>Install the Android debug build on a connected device or emulator:</p>
+      <pre><code>./gradlew :app:main:android:installDebug --console=plain</code></pre>
+    </section>
+
+    <section id="status">
+      <h2>Project status</h2>
+      <p>
+        Money Manager is in <strong>beta</strong>. The database schema is still evolving and
+        migrations are not yet implemented — local databases are recreated on schema changes.
+        Once the tool reaches a usefully stable state, contributions will be very welcome.
+      </p>
+      <p>
+        Found a bug or have an idea? Open an
+        <a href="https://github.com/NikolayMetchev/money-manager/issues">issue on GitHub</a>.
+      </p>
+    </section>
+  </main>
+
+  <footer>
+    Money Manager · <a href="https://github.com/NikolayMetchev/money-manager/blob/main/LICENSE">License</a> ·
+    Built with Kotlin Multiplatform
+  </footer>
+</body>
+</html>
