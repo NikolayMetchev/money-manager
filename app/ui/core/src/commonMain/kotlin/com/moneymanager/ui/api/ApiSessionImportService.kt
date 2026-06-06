@@ -1246,7 +1246,7 @@ private suspend fun importOwnersForAccount(
         personAccountOwnershipRepository
             .getOwnershipsByAccount(accountId)
             .first()
-            .associateBy { it.personId }
+            .mapTo(mutableSetOf()) { it.personId }
     var newPeopleCount = 0
     var newOwnershipCount = 0
 
@@ -1263,9 +1263,10 @@ private suspend fun importOwnersForAccount(
                 requestId = requestId,
             ) ?: continue
 
-        val existingOwnership = existingOwnerPersonIds[person.id]
-        if (existingOwnership == null) {
+        if (person.id !in existingOwnerPersonIds) {
             val ownershipId = personAccountOwnershipRepository.createOwnership(person.id, accountId)
+            // Track the new link so duplicate owner entries in the same payload don't re-insert it.
+            existingOwnerPersonIds += person.id
             newOwnershipCount++
             if (entitySource != null && sessionId != null && requestId != null) {
                 entitySource.recordFromApi(

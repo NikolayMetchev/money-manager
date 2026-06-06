@@ -620,19 +620,20 @@ fun ApiStrategyEditDialog(
                     val originalPagination = strategy?.transactionsEndpoint?.pagination
                     val pagination =
                         when {
+                            // The toggle always wins: switching pagination off clears any config.
+                            !paginationEnabled -> null
                             // This dialog only exposes cursor-mode fields. For other modes (e.g. Wise's
                             // DATE_WINDOW) preserve the original config verbatim so saving doesn't
                             // silently downgrade it to cursor pagination and lose its settings.
                             originalPagination != null && originalPagination.mode != PaginationMode.CURSOR ->
                                 originalPagination
-                            paginationEnabled ->
+                            else ->
                                 ApiPaginationConfig(
                                     limitParam = paginationLimitParam,
                                     limitValue = paginationLimitValue.toIntOrNull() ?: 100,
                                     cursorParam = paginationCursorParam,
                                     cursorResponseField = paginationCursorField,
                                 )
-                            else -> null
                         }
                     val accountIdQueryParam =
                         if (transactionsAccountIdParam.isNotBlank()) {
