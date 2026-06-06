@@ -97,8 +97,44 @@ data class RegexAccountMapping(
 }
 
 /**
+ * Looks up an account by templating a CSV column value into an account name.
+ * The looked-up name is `prefix + columnValue + suffix` (e.g. "Wise: " + "EUR").
+ * Useful when one logical account exists per currency and the CSV only carries
+ * the currency code.
+ *
+ * Persisted [CsvAccountMapping] overrides on the raw column value are applied first,
+ * so renamed accounts keep matching.
+ */
+@Serializable
+data class TemplateAccountMapping(
+    override val id: FieldMappingId,
+    override val fieldType: TransferField,
+    val columnName: String,
+    val prefix: String = "",
+    val suffix: String = "",
+    val defaultCategoryId: Long = Category.UNCATEGORIZED_ID,
+) : FieldMapping
+
+/**
+ * Chooses between two account mappings based on row-level conditions.
+ * All [conditions] must hold (AND) for [whenTrue] to be used; otherwise [whenFalse] applies.
+ * Conditions are evaluated against the row values after any row preprocessing rules ran.
+ */
+@Serializable
+data class ConditionalAccountMapping(
+    override val id: FieldMappingId,
+    override val fieldType: TransferField,
+    val conditions: List<RowCondition>,
+    val whenTrue: FieldMapping,
+    val whenFalse: FieldMapping,
+) : FieldMapping
+
+/**
  * Parses a date/time from one or two CSV columns.
  * If only a date column is specified, uses the defaultTime.
+ *
+ * When [dateTimeFormat] is set, the [dateColumnName] column holds a combined
+ * date+time value parsed with that format, and the other time settings are ignored.
  */
 @Serializable
 data class DateTimeParsingMapping(
@@ -109,6 +145,7 @@ data class DateTimeParsingMapping(
     val timeColumnName: String? = null,
     val timeFormat: String? = null,
     val defaultTime: String = "12:00:00",
+    val dateTimeFormat: String? = null,
 ) : FieldMapping
 
 /**
@@ -139,6 +176,11 @@ data class DirectColumnMapping(
  * When flipAccountsOnPositive is true and the parsed amount is positive,
  * the source and target accounts are swapped. This is useful for bank statements
  * where positive values indicate money flowing INTO the statement account.
+ *
+ * When [feeColumnName] is set, that column's value (if non-blank) is added to the
+ * amount's magnitude whenever all [feeConditions] hold (empty = always). This handles
+ * exports like Wise's, where the amount column is net of fees but the fee also left
+ * the account (e.g. ATM withdrawals: 200.00 withdrawn + 7.29 fee = 207.29 debited).
  */
 @Serializable
 data class AmountParsingMapping(
@@ -150,6 +192,8 @@ data class AmountParsingMapping(
     val debitColumnName: String? = null,
     val negateValues: Boolean = false,
     val flipAccountsOnPositive: Boolean = false,
+    val feeColumnName: String? = null,
+    val feeConditions: List<RowCondition> = emptyList(),
 ) : FieldMapping {
     init {
         when (mode) {

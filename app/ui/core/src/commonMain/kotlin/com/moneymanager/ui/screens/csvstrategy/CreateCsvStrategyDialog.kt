@@ -1013,13 +1013,30 @@ fun CreateCsvStrategyDialog(
                                             },
                                         )
                                     }
+                                // Preserve mappings the form cannot represent (e.g. the built-in
+                                // Wise CSV strategy's template/conditional account mappings and
+                                // combined date-time format) so editing doesn't silently destroy them.
+                                val preservedMappings =
+                                    existingStrategy?.fieldMappings.orEmpty().filter { (field, mapping) ->
+                                        when (field) {
+                                            TransferField.SOURCE_ACCOUNT -> mapping !is HardCodedAccountMapping
+                                            TransferField.TARGET_ACCOUNT ->
+                                                mapping !is AccountLookupMapping && mapping !is RegexAccountMapping
+                                            TransferField.TIMESTAMP ->
+                                                mapping is DateTimeParsingMapping && mapping.dateTimeFormat != null
+                                            TransferField.AMOUNT ->
+                                                mapping is AmountParsingMapping && mapping.feeColumnName != null
+                                            else -> false
+                                        }
+                                    }
                                 val strategy =
                                     CsvImportStrategy(
                                         id = existingStrategy?.id ?: CsvImportStrategyId(Uuid.random()),
                                         name = name,
                                         identificationColumns = identificationColumns,
-                                        fieldMappings = fieldMappings,
+                                        fieldMappings = fieldMappings + preservedMappings,
                                         attributeMappings = attributeMappings,
+                                        rowPreprocessingRules = existingStrategy?.rowPreprocessingRules.orEmpty(),
                                         createdAt = existingStrategy?.createdAt ?: now,
                                         updatedAt = now,
                                     )

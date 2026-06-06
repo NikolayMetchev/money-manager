@@ -5,6 +5,7 @@ package com.moneymanager.database
 import com.moneymanager.currency.Currency
 import com.moneymanager.database.json.ApiStrategyConfigJson
 import com.moneymanager.database.json.ApiStrategyJsonCodec
+import com.moneymanager.database.json.FieldMappingJsonCodec
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.SourceType
 import com.moneymanager.domain.model.apistrategy.ApiAccountMappings
@@ -22,8 +23,27 @@ import com.moneymanager.domain.model.apistrategy.PaginationMode
 import com.moneymanager.domain.model.apistrategy.PredicateOp
 import com.moneymanager.domain.model.apistrategy.RulePredicate
 import com.moneymanager.domain.model.apistrategy.RuleSign
+import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
+import com.moneymanager.domain.model.csvstrategy.AmountMode
+import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
+import com.moneymanager.domain.model.csvstrategy.AttributeColumnMapping
+import com.moneymanager.domain.model.csvstrategy.ColumnPairSwap
+import com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping
+import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
+import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
+import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
+import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
+import com.moneymanager.domain.model.csvstrategy.FieldMappingId
+import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
+import com.moneymanager.domain.model.csvstrategy.RowCondition
+import com.moneymanager.domain.model.csvstrategy.RowConditionOperator
+import com.moneymanager.domain.model.csvstrategy.RowPreprocessingRule
+import com.moneymanager.domain.model.csvstrategy.TemplateAccountMapping
+import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.repository.CurrencyRepository
 import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
@@ -803,6 +823,9 @@ object DatabaseConfig {
             seedMonzoStrategy(systemDeviceId)
             seedWiseStrategy(systemDeviceId)
 
+            // Seed the built-in Wise CSV import strategy
+            seedWiseCsvStrategy()
+
             // Seed currencies with source tracking
             allCurrencies.forEach { currency ->
                 val currencyId = currencyRepository.upsertCurrencyByCode(currency.code, currency.displayName)
@@ -947,7 +970,11 @@ object DatabaseConfig {
                     ),
                 accountMappings =
                     ApiAccountMappings(
-                        descriptionField = "name",
+                        // Balances only have a "name" when the user explicitly names them (null by
+                        // default), which made account names fall back to the opaque balance id.
+                        // Use the currency code instead so accounts are named "Wise: EUR" etc.,
+                        // matching the accounts the built-in Wise CSV strategy resolves per-row.
+                        descriptionField = "currency",
                         ownersArrayField = null,
                         currencyField = "currency",
                     ),
@@ -1000,6 +1027,178 @@ object DatabaseConfig {
             revision_id = 1,
             source_type_id = SourceType.SYSTEM.id.toLong(),
             device_id = systemDeviceId,
+        )
+    }
+
+    /** Fixed UUID for the built-in Wise CSV strategy so it can be referenced reliably. */
+    val wiseCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000003")
+
+    /** Account name prefix shared with the Wise API import strategy ("Wise: " + currency code). */
+    private const val WISE_ACCOUNT_PREFIX = "Wise: "
+
+    private fun wiseCsvMappingId(index: Int): FieldMappingId =
+        FieldMappingId(Uuid.parse("00000000-0000-0000-0001-${index.toString().padStart(12, '0')}"))
+
+    /**
+     * Builds the built-in Wise CSV import strategy for Wise's transaction-history.csv export.
+     *
+     * Each row carries both sides of the transaction (Source and Target columns) and a Direction
+     * column saying which side is the user's Wise balance. A row preprocessing rule swaps the
+     * Source/Target values for IN rows so all field mappings can read the Source-side columns,
+     * then flips the resolved accounts. The per-currency Wise balance is resolved by templating
+     * the currency code into the account name used by the Wise API import ("Wise: EUR").
+     * Balance-to-balance conversions (same name on both sides, different currencies) route the
+     * target to the other Wise balance instead of a counterparty account.
+     */
+    fun buildWiseCsvStrategy(now: Instant): CsvImportStrategy {
+        val sourceAccount =
+            TemplateAccountMapping(
+                id = wiseCsvMappingId(1),
+                fieldType = TransferField.SOURCE_ACCOUNT,
+                columnName = "Source currency",
+                prefix = WISE_ACCOUNT_PREFIX,
+            )
+        val targetAccount =
+            ConditionalAccountMapping(
+                id = wiseCsvMappingId(2),
+                fieldType = TransferField.TARGET_ACCOUNT,
+                conditions =
+                    listOf(
+                        RowCondition("Source name", RowConditionOperator.EQUALS_COLUMN, otherColumnName = "Target name"),
+                        RowCondition("Source name", RowConditionOperator.IS_NOT_BLANK),
+                        RowCondition("Source currency", RowConditionOperator.NOT_EQUALS_COLUMN, otherColumnName = "Target currency"),
+                    ),
+                whenTrue =
+                    TemplateAccountMapping(
+                        id = wiseCsvMappingId(3),
+                        fieldType = TransferField.TARGET_ACCOUNT,
+                        columnName = "Target currency",
+                        prefix = WISE_ACCOUNT_PREFIX,
+                    ),
+                whenFalse =
+                    AccountLookupMapping(
+                        id = wiseCsvMappingId(4),
+                        fieldType = TransferField.TARGET_ACCOUNT,
+                        columnName = "Target name",
+                        fallbackColumns = listOf("Source name"),
+                    ),
+            )
+        val fieldMappings =
+            mapOf(
+                TransferField.SOURCE_ACCOUNT to sourceAccount,
+                TransferField.TARGET_ACCOUNT to targetAccount,
+                TransferField.TIMESTAMP to
+                    DateTimeParsingMapping(
+                        id = wiseCsvMappingId(5),
+                        fieldType = TransferField.TIMESTAMP,
+                        dateColumnName = "Created on",
+                        dateFormat = "yyyy-MM-dd",
+                        dateTimeFormat = "yyyy-MM-dd HH:mm:ss",
+                    ),
+                TransferField.DESCRIPTION to
+                    DirectColumnMapping(
+                        id = wiseCsvMappingId(6),
+                        fieldType = TransferField.DESCRIPTION,
+                        columnName = "Reference",
+                        fallbackColumns = listOf("Note", "Category", "Target name"),
+                    ),
+                TransferField.AMOUNT to
+                    AmountParsingMapping(
+                        id = wiseCsvMappingId(7),
+                        fieldType = TransferField.AMOUNT,
+                        mode = AmountMode.SINGLE_COLUMN,
+                        amountColumnName = "Source amount (after fees)",
+                        // The amount column is net of fees, but on OUT rows the fee also left the
+                        // balance (e.g. ATM: 200.00 withdrawn + 7.29 fee = 207.29 debited). On IN
+                        // rows the after-fees amount is already exactly what arrived.
+                        feeColumnName = "Source fee amount",
+                        feeConditions = listOf(RowCondition("Direction", RowConditionOperator.EQUALS_VALUE, value = "OUT")),
+                    ),
+                TransferField.CURRENCY to
+                    CurrencyLookupMapping(
+                        id = wiseCsvMappingId(8),
+                        fieldType = TransferField.CURRENCY,
+                        columnName = "Source currency",
+                    ),
+                TransferField.TIMEZONE to
+                    HardCodedTimezoneMapping(
+                        id = wiseCsvMappingId(9),
+                        fieldType = TransferField.TIMEZONE,
+                        timezoneId = "UTC",
+                    ),
+            )
+        val rowRules =
+            listOf(
+                RowPreprocessingRule(
+                    conditions = listOf(RowCondition("Direction", RowConditionOperator.EQUALS_VALUE, value = "IN")),
+                    columnSwaps =
+                        listOf(
+                            ColumnPairSwap("Source name", "Target name"),
+                            ColumnPairSwap("Source amount (after fees)", "Target amount (after fees)"),
+                            ColumnPairSwap("Source currency", "Target currency"),
+                        ),
+                    flipSourceAndTarget = true,
+                ),
+            )
+        val attributeMappings =
+            listOf(
+                AttributeColumnMapping("ID", "wise-id", isUniqueIdentifier = true),
+                AttributeColumnMapping("Status", "wise-status"),
+                AttributeColumnMapping("Direction", "wise-direction"),
+                AttributeColumnMapping("Exchange rate", "wise-exchange-rate"),
+                AttributeColumnMapping("Category", "wise-category"),
+                AttributeColumnMapping("Note", "note"),
+                AttributeColumnMapping("Created by", "wise-created-by"),
+            )
+        val identificationColumns =
+            setOf(
+                "ID",
+                "Status",
+                "Direction",
+                "Created on",
+                "Finished on",
+                "Source fee amount",
+                "Source fee currency",
+                "Target fee amount",
+                "Target fee currency",
+                "Source name",
+                "Source amount (after fees)",
+                "Source currency",
+                "Target name",
+                "Target amount (after fees)",
+                "Target currency",
+                "Exchange rate",
+                "Reference",
+                "Batch",
+                "Created by",
+                "Category",
+                "Note",
+            )
+        return CsvImportStrategy(
+            id = CsvImportStrategyId(wiseCsvStrategyId),
+            name = "Wise CSV",
+            identificationColumns = identificationColumns,
+            fieldMappings = fieldMappings,
+            attributeMappings = attributeMappings,
+            rowPreprocessingRules = rowRules,
+            createdAt = now,
+            updatedAt = now,
+        )
+    }
+
+    /** Seeds the built-in Wise CSV import strategy during new-database initialisation. */
+    private fun MoneyManagerDatabaseWrapper.seedWiseCsvStrategy() {
+        val now = Clock.System.now()
+        val strategy = buildWiseCsvStrategy(now)
+        csvImportStrategyQueries.insert(
+            id = strategy.id.id.toString(),
+            name = strategy.name,
+            identification_columns_json = FieldMappingJsonCodec.encodeColumns(strategy.identificationColumns),
+            field_mappings_json = FieldMappingJsonCodec.encode(strategy.fieldMappings),
+            attribute_mappings_json = FieldMappingJsonCodec.encodeAttributeMappings(strategy.attributeMappings),
+            row_rules_json = FieldMappingJsonCodec.encodeRowRules(strategy.rowPreprocessingRules),
+            created_at = now.toEpochMilliseconds(),
+            updated_at = now.toEpochMilliseconds(),
         )
     }
 }

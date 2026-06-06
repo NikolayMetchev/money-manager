@@ -9,7 +9,6 @@ package com.moneymanager.database.csv
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
-import com.moneymanager.domain.model.Category.Companion.UNCATEGORIZED_ID
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Money
@@ -21,6 +20,8 @@ import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
+import com.moneymanager.domain.model.csvstrategy.ColumnPairSwap
+import com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
@@ -31,6 +32,9 @@ import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.RegexAccountMapping
+import com.moneymanager.domain.model.csvstrategy.RowCondition
+import com.moneymanager.domain.model.csvstrategy.RowConditionOperator
+import com.moneymanager.domain.model.csvstrategy.TemplateAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import kotlinx.datetime.LocalDate
@@ -47,20 +51,26 @@ import kotlin.time.Instant
 sealed interface MappingResult {
     /**
      * @property transfer The mapped transfer
-     * @property newAccountName Name of new account to create (if any)
+     * @property newAccounts New accounts to create (source and/or target side)
      * @property attributes List of (attributeTypeName, value) pairs extracted from CSV
      * @property importStatus The import status (IMPORTED for new, DUPLICATE if exists with same values, UPDATED if exists with different values)
      * @property existingTransferId If status is DUPLICATE or UPDATED, the ID of the existing transfer
-     * @property discoveredMapping If a new account is being created, the CSV column/value that triggered it (for auto-capture)
+     * @property discoveredMappings For each new account being created, the CSV column/value that triggered it (for auto-capture)
      */
     data class Success(
         val transfer: Transfer,
-        val newAccountName: String?,
+        val newAccounts: List<NewAccount> = emptyList(),
         val attributes: List<Pair<String, String>> = emptyList(),
         val importStatus: ImportStatus = ImportStatus.IMPORTED,
         val existingTransferId: TransferId? = null,
-        val discoveredMapping: DiscoveredAccountMapping? = null,
-    ) : MappingResult
+        val discoveredMappings: List<DiscoveredAccountMapping> = emptyList(),
+    ) : MappingResult {
+        /** Convenience for flows where only the target side can discover a new account. */
+        val newAccountName: String? get() = newAccounts.firstOrNull()?.name
+
+        /** Convenience for flows where only the target side can discover a new account. */
+        val discoveredMapping: DiscoveredAccountMapping? get() = discoveredMappings.firstOrNull()
+    }
 
     data class Error(
         val rowIndex: Long,
@@ -85,7 +95,7 @@ data class NewAccount(
  * @property importStatus The import status (IMPORTED, DUPLICATE, UPDATED)
  * @property existingTransferId If status is DUPLICATE or UPDATED, the ID of the existing transfer
  * @property rowIndex The original CSV row index for status tracking
- * @property discoveredMapping If a new account is being created, the CSV column/value that triggered it
+ * @property discoveredMappings For each new account being created, the CSV column/value that triggered it
  */
 data class CsvTransferWithAttributes(
     val transfer: Transfer,
@@ -93,7 +103,7 @@ data class CsvTransferWithAttributes(
     val importStatus: ImportStatus = ImportStatus.IMPORTED,
     val existingTransferId: TransferId? = null,
     val rowIndex: Long,
-    val discoveredMapping: DiscoveredAccountMapping? = null,
+    val discoveredMappings: List<DiscoveredAccountMapping> = emptyList(),
 )
 
 /**
@@ -197,21 +207,13 @@ class CsvTransferMapper(
                             importStatus = result.importStatus,
                             existingTransferId = result.existingTransferId,
                             rowIndex = row.rowIndex,
-                            discoveredMapping = result.discoveredMapping,
+                            discoveredMappings = result.discoveredMappings,
                         ),
                     )
                     // Count by status
                     statusCounts[result.importStatus] = statusCounts.getOrDefault(result.importStatus, 0) + 1
 
-                    if (result.newAccountName != null) {
-                        val categoryId =
-                            when (val lookupMapping = strategy.fieldMappings[TransferField.TARGET_ACCOUNT]) {
-                                is AccountLookupMapping -> lookupMapping.defaultCategoryId
-                                is RegexAccountMapping -> lookupMapping.defaultCategoryId
-                                else -> UNCATEGORIZED_ID
-                            }
-                        newAccounts.add(NewAccount(result.newAccountName, categoryId))
-                    }
+                    newAccounts.addAll(result.newAccounts)
                 }
                 is MappingResult.Error -> {
                     errorRows.add(result)
@@ -244,7 +246,10 @@ class CsvTransferMapper(
      */
     fun mapRow(row: CsvRow): MappingResult {
         return try {
-            val values = row.values
+            // Attribute extraction and unique-id dedup use the original values so they stay
+            // faithful to the CSV; field parsing uses the preprocessed (possibly swapped) values.
+            val originalValues = row.values
+            val (values, rulesFlip) = applyRowPreprocessing(originalValues)
             val targetMapping =
                 strategy.fieldMappings[TransferField.TARGET_ACCOUNT]
                     ?: return MappingResult.Error(row.rowIndex, "Missing TARGET_ACCOUNT mapping")
@@ -269,11 +274,12 @@ class CsvTransferMapper(
                 parseCurrency(currencyMapping, values)
                     ?: return MappingResult.Error(row.rowIndex, "Currency not found")
 
-            // Determine if we need to flip accounts
-            val flipAccounts =
+            // Determine if we need to flip accounts (sign-based flip XOR preprocessing flip)
+            val amountFlip =
                 amountMapping is AmountParsingMapping &&
                     amountMapping.flipAccountsOnPositive &&
                     rawAmount > BigDecimal.ZERO
+            val flipAccounts = amountFlip xor rulesFlip
 
             // Resolve the source account: use override if provided, otherwise fall back to the
             // strategy's SOURCE_ACCOUNT mapping (if present), or return an error.
@@ -325,68 +331,36 @@ class CsvTransferMapper(
                     amount = amount,
                 )
 
-            // Extract attributes from mapped columns
-            val attributes = extractAttributes(values)
+            // Extract attributes from mapped columns (original, pre-swap values)
+            val attributes = extractAttributes(originalValues)
 
             // Check for duplicates using unique identifiers if configured, otherwise check by all fields
             val (importStatus, existingTransferId) =
                 if (uniqueIdentifierColumns.isNotEmpty()) {
-                    checkForDuplicateByUniqueId(values, transfer, attributes)
+                    checkForDuplicateByUniqueId(originalValues, transfer, attributes)
                 } else {
                     checkForDuplicateByAllFields(transfer, attributes)
                 }
 
-            // Determine if a new account needs to be created and capture mapping info
-            // Only create new account if no persisted mapping matched
-            val (newAccountName, discoveredMapping) =
-                when (targetMapping) {
-                    is AccountLookupMapping -> {
-                        val csvValue = getColumnValue(targetMapping.columnName, values)
-                        // If a persisted mapping matched, don't create a new account
-                        if (findPersistedMapping(targetMapping.columnName, csvValue) != null) {
-                            null to null
-                        } else {
-                            val name = getAccountName(targetMapping, values)
-                            if (name.isNotBlank() && !accountExists(name)) {
-                                // For AccountLookupMapping, csvValue == name (account name)
-                                name to DiscoveredAccountMapping(targetMapping.columnName, csvValue, name)
-                            } else {
-                                null to null
-                            }
-                        }
+            // Determine which new accounts need to be created and capture mapping info.
+            // The source side participates only when it is resolved per-row (no UI override).
+            val discoveries =
+                buildList {
+                    if (sourceAccountOverride == null) {
+                        strategy.fieldMappings[TransferField.SOURCE_ACCOUNT]?.let { add(discoverNewAccount(it, values)) }
                     }
-                    is RegexAccountMapping -> {
-                        val result = getAccountNameFromRegexWithPattern(targetMapping, values)
-                        // If a persisted mapping matched, don't create a new account
-                        if (findPersistedMapping(result.sourceColumnName, result.sourceColumnValue) != null) {
-                            null to null
-                        } else {
-                            if (result.accountName.isNotBlank() && !accountExists(result.accountName)) {
-                                // For RegexAccountMapping, accountName differs from sourceColumnValue
-                                // (e.g., sourceColumnValue="Paxos Technology LTD", accountName="Paxos")
-                                // Use the actual source column that produced the value (important for fallback)
-                                result.accountName to
-                                    DiscoveredAccountMapping(
-                                        columnName = result.sourceColumnName,
-                                        csvValue = result.sourceColumnValue,
-                                        targetAccountName = result.accountName,
-                                        matchedPattern = result.matchedPattern,
-                                    )
-                            } else {
-                                null to null
-                            }
-                        }
-                    }
-                    else -> null to null
+                    add(discoverNewAccount(targetMapping, values))
                 }
+            val newAccounts = discoveries.mapNotNull { it?.first }
+            val discoveredMappings = discoveries.mapNotNull { it?.second }
 
             MappingResult.Success(
                 transfer = transfer,
-                newAccountName = newAccountName,
+                newAccounts = newAccounts,
                 attributes = attributes,
                 importStatus = importStatus,
                 existingTransferId = existingTransferId,
-                discoveredMapping = discoveredMapping,
+                discoveredMappings = discoveredMappings,
             )
         } catch (expected: Exception) {
             MappingResult.Error(row.rowIndex, expected.message ?: "Unknown error")
@@ -423,29 +397,132 @@ class CsvTransferMapper(
         values: List<String>,
     ): BigDecimal {
         val mapping = amountMapping as AmountParsingMapping
-        return when (mapping.mode) {
-            AmountMode.SINGLE_COLUMN -> {
-                val columnName =
-                    mapping.amountColumnName
-                        ?: error("amountColumnName required for SINGLE_COLUMN mode")
-                val value = getColumnValue(columnName, values)
-                if (mapping.negateValues) -parseBigDecimal(value) else parseBigDecimal(value)
+        val baseAmount =
+            when (mapping.mode) {
+                AmountMode.SINGLE_COLUMN -> {
+                    val columnName =
+                        mapping.amountColumnName
+                            ?: error("amountColumnName required for SINGLE_COLUMN mode")
+                    val value = getColumnValue(columnName, values)
+                    if (mapping.negateValues) -parseBigDecimal(value) else parseBigDecimal(value)
+                }
+                AmountMode.CREDIT_DEBIT_COLUMNS -> {
+                    val creditColumnName =
+                        mapping.creditColumnName
+                            ?: error("creditColumnName required")
+                    val debitColumnName =
+                        mapping.debitColumnName
+                            ?: error("debitColumnName required")
+                    val creditValue = getColumnValue(creditColumnName, values)
+                    val debitValue = getColumnValue(debitColumnName, values)
+                    val credit = if (creditValue.isNotBlank()) parseBigDecimal(creditValue) else BigDecimal.ZERO
+                    val debit = if (debitValue.isNotBlank()) parseBigDecimal(debitValue) else BigDecimal.ZERO
+                    credit - debit
+                }
             }
-            AmountMode.CREDIT_DEBIT_COLUMNS -> {
-                val creditColumnName =
-                    mapping.creditColumnName
-                        ?: error("creditColumnName required")
-                val debitColumnName =
-                    mapping.debitColumnName
-                        ?: error("debitColumnName required")
-                val creditValue = getColumnValue(creditColumnName, values)
-                val debitValue = getColumnValue(debitColumnName, values)
-                val credit = if (creditValue.isNotBlank()) parseBigDecimal(creditValue) else BigDecimal.ZERO
-                val debit = if (debitValue.isNotBlank()) parseBigDecimal(debitValue) else BigDecimal.ZERO
-                credit - debit
+        return baseAmount + parseFee(mapping, values, baseAmount)
+    }
+
+    /**
+     * Returns the fee to add to the amount's magnitude, signed to match [baseAmount].
+     * Zero when no fee column is configured, the value is blank, or the conditions don't hold.
+     */
+    private fun parseFee(
+        mapping: AmountParsingMapping,
+        values: List<String>,
+        baseAmount: BigDecimal,
+    ): BigDecimal {
+        val feeColumnName = mapping.feeColumnName ?: return BigDecimal.ZERO
+        if (!mapping.feeConditions.all { evaluateCondition(it, values) }) return BigDecimal.ZERO
+        val feeValue = getColumnValueOrNull(feeColumnName, values)?.trim()
+        if (feeValue.isNullOrBlank()) return BigDecimal.ZERO
+        val fee = parseBigDecimal(feeValue)
+        return if (baseAmount < BigDecimal.ZERO) -fee else fee
+    }
+
+    /**
+     * Applies the strategy's row preprocessing rules to the raw row values.
+     * Returns the (possibly column-swapped) values and whether source/target accounts must flip.
+     */
+    private fun applyRowPreprocessing(values: List<String>): Pair<List<String>, Boolean> {
+        var effective = values
+        var flip = false
+        for (rule in strategy.rowPreprocessingRules) {
+            if (rule.conditions.all { evaluateCondition(it, effective) }) {
+                effective = applyColumnSwaps(rule.columnSwaps, effective)
+                if (rule.flipSourceAndTarget) flip = !flip
             }
         }
+        return effective to flip
     }
+
+    private fun applyColumnSwaps(
+        swaps: List<ColumnPairSwap>,
+        values: List<String>,
+    ): List<String> {
+        if (swaps.isEmpty()) return values
+        val mutable = values.toMutableList()
+        for (swap in swaps) {
+            val firstIndex = columnIndexByName[swap.firstColumn]
+            val secondIndex = columnIndexByName[swap.secondColumn]
+            if (firstIndex != null && secondIndex != null) {
+                // Rows may have fewer values than columns; pad so both indices are addressable
+                while (mutable.size <= maxOf(firstIndex, secondIndex)) {
+                    mutable.add("")
+                }
+                val temp = mutable[firstIndex]
+                mutable[firstIndex] = mutable[secondIndex]
+                mutable[secondIndex] = temp
+            }
+        }
+        return mutable
+    }
+
+    private fun evaluateCondition(
+        condition: RowCondition,
+        values: List<String>,
+    ): Boolean {
+        val value = getColumnValueOrNull(condition.columnName, values)?.trim().orEmpty()
+        return when (condition.operator) {
+            RowConditionOperator.EQUALS_VALUE -> value == condition.value?.trim().orEmpty()
+            RowConditionOperator.EQUALS_COLUMN -> value == otherColumnValue(condition, values)
+            RowConditionOperator.NOT_EQUALS_COLUMN -> value != otherColumnValue(condition, values)
+            RowConditionOperator.IS_BLANK -> value.isBlank()
+            RowConditionOperator.IS_NOT_BLANK -> value.isNotBlank()
+        }
+    }
+
+    private fun otherColumnValue(
+        condition: RowCondition,
+        values: List<String>,
+    ): String {
+        val otherColumn =
+            condition.otherColumnName
+                ?: error("otherColumnName required for ${condition.operator}")
+        return getColumnValueOrNull(otherColumn, values)?.trim().orEmpty()
+    }
+
+    /**
+     * Resolves a ConditionalAccountMapping to its active branch for the given row.
+     */
+    private fun resolveConditional(
+        mapping: ConditionalAccountMapping,
+        values: List<String>,
+    ): FieldMapping =
+        if (mapping.conditions.all { evaluateCondition(it, values) }) {
+            mapping.whenTrue
+        } else {
+            mapping.whenFalse
+        }
+
+    /**
+     * Builds the templated account name for a TemplateAccountMapping,
+     * or an empty string when the column value is blank.
+     */
+    private fun templatedAccountName(
+        mapping: TemplateAccountMapping,
+        csvValue: String,
+    ): String = if (csvValue.isBlank()) "" else mapping.prefix + csvValue + mapping.suffix
 
     private fun parseAccount(
         mapping: FieldMapping,
@@ -457,6 +534,20 @@ class CsvTransferMapper(
         }
 
         return when (mapping) {
+            is TemplateAccountMapping -> {
+                val csvValue = getColumnValue(mapping.columnName, values).trim()
+
+                // Check persisted mappings FIRST - this handles renamed accounts
+                val persistedMatch = findPersistedMapping(mapping.columnName, csvValue)
+                if (persistedMatch != null) {
+                    return persistedMatch
+                }
+
+                val name = templatedAccountName(mapping, csvValue)
+                existingAccounts[name]?.id
+                    ?: AccountId(-1) // Placeholder for new accounts
+            }
+            is ConditionalAccountMapping -> parseAccount(resolveConditional(mapping, values), values)
             is AccountLookupMapping -> {
                 val columnName = mapping.columnName
                 val csvValue = getColumnValue(columnName, values)
@@ -511,6 +602,69 @@ class CsvTransferMapper(
         }
         return null
     }
+
+    /**
+     * Determines whether resolving [mapping] for this row requires creating a new account.
+     * Returns the account to create together with the discovered mapping for auto-capture,
+     * or null when no new account is needed (existing account, persisted mapping, or blank value).
+     */
+    private fun discoverNewAccount(
+        mapping: FieldMapping,
+        values: List<String>,
+    ): Pair<NewAccount, DiscoveredAccountMapping>? =
+        when (mapping) {
+            is AccountLookupMapping -> {
+                val csvValue = getColumnValue(mapping.columnName, values)
+                // If a persisted mapping matched, don't create a new account
+                if (findPersistedMapping(mapping.columnName, csvValue) != null) {
+                    null
+                } else {
+                    val name = getAccountName(mapping, values)
+                    if (name.isNotBlank() && !accountExists(name)) {
+                        // For AccountLookupMapping, csvValue == name (account name)
+                        NewAccount(name, mapping.defaultCategoryId) to
+                            DiscoveredAccountMapping(mapping.columnName, csvValue, name)
+                    } else {
+                        null
+                    }
+                }
+            }
+            is RegexAccountMapping -> {
+                val result = getAccountNameFromRegexWithPattern(mapping, values)
+                // If a persisted mapping matched, don't create a new account
+                if (findPersistedMapping(result.sourceColumnName, result.sourceColumnValue) != null) {
+                    null
+                } else if (result.accountName.isNotBlank() && !accountExists(result.accountName)) {
+                    // For RegexAccountMapping, accountName differs from sourceColumnValue
+                    // (e.g., sourceColumnValue="Paxos Technology LTD", accountName="Paxos")
+                    // Use the actual source column that produced the value (important for fallback)
+                    NewAccount(result.accountName, mapping.defaultCategoryId) to
+                        DiscoveredAccountMapping(
+                            columnName = result.sourceColumnName,
+                            csvValue = result.sourceColumnValue,
+                            targetAccountName = result.accountName,
+                            matchedPattern = result.matchedPattern,
+                        )
+                } else {
+                    null
+                }
+            }
+            is TemplateAccountMapping -> {
+                val csvValue = getColumnValue(mapping.columnName, values).trim()
+                val name = templatedAccountName(mapping, csvValue)
+                if (findPersistedMapping(mapping.columnName, csvValue) != null ||
+                    name.isBlank() ||
+                    accountExists(name)
+                ) {
+                    null
+                } else {
+                    NewAccount(name, mapping.defaultCategoryId) to
+                        DiscoveredAccountMapping(mapping.columnName, csvValue, name)
+                }
+            }
+            is ConditionalAccountMapping -> discoverNewAccount(resolveConditional(mapping, values), values)
+            else -> null
+        }
 
     /**
      * Gets the effective account name from an AccountLookupMapping,
@@ -594,10 +748,18 @@ class CsvTransferMapper(
             mapping.timeColumnName?.let { getColumnValue(it, values) }
                 ?: mapping.defaultTime
 
+        val dateTimeFormat = mapping.dateTimeFormat
         return try {
-            // Parse date and time using the specified formats
-            val dateTime = parseDateTimeString(dateValue, mapping.dateFormat, timeValue, mapping.timeFormat, timezone)
-            dateTime
+            if (dateTimeFormat != null) {
+                // Single column holding a combined date+time value
+                LocalDateTime
+                    .Format { byUnicodePattern(dateTimeFormat) }
+                    .parse(dateValue.trim())
+                    .toInstant(timezone)
+            } else {
+                // Parse date and time using the specified formats
+                parseDateTimeString(dateValue, mapping.dateFormat, timeValue, mapping.timeFormat, timezone)
+            }
         } catch (_: Exception) {
             null
         }

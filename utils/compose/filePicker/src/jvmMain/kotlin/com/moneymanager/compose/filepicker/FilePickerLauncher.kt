@@ -23,6 +23,9 @@ actual class FilePickerLauncher(
         try {
             val fileDialog = FileDialog(frame, "Select a CSV file", FileDialog.LOAD)
 
+            // Open in the directory of the previous selection
+            LastDirectoryStore.load()?.let { fileDialog.directory = it }
+
             // Set file filter based on mime types
             val extensions = mimeTypesToExtensions(mimeTypes)
 
@@ -39,6 +42,7 @@ actual class FilePickerLauncher(
             val file = fileDialog.file
 
             if (directory != null && file != null) {
+                LastDirectoryStore.save(directory)
                 val selectedFile = File(directory, file)
                 val result = readFileAsResult(selectedFile)
                 onResult(result)

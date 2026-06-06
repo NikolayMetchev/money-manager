@@ -17,6 +17,7 @@ import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -125,7 +126,25 @@ class ApplyStrategyDialogTest {
     }
 
     @Test
-    fun `hasBlankNewAccountNames detects create selections without names`() {
+    fun `hasBlankNewAccountNames detects create selections with explicitly blank names`() {
+        val hasBlank =
+            hasBlankNewAccountNames(
+                preparation =
+                    ImportPreparation(
+                        validTransfers = emptyList(),
+                        errorRows = emptyList(),
+                        newAccounts = setOf(NewAccount(name = "Acme", categoryId = 10)),
+                        existingAccountMatches = emptyMap(),
+                    ),
+                existingAccountSelections = emptyMap(),
+                newAccountNames = mapOf("Acme" to "   "),
+            )
+
+        assertTrue(hasBlank)
+    }
+
+    @Test
+    fun `hasBlankNewAccountNames treats missing entries as keeping the detected name`() {
         val hasBlank =
             hasBlankNewAccountNames(
                 preparation =
@@ -139,7 +158,7 @@ class ApplyStrategyDialogTest {
                 newAccountNames = emptyMap(),
             )
 
-        assertTrue(hasBlank)
+        assertFalse(hasBlank)
     }
 
     @Test
@@ -194,6 +213,6 @@ class ApplyStrategyDialogTest {
             attributes = emptyList(),
             importStatus = ImportStatus.IMPORTED,
             rowIndex = 0,
-            discoveredMapping = discoveredMapping,
+            discoveredMappings = listOf(discoveredMapping),
         )
 }

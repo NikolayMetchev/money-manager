@@ -48,7 +48,7 @@ private val PROFILES_JSON =
 private val BALANCES_JSON =
     """
 [
-  { "id": $BALANCE_ID, "currency": "GBP", "name": "GBP", "type": "STANDARD" }
+  { "id": $BALANCE_ID, "currency": "GBP", "name": null, "type": "STANDARD" }
 ]
     """.trimIndent()
 

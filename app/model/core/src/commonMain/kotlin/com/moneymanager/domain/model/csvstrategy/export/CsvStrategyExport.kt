@@ -3,6 +3,8 @@ package com.moneymanager.domain.model.csvstrategy.export
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AttributeColumnMapping
 import com.moneymanager.domain.model.csvstrategy.RegexRule
+import com.moneymanager.domain.model.csvstrategy.RowCondition
+import com.moneymanager.domain.model.csvstrategy.RowPreprocessingRule
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import kotlinx.serialization.Serializable
 
@@ -16,6 +18,7 @@ import kotlinx.serialization.Serializable
  * @property fieldMappings Map of transfer fields to their export-format mappings
  * @property attributeMappings Attribute column mappings (already portable, no IDs)
  * @property accountMappings Persisted account mappings (optional; empty for legacy exports)
+ * @property rowPreprocessingRules Row preprocessing rules (already portable, no IDs)
  */
 @Serializable
 data class CsvStrategyExport(
@@ -25,6 +28,7 @@ data class CsvStrategyExport(
     val fieldMappings: Map<TransferField, FieldMappingExport>,
     val attributeMappings: List<AttributeColumnMapping> = emptyList(),
     val accountMappings: List<CsvAccountMappingExport> = emptyList(),
+    val rowPreprocessingRules: List<RowPreprocessingRule> = emptyList(),
 )
 
 /**
@@ -88,6 +92,31 @@ data class RegexAccountExport(
 ) : FieldMappingExport
 
 /**
+ * Export format for [com.moneymanager.domain.model.csvstrategy.TemplateAccountMapping].
+ * Uses category name instead of category ID.
+ */
+@Serializable
+data class TemplateAccountExport(
+    override val fieldType: TransferField,
+    val columnName: String,
+    val prefix: String = "",
+    val suffix: String = "",
+    val defaultCategoryName: String,
+) : FieldMappingExport
+
+/**
+ * Export format for [com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping].
+ * RowCondition is already portable (no IDs).
+ */
+@Serializable
+data class ConditionalAccountExport(
+    override val fieldType: TransferField,
+    val conditions: List<RowCondition>,
+    val whenTrue: FieldMappingExport,
+    val whenFalse: FieldMappingExport,
+) : FieldMappingExport
+
+/**
  * Export format for [com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping].
  * No IDs - fully portable as-is.
  */
@@ -99,6 +128,7 @@ data class DateTimeParsingExport(
     val timeColumnName: String? = null,
     val timeFormat: String? = null,
     val defaultTime: String = "12:00:00",
+    val dateTimeFormat: String? = null,
 ) : FieldMappingExport
 
 /**
@@ -125,6 +155,8 @@ data class AmountParsingExport(
     val debitColumnName: String? = null,
     val negateValues: Boolean = false,
     val flipAccountsOnPositive: Boolean = false,
+    val feeColumnName: String? = null,
+    val feeConditions: List<RowCondition> = emptyList(),
 ) : FieldMappingExport
 
 /**
