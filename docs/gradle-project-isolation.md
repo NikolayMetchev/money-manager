@@ -1,60 +1,51 @@
 # Gradle Project Isolation Status
 
-Date tested: 2026-05-24
+Date tested: 2026-06-06 (previous attempt: 2026-05-24)
 
 ## Result
 
-Project isolation (`org.gradle.unsafe.isolated-projects=true`) is **not yet fully compatible** with this build.
-Several repository-level blockers were fixed, but one plugin-level blocker remains.
+Project isolation (`org.gradle.unsafe.isolated-projects=true`) is **enabled** in `gradle.properties`.
 
-## What was tested
+`./gradlew build` (tests, kover, buildHealth, detekt, ktlint, Android lint) passes with the flag
+on, and the configuration cache entry is stored without isolation violations.
 
-1. Enabled:
-   - `org.gradle.unsafe.isolated-projects=true`
-2. Ran:
-   - `./gradlew.bat help --console=plain`
-   - `./gradlew.bat tasks --console=plain`
+## What was verified
 
-Both commands were used repeatedly while applying fixes. Remaining failure is during configuration cache storage with isolated-project violations.
+With isolation enabled, all of the following configure and store a configuration-cache entry
+cleanly; `build` was also executed to completion:
 
-## Why it fails
+- `./gradlew build` — BUILD SUCCESSFUL (1881 tasks)
+- `./gradlew lintFormat --dry-run`
+- `./gradlew :app:main:jvm:run --dry-run`
+- `./gradlew :app:main:android:assembleDebug --dry-run`
+- `./gradlew :app:ui:core:pixel6api34AndroidDeviceTest --dry-run`
 
-### Fixed in this change
+## What unblocked it since the 2026-05-24 attempt
 
-1. Root build script cross-project configuration was removed:
-   - removed `allprojects { ... }` and `subprojects { ... }`
-   - removed dynamic `subprojects.mapNotNull { it.tasks.findByName(...) }` wiring
-2. Convention plugin cross-project file access was removed:
-   - `gradle/build-logic/src/main/kotlin/moneymanager.kotlin-convention.gradle.kts`
-   - `rootProject.file("detekt.yml")` -> `rootDir.resolve("detekt.yml")`
-3. Module script cross-project file access was removed:
-   - `app/main/android/build.gradle.kts`
-   - `app/main/jvm/build.gradle.kts`
-   - replaced `rootProject.file("VERSION")` with `rootDir.resolve("VERSION")`
-4. Root plugin conflict was mitigated:
-   - `com.osacky.doctor` is not applied when isolation is enabled
-5. `dev.mokkery` dynamic lookup conflict was mitigated:
-   - in `app/ui/core/build.gradle.kts`, plugin application is skipped when isolation is enabled
+1. **Compose Multiplatform plugin** — the previous blocker. `org.jetbrains.compose` accessed
+   `Project.layout`/`Project.tasks` on other projects. Fixed upstream; the version currently in
+   use (1.11.0) produces no isolation violations.
+2. **Mokkery** (`dev.mokkery` 3.3.0) — re-enabled. Its only violation was
+   `MokkeryGradlePlugin.checkKotlinSetup` reading the `dev.mokkery.versionWarnings` property via
+   `Project.findProperty`, which dynamically walks up to the parent project when the property is
+   undefined. Workaround: define `dev.mokkery.versionWarnings=true` in `gradle.properties` so the
+   lookup resolves on the project itself (see comment there). The previous workaround of skipping
+   the Mokkery plugin under isolation broke `:app:ui:core` tests (un-transformed `mock()` calls
+   throw `MokkeryIntrinsicException`) and has been removed.
 
-### Remaining blocker
+## Remaining incompatibilities
 
-With the fixes above, the remaining isolation violations come from `org.jetbrains.compose`:
+1. **gradle-doctor** (`com.osacky.doctor` 0.12.1) — still incompatible. It accesses
+   `Project.tasks` and `Project.plugins` across subprojects from the root project (50 violations).
+   It stays conditionally disabled in the root `build.gradle.kts` while isolation is on.
+   Re-test when upgrading the plugin.
 
-- `Plugin 'org.jetbrains.compose': Project ':app' cannot access 'Project.layout' functionality on another project ':'`
-- `Plugin 'org.jetbrains.compose': Project ':app' cannot access 'Project.tasks' functionality on another project ':'`
-- `Plugin 'org.jetbrains.compose': Project ':app:main' cannot access 'Project.layout' functionality on another project ':'`
-- `Plugin 'org.jetbrains.compose': Project ':app:main' cannot access 'Project.tasks' functionality on another project ':'`
-- `Plugin 'org.jetbrains.compose': Project ':app:main:jvm' cannot access 'Project.layout' functionality on another project ':'`
-- `Plugin 'org.jetbrains.compose': Project ':app:main:jvm' cannot access 'Project.tasks' functionality on another project ':'`
+## Notes / follow-ups
 
-This appears to be plugin internals, not project script code.
-
-## Required migration work before re-enabling
-
-1. Track Compose plugin support for isolated projects in the currently used version.
-2. Upgrade Compose Gradle plugin once a compatible version is available.
-3. Re-evaluate whether `dev.mokkery` and `com.osacky.doctor` can be kept enabled under isolation.
-4. Re-run:
-   - `./gradlew.bat help --console=plain`
-   - `./gradlew.bat build --console=plain`
-   with isolation enabled.
+- Detekt, ktlint, SQLDelight, Metro, Mappie, Kover, dependency-analysis (DAGP), Android, and KMP
+  plugins all work under isolation at current versions — no plugins needed disabling besides
+  gradle-doctor.
+- The configuration-cache report still lists *inputs* such as Gradle property reads by KGP/AGP/
+  Compose internals; these are recorded inputs, not violations.
+- When upgrading any Gradle plugin, watch for new isolation violations: they fail the build at
+  configuration-cache store time with `Project ':x' cannot access ... on another project`.
