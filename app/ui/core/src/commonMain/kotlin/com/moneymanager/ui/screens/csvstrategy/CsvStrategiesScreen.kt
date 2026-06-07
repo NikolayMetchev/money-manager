@@ -169,12 +169,15 @@ fun CsvStrategiesScreen(
         }
     }
 
-    // Load CSV rows when a CSV import is selected
-    LaunchedEffect(selectedCsvImport) {
+    // Load CSV rows when a CSV import is selected. The selector dialog lists imports
+    // without their columns, so the full import (columns included) is fetched here -
+    // the strategy editor needs the columns for its dropdowns.
+    LaunchedEffect(selectedCsvImport?.id) {
         val csvImport = selectedCsvImport
         if (csvImport != null) {
             isLoadingRows = true
             try {
+                selectedCsvImport = csvImportRepository.getImport(csvImport.id).first() ?: csvImport
                 csvRows = csvImportRepository.getImportRows(csvImport.id, limit = 100, offset = 0)
             } finally {
                 isLoadingRows = false

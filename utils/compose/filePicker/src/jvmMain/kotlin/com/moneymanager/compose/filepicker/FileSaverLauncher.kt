@@ -26,6 +26,9 @@ actual class FileSaverLauncher(
             val fileDialog = FileDialog(frame, "Save file", FileDialog.SAVE)
             fileDialog.file = fileName
 
+            // Open in the directory of the previous selection
+            LastDirectoryStore.load()?.let { fileDialog.directory = it }
+
             // Set file filter based on mime type
             val extension = mimeTypeToExtension(mimeType)
             if (extension != null) {
@@ -40,6 +43,7 @@ actual class FileSaverLauncher(
             val file = fileDialog.file
 
             if (directory != null && file != null) {
+                LastDirectoryStore.save(directory)
                 val targetFile = File(directory, file)
                 val result = writeFileContent(targetFile, content)
                 onResult(result)

@@ -23,6 +23,15 @@ private val logger = logging()
 fun main() {
     logger.info { "Starting Money Manager application" }
 
+    // On Linux, AWT's FileDialog uses an in-process GTK file chooser whose text rendering
+    // breaks when the JDK's bundled libfreetype clashes with the system GTK's (blank labels,
+    // "drawing failure ... error occurred in libfreetype" warnings). Fall back to AWT's own
+    // dialog instead. Must be set before AWT initialises.
+    val osName = System.getProperty("os.name").orEmpty().lowercase()
+    if (osName.contains("linux")) {
+        System.setProperty("sun.awt.disableGtkFileDialogs", "true")
+    }
+
     // Desktop runs need the Swing Main dispatcher provider on the application classpath.
     Dispatchers.Swing
 

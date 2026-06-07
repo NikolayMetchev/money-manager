@@ -5,6 +5,7 @@ CREATE TABLE csv_import_strategy (
     identification_columns_json TEXT NOT NULL,
     field_mappings_json TEXT NOT NULL,
     attribute_mappings_json TEXT NOT NULL,
+    row_rules_json TEXT NOT NULL DEFAULT '[]',
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
 );
@@ -25,13 +26,13 @@ SELECT * FROM csv_import_strategy WHERE name = ?;
 
 -- Insert a new strategy
 insert:
-INSERT INTO csv_import_strategy (id, name, identification_columns_json, field_mappings_json, attribute_mappings_json, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?);
+INSERT INTO csv_import_strategy (id, name, identification_columns_json, field_mappings_json, attribute_mappings_json, row_rules_json, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?);
 
 -- Update an existing strategy
 update:
 UPDATE csv_import_strategy
-SET name = ?, identification_columns_json = ?, field_mappings_json = ?, attribute_mappings_json = ?, updated_at = ?
+SET name = ?, identification_columns_json = ?, field_mappings_json = ?, attribute_mappings_json = ?, row_rules_json = ?, updated_at = ?
 WHERE id = ?;
 
 -- Delete a strategy by ID

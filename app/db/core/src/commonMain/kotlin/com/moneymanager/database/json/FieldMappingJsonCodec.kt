@@ -2,6 +2,7 @@ package com.moneymanager.database.json
 
 import com.moneymanager.domain.model.csvstrategy.AttributeColumnMapping
 import com.moneymanager.domain.model.csvstrategy.FieldMapping
+import com.moneymanager.domain.model.csvstrategy.RowPreprocessingRule
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.serialization.UuidSerializersModule
 import kotlinx.serialization.json.Json
@@ -46,4 +47,14 @@ object FieldMappingJsonCodec {
      * Decodes attribute column mappings from JSON array string.
      */
     fun decodeAttributeMappings(jsonString: String): List<AttributeColumnMapping> = json.decodeFromString(jsonString)
+
+    /**
+     * Encodes row preprocessing rules to JSON array string.
+     */
+    fun encodeRowRules(rules: List<RowPreprocessingRule>): String = json.encodeToString(rules)
+
+    /**
+     * Decodes row preprocessing rules from JSON array string.
+     */
+    fun decodeRowRules(jsonString: String): List<RowPreprocessingRule> = json.decodeFromString(jsonString)
 }

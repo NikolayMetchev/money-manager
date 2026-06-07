@@ -7,6 +7,8 @@ import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
+import com.moneymanager.domain.model.csvstrategy.ColumnPairSwap
+import com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
@@ -16,6 +18,10 @@ import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.RegexAccountMapping
 import com.moneymanager.domain.model.csvstrategy.RegexRule
+import com.moneymanager.domain.model.csvstrategy.RowCondition
+import com.moneymanager.domain.model.csvstrategy.RowConditionOperator
+import com.moneymanager.domain.model.csvstrategy.RowPreprocessingRule
+import com.moneymanager.domain.model.csvstrategy.TemplateAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import kotlin.test.Test
@@ -349,5 +355,129 @@ class FieldMappingJsonCodecTest {
         assertIs<TimezoneLookupMapping>(decodedMapping)
         assertEquals("Timezone", decodedMapping.columnName)
         assertEquals(TransferField.TIMEZONE, decodedMapping.fieldType)
+    }
+
+    @Test
+    fun `encode and decode TemplateAccountMapping`() {
+        val mapping =
+            TemplateAccountMapping(
+                id = FieldMappingId(Uuid.random()),
+                fieldType = TransferField.SOURCE_ACCOUNT,
+                columnName = "Source currency",
+                prefix = "Wise: ",
+            )
+        val mappings = mapOf(TransferField.SOURCE_ACCOUNT to mapping)
+
+        val json = FieldMappingJsonCodec.encode(mappings)
+        val decoded = FieldMappingJsonCodec.decode(json)
+
+        val decodedMapping = decoded[TransferField.SOURCE_ACCOUNT]
+        assertIs<TemplateAccountMapping>(decodedMapping)
+        assertEquals("Source currency", decodedMapping.columnName)
+        assertEquals("Wise: ", decodedMapping.prefix)
+        assertEquals("", decodedMapping.suffix)
+    }
+
+    @Test
+    fun `encode and decode ConditionalAccountMapping with nested mappings`() {
+        val mapping =
+            ConditionalAccountMapping(
+                id = FieldMappingId(Uuid.random()),
+                fieldType = TransferField.TARGET_ACCOUNT,
+                conditions =
+                    listOf(
+                        RowCondition("Source name", RowConditionOperator.EQUALS_COLUMN, otherColumnName = "Target name"),
+                        RowCondition("Source name", RowConditionOperator.IS_NOT_BLANK),
+                    ),
+                whenTrue =
+                    TemplateAccountMapping(
+                        id = FieldMappingId(Uuid.random()),
+                        fieldType = TransferField.TARGET_ACCOUNT,
+                        columnName = "Target currency",
+                        prefix = "Wise: ",
+                    ),
+                whenFalse =
+                    AccountLookupMapping(
+                        id = FieldMappingId(Uuid.random()),
+                        fieldType = TransferField.TARGET_ACCOUNT,
+                        columnName = "Target name",
+                        fallbackColumns = listOf("Source name"),
+                    ),
+            )
+        val mappings = mapOf(TransferField.TARGET_ACCOUNT to mapping)
+
+        val json = FieldMappingJsonCodec.encode(mappings)
+        val decoded = FieldMappingJsonCodec.decode(json)
+
+        val decodedMapping = decoded[TransferField.TARGET_ACCOUNT]
+        assertIs<ConditionalAccountMapping>(decodedMapping)
+        assertEquals(2, decodedMapping.conditions.size)
+        assertEquals(RowConditionOperator.EQUALS_COLUMN, decodedMapping.conditions[0].operator)
+        assertIs<TemplateAccountMapping>(decodedMapping.whenTrue)
+        assertIs<AccountLookupMapping>(decodedMapping.whenFalse)
+    }
+
+    @Test
+    fun `encode and decode DateTimeParsingMapping with combined date-time format`() {
+        val mapping =
+            DateTimeParsingMapping(
+                id = FieldMappingId(Uuid.random()),
+                fieldType = TransferField.TIMESTAMP,
+                dateColumnName = "Created on",
+                dateFormat = "yyyy-MM-dd",
+                dateTimeFormat = "yyyy-MM-dd HH:mm:ss",
+            )
+        val mappings = mapOf(TransferField.TIMESTAMP to mapping)
+
+        val json = FieldMappingJsonCodec.encode(mappings)
+        val decoded = FieldMappingJsonCodec.decode(json)
+
+        val decodedMapping = decoded[TransferField.TIMESTAMP]
+        assertIs<DateTimeParsingMapping>(decodedMapping)
+        assertEquals("yyyy-MM-dd HH:mm:ss", decodedMapping.dateTimeFormat)
+    }
+
+    @Test
+    fun `encode and decode AmountParsingMapping with conditional fee column`() {
+        val mapping =
+            AmountParsingMapping(
+                id = FieldMappingId(Uuid.random()),
+                fieldType = TransferField.AMOUNT,
+                mode = AmountMode.SINGLE_COLUMN,
+                amountColumnName = "Source amount (after fees)",
+                feeColumnName = "Source fee amount",
+                feeConditions = listOf(RowCondition("Direction", RowConditionOperator.EQUALS_VALUE, value = "OUT")),
+            )
+        val mappings = mapOf(TransferField.AMOUNT to mapping)
+
+        val json = FieldMappingJsonCodec.encode(mappings)
+        val decoded = FieldMappingJsonCodec.decode(json)
+
+        val decodedMapping = decoded[TransferField.AMOUNT]
+        assertIs<AmountParsingMapping>(decodedMapping)
+        assertEquals("Source fee amount", decodedMapping.feeColumnName)
+        assertEquals(RowConditionOperator.EQUALS_VALUE, decodedMapping.feeConditions.single().operator)
+    }
+
+    @Test
+    fun `encode and decode row preprocessing rules`() {
+        val rules =
+            listOf(
+                RowPreprocessingRule(
+                    conditions = listOf(RowCondition("Direction", RowConditionOperator.EQUALS_VALUE, value = "IN")),
+                    columnSwaps = listOf(ColumnPairSwap("Source name", "Target name")),
+                    flipSourceAndTarget = true,
+                ),
+            )
+
+        val json = FieldMappingJsonCodec.encodeRowRules(rules)
+        val decoded = FieldMappingJsonCodec.decodeRowRules(json)
+
+        assertEquals(rules, decoded)
+    }
+
+    @Test
+    fun `decoding legacy row rules json defaults to empty list`() {
+        assertEquals(emptyList(), FieldMappingJsonCodec.decodeRowRules("[]"))
     }
 }

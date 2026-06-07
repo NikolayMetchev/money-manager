@@ -62,6 +62,7 @@ class CsvImportStrategyRepositoryImpl(
                 identification_columns_json = FieldMappingJsonCodec.encodeColumns(strategy.identificationColumns),
                 field_mappings_json = FieldMappingJsonCodec.encode(strategy.fieldMappings),
                 attribute_mappings_json = FieldMappingJsonCodec.encodeAttributeMappings(strategy.attributeMappings),
+                row_rules_json = FieldMappingJsonCodec.encodeRowRules(strategy.rowPreprocessingRules),
                 created_at = now.toEpochMilliseconds(),
                 updated_at = now.toEpochMilliseconds(),
             )
@@ -76,6 +77,7 @@ class CsvImportStrategyRepositoryImpl(
                 identification_columns_json = FieldMappingJsonCodec.encodeColumns(strategy.identificationColumns),
                 field_mappings_json = FieldMappingJsonCodec.encode(strategy.fieldMappings),
                 attribute_mappings_json = FieldMappingJsonCodec.encodeAttributeMappings(strategy.attributeMappings),
+                row_rules_json = FieldMappingJsonCodec.encodeRowRules(strategy.rowPreprocessingRules),
                 updated_at = now.toEpochMilliseconds(),
                 id = strategy.id.id.toString(),
             )
@@ -93,6 +95,7 @@ class CsvImportStrategyRepositoryImpl(
             identificationColumns = FieldMappingJsonCodec.decodeColumns(entity.identification_columns_json),
             fieldMappings = FieldMappingJsonCodec.decode(entity.field_mappings_json),
             attributeMappings = FieldMappingJsonCodec.decodeAttributeMappings(entity.attribute_mappings_json),
+            rowPreprocessingRules = FieldMappingJsonCodec.decodeRowRules(entity.row_rules_json),
             createdAt = Instant.fromEpochMilliseconds(entity.created_at),
             updatedAt = Instant.fromEpochMilliseconds(entity.updated_at),
         )
