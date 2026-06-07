@@ -1072,9 +1072,10 @@ fun CreateCsvStrategyDialog(
                                         identificationColumns = identificationColumns,
                                         fieldMappings = fieldMappings,
                                         attributeMappings = attributeMappings,
-                                        // The form has no editor for row preprocessing rules, so they
-                                        // are always carried over unchanged.
+                                        // The form has no editor for row preprocessing or companion
+                                        // transaction rules, so they are always carried over unchanged.
                                         rowPreprocessingRules = existingStrategy?.rowPreprocessingRules.orEmpty(),
+                                        companionTransactionRules = existingStrategy?.companionTransactionRules.orEmpty(),
                                         createdAt = existingStrategy?.createdAt ?: now,
                                         updatedAt = now,
                                     )

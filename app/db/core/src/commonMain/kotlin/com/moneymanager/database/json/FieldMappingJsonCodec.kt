@@ -1,6 +1,7 @@
 package com.moneymanager.database.json
 
 import com.moneymanager.domain.model.csvstrategy.AttributeColumnMapping
+import com.moneymanager.domain.model.csvstrategy.CompanionTransactionRule
 import com.moneymanager.domain.model.csvstrategy.FieldMapping
 import com.moneymanager.domain.model.csvstrategy.RowPreprocessingRule
 import com.moneymanager.domain.model.csvstrategy.TransferField
@@ -57,4 +58,14 @@ object FieldMappingJsonCodec {
      * Decodes row preprocessing rules from JSON array string.
      */
     fun decodeRowRules(jsonString: String): List<RowPreprocessingRule> = json.decodeFromString(jsonString)
+
+    /**
+     * Encodes companion transaction rules to JSON array string.
+     */
+    fun encodeCompanionRules(rules: List<CompanionTransactionRule>): String = json.encodeToString(rules)
+
+    /**
+     * Decodes companion transaction rules from JSON array string.
+     */
+    fun decodeCompanionRules(jsonString: String): List<CompanionTransactionRule> = json.decodeFromString(jsonString)
 }

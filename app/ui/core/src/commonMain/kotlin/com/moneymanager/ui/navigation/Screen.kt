@@ -11,7 +11,7 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
 import com.moneymanager.domain.model.csv.CsvImportId
 
-enum class ImportTab { CSV, API }
+enum class ImportTab { CSV, API, MANUAL }
 
 sealed class Screen(
     val title: String,

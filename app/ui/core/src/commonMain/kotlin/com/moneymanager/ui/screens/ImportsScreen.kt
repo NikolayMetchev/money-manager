@@ -18,6 +18,7 @@ import com.moneymanager.domain.repository.ApiImportStrategyRepository
 import com.moneymanager.domain.repository.ApiSessionRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CsvImportRepository
+import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonAttributeRepository
@@ -30,6 +31,7 @@ fun ImportsScreen(
     selectedTab: ImportTab,
     onTabSelected: (ImportTab) -> Unit,
     csvImportRepository: CsvImportRepository,
+    csvImportStrategyRepository: CsvImportStrategyRepository,
     apiSessionRepository: ApiSessionRepository,
     apiImportStrategyRepository: ApiImportStrategyRepository,
     attributeTypeRepository: AttributeTypeRepository,
@@ -62,6 +64,11 @@ fun ImportsScreen(
                 onClick = { onTabSelected(ImportTab.API) },
                 text = { Text("API") },
             )
+            Tab(
+                selected = selectedTab == ImportTab.MANUAL,
+                onClick = { onTabSelected(ImportTab.MANUAL) },
+                text = { Text("Manual Entries") },
+            )
         }
 
         when (selectedTab) {
@@ -89,6 +96,15 @@ fun ImportsScreen(
                     onMonzoConnectClick = onAddCredentialClick,
                     onApiStrategiesClick = onApiStrategiesClick,
                     onSessionClick = onSessionClick,
+                    onTransactionsImported = onTransactionsImported,
+                )
+            ImportTab.MANUAL ->
+                ManualEntriesScreen(
+                    csvImportStrategyRepository = csvImportStrategyRepository,
+                    transactionRepository = transactionRepository,
+                    attributeTypeRepository = attributeTypeRepository,
+                    entitySource = entitySource,
+                    maintenance = maintenance,
                     onTransactionsImported = onTransactionsImported,
                 )
         }

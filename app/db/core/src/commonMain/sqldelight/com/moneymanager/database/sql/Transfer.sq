@@ -450,3 +450,37 @@ moveTransfersTargetAccount:
 UPDATE transfer
 SET revision_id = revision_id + 1, target_account_id = :targetAccount
 WHERE target_account_id = :accountToDelete;
+
+-- Transfers whose match attribute fits the LIKE pattern but for which no transfer
+-- carries the link attribute with the same value (companion transaction missing).
+selectTransfersMissingCompanion:
+SELECT
+    transfer.id,
+    transfer.timestamp,
+    transfer.description,
+    transfer.amount,
+    match_attr.attribute_value AS match_value,
+    source_account.id AS source_account_id,
+    source_account.name AS source_account_name,
+    target_account.id AS target_account_id,
+    target_account.name AS target_account_name,
+    currency.id AS currency_id,
+    currency.code AS currency_code,
+    currency.name AS currency_name,
+    currency.scale_factor AS currency_scale_factor
+FROM transfer
+JOIN transfer_attribute match_attr ON match_attr.transaction_id = transfer.id
+JOIN attribute_type match_type ON match_attr.attribute_type_id = match_type.id
+JOIN account source_account ON transfer.source_account_id = source_account.id
+JOIN account target_account ON transfer.target_account_id = target_account.id
+JOIN currency ON transfer.currency_id = currency.id
+WHERE match_type.name = :matchAttributeName
+  AND match_attr.attribute_value LIKE :matchValuePattern
+  AND NOT EXISTS (
+    SELECT 1
+    FROM transfer_attribute link_attr
+    JOIN attribute_type link_type ON link_attr.attribute_type_id = link_type.id
+    WHERE link_type.name = :linkAttributeName
+      AND link_attr.attribute_value = match_attr.attribute_value
+  )
+ORDER BY transfer.timestamp DESC, transfer.id DESC;

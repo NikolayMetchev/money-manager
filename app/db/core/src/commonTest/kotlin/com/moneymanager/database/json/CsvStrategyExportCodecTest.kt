@@ -1,6 +1,7 @@
 package com.moneymanager.database.json
 
 import com.moneymanager.domain.model.csvstrategy.AmountMode
+import com.moneymanager.domain.model.csvstrategy.CompanionTransactionRule
 import com.moneymanager.domain.model.csvstrategy.RegexRule
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.csvstrategy.export.AccountLookupExport
@@ -236,6 +237,54 @@ class CsvStrategyExportCodecTest {
         assertEquals("Name", decoded.accountMappings.first().columnName)
         assertEquals(".*Acme.*", decoded.accountMappings.first().valuePattern)
         assertEquals("Acme Bank", decoded.accountMappings.first().accountName)
+    }
+
+    @Test
+    fun `encode and decode export with companion transaction rules`() {
+        val export =
+            CsvStrategyExport(
+                version = "1.0.0",
+                name = "With companion rules",
+                identificationColumns = setOf("ID"),
+                fieldMappings = emptyMap(),
+                companionTransactionRules =
+                    listOf(
+                        CompanionTransactionRule(
+                            name = "Interest earned",
+                            matchAttributeName = "wise-id",
+                            matchValuePattern = "ACCRUAL_CHARGE-%",
+                            linkAttributeName = "wise-interest-for",
+                            companionDescription = "Interest earned",
+                        ),
+                    ),
+            )
+
+        val json = CsvStrategyExportCodec.encode(export)
+        val decoded = CsvStrategyExportCodec.decode(json)
+
+        val rule = decoded.companionTransactionRules.single()
+        assertEquals("Interest earned", rule.name)
+        assertEquals("wise-id", rule.matchAttributeName)
+        assertEquals("ACCRUAL_CHARGE-%", rule.matchValuePattern)
+        assertEquals("wise-interest-for", rule.linkAttributeName)
+        assertEquals("Interest earned", rule.companionDescription)
+    }
+
+    @Test
+    fun `decode legacy export without companion rules defaults to empty list`() {
+        val legacyJson =
+            """
+            {
+                "version": "1.0.0",
+                "name": "Legacy",
+                "identificationColumns": ["Date"],
+                "fieldMappings": {}
+            }
+            """.trimIndent()
+
+        val decoded = CsvStrategyExportCodec.decode(legacyJson)
+
+        assertTrue(decoded.companionTransactionRules.isEmpty())
     }
 
     @Test
