@@ -51,6 +51,7 @@ kotlin {
                 implementation(libs.androidx.compose.animation.core)
                 implementation(libs.androidx.compose.material.icons.core)
                 implementation(libs.androidx.compose.material3)
+                implementation(libs.androidx.compose.runtime.annotation)
                 implementation(libs.androidx.compose.ui.graphics)
                 implementation(libs.androidx.compose.ui.text)
                 implementation(libs.diamondedge.logging)
@@ -75,6 +76,7 @@ kotlin {
                 api(projects.utils.bigdecimal)
                 api(projects.utils.rest)
 
+                implementation(libs.androidx.compose.runtime.annotation)
                 implementation(libs.compose.animation.core.desktop)
                 implementation(libs.compose.animation.desktop)
                 implementation(libs.compose.material.desktop)

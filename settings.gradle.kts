@@ -41,6 +41,15 @@ buildscript {
             ?.get(1)
             ?: error("android-gradle-plugin version not found in gradle/libs.versions.toml")
         classpath("com.android.tools.build:gradle:$androidGradlePluginVersion")
+
+        // Workaround for DAGP not yet reading Kotlin 2.4 metadata:
+        // https://github.com/autonomousapps/dependency-analysis-gradle-plugin/issues/1661
+        val kotlinVersion = Regex("""\nkotlin\s*=\s*"([^"]+)"""")
+            .find(libsVersionsToml)
+            ?.groupValues
+            ?.get(1)
+            ?: error("kotlin version not found in gradle/libs.versions.toml")
+        classpath("org.jetbrains.kotlin:kotlin-metadata-jvm:$kotlinVersion")
     }
 }
 
@@ -49,8 +58,8 @@ plugins {
     id("com.autonomousapps.build-health") version "3.14.1"
 
     // Kotlin plugins declared here for classloader compatibility with DAGP
-    id("org.jetbrains.kotlin.multiplatform") version "2.3.21" apply false
-    id("org.jetbrains.kotlin.jvm") version "2.3.21" apply false
+    id("org.jetbrains.kotlin.multiplatform") version "2.4.0" apply false
+    id("org.jetbrains.kotlin.jvm") version "2.4.0" apply false
 }
 
 develocity {

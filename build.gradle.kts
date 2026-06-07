@@ -40,6 +40,12 @@ dependencyAnalysis {
             onAny {
                 severity("fail")
             }
+            // Kotlin 2.4 surfaces the JUnit framework artifact that kotlin("test")
+            // auto-selects as a used transitive in every platform test source set.
+            // It is an implementation detail of kotlin("test"), not a direct dependency.
+            onUsedTransitiveDependencies {
+                exclude("org.jetbrains.kotlin:kotlin-test-junit")
+            }
         }
 
         project(":app:di:core") {
