@@ -23,9 +23,11 @@ import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
 import com.moneymanager.ui.test.MoneyManagerTestApp
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlin.test.AfterTest
 import kotlin.test.Test
+import kotlin.test.assertNotNull
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
@@ -135,6 +137,90 @@ class ImportWiseCsvE2ETest {
                 hasText("All rows have already been imported successfully."),
                 timeoutMillis = 15000,
             )
+        }
+
+    /**
+     * Regression test for importing on a fresh database with no accounts at all: the dialog
+     * must still prepare the import, offer the per-currency Wise accounts ("Wise: EUR",
+     * "Wise: GBP") as new accounts to create, and enable the import button. Previously the
+     * preview was gated on at least one account existing, so a fresh database showed
+     * "Import 0 Transfers" with no way to proceed.
+     */
+    @Test
+    fun importWiseCsv_onFreshDatabaseCreatesWiseAccounts() =
+        runMoneyManagerComposeUiTest {
+            testDbLocation = createTestDatabaseLocation()
+            val databaseManager = createTestDatabaseManager()
+            lateinit var databaseComponent: DatabaseComponent
+
+            runBlocking {
+                val db = databaseManager.openDatabase(testDbLocation!!)
+                databaseComponent = DatabaseComponent.create(db)
+
+                // No accounts are created up front - the import must discover all of them
+                val csvContent = wiseCsvContent()
+                val lines = csvContent.lines().filter { it.isNotBlank() }
+                val headers = parseCsvLine(lines.first())
+                val rows = lines.drop(1).map { parseCsvLine(it) }
+
+                databaseComponent.csvImportRepository.createImport(
+                    fileName = "transaction-history.csv",
+                    headers = headers,
+                    rows = rows,
+                    fileChecksum = "wise_test_export_checksum",
+                    fileLastModified = Instant.fromEpochMilliseconds(1700000000000L),
+                )
+            }
+
+            val testDatabaseManager =
+                SimpleWiseDatabaseManager(
+                    databaseManager = databaseManager,
+                    testLocation = testDbLocation!!,
+                )
+
+            setContent {
+                MoneyManagerTestApp(
+                    databaseManager = testDatabaseManager,
+                    appVersion = AppVersion("1.0.0-test"),
+                )
+            }
+
+            waitForIdle()
+            waitUntilAtLeastOneExists(hasText("Your Accounts"), timeoutMillis = 20000)
+
+            // Navigate to the imported Wise CSV
+            waitUntilAtLeastOneExists(hasText("Imports"), timeoutMillis = 10000)
+            onNodeWithText("Imports", useUnmergedTree = true).performClick()
+            waitForIdle()
+
+            waitUntilExactlyOneExists(hasText("transaction-history.csv"), timeoutMillis = 15000)
+            onNodeWithText("transaction-history.csv").performClick()
+            waitUntilExactlyOneExists(hasText("5 rows"), timeoutMillis = 10000)
+
+            waitUntilAtLeastOneExists(hasText("Apply Strategy") and isEnabled(), timeoutMillis = 15000)
+            onAllNodesWithText("Apply Strategy").onFirst().performClick()
+            waitUntilAtLeastOneExists(hasText("Apply Import Strategy"), timeoutMillis = 15000)
+            waitUntilExactlyOneExists(hasText("Wise CSV"), timeoutMillis = 10000)
+            waitForIdle()
+
+            // The per-currency source accounts are offered as new accounts alongside counterparties
+            waitUntilAtLeastOneExists(hasText("New Account Handling"), timeoutMillis = 15000)
+            waitUntilAtLeastOneExists(hasText("Wise: EUR"), timeoutMillis = 10000)
+            waitUntilAtLeastOneExists(hasText("Wise: GBP"), timeoutMillis = 10000)
+            waitUntilAtLeastOneExists(hasText("Avolta - Tenerife"), timeoutMillis = 10000)
+
+            // All five rows import even though no account existed beforehand
+            waitUntilAtLeastOneExists(hasText("Import 5 Transfers") and isEnabled(), timeoutMillis = 15000)
+            onNodeWithText("Import 5 Transfers").performClick()
+            waitUntilDoesNotExist(hasText("Apply Import Strategy"), timeoutMillis = 30000)
+            waitForIdle()
+
+            // The per-currency Wise accounts were created during the import
+            runBlocking {
+                val accounts = databaseComponent.accountRepository.getAllAccounts().first()
+                assertNotNull(accounts.singleOrNull { it.name == "Wise: EUR" }, "Wise: EUR account is created")
+                assertNotNull(accounts.singleOrNull { it.name == "Wise: GBP" }, "Wise: GBP account is created")
+            }
         }
 
     /**
