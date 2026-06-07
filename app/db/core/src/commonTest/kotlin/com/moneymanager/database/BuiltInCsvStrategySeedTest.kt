@@ -13,6 +13,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class BuiltInCsvStrategySeedTest : DbTest() {
@@ -77,6 +78,53 @@ class BuiltInCsvStrategySeedTest : DbTest() {
 
             // The Wise transaction ID drives duplicate detection on re-import
             val idMapping = strategy.attributeMappings.single { it.columnName == "ID" }
+            assertTrue(idMapping.isUniqueIdentifier)
+        }
+
+    @Test
+    fun `a fresh database seeds the built-in Monzo CSV strategy`() =
+        runTest {
+            val strategy =
+                repositories.csvImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .single { it.name == "Monzo CSV" }
+
+            // The strategy auto-matches Monzo's transaction export header
+            val monzoHeader =
+                setOf(
+                    "Transaction ID",
+                    "Date",
+                    "Time",
+                    "Type",
+                    "Name",
+                    "Emoji",
+                    "Category",
+                    "Amount",
+                    "Currency",
+                    "Local amount",
+                    "Local currency",
+                    "Notes and #tags",
+                    "Address",
+                    "Receipt",
+                    "Description",
+                    "Category split",
+                    "Money Out",
+                    "Money In",
+                )
+            assertTrue(strategy.matchesColumns(monzoHeader))
+
+            // No source account is seeded (account ids are database-specific);
+            // the user picks the Monzo account when applying the strategy
+            assertNull(strategy.fieldMappings[TransferField.SOURCE_ACCOUNT])
+
+            // Positive amounts flow INTO the account, so credits flip source/target
+            val amount = strategy.fieldMappings[TransferField.AMOUNT]
+            assertIs<AmountParsingMapping>(amount)
+            assertTrue(amount.flipAccountsOnPositive)
+
+            // The Monzo transaction ID drives duplicate detection on re-import
+            val idMapping = strategy.attributeMappings.single { it.columnName == "Transaction ID" }
             assertTrue(idMapping.isUniqueIdentifier)
         }
 }

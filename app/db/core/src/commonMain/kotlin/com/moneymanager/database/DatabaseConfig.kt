@@ -823,8 +823,8 @@ object DatabaseConfig {
             seedMonzoStrategy(systemDeviceId)
             seedWiseStrategy(systemDeviceId)
 
-            // Seed the built-in Wise CSV import strategy
-            seedWiseCsvStrategy()
+            // Seed the built-in CSV import strategies
+            seedBuiltInCsvStrategies()
 
             // Seed currencies with source tracking
             allCurrencies.forEach { currency ->
@@ -1033,11 +1033,36 @@ object DatabaseConfig {
     /** Fixed UUID for the built-in Wise CSV strategy so it can be referenced reliably. */
     val wiseCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000003")
 
+    /** Fixed UUID for the built-in Monzo CSV strategy so it can be referenced reliably. */
+    val monzoCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000004")
+
     /** Account name prefix shared with the Wise API import strategy ("Wise: " + currency code). */
     private const val WISE_ACCOUNT_PREFIX = "Wise: "
 
-    private fun wiseCsvMappingId(index: Int): FieldMappingId =
-        FieldMappingId(Uuid.parse("00000000-0000-0000-0001-${index.toString().padStart(12, '0')}"))
+    /**
+     * Deterministic FieldMappingId for built-in CSV strategies.
+     * Each strategy uses its own [strategyGroup] so ids never collide across strategies.
+     */
+    private fun builtInCsvMappingId(
+        strategyGroup: Int,
+        index: Int,
+    ): FieldMappingId =
+        FieldMappingId(
+            Uuid.parse(
+                "00000000-0000-0000-${strategyGroup.toString().padStart(4, '0')}-${index.toString().padStart(12, '0')}",
+            ),
+        )
+
+    private fun wiseCsvMappingId(index: Int): FieldMappingId = builtInCsvMappingId(strategyGroup = 1, index = index)
+
+    private fun monzoCsvMappingId(index: Int): FieldMappingId = builtInCsvMappingId(strategyGroup = 2, index = index)
+
+    /** All built-in CSV import strategies seeded into a fresh database. */
+    fun builtInCsvStrategies(now: Instant): List<CsvImportStrategy> =
+        listOf(
+            buildWiseCsvStrategy(now),
+            buildMonzoCsvStrategy(now),
+        )
 
     /**
      * Builds the built-in Wise CSV import strategy for Wise's transaction-history.csv export.
@@ -1186,19 +1211,117 @@ object DatabaseConfig {
         )
     }
 
-    /** Seeds the built-in Wise CSV import strategy during new-database initialisation. */
-    private fun MoneyManagerDatabaseWrapper.seedWiseCsvStrategy() {
-        val now = Clock.System.now()
-        val strategy = buildWiseCsvStrategy(now)
-        csvImportStrategyQueries.insert(
-            id = strategy.id.id.toString(),
-            name = strategy.name,
-            identification_columns_json = FieldMappingJsonCodec.encodeColumns(strategy.identificationColumns),
-            field_mappings_json = FieldMappingJsonCodec.encode(strategy.fieldMappings),
-            attribute_mappings_json = FieldMappingJsonCodec.encodeAttributeMappings(strategy.attributeMappings),
-            row_rules_json = FieldMappingJsonCodec.encodeRowRules(strategy.rowPreprocessingRules),
-            created_at = now.toEpochMilliseconds(),
-            updated_at = now.toEpochMilliseconds(),
+    /**
+     * Builds the built-in Monzo CSV import strategy for Monzo's transaction export.
+     *
+     * No SOURCE_ACCOUNT mapping is seeded (account ids are database-specific); the user picks
+     * the Monzo account when applying the strategy. Positive amounts flow INTO the account, so
+     * flipAccountsOnPositive swaps source/target for credits. Transactions are deduplicated by
+     * the Transaction ID column on re-import.
+     */
+    fun buildMonzoCsvStrategy(now: Instant): CsvImportStrategy {
+        val fieldMappings =
+            mapOf(
+                TransferField.TARGET_ACCOUNT to
+                    AccountLookupMapping(
+                        id = monzoCsvMappingId(1),
+                        fieldType = TransferField.TARGET_ACCOUNT,
+                        columnName = "Name",
+                        fallbackColumns = listOf("Type"),
+                    ),
+                TransferField.TIMESTAMP to
+                    DateTimeParsingMapping(
+                        id = monzoCsvMappingId(2),
+                        fieldType = TransferField.TIMESTAMP,
+                        dateColumnName = "Date",
+                        dateFormat = "dd/MM/yyyy",
+                        timeColumnName = "Time",
+                        timeFormat = "HH:mm:ss",
+                    ),
+                TransferField.DESCRIPTION to
+                    DirectColumnMapping(
+                        id = monzoCsvMappingId(3),
+                        fieldType = TransferField.DESCRIPTION,
+                        columnName = "Description",
+                        fallbackColumns = listOf("Type"),
+                    ),
+                TransferField.AMOUNT to
+                    AmountParsingMapping(
+                        id = monzoCsvMappingId(4),
+                        fieldType = TransferField.AMOUNT,
+                        mode = AmountMode.SINGLE_COLUMN,
+                        amountColumnName = "Amount",
+                        flipAccountsOnPositive = true,
+                    ),
+                TransferField.CURRENCY to
+                    CurrencyLookupMapping(
+                        id = monzoCsvMappingId(5),
+                        fieldType = TransferField.CURRENCY,
+                        columnName = "Currency",
+                    ),
+                TransferField.TIMEZONE to
+                    HardCodedTimezoneMapping(
+                        id = monzoCsvMappingId(6),
+                        fieldType = TransferField.TIMEZONE,
+                        timezoneId = "Europe/London",
+                    ),
+            )
+        val attributeMappings =
+            listOf(
+                AttributeColumnMapping("Transaction ID", "Monzo Transaction ID", isUniqueIdentifier = true),
+                AttributeColumnMapping("Emoji", "Emoji"),
+                AttributeColumnMapping("Category", "Monzo Category"),
+                AttributeColumnMapping("Notes and #tags", "Notes and #tags"),
+                AttributeColumnMapping("Address", "Address"),
+                AttributeColumnMapping("Receipt", "Receipt"),
+                AttributeColumnMapping("Type", "Type"),
+            )
+        val identificationColumns =
+            setOf(
+                "Transaction ID",
+                "Date",
+                "Time",
+                "Type",
+                "Name",
+                "Emoji",
+                "Category",
+                "Amount",
+                "Currency",
+                "Local amount",
+                "Local currency",
+                "Notes and #tags",
+                "Address",
+                "Receipt",
+                "Description",
+                "Category split",
+                "Money Out",
+                "Money In",
+            )
+        return CsvImportStrategy(
+            id = CsvImportStrategyId(monzoCsvStrategyId),
+            name = "Monzo CSV",
+            identificationColumns = identificationColumns,
+            fieldMappings = fieldMappings,
+            attributeMappings = attributeMappings,
+            createdAt = now,
+            updatedAt = now,
         )
+    }
+
+    /** Seeds the built-in CSV import strategies during new-database initialisation. */
+    private fun MoneyManagerDatabaseWrapper.seedBuiltInCsvStrategies() {
+        val now = Clock.System.now()
+        for (strategy in builtInCsvStrategies(now)) {
+            csvImportStrategyQueries.insert(
+                id = strategy.id.id.toString(),
+                name = strategy.name,
+                identification_columns_json = FieldMappingJsonCodec.encodeColumns(strategy.identificationColumns),
+                field_mappings_json = FieldMappingJsonCodec.encode(strategy.fieldMappings),
+                attribute_mappings_json = FieldMappingJsonCodec.encodeAttributeMappings(strategy.attributeMappings),
+                row_rules_json = FieldMappingJsonCodec.encodeRowRules(strategy.rowPreprocessingRules),
+                created_at = now.toEpochMilliseconds(),
+                updated_at = now.toEpochMilliseconds(),
+            )
+        }
     }
 }
