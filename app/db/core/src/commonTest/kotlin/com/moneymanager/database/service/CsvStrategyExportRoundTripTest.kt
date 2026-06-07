@@ -1,5 +1,8 @@
+@file:OptIn(kotlin.time.ExperimentalTime::class)
+
 package com.moneymanager.database.service
 
+import com.moneymanager.database.DatabaseConfig
 import com.moneymanager.database.json.CsvStrategyExportCodec
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.test.database.DbTest
@@ -8,6 +11,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Clock
 
 /**
  * Verifies that exporting a strategy to JSON and importing it back is lossless.
@@ -31,8 +35,9 @@ class CsvStrategyExportRoundTripTest : DbTest() {
 
             val strategies = repositories.csvImportStrategyRepository.getAllStrategies().first()
             assertTrue(strategies.isNotEmpty(), "Expected built-in CSV strategies to be seeded")
+            // Compare against the authoritative seed list so new strategies are picked up automatically
             assertEquals(
-                setOf("Wise CSV", "Monzo CSV"),
+                DatabaseConfig.builtInCsvStrategies(Clock.System.now()).map { it.name }.toSet(),
                 strategies.map { it.name }.toSet(),
             )
 
