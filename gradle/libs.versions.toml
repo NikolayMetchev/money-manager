@@ -29,7 +29,7 @@ human-readable = "1.12.3"
 jvm-target = "25"
 jvm-toolchain = "25"
 kmlogging = "2.0.3"
-kotlin = "2.3.21"
+kotlin = "2.4.0"
 kotlinx-coroutines = "1.11.0"
 kotlinx-datetime = "0.8.0"
 kotlinx-serialization = "1.11.0"
@@ -37,7 +37,7 @@ kover = "0.9.8"
 ktlint = "14.2.0"
 ktor = "3.5.0"
 log4j = "2.26.0"
-mappie = "2.3.20-2.4.1"
+mappie = "2.4.0-2.4.1"
 proguard = "7.8.2"
 metro = "1.1.1"
 mokkery = "3.4.1"
@@ -58,6 +58,7 @@ androidx-compose-foundation-layout = { module = "androidx.compose.foundation:fou
 androidx-compose-material-icons-core = { module = "androidx.compose.material:material-icons-core", version.ref = "androidx-compose-material-icons" }
 androidx-compose-material3 = { module = "androidx.compose.material3:material3", version.ref = "androidx-compose-material3" }
 androidx-compose-runtime = { module = "androidx.compose.runtime:runtime", version.ref = "androidx-compose" }
+androidx-compose-runtime-annotation = { module = "androidx.compose.runtime:runtime-annotation", version.ref = "androidx-compose" }
 androidx-compose-runtime-desktop = { module = "androidx.compose.runtime:runtime-desktop", version.ref = "androidx-compose" }
 androidx-compose-ui = { module = "androidx.compose.ui:ui", version.ref = "androidx-compose" }
 androidx-compose-ui-geometry = { module = "androidx.compose.ui:ui-geometry", version.ref = "androidx-compose" }
