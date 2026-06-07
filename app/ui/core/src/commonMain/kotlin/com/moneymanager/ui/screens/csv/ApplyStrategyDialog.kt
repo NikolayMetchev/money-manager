@@ -178,7 +178,9 @@ fun ApplyStrategyDialog(
     // Prepare baseline import preview from persisted mappings only.
     LaunchedEffect(selectedStrategy, selectedSourceAccountId, rowsToProcess, accounts, currencies, accountMappings) {
         selectedStrategy?.let { strategy ->
-            if (accounts.isNotEmpty() && currencies.isNotEmpty() && rowsToProcess.isNotEmpty()) {
+            // An empty accounts list is fine: the mapper resolves unknown accounts to
+            // placeholders and reports them as new accounts to create during import.
+            if (currencies.isNotEmpty() && rowsToProcess.isNotEmpty()) {
                 try {
                     val accountsByName = accounts.associateBy { it.name }
                     val currenciesById = currencies.associateBy { it.id }
@@ -232,7 +234,7 @@ fun ApplyStrategyDialog(
     ) {
         selectedStrategy?.let { strategy ->
             val basePreparation = baseImportPreparation
-            if (accounts.isNotEmpty() && currencies.isNotEmpty() && rowsToProcess.isNotEmpty() && basePreparation != null) {
+            if (currencies.isNotEmpty() && rowsToProcess.isNotEmpty() && basePreparation != null) {
                 try {
                     val accountsByName = accounts.associateBy { it.name }
                     val currenciesById = currencies.associateBy { it.id }
