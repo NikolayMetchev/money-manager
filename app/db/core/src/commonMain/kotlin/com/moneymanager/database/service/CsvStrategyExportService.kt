@@ -10,6 +10,7 @@ import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
+import com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
@@ -22,10 +23,12 @@ import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.RegexAccountMapping
+import com.moneymanager.domain.model.csvstrategy.TemplateAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.csvstrategy.export.AccountLookupExport
 import com.moneymanager.domain.model.csvstrategy.export.AmountParsingExport
+import com.moneymanager.domain.model.csvstrategy.export.ConditionalAccountExport
 import com.moneymanager.domain.model.csvstrategy.export.CsvAccountMappingExport
 import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExport
 import com.moneymanager.domain.model.csvstrategy.export.CurrencyLookupExport
@@ -36,6 +39,7 @@ import com.moneymanager.domain.model.csvstrategy.export.HardCodedAccountExport
 import com.moneymanager.domain.model.csvstrategy.export.HardCodedCurrencyExport
 import com.moneymanager.domain.model.csvstrategy.export.HardCodedTimezoneExport
 import com.moneymanager.domain.model.csvstrategy.export.RegexAccountExport
+import com.moneymanager.domain.model.csvstrategy.export.TemplateAccountExport
 import com.moneymanager.domain.model.csvstrategy.export.TimezoneLookupExport
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.CategoryRepository
@@ -158,6 +162,7 @@ class CsvStrategyExportService(
                             accountName = account.name,
                         )
                     }.orEmpty(),
+            rowPreprocessingRules = strategy.rowPreprocessingRules,
         )
     }
 
@@ -171,64 +176,7 @@ class CsvStrategyExportService(
         val unresolvedReferences = mutableListOf<UnresolvedReference>()
 
         for ((fieldType, mappingExport) in export.fieldMappings) {
-            when (mappingExport) {
-                is HardCodedAccountExport -> {
-                    if (referenceData.accountsByName[mappingExport.accountName] == null) {
-                        unresolvedReferences.add(
-                            UnresolvedReference(
-                                type = ReferenceType.ACCOUNT,
-                                name = mappingExport.accountName,
-                                fieldType = fieldType,
-                            ),
-                        )
-                    }
-                }
-                is AccountLookupExport -> {
-                    if (mappingExport.defaultCategoryName != Category.UNCATEGORIZED_NAME &&
-                        referenceData.categoriesByName[mappingExport.defaultCategoryName] == null
-                    ) {
-                        unresolvedReferences.add(
-                            UnresolvedReference(
-                                type = ReferenceType.CATEGORY,
-                                name = mappingExport.defaultCategoryName,
-                                fieldType = fieldType,
-                            ),
-                        )
-                    }
-                }
-                is RegexAccountExport -> {
-                    if (mappingExport.defaultCategoryName != Category.UNCATEGORIZED_NAME &&
-                        referenceData.categoriesByName[mappingExport.defaultCategoryName] == null
-                    ) {
-                        unresolvedReferences.add(
-                            UnresolvedReference(
-                                type = ReferenceType.CATEGORY,
-                                name = mappingExport.defaultCategoryName,
-                                fieldType = fieldType,
-                            ),
-                        )
-                    }
-                }
-                is HardCodedCurrencyExport -> {
-                    if (referenceData.currenciesByCode[mappingExport.currencyCode] == null) {
-                        unresolvedReferences.add(
-                            UnresolvedReference(
-                                type = ReferenceType.CURRENCY,
-                                name = mappingExport.currencyCode,
-                                fieldType = fieldType,
-                            ),
-                        )
-                    }
-                }
-                // These don't have ID references
-                is DateTimeParsingExport,
-                is DirectColumnExport,
-                is AmountParsingExport,
-                is CurrencyLookupExport,
-                is HardCodedTimezoneExport,
-                is TimezoneLookupExport,
-                -> Unit
-            }
+            collectUnresolvedReferences(mappingExport, fieldType, referenceData, unresolvedReferences)
         }
 
         for (mapping in export.accountMappings) {
@@ -248,6 +196,75 @@ class CsvStrategyExportService(
             export = export,
             unresolvedReferences = unresolvedReferences.distinct(),
         )
+    }
+
+    private fun collectUnresolvedReferences(
+        mappingExport: FieldMappingExport,
+        fieldType: TransferField,
+        referenceData: StrategyReferenceData,
+        unresolvedReferences: MutableList<UnresolvedReference>,
+    ) {
+        when (mappingExport) {
+            is HardCodedAccountExport -> {
+                if (referenceData.accountsByName[mappingExport.accountName] == null) {
+                    unresolvedReferences.add(
+                        UnresolvedReference(
+                            type = ReferenceType.ACCOUNT,
+                            name = mappingExport.accountName,
+                            fieldType = fieldType,
+                        ),
+                    )
+                }
+            }
+            is AccountLookupExport ->
+                addCategoryReferenceIfMissing(mappingExport.defaultCategoryName, fieldType, referenceData, unresolvedReferences)
+            is RegexAccountExport ->
+                addCategoryReferenceIfMissing(mappingExport.defaultCategoryName, fieldType, referenceData, unresolvedReferences)
+            is TemplateAccountExport ->
+                addCategoryReferenceIfMissing(mappingExport.defaultCategoryName, fieldType, referenceData, unresolvedReferences)
+            is ConditionalAccountExport -> {
+                collectUnresolvedReferences(mappingExport.whenTrue, fieldType, referenceData, unresolvedReferences)
+                collectUnresolvedReferences(mappingExport.whenFalse, fieldType, referenceData, unresolvedReferences)
+            }
+            is HardCodedCurrencyExport -> {
+                if (referenceData.currenciesByCode[mappingExport.currencyCode] == null) {
+                    unresolvedReferences.add(
+                        UnresolvedReference(
+                            type = ReferenceType.CURRENCY,
+                            name = mappingExport.currencyCode,
+                            fieldType = fieldType,
+                        ),
+                    )
+                }
+            }
+            // These don't have ID references
+            is DateTimeParsingExport,
+            is DirectColumnExport,
+            is AmountParsingExport,
+            is CurrencyLookupExport,
+            is HardCodedTimezoneExport,
+            is TimezoneLookupExport,
+            -> Unit
+        }
+    }
+
+    private fun addCategoryReferenceIfMissing(
+        defaultCategoryName: String,
+        fieldType: TransferField,
+        referenceData: StrategyReferenceData,
+        unresolvedReferences: MutableList<UnresolvedReference>,
+    ) {
+        if (defaultCategoryName != Category.UNCATEGORIZED_NAME &&
+            referenceData.categoriesByName[defaultCategoryName] == null
+        ) {
+            unresolvedReferences.add(
+                UnresolvedReference(
+                    type = ReferenceType.CATEGORY,
+                    name = defaultCategoryName,
+                    fieldType = fieldType,
+                ),
+            )
+        }
     }
 
     private suspend fun loadReferenceData(): StrategyReferenceData =
@@ -355,6 +372,7 @@ class CsvStrategyExportService(
                     mappingExport.toDomain(accountsByName, currenciesByCode, categoriesByName)
                 },
             attributeMappings = export.attributeMappings,
+            rowPreprocessingRules = export.rowPreprocessingRules,
             createdAt = now,
             updatedAt = now,
         )
@@ -390,6 +408,23 @@ class CsvStrategyExportService(
                         categoriesById[defaultCategoryId]?.name
                             ?: Category.UNCATEGORIZED_NAME,
                 )
+            is TemplateAccountMapping ->
+                TemplateAccountExport(
+                    fieldType = fieldType,
+                    columnName = columnName,
+                    prefix = prefix,
+                    suffix = suffix,
+                    defaultCategoryName =
+                        categoriesById[defaultCategoryId]?.name
+                            ?: Category.UNCATEGORIZED_NAME,
+                )
+            is ConditionalAccountMapping ->
+                ConditionalAccountExport(
+                    fieldType = fieldType,
+                    conditions = conditions,
+                    whenTrue = whenTrue.toExport(accountsById, currenciesById, categoriesById),
+                    whenFalse = whenFalse.toExport(accountsById, currenciesById, categoriesById),
+                )
             is DateTimeParsingMapping ->
                 DateTimeParsingExport(
                     fieldType = fieldType,
@@ -398,6 +433,7 @@ class CsvStrategyExportService(
                     timeColumnName = timeColumnName,
                     timeFormat = timeFormat,
                     defaultTime = defaultTime,
+                    dateTimeFormat = dateTimeFormat,
                 )
             is DirectColumnMapping ->
                 DirectColumnExport(
@@ -414,6 +450,8 @@ class CsvStrategyExportService(
                     debitColumnName = debitColumnName,
                     negateValues = negateValues,
                     flipAccountsOnPositive = flipAccountsOnPositive,
+                    feeColumnName = feeColumnName,
+                    feeConditions = feeConditions,
                 )
             is HardCodedCurrencyMapping ->
                 HardCodedCurrencyExport(
@@ -474,6 +512,25 @@ class CsvStrategyExportService(
                         categoriesByName[defaultCategoryName]?.id
                             ?: Category.UNCATEGORIZED_ID,
                 )
+            is TemplateAccountExport ->
+                TemplateAccountMapping(
+                    id = newId,
+                    fieldType = fieldType,
+                    columnName = columnName,
+                    prefix = prefix,
+                    suffix = suffix,
+                    defaultCategoryId =
+                        categoriesByName[defaultCategoryName]?.id
+                            ?: Category.UNCATEGORIZED_ID,
+                )
+            is ConditionalAccountExport ->
+                ConditionalAccountMapping(
+                    id = newId,
+                    fieldType = fieldType,
+                    conditions = conditions,
+                    whenTrue = whenTrue.toDomain(accountsByName, currenciesByCode, categoriesByName),
+                    whenFalse = whenFalse.toDomain(accountsByName, currenciesByCode, categoriesByName),
+                )
             is DateTimeParsingExport ->
                 DateTimeParsingMapping(
                     id = newId,
@@ -483,6 +540,7 @@ class CsvStrategyExportService(
                     timeColumnName = timeColumnName,
                     timeFormat = timeFormat,
                     defaultTime = defaultTime,
+                    dateTimeFormat = dateTimeFormat,
                 )
             is DirectColumnExport ->
                 DirectColumnMapping(
@@ -501,6 +559,8 @@ class CsvStrategyExportService(
                     debitColumnName = debitColumnName,
                     negateValues = negateValues,
                     flipAccountsOnPositive = flipAccountsOnPositive,
+                    feeColumnName = feeColumnName,
+                    feeConditions = feeConditions,
                 )
             is HardCodedCurrencyExport ->
                 HardCodedCurrencyMapping(

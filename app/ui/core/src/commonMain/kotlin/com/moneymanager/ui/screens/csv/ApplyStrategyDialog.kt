@@ -140,6 +140,11 @@ fun ApplyStrategyDialog(
     var isImporting by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
+    // Strategies whose SOURCE_ACCOUNT mapping resolves per-row (e.g. by currency) need no
+    // user-selected source account; the mapping decides the account for each row.
+    val sourceAccountMapping = selectedStrategy?.fieldMappings?.get(TransferField.SOURCE_ACCOUNT)
+    val strategyHasPerRowSource = sourceAccountMapping != null && sourceAccountMapping !is HardCodedAccountMapping
+
     // Load account mappings when strategy is selected and pre-populate source account from strategy
     LaunchedEffect(selectedStrategy) {
         selectedStrategy?.let { strategy ->
@@ -149,10 +154,11 @@ fun ApplyStrategyDialog(
             // Pre-populate source account from the strategy's SOURCE_ACCOUNT mapping if present.
             // This runs whenever the strategy changes, so switching strategies updates the
             // pre-selected source account to match the new strategy's default.
-            val strategySourceAccountId =
-                (strategy.fieldMappings[TransferField.SOURCE_ACCOUNT] as? HardCodedAccountMapping)?.accountId
-            if (strategySourceAccountId != null) {
-                selectedSourceAccountId = strategySourceAccountId
+            when (val strategySourceMapping = strategy.fieldMappings[TransferField.SOURCE_ACCOUNT]) {
+                is HardCodedAccountMapping -> selectedSourceAccountId = strategySourceMapping.accountId
+                // Per-row mapping: clear any override left over from a previously selected strategy
+                null -> Unit
+                else -> selectedSourceAccountId = null
             }
         }
     }
@@ -278,28 +284,30 @@ fun ApplyStrategyDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Source account selector
-                AccountPicker(
-                    selectedAccountId = selectedSourceAccountId,
-                    onAccountSelected = { selectedSourceAccountId = it },
-                    label = "Source Account",
-                    accountRepository = accountRepository,
-                    categoryRepository = categoryRepository,
-                    personRepository = personRepository,
-                    personAccountOwnershipRepository = personAccountOwnershipRepository,
-                    entitySource = entitySource,
-                    enabled = !isImporting,
-                    isError = selectedSourceAccountId == null,
-                )
+                // Source account selector (hidden when the strategy resolves the source per-row)
+                if (!strategyHasPerRowSource) {
+                    AccountPicker(
+                        selectedAccountId = selectedSourceAccountId,
+                        onAccountSelected = { selectedSourceAccountId = it },
+                        label = "Source Account",
+                        accountRepository = accountRepository,
+                        categoryRepository = categoryRepository,
+                        personRepository = personRepository,
+                        personAccountOwnershipRepository = personAccountOwnershipRepository,
+                        entitySource = entitySource,
+                        enabled = !isImporting,
+                        isError = selectedSourceAccountId == null,
+                    )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
 
                 baseImportPreparation
                     ?.takeIf { it.newAccounts.isNotEmpty() }
                     ?.let { basePrep ->
                         NewAccountResolutionSection(
                             newAccounts = basePrep.newAccounts.toList(),
-                            discoveredMappings = basePrep.validTransfers.mapNotNull { it.discoveredMapping },
+                            discoveredMappings = basePrep.validTransfers.flatMap { it.discoveredMappings },
                             accounts = accounts,
                             selectedExistingAccounts = selectedExistingAccounts,
                             selectedNewAccountNames = selectedNewAccountNames,
@@ -417,9 +425,7 @@ fun ApplyStrategyDialog(
 
                                 // Collect discovered mappings, separating regex matches from exact matches
                                 val allDiscoveredMappings =
-                                    prep.validTransfers
-                                        .filter { it.discoveredMapping != null }
-                                        .map { it.discoveredMapping!! }
+                                    prep.validTransfers.flatMap { it.discoveredMappings }
 
                                 // For regex matches (matchedPattern != null), deduplicate by pattern
                                 // This ensures only ONE mapping is created per regex rule
@@ -779,7 +785,7 @@ fun ApplyStrategyDialog(
                 enabled =
                     !isImporting &&
                         selectedStrategy != null &&
-                        selectedSourceAccountId != null &&
+                        (selectedSourceAccountId != null || strategyHasPerRowSource) &&
                         importPreparation != null &&
                         !hasBlankNewAccountNames(
                             preparation = baseImportPreparation,
@@ -1170,7 +1176,7 @@ internal fun buildPendingAccountMappings(
 
     return preparation.validTransfers
         .asSequence()
-        .mapNotNull { it.discoveredMapping }
+        .flatMap { it.discoveredMappings }
         .filter { discoveredMapping -> discoveredMapping.targetAccountName in accountSelections }
         .map { discoveredMapping ->
             val selectedAccountId = accountSelections.getValue(discoveredMapping.targetAccountName)
@@ -1219,7 +1225,11 @@ internal fun buildAccountsToCreate(
         .asSequence()
         .filter { it.name !in existingAccountSelections }
         .mapNotNull { account ->
-            val finalName = newAccountNames[account.name]?.trim()?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+            // A missing entry means the user kept the detected name
+            val finalName =
+                (newAccountNames[account.name] ?: account.name)
+                    .trim()
+                    .takeIf { it.isNotBlank() } ?: return@mapNotNull null
             NewAccount(
                 name = finalName,
                 categoryId = account.categoryId,
@@ -1235,7 +1245,8 @@ internal fun hasBlankNewAccountNames(
     val safePreparation = preparation ?: return false
     return safePreparation.newAccounts.any { account ->
         account.name !in existingAccountSelections &&
-            newAccountNames[account.name].isNullOrBlank()
+            // A missing entry means the user kept the detected name; only an explicit blank blocks
+            (newAccountNames[account.name] ?: account.name).isBlank()
     }
 }
 

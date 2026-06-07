@@ -13,6 +13,8 @@ import kotlin.time.Instant
  * @property identificationColumns Set of column names used to auto-identify this strategy
  *                                 when importing a CSV file. Matching is exact and order-independent.
  * @property fieldMappings Map of TransferField to FieldMapping defining how each field is populated
+ * @property rowPreprocessingRules Rules that may swap column values / flip accounts per row
+ *                                 before field mappings run (see [RowPreprocessingRule])
  * @property createdAt Timestamp when this strategy was created
  * @property updatedAt Timestamp when this strategy was last modified
  */
@@ -22,6 +24,7 @@ data class CsvImportStrategy(
     val identificationColumns: Set<String>,
     val fieldMappings: Map<TransferField, FieldMapping>,
     val attributeMappings: List<AttributeColumnMapping> = emptyList(),
+    val rowPreprocessingRules: List<RowPreprocessingRule> = emptyList(),
     val createdAt: Instant,
     val updatedAt: Instant,
 ) {
