@@ -27,7 +27,9 @@ fun main() {
     // breaks when the JDK's bundled libfreetype clashes with the system GTK's (blank labels,
     // "drawing failure ... error occurred in libfreetype" warnings). Fall back to AWT's own
     // dialog instead. Must be set before AWT initialises.
-    System.setProperty("sun.awt.disableGtkFileDialogs", "true")
+    if (System.getProperty("os.name").orEmpty().lowercase().contains("linux")) {
+        System.setProperty("sun.awt.disableGtkFileDialogs", "true")
+    }
 
     // Desktop runs need the Swing Main dispatcher provider on the application classpath.
     Dispatchers.Swing

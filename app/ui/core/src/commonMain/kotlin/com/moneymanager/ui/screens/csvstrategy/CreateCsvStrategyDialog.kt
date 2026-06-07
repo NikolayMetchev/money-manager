@@ -347,6 +347,17 @@ fun CreateCsvStrategyDialog(
     val isEditMode = existingStrategy != null
     val availableColumnNames = csvColumns.map { it.originalName }.toSet()
 
+    // Mappings whose types this form cannot represent (e.g. the built-in Wise CSV strategy's
+    // template/conditional account mappings) are locked: their sections show an explanation
+    // instead of editable controls, and the original mapping is kept unchanged on save.
+    val existingSourceMapping = existingStrategy?.fieldMappings?.get(TransferField.SOURCE_ACCOUNT)
+    val sourceAccountLocked = existingSourceMapping != null && existingSourceMapping !is HardCodedAccountMapping
+    val existingTargetMapping = existingStrategy?.fieldMappings?.get(TransferField.TARGET_ACCOUNT)
+    val targetAccountLocked =
+        existingTargetMapping != null &&
+            existingTargetMapping !is AccountLookupMapping &&
+            existingTargetMapping !is RegexAccountMapping
+
     // Extract initial state from existing strategy if in edit mode
     val initialState =
         existingStrategy?.let {
@@ -433,7 +444,7 @@ fun CreateCsvStrategyDialog(
     val isFormValid =
         name.isNotBlank() &&
             identificationColumns.isNotEmpty() &&
-            targetAccountColumnName != null &&
+            (targetAccountColumnName != null || targetAccountLocked) &&
             dateColumnName != null &&
             descriptionColumnName != null &&
             amountColumnName != null &&
@@ -541,85 +552,103 @@ fun CreateCsvStrategyDialog(
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
-                Text("Source Account (Optional)", style = MaterialTheme.typography.titleSmall)
-                Text(
-                    "Can also be chosen each time you apply this strategy",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                AccountPicker(
-                    selectedAccountId = selectedAccountId,
-                    onAccountSelected = { selectedAccountId = it },
-                    label = "Select Account",
-                    accountRepository = accountRepository,
-                    categoryRepository = categoryRepository,
-                    personRepository = personRepository,
-                    personAccountOwnershipRepository = personAccountOwnershipRepository,
-                    entitySource = entitySource,
-                    enabled = !isSaving,
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-                Text("Target Account Column", style = MaterialTheme.typography.titleSmall)
-                ColumnDropdown(
-                    columns = csvColumns,
-                    selectedColumn = targetAccountColumnName,
-                    onColumnSelected = { targetAccountColumnName = it },
-                    label = "Column for payee/counterparty name",
-                    sampleValue = getSampleValue(csvColumns, firstRow, targetAccountColumnName),
-                    enabled = !isSaving,
-                    isError = targetAccountColumnName == null,
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    "Fallback column (when primary is empty)",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                // Find a row where the primary column is blank to show a relevant sample
-                val fallbackSampleRow = findRowWithBlankColumn(csvColumns, rows, targetAccountColumnName)
-                OptionalColumnDropdown(
-                    columns = csvColumns,
-                    selectedColumn = targetAccountFallbackColumns.firstOrNull(),
-                    onColumnSelected = { selected ->
-                        targetAccountFallbackColumns = if (selected != null) listOf(selected) else emptyList()
-                    },
-                    label = "Fallback column for account name",
-                    sampleValue = getSampleValue(csvColumns, fallbackSampleRow, targetAccountFallbackColumns.firstOrNull()),
-                    enabled = !isSaving,
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    "Account Name Mapping",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    RadioButton(
-                        selected = targetAccountMode == TargetAccountMode.DIRECT_LOOKUP,
-                        onClick = { targetAccountMode = TargetAccountMode.DIRECT_LOOKUP },
+                if (sourceAccountLocked) {
+                    LockedMappingNotice(
+                        title = "Source Account",
+                        explanation =
+                            "This strategy resolves the source account per row with a custom mapping " +
+                                "that can't be edited here. It will be kept as-is.",
+                    )
+                } else {
+                    Text("Source Account (Optional)", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        "Can also be chosen each time you apply this strategy",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    AccountPicker(
+                        selectedAccountId = selectedAccountId,
+                        onAccountSelected = { selectedAccountId = it },
+                        label = "Select Account",
+                        accountRepository = accountRepository,
+                        categoryRepository = categoryRepository,
+                        personRepository = personRepository,
+                        personAccountOwnershipRepository = personAccountOwnershipRepository,
+                        entitySource = entitySource,
                         enabled = !isSaving,
                     )
-                    Text("Direct Lookup", modifier = Modifier.padding(end = 16.dp))
-                    RadioButton(
-                        selected = targetAccountMode == TargetAccountMode.REGEX_MATCH,
-                        onClick = { targetAccountMode = TargetAccountMode.REGEX_MATCH },
-                        enabled = !isSaving,
-                    )
-                    Text("Regex Match")
                 }
 
-                if (targetAccountMode == TargetAccountMode.REGEX_MATCH) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    RegexRulesEditor(
-                        rules = regexRules,
-                        onRulesChanged = { regexRules = it },
-                        columnName = targetAccountColumnName,
+                Spacer(modifier = Modifier.height(16.dp))
+                if (targetAccountLocked) {
+                    LockedMappingNotice(
+                        title = "Target Account",
+                        explanation =
+                            "This strategy resolves the target account with a custom conditional mapping " +
+                                "that can't be edited here. It will be kept as-is.",
+                    )
+                } else {
+                    Text("Target Account Column", style = MaterialTheme.typography.titleSmall)
+                    ColumnDropdown(
                         columns = csvColumns,
-                        rows = rows,
+                        selectedColumn = targetAccountColumnName,
+                        onColumnSelected = { targetAccountColumnName = it },
+                        label = "Column for payee/counterparty name",
+                        sampleValue = getSampleValue(csvColumns, firstRow, targetAccountColumnName),
+                        enabled = !isSaving,
+                        isError = targetAccountColumnName == null,
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        "Fallback column (when primary is empty)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    // Find a row where the primary column is blank to show a relevant sample
+                    val fallbackSampleRow = findRowWithBlankColumn(csvColumns, rows, targetAccountColumnName)
+                    OptionalColumnDropdown(
+                        columns = csvColumns,
+                        selectedColumn = targetAccountFallbackColumns.firstOrNull(),
+                        onColumnSelected = { selected ->
+                            targetAccountFallbackColumns = if (selected != null) listOf(selected) else emptyList()
+                        },
+                        label = "Fallback column for account name",
+                        sampleValue = getSampleValue(csvColumns, fallbackSampleRow, targetAccountFallbackColumns.firstOrNull()),
                         enabled = !isSaving,
                     )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "Account Name Mapping",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(
+                            selected = targetAccountMode == TargetAccountMode.DIRECT_LOOKUP,
+                            onClick = { targetAccountMode = TargetAccountMode.DIRECT_LOOKUP },
+                            enabled = !isSaving,
+                        )
+                        Text("Direct Lookup", modifier = Modifier.padding(end = 16.dp))
+                        RadioButton(
+                            selected = targetAccountMode == TargetAccountMode.REGEX_MATCH,
+                            onClick = { targetAccountMode = TargetAccountMode.REGEX_MATCH },
+                            enabled = !isSaving,
+                        )
+                        Text("Regex Match")
+                    }
+
+                    if (targetAccountMode == TargetAccountMode.REGEX_MATCH) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        RegexRulesEditor(
+                            rules = regexRules,
+                            onRulesChanged = { regexRules = it },
+                            columnName = targetAccountColumnName,
+                            columns = csvColumns,
+                            rows = rows,
+                            enabled = !isSaving,
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -914,31 +943,39 @@ fun CreateCsvStrategyDialog(
                         scope.launch {
                             try {
                                 val now = Clock.System.now()
+                                val existingMappings = existingStrategy?.fieldMappings.orEmpty()
                                 // Build field mappings; SOURCE_ACCOUNT is optional and only included
-                                // when an account has been selected in the strategy form.
+                                // when an account has been selected in the strategy form. Locked
+                                // mappings (types the form can't represent, shown read-only above)
+                                // are carried over unchanged.
                                 val fieldMappings =
                                     buildMap {
-                                        selectedAccountId?.let { accountId ->
-                                            put(
-                                                TransferField.SOURCE_ACCOUNT,
-                                                HardCodedAccountMapping(
-                                                    id = FieldMappingId(Uuid.random()),
-                                                    fieldType = TransferField.SOURCE_ACCOUNT,
-                                                    accountId = accountId,
-                                                ),
-                                            )
+                                        if (sourceAccountLocked) {
+                                            put(TransferField.SOURCE_ACCOUNT, existingMappings.getValue(TransferField.SOURCE_ACCOUNT))
+                                        } else {
+                                            selectedAccountId?.let { accountId ->
+                                                put(
+                                                    TransferField.SOURCE_ACCOUNT,
+                                                    HardCodedAccountMapping(
+                                                        id = FieldMappingId(Uuid.random()),
+                                                        fieldType = TransferField.SOURCE_ACCOUNT,
+                                                        accountId = accountId,
+                                                    ),
+                                                )
+                                            }
                                         }
                                         put(
                                             TransferField.TARGET_ACCOUNT,
-                                            when (targetAccountMode) {
-                                                TargetAccountMode.DIRECT_LOOKUP ->
+                                            when {
+                                                targetAccountLocked -> existingMappings.getValue(TransferField.TARGET_ACCOUNT)
+                                                targetAccountMode == TargetAccountMode.DIRECT_LOOKUP ->
                                                     AccountLookupMapping(
                                                         id = FieldMappingId(Uuid.random()),
                                                         fieldType = TransferField.TARGET_ACCOUNT,
                                                         columnName = targetAccountColumnName!!,
                                                         fallbackColumns = targetAccountFallbackColumns,
                                                     )
-                                                TargetAccountMode.REGEX_MATCH ->
+                                                else ->
                                                     RegexAccountMapping(
                                                         id = FieldMappingId(Uuid.random()),
                                                         fieldType = TransferField.TARGET_ACCOUNT,
@@ -948,6 +985,9 @@ fun CreateCsvStrategyDialog(
                                                     )
                                             },
                                         )
+                                        // Keep the combined date-time format only while the date column
+                                        // is unchanged; picking a different column invalidates it.
+                                        val originalTimestamp = existingMappings[TransferField.TIMESTAMP] as? DateTimeParsingMapping
                                         put(
                                             TransferField.TIMESTAMP,
                                             DateTimeParsingMapping(
@@ -957,6 +997,10 @@ fun CreateCsvStrategyDialog(
                                                 dateFormat = dateFormat,
                                                 timeColumnName = timeColumnName,
                                                 timeFormat = timeColumnName?.let { timeFormat },
+                                                dateTimeFormat =
+                                                    originalTimestamp
+                                                        ?.dateTimeFormat
+                                                        ?.takeIf { originalTimestamp.dateColumnName == dateColumnName },
                                             ),
                                         )
                                         put(
@@ -968,6 +1012,12 @@ fun CreateCsvStrategyDialog(
                                                 fallbackColumns = descriptionFallbackColumns,
                                             ),
                                         )
+                                        // Keep the fee configuration only while the amount column is
+                                        // unchanged; picking a different column invalidates it.
+                                        val originalAmount = existingMappings[TransferField.AMOUNT] as? AmountParsingMapping
+                                        val keepFee =
+                                            originalAmount?.feeColumnName != null &&
+                                                originalAmount.amountColumnName == amountColumnName
                                         put(
                                             TransferField.AMOUNT,
                                             AmountParsingMapping(
@@ -976,6 +1026,8 @@ fun CreateCsvStrategyDialog(
                                                 mode = AmountMode.SINGLE_COLUMN,
                                                 amountColumnName = amountColumnName!!,
                                                 flipAccountsOnPositive = flipAccountsOnPositive,
+                                                feeColumnName = if (keepFee) originalAmount.feeColumnName else null,
+                                                feeConditions = if (keepFee) originalAmount.feeConditions else emptyList(),
                                             ),
                                         )
                                         put(
@@ -1013,29 +1065,15 @@ fun CreateCsvStrategyDialog(
                                             },
                                         )
                                     }
-                                // Preserve mappings the form cannot represent (e.g. the built-in
-                                // Wise CSV strategy's template/conditional account mappings and
-                                // combined date-time format) so editing doesn't silently destroy them.
-                                val preservedMappings =
-                                    existingStrategy?.fieldMappings.orEmpty().filter { (field, mapping) ->
-                                        when (field) {
-                                            TransferField.SOURCE_ACCOUNT -> mapping !is HardCodedAccountMapping
-                                            TransferField.TARGET_ACCOUNT ->
-                                                mapping !is AccountLookupMapping && mapping !is RegexAccountMapping
-                                            TransferField.TIMESTAMP ->
-                                                mapping is DateTimeParsingMapping && mapping.dateTimeFormat != null
-                                            TransferField.AMOUNT ->
-                                                mapping is AmountParsingMapping && mapping.feeColumnName != null
-                                            else -> false
-                                        }
-                                    }
                                 val strategy =
                                     CsvImportStrategy(
                                         id = existingStrategy?.id ?: CsvImportStrategyId(Uuid.random()),
                                         name = name,
                                         identificationColumns = identificationColumns,
-                                        fieldMappings = fieldMappings + preservedMappings,
+                                        fieldMappings = fieldMappings,
                                         attributeMappings = attributeMappings,
+                                        // The form has no editor for row preprocessing rules, so they
+                                        // are always carried over unchanged.
                                         rowPreprocessingRules = existingStrategy?.rowPreprocessingRules.orEmpty(),
                                         createdAt = existingStrategy?.createdAt ?: now,
                                         updatedAt = now,
@@ -1096,6 +1134,24 @@ fun CreateCsvStrategyDialog(
             onDismiss = { showAddAccountMappingDialog = false },
         )
     }
+}
+
+/**
+ * Read-only placeholder for a field whose mapping type this form cannot represent
+ * (e.g. the built-in Wise CSV strategy's template/conditional account mappings).
+ * The mapping is carried over unchanged when the strategy is saved.
+ */
+@Composable
+private fun LockedMappingNotice(
+    title: String,
+    explanation: String,
+) {
+    Text(title, style = MaterialTheme.typography.titleSmall)
+    Text(
+        text = explanation,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 /**
