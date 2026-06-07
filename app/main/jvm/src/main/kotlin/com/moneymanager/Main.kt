@@ -27,7 +27,8 @@ fun main() {
     // breaks when the JDK's bundled libfreetype clashes with the system GTK's (blank labels,
     // "drawing failure ... error occurred in libfreetype" warnings). Fall back to AWT's own
     // dialog instead. Must be set before AWT initialises.
-    if (System.getProperty("os.name").orEmpty().lowercase().contains("linux")) {
+    val osName = System.getProperty("os.name").orEmpty().lowercase()
+    if (osName.contains("linux")) {
         System.setProperty("sun.awt.disableGtkFileDialogs", "true")
     }
 
