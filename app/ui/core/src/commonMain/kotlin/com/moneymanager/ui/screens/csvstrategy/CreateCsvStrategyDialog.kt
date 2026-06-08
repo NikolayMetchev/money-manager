@@ -216,8 +216,8 @@ private fun defaultLeafAccountMapping(
 }
 
 @OptIn(kotlin.uuid.ExperimentalUuidApi::class)
-private fun emptyLeafAccountMapping(fieldType: TransferField): FieldMapping =
-    AccountLookupMapping(FieldMappingId(Uuid.random()), fieldType, columnName = "")
+private fun emptyTargetAccountMapping(): FieldMapping =
+    AccountLookupMapping(FieldMappingId(Uuid.random()), TransferField.TARGET_ACCOUNT, columnName = "")
 
 /**
  * Data class holding extracted form state from an existing strategy.
@@ -314,8 +314,8 @@ internal fun extractFormStateFromStrategy(
     var targetTemplatePrefix = ""
     var targetTemplateSuffix = ""
     var targetConditions: List<RowCondition> = emptyList()
-    var targetWhenTrue: FieldMapping = emptyLeafAccountMapping(TransferField.TARGET_ACCOUNT)
-    var targetWhenFalse: FieldMapping = emptyLeafAccountMapping(TransferField.TARGET_ACCOUNT)
+    var targetWhenTrue: FieldMapping = emptyTargetAccountMapping()
+    var targetWhenFalse: FieldMapping = emptyTargetAccountMapping()
     when (targetAccountMapping) {
         is AccountLookupMapping -> {
             targetAccountColumnName = columnIfExists(targetAccountMapping.columnName)
@@ -756,10 +756,10 @@ fun CreateCsvStrategyDialog(
     var targetTemplateSuffix by remember { mutableStateOf(initialState?.targetTemplateSuffix.orEmpty()) }
     var targetConditions by remember { mutableStateOf(initialState?.targetConditions.orEmpty()) }
     var targetWhenTrue by remember {
-        mutableStateOf(initialState?.targetWhenTrue ?: emptyLeafAccountMapping(TransferField.TARGET_ACCOUNT))
+        mutableStateOf(initialState?.targetWhenTrue ?: emptyTargetAccountMapping())
     }
     var targetWhenFalse by remember {
-        mutableStateOf(initialState?.targetWhenFalse ?: emptyLeafAccountMapping(TransferField.TARGET_ACCOUNT))
+        mutableStateOf(initialState?.targetWhenFalse ?: emptyTargetAccountMapping())
     }
     var flipAccountsOnPositive by remember { mutableStateOf(initialState?.flipAccountsOnPositive ?: true) }
     // List of attribute column mappings with unique identifier flags
