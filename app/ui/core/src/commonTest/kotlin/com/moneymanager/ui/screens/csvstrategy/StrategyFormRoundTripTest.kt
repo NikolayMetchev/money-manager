@@ -215,5 +215,12 @@ class StrategyFormRoundTripTest {
         assertEquals(RowConditionOperator.IS_NOT_BLANK, state.targetConditions.single().operator)
         // The preprocessing rule referenced "Target name" in a swap, so the whole rule is dropped.
         assertEquals(emptyList(), state.rowPreprocessingRules)
+        // The conditional's whenFalse branch looked up the now-missing "Target name" column, so
+        // the stale reference is cleared rather than carried through extraction.
+        val whenFalse = state.targetWhenFalse
+        assertIs<AccountLookupMapping>(whenFalse)
+        assertEquals("", whenFalse.columnName)
+        // "Source name" still exists, so the fallback is retained.
+        assertEquals(listOf("Source name"), whenFalse.fallbackColumns)
     }
 }

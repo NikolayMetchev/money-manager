@@ -211,6 +211,25 @@ internal fun extractFormStateFromStrategy(
                 (c.otherColumnName == null || c.otherColumnName in availableColumnNames)
         }
 
+    // Clear column references on a conditional branch's leaf mapping when those columns no longer
+    // exist, so stale references don't survive extraction and get persisted again on save.
+    fun sanitizeLeafMapping(mapping: FieldMapping): FieldMapping =
+        when (mapping) {
+            is AccountLookupMapping ->
+                mapping.copy(
+                    columnName = columnIfExists(mapping.columnName).orEmpty(),
+                    fallbackColumns = mapping.fallbackColumns.mapNotNull { columnIfExists(it) },
+                )
+            is RegexAccountMapping ->
+                mapping.copy(
+                    columnName = columnIfExists(mapping.columnName).orEmpty(),
+                    fallbackColumns = mapping.fallbackColumns.mapNotNull { columnIfExists(it) },
+                )
+            is TemplateAccountMapping ->
+                mapping.copy(columnName = columnIfExists(mapping.columnName).orEmpty())
+            else -> mapping
+        }
+
     // Extract source account mapping
     val sourceAccountMapping = strategy.fieldMappings[TransferField.SOURCE_ACCOUNT]
     val sourceAccountMode: SourceAccountMode
@@ -275,8 +294,8 @@ internal fun extractFormStateFromStrategy(
             targetAccountMode = TargetAccountMode.CONDITIONAL
             regexRules = emptyList()
             targetConditions = keepConditions(targetAccountMapping.conditions)
-            targetWhenTrue = targetAccountMapping.whenTrue
-            targetWhenFalse = targetAccountMapping.whenFalse
+            targetWhenTrue = sanitizeLeafMapping(targetAccountMapping.whenTrue)
+            targetWhenFalse = sanitizeLeafMapping(targetAccountMapping.whenFalse)
         }
         else -> {
             targetAccountColumnName = null

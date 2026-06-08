@@ -233,6 +233,7 @@ class ImportMonzoCsvE2ETest {
             // Navigate back to the CSV detail screen
             onNodeWithText("← Back").performClick()
             waitUntilDoesNotExist(hasText("Create Import Strategy"), timeoutMillis = 10000)
+            waitForIdle()
 
             // Verify we're back on the CSV detail screen. The detail screen re-mounts and reloads
             // its rows on navigation, so wait for the row count to reappear.

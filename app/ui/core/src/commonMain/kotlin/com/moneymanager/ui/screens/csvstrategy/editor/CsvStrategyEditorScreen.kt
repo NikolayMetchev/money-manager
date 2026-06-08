@@ -33,7 +33,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.EntitySource
-import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
@@ -52,6 +51,8 @@ import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.screens.csvstrategy.AccountMappingEditorDialog
 import com.moneymanager.ui.screens.csvstrategy.ColumnDetector
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
 import kotlin.uuid.Uuid
@@ -82,22 +83,35 @@ fun CsvStrategyEditorScreen(
     val isEditMode = strategyId != null
     val scope = rememberSchemaAwareCoroutineScope()
 
+    // Repository flows are collected via the schema-aware helper so database schema errors are
+    // reported globally instead of cancelling the effect.
     val csvImport by csvImportRepository.getImport(csvImportId).collectAsStateWithSchemaErrorHandling(null)
     val accounts by accountRepository.getAllAccounts().collectAsStateWithSchemaErrorHandling(emptyList())
+    val existingAttributeTypes by attributeTypeRepository.getAll().collectAsStateWithSchemaErrorHandling(emptyList())
 
-    var existingStrategy by remember { mutableStateOf<CsvImportStrategy?>(null) }
+    // Wrap the strategy in a load state so "still loading" is distinct from "loaded but missing"
+    // (a deleted/invalid id), which is rendered as a terminal error rather than an infinite spinner.
+    val strategyFlow =
+        remember(strategyId) {
+            (strategyId?.let { csvImportStrategyRepository.getStrategyById(it) } ?: flowOf(null))
+                .map<CsvImportStrategy?, StrategyLoad> { StrategyLoad.Loaded(it) }
+        }
+    val strategyLoad by strategyFlow.collectAsStateWithSchemaErrorHandling(
+        if (isEditMode) StrategyLoad.Loading else StrategyLoad.Loaded(null),
+    )
+    val existingStrategy = (strategyLoad as? StrategyLoad.Loaded)?.strategy
+    val strategyLoaded = strategyLoad is StrategyLoad.Loaded
+
+    val accountMappingsFlow =
+        remember(strategyId) {
+            strategyId?.let { csvAccountMappingRepository.getMappingsForStrategy(it) } ?: flowOf(emptyList())
+        }
+    val accountMappings by accountMappingsFlow.collectAsStateWithSchemaErrorHandling(emptyList())
+
     var rows by remember { mutableStateOf<List<CsvRow>>(emptyList()) }
     var rowsLoaded by remember { mutableStateOf(false) }
-    var existingAttributeTypes by remember { mutableStateOf<List<AttributeType>>(emptyList()) }
-    var accountMappings by remember { mutableStateOf<List<CsvAccountMapping>>(emptyList()) }
     var editingAccountMapping by remember { mutableStateOf<CsvAccountMapping?>(null) }
     var showAddAccountMappingDialog by remember { mutableStateOf(false) }
-
-    LaunchedEffect(strategyId) {
-        if (strategyId != null) {
-            csvImportStrategyRepository.getStrategyById(strategyId).collect { existingStrategy = it }
-        }
-    }
 
     LaunchedEffect(csvImportId, csvImport?.rowCount) {
         val import = csvImport ?: return@LaunchedEffect
@@ -105,30 +119,18 @@ fun CsvStrategyEditorScreen(
         rowsLoaded = true
     }
 
-    LaunchedEffect(Unit) {
-        attributeTypeRepository.getAll().collect { existingAttributeTypes = it }
-    }
-
-    LaunchedEffect(strategyId) {
-        if (strategyId != null) {
-            csvAccountMappingRepository.getMappingsForStrategy(strategyId).collect { accountMappings = it }
-        }
-    }
-
     val currentImport = csvImport
-    val ready = currentImport != null && rowsLoaded && (!isEditMode || existingStrategy != null)
+    val ready = currentImport != null && rowsLoaded && strategyLoaded
     if (!ready) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            EditorHeader(
-                isEditMode = isEditMode,
-                saveEnabled = false,
-                isSaving = false,
-                onBack = onBack,
-                onSave = {},
-            )
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
+        EditorPlaceholder(isEditMode = isEditMode, onBack = onBack) {
+            CircularProgressIndicator()
+        }
+        return
+    }
+
+    if (isEditMode && existingStrategy == null) {
+        EditorPlaceholder(isEditMode = isEditMode, onBack = onBack) {
+            Text("Strategy not found.", style = MaterialTheme.typography.bodyLarge)
         }
         return
     }
@@ -305,9 +307,16 @@ fun CsvStrategyEditorScreen(
     }
 
     editingAccountMapping?.let { mapping ->
+        // Account mappings only exist in edit mode, so strategyId is non-null here; guard rather
+        // than force-unwrap so a parameter transition can never crash the dialog.
+        val currentStrategyId = strategyId
+        if (currentStrategyId == null) {
+            editingAccountMapping = null
+            return@let
+        }
         AccountMappingEditorDialog(
             existingMapping = mapping,
-            strategyId = strategyId!!,
+            strategyId = currentStrategyId,
             accounts = accounts,
             csvAccountMappingRepository = csvAccountMappingRepository,
             onDismiss = { editingAccountMapping = null },
@@ -359,4 +368,39 @@ private fun EditorHeader(
             Text(if (isEditMode) "Save" else "Create")
         }
     }
+}
+
+/**
+ * Header plus a centered [content] slot, used for the loading and "not found" states.
+ */
+@Composable
+private fun EditorPlaceholder(
+    isEditMode: Boolean,
+    onBack: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        EditorHeader(
+            isEditMode = isEditMode,
+            saveEnabled = false,
+            isSaving = false,
+            onBack = onBack,
+            onSave = {},
+        )
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            content()
+        }
+    }
+}
+
+/**
+ * Load state for the edited strategy: distinguishes "still loading" from "loaded" (where the
+ * strategy may be null if the id no longer resolves).
+ */
+private sealed interface StrategyLoad {
+    data object Loading : StrategyLoad
+
+    data class Loaded(
+        val strategy: CsvImportStrategy?,
+    ) : StrategyLoad
 }
