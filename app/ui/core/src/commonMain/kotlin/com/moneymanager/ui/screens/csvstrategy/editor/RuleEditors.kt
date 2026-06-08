@@ -47,22 +47,12 @@ internal fun RowPreprocessingRulesEditor(
                     ),
             ) {
                 Column(modifier = Modifier.padding(8.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            "Rule ${index + 1}",
-                            style = MaterialTheme.typography.labelMedium,
-                            modifier = Modifier.weight(1f),
-                        )
-                        IconButton(
-                            onClick = { onRulesChanged(rules.filterIndexed { i, _ -> i != index }) },
-                            enabled = enabled,
-                        ) {
-                            Icon(Icons.Filled.Close, contentDescription = "Remove rule")
-                        }
-                    }
+                    EditorCardHeader(
+                        title = "Rule ${index + 1}",
+                        removeContentDescription = "Remove rule",
+                        onRemove = { onRulesChanged(rules.filterIndexed { i, _ -> i != index }) },
+                        enabled = enabled,
+                    )
 
                     fun updateRule(transform: (RowPreprocessingRule) -> RowPreprocessingRule) {
                         onRulesChanged(rules.mapIndexed { i, r -> if (i == index) transform(r) else r })
@@ -184,22 +174,12 @@ internal fun CompanionTransactionRulesEditor(
                     ),
             ) {
                 Column(modifier = Modifier.padding(8.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            "Rule ${index + 1}",
-                            style = MaterialTheme.typography.labelMedium,
-                            modifier = Modifier.weight(1f),
-                        )
-                        IconButton(
-                            onClick = { onRulesChanged(rules.filterIndexed { i, _ -> i != index }) },
-                            enabled = enabled,
-                        ) {
-                            Icon(Icons.Filled.Close, contentDescription = "Remove rule")
-                        }
-                    }
+                    EditorCardHeader(
+                        title = "Rule ${index + 1}",
+                        removeContentDescription = "Remove rule",
+                        onRemove = { onRulesChanged(rules.filterIndexed { i, _ -> i != index }) },
+                        enabled = enabled,
+                    )
 
                     fun updateRule(transform: (CompanionTransactionRule) -> CompanionTransactionRule) {
                         onRulesChanged(rules.mapIndexed { i, r -> if (i == index) transform(r) else r })

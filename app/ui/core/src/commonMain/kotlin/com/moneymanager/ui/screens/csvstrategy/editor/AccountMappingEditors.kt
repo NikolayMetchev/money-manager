@@ -11,11 +11,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -158,14 +156,12 @@ internal fun LeafAccountMappingEditor(
         }
         when (mapping) {
             is AccountLookupMapping -> {
-                ColumnDropdown(
+                AccountNameColumnDropdown(
+                    columnName = mapping.columnName,
+                    onColumnChanged = { onMappingChanged(mapping.copy(columnName = it)) },
                     columns = columns,
-                    selectedColumn = mapping.columnName.takeIf { it.isNotBlank() },
-                    onColumnSelected = { onMappingChanged(mapping.copy(columnName = it)) },
-                    label = "Column for account name",
-                    sampleValue = getSampleValue(columns, firstRow, mapping.columnName),
+                    firstRow = firstRow,
                     enabled = enabled,
-                    isError = mapping.columnName.isBlank(),
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 OptionalColumnDropdown(
@@ -179,14 +175,12 @@ internal fun LeafAccountMappingEditor(
                 )
             }
             is RegexAccountMapping -> {
-                ColumnDropdown(
+                AccountNameColumnDropdown(
+                    columnName = mapping.columnName,
+                    onColumnChanged = { onMappingChanged(mapping.copy(columnName = it)) },
                     columns = columns,
-                    selectedColumn = mapping.columnName.takeIf { it.isNotBlank() },
-                    onColumnSelected = { onMappingChanged(mapping.copy(columnName = it)) },
-                    label = "Column for account name",
-                    sampleValue = getSampleValue(columns, firstRow, mapping.columnName),
+                    firstRow = firstRow,
                     enabled = enabled,
-                    isError = mapping.columnName.isBlank(),
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 RegexRulesEditor(
@@ -305,27 +299,12 @@ internal fun RegexRulesEditor(
                     ),
             ) {
                 Column(modifier = Modifier.padding(8.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            "Rule ${index + 1}",
-                            style = MaterialTheme.typography.labelMedium,
-                            modifier = Modifier.weight(1f),
-                        )
-                        IconButton(
-                            onClick = {
-                                onRulesChanged(rules.filterIndexed { i, _ -> i != index })
-                            },
-                            enabled = enabled,
-                        ) {
-                            Icon(
-                                Icons.Filled.Close,
-                                contentDescription = "Remove rule",
-                            )
-                        }
-                    }
+                    EditorCardHeader(
+                        title = "Rule ${index + 1}",
+                        removeContentDescription = "Remove rule",
+                        onRemove = { onRulesChanged(rules.filterIndexed { i, _ -> i != index }) },
+                        enabled = enabled,
+                    )
 
                     OutlinedTextField(
                         value = rule.pattern,
