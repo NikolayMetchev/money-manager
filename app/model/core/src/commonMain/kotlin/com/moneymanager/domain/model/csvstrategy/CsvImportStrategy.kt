@@ -15,6 +15,8 @@ import kotlin.time.Instant
  * @property fieldMappings Map of TransferField to FieldMapping defining how each field is populated
  * @property rowPreprocessingRules Rules that may swap column values / flip accounts per row
  *                                 before field mappings run (see [RowPreprocessingRule])
+ * @property companionTransactionRules Rules flagging imported transfers that require a manually
+ *                                     entered companion transaction (see [CompanionTransactionRule])
  * @property createdAt Timestamp when this strategy was created
  * @property updatedAt Timestamp when this strategy was last modified
  */
@@ -25,6 +27,7 @@ data class CsvImportStrategy(
     val fieldMappings: Map<TransferField, FieldMapping>,
     val attributeMappings: List<AttributeColumnMapping> = emptyList(),
     val rowPreprocessingRules: List<RowPreprocessingRule> = emptyList(),
+    val companionTransactionRules: List<CompanionTransactionRule> = emptyList(),
     val createdAt: Instant,
     val updatedAt: Instant,
 ) {

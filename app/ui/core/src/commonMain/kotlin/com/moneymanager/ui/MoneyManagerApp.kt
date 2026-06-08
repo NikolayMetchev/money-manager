@@ -367,6 +367,7 @@ fun MoneyManagerApp(
                                             navigationHistory.replaceCurrentScreen(Screen.Imports(tab))
                                         },
                                         csvImportRepository = services.imports.csvImportRepository,
+                                        csvImportStrategyRepository = services.imports.csvImportStrategyRepository,
                                         apiSessionRepository = services.imports.apiSessionRepository,
                                         apiImportStrategyRepository = services.imports.apiImportStrategyRepository,
                                         attributeTypeRepository = services.transactions.attributeTypeRepository,

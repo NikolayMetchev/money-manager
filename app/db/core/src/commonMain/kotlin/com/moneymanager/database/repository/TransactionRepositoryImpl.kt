@@ -9,6 +9,7 @@ import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.mapper.AccountBalanceMapper
 import com.moneymanager.database.mapper.AccountRowMapper
 import com.moneymanager.database.mapper.TransferMapper
+import com.moneymanager.database.mapper.TransferMissingCompanionMapper
 import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
@@ -23,6 +24,7 @@ import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferAttribute
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.TransferMissingCompanion
 import com.moneymanager.domain.repository.TransactionRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -109,6 +111,20 @@ class TransactionRepositoryImpl(
             ).asFlow()
             .mapToList(Dispatchers.Default)
             .map { loadAttributesForTransfers(it) }
+
+    override fun getTransfersMissingCompanion(
+        matchAttributeName: String,
+        matchValuePattern: String,
+        linkAttributeName: String,
+    ): Flow<List<TransferMissingCompanion>> =
+        transferQueries
+            .selectTransfersMissingCompanion(
+                matchAttributeName,
+                matchValuePattern,
+                linkAttributeName,
+                TransferMissingCompanionMapper::mapRaw,
+            ).asFlow()
+            .mapToList(Dispatchers.Default)
 
     override fun getAccountBalances(): Flow<List<AccountBalance>> =
         transferQueries

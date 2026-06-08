@@ -28,6 +28,7 @@ import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.AttributeColumnMapping
 import com.moneymanager.domain.model.csvstrategy.ColumnPairSwap
+import com.moneymanager.domain.model.csvstrategy.CompanionTransactionRule
 import com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
@@ -1074,6 +1075,10 @@ object DatabaseConfig {
      * the currency code into the account name used by the Wise API import ("Wise: EUR").
      * Balance-to-balance conversions (same name on both sides, different currencies) route the
      * target to the other Wise balance instead of a counterparty account.
+     *
+     * Wise's export omits interest-earned rows, but each monthly "Assets fee" (wise-id like
+     * `ACCRUAL_CHARGE-…`) implies one, so a companion transaction rule flags those transfers
+     * for manual entry of the mirroring interest transfer.
      */
     fun buildWiseCsvStrategy(now: Instant): CsvImportStrategy {
         val sourceAccount =
@@ -1175,6 +1180,16 @@ object DatabaseConfig {
                 AttributeColumnMapping("Note", "note"),
                 AttributeColumnMapping("Created by", "wise-created-by"),
             )
+        val companionRules =
+            listOf(
+                CompanionTransactionRule(
+                    name = "Interest earned",
+                    matchAttributeName = "wise-id",
+                    matchValuePattern = "ACCRUAL_CHARGE-%",
+                    linkAttributeName = "wise-interest-for",
+                    companionDescription = "Interest earned",
+                ),
+            )
         val identificationColumns =
             setOf(
                 "ID",
@@ -1206,6 +1221,7 @@ object DatabaseConfig {
             fieldMappings = fieldMappings,
             attributeMappings = attributeMappings,
             rowPreprocessingRules = rowRules,
+            companionTransactionRules = companionRules,
             createdAt = now,
             updatedAt = now,
         )
@@ -1319,6 +1335,7 @@ object DatabaseConfig {
                 field_mappings_json = FieldMappingJsonCodec.encode(strategy.fieldMappings),
                 attribute_mappings_json = FieldMappingJsonCodec.encodeAttributeMappings(strategy.attributeMappings),
                 row_rules_json = FieldMappingJsonCodec.encodeRowRules(strategy.rowPreprocessingRules),
+                companion_rules_json = FieldMappingJsonCodec.encodeCompanionRules(strategy.companionTransactionRules),
                 created_at = now.toEpochMilliseconds(),
                 updated_at = now.toEpochMilliseconds(),
             )

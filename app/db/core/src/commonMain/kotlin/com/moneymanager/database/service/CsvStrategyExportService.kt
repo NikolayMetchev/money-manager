@@ -163,6 +163,7 @@ class CsvStrategyExportService(
                         )
                     }.orEmpty(),
             rowPreprocessingRules = strategy.rowPreprocessingRules,
+            companionTransactionRules = strategy.companionTransactionRules,
         )
     }
 
@@ -373,6 +374,7 @@ class CsvStrategyExportService(
                 },
             attributeMappings = export.attributeMappings,
             rowPreprocessingRules = export.rowPreprocessingRules,
+            companionTransactionRules = export.companionTransactionRules,
             createdAt = now,
             updatedAt = now,
         )

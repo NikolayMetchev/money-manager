@@ -79,6 +79,15 @@ class BuiltInCsvStrategySeedTest : DbTest() {
             // The Wise transaction ID drives duplicate detection on re-import
             val idMapping = strategy.attributeMappings.single { it.columnName == "ID" }
             assertTrue(idMapping.isUniqueIdentifier)
+
+            // Assets fees require a manually entered interest transfer (companion rule
+            // survives the JSON round trip through the database)
+            val companionRule = strategy.companionTransactionRules.single()
+            assertEquals("Interest earned", companionRule.name)
+            assertEquals("wise-id", companionRule.matchAttributeName)
+            assertEquals("ACCRUAL_CHARGE-%", companionRule.matchValuePattern)
+            assertEquals("wise-interest-for", companionRule.linkAttributeName)
+            assertEquals("Interest earned", companionRule.companionDescription)
         }
 
     @Test
