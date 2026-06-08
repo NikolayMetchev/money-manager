@@ -27,6 +27,8 @@ import com.moneymanager.domain.model.csvstrategy.RowPreprocessingRule
 import com.moneymanager.domain.model.csvstrategy.TemplateAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.ui.screens.csvstrategy.editor.buildStrategyFromFormState
+import com.moneymanager.ui.screens.csvstrategy.editor.extractFormStateFromStrategy
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs

@@ -150,24 +150,24 @@ class ImportMonzoCsvE2ETest {
             waitUntilExactlyOneExists(hasText("20 rows"), timeoutMillis = 10000)
             onNodeWithText("18 columns").assertIsDisplayed()
 
-            // Step 3: Click "Create Strategy" button
+            // Step 3: Click "Create Strategy" button - opens the tabbed editor screen
             onNodeWithText("Create Strategy").performClick()
             waitUntilExactlyOneExists(hasText("Create Import Strategy"), timeoutMillis = 10000)
 
-            // Step 4: Enter strategy name "Monzo"
+            // Step 4: General tab (default) - enter strategy name "Monzo"
             waitUntilExactlyOneExists(hasText("Strategy Name"), timeoutMillis = 10000)
             onNodeWithText("Strategy Name").performTextInput("Monzo")
             waitForIdle()
 
-            // Step 5: Create source account inline via AccountPicker
-            // Wait for the dialog to fully load - look for the Source Account section title
+            // The Description column should be auto-detected as "Description" on the General tab
+            waitUntilAtLeastOneExists(hasText("Description", substring = false), timeoutMillis = 10000)
+
+            // Step 5: Accounts tab - create source account inline via AccountPicker.
+            // "Accounts" matches both the editor tab (top) and the bottom nav item, so take the first.
+            onAllNodesWithText("Accounts", substring = true).onFirst().performClick()
             waitUntilExactlyOneExists(hasText("Source Account (Optional)"), timeoutMillis = 10000)
-            // Note: There are two "Select..." elements - one for AccountPicker and one for CurrencyPicker
             waitUntilAtLeastOneExists(hasText("Select..."), timeoutMillis = 10000)
 
-            // Scroll the AccountPicker into view and click to expand dropdown
-            // The dialog content is scrollable, so ensure element is visible
-            // Use onFirst() since there are two "Select..." (account and currency pickers)
             onAllNodesWithText("Select...").onFirst().performScrollTo()
             waitForIdle()
             onAllNodesWithText("Select...").onFirst().performClick()
@@ -183,49 +183,36 @@ class ImportMonzoCsvE2ETest {
             onNodeWithText("Account Name").performTextInput("Monzo Current Account")
             waitForIdle()
 
-            // Click Create to create the account
-            // Note: There are two "Create" buttons - one in CreateAccountDialog and one in CreateCsvStrategyDialog
-            // The CreateAccountDialog is on top, so we select the last one (rendered on top)
+            // Click Create to create the account. Two "Create" buttons exist - the editor header's
+            // and the CreateAccountDialog's. The dialog is on top, so select the last one.
             onAllNodesWithText("Create").onLast().performClick()
             waitUntilDoesNotExist(hasText("Create New Account"), timeoutMillis = 10000)
 
             // Verify the account was selected in the AccountPicker
             waitUntilExactlyOneExists(hasText("Monzo Current Account"), timeoutMillis = 10000)
 
-            // Step 6: Verify column auto-detection selected the correct columns
-            // The ColumnDetector should have selected:
-            // - Date Column: "Date" (not "Transaction ID" which was the bug)
-            // - Time Column: "Time" (optional, auto-detected from Monzo format)
-            // - Amount Column: "Amount"
-            // - Description Column: "Description"
-            // - Target Account Column: "Name"
-            // - Currency Column: "Currency" (auto-detected, mode set to FROM_COLUMN)
+            // The Target Account column should be auto-detected as "Name" on the Accounts tab
+            waitUntilAtLeastOneExists(hasText("Name", substring = false), timeoutMillis = 10000)
 
-            // Wait for the dialog to fully load with auto-detected values
+            // Step 6: Amount & Date tab - verify column auto-detection.
+            // ColumnDetector should have selected: Date -> "Date", Time -> "Time", Amount -> "Amount",
+            // Currency -> "Currency" (mode FROM_COLUMN).
+            onNodeWithText("Amount & Date", substring = true).performClick()
             waitForIdle()
 
-            // Verify currency mode is set to FROM_COLUMN because "Currency" column was auto-detected
+            // Currency mode is set to FROM_COLUMN because "Currency" column was auto-detected
             waitUntilAtLeastOneExists(hasText("From CSV Column"), timeoutMillis = 10000)
 
-            // Verify the auto-detected column names are shown in the dropdown fields
-            // The Date column dropdown should show "Date" (not "Transaction ID")
+            // The Amount column dropdown should show "Amount"
+            waitUntilAtLeastOneExists(hasText("Amount", substring = false), timeoutMillis = 10000)
+
+            // The Date column dropdown should show "Date" (not "Transaction ID" which was the bug)
             waitUntilAtLeastOneExists(hasText("Date", substring = false), timeoutMillis = 10000)
 
             // The Time column section should be visible and auto-detected as "Time"
             waitUntilAtLeastOneExists(hasText("Time Column (Optional)", substring = true), timeoutMillis = 10000)
 
-            // The Amount column dropdown should show "Amount"
-            waitUntilAtLeastOneExists(hasText("Amount", substring = false), timeoutMillis = 10000)
-
-            // The Description column dropdown should show "Description"
-            waitUntilAtLeastOneExists(hasText("Description", substring = false), timeoutMillis = 10000)
-
-            // The Target Account column dropdown should show "Name"
-            waitUntilAtLeastOneExists(hasText("Name", substring = false), timeoutMillis = 10000)
-
-            // The dropdown sample values help verify the correct column was selected
             // Date column sample: "24/02/2022" (from "Date" column, not "tx_..." from "Transaction ID")
-            // These may be truncated in supportingText, so just check for part of the date format
             waitUntilAtLeastOneExists(hasText("24/02/2022", substring = true), timeoutMillis = 10000)
 
             // Time column sample: "17:44:34" (from "Time" column in Monzo format)
@@ -234,7 +221,6 @@ class ImportMonzoCsvE2ETest {
             // The Time Format field should be visible since a time column was auto-detected
             waitUntilAtLeastOneExists(hasText("Time Format", substring = true), timeoutMillis = 10000)
 
-            // Step 7: Verify currency column auto-detection
             // The currency column dropdown label should show "Column containing currency code"
             waitUntilAtLeastOneExists(
                 hasText("Column containing currency code", substring = true),
@@ -244,12 +230,13 @@ class ImportMonzoCsvE2ETest {
             // The currency column sample should show "GBP" (from "Currency" column in Monzo format)
             waitUntilAtLeastOneExists(hasText("GBP", substring = true), timeoutMillis = 10000)
 
-            // Cancel the dialog to return to CSV detail screen
-            onNodeWithText("Cancel").performClick()
+            // Navigate back to the CSV detail screen
+            onNodeWithText("← Back").performClick()
             waitUntilDoesNotExist(hasText("Create Import Strategy"), timeoutMillis = 10000)
 
-            // Verify we're back on the CSV detail screen
-            onNodeWithText("20 rows").assertIsDisplayed()
+            // Verify we're back on the CSV detail screen. The detail screen re-mounts and reloads
+            // its rows on navigation, so wait for the row count to reappear.
+            waitUntilAtLeastOneExists(hasText("20 rows"), timeoutMillis = 15000)
         }
 
     @Test

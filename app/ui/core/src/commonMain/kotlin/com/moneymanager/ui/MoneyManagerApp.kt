@@ -59,6 +59,7 @@ import com.moneymanager.ui.screens.SettingsScreen
 import com.moneymanager.ui.screens.apistrategy.ApiImportStrategyAuditScreen
 import com.moneymanager.ui.screens.apistrategy.ApiStrategiesScreen
 import com.moneymanager.ui.screens.csvstrategy.CsvStrategiesScreen
+import com.moneymanager.ui.screens.csvstrategy.editor.CsvStrategyEditorScreen
 import com.moneymanager.ui.screens.transactions.AccountTransactionsScreen
 import com.moneymanager.ui.screens.transactions.TransactionAuditScreen
 import com.moneymanager.ui.screens.transactions.TransactionEditDialog
@@ -172,6 +173,7 @@ fun MoneyManagerApp(
                                     currentScreen is Screen.Imports ||
                                         currentScreen is Screen.CsvImportDetail ||
                                         currentScreen is Screen.CsvStrategies ||
+                                        currentScreen is Screen.CsvStrategyEditor ||
                                         currentScreen is Screen.ApiStrategies ||
                                         currentScreen is Screen.ApiStrategyAuditHistory ||
                                         currentScreen is Screen.ApiSessionTraffic ||
@@ -436,6 +438,9 @@ fun MoneyManagerApp(
                                         entitySource = services.transactions.entitySource,
                                         onBack = { navigationHistory.navigateBack() },
                                         onDeleted = { navigationHistory.navigateTo(Screen.Imports(ImportTab.CSV)) },
+                                        onCreateStrategy = { importId ->
+                                            navigationHistory.navigateTo(Screen.CsvStrategyEditor(importId))
+                                        },
                                         onCsvSourceClick = { importId, rowIndex ->
                                             navigationHistory.navigateTo(Screen.CsvImportDetail(importId, rowIndex))
                                         },
@@ -478,12 +483,31 @@ fun MoneyManagerApp(
                                         accountRepository = services.accounts.accountRepository,
                                         categoryRepository = services.accounts.categoryRepository,
                                         currencyRepository = services.accounts.currencyRepository,
-                                        attributeTypeRepository = services.transactions.attributeTypeRepository,
                                         personRepository = services.people.personRepository,
                                         personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
                                         entitySource = services.transactions.entitySource,
                                         csvStrategyImportExport = services.imports.csvStrategyImportExport,
                                         appVersion = appVersion,
+                                        onBack = { navigationHistory.navigateBack() },
+                                        onEditStrategy = { strategyId, importId ->
+                                            navigationHistory.navigateTo(Screen.CsvStrategyEditor(importId, strategyId))
+                                        },
+                                    )
+                                }
+                                is Screen.CsvStrategyEditor -> {
+                                    CsvStrategyEditorScreen(
+                                        csvImportId = screen.csvImportId,
+                                        strategyId = screen.strategyId,
+                                        csvImportRepository = services.imports.csvImportRepository,
+                                        csvImportStrategyRepository = services.imports.csvImportStrategyRepository,
+                                        csvAccountMappingRepository = services.imports.csvAccountMappingRepository,
+                                        accountRepository = services.accounts.accountRepository,
+                                        categoryRepository = services.accounts.categoryRepository,
+                                        currencyRepository = services.accounts.currencyRepository,
+                                        attributeTypeRepository = services.transactions.attributeTypeRepository,
+                                        personRepository = services.people.personRepository,
+                                        personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
+                                        entitySource = services.transactions.entitySource,
                                         onBack = { navigationHistory.navigateBack() },
                                     )
                                 }
