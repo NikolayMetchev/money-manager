@@ -62,18 +62,26 @@ import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.AttributeColumnMapping
+import com.moneymanager.domain.model.csvstrategy.ColumnPairSwap
+import com.moneymanager.domain.model.csvstrategy.CompanionTransactionRule
+import com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
+import com.moneymanager.domain.model.csvstrategy.FieldMapping
 import com.moneymanager.domain.model.csvstrategy.FieldMappingId
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.RegexAccountMapping
 import com.moneymanager.domain.model.csvstrategy.RegexRule
+import com.moneymanager.domain.model.csvstrategy.RowCondition
+import com.moneymanager.domain.model.csvstrategy.RowConditionOperator
+import com.moneymanager.domain.model.csvstrategy.RowPreprocessingRule
+import com.moneymanager.domain.model.csvstrategy.TemplateAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.repository.AccountRepository
@@ -92,6 +100,7 @@ import com.moneymanager.ui.screens.transactions.AttributeTypeField
 import kotlinx.coroutines.launch
 import kotlinx.datetime.TimeZone
 import kotlin.time.Clock
+import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
@@ -119,17 +128,101 @@ internal fun attributeCandidateColumns(
 }
 
 /**
+ * Source account mapping mode for CSV import.
+ */
+internal enum class SourceAccountMode {
+    FIXED_ACCOUNT,
+    TEMPLATE,
+}
+
+/**
  * Target account mapping mode for CSV import.
  */
-private enum class TargetAccountMode {
+internal enum class TargetAccountMode {
     DIRECT_LOOKUP,
     REGEX_MATCH,
+    TEMPLATE,
+    CONDITIONAL,
 }
+
+/**
+ * The non-conditional account mapping types offered as branches of a conditional
+ * mapping. Excluding the conditional kind bounds nesting to a single level.
+ */
+private enum class LeafAccountKind {
+    LOOKUP,
+    REGEX,
+    TEMPLATE,
+}
+
+private fun LeafAccountKind.label(): String =
+    when (this) {
+        LeafAccountKind.LOOKUP -> "Lookup"
+        LeafAccountKind.REGEX -> "Regex"
+        LeafAccountKind.TEMPLATE -> "Template"
+    }
+
+private fun RowConditionOperator.label(): String =
+    when (this) {
+        RowConditionOperator.EQUALS_VALUE -> "equals value"
+        RowConditionOperator.EQUALS_COLUMN -> "equals column"
+        RowConditionOperator.NOT_EQUALS_COLUMN -> "not equals column"
+        RowConditionOperator.IS_BLANK -> "is blank"
+        RowConditionOperator.IS_NOT_BLANK -> "is not blank"
+    }
+
+/**
+ * Whether a condition has all the inputs its operator requires.
+ */
+private fun RowCondition.isComplete(): Boolean =
+    columnName.isNotBlank() &&
+        when (operator) {
+            RowConditionOperator.EQUALS_VALUE -> !value.isNullOrBlank()
+            RowConditionOperator.EQUALS_COLUMN, RowConditionOperator.NOT_EQUALS_COLUMN -> !otherColumnName.isNullOrBlank()
+            RowConditionOperator.IS_BLANK, RowConditionOperator.IS_NOT_BLANK -> true
+        }
+
+/**
+ * Whether a conditional-branch account mapping is fully specified.
+ */
+private fun FieldMapping.isLeafAccountValid(): Boolean =
+    when (this) {
+        is AccountLookupMapping -> columnName.isNotBlank()
+        is RegexAccountMapping -> columnName.isNotBlank() && rules.isNotEmpty() && rules.all { it.accountName.isNotBlank() }
+        is TemplateAccountMapping -> columnName.isNotBlank()
+        is HardCodedAccountMapping -> true
+        else -> false
+    }
+
+@OptIn(kotlin.uuid.ExperimentalUuidApi::class)
+private fun defaultLeafAccountMapping(
+    kind: LeafAccountKind,
+    fieldType: TransferField,
+    existing: FieldMapping,
+): FieldMapping {
+    val column =
+        when (existing) {
+            is AccountLookupMapping -> existing.columnName
+            is RegexAccountMapping -> existing.columnName
+            is TemplateAccountMapping -> existing.columnName
+            else -> ""
+        }
+    val id = FieldMappingId(Uuid.random())
+    return when (kind) {
+        LeafAccountKind.LOOKUP -> AccountLookupMapping(id, fieldType, columnName = column)
+        LeafAccountKind.REGEX -> RegexAccountMapping(id, fieldType, columnName = column, rules = emptyList())
+        LeafAccountKind.TEMPLATE -> TemplateAccountMapping(id, fieldType, columnName = column)
+    }
+}
+
+@OptIn(kotlin.uuid.ExperimentalUuidApi::class)
+private fun emptyLeafAccountMapping(fieldType: TransferField): FieldMapping =
+    AccountLookupMapping(FieldMappingId(Uuid.random()), fieldType, columnName = "")
 
 /**
  * Data class holding extracted form state from an existing strategy.
  */
-private data class StrategyFormState(
+internal data class StrategyFormState(
     val name: String,
     val identificationColumns: Set<String>,
     val dateColumnName: String?,
@@ -140,11 +233,24 @@ private data class StrategyFormState(
     val descriptionFallbackColumns: List<String>,
     val amountColumnName: String?,
     val flipAccountsOnPositive: Boolean,
+    val feeColumnName: String?,
+    val feeConditions: List<RowCondition>,
+    val dateTimeFormat: String,
+    val sourceAccountMode: SourceAccountMode,
     val selectedAccountId: AccountId?,
+    val sourceTemplateColumnName: String?,
+    val sourceTemplatePrefix: String,
+    val sourceTemplateSuffix: String,
     val targetAccountColumnName: String?,
     val targetAccountFallbackColumns: List<String>,
     val targetAccountMode: TargetAccountMode,
     val regexRules: List<RegexRule>,
+    val targetTemplateColumnName: String?,
+    val targetTemplatePrefix: String,
+    val targetTemplateSuffix: String,
+    val targetConditions: List<RowCondition>,
+    val targetWhenTrue: FieldMapping,
+    val targetWhenFalse: FieldMapping,
     val currencyMode: CurrencyMode,
     val selectedCurrencyId: CurrencyId?,
     val currencyColumnName: String?,
@@ -152,22 +258,51 @@ private data class StrategyFormState(
     val selectedTimezone: String,
     val timezoneColumnName: String?,
     val attributeMappings: List<AttributeColumnMapping>,
+    val rowPreprocessingRules: List<RowPreprocessingRule>,
+    val companionTransactionRules: List<CompanionTransactionRule>,
 )
 
 /**
  * Extracts form state from an existing strategy.
  * Returns null for columns that don't exist in the current CSV.
  */
-private fun extractFormStateFromStrategy(
+internal fun extractFormStateFromStrategy(
     strategy: CsvImportStrategy,
     availableColumnNames: Set<String>,
 ): StrategyFormState {
     // Helper to check if column exists
     fun columnIfExists(name: String?): String? = name?.takeIf { it in availableColumnNames }
 
-    // Extract source account ID
+    // Drop conditions referencing columns absent from the uploaded CSV.
+    fun keepConditions(conditions: List<RowCondition>): List<RowCondition> =
+        conditions.filter { c ->
+            c.columnName in availableColumnNames &&
+                (c.otherColumnName == null || c.otherColumnName in availableColumnNames)
+        }
+
+    // Extract source account mapping
     val sourceAccountMapping = strategy.fieldMappings[TransferField.SOURCE_ACCOUNT]
-    val selectedAccountId = (sourceAccountMapping as? HardCodedAccountMapping)?.accountId
+    val sourceAccountMode: SourceAccountMode
+    val selectedAccountId: AccountId?
+    val sourceTemplateColumnName: String?
+    val sourceTemplatePrefix: String
+    val sourceTemplateSuffix: String
+    when (sourceAccountMapping) {
+        is TemplateAccountMapping -> {
+            sourceAccountMode = SourceAccountMode.TEMPLATE
+            selectedAccountId = null
+            sourceTemplateColumnName = columnIfExists(sourceAccountMapping.columnName)
+            sourceTemplatePrefix = sourceAccountMapping.prefix
+            sourceTemplateSuffix = sourceAccountMapping.suffix
+        }
+        else -> {
+            sourceAccountMode = SourceAccountMode.FIXED_ACCOUNT
+            selectedAccountId = (sourceAccountMapping as? HardCodedAccountMapping)?.accountId
+            sourceTemplateColumnName = null
+            sourceTemplatePrefix = ""
+            sourceTemplateSuffix = ""
+        }
+    }
 
     // Extract target account column
     val targetAccountMapping = strategy.fieldMappings[TransferField.TARGET_ACCOUNT]
@@ -175,6 +310,12 @@ private fun extractFormStateFromStrategy(
     val targetAccountFallbackColumns: List<String>
     val targetAccountMode: TargetAccountMode
     val regexRules: List<RegexRule>
+    var targetTemplateColumnName: String? = null
+    var targetTemplatePrefix = ""
+    var targetTemplateSuffix = ""
+    var targetConditions: List<RowCondition> = emptyList()
+    var targetWhenTrue: FieldMapping = emptyLeafAccountMapping(TransferField.TARGET_ACCOUNT)
+    var targetWhenFalse: FieldMapping = emptyLeafAccountMapping(TransferField.TARGET_ACCOUNT)
     when (targetAccountMapping) {
         is AccountLookupMapping -> {
             targetAccountColumnName = columnIfExists(targetAccountMapping.columnName)
@@ -187,6 +328,24 @@ private fun extractFormStateFromStrategy(
             targetAccountFallbackColumns = targetAccountMapping.fallbackColumns.mapNotNull { columnIfExists(it) }
             targetAccountMode = TargetAccountMode.REGEX_MATCH
             regexRules = targetAccountMapping.rules
+        }
+        is TemplateAccountMapping -> {
+            targetAccountColumnName = null
+            targetAccountFallbackColumns = emptyList()
+            targetAccountMode = TargetAccountMode.TEMPLATE
+            regexRules = emptyList()
+            targetTemplateColumnName = columnIfExists(targetAccountMapping.columnName)
+            targetTemplatePrefix = targetAccountMapping.prefix
+            targetTemplateSuffix = targetAccountMapping.suffix
+        }
+        is ConditionalAccountMapping -> {
+            targetAccountColumnName = null
+            targetAccountFallbackColumns = emptyList()
+            targetAccountMode = TargetAccountMode.CONDITIONAL
+            regexRules = emptyList()
+            targetConditions = keepConditions(targetAccountMapping.conditions)
+            targetWhenTrue = targetAccountMapping.whenTrue
+            targetWhenFalse = targetAccountMapping.whenFalse
         }
         else -> {
             targetAccountColumnName = null
@@ -202,18 +361,25 @@ private fun extractFormStateFromStrategy(
     val dateFormat: String
     val timeColumnName: String?
     val timeFormat: String
+    val dateTimeFormat: String
     when (timestampMapping) {
         is DateTimeParsingMapping -> {
             dateColumnName = columnIfExists(timestampMapping.dateColumnName)
             dateFormat = timestampMapping.dateFormat
             timeColumnName = columnIfExists(timestampMapping.timeColumnName)
             timeFormat = timestampMapping.timeFormat ?: "HH:mm:ss"
+            // Keep the combined format only while its date column still exists.
+            dateTimeFormat =
+                timestampMapping.dateTimeFormat
+                    ?.takeIf { dateColumnName != null }
+                    .orEmpty()
         }
         else -> {
             dateColumnName = null
             dateFormat = "dd/MM/yyyy"
             timeColumnName = null
             timeFormat = "HH:mm:ss"
+            dateTimeFormat = ""
         }
     }
 
@@ -236,14 +402,20 @@ private fun extractFormStateFromStrategy(
     val amountMapping = strategy.fieldMappings[TransferField.AMOUNT]
     val amountColumnName: String?
     val flipAccountsOnPositive: Boolean
+    val feeColumnName: String?
+    val feeConditions: List<RowCondition>
     when (amountMapping) {
         is AmountParsingMapping -> {
             amountColumnName = columnIfExists(amountMapping.amountColumnName)
             flipAccountsOnPositive = amountMapping.flipAccountsOnPositive
+            feeColumnName = columnIfExists(amountMapping.feeColumnName)
+            feeConditions = if (feeColumnName != null) keepConditions(amountMapping.feeConditions) else emptyList()
         }
         else -> {
             amountColumnName = null
             flipAccountsOnPositive = true
+            feeColumnName = null
+            feeConditions = emptyList()
         }
     }
 
@@ -296,6 +468,21 @@ private fun extractFormStateFromStrategy(
     // Filter attribute mappings to only include columns that exist
     val attributeMappings = strategy.attributeMappings.filter { it.columnName in availableColumnNames }
 
+    // Keep only preprocessing rules whose referenced columns all still exist.
+    val rowPreprocessingRules =
+        strategy.rowPreprocessingRules.mapNotNull { rule ->
+            val swaps =
+                rule.columnSwaps.filter {
+                    it.firstColumn in availableColumnNames && it.secondColumn in availableColumnNames
+                }
+            val conditions = keepConditions(rule.conditions)
+            if (conditions.size != rule.conditions.size || swaps.size != rule.columnSwaps.size) {
+                null
+            } else {
+                rule.copy(conditions = conditions, columnSwaps = swaps)
+            }
+        }
+
     return StrategyFormState(
         name = strategy.name,
         identificationColumns = strategy.identificationColumns.filter { it in availableColumnNames }.toSet(),
@@ -307,11 +494,24 @@ private fun extractFormStateFromStrategy(
         descriptionFallbackColumns = descriptionFallbackColumns,
         amountColumnName = amountColumnName,
         flipAccountsOnPositive = flipAccountsOnPositive,
+        feeColumnName = feeColumnName,
+        feeConditions = feeConditions,
+        dateTimeFormat = dateTimeFormat,
+        sourceAccountMode = sourceAccountMode,
         selectedAccountId = selectedAccountId,
+        sourceTemplateColumnName = sourceTemplateColumnName,
+        sourceTemplatePrefix = sourceTemplatePrefix,
+        sourceTemplateSuffix = sourceTemplateSuffix,
         targetAccountColumnName = targetAccountColumnName,
         targetAccountFallbackColumns = targetAccountFallbackColumns,
         targetAccountMode = targetAccountMode,
         regexRules = regexRules,
+        targetTemplateColumnName = targetTemplateColumnName,
+        targetTemplatePrefix = targetTemplatePrefix,
+        targetTemplateSuffix = targetTemplateSuffix,
+        targetConditions = targetConditions,
+        targetWhenTrue = targetWhenTrue,
+        targetWhenFalse = targetWhenFalse,
         currencyMode = currencyMode,
         selectedCurrencyId = selectedCurrencyId,
         currencyColumnName = currencyColumnName,
@@ -319,6 +519,166 @@ private fun extractFormStateFromStrategy(
         selectedTimezone = selectedTimezone,
         timezoneColumnName = timezoneColumnName,
         attributeMappings = attributeMappings,
+        rowPreprocessingRules = rowPreprocessingRules,
+        companionTransactionRules = strategy.companionTransactionRules,
+    )
+}
+
+/**
+ * Builds a [CsvImportStrategy] from the dialog's form state. Shared by the save handler and
+ * tests so the round-trip (extract → edit → save) is exercised by a single code path.
+ *
+ * Required columns (date, description, amount, and the target column/template depending on mode)
+ * are asserted non-null; callers gate this behind form validation.
+ */
+internal fun buildStrategyFromFormState(
+    state: StrategyFormState,
+    id: CsvImportStrategyId,
+    createdAt: Instant,
+    updatedAt: Instant,
+): CsvImportStrategy {
+    val fieldMappings =
+        buildMap {
+            when (state.sourceAccountMode) {
+                SourceAccountMode.FIXED_ACCOUNT ->
+                    state.selectedAccountId?.let { accountId ->
+                        put(
+                            TransferField.SOURCE_ACCOUNT,
+                            HardCodedAccountMapping(
+                                id = FieldMappingId(Uuid.random()),
+                                fieldType = TransferField.SOURCE_ACCOUNT,
+                                accountId = accountId,
+                            ),
+                        )
+                    }
+                SourceAccountMode.TEMPLATE ->
+                    state.sourceTemplateColumnName?.let { column ->
+                        put(
+                            TransferField.SOURCE_ACCOUNT,
+                            TemplateAccountMapping(
+                                id = FieldMappingId(Uuid.random()),
+                                fieldType = TransferField.SOURCE_ACCOUNT,
+                                columnName = column,
+                                prefix = state.sourceTemplatePrefix,
+                                suffix = state.sourceTemplateSuffix,
+                            ),
+                        )
+                    }
+            }
+            put(
+                TransferField.TARGET_ACCOUNT,
+                when (state.targetAccountMode) {
+                    TargetAccountMode.DIRECT_LOOKUP ->
+                        AccountLookupMapping(
+                            id = FieldMappingId(Uuid.random()),
+                            fieldType = TransferField.TARGET_ACCOUNT,
+                            columnName = state.targetAccountColumnName!!,
+                            fallbackColumns = state.targetAccountFallbackColumns,
+                        )
+                    TargetAccountMode.REGEX_MATCH ->
+                        RegexAccountMapping(
+                            id = FieldMappingId(Uuid.random()),
+                            fieldType = TransferField.TARGET_ACCOUNT,
+                            columnName = state.targetAccountColumnName!!,
+                            rules = state.regexRules,
+                            fallbackColumns = state.targetAccountFallbackColumns,
+                        )
+                    TargetAccountMode.TEMPLATE ->
+                        TemplateAccountMapping(
+                            id = FieldMappingId(Uuid.random()),
+                            fieldType = TransferField.TARGET_ACCOUNT,
+                            columnName = state.targetTemplateColumnName!!,
+                            prefix = state.targetTemplatePrefix,
+                            suffix = state.targetTemplateSuffix,
+                        )
+                    TargetAccountMode.CONDITIONAL ->
+                        ConditionalAccountMapping(
+                            id = FieldMappingId(Uuid.random()),
+                            fieldType = TransferField.TARGET_ACCOUNT,
+                            conditions = state.targetConditions,
+                            whenTrue = state.targetWhenTrue,
+                            whenFalse = state.targetWhenFalse,
+                        )
+                },
+            )
+            put(
+                TransferField.TIMESTAMP,
+                DateTimeParsingMapping(
+                    id = FieldMappingId(Uuid.random()),
+                    fieldType = TransferField.TIMESTAMP,
+                    dateColumnName = state.dateColumnName!!,
+                    dateFormat = state.dateFormat,
+                    timeColumnName = state.timeColumnName,
+                    timeFormat = state.timeColumnName?.let { state.timeFormat },
+                    dateTimeFormat = state.dateTimeFormat.takeIf { it.isNotBlank() },
+                ),
+            )
+            put(
+                TransferField.DESCRIPTION,
+                DirectColumnMapping(
+                    id = FieldMappingId(Uuid.random()),
+                    fieldType = TransferField.DESCRIPTION,
+                    columnName = state.descriptionColumnName!!,
+                    fallbackColumns = state.descriptionFallbackColumns,
+                ),
+            )
+            put(
+                TransferField.AMOUNT,
+                AmountParsingMapping(
+                    id = FieldMappingId(Uuid.random()),
+                    fieldType = TransferField.AMOUNT,
+                    mode = AmountMode.SINGLE_COLUMN,
+                    amountColumnName = state.amountColumnName!!,
+                    flipAccountsOnPositive = state.flipAccountsOnPositive,
+                    feeColumnName = state.feeColumnName,
+                    feeConditions = if (state.feeColumnName != null) state.feeConditions else emptyList(),
+                ),
+            )
+            put(
+                TransferField.CURRENCY,
+                when (state.currencyMode) {
+                    CurrencyMode.HARDCODED ->
+                        HardCodedCurrencyMapping(
+                            id = FieldMappingId(Uuid.random()),
+                            fieldType = TransferField.CURRENCY,
+                            currencyId = state.selectedCurrencyId!!,
+                        )
+                    CurrencyMode.FROM_COLUMN ->
+                        CurrencyLookupMapping(
+                            id = FieldMappingId(Uuid.random()),
+                            fieldType = TransferField.CURRENCY,
+                            columnName = state.currencyColumnName!!,
+                        )
+                },
+            )
+            put(
+                TransferField.TIMEZONE,
+                when (state.timezoneMode) {
+                    TimezoneMode.HARDCODED ->
+                        HardCodedTimezoneMapping(
+                            id = FieldMappingId(Uuid.random()),
+                            fieldType = TransferField.TIMEZONE,
+                            timezoneId = state.selectedTimezone,
+                        )
+                    TimezoneMode.FROM_COLUMN ->
+                        TimezoneLookupMapping(
+                            id = FieldMappingId(Uuid.random()),
+                            fieldType = TransferField.TIMEZONE,
+                            columnName = state.timezoneColumnName!!,
+                        )
+                },
+            )
+        }
+    return CsvImportStrategy(
+        id = id,
+        name = state.name,
+        identificationColumns = state.identificationColumns,
+        fieldMappings = fieldMappings,
+        attributeMappings = state.attributeMappings,
+        rowPreprocessingRules = state.rowPreprocessingRules,
+        companionTransactionRules = state.companionTransactionRules,
+        createdAt = createdAt,
+        updatedAt = updatedAt,
     )
 }
 
@@ -347,17 +707,6 @@ fun CreateCsvStrategyDialog(
     val isEditMode = existingStrategy != null
     val availableColumnNames = csvColumns.map { it.originalName }.toSet()
 
-    // Mappings whose types this form cannot represent (e.g. the built-in Wise CSV strategy's
-    // template/conditional account mappings) are locked: their sections show an explanation
-    // instead of editable controls, and the original mapping is kept unchanged on save.
-    val existingSourceMapping = existingStrategy?.fieldMappings?.get(TransferField.SOURCE_ACCOUNT)
-    val sourceAccountLocked = existingSourceMapping != null && existingSourceMapping !is HardCodedAccountMapping
-    val existingTargetMapping = existingStrategy?.fieldMappings?.get(TransferField.TARGET_ACCOUNT)
-    val targetAccountLocked =
-        existingTargetMapping != null &&
-            existingTargetMapping !is AccountLookupMapping &&
-            existingTargetMapping !is RegexAccountMapping
-
     // Extract initial state from existing strategy if in edit mode
     val initialState =
         existingStrategy?.let {
@@ -376,7 +725,16 @@ fun CreateCsvStrategyDialog(
         mutableStateOf(initialState?.descriptionFallbackColumns.orEmpty())
     }
     var amountColumnName by remember { mutableStateOf(initialState?.amountColumnName) }
+    var feeColumnName by remember { mutableStateOf(initialState?.feeColumnName) }
+    var feeConditions by remember { mutableStateOf(initialState?.feeConditions.orEmpty()) }
+    var dateTimeFormat by remember { mutableStateOf(initialState?.dateTimeFormat.orEmpty()) }
+    var sourceAccountMode by remember {
+        mutableStateOf(initialState?.sourceAccountMode ?: SourceAccountMode.FIXED_ACCOUNT)
+    }
     var selectedAccountId by remember { mutableStateOf(initialState?.selectedAccountId) }
+    var sourceTemplateColumnName by remember { mutableStateOf(initialState?.sourceTemplateColumnName) }
+    var sourceTemplatePrefix by remember { mutableStateOf(initialState?.sourceTemplatePrefix.orEmpty()) }
+    var sourceTemplateSuffix by remember { mutableStateOf(initialState?.sourceTemplateSuffix.orEmpty()) }
     var selectedCurrencyId by remember { mutableStateOf(initialState?.selectedCurrencyId) }
     var currencyMode by remember { mutableStateOf(initialState?.currencyMode ?: CurrencyMode.HARDCODED) }
     var currencyColumnName by remember { mutableStateOf(initialState?.currencyColumnName) }
@@ -393,10 +751,24 @@ fun CreateCsvStrategyDialog(
         mutableStateOf(initialState?.targetAccountMode ?: TargetAccountMode.DIRECT_LOOKUP)
     }
     var regexRules by remember { mutableStateOf(initialState?.regexRules.orEmpty()) }
+    var targetTemplateColumnName by remember { mutableStateOf(initialState?.targetTemplateColumnName) }
+    var targetTemplatePrefix by remember { mutableStateOf(initialState?.targetTemplatePrefix.orEmpty()) }
+    var targetTemplateSuffix by remember { mutableStateOf(initialState?.targetTemplateSuffix.orEmpty()) }
+    var targetConditions by remember { mutableStateOf(initialState?.targetConditions.orEmpty()) }
+    var targetWhenTrue by remember {
+        mutableStateOf(initialState?.targetWhenTrue ?: emptyLeafAccountMapping(TransferField.TARGET_ACCOUNT))
+    }
+    var targetWhenFalse by remember {
+        mutableStateOf(initialState?.targetWhenFalse ?: emptyLeafAccountMapping(TransferField.TARGET_ACCOUNT))
+    }
     var flipAccountsOnPositive by remember { mutableStateOf(initialState?.flipAccountsOnPositive ?: true) }
     // List of attribute column mappings with unique identifier flags
     var attributeMappings by remember {
         mutableStateOf(initialState?.attributeMappings.orEmpty())
+    }
+    var rowPreprocessingRules by remember { mutableStateOf(initialState?.rowPreprocessingRules.orEmpty()) }
+    var companionTransactionRules by remember {
+        mutableStateOf(initialState?.companionTransactionRules.orEmpty())
     }
 
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -437,18 +809,42 @@ fun CreateCsvStrategyDialog(
         }
 
     // Compute form validity - all required fields must be populated
-    val regexRulesValid =
-        targetAccountMode != TargetAccountMode.REGEX_MATCH ||
-            (regexRules.isNotEmpty() && regexRules.all { it.accountName.isNotBlank() })
+    val targetAccountValid =
+        when (targetAccountMode) {
+            TargetAccountMode.DIRECT_LOOKUP -> targetAccountColumnName != null
+            TargetAccountMode.REGEX_MATCH ->
+                targetAccountColumnName != null &&
+                    regexRules.isNotEmpty() &&
+                    regexRules.all { it.accountName.isNotBlank() }
+            TargetAccountMode.TEMPLATE -> targetTemplateColumnName != null
+            TargetAccountMode.CONDITIONAL ->
+                targetConditions.isNotEmpty() &&
+                    targetConditions.all { it.isComplete() } &&
+                    targetWhenTrue.isLeafAccountValid() &&
+                    targetWhenFalse.isLeafAccountValid()
+        }
+
+    val feeValid = feeColumnName == null || feeConditions.all { it.isComplete() }
+    val rowPreprocessingValid =
+        rowPreprocessingRules.all { rule ->
+            rule.conditions.all { it.isComplete() } &&
+                rule.columnSwaps.all { it.firstColumn.isNotBlank() && it.secondColumn.isNotBlank() }
+        }
+    val companionRulesValid =
+        companionTransactionRules.all {
+            it.name.isNotBlank() && it.matchAttributeName.isNotBlank() && it.matchValuePattern.isNotBlank()
+        }
 
     val isFormValid =
         name.isNotBlank() &&
             identificationColumns.isNotEmpty() &&
-            (targetAccountColumnName != null || targetAccountLocked) &&
+            targetAccountValid &&
             dateColumnName != null &&
             descriptionColumnName != null &&
             amountColumnName != null &&
-            regexRulesValid &&
+            feeValid &&
+            rowPreprocessingValid &&
+            companionRulesValid &&
             when (currencyMode) {
                 CurrencyMode.HARDCODED -> selectedCurrencyId != null
                 CurrencyMode.FROM_COLUMN -> currencyColumnName != null
@@ -552,100 +948,135 @@ fun CreateCsvStrategyDialog(
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
-                if (sourceAccountLocked) {
-                    LockedMappingNotice(
-                        title = "Source Account",
-                        explanation =
-                            "This strategy resolves the source account per row with a custom mapping " +
-                                "that can't be edited here. It will be kept as-is.",
-                    )
-                } else {
-                    Text("Source Account (Optional)", style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        "Can also be chosen each time you apply this strategy",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    AccountPicker(
-                        selectedAccountId = selectedAccountId,
-                        onAccountSelected = { selectedAccountId = it },
-                        label = "Select Account",
-                        accountRepository = accountRepository,
-                        categoryRepository = categoryRepository,
-                        personRepository = personRepository,
-                        personAccountOwnershipRepository = personAccountOwnershipRepository,
-                        entitySource = entitySource,
+                Text("Source Account (Optional)", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    "Can also be chosen each time you apply this strategy",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(
+                        selected = sourceAccountMode == SourceAccountMode.FIXED_ACCOUNT,
+                        onClick = { sourceAccountMode = SourceAccountMode.FIXED_ACCOUNT },
                         enabled = !isSaving,
                     )
+                    Text("Fixed Account", modifier = Modifier.padding(end = 16.dp))
+                    RadioButton(
+                        selected = sourceAccountMode == SourceAccountMode.TEMPLATE,
+                        onClick = { sourceAccountMode = SourceAccountMode.TEMPLATE },
+                        enabled = !isSaving,
+                    )
+                    Text("From Column (Template)")
+                }
+                when (sourceAccountMode) {
+                    SourceAccountMode.FIXED_ACCOUNT ->
+                        AccountPicker(
+                            selectedAccountId = selectedAccountId,
+                            onAccountSelected = { selectedAccountId = it },
+                            label = "Select Account",
+                            accountRepository = accountRepository,
+                            categoryRepository = categoryRepository,
+                            personRepository = personRepository,
+                            personAccountOwnershipRepository = personAccountOwnershipRepository,
+                            entitySource = entitySource,
+                            enabled = !isSaving,
+                        )
+                    SourceAccountMode.TEMPLATE ->
+                        TemplateAccountMappingEditor(
+                            columnName = sourceTemplateColumnName,
+                            onColumnChanged = { sourceTemplateColumnName = it },
+                            prefix = sourceTemplatePrefix,
+                            onPrefixChanged = { sourceTemplatePrefix = it },
+                            suffix = sourceTemplateSuffix,
+                            onSuffixChanged = { sourceTemplateSuffix = it },
+                            columns = csvColumns,
+                            firstRow = firstRow,
+                            enabled = !isSaving,
+                        )
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
-                if (targetAccountLocked) {
-                    LockedMappingNotice(
-                        title = "Target Account",
-                        explanation =
-                            "This strategy resolves the target account with a custom conditional mapping " +
-                                "that can't be edited here. It will be kept as-is.",
-                    )
-                } else {
-                    Text("Target Account Column", style = MaterialTheme.typography.titleSmall)
-                    ColumnDropdown(
-                        columns = csvColumns,
-                        selectedColumn = targetAccountColumnName,
-                        onColumnSelected = { targetAccountColumnName = it },
-                        label = "Column for payee/counterparty name",
-                        sampleValue = getSampleValue(csvColumns, firstRow, targetAccountColumnName),
-                        enabled = !isSaving,
-                        isError = targetAccountColumnName == null,
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        "Fallback column (when primary is empty)",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    // Find a row where the primary column is blank to show a relevant sample
-                    val fallbackSampleRow = findRowWithBlankColumn(csvColumns, rows, targetAccountColumnName)
-                    OptionalColumnDropdown(
-                        columns = csvColumns,
-                        selectedColumn = targetAccountFallbackColumns.firstOrNull(),
-                        onColumnSelected = { selected ->
-                            targetAccountFallbackColumns = if (selected != null) listOf(selected) else emptyList()
-                        },
-                        label = "Fallback column for account name",
-                        sampleValue = getSampleValue(csvColumns, fallbackSampleRow, targetAccountFallbackColumns.firstOrNull()),
-                        enabled = !isSaving,
-                    )
+                Text("Target Account", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    "How the target account is resolved for each row",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                TargetAccountModeSelector(
+                    selected = targetAccountMode,
+                    onSelected = { targetAccountMode = it },
+                    enabled = !isSaving,
+                )
 
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        "Account Name Mapping",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        RadioButton(
-                            selected = targetAccountMode == TargetAccountMode.DIRECT_LOOKUP,
-                            onClick = { targetAccountMode = TargetAccountMode.DIRECT_LOOKUP },
+                when (targetAccountMode) {
+                    TargetAccountMode.DIRECT_LOOKUP, TargetAccountMode.REGEX_MATCH -> {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        ColumnDropdown(
+                            columns = csvColumns,
+                            selectedColumn = targetAccountColumnName,
+                            onColumnSelected = { targetAccountColumnName = it },
+                            label = "Column for payee/counterparty name",
+                            sampleValue = getSampleValue(csvColumns, firstRow, targetAccountColumnName),
+                            enabled = !isSaving,
+                            isError = targetAccountColumnName == null,
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            "Fallback column (when primary is empty)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        // Find a row where the primary column is blank to show a relevant sample
+                        val fallbackSampleRow = findRowWithBlankColumn(csvColumns, rows, targetAccountColumnName)
+                        OptionalColumnDropdown(
+                            columns = csvColumns,
+                            selectedColumn = targetAccountFallbackColumns.firstOrNull(),
+                            onColumnSelected = { selected ->
+                                targetAccountFallbackColumns = if (selected != null) listOf(selected) else emptyList()
+                            },
+                            label = "Fallback column for account name",
+                            sampleValue = getSampleValue(csvColumns, fallbackSampleRow, targetAccountFallbackColumns.firstOrNull()),
                             enabled = !isSaving,
                         )
-                        Text("Direct Lookup", modifier = Modifier.padding(end = 16.dp))
-                        RadioButton(
-                            selected = targetAccountMode == TargetAccountMode.REGEX_MATCH,
-                            onClick = { targetAccountMode = TargetAccountMode.REGEX_MATCH },
-                            enabled = !isSaving,
-                        )
-                        Text("Regex Match")
+
+                        if (targetAccountMode == TargetAccountMode.REGEX_MATCH) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            RegexRulesEditor(
+                                rules = regexRules,
+                                onRulesChanged = { regexRules = it },
+                                columnName = targetAccountColumnName,
+                                columns = csvColumns,
+                                rows = rows,
+                                enabled = !isSaving,
+                            )
+                        }
                     }
-
-                    if (targetAccountMode == TargetAccountMode.REGEX_MATCH) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        RegexRulesEditor(
-                            rules = regexRules,
-                            onRulesChanged = { regexRules = it },
-                            columnName = targetAccountColumnName,
+                    TargetAccountMode.TEMPLATE -> {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        TemplateAccountMappingEditor(
+                            columnName = targetTemplateColumnName,
+                            onColumnChanged = { targetTemplateColumnName = it },
+                            prefix = targetTemplatePrefix,
+                            onPrefixChanged = { targetTemplatePrefix = it },
+                            suffix = targetTemplateSuffix,
+                            onSuffixChanged = { targetTemplateSuffix = it },
+                            columns = csvColumns,
+                            firstRow = firstRow,
+                            enabled = !isSaving,
+                        )
+                    }
+                    TargetAccountMode.CONDITIONAL -> {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        ConditionalAccountMappingEditor(
+                            conditions = targetConditions,
+                            onConditionsChanged = { targetConditions = it },
+                            whenTrue = targetWhenTrue,
+                            onWhenTrueChanged = { targetWhenTrue = it },
+                            whenFalse = targetWhenFalse,
+                            onWhenFalseChanged = { targetWhenFalse = it },
                             columns = csvColumns,
                             rows = rows,
+                            firstRow = firstRow,
                             enabled = !isSaving,
                         )
                     }
@@ -693,7 +1124,7 @@ fun CreateCsvStrategyDialog(
                     sampleValue = getSampleValue(csvColumns, firstRow, timeColumnName),
                     enabled = !isSaving,
                 )
-                if (timeColumnName != null) {
+                if (timeColumnName != null && dateTimeFormat.isBlank()) {
                     Spacer(modifier = Modifier.height(4.dp))
                     OutlinedTextField(
                         value = timeFormat,
@@ -709,6 +1140,22 @@ fun CreateCsvStrategyDialog(
                         },
                     )
                 }
+
+                Spacer(modifier = Modifier.height(4.dp))
+                OutlinedTextField(
+                    value = dateTimeFormat,
+                    onValueChange = { dateTimeFormat = it },
+                    label = { Text("Combined date+time format (optional)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    enabled = !isSaving,
+                    supportingText = {
+                        Text(
+                            "When set, the date column holds both date and time " +
+                                "(e.g., yyyy-MM-dd HH:mm:ss) and the separate time column is ignored.",
+                        )
+                    },
+                )
 
                 Spacer(modifier = Modifier.height(16.dp))
                 Text("Description Column", style = MaterialTheme.typography.titleSmall)
@@ -764,6 +1211,36 @@ fun CreateCsvStrategyDialog(
                     Text(
                         "Swap accounts when amount is positive",
                         style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "Fee column (optional)",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    "Added to the amount's magnitude when the conditions below hold",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OptionalColumnDropdown(
+                    columns = csvColumns,
+                    selectedColumn = feeColumnName,
+                    onColumnSelected = { feeColumnName = it },
+                    label = "Column containing fee amount",
+                    sampleValue = getSampleValue(csvColumns, firstRow, feeColumnName),
+                    enabled = !isSaving,
+                )
+                if (feeColumnName != null) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    RowConditionsEditor(
+                        conditions = feeConditions,
+                        onConditionsChanged = { feeConditions = it },
+                        columns = csvColumns,
+                        enabled = !isSaving,
+                        title = "Apply fee when (all conditions match; none = always)",
                     )
                 }
 
@@ -899,6 +1376,37 @@ fun CreateCsvStrategyDialog(
                     )
                 }
 
+                // Row preprocessing rules section
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Row Preprocessing Rules (Optional)", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    "Swap column values and/or flip source/target accounts when conditions match",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                RowPreprocessingRulesEditor(
+                    rules = rowPreprocessingRules,
+                    onRulesChanged = { rowPreprocessingRules = it },
+                    columns = csvColumns,
+                    enabled = !isSaving,
+                )
+
+                // Companion transaction rules section
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Companion Transaction Rules (Optional)", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    "Flag imported transfers that imply a manually entered companion transaction",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                CompanionTransactionRulesEditor(
+                    rules = companionTransactionRules,
+                    onRulesChanged = { companionTransactionRules = it },
+                    enabled = !isSaving,
+                )
+
                 // Account Mappings section (edit mode only)
                 if (isEditMode) {
                     Spacer(modifier = Modifier.height(16.dp))
@@ -943,139 +1451,50 @@ fun CreateCsvStrategyDialog(
                         scope.launch {
                             try {
                                 val now = Clock.System.now()
-                                val existingMappings = existingStrategy?.fieldMappings.orEmpty()
-                                // Build field mappings; SOURCE_ACCOUNT is optional and only included
-                                // when an account has been selected in the strategy form. Locked
-                                // mappings (types the form can't represent, shown read-only above)
-                                // are carried over unchanged.
-                                val fieldMappings =
-                                    buildMap {
-                                        if (sourceAccountLocked) {
-                                            put(TransferField.SOURCE_ACCOUNT, existingMappings.getValue(TransferField.SOURCE_ACCOUNT))
-                                        } else {
-                                            selectedAccountId?.let { accountId ->
-                                                put(
-                                                    TransferField.SOURCE_ACCOUNT,
-                                                    HardCodedAccountMapping(
-                                                        id = FieldMappingId(Uuid.random()),
-                                                        fieldType = TransferField.SOURCE_ACCOUNT,
-                                                        accountId = accountId,
-                                                    ),
-                                                )
-                                            }
-                                        }
-                                        put(
-                                            TransferField.TARGET_ACCOUNT,
-                                            when {
-                                                targetAccountLocked -> existingMappings.getValue(TransferField.TARGET_ACCOUNT)
-                                                targetAccountMode == TargetAccountMode.DIRECT_LOOKUP ->
-                                                    AccountLookupMapping(
-                                                        id = FieldMappingId(Uuid.random()),
-                                                        fieldType = TransferField.TARGET_ACCOUNT,
-                                                        columnName = targetAccountColumnName!!,
-                                                        fallbackColumns = targetAccountFallbackColumns,
-                                                    )
-                                                else ->
-                                                    RegexAccountMapping(
-                                                        id = FieldMappingId(Uuid.random()),
-                                                        fieldType = TransferField.TARGET_ACCOUNT,
-                                                        columnName = targetAccountColumnName!!,
-                                                        rules = regexRules,
-                                                        fallbackColumns = targetAccountFallbackColumns,
-                                                    )
-                                            },
-                                        )
-                                        // Keep the combined date-time format only while the date column
-                                        // is unchanged; picking a different column invalidates it.
-                                        val originalTimestamp = existingMappings[TransferField.TIMESTAMP] as? DateTimeParsingMapping
-                                        put(
-                                            TransferField.TIMESTAMP,
-                                            DateTimeParsingMapping(
-                                                id = FieldMappingId(Uuid.random()),
-                                                fieldType = TransferField.TIMESTAMP,
-                                                dateColumnName = dateColumnName!!,
-                                                dateFormat = dateFormat,
-                                                timeColumnName = timeColumnName,
-                                                timeFormat = timeColumnName?.let { timeFormat },
-                                                dateTimeFormat =
-                                                    originalTimestamp
-                                                        ?.dateTimeFormat
-                                                        ?.takeIf { originalTimestamp.dateColumnName == dateColumnName },
-                                            ),
-                                        )
-                                        put(
-                                            TransferField.DESCRIPTION,
-                                            DirectColumnMapping(
-                                                id = FieldMappingId(Uuid.random()),
-                                                fieldType = TransferField.DESCRIPTION,
-                                                columnName = descriptionColumnName!!,
-                                                fallbackColumns = descriptionFallbackColumns,
-                                            ),
-                                        )
-                                        // Keep the fee configuration only while the amount column is
-                                        // unchanged; picking a different column invalidates it.
-                                        val originalAmount = existingMappings[TransferField.AMOUNT] as? AmountParsingMapping
-                                        val keepFee =
-                                            originalAmount?.feeColumnName != null &&
-                                                originalAmount.amountColumnName == amountColumnName
-                                        put(
-                                            TransferField.AMOUNT,
-                                            AmountParsingMapping(
-                                                id = FieldMappingId(Uuid.random()),
-                                                fieldType = TransferField.AMOUNT,
-                                                mode = AmountMode.SINGLE_COLUMN,
-                                                amountColumnName = amountColumnName!!,
-                                                flipAccountsOnPositive = flipAccountsOnPositive,
-                                                feeColumnName = if (keepFee) originalAmount.feeColumnName else null,
-                                                feeConditions = if (keepFee) originalAmount.feeConditions else emptyList(),
-                                            ),
-                                        )
-                                        put(
-                                            TransferField.CURRENCY,
-                                            when (currencyMode) {
-                                                CurrencyMode.HARDCODED ->
-                                                    HardCodedCurrencyMapping(
-                                                        id = FieldMappingId(Uuid.random()),
-                                                        fieldType = TransferField.CURRENCY,
-                                                        currencyId = selectedCurrencyId!!,
-                                                    )
-                                                CurrencyMode.FROM_COLUMN ->
-                                                    CurrencyLookupMapping(
-                                                        id = FieldMappingId(Uuid.random()),
-                                                        fieldType = TransferField.CURRENCY,
-                                                        columnName = currencyColumnName!!,
-                                                    )
-                                            },
-                                        )
-                                        put(
-                                            TransferField.TIMEZONE,
-                                            when (timezoneMode) {
-                                                TimezoneMode.HARDCODED ->
-                                                    HardCodedTimezoneMapping(
-                                                        id = FieldMappingId(Uuid.random()),
-                                                        fieldType = TransferField.TIMEZONE,
-                                                        timezoneId = selectedTimezone,
-                                                    )
-                                                TimezoneMode.FROM_COLUMN ->
-                                                    TimezoneLookupMapping(
-                                                        id = FieldMappingId(Uuid.random()),
-                                                        fieldType = TransferField.TIMEZONE,
-                                                        columnName = timezoneColumnName!!,
-                                                    )
-                                            },
-                                        )
-                                    }
-                                val strategy =
-                                    CsvImportStrategy(
-                                        id = existingStrategy?.id ?: CsvImportStrategyId(Uuid.random()),
+                                val formState =
+                                    StrategyFormState(
                                         name = name,
                                         identificationColumns = identificationColumns,
-                                        fieldMappings = fieldMappings,
+                                        dateColumnName = dateColumnName,
+                                        dateFormat = dateFormat,
+                                        timeColumnName = timeColumnName,
+                                        timeFormat = timeFormat,
+                                        descriptionColumnName = descriptionColumnName,
+                                        descriptionFallbackColumns = descriptionFallbackColumns,
+                                        amountColumnName = amountColumnName,
+                                        flipAccountsOnPositive = flipAccountsOnPositive,
+                                        feeColumnName = feeColumnName,
+                                        feeConditions = feeConditions,
+                                        dateTimeFormat = dateTimeFormat,
+                                        sourceAccountMode = sourceAccountMode,
+                                        selectedAccountId = selectedAccountId,
+                                        sourceTemplateColumnName = sourceTemplateColumnName,
+                                        sourceTemplatePrefix = sourceTemplatePrefix,
+                                        sourceTemplateSuffix = sourceTemplateSuffix,
+                                        targetAccountColumnName = targetAccountColumnName,
+                                        targetAccountFallbackColumns = targetAccountFallbackColumns,
+                                        targetAccountMode = targetAccountMode,
+                                        regexRules = regexRules,
+                                        targetTemplateColumnName = targetTemplateColumnName,
+                                        targetTemplatePrefix = targetTemplatePrefix,
+                                        targetTemplateSuffix = targetTemplateSuffix,
+                                        targetConditions = targetConditions,
+                                        targetWhenTrue = targetWhenTrue,
+                                        targetWhenFalse = targetWhenFalse,
+                                        currencyMode = currencyMode,
+                                        selectedCurrencyId = selectedCurrencyId,
+                                        currencyColumnName = currencyColumnName,
+                                        timezoneMode = timezoneMode,
+                                        selectedTimezone = selectedTimezone,
+                                        timezoneColumnName = timezoneColumnName,
                                         attributeMappings = attributeMappings,
-                                        // The form has no editor for row preprocessing or companion
-                                        // transaction rules, so they are always carried over unchanged.
-                                        rowPreprocessingRules = existingStrategy?.rowPreprocessingRules.orEmpty(),
-                                        companionTransactionRules = existingStrategy?.companionTransactionRules.orEmpty(),
+                                        rowPreprocessingRules = rowPreprocessingRules,
+                                        companionTransactionRules = companionTransactionRules,
+                                    )
+                                val strategy =
+                                    buildStrategyFromFormState(
+                                        state = formState,
+                                        id = existingStrategy?.id ?: CsvImportStrategyId(Uuid.random()),
                                         createdAt = existingStrategy?.createdAt ?: now,
                                         updatedAt = now,
                                     )
@@ -1138,21 +1557,653 @@ fun CreateCsvStrategyDialog(
 }
 
 /**
- * Read-only placeholder for a field whose mapping type this form cannot represent
- * (e.g. the built-in Wise CSV strategy's template/conditional account mappings).
- * The mapping is carried over unchanged when the strategy is saved.
+ * Radio-button row selecting how the target account is resolved.
  */
 @Composable
-private fun LockedMappingNotice(
-    title: String,
-    explanation: String,
+private fun TargetAccountModeSelector(
+    selected: TargetAccountMode,
+    onSelected: (TargetAccountMode) -> Unit,
+    enabled: Boolean,
 ) {
-    Text(title, style = MaterialTheme.typography.titleSmall)
-    Text(
-        text = explanation,
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    val labels =
+        listOf(
+            TargetAccountMode.DIRECT_LOOKUP to "Lookup",
+            TargetAccountMode.REGEX_MATCH to "Regex",
+            TargetAccountMode.TEMPLATE to "Template",
+            TargetAccountMode.CONDITIONAL to "Conditional",
+        )
+    Column {
+        labels.chunked(2).forEach { row ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                row.forEach { (mode, label) ->
+                    RadioButton(
+                        selected = selected == mode,
+                        onClick = { onSelected(mode) },
+                        enabled = enabled,
+                    )
+                    Text(label, modifier = Modifier.padding(end = 16.dp))
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Editor for an account mapping that templates a column value into an account name
+ * (`prefix + columnValue + suffix`).
+ */
+@Composable
+private fun TemplateAccountMappingEditor(
+    columnName: String?,
+    onColumnChanged: (String) -> Unit,
+    prefix: String,
+    onPrefixChanged: (String) -> Unit,
+    suffix: String,
+    onSuffixChanged: (String) -> Unit,
+    columns: List<CsvColumn>,
+    firstRow: CsvRow?,
+    enabled: Boolean,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        ColumnDropdown(
+            columns = columns,
+            selectedColumn = columnName,
+            onColumnSelected = onColumnChanged,
+            label = "Column for account name",
+            sampleValue = getSampleValue(columns, firstRow, columnName),
+            enabled = enabled,
+            isError = columnName == null,
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        OutlinedTextField(
+            value = prefix,
+            onValueChange = onPrefixChanged,
+            label = { Text("Prefix (optional)") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            enabled = enabled,
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        OutlinedTextField(
+            value = suffix,
+            onValueChange = onSuffixChanged,
+            label = { Text("Suffix (optional)") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            enabled = enabled,
+        )
+        getSampleValue(columns, firstRow, columnName)?.let { sample ->
+            Text(
+                "Account: $prefix$sample$suffix",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+    }
+}
+
+/**
+ * Editor for a list of [RowCondition]s combined with AND semantics.
+ */
+@Composable
+private fun RowConditionsEditor(
+    conditions: List<RowCondition>,
+    onConditionsChanged: (List<RowCondition>) -> Unit,
+    columns: List<CsvColumn>,
+    enabled: Boolean,
+    title: String = "Conditions (all must match)",
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(title, style = MaterialTheme.typography.bodyMedium)
+        conditions.forEachIndexed { index, condition ->
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                colors =
+                    CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    ),
+            ) {
+                Column(modifier = Modifier.padding(8.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            "Condition ${index + 1}",
+                            style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier.weight(1f),
+                        )
+                        IconButton(
+                            onClick = { onConditionsChanged(conditions.filterIndexed { i, _ -> i != index }) },
+                            enabled = enabled,
+                        ) {
+                            Icon(Icons.Filled.Close, contentDescription = "Remove condition")
+                        }
+                    }
+                    RowConditionRow(
+                        condition = condition,
+                        onConditionChanged = { updated ->
+                            onConditionsChanged(conditions.mapIndexed { i, c -> if (i == index) updated else c })
+                        },
+                        columns = columns,
+                        enabled = enabled,
+                    )
+                }
+            }
+        }
+        TextButton(
+            onClick = {
+                onConditionsChanged(
+                    conditions +
+                        RowCondition(
+                            columnName = columns.firstOrNull()?.originalName.orEmpty(),
+                            operator = RowConditionOperator.EQUALS_VALUE,
+                            value = "",
+                        ),
+                )
+            },
+            enabled = enabled,
+        ) {
+            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+            Text("Add Condition")
+        }
+    }
+}
+
+/**
+ * A single editable [RowCondition]: column, operator, and the operator-dependent
+ * value or other-column input.
+ */
+@Composable
+private fun RowConditionRow(
+    condition: RowCondition,
+    onConditionChanged: (RowCondition) -> Unit,
+    columns: List<CsvColumn>,
+    enabled: Boolean,
+) {
+    ColumnDropdown(
+        columns = columns,
+        selectedColumn = condition.columnName.takeIf { it.isNotBlank() },
+        onColumnSelected = { onConditionChanged(condition.copy(columnName = it)) },
+        label = "Column",
+        enabled = enabled,
+        isError = condition.columnName.isBlank(),
     )
+    Spacer(modifier = Modifier.height(4.dp))
+    OperatorDropdown(
+        selected = condition.operator,
+        onSelected = { op ->
+            onConditionChanged(
+                when (op) {
+                    RowConditionOperator.EQUALS_VALUE ->
+                        condition.copy(operator = op, otherColumnName = null, value = condition.value ?: "")
+                    RowConditionOperator.EQUALS_COLUMN, RowConditionOperator.NOT_EQUALS_COLUMN ->
+                        condition.copy(operator = op, value = null)
+                    RowConditionOperator.IS_BLANK, RowConditionOperator.IS_NOT_BLANK ->
+                        condition.copy(operator = op, value = null, otherColumnName = null)
+                },
+            )
+        },
+        enabled = enabled,
+    )
+    when (condition.operator) {
+        RowConditionOperator.EQUALS_VALUE -> {
+            Spacer(modifier = Modifier.height(4.dp))
+            OutlinedTextField(
+                value = condition.value.orEmpty(),
+                onValueChange = { onConditionChanged(condition.copy(value = it)) },
+                label = { Text("Value") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                enabled = enabled,
+                isError = condition.value.isNullOrBlank(),
+            )
+        }
+        RowConditionOperator.EQUALS_COLUMN, RowConditionOperator.NOT_EQUALS_COLUMN -> {
+            Spacer(modifier = Modifier.height(4.dp))
+            ColumnDropdown(
+                columns = columns,
+                selectedColumn = condition.otherColumnName,
+                onColumnSelected = { onConditionChanged(condition.copy(otherColumnName = it)) },
+                label = "Other column",
+                enabled = enabled,
+                isError = condition.otherColumnName.isNullOrBlank(),
+            )
+        }
+        RowConditionOperator.IS_BLANK, RowConditionOperator.IS_NOT_BLANK -> Unit
+    }
+}
+
+/**
+ * Dropdown selecting a [RowConditionOperator].
+ */
+@Composable
+private fun OperatorDropdown(
+    selected: RowConditionOperator,
+    onSelected: (RowConditionOperator) -> Unit,
+    enabled: Boolean,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { if (enabled) expanded = !expanded },
+    ) {
+        OutlinedTextField(
+            value = selected.label(),
+            onValueChange = {},
+            readOnly = true,
+            label = { Text("Operator") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+            enabled = enabled,
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            RowConditionOperator.entries.forEach { op ->
+                DropdownMenuItem(
+                    text = { DropdownSelectionRow(text = op.label(), selected = op == selected) },
+                    onClick = {
+                        onSelected(op)
+                        expanded = false
+                    },
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Editor for a single non-conditional account mapping used as a branch of a
+ * [ConditionalAccountMapping]. The kind picker excludes the conditional type, so
+ * nesting is bounded to one level.
+ */
+@Composable
+private fun LeafAccountMappingEditor(
+    label: String,
+    mapping: FieldMapping,
+    onMappingChanged: (FieldMapping) -> Unit,
+    columns: List<CsvColumn>,
+    rows: List<CsvRow>,
+    firstRow: CsvRow?,
+    enabled: Boolean,
+) {
+    val kind =
+        when (mapping) {
+            is RegexAccountMapping -> LeafAccountKind.REGEX
+            is TemplateAccountMapping -> LeafAccountKind.TEMPLATE
+            else -> LeafAccountKind.LOOKUP
+        }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(label, style = MaterialTheme.typography.bodyMedium)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            LeafAccountKind.entries.forEach { k ->
+                RadioButton(
+                    selected = k == kind,
+                    onClick = { if (k != kind) onMappingChanged(defaultLeafAccountMapping(k, mapping.fieldType, mapping)) },
+                    enabled = enabled,
+                )
+                Text(k.label(), modifier = Modifier.padding(end = 8.dp))
+            }
+        }
+        when (mapping) {
+            is AccountLookupMapping -> {
+                ColumnDropdown(
+                    columns = columns,
+                    selectedColumn = mapping.columnName.takeIf { it.isNotBlank() },
+                    onColumnSelected = { onMappingChanged(mapping.copy(columnName = it)) },
+                    label = "Column for account name",
+                    sampleValue = getSampleValue(columns, firstRow, mapping.columnName),
+                    enabled = enabled,
+                    isError = mapping.columnName.isBlank(),
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                OptionalColumnDropdown(
+                    columns = columns,
+                    selectedColumn = mapping.fallbackColumns.firstOrNull(),
+                    onColumnSelected = { selected ->
+                        onMappingChanged(mapping.copy(fallbackColumns = if (selected != null) listOf(selected) else emptyList()))
+                    },
+                    label = "Fallback column",
+                    enabled = enabled,
+                )
+            }
+            is RegexAccountMapping -> {
+                ColumnDropdown(
+                    columns = columns,
+                    selectedColumn = mapping.columnName.takeIf { it.isNotBlank() },
+                    onColumnSelected = { onMappingChanged(mapping.copy(columnName = it)) },
+                    label = "Column for account name",
+                    sampleValue = getSampleValue(columns, firstRow, mapping.columnName),
+                    enabled = enabled,
+                    isError = mapping.columnName.isBlank(),
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                RegexRulesEditor(
+                    rules = mapping.rules,
+                    onRulesChanged = { onMappingChanged(mapping.copy(rules = it)) },
+                    columnName = mapping.columnName.takeIf { it.isNotBlank() },
+                    columns = columns,
+                    rows = rows,
+                    enabled = enabled,
+                )
+            }
+            is TemplateAccountMapping -> {
+                TemplateAccountMappingEditor(
+                    columnName = mapping.columnName.takeIf { it.isNotBlank() },
+                    onColumnChanged = { onMappingChanged(mapping.copy(columnName = it)) },
+                    prefix = mapping.prefix,
+                    onPrefixChanged = { onMappingChanged(mapping.copy(prefix = it)) },
+                    suffix = mapping.suffix,
+                    onSuffixChanged = { onMappingChanged(mapping.copy(suffix = it)) },
+                    columns = columns,
+                    firstRow = firstRow,
+                    enabled = enabled,
+                )
+            }
+            else -> Unit
+        }
+    }
+}
+
+/**
+ * Editor for a [ConditionalAccountMapping]: a condition list plus two nested
+ * leaf-account editors for the true/false branches.
+ */
+@Composable
+private fun ConditionalAccountMappingEditor(
+    conditions: List<RowCondition>,
+    onConditionsChanged: (List<RowCondition>) -> Unit,
+    whenTrue: FieldMapping,
+    onWhenTrueChanged: (FieldMapping) -> Unit,
+    whenFalse: FieldMapping,
+    onWhenFalseChanged: (FieldMapping) -> Unit,
+    columns: List<CsvColumn>,
+    rows: List<CsvRow>,
+    firstRow: CsvRow?,
+    enabled: Boolean,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        RowConditionsEditor(
+            conditions = conditions,
+            onConditionsChanged = onConditionsChanged,
+            columns = columns,
+            enabled = enabled,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        LeafAccountMappingEditor(
+            label = "When conditions match",
+            mapping = whenTrue,
+            onMappingChanged = onWhenTrueChanged,
+            columns = columns,
+            rows = rows,
+            firstRow = firstRow,
+            enabled = enabled,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        LeafAccountMappingEditor(
+            label = "Otherwise",
+            mapping = whenFalse,
+            onMappingChanged = onWhenFalseChanged,
+            columns = columns,
+            rows = rows,
+            firstRow = firstRow,
+            enabled = enabled,
+        )
+    }
+}
+
+/**
+ * Editor for the strategy's list of [RowPreprocessingRule]s.
+ */
+@Composable
+private fun RowPreprocessingRulesEditor(
+    rules: List<RowPreprocessingRule>,
+    onRulesChanged: (List<RowPreprocessingRule>) -> Unit,
+    columns: List<CsvColumn>,
+    enabled: Boolean,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        rules.forEachIndexed { index, rule ->
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                colors =
+                    CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    ),
+            ) {
+                Column(modifier = Modifier.padding(8.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            "Rule ${index + 1}",
+                            style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier.weight(1f),
+                        )
+                        IconButton(
+                            onClick = { onRulesChanged(rules.filterIndexed { i, _ -> i != index }) },
+                            enabled = enabled,
+                        ) {
+                            Icon(Icons.Filled.Close, contentDescription = "Remove rule")
+                        }
+                    }
+
+                    fun updateRule(transform: (RowPreprocessingRule) -> RowPreprocessingRule) {
+                        onRulesChanged(rules.mapIndexed { i, r -> if (i == index) transform(r) else r })
+                    }
+                    RowConditionsEditor(
+                        conditions = rule.conditions,
+                        onConditionsChanged = { updated -> updateRule { it.copy(conditions = updated) } },
+                        columns = columns,
+                        enabled = enabled,
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    ColumnSwapsEditor(
+                        swaps = rule.columnSwaps,
+                        onSwapsChanged = { updated -> updateRule { it.copy(columnSwaps = updated) } },
+                        columns = columns,
+                        enabled = enabled,
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = rule.flipSourceAndTarget,
+                            onCheckedChange = { checked -> updateRule { it.copy(flipSourceAndTarget = checked) } },
+                            enabled = enabled,
+                        )
+                        Text(
+                            "Flip source and target accounts",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+            }
+        }
+        TextButton(
+            onClick = { onRulesChanged(rules + RowPreprocessingRule(conditions = emptyList())) },
+            enabled = enabled,
+        ) {
+            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+            Text("Add Rule")
+        }
+    }
+}
+
+/**
+ * Editor for a list of [ColumnPairSwap]s exchanged when a preprocessing rule applies.
+ */
+@Composable
+private fun ColumnSwapsEditor(
+    swaps: List<ColumnPairSwap>,
+    onSwapsChanged: (List<ColumnPairSwap>) -> Unit,
+    columns: List<CsvColumn>,
+    enabled: Boolean,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text("Column swaps", style = MaterialTheme.typography.bodyMedium)
+        swaps.forEachIndexed { index, swap ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    ColumnDropdown(
+                        columns = columns,
+                        selectedColumn = swap.firstColumn.takeIf { it.isNotBlank() },
+                        onColumnSelected = { selected ->
+                            onSwapsChanged(swaps.mapIndexed { i, s -> if (i == index) s.copy(firstColumn = selected) else s })
+                        },
+                        label = "First column",
+                        enabled = enabled,
+                        isError = swap.firstColumn.isBlank(),
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    ColumnDropdown(
+                        columns = columns,
+                        selectedColumn = swap.secondColumn.takeIf { it.isNotBlank() },
+                        onColumnSelected = { selected ->
+                            onSwapsChanged(swaps.mapIndexed { i, s -> if (i == index) s.copy(secondColumn = selected) else s })
+                        },
+                        label = "Second column",
+                        enabled = enabled,
+                        isError = swap.secondColumn.isBlank(),
+                    )
+                }
+                IconButton(
+                    onClick = { onSwapsChanged(swaps.filterIndexed { i, _ -> i != index }) },
+                    enabled = enabled,
+                ) {
+                    Icon(Icons.Filled.Close, contentDescription = "Remove swap")
+                }
+            }
+        }
+        TextButton(
+            onClick = {
+                onSwapsChanged(swaps + ColumnPairSwap(firstColumn = "", secondColumn = ""))
+            },
+            enabled = enabled,
+        ) {
+            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+            Text("Add Swap")
+        }
+    }
+}
+
+/**
+ * Editor for the strategy's list of [CompanionTransactionRule]s.
+ */
+@Composable
+private fun CompanionTransactionRulesEditor(
+    rules: List<CompanionTransactionRule>,
+    onRulesChanged: (List<CompanionTransactionRule>) -> Unit,
+    enabled: Boolean,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        rules.forEachIndexed { index, rule ->
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                colors =
+                    CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    ),
+            ) {
+                Column(modifier = Modifier.padding(8.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            "Rule ${index + 1}",
+                            style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier.weight(1f),
+                        )
+                        IconButton(
+                            onClick = { onRulesChanged(rules.filterIndexed { i, _ -> i != index }) },
+                            enabled = enabled,
+                        ) {
+                            Icon(Icons.Filled.Close, contentDescription = "Remove rule")
+                        }
+                    }
+
+                    fun updateRule(transform: (CompanionTransactionRule) -> CompanionTransactionRule) {
+                        onRulesChanged(rules.mapIndexed { i, r -> if (i == index) transform(r) else r })
+                    }
+                    OutlinedTextField(
+                        value = rule.name,
+                        onValueChange = { newValue -> updateRule { it.copy(name = newValue) } },
+                        label = { Text("Name") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        enabled = enabled,
+                        isError = rule.name.isBlank(),
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    OutlinedTextField(
+                        value = rule.matchAttributeName,
+                        onValueChange = { newValue -> updateRule { it.copy(matchAttributeName = newValue) } },
+                        label = { Text("Match attribute name") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        enabled = enabled,
+                        isError = rule.matchAttributeName.isBlank(),
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    OutlinedTextField(
+                        value = rule.matchValuePattern,
+                        onValueChange = { newValue -> updateRule { it.copy(matchValuePattern = newValue) } },
+                        label = { Text("Match value pattern (SQL LIKE)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        enabled = enabled,
+                        isError = rule.matchValuePattern.isBlank(),
+                        supportingText = { Text("e.g., ACCRUAL_CHARGE-%") },
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    OutlinedTextField(
+                        value = rule.linkAttributeName,
+                        onValueChange = { newValue -> updateRule { it.copy(linkAttributeName = newValue) } },
+                        label = { Text("Link attribute name") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        enabled = enabled,
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    OutlinedTextField(
+                        value = rule.companionDescription,
+                        onValueChange = { newValue -> updateRule { it.copy(companionDescription = newValue) } },
+                        label = { Text("Companion description") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        enabled = enabled,
+                    )
+                }
+            }
+        }
+        TextButton(
+            onClick = {
+                onRulesChanged(
+                    rules +
+                        CompanionTransactionRule(
+                            name = "",
+                            matchAttributeName = "",
+                            matchValuePattern = "",
+                            linkAttributeName = "",
+                            companionDescription = "",
+                        ),
+                )
+            },
+            enabled = enabled,
+        ) {
+            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+            Text("Add Rule")
+        }
+    }
 }
 
 /**
