@@ -33,6 +33,15 @@ interface CsvAccountMappingRepository {
     ): Long
 
     /**
+     * Creates multiple mappings in a single database transaction.
+     * Much faster than per-mapping [createMapping] calls.
+     * The id field of each mapping is ignored; created/updated timestamps are honored.
+     *
+     * @param mappings The mappings to create
+     */
+    suspend fun createMappings(mappings: List<CsvAccountMapping>)
+
+    /**
      * Updates an existing mapping.
      * The updatedAt timestamp will be set automatically.
      *

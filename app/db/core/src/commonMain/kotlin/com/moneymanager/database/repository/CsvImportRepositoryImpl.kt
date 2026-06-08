@@ -194,6 +194,25 @@ class CsvImportRepositoryImpl(
             tableManager.updateRowStatus(import.table_name, rowIndex, status, transferId)
         }
 
+    override suspend fun updateRowStatusesBatch(
+        id: CsvImportId,
+        status: String,
+        rowTransferMap: Map<Long, TransferId?>,
+    ): Unit =
+        withContext(coroutineContext) {
+            if (rowTransferMap.isEmpty()) return@withContext
+
+            val import =
+                csvImportQueries.selectImportById(id.id.toString()).executeAsOneOrNull()
+                    ?: return@withContext
+
+            database.transaction {
+                rowTransferMap.forEach { (rowIndex, transferId) ->
+                    tableManager.updateRowStatus(import.table_name, rowIndex, status, transferId)
+                }
+            }
+        }
+
     override suspend fun saveError(
         id: CsvImportId,
         rowIndex: Long,
@@ -217,6 +236,23 @@ class CsvImportRepositoryImpl(
                 csv_import_id = id.id.toString(),
                 row_index = rowIndex,
             )
+        }
+
+    override suspend fun clearErrors(
+        id: CsvImportId,
+        rowIndexes: Collection<Long>,
+    ): Unit =
+        withContext(coroutineContext) {
+            if (rowIndexes.isEmpty()) return@withContext
+
+            database.transaction {
+                rowIndexes.forEach { rowIndex ->
+                    csvImportQueries.deleteError(
+                        csv_import_id = id.id.toString(),
+                        row_index = rowIndex,
+                    )
+                }
+            }
         }
 
     override suspend fun recordImportApplication(

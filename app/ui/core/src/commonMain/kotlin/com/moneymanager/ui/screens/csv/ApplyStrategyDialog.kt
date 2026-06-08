@@ -383,40 +383,67 @@ fun ApplyStrategyDialog(
                                     strategyId = strategy.id,
                                     accountSelections = selectedExistingAccounts,
                                 )
-                            for (mapping in selectedMappingsToPersist) {
+                            if (selectedMappingsToPersist.isNotEmpty()) {
                                 try {
-                                    csvAccountMappingRepository.createMapping(
-                                        strategyId = mapping.strategyId,
-                                        columnName = mapping.columnName,
-                                        valuePattern = mapping.valuePattern,
-                                        accountId = mapping.accountId,
-                                    )
-                                    logger.info {
-                                        "Saved mapping '${mapping.valuePattern.pattern}' -> ${mapping.accountId.id}"
-                                    }
+                                    csvAccountMappingRepository.createMappings(selectedMappingsToPersist)
+                                    logger.info { "Saved ${selectedMappingsToPersist.size} selected account mappings" }
                                 } catch (expected: Exception) {
+                                    // Batch is atomic, nothing was committed — retry per mapping
+                                    // so one bad mapping doesn't block the rest
                                     logger.warn(expected) {
-                                        "Failed to save selected mapping '${mapping.valuePattern.pattern}'"
+                                        "Bulk mapping save failed, falling back to per-mapping save"
+                                    }
+                                    for (mapping in selectedMappingsToPersist) {
+                                        try {
+                                            csvAccountMappingRepository.createMapping(
+                                                strategyId = mapping.strategyId,
+                                                columnName = mapping.columnName,
+                                                valuePattern = mapping.valuePattern,
+                                                accountId = mapping.accountId,
+                                            )
+                                        } catch (expectedMappingError: Exception) {
+                                            logger.warn(expectedMappingError) {
+                                                "Failed to save selected mapping '${mapping.valuePattern.pattern}'"
+                                            }
+                                        }
                                     }
                                 }
                             }
 
                             // Create new accounts first (skip failures - transfers using them will fail later)
                             val createdAccountNames = mutableSetOf<String>()
-                            for (newAccount in accountsToCreate) {
-                                try {
-                                    val account =
+                            if (accountsToCreate.isNotEmpty()) {
+                                val newAccounts =
+                                    accountsToCreate.map { newAccount ->
                                         Account(
                                             id = AccountId(0),
                                             name = newAccount.name,
                                             openingDate = Clock.System.now(),
                                             categoryId = newAccount.categoryId,
                                         )
-                                    accountRepository.createAccount(account)
-                                    createdAccountNames.add(newAccount.name)
-                                    logger.info { "Created new account: ${newAccount.name}" }
+                                    }
+                                try {
+                                    // Bulk-create all accounts in a single database transaction
+                                    accountRepository.createAccountsBatch(newAccounts)
+                                    createdAccountNames.addAll(accountsToCreate.map { it.name })
+                                    logger.info { "Created ${accountsToCreate.size} new accounts" }
                                 } catch (expected: Exception) {
-                                    logger.warn(expected) { "Skipping account '${newAccount.name}': ${expected.message}" }
+                                    // Batch is atomic, nothing was committed — fall back to
+                                    // per-account creation to skip only the failing accounts
+                                    logger.warn(expected) {
+                                        "Bulk account creation failed, falling back to per-account creation"
+                                    }
+                                    for (account in newAccounts) {
+                                        try {
+                                            accountRepository.createAccount(account)
+                                            createdAccountNames.add(account.name)
+                                            logger.info { "Created new account: ${account.name}" }
+                                        } catch (expectedAccountError: Exception) {
+                                            logger.warn(expectedAccountError) {
+                                                "Skipping account '${account.name}': ${expectedAccountError.message}"
+                                            }
+                                        }
+                                    }
                                 }
                             }
 
@@ -442,45 +469,67 @@ fun ApplyStrategyDialog(
                                         .filter { it.matchedPattern == null }
                                         .distinctBy { it.csvValue }
 
-                                for (discoveredMapping in regexMappings + exactMappings) {
-                                    val createdAccountName =
-                                        selectedNewAccountNames[discoveredMapping.targetAccountName]
-                                            ?.trim()
-                                            ?.takeIf { it.isNotBlank() }
-                                            ?: discoveredMapping.targetAccountName
+                                val mappingCreatedAt = Clock.System.now()
+                                val mappingsToCapture =
+                                    (regexMappings + exactMappings).mapIndexedNotNull { index, discoveredMapping ->
+                                        val createdAccountName =
+                                            selectedNewAccountNames[discoveredMapping.targetAccountName]
+                                                ?.trim()
+                                                ?.takeIf { it.isNotBlank() }
+                                                ?: discoveredMapping.targetAccountName
 
-                                    // Look up the account by the final name created for this detected value
-                                    val createdAccount =
-                                        accountsByNameForMapping[createdAccountName]
-                                            ?.takeIf { it.name in createdAccountNames }
+                                        // Look up the account by the final name created for this detected value
+                                        val createdAccount =
+                                            accountsByNameForMapping[createdAccountName]
+                                                ?.takeIf { it.name in createdAccountNames }
+                                                ?: return@mapIndexedNotNull null
 
-                                    if (createdAccount != null) {
-                                        try {
-                                            // Use the matched regex pattern if available,
-                                            // otherwise create an exact-match pattern for the CSV value
-                                            val matchedPattern = discoveredMapping.matchedPattern
-                                            val pattern =
-                                                if (matchedPattern != null) {
-                                                    Regex(matchedPattern, RegexOption.IGNORE_CASE)
-                                                } else {
-                                                    Regex(
-                                                        "^${Regex.escape(discoveredMapping.csvValue)}$",
-                                                        RegexOption.IGNORE_CASE,
-                                                    )
-                                                }
-                                            csvAccountMappingRepository.createMapping(
-                                                strategyId = strategy.id,
-                                                columnName = discoveredMapping.columnName,
-                                                valuePattern = pattern,
-                                                accountId = createdAccount.id,
-                                            )
-                                            val patternDesc = matchedPattern ?: discoveredMapping.csvValue
-                                            logger.info {
-                                                "Auto-captured mapping: '$patternDesc' -> ${createdAccount.name}"
+                                        // Use the matched regex pattern if available,
+                                        // otherwise create an exact-match pattern for the CSV value
+                                        val matchedPattern = discoveredMapping.matchedPattern
+                                        val pattern =
+                                            if (matchedPattern != null) {
+                                                Regex(matchedPattern, RegexOption.IGNORE_CASE)
+                                            } else {
+                                                Regex(
+                                                    "^${Regex.escape(discoveredMapping.csvValue)}$",
+                                                    RegexOption.IGNORE_CASE,
+                                                )
                                             }
-                                        } catch (expected: Exception) {
-                                            logger.warn(expected) {
-                                                "Failed to auto-capture mapping for '${discoveredMapping.csvValue}'"
+                                        CsvAccountMapping(
+                                            id = -(index + 1).toLong(),
+                                            strategyId = strategy.id,
+                                            columnName = discoveredMapping.columnName,
+                                            valuePattern = pattern,
+                                            accountId = createdAccount.id,
+                                            createdAt = mappingCreatedAt,
+                                            updatedAt = mappingCreatedAt,
+                                        )
+                                    }
+
+                                if (mappingsToCapture.isNotEmpty()) {
+                                    try {
+                                        // Bulk-save all auto-captured mappings in a single database transaction
+                                        csvAccountMappingRepository.createMappings(mappingsToCapture)
+                                        logger.info { "Auto-captured ${mappingsToCapture.size} account mappings" }
+                                    } catch (expected: Exception) {
+                                        // Batch is atomic, nothing was committed — retry per mapping
+                                        // so one bad mapping doesn't block the rest
+                                        logger.warn(expected) {
+                                            "Bulk auto-capture failed, falling back to per-mapping save"
+                                        }
+                                        for (mapping in mappingsToCapture) {
+                                            try {
+                                                csvAccountMappingRepository.createMapping(
+                                                    strategyId = mapping.strategyId,
+                                                    columnName = mapping.columnName,
+                                                    valuePattern = mapping.valuePattern,
+                                                    accountId = mapping.accountId,
+                                                )
+                                            } catch (expectedMappingError: Exception) {
+                                                logger.warn(expectedMappingError) {
+                                                    "Failed to auto-capture mapping '${mapping.valuePattern.pattern}'"
+                                                }
                                             }
                                         }
                                     }
@@ -620,27 +669,107 @@ fun ApplyStrategyDialog(
                             var successCount = 0
                             var duplicateCount = 0
 
-                            for (transferWithAttrs in finalPrep.validTransfers) {
-                                val transfer = transferWithAttrs.transfer
-                                val importStatus = transferWithAttrs.importStatus
-                                val existingTransferId = transferWithAttrs.existingTransferId
-                                val originalRowIndex = transferWithAttrs.rowIndex
+                            // Convert attributes from (typeName, value) to NewAttribute
+                            fun attributesFor(attributes: List<Pair<String, String>>): List<NewAttribute> =
+                                attributes.mapNotNull { (typeName, value) ->
+                                    val typeId = attributeTypeIdByName[typeName]
+                                    if (typeId != null) NewAttribute(typeId, value) else null
+                                }
 
+                            suspend fun markRowFailed(
+                                originalRowIndex: Long,
+                                expected: Exception,
+                            ) {
+                                // Mark row as ERROR in database
+                                csvImportRepository.updateRowStatus(
+                                    csvImport.id,
+                                    originalRowIndex,
+                                    ImportStatus.ERROR.name,
+                                )
+                                // Log the error and continue with remaining rows
+                                val errorMsg = expected.message ?: "Unknown error"
+                                // Persist the error message for later viewing
+                                csvImportRepository.saveError(csvImport.id, originalRowIndex, errorMsg)
+                                logger.warn(expected) {
+                                    "Failed to import row $originalRowIndex: $errorMsg"
+                                }
+                                failedRows.add(
+                                    CsvImportResult.FailedRow(
+                                        rowIndex = originalRowIndex,
+                                        errorMessage = errorMsg,
+                                    ),
+                                )
+                            }
+
+                            val importedRows =
+                                finalPrep.validTransfers.filter { it.importStatus == ImportStatus.IMPORTED }
+                            val duplicateRows =
+                                finalPrep.validTransfers.filter { it.importStatus == ImportStatus.DUPLICATE }
+                            val updatedRows =
+                                finalPrep.validTransfers.filter { it.importStatus == ImportStatus.UPDATED }
+
+                            // ERROR status shouldn't come from mapper, but handle gracefully
+                            finalPrep.validTransfers
+                                .filter { it.importStatus == ImportStatus.ERROR }
+                                .forEach { logger.warn { "Unexpected ERROR status for row ${it.rowIndex}" } }
+
+                            // Bulk-create all new transfers in a single database transaction —
+                            // dramatically faster than one transaction per row
+                            if (importedRows.isNotEmpty()) {
+                                // The mapper assigns the same placeholder ID to every new transfer,
+                                // so key attributes by unique temporary IDs for the bulk call
+                                val transfersWithTempIds =
+                                    importedRows.mapIndexed { index, row ->
+                                        row.transfer.copy(id = TransferId(-(index + 1L)))
+                                    }
+                                val attributesByTempId =
+                                    importedRows
+                                        .mapIndexed { index, row ->
+                                            TransferId(-(index + 1L)) to attributesFor(row.attributes)
+                                        }.toMap()
+                                // createTransfers records sources sequentially in list order,
+                                // so a running index maps each generated ID back to its CSV row
+                                var recorderCallIndex = 0
                                 try {
-                                    // Convert attributes from (typeName, value) to NewAttribute
-                                    val attributes =
-                                        transferWithAttrs.attributes.mapNotNull { (typeName, value) ->
-                                            val typeId = attributeTypeIdByName[typeName]
-                                            if (typeId != null) NewAttribute(typeId, value) else null
-                                        }
-
-                                    when (importStatus) {
-                                        ImportStatus.IMPORTED -> {
+                                    val createdIds =
+                                        transactionRepository.createTransfers(
+                                            transfers = transfersWithTempIds,
+                                            newAttributes = attributesByTempId,
+                                            sourceRecorder =
+                                                entitySource.csvImportRecorder(
+                                                    csvImportId = csvImport.id,
+                                                    rowIndexForTransfer = {
+                                                        importedRows[recorderCallIndex++].rowIndex
+                                                    },
+                                                ),
+                                            // Single all-or-nothing batch so the per-row fallback
+                                            // below can't create duplicates after a partial commit
+                                            batchSize = transfersWithTempIds.size,
+                                        )
+                                    csvImportRepository.updateRowStatusesBatch(
+                                        csvImport.id,
+                                        ImportStatus.IMPORTED.name,
+                                        importedRows
+                                            .mapIndexed { index, row ->
+                                                row.rowIndex to createdIds.getOrNull(index)
+                                            }.toMap(),
+                                    )
+                                    // Clear any previous errors for these rows (re-import success)
+                                    csvImportRepository.clearErrors(csvImport.id, importedRows.map { it.rowIndex })
+                                    successCount += importedRows.size
+                                } catch (expected: Exception) {
+                                    // Bulk insert is atomic, so nothing was committed —
+                                    // fall back to per-row import to isolate the failing rows
+                                    logger.warn(expected) {
+                                        "Bulk transfer creation failed, falling back to per-row import"
+                                    }
+                                    for (row in importedRows) {
+                                        val originalRowIndex = row.rowIndex
+                                        try {
                                             var createdTransferId: TransferId? = null
-                                            // Create new transfer
                                             transactionRepository.createTransfers(
-                                                transfers = listOf(transfer),
-                                                newAttributes = mapOf(transfer.id to attributes),
+                                                transfers = listOf(row.transfer),
+                                                newAttributes = mapOf(row.transfer.id to attributesFor(row.attributes)),
                                                 sourceRecorder =
                                                     entitySource.csvImportRecorder(
                                                         csvImportId = csvImport.id,
@@ -650,85 +779,65 @@ fun ApplyStrategyDialog(
                                                         },
                                                     ),
                                             )
-                                            val rowTransferId = createdTransferId ?: transfer.id
-                                            // Update row with status and transfer ID
                                             csvImportRepository.updateRowStatus(
                                                 csvImport.id,
                                                 originalRowIndex,
                                                 ImportStatus.IMPORTED.name,
-                                                rowTransferId,
+                                                createdTransferId ?: row.transfer.id,
                                             )
-                                            // Clear any previous error for this row (re-import success)
                                             csvImportRepository.clearError(csvImport.id, originalRowIndex)
                                             successCount++
-                                        }
-                                        ImportStatus.DUPLICATE -> {
-                                            // Skip creating transfer, just update CSV row status
-                                            csvImportRepository.updateRowStatus(
-                                                csvImport.id,
-                                                originalRowIndex,
-                                                ImportStatus.DUPLICATE.name,
-                                                existingTransferId,
-                                            )
-                                            logger.info { "Skipped duplicate row $originalRowIndex" }
-                                            duplicateCount++
-                                        }
-                                        ImportStatus.UPDATED -> {
-                                            // Update existing transfer
-                                            if (existingTransferId != null) {
-                                                transactionRepository.updateTransfer(
-                                                    transfer = transfer.copy(id = existingTransferId),
-                                                    deletedAttributeIds = emptySet(),
-                                                    updatedAttributes = emptyMap(),
-                                                    newAttributes = attributes,
-                                                    transactionId = existingTransferId,
-                                                )
-                                                val updatedTransfer =
-                                                    transactionRepository.getTransactionById(existingTransferId.id).first()
-                                                if (updatedTransfer != null) {
-                                                    transferSourceRepository.recordCsvImportSource(
-                                                        transactionId = existingTransferId,
-                                                        revisionId = updatedTransfer.revisionId,
-                                                        csvImportId = csvImport.id,
-                                                        rowIndex = originalRowIndex,
-                                                    )
-                                                }
-                                                csvImportRepository.updateRowStatus(
-                                                    csvImport.id,
-                                                    originalRowIndex,
-                                                    ImportStatus.UPDATED.name,
-                                                    existingTransferId,
-                                                )
-                                                // Clear any previous error for this row (re-import success)
-                                                csvImportRepository.clearError(csvImport.id, originalRowIndex)
-                                                successCount++
-                                            }
-                                        }
-                                        ImportStatus.ERROR -> {
-                                            // ERROR status shouldn't come from mapper, but handle gracefully
-                                            logger.warn { "Unexpected ERROR status for row $originalRowIndex" }
+                                        } catch (expectedRowError: Exception) {
+                                            markRowFailed(originalRowIndex, expectedRowError)
                                         }
                                     }
-                                } catch (expected: Exception) {
-                                    // Mark row as ERROR in database
+                                }
+                            }
+
+                            // Skip creating transfers for duplicates, just update CSV row statuses in batch
+                            if (duplicateRows.isNotEmpty()) {
+                                csvImportRepository.updateRowStatusesBatch(
+                                    csvImport.id,
+                                    ImportStatus.DUPLICATE.name,
+                                    duplicateRows.associate { it.rowIndex to it.existingTransferId },
+                                )
+                                logger.info { "Skipped ${duplicateRows.size} duplicate rows" }
+                                duplicateCount += duplicateRows.size
+                            }
+
+                            // Update existing transfers (typically few rows, so per-row is fine)
+                            for (row in updatedRows) {
+                                val existingTransferId = row.existingTransferId ?: continue
+                                val originalRowIndex = row.rowIndex
+                                try {
+                                    transactionRepository.updateTransfer(
+                                        transfer = row.transfer.copy(id = existingTransferId),
+                                        deletedAttributeIds = emptySet(),
+                                        updatedAttributes = emptyMap(),
+                                        newAttributes = attributesFor(row.attributes),
+                                        transactionId = existingTransferId,
+                                    )
+                                    val updatedTransfer =
+                                        transactionRepository.getTransactionById(existingTransferId.id).first()
+                                    if (updatedTransfer != null) {
+                                        transferSourceRepository.recordCsvImportSource(
+                                            transactionId = existingTransferId,
+                                            revisionId = updatedTransfer.revisionId,
+                                            csvImportId = csvImport.id,
+                                            rowIndex = originalRowIndex,
+                                        )
+                                    }
                                     csvImportRepository.updateRowStatus(
                                         csvImport.id,
                                         originalRowIndex,
-                                        ImportStatus.ERROR.name,
+                                        ImportStatus.UPDATED.name,
+                                        existingTransferId,
                                     )
-                                    // Log the error and continue with remaining rows
-                                    val errorMsg = expected.message ?: "Unknown error"
-                                    // Persist the error message for later viewing
-                                    csvImportRepository.saveError(csvImport.id, originalRowIndex, errorMsg)
-                                    logger.warn(expected) {
-                                        "Failed to import row $originalRowIndex: $errorMsg"
-                                    }
-                                    failedRows.add(
-                                        CsvImportResult.FailedRow(
-                                            rowIndex = originalRowIndex,
-                                            errorMessage = errorMsg,
-                                        ),
-                                    )
+                                    // Clear any previous error for this row (re-import success)
+                                    csvImportRepository.clearError(csvImport.id, originalRowIndex)
+                                    successCount++
+                                } catch (expected: Exception) {
+                                    markRowFailed(originalRowIndex, expected)
                                 }
                             }
 

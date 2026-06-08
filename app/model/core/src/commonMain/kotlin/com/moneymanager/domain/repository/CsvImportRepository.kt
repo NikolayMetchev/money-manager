@@ -99,6 +99,20 @@ interface CsvImportRepository {
     )
 
     /**
+     * Updates the import status for multiple rows in a single database transaction.
+     * Much faster than per-row [updateRowStatus] calls for large imports.
+     *
+     * @param id The import ID
+     * @param status The import status to set for all rows (IMPORTED, DUPLICATE, UPDATED)
+     * @param rowTransferMap Map of row index to optional transfer ID to link
+     */
+    suspend fun updateRowStatusesBatch(
+        id: CsvImportId,
+        status: String,
+        rowTransferMap: Map<Long, TransferId?>,
+    )
+
+    /**
      * Saves an error message for a specific row.
      * Replaces any existing error for the same row.
      *
@@ -121,6 +135,17 @@ interface CsvImportRepository {
     suspend fun clearError(
         id: CsvImportId,
         rowIndex: Long,
+    )
+
+    /**
+     * Clears errors for multiple rows in a single database transaction.
+     *
+     * @param id The import ID
+     * @param rowIndexes The row indexes to clear errors for
+     */
+    suspend fun clearErrors(
+        id: CsvImportId,
+        rowIndexes: Collection<Long>,
     )
 
     /**

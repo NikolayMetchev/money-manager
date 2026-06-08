@@ -58,6 +58,24 @@ class CsvAccountMappingRepositoryImpl(
             queries.lastInsertRowId().executeAsOne()
         }
 
+    override suspend fun createMappings(mappings: List<CsvAccountMapping>): Unit =
+        withContext(coroutineContext) {
+            if (mappings.isEmpty()) return@withContext
+
+            queries.transaction {
+                mappings.forEach { mapping ->
+                    queries.insert(
+                        strategy_id = mapping.strategyId.id.toString(),
+                        column_name = mapping.columnName,
+                        value_pattern = mapping.valuePattern.pattern,
+                        account_id = mapping.accountId.id,
+                        created_at = mapping.createdAt.toEpochMilliseconds(),
+                        updated_at = mapping.updatedAt.toEpochMilliseconds(),
+                    )
+                }
+            }
+        }
+
     override suspend fun updateMapping(mapping: CsvAccountMapping): Unit =
         withContext(coroutineContext) {
             val now = Clock.System.now()
