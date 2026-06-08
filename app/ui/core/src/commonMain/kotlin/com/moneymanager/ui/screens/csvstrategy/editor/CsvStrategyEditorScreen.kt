@@ -129,7 +129,7 @@ fun CsvStrategyEditorScreen(
     }
 
     if (isEditMode && existingStrategy == null) {
-        EditorPlaceholder(isEditMode = isEditMode, onBack = onBack) {
+        EditorPlaceholder(isEditMode = true, onBack = onBack) {
             Text("Strategy not found.", style = MaterialTheme.typography.bodyLarge)
         }
         return
@@ -145,14 +145,14 @@ fun CsvStrategyEditorScreen(
     val state = rememberCsvStrategyEditorState(editKey, initial, availableColumnNames)
 
     val firstRow = rows.firstOrNull()
-    val sampleValues: Map<Int, String>? =
-        firstRow?.let { row ->
-            csvColumns.associate { col -> col.columnIndex to row.values.getOrNull(col.columnIndex).orEmpty() }
-        }
 
     // Auto-detect columns on first load (create mode only).
     LaunchedEffect(csvColumns, firstRow) {
         if (!isEditMode) {
+            val sampleValues =
+                firstRow?.let { row ->
+                    csvColumns.associate { col -> col.columnIndex to row.values.getOrNull(col.columnIndex).orEmpty() }
+                }
             if (state.dateColumnName == null) {
                 state.dateColumnName = ColumnDetector.suggestDateColumn(csvColumns, sampleValues)
             }

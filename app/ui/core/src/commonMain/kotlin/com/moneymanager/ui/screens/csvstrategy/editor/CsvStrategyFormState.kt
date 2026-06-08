@@ -201,7 +201,6 @@ internal fun extractFormStateFromStrategy(
     strategy: CsvImportStrategy,
     availableColumnNames: Set<String>,
 ): StrategyFormState {
-    // Helper to check if column exists
     fun columnIfExists(name: String?): String? = name?.takeIf { it in availableColumnNames }
 
     // Drop conditions referencing columns absent from the uploaded CSV.
@@ -230,7 +229,6 @@ internal fun extractFormStateFromStrategy(
             else -> mapping
         }
 
-    // Extract source account mapping
     val sourceAccountMapping = strategy.fieldMappings[TransferField.SOURCE_ACCOUNT]
     val sourceAccountMode: SourceAccountMode
     val selectedAccountId: AccountId?
@@ -254,7 +252,6 @@ internal fun extractFormStateFromStrategy(
         }
     }
 
-    // Extract target account column
     val targetAccountMapping = strategy.fieldMappings[TransferField.TARGET_ACCOUNT]
     val targetAccountColumnName: String?
     val targetAccountFallbackColumns: List<String>
@@ -305,7 +302,6 @@ internal fun extractFormStateFromStrategy(
         }
     }
 
-    // Extract timestamp mapping
     val timestampMapping = strategy.fieldMappings[TransferField.TIMESTAMP]
     val dateColumnName: String?
     val dateFormat: String
@@ -333,7 +329,6 @@ internal fun extractFormStateFromStrategy(
         }
     }
 
-    // Extract description column
     val descriptionMapping = strategy.fieldMappings[TransferField.DESCRIPTION]
     val descriptionColumnName: String?
     val descriptionFallbackColumns: List<String>
@@ -348,7 +343,6 @@ internal fun extractFormStateFromStrategy(
         }
     }
 
-    // Extract amount mapping
     val amountMapping = strategy.fieldMappings[TransferField.AMOUNT]
     val amountColumnName: String?
     val flipAccountsOnPositive: Boolean
@@ -369,7 +363,6 @@ internal fun extractFormStateFromStrategy(
         }
     }
 
-    // Extract currency mapping
     val currencyMapping = strategy.fieldMappings[TransferField.CURRENCY]
     val currencyMode: CurrencyMode
     val selectedCurrencyId: CurrencyId?
@@ -392,7 +385,6 @@ internal fun extractFormStateFromStrategy(
         }
     }
 
-    // Extract timezone mapping
     val timezoneMapping = strategy.fieldMappings[TransferField.TIMEZONE]
     val timezoneMode: TimezoneMode
     val selectedTimezone: String

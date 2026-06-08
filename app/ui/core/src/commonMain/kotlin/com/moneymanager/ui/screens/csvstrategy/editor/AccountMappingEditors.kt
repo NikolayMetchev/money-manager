@@ -365,28 +365,24 @@ internal fun RegexRulesEditor(
                     // Show preview of matching values
                     if (columnIndex != null && rule.pattern.isNotBlank()) {
                         Spacer(modifier = Modifier.height(4.dp))
-                        val matchingValues =
+                        // Compile the pattern and scan the rows once, deriving both the matched-row
+                        // count and the distinct matched values from a single pass.
+                        val (matchingValues, matchCount) =
                             remember(rule.pattern, rows, columnIndex) {
                                 try {
                                     val regex = Regex(rule.pattern, RegexOption.IGNORE_CASE)
-                                    rows
-                                        .mapNotNull { row ->
-                                            row.values.getOrNull(columnIndex)?.takeIf { it.isNotBlank() }
-                                        }.filter { regex.containsMatchIn(it) }
-                                        .distinct()
-                                } catch (_: Exception) {
-                                    emptyList()
-                                }
-                            }
-                        val matchCount =
-                            remember(rule.pattern, rows, columnIndex) {
-                                try {
-                                    val regex = Regex(rule.pattern, RegexOption.IGNORE_CASE)
-                                    rows.count { row ->
-                                        row.values.getOrNull(columnIndex)?.let { regex.containsMatchIn(it) } == true
+                                    var count = 0
+                                    val values = LinkedHashSet<String>()
+                                    rows.forEach { row ->
+                                        val value = row.values.getOrNull(columnIndex) ?: return@forEach
+                                        if (regex.containsMatchIn(value)) {
+                                            count++
+                                            if (value.isNotBlank()) values.add(value)
+                                        }
                                     }
+                                    values.toList() to count
                                 } catch (_: Exception) {
-                                    0
+                                    emptyList<String>() to 0
                                 }
                             }
                         if (matchCount > 0) {
