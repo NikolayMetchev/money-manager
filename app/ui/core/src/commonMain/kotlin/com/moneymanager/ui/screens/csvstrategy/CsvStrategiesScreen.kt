@@ -45,11 +45,10 @@ import com.moneymanager.domain.CsvImportParseResult
 import com.moneymanager.domain.CsvStrategyImportExport
 import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.model.AppVersion
-import com.moneymanager.domain.model.csv.CsvImport
-import com.moneymanager.domain.model.csv.CsvRow
+import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.repository.AccountRepository
-import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CsvAccountMappingRepository
 import com.moneymanager.domain.repository.CsvImportRepository
@@ -70,7 +69,6 @@ fun CsvStrategiesScreen(
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
-    attributeTypeRepository: AttributeTypeRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     entitySource: EntitySource,
@@ -78,17 +76,15 @@ fun CsvStrategiesScreen(
     appVersion: AppVersion,
     onStrategyClick: (CsvImportStrategy) -> Unit = {},
     onBack: () -> Unit = {},
+    onEditStrategy: (CsvImportStrategyId, CsvImportId) -> Unit = { _, _ -> },
 ) {
     val strategies by csvImportStrategyRepository
         .getAllStrategies()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
 
-    // Edit flow state
+    // Edit flow state: pick a CSV to edit the strategy against, then navigate to the editor screen.
     var strategyToEdit by remember { mutableStateOf<CsvImportStrategy?>(null) }
     var showSelectCsvDialog by remember { mutableStateOf(false) }
-    var selectedCsvImport by remember { mutableStateOf<CsvImport?>(null) }
-    var csvRows by remember { mutableStateOf<List<CsvRow>>(emptyList()) }
-    var isLoadingRows by remember { mutableStateOf(false) }
 
     // Export state
     var strategyPendingExportPrompt by remember { mutableStateOf<CsvImportStrategy?>(null) }
@@ -165,22 +161,6 @@ fun CsvStrategiesScreen(
                 includeAccountMappingsInExport = null
                 exportJson = null
                 exportError = "Failed to export: ${expected.message}"
-            }
-        }
-    }
-
-    // Load CSV rows when a CSV import is selected. The selector dialog lists imports
-    // without their columns, so the full import (columns included) is fetched here -
-    // the strategy editor needs the columns for its dropdowns.
-    LaunchedEffect(selectedCsvImport?.id) {
-        val csvImport = selectedCsvImport
-        if (csvImport != null) {
-            isLoadingRows = true
-            try {
-                selectedCsvImport = csvImportRepository.getImport(csvImport.id).first() ?: csvImport
-                csvRows = csvImportRepository.getImportRows(csvImport.id, limit = 100, offset = 0)
-            } finally {
-                isLoadingRows = false
             }
         }
     }
@@ -306,43 +286,20 @@ fun CsvStrategiesScreen(
         )
     }
 
-    // Show CSV import selector dialog
-    if (showSelectCsvDialog && strategyToEdit != null) {
+    // Show CSV import selector dialog, then navigate to the editor screen for the chosen CSV.
+    val editingStrategy = strategyToEdit
+    if (showSelectCsvDialog && editingStrategy != null) {
         SelectCsvImportDialog(
             csvImportRepository = csvImportRepository,
             onCsvSelected = { csvImport ->
-                selectedCsvImport = csvImport
                 showSelectCsvDialog = false
+                strategyToEdit = null
+                onEditStrategy(editingStrategy.id, csvImport.id)
             },
             onDismiss = {
                 showSelectCsvDialog = false
                 strategyToEdit = null
             },
-        )
-    }
-
-    // Show edit strategy dialog when CSV import is selected
-    val currentCsvImport = selectedCsvImport
-    val currentStrategyToEdit = strategyToEdit
-    if (currentCsvImport != null && currentStrategyToEdit != null && !isLoadingRows) {
-        CreateCsvStrategyDialog(
-            csvImportStrategyRepository = csvImportStrategyRepository,
-            csvAccountMappingRepository = csvAccountMappingRepository,
-            accountRepository = accountRepository,
-            categoryRepository = categoryRepository,
-            currencyRepository = currencyRepository,
-            attributeTypeRepository = attributeTypeRepository,
-            personRepository = personRepository,
-            personAccountOwnershipRepository = personAccountOwnershipRepository,
-            entitySource = entitySource,
-            csvColumns = currentCsvImport.columns,
-            rows = csvRows,
-            onDismiss = {
-                selectedCsvImport = null
-                strategyToEdit = null
-                csvRows = emptyList()
-            },
-            existingStrategy = currentStrategyToEdit,
         )
     }
 

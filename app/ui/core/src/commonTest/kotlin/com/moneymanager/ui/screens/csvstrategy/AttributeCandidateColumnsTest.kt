@@ -4,6 +4,7 @@ package com.moneymanager.ui.screens.csvstrategy
 
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvColumnId
+import com.moneymanager.ui.screens.csvstrategy.editor.attributeCandidateColumns
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.uuid.Uuid

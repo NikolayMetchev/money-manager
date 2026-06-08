@@ -50,7 +50,6 @@ import com.moneymanager.ui.components.csv.CsvPreviewTable
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.screens.csv.ApplyStrategyDialog
-import com.moneymanager.ui.screens.csvstrategy.CreateCsvStrategyDialog
 import com.moneymanager.ui.util.displayDateTime
 import kotlinx.coroutines.launch
 
@@ -73,6 +72,7 @@ fun CsvImportDetailScreen(
     entitySource: EntitySource,
     onBack: () -> Unit,
     onDeleted: () -> Unit,
+    onCreateStrategy: (CsvImportId) -> Unit = {},
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
     onTransferClick: ((TransferId, Boolean) -> Unit)? = null,
 ) {
@@ -84,7 +84,6 @@ fun CsvImportDetailScreen(
     var isLoading by remember { mutableStateOf(true) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showApplyStrategyDialog by remember { mutableStateOf(false) }
-    var showCreateStrategyDialog by remember { mutableStateOf(false) }
     var isDeleting by remember { mutableStateOf(false) }
     var importSuccessMessage by remember { mutableStateOf<String?>(null) }
     var importFailedRows by remember { mutableStateOf<List<String>>(emptyList()) }
@@ -161,7 +160,7 @@ fun CsvImportDetailScreen(
             }
             Row {
                 TextButton(
-                    onClick = { showCreateStrategyDialog = true },
+                    onClick = { onCreateStrategy(importId) },
                     enabled = !isDeleting && import != null,
                 ) {
                     Text(
@@ -427,24 +426,6 @@ fun CsvImportDetailScreen(
                     }
                 rowsRefreshTrigger++
             },
-        )
-    }
-
-    // Create Strategy dialog
-    if (showCreateStrategyDialog && import != null) {
-        CreateCsvStrategyDialog(
-            csvImportStrategyRepository = csvImportStrategyRepository,
-            csvAccountMappingRepository = csvAccountMappingRepository,
-            accountRepository = accountRepository,
-            categoryRepository = categoryRepository,
-            currencyRepository = currencyRepository,
-            attributeTypeRepository = attributeTypeRepository,
-            personRepository = personRepository,
-            personAccountOwnershipRepository = personAccountOwnershipRepository,
-            entitySource = entitySource,
-            csvColumns = import!!.columns,
-            rows = rows,
-            onDismiss = { showCreateStrategyDialog = false },
         )
     }
 }

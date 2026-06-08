@@ -10,6 +10,7 @@ import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
 import com.moneymanager.domain.model.csv.CsvImportId
+import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 
 enum class ImportTab { CSV, API, MANUAL }
 
@@ -35,6 +36,11 @@ sealed class Screen(
     ) : Screen("Imports")
 
     data object CsvStrategies : Screen("Import Strategies")
+
+    data class CsvStrategyEditor(
+        val csvImportId: CsvImportId,
+        val strategyId: CsvImportStrategyId? = null,
+    ) : Screen(if (strategyId == null) "Create Strategy" else "Edit Strategy")
 
     data object ApiStrategies : Screen("API Import Strategies")
 
