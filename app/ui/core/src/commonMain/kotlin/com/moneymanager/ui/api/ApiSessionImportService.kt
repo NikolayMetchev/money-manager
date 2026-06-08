@@ -281,7 +281,11 @@ suspend fun downloadApiSessionTransactions(
                 before = transactions.minOfOrNull { it.created }
                 hasTransactions = transactions.isNotEmpty()
                 page += 1
-            } while (hasTransactions)
+                // A null pagination config means the endpoint returns the whole feed in one response
+                // (e.g. Starling); fetch exactly one page. Cursor mode keeps paging until a page is
+                // empty. Without this guard a non-paginating endpoint that ignores the cursor would
+                // return the same items forever and loop indefinitely.
+            } while (hasTransactions && pagination != null)
         }
     }
 
@@ -343,12 +347,24 @@ suspend fun importApiSessionPeople(
         }
     val ownedAccountsByProfile =
         buildProfileAccountMap(apiSessionRepository, accountRepository, accountAttributeRepository, accountsSessionId, strategy, config)
+    // Flat providers with a single global account holder (no ancestor hierarchy) link that holder to
+    // every account imported in the session.
+    val allSessionAccountIds =
+        if (config.ownsAllAccounts) {
+            loadSessionAccountIds(apiSessionRepository, accountRepository, accountAttributeRepository, accountsSessionId, strategy)
+        } else {
+            emptyList()
+        }
     // Ownership links can only be created against accounts that already exist. When people are
     // imported before their accounts (no accounts session, or accounts not yet imported), the
     // profile→account map is empty and people are created without ownerships; flag that so the
     // empty-ownership outcome isn't mistaken for a successful link.
-    if (config.accountOwnerAncestorExpr != null && ownedAccountsByProfile.isEmpty()) {
-        logger.warn { "Importing people with no imported accounts to link; ownerships will not be created. Import accounts first." }
+    val noLinkableAccounts =
+        if (config.ownsAllAccounts) allSessionAccountIds.isEmpty() else ownedAccountsByProfile.isEmpty()
+    if (config.accountOwnerAncestorExpr != null || config.ownsAllAccounts) {
+        if (noLinkableAccounts) {
+            logger.warn { "Importing people with no imported accounts to link; ownerships will not be created. Import accounts first." }
+        }
     }
     val peopleIndex = loadPeopleIndex(personRepository, personAttributeRepository, externalIdAttributeTypeId)
 
@@ -360,7 +376,8 @@ suspend fun importApiSessionPeople(
             ?.forEachIndexed { index, element ->
                 val obj = element as? JsonObject ?: return@forEachIndexed
                 val owner = obj.toPersonOwner(config, index) ?: return@forEachIndexed
-                val ownedAccounts = ownedAccountsByProfile[owner.userId].orEmpty()
+                val ownedAccounts =
+                    if (config.ownsAllAccounts) allSessionAccountIds else ownedAccountsByProfile[owner.userId].orEmpty()
                 if (ownedAccounts.isEmpty()) {
                     val created =
                         resolveOrCreatePerson(
@@ -425,6 +442,29 @@ private suspend fun buildProfileAccountMap(
         }
     }
     return result
+}
+
+/** Returns every [AccountId] imported under [accountsSessionId] (used for [ApiPersonImportConfig.ownsAllAccounts]). */
+private suspend fun loadSessionAccountIds(
+    apiSessionRepository: ApiSessionRepository,
+    accountRepository: AccountRepository,
+    accountAttributeRepository: AccountAttributeRepository,
+    accountsSessionId: ApiSessionId?,
+    strategy: ApiImportStrategy,
+): List<AccountId> {
+    if (accountsSessionId == null) return emptyList()
+    val accountIdByExternalId = loadAccountExternalIdIndex(accountRepository, accountAttributeRepository)
+    val requestsById = apiSessionRepository.getRequestsBySession(accountsSessionId).associateBy { it.id }
+    val result = mutableListOf<AccountId>()
+    for (response in apiSessionRepository.getResponsesBySession(accountsSessionId)) {
+        val isAccountsResponse = requestsById[response.requestId]?.isAccountsRequest(strategy) == true
+        if (isAccountsResponse) {
+            for (account in parseAccounts(response.json, strategy)) {
+                accountIdByExternalId[account.id]?.let { result.add(it) }
+            }
+        }
+    }
+    return result.distinct()
 }
 
 /** Maps a profile object to an owner; returns null when no usable name can be derived. */
@@ -2269,7 +2309,11 @@ private fun arrayItemJsonPath(
     index: Int,
 ): JsonPath = if (responseArrayKey.isBlank()) JsonPath("$[$index]") else JsonPath("$.$responseArrayKey[$index]")
 
-/** Extracts the items array from a response body; a blank [responseArrayKey] means the body is the array. */
+/**
+ * Extracts the items array from a response body; a blank [responseArrayKey] means the body is the
+ * array. A bare JSON object body (e.g. a single-resource endpoint like Starling's account holder) is
+ * wrapped as a one-element array so single-object responses parse like any other.
+ */
 private fun responseItemsArray(
     json: String,
     responseArrayKey: String,
@@ -2277,7 +2321,11 @@ private fun responseItemsArray(
     try {
         val root = Json.parseToJsonElement(json)
         if (responseArrayKey.isBlank()) {
-            root as? JsonArray
+            when (root) {
+                is JsonArray -> root
+                is JsonObject -> JsonArray(listOf(root))
+                else -> null
+            }
         } else {
             (root as? JsonObject)?.get(responseArrayKey)?.jsonArray
         }

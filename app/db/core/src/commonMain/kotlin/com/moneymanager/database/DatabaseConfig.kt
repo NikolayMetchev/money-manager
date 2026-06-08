@@ -819,10 +819,11 @@ object DatabaseConfig {
             attributeTypeQueries.insertWithId(id = ACCOUNT_SORT_CODE_ATTR_TYPE_ID, name = "account-sort-code")
             attributeTypeQueries.insertWithId(id = ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID, name = "account-account-number")
 
-            // Seed the built-in Monzo and Wise API import strategies (after triggers and system
-            // device are created so the INSERT trigger records the initial audit entry and source)
+            // Seed the built-in Monzo, Wise and Starling API import strategies (after triggers and
+            // system device are created so the INSERT trigger records the initial audit entry/source)
             seedMonzoStrategy(systemDeviceId)
             seedWiseStrategy(systemDeviceId)
+            seedStarlingStrategy(systemDeviceId)
 
             // Seed the built-in CSV import strategies
             seedBuiltInCsvStrategies()
@@ -1025,6 +1026,83 @@ object DatabaseConfig {
         )
         apiImportStrategyQueries.insertSource(
             strategy_id = wiseStrategyId.toString(),
+            revision_id = 1,
+            source_type_id = SourceType.SYSTEM.id.toLong(),
+            device_id = systemDeviceId,
+        )
+    }
+
+    /** Fixed UUID for the built-in Starling strategy so it can be referenced reliably. */
+    private val starlingStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000005")
+
+    /**
+     * Seeds the built-in Starling Bank API import strategy. Starling is a flat two-level API like
+     * Monzo: a single Bearer token lists accounts, and each account's transaction feed is fetched
+     * from a path templated with the account id and its `defaultCategory`. Amounts are integer minor
+     * units and the direction lives in a separate `direction` field (IN/OUT). The whole feed is
+     * returned in one response, so no pagination is configured. The account holder is a single global
+     * object (`/api/v2/account-holder/individual`) linked to every imported account.
+     */
+    private fun MoneyManagerDatabaseWrapper.seedStarlingStrategy(systemDeviceId: Long) {
+        val config =
+            ApiStrategyConfigJson(
+                baseUrl = "https://api.starlingbank.com",
+                authType = ApiAuthType.BEARER_TOKEN,
+                accountsEndpoint =
+                    ApiEndpointConfig(
+                        path = "/api/v2/accounts",
+                        responseArrayKey = "accounts",
+                    ),
+                transactionsEndpoint =
+                    ApiEndpointConfig(
+                        // {account.defaultCategory} resolves the account's defaultCategory from its raw
+                        // JSON; the feed endpoint returns the full history in a single response.
+                        path = "/api/v2/feed/account/{account.id}/category/{account.defaultCategory}",
+                        responseArrayKey = "feedItems",
+                    ),
+                accountMappings =
+                    ApiAccountMappings(
+                        idField = "accountUid",
+                        descriptionField = "name",
+                        currencyField = "currency",
+                        ownersArrayField = null,
+                    ),
+                transactionMappings =
+                    ApiTransactionMappings(
+                        amountField = "amount.minorUnits",
+                        currencyField = "amount.currency",
+                        timestampField = "transactionTime",
+                        descriptionField = "reference",
+                        amountFormat = ApiAmountFormat.MINOR_UNITS_INTEGER,
+                        signSource = ApiSignSource.FIELD,
+                        signField = "direction",
+                        creditValues = setOf("IN"),
+                        idField = "feedItemUid",
+                        counterpartyNameField = "counterPartyName",
+                    ),
+                accountNamePrefix = "Starling: ",
+                counterpartyPrefix = "Starling Counterparty: ",
+                // The account holder is global (one per connection) and returned as a single object,
+                // so it is linked to every account imported in the session.
+                peopleDownload =
+                    ApiPersonImportConfig(
+                        endpoint = ApiEndpointConfig(path = "/api/v2/account-holder/individual", responseArrayKey = ""),
+                        firstNameField = "firstName",
+                        lastNameField = "lastName",
+                        ownsAllAccounts = true,
+                    ),
+                personExternalIdAttribute = "starling-external-id",
+            )
+        val now = Clock.System.now().toEpochMilliseconds()
+        apiImportStrategyQueries.insert(
+            id = starlingStrategyId.toString(),
+            name = "Starling",
+            config_json = ApiStrategyJsonCodec.encode(config),
+            created_at = now,
+            updated_at = now,
+        )
+        apiImportStrategyQueries.insertSource(
+            strategy_id = starlingStrategyId.toString(),
             revision_id = 1,
             source_type_id = SourceType.SYSTEM.id.toLong(),
             device_id = systemDeviceId,

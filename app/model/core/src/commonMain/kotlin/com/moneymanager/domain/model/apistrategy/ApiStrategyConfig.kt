@@ -292,6 +292,10 @@ data class ApiSigningConfig(
  * @property accountOwnerAncestorExpr When set, links each imported person to the accounts fetched
  *                                    under the matching ancestor value (e.g. "ancestor[0].id" links a
  *                                    profile to the balances fetched under that profile id).
+ * @property ownsAllAccounts When true, the holder(s) returned by [endpoint] are linked to every
+ *                           account imported in the session, regardless of ancestor/id. Use for flat
+ *                           providers with a single global account holder and no ancestor hierarchy
+ *                           (e.g. Starling). Mutually exclusive with [accountOwnerAncestorExpr].
  */
 @Serializable
 data class ApiPersonImportConfig(
@@ -302,6 +306,7 @@ data class ApiPersonImportConfig(
     val preferredNameField: String? = null,
     val fallbackNameField: String? = null,
     val accountOwnerAncestorExpr: String? = null,
+    val ownsAllAccounts: Boolean = false,
 )
 
 /**
