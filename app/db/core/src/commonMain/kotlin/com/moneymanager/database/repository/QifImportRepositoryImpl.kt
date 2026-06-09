@@ -18,7 +18,6 @@ import com.moneymanager.domain.model.qif.QifRecordSplit
 import com.moneymanager.domain.repository.QifImportRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
