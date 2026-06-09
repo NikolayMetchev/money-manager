@@ -46,7 +46,8 @@ import kotlinx.coroutines.launch
  * used for QIF imports. Payee accounts auto-create with their detected names.
  */
 @Composable
-@Suppress("LongParameterList", "LongMethod")
+// Shares the single-file QIF apply flow's source-account/currency selection by design.
+@Suppress("LongParameterList", "LongMethod", "DuplicatedCode")
 fun QifImportAllDialog(
     unimported: List<QifImport>,
     csvImportStrategyRepository: CsvImportStrategyRepository,

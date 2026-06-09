@@ -124,7 +124,7 @@ class QifParserTest {
     @Test
     fun parse_splitTransaction_parsesSplits() {
         val qif =
-            $$"""
+            """
             !Type:Bank
             D02/02/2022
             T-90.00
@@ -147,7 +147,7 @@ class QifParserTest {
     @Test
     fun parse_splitWithTransferAccount_populatesSplitTransferAccount() {
         val qif =
-            $$"""
+            """
             !Type:Bank
             T-50.00
             S[Cash]

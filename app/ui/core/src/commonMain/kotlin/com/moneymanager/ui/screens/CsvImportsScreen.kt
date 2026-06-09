@@ -43,6 +43,8 @@ import com.moneymanager.ui.util.sha256Hex
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
 
+// The QIF imports screen mirrors this one (QIF reuses the CSV import engine); overlap is intentional.
+@Suppress("DuplicatedCode")
 @Composable
 fun CsvImportsScreen(
     csvImportRepository: CsvImportRepository,
@@ -182,6 +184,8 @@ fun CsvImportsScreen(
     }
 }
 
+// The QIF import card mirrors this one by design.
+@Suppress("DuplicatedCode")
 @Composable
 private fun CsvImportCard(
     import: CsvImport,

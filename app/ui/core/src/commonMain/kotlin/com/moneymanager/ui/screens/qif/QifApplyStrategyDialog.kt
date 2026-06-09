@@ -66,7 +66,10 @@ private val logger = logging()
  * strategy engine as rows over fixed columns via [QifCsvAdapter], so this reuses the same
  * strategy/account-mapping machinery and helper UI as CSV. v1 always creates new transfers
  * (duplicate detection between records is not performed; file-level re-import is blocked by checksum).
+ *
+ * Structurally mirrors the CSV ApplyStrategyDialog by design, hence the DuplicatedCode suppression.
  */
+@Suppress("DuplicatedCode")
 @Composable
 fun QifApplyStrategyDialog(
     qifImport: QifImport,

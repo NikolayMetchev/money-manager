@@ -99,6 +99,8 @@ data class CsvImportResult(
     )
 }
 
+// QIF reuses the CSV import engine, so its apply dialog/applier mirror this one by design.
+@Suppress("DuplicatedCode")
 @Composable
 fun ApplyStrategyDialog(
     csvImport: CsvImport,

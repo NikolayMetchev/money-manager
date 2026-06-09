@@ -14,45 +14,9 @@ actual class FilePickerLauncher(
     private val onResult: (FilePickerResult?) -> Unit,
 ) {
     actual fun launch() {
-        openFileDialog()
-    }
-
-    private fun openFileDialog() {
-        // Create a hidden frame for the dialog
-        val frame = Frame()
-        try {
-            val fileDialog = FileDialog(frame, "Select a CSV file", FileDialog.LOAD)
-
-            // Open in the directory of the previous selection
-            LastDirectoryStore.load()?.let { fileDialog.directory = it }
-
-            // Set file filter based on mime types
-            val extensions = mimeTypesToExtensions(mimeTypes)
-
-            if (extensions.isNotEmpty()) {
-                fileDialog.filenameFilter =
-                    FilenameFilter { _, name ->
-                        matchesExtensions(name, extensions)
-                    }
-            }
-
-            fileDialog.isVisible = true
-
-            val directory = fileDialog.directory
-            val file = fileDialog.file
-
-            if (directory != null && file != null) {
-                LastDirectoryStore.save(directory)
-                val selectedFile = File(directory, file)
-                val result = readFileAsResult(selectedFile)
-                onResult(result)
-            } else {
-                // User cancelled
-                onResult(null)
-            }
-        } finally {
-            frame.dispose()
-        }
+        val files = showLoadDialog("Select a file", mimeTypes, multiple = false)
+        files.firstOrNull()?.parent?.let { LastDirectoryStore.save(it) }
+        onResult(files.firstOrNull()?.let { readFileAsResult(it) })
     }
 }
 
@@ -61,25 +25,37 @@ actual class MultipleFilePickerLauncher(
     private val onResult: (List<FilePickerResult>) -> Unit,
 ) {
     actual fun launch() {
-        val frame = Frame()
-        try {
-            val fileDialog = FileDialog(frame, "Select files", FileDialog.LOAD)
-            fileDialog.isMultipleMode = true
-            LastDirectoryStore.load()?.let { fileDialog.directory = it }
+        val files = showLoadDialog("Select files", mimeTypes, multiple = true)
+        files.firstOrNull()?.parent?.let { LastDirectoryStore.save(it) }
+        onResult(files.mapNotNull { readFileAsResult(it) })
+    }
+}
 
-            val extensions = mimeTypesToExtensions(mimeTypes)
-            if (extensions.isNotEmpty()) {
-                fileDialog.filenameFilter = FilenameFilter { _, name -> matchesExtensions(name, extensions) }
-            }
+/**
+ * Shows a native load dialog filtered by [mimeTypes], opened at the last-used directory, and returns
+ * the selected files (empty if the user cancelled).
+ */
+private fun showLoadDialog(
+    title: String,
+    mimeTypes: List<String>,
+    multiple: Boolean,
+): List<File> {
+    val frame = Frame()
+    try {
+        val fileDialog = FileDialog(frame, title, FileDialog.LOAD)
+        fileDialog.isMultipleMode = multiple
+        LastDirectoryStore.load()?.let { fileDialog.directory = it }
 
-            fileDialog.isVisible = true
-
-            val files = fileDialog.files.orEmpty()
-            files.firstOrNull()?.parent?.let { LastDirectoryStore.save(it) }
-            onResult(files.mapNotNull { readFileAsResult(it) })
-        } finally {
-            frame.dispose()
+        val extensions = mimeTypesToExtensions(mimeTypes)
+        if (extensions.isNotEmpty()) {
+            fileDialog.filenameFilter = FilenameFilter { _, name -> matchesExtensions(name, extensions) }
         }
+
+        fileDialog.isVisible = true
+
+        return fileDialog.files.orEmpty().toList()
+    } finally {
+        frame.dispose()
     }
 }
 

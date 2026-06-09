@@ -60,7 +60,8 @@ import kotlinx.coroutines.launch
 import kotlin.time.Clock
 
 @Composable
-@Suppress("LongParameterList")
+// Mirrors CsvImportsScreen (QIF reuses the CSV import engine); overlap is intentional.
+@Suppress("LongParameterList", "DuplicatedCode")
 fun QifImportsScreen(
     qifImportRepository: QifImportRepository,
     csvImportStrategyRepository: CsvImportStrategyRepository,
@@ -272,6 +273,8 @@ fun QifImportsScreen(
     }
 }
 
+// Mirrors CsvImportCard by design.
+@Suppress("DuplicatedCode")
 @Composable
 private fun QifImportCard(
     import: QifImport,

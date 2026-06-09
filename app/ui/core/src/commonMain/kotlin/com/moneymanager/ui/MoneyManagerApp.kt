@@ -31,6 +31,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DbLocation
+import com.moneymanager.domain.model.TransferId
 import com.moneymanager.ui.background.BackgroundTaskPanel
 import com.moneymanager.ui.background.LocalBackgroundTaskManager
 import com.moneymanager.ui.background.rememberBackgroundTaskManager
@@ -98,6 +99,30 @@ fun MoneyManagerApp(
         val accounts by services.accounts.accountRepository
             .getAllAccounts()
             .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+
+        // Opens the account view for a clicked transfer, scrolled to it: money flows into the target
+        // account for positive amounts and out of the source account for negative ones.
+        fun navigateToTransferAccount(
+            transferId: TransferId,
+            isPositiveAmount: Boolean,
+        ) {
+            scope.launch {
+                val transfer =
+                    services.transactions.transactionRepository
+                        .getTransactionById(transferId.id)
+                        .first()
+                        ?: return@launch
+                val accountId = if (isPositiveAmount) transfer.targetAccountId else transfer.sourceAccountId
+                val account = accounts.find { a -> a.id == accountId }
+                navigationHistory.navigateTo(
+                    Screen.AccountTransactions(
+                        accountId = accountId,
+                        accountName = account?.name ?: accountId.toString(),
+                        scrollToTransferId = transferId,
+                    ),
+                )
+            }
+        }
 
         MaterialTheme {
             CompositionLocalProvider(LocalBackgroundTaskManager provides backgroundTaskManager) {
@@ -456,31 +481,7 @@ fun MoneyManagerApp(
                                         onCsvSourceClick = { importId, rowIndex ->
                                             navigationHistory.navigateTo(Screen.CsvImportDetail(importId, rowIndex))
                                         },
-                                        onTransferClick = { transferId, isPositiveAmount ->
-                                            scope.launch {
-                                                val transfer =
-                                                    services.transactions.transactionRepository
-                                                        .getTransactionById(transferId.id)
-                                                        .first()
-                                                        ?: return@launch
-                                                // Navigate to target account if positive (money coming in),
-                                                // source account if negative (money going out)
-                                                val accountId =
-                                                    if (isPositiveAmount) {
-                                                        transfer.targetAccountId
-                                                    } else {
-                                                        transfer.sourceAccountId
-                                                    }
-                                                val account = accounts.find { a -> a.id == accountId }
-                                                navigationHistory.navigateTo(
-                                                    Screen.AccountTransactions(
-                                                        accountId = accountId,
-                                                        accountName = account?.name ?: accountId.toString(),
-                                                        scrollToTransferId = transferId,
-                                                    ),
-                                                )
-                                            }
-                                        },
+                                        onTransferClick = ::navigateToTransferAccount,
                                     )
                                 }
                                 is Screen.QifImportDetail -> {
@@ -504,25 +505,7 @@ fun MoneyManagerApp(
                                             navigationHistory.navigateTo(Screen.QifStrategyEditor(qifImportId))
                                         },
                                         onDeleted = { navigationHistory.navigateTo(Screen.Imports(ImportTab.QIF)) },
-                                        onTransferClick = { transferId, isPositiveAmount ->
-                                            scope.launch {
-                                                val transfer =
-                                                    services.transactions.transactionRepository
-                                                        .getTransactionById(transferId.id)
-                                                        .first()
-                                                        ?: return@launch
-                                                val accountId =
-                                                    if (isPositiveAmount) transfer.targetAccountId else transfer.sourceAccountId
-                                                val account = accounts.find { a -> a.id == accountId }
-                                                navigationHistory.navigateTo(
-                                                    Screen.AccountTransactions(
-                                                        accountId = accountId,
-                                                        accountName = account?.name ?: accountId.toString(),
-                                                        scrollToTransferId = transferId,
-                                                    ),
-                                                )
-                                            }
-                                        },
+                                        onTransferClick = ::navigateToTransferAccount,
                                     )
                                 }
                                 is Screen.CsvStrategies -> {
