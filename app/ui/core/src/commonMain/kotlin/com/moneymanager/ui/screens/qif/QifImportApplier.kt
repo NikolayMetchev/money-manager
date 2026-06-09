@@ -296,8 +296,12 @@ internal suspend fun runImport(
 
     // Pre-resolve attribute types.
     val attributeTypeIdByName =
-        importedRows.flatMap { it.attributes }.map { it.first }.toSet()
+        importedRows
+            .flatMap { it.attributes }
+            .map { it.first }
+            .toSet()
             .associateWith { attributeTypeRepository.getOrCreate(it) }
+
     fun attributesFor(attributes: List<Pair<String, String>>): List<NewAttribute> =
         attributes.mapNotNull { (typeName, value) ->
             attributeTypeIdByName[typeName]?.let { NewAttribute(it, value) }

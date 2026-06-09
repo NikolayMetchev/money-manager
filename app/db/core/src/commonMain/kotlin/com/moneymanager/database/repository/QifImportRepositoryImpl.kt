@@ -6,6 +6,7 @@ import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
+import com.moneymanager.database.sql.Qif_record
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.ImportStatus
@@ -15,7 +16,6 @@ import com.moneymanager.domain.model.qif.QifImportId
 import com.moneymanager.domain.model.qif.QifImportRecord
 import com.moneymanager.domain.model.qif.QifRecordSplit
 import com.moneymanager.domain.repository.QifImportRepository
-import com.moneymanager.database.sql.Qif_record
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map

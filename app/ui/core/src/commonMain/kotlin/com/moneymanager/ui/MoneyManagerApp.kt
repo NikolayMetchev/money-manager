@@ -53,15 +53,15 @@ import com.moneymanager.ui.screens.CsvImportDetailScreen
 import com.moneymanager.ui.screens.CurrenciesScreen
 import com.moneymanager.ui.screens.CurrencyAuditScreen
 import com.moneymanager.ui.screens.ImportsScreen
-import com.moneymanager.ui.screens.QifImportDetailScreen
-import com.moneymanager.ui.screens.qif.QifStrategyEditorScreen
 import com.moneymanager.ui.screens.PeopleScreen
 import com.moneymanager.ui.screens.PersonAuditScreen
+import com.moneymanager.ui.screens.QifImportDetailScreen
 import com.moneymanager.ui.screens.SettingsScreen
 import com.moneymanager.ui.screens.apistrategy.ApiImportStrategyAuditScreen
 import com.moneymanager.ui.screens.apistrategy.ApiStrategiesScreen
 import com.moneymanager.ui.screens.csvstrategy.CsvStrategiesScreen
 import com.moneymanager.ui.screens.csvstrategy.editor.CsvStrategyEditorScreen
+import com.moneymanager.ui.screens.qif.QifStrategyEditorScreen
 import com.moneymanager.ui.screens.transactions.AccountTransactionsScreen
 import com.moneymanager.ui.screens.transactions.TransactionAuditScreen
 import com.moneymanager.ui.screens.transactions.TransactionEditDialog

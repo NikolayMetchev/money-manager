@@ -18,7 +18,11 @@ class SettingsRepositoryImplTest : DbTest() {
         repositories.accountRepository.createAccount(
             Account(id = AccountId(0), name = name, openingDate = Clock.System.now()),
         )
-        return repositories.accountRepository.getAllAccounts().first().first { it.name == name }.id
+        return repositories.accountRepository
+            .getAllAccounts()
+            .first()
+            .first { it.name == name }
+            .id
     }
 
     @Test
@@ -74,7 +78,11 @@ class SettingsRepositoryImplTest : DbTest() {
     @Test
     fun `settings columns are independent - writing one does not clear the other`() =
         runTest {
-            val eur = repositories.currencyRepository.getAllCurrencies().first().first { it.code == "EUR" }
+            val eur =
+                repositories.currencyRepository
+                    .getAllCurrencies()
+                    .first()
+                    .first { it.code == "EUR" }
             val accountId = createAccount("Cash Account")
 
             // Set the last QIF account first, then the default currency: the currency upsert must

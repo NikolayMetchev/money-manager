@@ -76,7 +76,9 @@ private fun QifRecordCard(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = record.payee?.takeIf { it.isNotBlank() } ?: record.memo?.takeIf { it.isNotBlank() } ?: "Record ${record.recordIndex}",
+                        text =
+                            record.payee?.takeIf { it.isNotBlank() } ?: record.memo?.takeIf { it.isNotBlank() }
+                                ?: "Record ${record.recordIndex}",
                         style = MaterialTheme.typography.titleSmall,
                     )
                     Text(

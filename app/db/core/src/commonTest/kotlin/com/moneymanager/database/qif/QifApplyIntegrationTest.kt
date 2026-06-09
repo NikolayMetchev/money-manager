@@ -6,8 +6,8 @@ import com.moneymanager.database.csv.CsvTransferMapper
 import com.moneymanager.database.csv.ExistingTransferInfo
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
-import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.Currency
+import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
@@ -239,9 +239,20 @@ class QifApplyIntegrationTest : DbTest() {
         runTest {
             val (currency, source, target) = seed()
             val existing =
-                existingFrom(currency, source, target, record("03/16/2022", "-16.00", "DIRECT DEBIT TO THAMES WATER REF 0183323799 MONTHLY"))
+                existingFrom(
+                    currency,
+                    source,
+                    target,
+                    record("03/16/2022", "-16.00", "DIRECT DEBIT TO THAMES WATER REF 0183323799 MONTHLY"),
+                )
             val result =
-                statuses(currency, source, target, record("03/16/2022", "-16.00", "CARD PURCHASE AT AMAZON UK MARKETPLACE ORDER 778229"), existing)
+                statuses(
+                    currency,
+                    source,
+                    target,
+                    record("03/16/2022", "-16.00", "CARD PURCHASE AT AMAZON UK MARKETPLACE ORDER 778229"),
+                    existing,
+                )
             assertEquals(listOf(ImportStatus.IMPORTED), result)
         }
 

@@ -1238,14 +1238,6 @@ object DatabaseConfig {
     }
 
     /**
-     * Builds the built-in Monzo CSV import strategy for Monzo's transaction export.
-     *
-     * No SOURCE_ACCOUNT mapping is seeded (account ids are database-specific); the user picks
-     * the Monzo account when applying the strategy. Positive amounts flow INTO the account, so
-     * flipAccountsOnPositive swaps source/target for credits. Transactions are deduplicated by
-     * the Transaction ID column on re-import.
-     */
-    /**
      * Built-in strategy for QIF imports. QIF reuses the CSV strategy engine over a fixed set of
      * columns (see [QifCsvAdapter]), so its identification columns are exactly those fixed fields and
      * it matches any QIF file. The source account and currency are chosen at import time (QIF data
@@ -1311,6 +1303,14 @@ object DatabaseConfig {
         )
     }
 
+    /**
+     * Builds the built-in Monzo CSV import strategy for Monzo's transaction export.
+     *
+     * No SOURCE_ACCOUNT mapping is seeded (account ids are database-specific); the user picks
+     * the Monzo account when applying the strategy. Positive amounts flow INTO the account, so
+     * flipAccountsOnPositive swaps source/target for credits. Transactions are deduplicated by
+     * the Transaction ID column on re-import.
+     */
     fun buildMonzoCsvStrategy(now: Instant): CsvImportStrategy {
         val fieldMappings =
             mapOf(

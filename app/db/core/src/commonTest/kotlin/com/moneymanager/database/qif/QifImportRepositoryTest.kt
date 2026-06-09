@@ -47,7 +47,11 @@ class QifImportRepositoryTest : DbTest() {
                     bankRecord(
                         1,
                         "-90.00",
-                        splits = listOf(QifRecordSplit(category = "Food", amount = "-60.00"), QifRecordSplit(transferAccount = "Cash", amount = "-30.00")),
+                        splits =
+                            listOf(
+                                QifRecordSplit(category = "Food", amount = "-60.00"),
+                                QifRecordSplit(transferAccount = "Cash", amount = "-30.00"),
+                            ),
                     ),
                     bankRecord(2, "100.00", supported = false, sectionType = "INVESTMENT"),
                 )

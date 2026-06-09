@@ -91,7 +91,14 @@ class QifParserTest {
             ^
             """.trimIndent()
 
-        assertEquals("-42.50", parser.parse(qif).records.single().fields.amount)
+        assertEquals(
+            "-42.50",
+            parser
+                .parse(qif)
+                .records
+                .single()
+                .fields.amount,
+        )
     }
 
     @Test
@@ -104,7 +111,14 @@ class QifParserTest {
             ^
             """.trimIndent()
 
-        assertEquals("-43.00", parser.parse(qif).records.single().fields.amount)
+        assertEquals(
+            "-43.00",
+            parser
+                .parse(qif)
+                .records
+                .single()
+                .fields.amount,
+        )
     }
 
     @Test
@@ -141,7 +155,13 @@ class QifParserTest {
             ^
             """.trimIndent()
 
-        val split = parser.parse(qif).records.single().fields.splits.single()
+        val split =
+            parser
+                .parse(qif)
+                .records
+                .single()
+                .fields.splits
+                .single()
 
         assertEquals("Cash", split.transferAccount)
         assertNull(split.category)
@@ -228,7 +248,11 @@ class QifParserTest {
 
         val result = parser.parse(qif)
 
-        val record = result.sections.single().records.single()
+        val record =
+            result.sections
+                .single()
+                .records
+                .single()
         assertEquals(QifSectionType.INVESTMENT, record.sectionType)
         assertFalse(record.supported)
         assertEquals("Buy", record.fields.investmentAction)
@@ -250,7 +274,13 @@ class QifParserTest {
         val result = parser.parse(qif)
 
         assertEquals(QifSectionType.CATEGORY_LIST, result.sections.single().type)
-        assertFalse(result.sections.single().records.single().supported)
+        assertFalse(
+            result.sections
+                .single()
+                .records
+                .single()
+                .supported,
+        )
         assertEquals(1, result.unsupportedRecordCount)
     }
 
@@ -280,7 +310,14 @@ class QifParserTest {
             ^
             """.trimIndent()
 
-        assertEquals(listOf("123 Main St", "Springfield"), parser.parse(qif).records.single().fields.address)
+        assertEquals(
+            listOf("123 Main St", "Springfield"),
+            parser
+                .parse(qif)
+                .records
+                .single()
+                .fields.address,
+        )
     }
 
     @Test
@@ -320,7 +357,12 @@ class QifParserTest {
 
         // The !Option header maps to UNKNOWN; the final record has no trailing ^ but still flushes.
         val bank = result.sections.single { it.type == QifSectionType.BANK }
-        assertEquals("-1.00", bank.records.single().fields.amount)
+        assertEquals(
+            "-1.00",
+            bank.records
+                .single()
+                .fields.amount,
+        )
     }
 
     @Test

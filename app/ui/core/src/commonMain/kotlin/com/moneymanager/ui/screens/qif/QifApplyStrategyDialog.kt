@@ -24,13 +24,13 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.database.csv.ImportPreparation
 import com.moneymanager.database.qif.QifCsvAdapter
 import com.moneymanager.domain.EntitySource
+import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
-import com.moneymanager.ui.components.CurrencyPicker
 import com.moneymanager.domain.model.qif.QifImport
 import com.moneymanager.domain.model.qif.QifImportRecord
 import com.moneymanager.domain.repository.AccountRepository
@@ -44,8 +44,8 @@ import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.QifImportRepository
 import com.moneymanager.domain.repository.SettingsRepository
 import com.moneymanager.domain.repository.TransactionRepository
-import com.moneymanager.domain.Maintenance
 import com.moneymanager.ui.components.AccountPicker
+import com.moneymanager.ui.components.CurrencyPicker
 import com.moneymanager.ui.components.LoadingTextButton
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -163,7 +163,16 @@ fun QifApplyStrategyDialog(
         }
     }
 
-    LaunchedEffect(selectedStrategy, selectedSourceAccountId, selectedCurrencyId, rows, accounts, currencies, accountMappings, selectedExistingAccounts) {
+    LaunchedEffect(
+        selectedStrategy,
+        selectedSourceAccountId,
+        selectedCurrencyId,
+        rows,
+        accounts,
+        currencies,
+        accountMappings,
+        selectedExistingAccounts,
+    ) {
         val strategy = selectedStrategy?.withQifCurrency(selectedCurrencyId)
         if (strategy != null && currencies.isNotEmpty() && rows.isNotEmpty()) {
             try {
@@ -334,4 +343,3 @@ fun QifApplyStrategyDialog(
         },
     )
 }
-

@@ -34,10 +34,10 @@ import com.moneymanager.domain.model.SourceRecorder
 import com.moneymanager.domain.model.SourceType
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImportId
-import com.moneymanager.domain.model.qif.QifImportId
 import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExport
+import com.moneymanager.domain.model.qif.QifImportId
 
 class DbMaintenance(
     private val delegate: DatabaseMaintenanceService,
