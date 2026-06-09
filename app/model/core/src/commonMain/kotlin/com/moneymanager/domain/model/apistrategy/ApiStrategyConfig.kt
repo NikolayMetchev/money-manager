@@ -157,7 +157,14 @@ enum class ApiSignSource {
  * @property idField Dot-path to the transaction's stable id, used for de-duplication
  * @property merchantNameField Optional dot-path to a merchant name; preferred counterparty name
  * @property counterpartyNameField Optional dot-path to a counterparty name; fallback for merchant
- * @property declineReasonField Optional dot-path to a decline reason for declined transactions
+ * @property declineReasonField Optional dot-path to a decline reason for declined transactions.
+ *                              Present-and-non-blank means declined (Monzo's `decline_reason` shape).
+ * @property declineStatusField Optional dot-path to a status field whose value flags declines
+ *                              (Starling's `status` shape, where the field is always present). When
+ *                              the resolved value is in [declinedStatusValues] the transaction is
+ *                              treated as declined — imported but excluded from balances — exactly
+ *                              like a non-blank [declineReasonField].
+ * @property declinedStatusValues Values of [declineStatusField] that mean "declined" (e.g. {"DECLINED"}).
  * @property localAmountField Optional dot-path to a local/original amount (foreign transactions)
  * @property localCurrencyField Optional dot-path to a local/original currency code
  */
@@ -176,6 +183,8 @@ data class ApiTransactionMappings(
     val counterpartyNameField: String? = null,
     val counterpartyIdField: String? = null,
     val declineReasonField: String? = null,
+    val declineStatusField: String? = null,
+    val declinedStatusValues: Set<String> = emptySet(),
     val localAmountField: String? = null,
     val localCurrencyField: String? = null,
     val customFields: Map<String, String> = emptyMap(),

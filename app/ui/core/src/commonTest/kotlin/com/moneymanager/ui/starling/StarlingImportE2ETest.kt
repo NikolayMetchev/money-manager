@@ -75,6 +75,48 @@ private val FEED_JSON =
 }
     """.trimIndent()
 
+/**
+ * Two settled items plus one DECLINED item. Declined feed items never moved money, so they are
+ * imported (for the record) but excluded from balances — mirroring Monzo's `decline_reason` handling.
+ */
+private val FEED_WITH_DECLINED_JSON =
+    """
+{
+  "feedItems": [
+    {
+      "feedItemUid": "f1",
+      "categoryUid": "$CATEGORY_UID",
+      "amount": { "currency": "GBP", "minorUnits": 1250 },
+      "direction": "OUT",
+      "status": "SETTLED",
+      "transactionTime": "2024-06-03T09:15:00.000Z",
+      "reference": "COFFEE SHOP",
+      "counterPartyName": "Coffee Shop"
+    },
+    {
+      "feedItemUid": "f2",
+      "categoryUid": "$CATEGORY_UID",
+      "amount": { "currency": "GBP", "minorUnits": 50000 },
+      "direction": "IN",
+      "status": "SETTLED",
+      "transactionTime": "2024-06-02T14:30:00.000Z",
+      "reference": "SALARY",
+      "counterPartyName": "ACME Ltd"
+    },
+    {
+      "feedItemUid": "f3",
+      "categoryUid": "$CATEGORY_UID",
+      "amount": { "currency": "GBP", "minorUnits": 200000 },
+      "direction": "OUT",
+      "status": "DECLINED",
+      "transactionTime": "2024-06-04T11:00:00.000Z",
+      "reference": "CRYPTO.COM",
+      "counterPartyName": "Crypto.com"
+    }
+  ]
+}
+    """.trimIndent()
+
 private val ACCOUNT_HOLDER_JSON =
     """
 {
@@ -87,13 +129,18 @@ private val ACCOUNT_HOLDER_JSON =
     """.trimIndent()
 
 class StarlingImportE2ETest : DbTest() {
-    private fun mockEngine() =
+    private val feedRequestUrls = mutableListOf<String>()
+
+    private fun mockEngine(feedJson: String = FEED_JSON) =
         MockEngine { request ->
             val url = request.url.toString()
             val json =
                 when {
                     url.contains("/account-holder/individual") -> ACCOUNT_HOLDER_JSON
-                    url.contains("/feed/account/") -> FEED_JSON
+                    url.contains("/feed/account/") -> {
+                        feedRequestUrls += url
+                        feedJson
+                    }
                     url.contains("/api/v2/accounts") -> ACCOUNTS_JSON
                     else -> error("Unexpected request: $url")
                 }
@@ -153,6 +200,14 @@ class StarlingImportE2ETest : DbTest() {
 
             assertEquals(2, importResult.transactionCount, "Both feed items should import")
             assertEquals(0, importResult.errorCount, "No import errors expected")
+
+            // Starling's feed endpoint rejects requests without the mandatory `changesSince` bound
+            // with HTTP 400, so every feed request must carry it.
+            assertTrue(feedRequestUrls.isNotEmpty(), "A feed request should have been made")
+            assertTrue(
+                feedRequestUrls.all { it.contains("changesSince=") },
+                "Every Starling feed request must include the mandatory changesSince parameter: $feedRequestUrls",
+            )
 
             val allAccounts = repositories.accountRepository.getAllAccounts().first()
             val ownAccount = allAccounts.single { it.name == "Starling: Personal" }
@@ -252,5 +307,71 @@ class StarlingImportE2ETest : DbTest() {
                     .first()
             assertTrue(owners.any { it.personId == ada.id }, "The account holder should own the Starling account")
             assertNotNull(ada)
+        }
+
+    @Test
+    fun `declined starling feed items are imported but excluded from the account balance`() =
+        runTest {
+            val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
+            val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
+            val sessionId = repositories.apiSessionRepository.createSession("test-starling-token", deviceId, now, null)
+            val strategy =
+                repositories.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .single { it.name == "Starling" }
+
+            val apiClient =
+                createApiClient(
+                    trafficRecorder =
+                        ApiSessionTrafficRecorder(sessionId = sessionId, apiSessionRepository = repositories.apiSessionRepository),
+                    engine = mockEngine(feedJson = FEED_WITH_DECLINED_JSON),
+                )
+
+            downloadApiSessionAccounts(
+                token = "test-starling-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+            downloadApiSessionTransactions(
+                token = "test-starling-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+            val importResult =
+                importApiSessionTransactions(
+                    apiSessionRepository = repositories.apiSessionRepository,
+                    accountRepository = repositories.accountRepository,
+                    currencyRepository = repositories.currencyRepository,
+                    transactionRepository = repositories.transactionRepository,
+                    entitySource = DbEntitySource(repositories.entitySourceQueries, repositories.transferSourceQueries, deviceId),
+                    personRepository = repositories.personRepository,
+                    personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
+                    personAttributeRepository = repositories.personAttributeRepository,
+                    attributeTypeRepository = repositories.attributeTypeRepository,
+                    accountAttributeRepository = repositories.accountAttributeRepository,
+                    deviceId = deviceId,
+                    sessionId = sessionId,
+                    strategy = strategy,
+                )
+
+            // All three items are imported, including the declined one (kept for the record).
+            assertEquals(3, importResult.transactionCount, "All feed items import, declined included")
+
+            // Balances are served from a materialized view that import does not refresh inline.
+            repositories.maintenanceService.refreshMaterializedViews()
+
+            val accounts = repositories.accountRepository.getAllAccounts().first()
+            val ownAccount = accounts.single { it.name == "Starling: Personal" }
+            val balances = repositories.transactionRepository.getAccountBalances().first()
+            val ownBalance = balances.single { it.accountId == ownAccount.id }
+
+            // Balance reflects only the two settled items (+50000 in, -1250 out); the 200000 declined
+            // outgoing is excluded. Were it counted, the balance would be -151250 instead of 48750.
+            assertEquals(48750L, ownBalance.balance.amount, "Declined item must not affect the balance")
         }
 }

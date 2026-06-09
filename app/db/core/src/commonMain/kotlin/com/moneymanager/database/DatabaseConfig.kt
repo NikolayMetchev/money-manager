@@ -1059,6 +1059,12 @@ object DatabaseConfig {
                         // JSON; the feed endpoint returns the full history in a single response.
                         path = "/api/v2/feed/account/{account.id}/category/{account.defaultCategory}",
                         responseArrayKey = "feedItems",
+                        // Starling requires a mandatory `changesSince` ISO-8601 bound; anchoring it to
+                        // the epoch returns the account's entire feed history in one response.
+                        queryParams =
+                            listOf(
+                                ApiQueryParam(name = "changesSince", value = "1970-01-01T00:00:00.000Z"),
+                            ),
                     ),
                 accountMappings =
                     ApiAccountMappings(
@@ -1079,6 +1085,10 @@ object DatabaseConfig {
                         creditValues = setOf("IN"),
                         idField = "feedItemUid",
                         counterpartyNameField = "counterPartyName",
+                        // Declined feed items never moved money; import them but exclude from balances
+                        // (same treatment as Monzo's `decline_reason`), keyed off Starling's status.
+                        declineStatusField = "status",
+                        declinedStatusValues = setOf("DECLINED"),
                     ),
                 accountNamePrefix = "Starling: ",
                 counterpartyPrefix = "Starling Counterparty: ",

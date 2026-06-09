@@ -2200,6 +2200,22 @@ private fun ApiTransactionPageItem.errorRecord(
         errorMessage = message,
     )
 
+/**
+ * Resolves a transaction's decline reason, used downstream to exclude it from balances. Two shapes
+ * are supported: a dedicated reason field that is only present when declined (Monzo's
+ * `decline_reason`), and an always-present status field whose value flags the decline (Starling's
+ * `status` == "DECLINED"). The status, when matched, doubles as the human-readable reason.
+ */
+private fun resolveDeclineReason(
+    obj: JsonObject,
+    mappings: ApiTransactionMappings,
+): String? {
+    val reason = mappings.declineReasonField?.let { obj.resolveJsonPath(it) }
+    if (!reason.isNullOrBlank()) return reason
+    val status = mappings.declineStatusField?.let { obj.resolveJsonPath(it) }
+    return status?.takeIf { it in mappings.declinedStatusValues }
+}
+
 private fun parseTransactionsWithPath(
     json: String,
     strategy: ApiImportStrategy,
@@ -2212,7 +2228,7 @@ private fun parseTransactionsWithPath(
                 val created = obj.resolveJsonPath(mappings.timestampField)?.let { Instant.parse(it) }
                 val amount = parseAmount(obj, mappings)
                 val currency = obj.resolveJsonPath(mappings.currencyField)
-                val declineReason = mappings.declineReasonField?.let { obj.resolveJsonPath(it) }
+                val declineReason = resolveDeclineReason(obj, mappings)
                 val localAmount = mappings.localAmountField?.let { obj.resolveJsonPath(it) }?.toLongOrNull()
                 val localCurrency = mappings.localCurrencyField?.let { obj.resolveJsonPath(it) }
                 if (created != null && amount != null && currency != null) {
