@@ -338,6 +338,12 @@ suspend fun importApiSessionPeople(
     accountsSessionId: ApiSessionId? = null,
 ): ApiPeopleImportResult {
     val config = strategy.peopleDownload ?: return ApiPeopleImportResult(personCount = 0, ownershipCount = 0)
+    // The two ownership-linking strategies are mutually exclusive: ownsAllAccounts links a single
+    // global holder to every account, while accountOwnerAncestorExpr derives ownership from the
+    // resource hierarchy. Allowing both would silently prefer ownsAllAccounts and persist wrong links.
+    require(!(config.ownsAllAccounts && config.accountOwnerAncestorExpr != null)) {
+        "Invalid peopleDownload config: ownsAllAccounts and accountOwnerAncestorExpr are mutually exclusive."
+    }
     val externalIdAttributeTypeId = strategy.personExternalIdAttribute?.let { attributeTypeRepository.getOrCreate(it) }
     val requestsById = apiSessionRepository.getRequestsBySession(sessionId).associateBy { it.id }
     val peopleResponses =

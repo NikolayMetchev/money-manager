@@ -53,6 +53,8 @@ class BuiltInApiStrategySeedTest : DbTest() {
                 assertEquals("direction", signField)
                 assertEquals(setOf("IN"), creditValues)
                 assertEquals("feedItemUid", idField)
+                assertEquals("status", declineStatusField)
+                assertEquals(setOf("DECLINED"), declinedStatusValues)
             }
 
             val people = assertNotNull(starling.peopleDownload, "Starling should configure a people download")

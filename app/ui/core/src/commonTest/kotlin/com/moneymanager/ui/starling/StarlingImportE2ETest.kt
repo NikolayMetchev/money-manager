@@ -129,23 +129,24 @@ private val ACCOUNT_HOLDER_JSON =
     """.trimIndent()
 
 class StarlingImportE2ETest : DbTest() {
-    private val feedRequestUrls = mutableListOf<String>()
-
-    private fun mockEngine(feedJson: String = FEED_JSON) =
-        MockEngine { request ->
-            val url = request.url.toString()
-            val json =
-                when {
-                    url.contains("/account-holder/individual") -> ACCOUNT_HOLDER_JSON
-                    url.contains("/feed/account/") -> {
-                        feedRequestUrls += url
-                        feedJson
-                    }
-                    url.contains("/api/v2/accounts") -> ACCOUNTS_JSON
-                    else -> error("Unexpected request: $url")
+    // Pass a per-test list to capture feed request URLs; kept local so tests stay isolated.
+    private fun mockEngine(
+        feedJson: String = FEED_JSON,
+        feedRequestUrls: MutableList<String>? = null,
+    ) = MockEngine { request ->
+        val url = request.url.toString()
+        val json =
+            when {
+                url.contains("/account-holder/individual") -> ACCOUNT_HOLDER_JSON
+                url.contains("/feed/account/") -> {
+                    feedRequestUrls?.add(url)
+                    feedJson
                 }
-            respond(content = json, status = HttpStatusCode.OK, headers = headersOf(HttpHeaders.ContentType, "application/json"))
-        }
+                url.contains("/api/v2/accounts") -> ACCOUNTS_JSON
+                else -> error("Unexpected request: $url")
+            }
+        respond(content = json, status = HttpStatusCode.OK, headers = headersOf(HttpHeaders.ContentType, "application/json"))
+    }
 
     @Test
     fun `starling feed items import with direction-based sign and minor-unit amounts`() =
@@ -159,11 +160,12 @@ class StarlingImportE2ETest : DbTest() {
                     .first()
                     .single { it.name == "Starling" }
 
+            val feedRequestUrls = mutableListOf<String>()
             val apiClient =
                 createApiClient(
                     trafficRecorder =
                         ApiSessionTrafficRecorder(sessionId = sessionId, apiSessionRepository = repositories.apiSessionRepository),
-                    engine = mockEngine(),
+                    engine = mockEngine(feedRequestUrls = feedRequestUrls),
                 )
 
             downloadApiSessionAccounts(
