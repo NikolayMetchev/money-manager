@@ -464,7 +464,6 @@ class StarlingImportE2ETest : DbTest() {
                 entitySource = DbEntitySource(repositories.entitySourceQueries, repositories.transferSourceQueries, deviceId),
                 sessionId = peopleSessionId,
                 strategy = strategy,
-                accountsSessionId = null,
             )
 
             // 2) Accounts AFTER the holder — the accounts import must back-link the holder to the own account.
@@ -546,7 +545,6 @@ class StarlingImportE2ETest : DbTest() {
                 entitySource = DbEntitySource(repositories.entitySourceQueries, repositories.transferSourceQueries, deviceId),
                 sessionId = peopleSessionId,
                 strategy = strategy,
-                accountsSessionId = null,
             )
 
             // Importing the SENDER counterparty "Ada Lovelace" matches the holder by name and backfills
