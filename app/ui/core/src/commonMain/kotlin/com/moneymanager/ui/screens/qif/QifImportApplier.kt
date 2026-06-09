@@ -308,9 +308,12 @@ internal suspend fun runImport(
             attributeTypeIdByName[typeName]?.let { NewAttribute(it, value) }
         }
 
-    // Bulk-create transfers; the QIF recorder links each one back to its source record index.
+    // Bulk-create transfers in a single batch. The mapper assigns the same placeholder id to every
+    // new transfer, so key attributes by unique temporary ids for the bulk call.
     val transfersWithTempIds = importedRows.mapIndexed { index, row -> row.transfer.copy(id = TransferId(-(index + 1L))) }
     val attributesByTempId = importedRows.mapIndexed { index, row -> TransferId(-(index + 1L)) to attributesFor(row.attributes) }.toMap()
+    // createTransfers invokes the source recorder once per transfer in list order, so a running index
+    // maps each recorded source back to its QIF record.
     var recorderCallIndex = 0
     val createdIds =
         transactionRepository.createTransfers(

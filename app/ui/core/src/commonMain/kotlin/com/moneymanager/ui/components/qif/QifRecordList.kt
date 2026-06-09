@@ -132,13 +132,24 @@ private fun QifRecordCard(
                         color = MaterialTheme.colorScheme.primary,
                         modifier =
                             Modifier.clickable {
-                                onTransferClick(transferId, !(record.amount ?: "").trim().startsWith("-"))
+                                onTransferClick(transferId, isPositiveQifAmount(record.amount))
                             },
                     )
                 }
             }
         }
     }
+}
+
+/**
+ * Decides the navigation direction for a linked transfer from its raw QIF amount string. QIF amounts
+ * from the T/U fields are normally '-'-prefixed when negative; parenthesised negatives (e.g.
+ * "(60.00)") are tolerated too. A blank amount is treated as positive (navigate to the target account).
+ */
+private fun isPositiveQifAmount(amount: String?): Boolean {
+    val trimmed = amount?.trim().orEmpty()
+    val isNegative = trimmed.startsWith("-") || (trimmed.startsWith("(") && trimmed.endsWith(")"))
+    return !isNegative
 }
 
 @Composable

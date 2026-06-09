@@ -20,6 +20,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import kotlin.coroutines.CoroutineContext
 import kotlin.time.Clock
@@ -96,7 +97,6 @@ class QifImportRepositoryImpl(
             .selectImportById(id.id.toString(), ::toQifImport)
             .asFlow()
             .mapToOneOrNull(coroutineContext)
-            .map { it }
 
     override suspend fun getImportRecords(
         id: QifImportId,
@@ -204,10 +204,22 @@ class QifImportRepositoryImpl(
             transferAccount = field_transfer_account,
             checkNumber = field_check_number,
             clearedStatus = field_cleared,
-            splits = splits_json?.let { Json.decodeFromString<List<QifRecordSplit>>(it) }.orEmpty(),
+            splits = decodeSplits(splits_json),
             transferId = transaction_id?.toLongOrNull()?.let { TransferId(it) },
             importStatus = import_status?.let { ImportStatus.valueOf(it) },
         )
+
+    // Splits are stored as JSON; tolerate malformed/corrupt data by falling back to no splits
+    // rather than failing the whole import view.
+    private fun decodeSplits(splitsJson: String?): List<QifRecordSplit> =
+        splitsJson
+            ?.let {
+                try {
+                    Json.decodeFromString<List<QifRecordSplit>>(it)
+                } catch (_: SerializationException) {
+                    emptyList()
+                }
+            }.orEmpty()
 
     @Suppress("LongParameterList")
     private fun toQifImport(
