@@ -286,7 +286,10 @@ class ImportQifE2ETest {
 
             // Apply to the first file (creates the transfers), then to the second (all duplicates).
             for (file in listOf("first.qif", "second.qif")) {
-                onNodeWithText(file).performClick()
+                // After navigating back from the previous file the list re-renders, so wait for the
+                // row before clicking it (it may not be present on the first recomposition on CI).
+                waitUntilAtLeastOneExists(hasText(file), timeoutMillis = 15000)
+                onAllNodesWithText(file).onFirst().performClick()
                 waitUntilAtLeastOneExists(hasText("Apply Strategy") and isEnabled(), timeoutMillis = 15000)
                 onAllNodesWithText("Apply Strategy").onFirst().performClick()
                 waitUntilExactlyOneExists(hasText("Apply Import Strategy"), timeoutMillis = 15000)
