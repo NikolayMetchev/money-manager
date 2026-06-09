@@ -320,6 +320,18 @@ suspend fun downloadApiSessionPeople(
 }
 
 /**
+ * The two ownership-linking strategies are mutually exclusive: [ApiPersonImportConfig.ownsAllAccounts]
+ * links a single global holder to every account, while [ApiPersonImportConfig.accountOwnerAncestorExpr]
+ * derives ownership from the resource hierarchy. Allowing both would silently prefer ownsAllAccounts and
+ * persist wrong links, so every code path that acts on the config validates it first.
+ */
+private fun validatePeopleOwnershipConfig(config: ApiPersonImportConfig) {
+    require(!(config.ownsAllAccounts && config.accountOwnerAncestorExpr != null)) {
+        "Invalid peopleDownload config: ownsAllAccounts and accountOwnerAncestorExpr are mutually exclusive."
+    }
+}
+
+/**
  * Imports people from a people-download session: creates a [Person] for each profile holder and, when
  * [accountsSessionId] is provided, links each person as an owner of the accounts fetched under their
  * profile (via [ApiPersonImportConfig.accountOwnerAncestorExpr]).
@@ -338,12 +350,7 @@ suspend fun importApiSessionPeople(
     accountsSessionId: ApiSessionId? = null,
 ): ApiPeopleImportResult {
     val config = strategy.peopleDownload ?: return ApiPeopleImportResult(personCount = 0, ownershipCount = 0)
-    // The two ownership-linking strategies are mutually exclusive: ownsAllAccounts links a single
-    // global holder to every account, while accountOwnerAncestorExpr derives ownership from the
-    // resource hierarchy. Allowing both would silently prefer ownsAllAccounts and persist wrong links.
-    require(!(config.ownsAllAccounts && config.accountOwnerAncestorExpr != null)) {
-        "Invalid peopleDownload config: ownsAllAccounts and accountOwnerAncestorExpr are mutually exclusive."
-    }
+    validatePeopleOwnershipConfig(config)
     val externalIdAttributeTypeId = strategy.personExternalIdAttribute?.let { attributeTypeRepository.getOrCreate(it) }
     val requestsById = apiSessionRepository.getRequestsBySession(sessionId).associateBy { it.id }
     val peopleResponses =
@@ -876,6 +883,7 @@ private suspend fun linkGlobalHolderToOwnAccounts(
     externalIdAttributeTypeId: AttributeTypeId?,
 ): Int {
     val config = setup.strategy.peopleDownload ?: return 0
+    validatePeopleOwnershipConfig(config)
     if (!config.ownsAllAccounts || setup.accountsById.isEmpty()) return 0
     val credentialId = setup.apiSessionRepository.getSessionById(setup.sessionId)?.credentialId ?: return 0
 

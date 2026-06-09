@@ -331,7 +331,11 @@ class StarlingImportE2ETest : DbTest() {
             val coffeeOwners = repositories.personAccountOwnershipRepository.getOwnershipsByAccount(coffee.id).first()
             assertTrue(coffeeOwners.isEmpty(), "The MERCHANT counterparty should not gain an owner")
 
-            val acmePerson = repositories.personRepository.getAllPeople().first().single { it.firstName == "ACME" }
+            val acmePerson =
+                repositories.personRepository
+                    .getAllPeople()
+                    .first()
+                    .single { it.firstName == "ACME" }
             assertEquals(acmeOwners.single().personId, acmePerson.id)
         }
 
@@ -490,14 +494,22 @@ class StarlingImportE2ETest : DbTest() {
                 strategy = strategy,
             )
 
-            val ada = repositories.personRepository.getAllPeople().first().single { it.firstName == "Ada" && it.lastName == "Lovelace" }
-            val ownAccount = repositories.accountRepository.getAllAccounts().first().single { it.name == "Starling: Personal" }
+            val ada =
+                repositories.personRepository
+                    .getAllPeople()
+                    .first()
+                    .single { it.firstName == "Ada" && it.lastName == "Lovelace" }
+            val ownAccount =
+                repositories.accountRepository
+                    .getAllAccounts()
+                    .first()
+                    .single { it.name == "Starling: Personal" }
             val owners = repositories.personAccountOwnershipRepository.getOwnershipsByAccount(ownAccount.id).first()
             assertTrue(owners.any { it.personId == ada.id }, "The holder should own the own account regardless of import order")
         }
 
     @Test
-    fun `backfilling a matched person's external id does not create an orphan revision`() =
+    fun `backfilling a matched person external id does not create an orphan revision`() =
         runTest {
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
@@ -570,7 +582,11 @@ class StarlingImportE2ETest : DbTest() {
                 strategy = strategy,
             )
 
-            val ada = repositories.personRepository.getAllPeople().first().single { it.firstName == "Ada" && it.lastName == "Lovelace" }
+            val ada =
+                repositories.personRepository
+                    .getAllPeople()
+                    .first()
+                    .single { it.firstName == "Ada" && it.lastName == "Lovelace" }
             assertEquals(1L, ada.revisionId, "Backfilling an external id must not bump the person revision")
             // The backfill still happened: the external id is now stored.
             val externalId =
