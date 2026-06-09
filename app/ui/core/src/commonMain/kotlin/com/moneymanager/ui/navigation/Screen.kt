@@ -61,7 +61,6 @@ sealed class Screen(
 
     data class QifImportDetail(
         val importId: QifImportId,
-        val scrollToRecordIndex: Long? = null,
     ) : Screen("QIF Import")
 
     data class QifStrategyEditor(

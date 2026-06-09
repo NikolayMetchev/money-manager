@@ -116,21 +116,19 @@ class ImportQifE2ETest {
             updatedAt = Instant.fromEpochMilliseconds(1700000000000L),
         )
 
-    private fun injectQifImport(
+    private suspend fun injectQifImport(
         component: DatabaseComponent,
         fileName: String = "statement.qif",
         checksum: String = "qif_e2e_checksum",
     ) {
-        runBlocking {
-            val parsed = QifParser().parse(qifContent)
-            component.qifImportRepository.createImport(
-                fileName = fileName,
-                records = parsed.toImportRecords(),
-                accountType = parsed.dominantAccountType(),
-                fileChecksum = checksum,
-                fileLastModified = Instant.fromEpochMilliseconds(1700000000000L),
-            )
-        }
+        val parsed = QifParser().parse(qifContent)
+        component.qifImportRepository.createImport(
+            fileName = fileName,
+            records = parsed.toImportRecords(),
+            accountType = parsed.dominantAccountType(),
+            fileChecksum = checksum,
+            fileLastModified = Instant.fromEpochMilliseconds(1700000000000L),
+        )
     }
 
     @Test

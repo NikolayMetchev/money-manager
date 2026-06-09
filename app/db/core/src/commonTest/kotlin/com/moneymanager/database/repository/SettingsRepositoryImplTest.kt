@@ -14,7 +14,8 @@ import kotlin.test.assertNull
 import kotlin.time.Clock
 
 class SettingsRepositoryImplTest : DbTest() {
-    private suspend fun createAccount(name: String): AccountId {
+    private suspend fun createAccount(): AccountId {
+        val name = "Cash Account"
         repositories.accountRepository.createAccount(
             Account(id = AccountId(0), name = name, openingDate = Clock.System.now()),
         )
@@ -68,7 +69,7 @@ class SettingsRepositoryImplTest : DbTest() {
     @Test
     fun `set and get last qif account`() =
         runTest {
-            val accountId = createAccount("Cash Account")
+            val accountId = createAccount()
 
             repositories.settingsRepository.setLastQifAccountId(accountId)
 
@@ -83,7 +84,7 @@ class SettingsRepositoryImplTest : DbTest() {
                     .getAllCurrencies()
                     .first()
                     .first { it.code == "EUR" }
-            val accountId = createAccount("Cash Account")
+            val accountId = createAccount()
 
             // Set the last QIF account first, then the default currency: the currency upsert must
             // not wipe the account, and vice versa.

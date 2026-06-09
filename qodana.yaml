@@ -11,6 +11,9 @@ profile:
 exclude:
   - name: KotlinNoActualForExpect
   - name: XmlHighlighting
+  # QIF import UI intentionally mirrors the CSV import UI (same apply dialog, imports screen and
+  # file-picker structure), so cross-file structural duplication between the two is expected.
+  - name: DuplicatedCode
   - name: FunctionName
     paths:
       - app/ui/core/src

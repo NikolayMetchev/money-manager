@@ -205,9 +205,6 @@ LIMIT ? OFFSET ?;
 countRecords:
 SELECT COUNT(*) FROM qif_record WHERE import_id = ?;
 
-updateRecordTransferId:
-UPDATE qif_record SET transaction_id = ? WHERE import_id = ? AND record_index = ?;
-
 updateRecordStatus:
 UPDATE qif_record SET import_status = ?, transaction_id = ? WHERE import_id = ? AND record_index = ?;
 
