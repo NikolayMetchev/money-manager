@@ -79,7 +79,6 @@ SELECT
     qif_import_metadata.record_count,
     qif_import_metadata.unsupported_count,
     qif_import_metadata.account_type,
-    qif_import_metadata.device_id,
     qif_import_metadata.file_checksum,
     qif_import_metadata.file_last_modified,
     (
@@ -115,7 +114,6 @@ SELECT
     qif_import_metadata.record_count,
     qif_import_metadata.unsupported_count,
     qif_import_metadata.account_type,
-    qif_import_metadata.device_id,
     qif_import_metadata.file_checksum,
     qif_import_metadata.file_last_modified,
     (
@@ -151,7 +149,6 @@ SELECT
     qif_import_metadata.record_count,
     qif_import_metadata.unsupported_count,
     qif_import_metadata.account_type,
-    qif_import_metadata.device_id,
     qif_import_metadata.file_checksum,
     qif_import_metadata.file_last_modified,
     (

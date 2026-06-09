@@ -209,7 +209,7 @@ class QifImportRepositoryImpl(
             importStatus = import_status?.let { ImportStatus.valueOf(it) },
         )
 
-    @Suppress("LongParameterList", "UnusedParameter", "unused")
+    @Suppress("LongParameterList")
     private fun toQifImport(
         id: String,
         originalFileName: String,
@@ -217,7 +217,6 @@ class QifImportRepositoryImpl(
         recordCount: Long,
         unsupportedCount: Long,
         accountType: String,
-        deviceId: Long,
         fileChecksum: String,
         fileLastModifiedMs: Long,
         applicationCount: Long,
