@@ -23,3 +23,22 @@ actual fun rememberFilePicker(
         )
     }
 }
+
+@Composable
+actual fun rememberMultipleFilePicker(
+    mimeTypes: List<String>,
+    onResult: (List<FilePickerResult>) -> Unit,
+): MultipleFilePickerLauncher {
+    val scope = rememberCoroutineScope()
+
+    return remember(mimeTypes, onResult) {
+        MultipleFilePickerLauncher(
+            mimeTypes = mimeTypes,
+            onResult = { results ->
+                scope.launch {
+                    onResult(results)
+                }
+            },
+        )
+    }
+}

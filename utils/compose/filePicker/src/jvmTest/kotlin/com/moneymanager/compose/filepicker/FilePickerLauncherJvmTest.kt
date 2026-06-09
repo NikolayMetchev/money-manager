@@ -55,6 +55,12 @@ class FilePickerLauncherJvmTest {
     }
 
     @Test
+    fun `mimeTypesToExtensions returns qif extension for qif mime types`() {
+        assertEquals(listOf(".qif"), mimeTypesToExtensions(listOf("application/qif")))
+        assertEquals(listOf(".qif"), mimeTypesToExtensions(listOf("application/x-qif")))
+    }
+
+    @Test
     fun `mimeTypesToExtensions returns empty list for unknown mime type`() {
         val extensions = mimeTypesToExtensions(listOf("application/unknown"))
 

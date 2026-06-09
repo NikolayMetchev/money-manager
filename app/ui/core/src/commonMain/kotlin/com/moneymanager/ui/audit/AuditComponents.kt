@@ -167,6 +167,12 @@ fun SourceInfoSection(
                     FieldValueRow("Origin", "CSV Import", labelWidth = labelWidth)
                     DeviceInfoRows(deviceInfo, labelWidth)
                 }
+                SourceType.QIF_IMPORT -> {
+                    // Entities (accounts/people/currencies) are not QIF-sourced; QIF only creates
+                    // transfers. This branch keeps the when exhaustive.
+                    FieldValueRow("Origin", "QIF Import", labelWidth = labelWidth)
+                    DeviceInfoRows(source.deviceInfo, labelWidth)
+                }
                 SourceType.SAMPLE_GENERATOR -> {
                     when (val deviceInfo = source.deviceInfo) {
                         is DeviceInfo.Jvm -> {

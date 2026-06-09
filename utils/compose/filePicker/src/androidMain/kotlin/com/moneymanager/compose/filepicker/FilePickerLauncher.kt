@@ -8,3 +8,12 @@ actual class FilePickerLauncher(
         launcher(mimeTypes)
     }
 }
+
+actual class MultipleFilePickerLauncher(
+    private val mimeTypes: Array<String>,
+    private val launcher: (Array<String>) -> Unit,
+) {
+    actual fun launch() {
+        launcher(mimeTypes)
+    }
+}

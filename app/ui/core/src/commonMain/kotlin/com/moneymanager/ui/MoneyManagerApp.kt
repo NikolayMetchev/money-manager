@@ -31,6 +31,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DbLocation
+import com.moneymanager.domain.model.TransferId
 import com.moneymanager.ui.background.BackgroundTaskPanel
 import com.moneymanager.ui.background.LocalBackgroundTaskManager
 import com.moneymanager.ui.background.rememberBackgroundTaskManager
@@ -55,11 +56,13 @@ import com.moneymanager.ui.screens.CurrencyAuditScreen
 import com.moneymanager.ui.screens.ImportsScreen
 import com.moneymanager.ui.screens.PeopleScreen
 import com.moneymanager.ui.screens.PersonAuditScreen
+import com.moneymanager.ui.screens.QifImportDetailScreen
 import com.moneymanager.ui.screens.SettingsScreen
 import com.moneymanager.ui.screens.apistrategy.ApiImportStrategyAuditScreen
 import com.moneymanager.ui.screens.apistrategy.ApiStrategiesScreen
 import com.moneymanager.ui.screens.csvstrategy.CsvStrategiesScreen
 import com.moneymanager.ui.screens.csvstrategy.editor.CsvStrategyEditorScreen
+import com.moneymanager.ui.screens.qif.QifStrategyEditorScreen
 import com.moneymanager.ui.screens.transactions.AccountTransactionsScreen
 import com.moneymanager.ui.screens.transactions.TransactionAuditScreen
 import com.moneymanager.ui.screens.transactions.TransactionEditDialog
@@ -96,6 +99,30 @@ fun MoneyManagerApp(
         val accounts by services.accounts.accountRepository
             .getAllAccounts()
             .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+
+        // Opens the account view for a clicked transfer, scrolled to it: money flows into the target
+        // account for positive amounts and out of the source account for negative ones.
+        fun navigateToTransferAccount(
+            transferId: TransferId,
+            isPositiveAmount: Boolean,
+        ) {
+            scope.launch {
+                val transfer =
+                    services.transactions.transactionRepository
+                        .getTransactionById(transferId.id)
+                        .first()
+                        ?: return@launch
+                val accountId = if (isPositiveAmount) transfer.targetAccountId else transfer.sourceAccountId
+                val account = accounts.find { a -> a.id == accountId }
+                navigationHistory.navigateTo(
+                    Screen.AccountTransactions(
+                        accountId = accountId,
+                        accountName = account?.name ?: accountId.toString(),
+                        scrollToTransferId = transferId,
+                    ),
+                )
+            }
+        }
 
         MaterialTheme {
             CompositionLocalProvider(LocalBackgroundTaskManager provides backgroundTaskManager) {
@@ -172,6 +199,8 @@ fun MoneyManagerApp(
                                 selected =
                                     currentScreen is Screen.Imports ||
                                         currentScreen is Screen.CsvImportDetail ||
+                                        currentScreen is Screen.QifImportDetail ||
+                                        currentScreen is Screen.QifStrategyEditor ||
                                         currentScreen is Screen.CsvStrategies ||
                                         currentScreen is Screen.CsvStrategyEditor ||
                                         currentScreen is Screen.ApiStrategies ||
@@ -185,6 +214,7 @@ fun MoneyManagerApp(
                                                 is Screen.ApiSessionTraffic, is Screen.ConnectApi,
                                                 is Screen.ApiStrategies, is Screen.ApiStrategyAuditHistory,
                                                 -> ImportTab.API
+                                                is Screen.QifImportDetail, is Screen.QifStrategyEditor -> ImportTab.QIF
                                                 is Screen.Imports -> currentScreen.tab
                                                 else -> ImportTab.CSV
                                             },
@@ -370,6 +400,10 @@ fun MoneyManagerApp(
                                         },
                                         csvImportRepository = services.imports.csvImportRepository,
                                         csvImportStrategyRepository = services.imports.csvImportStrategyRepository,
+                                        csvAccountMappingRepository = services.imports.csvAccountMappingRepository,
+                                        qifImportRepository = services.imports.qifImportRepository,
+                                        categoryRepository = services.accounts.categoryRepository,
+                                        settingsRepository = services.settings.settingsRepository,
                                         apiSessionRepository = services.imports.apiSessionRepository,
                                         apiImportStrategyRepository = services.imports.apiImportStrategyRepository,
                                         attributeTypeRepository = services.transactions.attributeTypeRepository,
@@ -388,6 +422,9 @@ fun MoneyManagerApp(
                                         },
                                         onCsvStrategiesClick = {
                                             navigationHistory.navigateTo(Screen.CsvStrategies)
+                                        },
+                                        onQifImportClick = { importId ->
+                                            navigationHistory.navigateTo(Screen.QifImportDetail(importId))
                                         },
                                         onAddCredentialClick = {
                                             navigationHistory.navigateTo(Screen.ConnectApi)
@@ -444,31 +481,31 @@ fun MoneyManagerApp(
                                         onCsvSourceClick = { importId, rowIndex ->
                                             navigationHistory.navigateTo(Screen.CsvImportDetail(importId, rowIndex))
                                         },
-                                        onTransferClick = { transferId, isPositiveAmount ->
-                                            scope.launch {
-                                                val transfer =
-                                                    services.transactions.transactionRepository
-                                                        .getTransactionById(transferId.id)
-                                                        .first()
-                                                        ?: return@launch
-                                                // Navigate to target account if positive (money coming in),
-                                                // source account if negative (money going out)
-                                                val accountId =
-                                                    if (isPositiveAmount) {
-                                                        transfer.targetAccountId
-                                                    } else {
-                                                        transfer.sourceAccountId
-                                                    }
-                                                val account = accounts.find { a -> a.id == accountId }
-                                                navigationHistory.navigateTo(
-                                                    Screen.AccountTransactions(
-                                                        accountId = accountId,
-                                                        accountName = account?.name ?: accountId.toString(),
-                                                        scrollToTransferId = transferId,
-                                                    ),
-                                                )
-                                            }
+                                        onTransferClick = ::navigateToTransferAccount,
+                                    )
+                                }
+                                is Screen.QifImportDetail -> {
+                                    QifImportDetailScreen(
+                                        importId = screen.importId,
+                                        qifImportRepository = services.imports.qifImportRepository,
+                                        csvImportStrategyRepository = services.imports.csvImportStrategyRepository,
+                                        csvAccountMappingRepository = services.imports.csvAccountMappingRepository,
+                                        accountRepository = services.accounts.accountRepository,
+                                        categoryRepository = services.accounts.categoryRepository,
+                                        currencyRepository = services.accounts.currencyRepository,
+                                        personRepository = services.people.personRepository,
+                                        personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
+                                        transactionRepository = services.transactions.transactionRepository,
+                                        attributeTypeRepository = services.transactions.attributeTypeRepository,
+                                        settingsRepository = services.settings.settingsRepository,
+                                        maintenance = services.imports.maintenance,
+                                        entitySource = services.transactions.entitySource,
+                                        onBack = { navigationHistory.navigateBack() },
+                                        onCreateStrategy = { qifImportId ->
+                                            navigationHistory.navigateTo(Screen.QifStrategyEditor(qifImportId))
                                         },
+                                        onDeleted = { navigationHistory.navigateTo(Screen.Imports(ImportTab.QIF)) },
+                                        onTransferClick = ::navigateToTransferAccount,
                                     )
                                 }
                                 is Screen.CsvStrategies -> {
@@ -498,6 +535,24 @@ fun MoneyManagerApp(
                                     CsvStrategyEditorScreen(
                                         csvImportId = screen.csvImportId,
                                         strategyId = screen.strategyId,
+                                        csvImportRepository = services.imports.csvImportRepository,
+                                        csvImportStrategyRepository = services.imports.csvImportStrategyRepository,
+                                        csvAccountMappingRepository = services.imports.csvAccountMappingRepository,
+                                        accountRepository = services.accounts.accountRepository,
+                                        categoryRepository = services.accounts.categoryRepository,
+                                        currencyRepository = services.accounts.currencyRepository,
+                                        attributeTypeRepository = services.transactions.attributeTypeRepository,
+                                        personRepository = services.people.personRepository,
+                                        personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
+                                        entitySource = services.transactions.entitySource,
+                                        onBack = { navigationHistory.navigateBack() },
+                                    )
+                                }
+                                is Screen.QifStrategyEditor -> {
+                                    QifStrategyEditorScreen(
+                                        qifImportId = screen.qifImportId,
+                                        strategyId = screen.strategyId,
+                                        qifImportRepository = services.imports.qifImportRepository,
                                         csvImportRepository = services.imports.csvImportRepository,
                                         csvImportStrategyRepository = services.imports.csvImportStrategyRepository,
                                         csvAccountMappingRepository = services.imports.csvAccountMappingRepository,

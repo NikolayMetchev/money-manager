@@ -43,6 +43,28 @@ actual fun rememberFilePicker(
     }
 }
 
+@Composable
+actual fun rememberMultipleFilePicker(
+    mimeTypes: List<String>,
+    onResult: (List<FilePickerResult>) -> Unit,
+): MultipleFilePickerLauncher {
+    val context = LocalContext.current
+
+    val launcher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.OpenMultipleDocuments(),
+        ) { uris: List<Uri> ->
+            onResult(uris.mapNotNull { uri -> readFileContent(context, uri) })
+        }
+
+    return remember(launcher, mimeTypes) {
+        MultipleFilePickerLauncher(
+            mimeTypes = mimeTypes.toTypedArray(),
+            launcher = { types -> launcher.launch(types) },
+        )
+    }
+}
+
 private fun readFileContent(
     context: Context,
     uri: Uri,

@@ -11,8 +11,9 @@ import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
+import com.moneymanager.domain.model.qif.QifImportId
 
-enum class ImportTab { CSV, API, MANUAL }
+enum class ImportTab { CSV, QIF, API, MANUAL }
 
 sealed class Screen(
     val title: String,
@@ -57,6 +58,15 @@ sealed class Screen(
         val importId: CsvImportId,
         val scrollToRowIndex: Long? = null,
     ) : Screen("CSV Import")
+
+    data class QifImportDetail(
+        val importId: QifImportId,
+    ) : Screen("QIF Import")
+
+    data class QifStrategyEditor(
+        val qifImportId: QifImportId,
+        val strategyId: CsvImportStrategyId? = null,
+    ) : Screen(if (strategyId == null) "Create Strategy" else "Edit Strategy")
 
     data class AuditHistory(
         val transferId: TransferId,

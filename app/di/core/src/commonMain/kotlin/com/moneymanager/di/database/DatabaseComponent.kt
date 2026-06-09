@@ -22,6 +22,7 @@ import com.moneymanager.domain.repository.DeviceRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonAttributeRepository
 import com.moneymanager.domain.repository.PersonRepository
+import com.moneymanager.domain.repository.QifImportRepository
 import com.moneymanager.domain.repository.SettingsRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.domain.repository.TransferAttributeRepository
@@ -52,6 +53,7 @@ interface DatabaseComponent {
     val personAccountOwnershipRepository: PersonAccountOwnershipRepository
     val personAttributeRepository: PersonAttributeRepository
     val personRepository: PersonRepository
+    val qifImportRepository: QifImportRepository
     val settingsRepository: SettingsRepository
     val transactionRepository: TransactionRepository
     val transferAttributeRepository: TransferAttributeRepository

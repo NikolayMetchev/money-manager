@@ -21,6 +21,9 @@ enum class SourceType(
 
     /** Imported via REST API call */
     API(5),
+
+    /** Imported from QIF file */
+    QIF_IMPORT(6),
     ;
 
     companion object {

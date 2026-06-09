@@ -36,6 +36,21 @@ CREATE INDEX IF NOT EXISTS idx_csv_transfer_source_import ON csv_transfer_source
 -- Note: Validation that csv_transfer_source.id references a CSV_IMPORT source (source_type_id = 2)
 -- is enforced at the application level. SQLDelight's dialect doesn't support trigger validation syntax.
 
+-- qif_transfer_source: QIF-specific data for QIF_IMPORT sources (source_type_id = 6)
+-- 1:1 relationship with transfer_source
+CREATE TABLE qif_transfer_source (
+    id INTEGER PRIMARY KEY,  -- Same as transfer_source.id
+    qif_import_id TEXT NOT NULL,
+    qif_record_index INTEGER NOT NULL,
+    FOREIGN KEY (id) REFERENCES transfer_source(id),
+    FOREIGN KEY (qif_import_id) REFERENCES qif_import_metadata(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_qif_transfer_source_import ON qif_transfer_source(qif_import_id);
+
+-- Note: Validation that qif_transfer_source.id references a QIF_IMPORT source (source_type_id = 6)
+-- is enforced at the application level. SQLDelight's dialect doesn't support trigger validation syntax.
+
 -- api_transfer_source: API-specific data for API sources (source_type_id = 5)
 -- 1:1 relationship with transfer_source
 -- Sessions and requests must not be deleted while transfer sources reference them (ON DELETE RESTRICT),
@@ -66,12 +81,15 @@ SELECT
     transfer_source.device_id,
     csv_transfer_source.csv_import_id,
     csv_transfer_source.csv_row_index,
+    qif_transfer_source.qif_import_id,
+    qif_transfer_source.qif_record_index,
     api_transfer_source.api_session_id,
     api_transfer_source.api_request_id,
     api_transfer_source.json_path AS api_json_path,
     transfer_source.created_at,
     source_type.name AS source_type,
     csv_import_metadata.original_file_name AS csv_file_name,
+    qif_import_metadata.original_file_name AS qif_file_name,
     device_view.platform_name,
     device_view.os_name,
     device_view.machine_name,
@@ -82,6 +100,8 @@ JOIN source_type ON transfer_source.source_type_id = source_type.id
 JOIN device_view ON transfer_source.device_id = device_view.id
 LEFT JOIN csv_transfer_source ON transfer_source.id = csv_transfer_source.id
 LEFT JOIN csv_import_metadata ON csv_transfer_source.csv_import_id = csv_import_metadata.id
+LEFT JOIN qif_transfer_source ON transfer_source.id = qif_transfer_source.id
+LEFT JOIN qif_import_metadata ON qif_transfer_source.qif_import_id = qif_import_metadata.id
 LEFT JOIN api_transfer_source ON transfer_source.id = api_transfer_source.id
 WHERE transfer_source.transaction_id = ? AND transfer_source.revision_id = ?;
 
@@ -95,12 +115,15 @@ SELECT
     transfer_source.device_id,
     csv_transfer_source.csv_import_id,
     csv_transfer_source.csv_row_index,
+    qif_transfer_source.qif_import_id,
+    qif_transfer_source.qif_record_index,
     api_transfer_source.api_session_id,
     api_transfer_source.api_request_id,
     api_transfer_source.json_path AS api_json_path,
     transfer_source.created_at,
     source_type.name AS source_type,
     csv_import_metadata.original_file_name AS csv_file_name,
+    qif_import_metadata.original_file_name AS qif_file_name,
     device_view.platform_name,
     device_view.os_name,
     device_view.machine_name,
@@ -111,6 +134,8 @@ JOIN source_type ON transfer_source.source_type_id = source_type.id
 JOIN device_view ON transfer_source.device_id = device_view.id
 LEFT JOIN csv_transfer_source ON transfer_source.id = csv_transfer_source.id
 LEFT JOIN csv_import_metadata ON csv_transfer_source.csv_import_id = csv_import_metadata.id
+LEFT JOIN qif_transfer_source ON transfer_source.id = qif_transfer_source.id
+LEFT JOIN qif_import_metadata ON qif_transfer_source.qif_import_id = qif_import_metadata.id
 LEFT JOIN api_transfer_source ON transfer_source.id = api_transfer_source.id
 WHERE transfer_source.transaction_id = ?
 ORDER BY transfer_source.revision_id DESC;
@@ -135,6 +160,21 @@ VALUES (?, ?, 2, ?);
 insertCsvImportDetails:
 INSERT INTO csv_transfer_source (
     id, csv_import_id, csv_row_index
+)
+VALUES (?, ?, ?);
+
+-- Insert a new source record for QIF import (base record)
+insertQifImportBase:
+INSERT INTO transfer_source (
+    transaction_id, revision_id, source_type_id,
+    device_id
+)
+VALUES (?, ?, 6, ?);
+
+-- Insert QIF-specific details (must be called after insertQifImportBase)
+insertQifImportDetails:
+INSERT INTO qif_transfer_source (
+    id, qif_import_id, qif_record_index
 )
 VALUES (?, ?, ?);
 

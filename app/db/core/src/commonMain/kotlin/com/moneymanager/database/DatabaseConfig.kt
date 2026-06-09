@@ -6,6 +6,8 @@ import com.moneymanager.currency.Currency
 import com.moneymanager.database.json.ApiStrategyConfigJson
 import com.moneymanager.database.json.ApiStrategyJsonCodec
 import com.moneymanager.database.json.FieldMappingJsonCodec
+import com.moneymanager.database.qif.QifCsvAdapter
+import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.SourceType
 import com.moneymanager.domain.model.apistrategy.ApiAccountMappings
@@ -36,6 +38,7 @@ import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
 import com.moneymanager.domain.model.csvstrategy.DateTimeParsingMapping
 import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.FieldMappingId
+import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.RowCondition
 import com.moneymanager.domain.model.csvstrategy.RowConditionOperator
@@ -757,6 +760,7 @@ object DatabaseConfig {
             sourceTypeQueries.insert(id = 3, name = "SAMPLE_GENERATOR")
             sourceTypeQueries.insert(id = 4, name = "SYSTEM")
             sourceTypeQueries.insert(id = 5, name = "API")
+            sourceTypeQueries.insert(id = 6, name = "QIF_IMPORT")
 
             // Seed API session type lookup table
             apiSessionQueries.insertSessionType(id = 1, name = "Monzo")
@@ -1037,6 +1041,9 @@ object DatabaseConfig {
     /** Fixed UUID for the built-in Monzo CSV strategy so it can be referenced reliably. */
     val monzoCsvStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000004")
 
+    /** Fixed UUID for the built-in QIF strategy so it can be referenced reliably. */
+    val qifStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000005")
+
     /** Account name prefix shared with the Wise API import strategy ("Wise: " + currency code). */
     private const val WISE_ACCOUNT_PREFIX = "Wise: "
 
@@ -1058,9 +1065,12 @@ object DatabaseConfig {
 
     private fun monzoCsvMappingId(index: Int): FieldMappingId = builtInCsvMappingId(strategyGroup = 2, index = index)
 
+    private fun qifMappingId(index: Int): FieldMappingId = builtInCsvMappingId(strategyGroup = 3, index = index)
+
     /** All built-in CSV import strategies seeded into a fresh database. */
     fun builtInCsvStrategies(now: Instant): List<CsvImportStrategy> =
         listOf(
+            buildQifStrategy(now),
             buildWiseCsvStrategy(now),
             buildMonzoCsvStrategy(now),
         )
@@ -1222,6 +1232,72 @@ object DatabaseConfig {
             attributeMappings = attributeMappings,
             rowPreprocessingRules = rowRules,
             companionTransactionRules = companionRules,
+            createdAt = now,
+            updatedAt = now,
+        )
+    }
+
+    /**
+     * Built-in strategy for QIF imports. QIF reuses the CSV strategy engine over a fixed set of
+     * columns (see [QifCsvAdapter]), so its identification columns are exactly those fixed fields and
+     * it matches any QIF file. The source account and currency are chosen at import time (QIF data
+     * carries neither): the seeded CURRENCY mapping is a placeholder the QIF apply flow overrides.
+     */
+    fun buildQifStrategy(now: Instant): CsvImportStrategy {
+        val fieldMappings =
+            mapOf(
+                // Prefer an explicit [transfer-account]; otherwise treat the payee (then category) as
+                // the other side of the transaction.
+                TransferField.TARGET_ACCOUNT to
+                    AccountLookupMapping(
+                        id = qifMappingId(1),
+                        fieldType = TransferField.TARGET_ACCOUNT,
+                        columnName = QifCsvAdapter.COL_TRANSFER_ACCOUNT,
+                        fallbackColumns = listOf(QifCsvAdapter.COL_PAYEE, QifCsvAdapter.COL_CATEGORY),
+                    ),
+                TransferField.TIMESTAMP to
+                    DateTimeParsingMapping(
+                        id = qifMappingId(2),
+                        fieldType = TransferField.TIMESTAMP,
+                        dateColumnName = QifCsvAdapter.COL_DATE,
+                        dateFormat = "dd/MM/yyyy",
+                    ),
+                TransferField.DESCRIPTION to
+                    DirectColumnMapping(
+                        id = qifMappingId(3),
+                        fieldType = TransferField.DESCRIPTION,
+                        columnName = QifCsvAdapter.COL_PAYEE,
+                        fallbackColumns = listOf(QifCsvAdapter.COL_MEMO),
+                    ),
+                // QIF amounts are signed: negative = money out of the account, positive = money in,
+                // so positive amounts flip source/target.
+                TransferField.AMOUNT to
+                    AmountParsingMapping(
+                        id = qifMappingId(4),
+                        fieldType = TransferField.AMOUNT,
+                        mode = AmountMode.SINGLE_COLUMN,
+                        amountColumnName = QifCsvAdapter.COL_AMOUNT,
+                        flipAccountsOnPositive = true,
+                    ),
+                TransferField.CURRENCY to
+                    HardCodedCurrencyMapping(
+                        id = qifMappingId(5),
+                        fieldType = TransferField.CURRENCY,
+                        // Placeholder: the QIF apply flow overrides this with the user's chosen currency.
+                        currencyId = CurrencyId(1),
+                    ),
+                TransferField.TIMEZONE to
+                    HardCodedTimezoneMapping(
+                        id = qifMappingId(6),
+                        fieldType = TransferField.TIMEZONE,
+                        timezoneId = "UTC",
+                    ),
+            )
+        return CsvImportStrategy(
+            id = CsvImportStrategyId(qifStrategyId),
+            name = "QIF",
+            identificationColumns = QifCsvAdapter.headers.toSet(),
+            fieldMappings = fieldMappings,
             createdAt = now,
             updatedAt = now,
         )

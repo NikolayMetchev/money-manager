@@ -14,3 +14,20 @@ expect fun rememberFilePicker(
     mimeTypes: List<String> = listOf("text/csv", "text/plain"),
     onResult: (FilePickerResult?) -> Unit,
 ): FilePickerLauncher
+
+/**
+ * Creates and remembers a file picker launcher that allows selecting multiple files at once.
+ *
+ * @param mimeTypes List of MIME types to filter files
+ * @param onResult Callback invoked with the selected files (empty if cancelled or none selected)
+ * @return A launcher that can be used to open the multi-file picker dialog
+ */
+@Composable
+expect fun rememberMultipleFilePicker(
+    mimeTypes: List<String> = listOf("text/csv", "text/plain"),
+    onResult: (List<FilePickerResult>) -> Unit,
+): MultipleFilePickerLauncher
+
+expect class MultipleFilePickerLauncher {
+    fun launch()
+}
