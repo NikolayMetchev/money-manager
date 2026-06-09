@@ -1,10 +1,20 @@
 CREATE TABLE settings (
-    default_currency_id INTEGER NOT NULL REFERENCES currency(id)
+    id INTEGER PRIMARY KEY,
+    default_currency_id INTEGER REFERENCES currency(id),
+    last_qif_account_id INTEGER REFERENCES account(id)
 );
 
 selectDefaultCurrencyId:
 SELECT default_currency_id FROM settings LIMIT 1;
 
-upsertDefaultCurrency:
-INSERT OR REPLACE INTO settings(rowid, default_currency_id) VALUES (1, ?);
+selectLastQifAccountId:
+SELECT last_qif_account_id FROM settings LIMIT 1;
 
+-- Column-preserving upserts: writing one setting must not clear the others.
+upsertDefaultCurrency:
+INSERT INTO settings(id, default_currency_id) VALUES (1, ?)
+ON CONFLICT(id) DO UPDATE SET default_currency_id = excluded.default_currency_id;
+
+upsertLastQifAccount:
+INSERT INTO settings(id, last_qif_account_id) VALUES (1, ?)
+ON CONFLICT(id) DO UPDATE SET last_qif_account_id = excluded.last_qif_account_id;

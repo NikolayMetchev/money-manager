@@ -34,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.model.csv.CsvImportId
+import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
@@ -66,9 +67,13 @@ import kotlin.uuid.Uuid
  */
 @Composable
 fun CsvStrategyEditorScreen(
-    csvImportId: CsvImportId,
+    csvImportId: CsvImportId?,
     strategyId: CsvImportStrategyId?,
     csvImportRepository: CsvImportRepository,
+    // When set, the editor uses these fixed columns and sample rows instead of loading them from a
+    // CSV import. QIF reuses this editor by supplying its fixed columns (see QifCsvAdapter).
+    columnsOverride: List<CsvColumn>? = null,
+    sampleRowsOverride: List<CsvRow>? = null,
     csvImportStrategyRepository: CsvImportStrategyRepository,
     csvAccountMappingRepository: CsvAccountMappingRepository,
     accountRepository: AccountRepository,
@@ -85,7 +90,11 @@ fun CsvStrategyEditorScreen(
 
     // Repository flows are collected via the schema-aware helper so database schema errors are
     // reported globally instead of cancelling the effect.
-    val csvImport by csvImportRepository.getImport(csvImportId).collectAsStateWithSchemaErrorHandling(null)
+    val csvImportFlow =
+        remember(csvImportId, columnsOverride) {
+            if (columnsOverride == null && csvImportId != null) csvImportRepository.getImport(csvImportId) else flowOf(null)
+        }
+    val csvImport by csvImportFlow.collectAsStateWithSchemaErrorHandling(null)
     val accounts by accountRepository.getAllAccounts().collectAsStateWithSchemaErrorHandling(emptyList())
     val existingAttributeTypes by attributeTypeRepository.getAll().collectAsStateWithSchemaErrorHandling(emptyList())
 
@@ -113,14 +122,20 @@ fun CsvStrategyEditorScreen(
     var editingAccountMapping by remember { mutableStateOf<CsvAccountMapping?>(null) }
     var showAddAccountMappingDialog by remember { mutableStateOf(false) }
 
-    LaunchedEffect(csvImportId, csvImport?.rowCount) {
+    LaunchedEffect(csvImportId, csvImport?.rowCount, columnsOverride) {
+        if (columnsOverride != null) {
+            rows = sampleRowsOverride.orEmpty()
+            rowsLoaded = true
+            return@LaunchedEffect
+        }
         val import = csvImport ?: return@LaunchedEffect
-        rows = csvImportRepository.getImportRows(csvImportId, limit = import.rowCount, offset = 0)
+        val id = csvImportId ?: return@LaunchedEffect
+        rows = csvImportRepository.getImportRows(id, limit = import.rowCount, offset = 0)
         rowsLoaded = true
     }
 
     val currentImport = csvImport
-    val ready = currentImport != null && rowsLoaded && strategyLoaded
+    val ready = (columnsOverride != null || currentImport != null) && rowsLoaded && strategyLoaded
     if (!ready) {
         EditorPlaceholder(isEditMode = isEditMode, onBack = onBack) {
             CircularProgressIndicator()
@@ -135,13 +150,13 @@ fun CsvStrategyEditorScreen(
         return
     }
 
-    val csvColumns = currentImport.columns
+    val csvColumns = columnsOverride ?: requireNotNull(currentImport).columns
     val availableColumnNames = remember(csvColumns) { csvColumns.map { it.originalName }.toSet() }
     val initial =
         remember(existingStrategy, availableColumnNames) {
             existingStrategy?.let { extractFormStateFromStrategy(it, availableColumnNames) }
         }
-    val editKey = strategyId?.toString() ?: "create:$csvImportId"
+    val editKey = strategyId?.toString() ?: "create:${csvImportId?.toString() ?: "external"}"
     val state = rememberCsvStrategyEditorState(editKey, initial, availableColumnNames)
 
     val firstRow = rows.firstOrNull()

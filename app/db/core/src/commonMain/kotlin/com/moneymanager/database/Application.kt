@@ -14,6 +14,7 @@ import com.moneymanager.domain.repository.AuditRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CsvAccountMappingRepository
 import com.moneymanager.domain.repository.CsvImportRepository
+import com.moneymanager.domain.repository.QifImportRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.DeviceRepository
@@ -49,6 +50,7 @@ data class Imports(
     val csvImportStrategyRepository: CsvImportStrategyRepository,
     val csvStrategyExportService: CsvStrategyExportService,
     val csvStrategyImportExport: CsvStrategyImportExport,
+    val qifImportRepository: QifImportRepository,
     val maintenance: Maintenance,
 )
 

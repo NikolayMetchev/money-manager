@@ -92,15 +92,17 @@ fun AccountPicker(
         // Use a non-empty placeholder so tests can click on it (similar to "Uncategorized" in category dropdown)
         val displayValue = selectedAccount?.name ?: "Select..."
         OutlinedTextField(
-            value = displayValue,
-            onValueChange = { },
-            readOnly = true,
+            // Editable while expanded so the user can type to filter (like the currency picker);
+            // shows the selected account name when collapsed.
+            value = if (expanded) searchQuery else displayValue,
+            onValueChange = { searchQuery = it },
             label = { Text(label) },
+            placeholder = { Text("Type to search...") },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable),
             enabled = enabled,
             singleLine = true,
             isError = isError,

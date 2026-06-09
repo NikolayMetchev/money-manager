@@ -56,6 +56,33 @@ actual class FilePickerLauncher(
     }
 }
 
+actual class MultipleFilePickerLauncher(
+    private val mimeTypes: List<String>,
+    private val onResult: (List<FilePickerResult>) -> Unit,
+) {
+    actual fun launch() {
+        val frame = Frame()
+        try {
+            val fileDialog = FileDialog(frame, "Select files", FileDialog.LOAD)
+            fileDialog.isMultipleMode = true
+            LastDirectoryStore.load()?.let { fileDialog.directory = it }
+
+            val extensions = mimeTypesToExtensions(mimeTypes)
+            if (extensions.isNotEmpty()) {
+                fileDialog.filenameFilter = FilenameFilter { _, name -> matchesExtensions(name, extensions) }
+            }
+
+            fileDialog.isVisible = true
+
+            val files = fileDialog.files.orEmpty()
+            files.firstOrNull()?.parent?.let { LastDirectoryStore.save(it) }
+            onResult(files.mapNotNull { readFileAsResult(it) })
+        } finally {
+            frame.dispose()
+        }
+    }
+}
+
 /**
  * Converts MIME types to file extensions.
  */
@@ -65,6 +92,7 @@ internal fun mimeTypesToExtensions(mimeTypes: List<String>): List<String> =
             when (mimeType) {
                 "text/csv" -> listOf(".csv")
                 "text/plain" -> listOf(".txt", ".csv")
+                "application/qif", "application/x-qif" -> listOf(".qif")
                 "text/tab-separated-values" -> listOf(".tsv")
                 "application/vnd.ms-excel" -> listOf(".csv", ".xls")
                 else -> emptyList()

@@ -6,6 +6,7 @@ import com.moneymanager.database.CsvImportSourceRecorder
 import com.moneymanager.database.DatabaseMaintenanceService
 import com.moneymanager.database.ManualEntitySourceRecorder
 import com.moneymanager.database.ManualSourceRecorder
+import com.moneymanager.database.QifImportSourceRecorder
 import com.moneymanager.database.SampleGeneratorEntitySourceRecorder
 import com.moneymanager.database.SampleGeneratorSourceRecorder
 import com.moneymanager.database.service.CsvStrategyExportService
@@ -33,6 +34,7 @@ import com.moneymanager.domain.model.SourceRecorder
 import com.moneymanager.domain.model.SourceType
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImportId
+import com.moneymanager.domain.model.qif.QifImportId
 import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.export.CsvStrategyExport
@@ -124,6 +126,17 @@ class DbEntitySource(
             requestId = requestId,
             jsonPath = jsonPath,
         )
+
+    override fun qifImportRecorder(
+        qifImportId: QifImportId,
+        recordIndexForTransfer: (TransferId) -> Long,
+    ): SourceRecorder =
+        QifImportSourceRecorder(
+            queries = transferSourceQueries,
+            deviceId = deviceId,
+            qifImportId = qifImportId,
+            recordIndexForTransfer = { transferId -> recordIndexForTransfer(transferId) },
+        )
 }
 
 class DbSampleEntitySource(
@@ -181,6 +194,17 @@ class DbSampleEntitySource(
             sessionId = sessionId,
             requestId = requestId,
             jsonPath = jsonPath,
+        )
+
+    override fun qifImportRecorder(
+        qifImportId: QifImportId,
+        recordIndexForTransfer: (TransferId) -> Long,
+    ): SourceRecorder =
+        QifImportSourceRecorder(
+            queries = transferSourceQueries,
+            deviceId = deviceId,
+            qifImportId = qifImportId,
+            recordIndexForTransfer = { transferId -> recordIndexForTransfer(transferId) },
         )
 }
 

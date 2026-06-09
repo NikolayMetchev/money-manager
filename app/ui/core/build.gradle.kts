@@ -22,6 +22,7 @@ kotlin {
                 implementation(projects.utils.compose.scrollbar)
                 implementation(projects.utils.currency)
                 implementation(projects.utils.parsers.csv)
+                implementation(projects.utils.parsers.qif)
             }
         }
         val jvmAndroidMain by creating {

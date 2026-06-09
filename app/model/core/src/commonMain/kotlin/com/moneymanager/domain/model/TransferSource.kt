@@ -3,6 +3,7 @@
 package com.moneymanager.domain.model
 
 import com.moneymanager.domain.model.csv.CsvImportId
+import com.moneymanager.domain.model.qif.QifImportId
 import kotlin.time.Instant
 
 /**
@@ -29,6 +30,20 @@ data class TransferSource(
     val csvSource: CsvSourceDetails?,
     val apiSource: ApiSourceDetails?,
     val createdAt: Instant,
+    val qifSource: QifSourceDetails? = null,
+)
+
+/**
+ * Details specific to QIF import sources.
+ *
+ * @property importId The ID of the QIF import (may be null if import was deleted)
+ * @property recordIndex The record index from the original QIF file
+ * @property fileName The original file name (null if import was deleted)
+ */
+data class QifSourceDetails(
+    val importId: QifImportId?,
+    val recordIndex: Long,
+    val fileName: String?,
 )
 
 /**

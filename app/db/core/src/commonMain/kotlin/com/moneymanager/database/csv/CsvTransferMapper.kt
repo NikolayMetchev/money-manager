@@ -43,6 +43,8 @@ import kotlinx.datetime.LocalTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.format.byUnicodePattern
 import kotlinx.datetime.toInstant
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
 import kotlin.time.Instant
 
 /**
@@ -904,7 +906,7 @@ class CsvTransferMapper(
         transfer: Transfer,
         attributes: List<Pair<String, String>>,
     ): Pair<ImportStatus, TransferId?> {
-        // Find an existing transfer that matches all core fields
+        // First pass: an exact core-field match preserves the existing DUPLICATE/UPDATED distinction.
         for (existingInfo in existingTransfers) {
             val coreFieldsMatch =
                 transfer.timestamp == existingInfo.transfer.timestamp &&
@@ -914,7 +916,6 @@ class CsvTransferMapper(
                     transfer.description == existingInfo.transfer.description
 
             if (coreFieldsMatch) {
-                // Core fields match - check if attributes also match
                 val attributesMatch = attributesAreIdentical(attributes, existingInfo.attributes)
                 return if (attributesMatch) {
                     ImportStatus.DUPLICATE to existingInfo.transferId
@@ -924,8 +925,34 @@ class CsvTransferMapper(
             }
         }
 
+        // Second pass: tolerate the formatting drift in bank re-exports (different trailing text, a
+        // posting date shifted by a day or two, and a different counterparty account derived from the
+        // varying payee). Same amount + a shared account + close date + similar description = the same
+        // transaction, so skip it as a duplicate rather than re-creating it.
+        for (existingInfo in existingTransfers) {
+            if (isFuzzyDuplicate(transfer, existingInfo.transfer)) {
+                return ImportStatus.DUPLICATE to existingInfo.transferId
+            }
+        }
+
         // No match found
         return ImportStatus.IMPORTED to null
+    }
+
+    private fun isFuzzyDuplicate(
+        transfer: Transfer,
+        existing: Transfer,
+    ): Boolean {
+        if (transfer.amount != existing.amount) return false
+        val sharesAccount =
+            transfer.sourceAccountId == existing.sourceAccountId ||
+                transfer.targetAccountId == existing.targetAccountId
+        if (!sharesAccount) return false
+        val withinDateTolerance =
+            (transfer.timestamp - existing.timestamp).absoluteValue <= DUPLICATE_DATE_TOLERANCE
+        if (!withinDateTolerance) return false
+        return StringSimilarity.similarity(transfer.description, existing.description) >=
+            StringSimilarity.DESCRIPTION_SIMILARITY_THRESHOLD
     }
 
     /**
@@ -967,5 +994,10 @@ class CsvTransferMapper(
         if (newAttrMap.keys != existingAttrMap.keys) return false
 
         return newAttrMap.all { (key, value) -> existingAttrMap[key] == value }
+    }
+
+    private companion object {
+        /** Posting dates of the same transaction can drift between bank exports by a day or two. */
+        val DUPLICATE_DATE_TOLERANCE: Duration = 3.days
     }
 }

@@ -7,6 +7,7 @@ import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.SourceRecorder
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImportId
+import com.moneymanager.domain.model.qif.QifImportId
 
 interface EntitySource {
     fun record(
@@ -34,6 +35,11 @@ interface EntitySource {
         sessionId: ApiSessionId,
         requestId: ApiRequestId,
         jsonPath: JsonPath,
+    ): SourceRecorder
+
+    fun qifImportRecorder(
+        qifImportId: QifImportId,
+        recordIndexForTransfer: (TransferId) -> Long,
     ): SourceRecorder
 }
 

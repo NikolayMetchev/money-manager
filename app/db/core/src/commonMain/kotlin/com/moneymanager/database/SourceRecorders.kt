@@ -14,6 +14,7 @@ import com.moneymanager.domain.model.SourceType
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImportId
+import com.moneymanager.domain.model.qif.QifImportId
 import org.lighthousegames.logging.logging
 
 /** Manual entry from UI. */
@@ -63,6 +64,30 @@ class CsvImportSourceRecorder(
                 transferSourceId,
                 csvImportId.id.toString(),
                 rowIndexForTransfer(transfer.id),
+            )
+        }
+    }
+}
+
+/** QIF import with record tracking. */
+class QifImportSourceRecorder(
+    private val queries: TransferSourceQueries,
+    private val deviceId: DeviceId,
+    private val qifImportId: QifImportId,
+    private val recordIndexForTransfer: (TransferId) -> Long,
+) : SourceRecorder {
+    override fun insert(transfer: Transfer) {
+        queries.transaction {
+            queries.insertQifImportBase(
+                transfer.id.id,
+                transfer.revisionId,
+                deviceId.id,
+            )
+            val transferSourceId = queries.lastInsertedId().executeAsOne()
+            queries.insertQifImportDetails(
+                transferSourceId,
+                qifImportId.id.toString(),
+                recordIndexForTransfer(transfer.id),
             )
         }
     }

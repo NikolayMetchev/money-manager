@@ -3,6 +3,7 @@ package com.moneymanager.database.repository
 import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToOneOrNull
 import com.moneymanager.database.sql.MoneyManagerDatabase
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.repository.SettingsRepository
 import kotlinx.coroutines.Dispatchers
@@ -20,10 +21,22 @@ class SettingsRepositoryImpl(
             .selectDefaultCurrencyId()
             .asFlow()
             .mapToOneOrNull(Dispatchers.Default)
-            .map { it?.let(::CurrencyId) }
+            .map { it?.default_currency_id?.let(::CurrencyId) }
 
     override suspend fun setDefaultCurrencyId(currencyId: CurrencyId): Unit =
         withContext(Dispatchers.Default) {
             queries.upsertDefaultCurrency(currencyId.id)
+        }
+
+    override fun getLastQifAccountId(): Flow<AccountId?> =
+        queries
+            .selectLastQifAccountId()
+            .asFlow()
+            .mapToOneOrNull(Dispatchers.Default)
+            .map { it?.last_qif_account_id?.let(::AccountId) }
+
+    override suspend fun setLastQifAccountId(accountId: AccountId): Unit =
+        withContext(Dispatchers.Default) {
+            queries.upsertLastQifAccount(accountId.id)
         }
 }

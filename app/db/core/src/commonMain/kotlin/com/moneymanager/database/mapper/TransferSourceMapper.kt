@@ -12,10 +12,12 @@ import com.moneymanager.domain.model.ApiSourceDetails
 import com.moneymanager.domain.model.CsvSourceDetails
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.JsonPath
+import com.moneymanager.domain.model.QifSourceDetails
 import com.moneymanager.domain.model.SourceType
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.TransferSource
 import com.moneymanager.domain.model.csv.CsvImportId
+import com.moneymanager.domain.model.qif.QifImportId
 import tech.mappie.api.ObjectMappie
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -91,6 +93,20 @@ private fun mapCsvSource(
     )
 }
 
+private fun mapQifSource(
+    sourceType: SourceType,
+    qifImportId: String?,
+    qifRecordIndex: Long?,
+    qifFileName: String?,
+): QifSourceDetails? {
+    if (sourceType != SourceType.QIF_IMPORT) return null
+    return QifSourceDetails(
+        importId = qifImportId?.let { QifImportId(Uuid.parse(it)) },
+        recordIndex = qifRecordIndex ?: 0,
+        fileName = qifFileName,
+    )
+}
+
 private fun mapApiSource(
     sourceType: SourceType,
     apiSessionId: Long?,
@@ -134,6 +150,9 @@ private fun SelectByTransactionIdAndRevision.toTransferSource(sourceType: Source
         csvImportId = csv_import_id,
         csvRowIndex = csv_row_index,
         csvFileName = csv_file_name,
+        qifImportId = qif_import_id,
+        qifRecordIndex = qif_record_index,
+        qifFileName = qif_file_name,
         apiSessionId = api_session_id,
         apiRequestId = api_request_id,
         apiJsonPath = api_json_path,
@@ -151,6 +170,9 @@ private fun SelectAllByTransactionId.toTransferSource(sourceType: SourceType): T
         csvImportId = csv_import_id,
         csvRowIndex = csv_row_index,
         csvFileName = csv_file_name,
+        qifImportId = qif_import_id,
+        qifRecordIndex = qif_record_index,
+        qifFileName = qif_file_name,
         apiSessionId = api_session_id,
         apiRequestId = api_request_id,
         apiJsonPath = api_json_path,
@@ -167,6 +189,9 @@ private fun transferSource(
     csvImportId: String?,
     csvRowIndex: Long?,
     csvFileName: String?,
+    qifImportId: String?,
+    qifRecordIndex: Long?,
+    qifFileName: String?,
     apiSessionId: Long?,
     apiRequestId: Long?,
     apiJsonPath: String?,
@@ -181,6 +206,7 @@ private fun transferSource(
         deviceInfo = deviceInfo,
         csvSource = mapCsvSource(sourceType, csvImportId, csvRowIndex, csvFileName),
         apiSource = mapApiSource(sourceType, apiSessionId, apiRequestId, apiJsonPath),
+        qifSource = mapQifSource(sourceType, qifImportId, qifRecordIndex, qifFileName),
         createdAt = Instant.fromEpochMilliseconds(createdAt),
     )
 

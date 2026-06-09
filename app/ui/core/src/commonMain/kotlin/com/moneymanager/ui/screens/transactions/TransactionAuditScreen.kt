@@ -504,6 +504,17 @@ private fun SourceInfoSection(
                 }
                 DeviceInfoFields(deviceInfo)
             }
+            SourceType.QIF_IMPORT -> {
+                val qifSource = source.qifSource
+                val deviceInfo = source.deviceInfo
+                val thisDeviceSuffix = if (isThisDevice) " (This Device)" else ""
+                FieldValueRow("Origin", "QIF Import$thisDeviceSuffix", labelWidth = LABEL_WIDTH)
+                if (qifSource != null) {
+                    FieldValueRow("File", qifSource.fileName ?: "Unknown file", labelWidth = LABEL_WIDTH)
+                    FieldValueRow("Record", qifSource.recordIndex.toString(), labelWidth = LABEL_WIDTH)
+                }
+                DeviceInfoFields(deviceInfo)
+            }
             SourceType.SAMPLE_GENERATOR -> {
                 val deviceInfo = source.deviceInfo
                 val thisDeviceSuffix = if (isThisDevice) " (This Device)" else ""

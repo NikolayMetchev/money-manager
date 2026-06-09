@@ -12,6 +12,7 @@ import com.moneymanager.database.repository.AuditRepositoryImpl
 import com.moneymanager.database.repository.CategoryRepositoryImpl
 import com.moneymanager.database.repository.CsvAccountMappingRepositoryImpl
 import com.moneymanager.database.repository.CsvImportRepositoryImpl
+import com.moneymanager.database.repository.QifImportRepositoryImpl
 import com.moneymanager.database.repository.CsvImportStrategyRepositoryImpl
 import com.moneymanager.database.repository.CurrencyRepositoryImpl
 import com.moneymanager.database.repository.DeviceRepositoryImpl
@@ -36,6 +37,7 @@ import com.moneymanager.domain.repository.AuditRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CsvAccountMappingRepository
 import com.moneymanager.domain.repository.CsvImportRepository
+import com.moneymanager.domain.repository.QifImportRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.DeviceRepository
@@ -120,6 +122,13 @@ interface RepositoryModule {
         database: MoneyManagerDatabaseWrapper,
         deviceId: DeviceId,
     ): CsvImportRepository = CsvImportRepositoryImpl(database, deviceId)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideQifImportRepository(
+        database: MoneyManagerDatabaseWrapper,
+        deviceId: DeviceId,
+    ): QifImportRepository = QifImportRepositoryImpl(database, deviceId)
 
     @Provides
     @SingleIn(DatabaseScope::class)
