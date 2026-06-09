@@ -281,7 +281,11 @@ suspend fun downloadApiSessionTransactions(
                 before = transactions.minOfOrNull { it.created }
                 hasTransactions = transactions.isNotEmpty()
                 page += 1
-            } while (hasTransactions)
+                // A null pagination config means the endpoint returns the whole feed in one response
+                // (e.g. Starling); fetch exactly one page. Cursor mode keeps paging until a page is
+                // empty. Without this guard a non-paginating endpoint that ignores the cursor would
+                // return the same items forever and loop indefinitely.
+            } while (hasTransactions && pagination != null)
         }
     }
 
@@ -316,6 +320,18 @@ suspend fun downloadApiSessionPeople(
 }
 
 /**
+ * The two ownership-linking strategies are mutually exclusive: [ApiPersonImportConfig.ownsAllAccounts]
+ * links a single global holder to every account, while [ApiPersonImportConfig.accountOwnerAncestorExpr]
+ * derives ownership from the resource hierarchy. Allowing both would silently prefer ownsAllAccounts and
+ * persist wrong links, so every code path that acts on the config validates it first.
+ */
+private fun validatePeopleOwnershipConfig(config: ApiPersonImportConfig) {
+    require(!(config.ownsAllAccounts && config.accountOwnerAncestorExpr != null)) {
+        "Invalid peopleDownload config: ownsAllAccounts and accountOwnerAncestorExpr are mutually exclusive."
+    }
+}
+
+/**
  * Imports people from a people-download session: creates a [Person] for each profile holder and, when
  * [accountsSessionId] is provided, links each person as an owner of the accounts fetched under their
  * profile (via [ApiPersonImportConfig.accountOwnerAncestorExpr]).
@@ -334,6 +350,7 @@ suspend fun importApiSessionPeople(
     accountsSessionId: ApiSessionId? = null,
 ): ApiPeopleImportResult {
     val config = strategy.peopleDownload ?: return ApiPeopleImportResult(personCount = 0, ownershipCount = 0)
+    validatePeopleOwnershipConfig(config)
     val externalIdAttributeTypeId = strategy.personExternalIdAttribute?.let { attributeTypeRepository.getOrCreate(it) }
     val requestsById = apiSessionRepository.getRequestsBySession(sessionId).associateBy { it.id }
     val peopleResponses =
@@ -343,12 +360,24 @@ suspend fun importApiSessionPeople(
         }
     val ownedAccountsByProfile =
         buildProfileAccountMap(apiSessionRepository, accountRepository, accountAttributeRepository, accountsSessionId, strategy, config)
+    // Flat providers with a single global account holder (no ancestor hierarchy) link that holder to
+    // every account imported in the session.
+    val allSessionAccountIds =
+        if (config.ownsAllAccounts) {
+            loadSessionAccountIds(apiSessionRepository, accountRepository, accountAttributeRepository, accountsSessionId, strategy)
+        } else {
+            emptyList()
+        }
     // Ownership links can only be created against accounts that already exist. When people are
     // imported before their accounts (no accounts session, or accounts not yet imported), the
     // profile→account map is empty and people are created without ownerships; flag that so the
     // empty-ownership outcome isn't mistaken for a successful link.
-    if (config.accountOwnerAncestorExpr != null && ownedAccountsByProfile.isEmpty()) {
-        logger.warn { "Importing people with no imported accounts to link; ownerships will not be created. Import accounts first." }
+    val noLinkableAccounts =
+        if (config.ownsAllAccounts) allSessionAccountIds.isEmpty() else ownedAccountsByProfile.isEmpty()
+    if (config.accountOwnerAncestorExpr != null || config.ownsAllAccounts) {
+        if (noLinkableAccounts) {
+            logger.warn { "Importing people with no imported accounts to link; ownerships will not be created. Import accounts first." }
+        }
     }
     val peopleIndex = loadPeopleIndex(personRepository, personAttributeRepository, externalIdAttributeTypeId)
 
@@ -360,7 +389,8 @@ suspend fun importApiSessionPeople(
             ?.forEachIndexed { index, element ->
                 val obj = element as? JsonObject ?: return@forEachIndexed
                 val owner = obj.toPersonOwner(config, index) ?: return@forEachIndexed
-                val ownedAccounts = ownedAccountsByProfile[owner.userId].orEmpty()
+                val ownedAccounts =
+                    if (config.ownsAllAccounts) allSessionAccountIds else ownedAccountsByProfile[owner.userId].orEmpty()
                 if (ownedAccounts.isEmpty()) {
                     val created =
                         resolveOrCreatePerson(
@@ -425,6 +455,29 @@ private suspend fun buildProfileAccountMap(
         }
     }
     return result
+}
+
+/** Returns every [AccountId] imported under [accountsSessionId] (used for [ApiPersonImportConfig.ownsAllAccounts]). */
+private suspend fun loadSessionAccountIds(
+    apiSessionRepository: ApiSessionRepository,
+    accountRepository: AccountRepository,
+    accountAttributeRepository: AccountAttributeRepository,
+    accountsSessionId: ApiSessionId?,
+    strategy: ApiImportStrategy,
+): List<AccountId> {
+    if (accountsSessionId == null) return emptyList()
+    val accountIdByExternalId = loadAccountExternalIdIndex(accountRepository, accountAttributeRepository)
+    val requestsById = apiSessionRepository.getRequestsBySession(accountsSessionId).associateBy { it.id }
+    val result = mutableListOf<AccountId>()
+    for (response in apiSessionRepository.getResponsesBySession(accountsSessionId)) {
+        val isAccountsResponse = requestsById[response.requestId]?.isAccountsRequest(strategy) == true
+        if (isAccountsResponse) {
+            for (account in parseAccounts(response.json, strategy)) {
+                accountIdByExternalId[account.id]?.let { result.add(it) }
+            }
+        }
+    }
+    return result.distinct()
 }
 
 /** Maps a profile object to an owner; returns null when no usable name can be derived. */
@@ -814,7 +867,62 @@ private suspend fun importPeopleFromSession(setup: ImportSetup): Int {
             personAccountOwnershipRepository = setup.personAccountOwnershipRepository,
             personAttributeRepository = setup.personAttributeRepository,
             externalIdAttributeTypeId = externalIdAttributeTypeId,
-        )
+        ) +
+        linkGlobalHolderToOwnAccounts(setup, externalIdAttributeTypeId)
+}
+
+/**
+ * Links the global account holder to every own account in this import, sourcing the holder from the
+ * credential's already-downloaded PEOPLE session(s). This makes `ownsAllAccounts` ownership
+ * order-independent: [importApiSessionPeople] links the holder when the PEOPLE session is imported
+ * after the accounts, and this covers the reverse — accounts imported after the holder — by re-linking
+ * each time accounts are imported. Idempotent: [importOwnersForAccount] skips already-linked owners.
+ */
+private suspend fun linkGlobalHolderToOwnAccounts(
+    setup: ImportSetup,
+    externalIdAttributeTypeId: AttributeTypeId?,
+): Int {
+    val config = setup.strategy.peopleDownload ?: return 0
+    validatePeopleOwnershipConfig(config)
+    if (!config.ownsAllAccounts || setup.accountsById.isEmpty()) return 0
+    val credentialId = setup.apiSessionRepository.getSessionById(setup.sessionId)?.credentialId ?: return 0
+
+    // Resolve the AccountIds of the own accounts known to this import (idempotent — they already exist).
+    val ownAccountIds =
+        setup.accountsById.values.map { account ->
+            setup.accountCache.getOrCreateAccountId(account.id, account.displayName(setup.strategy))
+        }
+
+    val peopleIndex = loadPeopleIndex(setup.personRepository, setup.personAttributeRepository, externalIdAttributeTypeId)
+    var newPeopleCount = 0
+    val peopleSessions =
+        setup.apiSessionRepository
+            .getSessionsByCredential(credentialId)
+            .filter { it.kind == ApiSessionKind.PEOPLE }
+    for (session in peopleSessions) {
+        for (response in setup.apiSessionRepository.getResponsesBySession(session.id)) {
+            responseItemsArray(response.json, config.endpoint.responseArrayKey)
+                ?.forEachIndexed { index, element ->
+                    val owner = (element as? JsonObject)?.toPersonOwner(config, index) ?: return@forEachIndexed
+                    for (accountId in ownAccountIds) {
+                        newPeopleCount +=
+                            importOwnersForAccount(
+                                owners = listOf(owner),
+                                accountId = accountId,
+                                peopleIndex = peopleIndex,
+                                personRepository = setup.personRepository,
+                                personAccountOwnershipRepository = setup.personAccountOwnershipRepository,
+                                personAttributeRepository = setup.personAttributeRepository,
+                                externalIdAttributeTypeId = externalIdAttributeTypeId,
+                                entitySource = setup.entitySource,
+                                sessionId = session.id,
+                                requestId = response.requestId,
+                            ).newPeople
+                    }
+                }
+        }
+    }
+    return newPeopleCount
 }
 
 private suspend fun flushPostTransactionAttributes(setup: ImportSetup) {
@@ -1184,32 +1292,39 @@ private suspend fun importPeopleFromCounterparties(
 
     for (response in transactionResponses) {
         val request = requestsById[response.requestId] ?: continue
-        val personalCounterpartyItems = mutableListOf<Triple<ApiTransactionPageItem, ApiImportAccountOwner, PersonalCounterpartyIdentity>>()
+        val personalCounterpartyItems = mutableListOf<Pair<ApiTransactionPageItem, ApiImportAccountOwner>>()
         for (item in parseTransactionsWithPath(response.json, strategy)) {
             val isBuiltIn = item.rawJson?.resolveBuiltInCounterpartyType(strategy.builtInCounterpartyRules, item.amountSign) != null
             if (!item.isZeroAmount && !isBuiltIn) {
-                val owner = item.personalCounterpartyOwner(strategy.peopleMappings)
-                val personalCounterpartyIdentity = owner?.personalCounterpartyIdentity()
-                if (owner != null && personalCounterpartyIdentity != null) {
-                    personalCounterpartyItems.add(Triple(item, owner, personalCounterpartyIdentity))
-                }
+                // Providers with full bank details (Monzo) yield a personalCounterpartyIdentity;
+                // providers with only a name + id (Starling) do not, but are still personal owners.
+                item.personalCounterpartyOwner(strategy.peopleMappings)?.let { personalCounterpartyItems.add(item to it) }
             }
         }
-        for ((item, owner, personalCounterpartyIdentity) in personalCounterpartyItems) {
+        for ((item, owner) in personalCounterpartyItems) {
+            val identity = owner.personalCounterpartyIdentity()
+            val counterpartyId = item.rawJson?.resolveCounterpartyIdentity(counterpartyIdField, strategy.peopleMappings)
+            val counterpartyName =
+                identity?.name ?: owner.preferredName?.takeIf { it.isNotBlank() } ?: item.counterpartyName(nameMappings)
+            // Need a stable key to hang the ownership on: a counterparty id, a bank identity, or at
+            // least a usable name. Skip otherwise to avoid creating orphan people.
+            if (counterpartyId == null && identity == null && counterpartyName.isBlank()) continue
             val counterpartyAccountId =
                 accountCache.getOrCreateCounterpartyAccountId(
-                    counterpartyId = item.rawJson?.resolveCounterpartyIdentity(counterpartyIdField, strategy.peopleMappings),
+                    counterpartyId = counterpartyId,
                     builtInType = null,
-                    name = nameMappings.counterpartyPrefix + personalCounterpartyIdentity.name,
-                    dedupeKey = personalCounterpartyIdentity.dedupeKey,
+                    name = nameMappings.counterpartyPrefix + counterpartyName,
+                    dedupeKey = identity?.dedupeKey,
                     apiSource = AccountApiSource(sessionId, request.id, JsonPath("${item.jsonPath.value}.counterparty")),
-                    personalIdentity = personalCounterpartyIdentity,
+                    personalIdentity = identity,
                 )
-            accountAttributeRepository.ensureCounterpartyPersonalAttributes(
-                accountId = counterpartyAccountId,
-                sortCode = personalCounterpartyIdentity.sortCode,
-                accountNumber = personalCounterpartyIdentity.accountNumber,
-            )
+            if (identity != null) {
+                accountAttributeRepository.ensureCounterpartyPersonalAttributes(
+                    accountId = counterpartyAccountId,
+                    sortCode = identity.sortCode,
+                    accountNumber = identity.accountNumber,
+                )
+            }
             newPeopleCount +=
                 importOwnersForAccount(
                     owners = listOf(owner),
@@ -1321,7 +1436,10 @@ private suspend fun resolveOrCreatePerson(
         if (externalIdAttributeTypeId != null && externalId != null && existing.externalId == null) {
             logger.info { "Backfilling external id for imported person '${existing.fullName}'" }
             runCatching {
-                personAttributeRepository.insert(existing.person.id, externalIdAttributeTypeId, externalId)
+                // Creation mode records the attribute at the person's existing revision rather than
+                // bumping a new one, matching how all other import-time attributes are written and
+                // avoiding an orphan person revision with no entity source.
+                personAttributeRepository.insertInCreationMode(existing.person.id, externalIdAttributeTypeId, externalId)
             }
             peopleIndex.replace(existing.person, externalId)
             return existing.person to false
@@ -1585,10 +1703,17 @@ private suspend fun AccountAttributeRepository.upsertAccountAttributeInCreationM
     }
 }
 
+/** Whether [type] marks a counterparty as a person, per the single or multi-value personal config. */
+private fun ApiPeopleMappings.isPersonalBeneficiaryType(type: String?): Boolean {
+    if (type == null) return false
+    if (type.equals(personalBeneficiaryAccountTypeValue, ignoreCase = true)) return true
+    return personalBeneficiaryAccountTypeValues.any { it.equals(type, ignoreCase = true) }
+}
+
 private fun ApiTransactionPageItem.personalCounterpartyOwner(peopleMappings: ApiPeopleMappings): ApiImportAccountOwner? {
     val counterparty = rawJson?.resolveJsonObjectPath(peopleMappings.counterpartyObjectField) ?: return null
     val beneficiaryAccountType = counterparty.stringOrNull(peopleMappings.beneficiaryAccountTypeField)
-    if (beneficiaryAccountType?.equals(peopleMappings.personalBeneficiaryAccountTypeValue, ignoreCase = true) != true) return null
+    if (!peopleMappings.isPersonalBeneficiaryType(beneficiaryAccountType)) return null
 
     val name = counterparty.stringOrNull(peopleMappings.counterpartyNameField)?.takeIf { it.isNotBlank() }
     val userId = counterparty.stringOrNull(peopleMappings.counterpartyUserIdField)?.takeIf { it.isNotBlank() }.orEmpty()
@@ -1607,7 +1732,7 @@ private fun ApiTransactionPageItem.personalCounterpartyOwner(peopleMappings: Api
 private fun JsonObject.personalCounterpartyIdentity(peopleMappings: ApiPeopleMappings): PersonalCounterpartyIdentity? {
     val counterparty = resolveJsonObjectPath(peopleMappings.counterpartyObjectField) ?: return null
     val beneficiaryAccountType = counterparty.stringOrNull(peopleMappings.beneficiaryAccountTypeField)
-    if (beneficiaryAccountType?.equals(peopleMappings.personalBeneficiaryAccountTypeValue, ignoreCase = true) != true) return null
+    if (!peopleMappings.isPersonalBeneficiaryType(beneficiaryAccountType)) return null
     val sortCode = counterparty.stringOrNull(peopleMappings.counterpartySortCodeField)?.takeIf { it.isNotBlank() } ?: return null
     val accountNumber = counterparty.stringOrNull(peopleMappings.counterpartyAccountNumberField)?.takeIf { it.isNotBlank() } ?: return null
     val name = counterparty.stringOrNull(peopleMappings.counterpartyNameField)?.takeIf { it.isNotBlank() } ?: return null
@@ -2160,6 +2285,22 @@ private fun ApiTransactionPageItem.errorRecord(
         errorMessage = message,
     )
 
+/**
+ * Resolves a transaction's decline reason, used downstream to exclude it from balances. Two shapes
+ * are supported: a dedicated reason field that is only present when declined (Monzo's
+ * `decline_reason`), and an always-present status field whose value flags the decline (Starling's
+ * `status` == "DECLINED"). The status, when matched, doubles as the human-readable reason.
+ */
+private fun resolveDeclineReason(
+    obj: JsonObject,
+    mappings: ApiTransactionMappings,
+): String? {
+    val reason = mappings.declineReasonField?.let { obj.resolveJsonPath(it) }
+    if (!reason.isNullOrBlank()) return reason
+    val status = mappings.declineStatusField?.let { obj.resolveJsonPath(it) }
+    return status?.takeIf { it in mappings.declinedStatusValues }
+}
+
 private fun parseTransactionsWithPath(
     json: String,
     strategy: ApiImportStrategy,
@@ -2172,7 +2313,7 @@ private fun parseTransactionsWithPath(
                 val created = obj.resolveJsonPath(mappings.timestampField)?.let { Instant.parse(it) }
                 val amount = parseAmount(obj, mappings)
                 val currency = obj.resolveJsonPath(mappings.currencyField)
-                val declineReason = mappings.declineReasonField?.let { obj.resolveJsonPath(it) }
+                val declineReason = resolveDeclineReason(obj, mappings)
                 val localAmount = mappings.localAmountField?.let { obj.resolveJsonPath(it) }?.toLongOrNull()
                 val localCurrency = mappings.localCurrencyField?.let { obj.resolveJsonPath(it) }
                 if (created != null && amount != null && currency != null) {
@@ -2269,7 +2410,11 @@ private fun arrayItemJsonPath(
     index: Int,
 ): JsonPath = if (responseArrayKey.isBlank()) JsonPath("$[$index]") else JsonPath("$.$responseArrayKey[$index]")
 
-/** Extracts the items array from a response body; a blank [responseArrayKey] means the body is the array. */
+/**
+ * Extracts the items array from a response body; a blank [responseArrayKey] means the body is the
+ * array. A bare JSON object body (e.g. a single-resource endpoint like Starling's account holder) is
+ * wrapped as a one-element array so single-object responses parse like any other.
+ */
 private fun responseItemsArray(
     json: String,
     responseArrayKey: String,
@@ -2277,7 +2422,11 @@ private fun responseItemsArray(
     try {
         val root = Json.parseToJsonElement(json)
         if (responseArrayKey.isBlank()) {
-            root as? JsonArray
+            when (root) {
+                is JsonArray -> root
+                is JsonObject -> JsonArray(listOf(root))
+                else -> null
+            }
         } else {
             (root as? JsonObject)?.get(responseArrayKey)?.jsonArray
         }
@@ -2870,6 +3019,9 @@ private fun JsonObject.resolveCounterpartyIdentity(
 }
 
 private fun JsonObject.resolveJsonObjectPath(dotPath: String): JsonObject? {
+    // A blank path means "this object" — used by providers whose counterparty fields are flat on the
+    // transaction item rather than nested under a sub-object.
+    if (dotPath.isBlank()) return this
     var current: JsonElement = this
     for (part in dotPath.split(".")) {
         current = (current as? JsonObject)?.get(part) ?: return null

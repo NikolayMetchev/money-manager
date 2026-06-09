@@ -243,6 +243,7 @@ private fun providerTokenPageUrl(strategy: ApiImportStrategy?): String? =
     when (providerKind(strategy)) {
         ProviderKind.MONZO -> "https://developers.monzo.com/"
         ProviderKind.WISE -> "https://wise.com/your-account/integrations-and-tools/api-tokens"
+        ProviderKind.STARLING -> "https://developer.starlingbank.com/"
         null -> null
     }
 
@@ -268,16 +269,24 @@ private fun connectInstructions(strategy: ApiImportStrategy?): List<String> =
                 "Note: retrieving statements via the API is only supported for accounts based in the US, Canada, " +
                     "Australia, New Zealand, Singapore, and Malaysia.",
             )
+        ProviderKind.STARLING ->
+            listOf(
+                "Open the Starling Developer portal in your browser and sign in with your Starling account.",
+                "Create a personal access token with the account:read, transaction:read and " +
+                    "account-holder-name:read scopes.",
+                "Copy the token, paste it below and tap \"Save Token\".",
+            )
         null -> emptyList()
     }
 
-private enum class ProviderKind { MONZO, WISE }
+private enum class ProviderKind { MONZO, WISE, STARLING }
 
 private fun providerKind(strategy: ApiImportStrategy?): ProviderKind? {
     val baseUrl = strategy?.baseUrl?.lowercase() ?: return null
     return when {
         "monzo" in baseUrl -> ProviderKind.MONZO
         "wise" in baseUrl || "transferwise" in baseUrl -> ProviderKind.WISE
+        "starling" in baseUrl -> ProviderKind.STARLING
         else -> null
     }
 }

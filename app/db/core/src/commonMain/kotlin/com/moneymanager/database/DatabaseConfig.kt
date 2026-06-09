@@ -15,6 +15,7 @@ import com.moneymanager.domain.model.apistrategy.ApiAmountFormat
 import com.moneymanager.domain.model.apistrategy.ApiAuthType
 import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
 import com.moneymanager.domain.model.apistrategy.ApiPaginationConfig
+import com.moneymanager.domain.model.apistrategy.ApiPeopleMappings
 import com.moneymanager.domain.model.apistrategy.ApiPersonImportConfig
 import com.moneymanager.domain.model.apistrategy.ApiQueryParam
 import com.moneymanager.domain.model.apistrategy.ApiSignSource
@@ -823,10 +824,11 @@ object DatabaseConfig {
             attributeTypeQueries.insertWithId(id = ACCOUNT_SORT_CODE_ATTR_TYPE_ID, name = "account-sort-code")
             attributeTypeQueries.insertWithId(id = ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID, name = "account-account-number")
 
-            // Seed the built-in Monzo and Wise API import strategies (after triggers and system
-            // device are created so the INSERT trigger records the initial audit entry and source)
+            // Seed the built-in Monzo, Wise and Starling API import strategies (after triggers and
+            // system device are created so the INSERT trigger records the initial audit entry/source)
             seedMonzoStrategy(systemDeviceId)
             seedWiseStrategy(systemDeviceId)
+            seedStarlingStrategy(systemDeviceId)
 
             // Seed the built-in CSV import strategies
             seedBuiltInCsvStrategies()
@@ -1029,6 +1031,111 @@ object DatabaseConfig {
         )
         apiImportStrategyQueries.insertSource(
             strategy_id = wiseStrategyId.toString(),
+            revision_id = 1,
+            source_type_id = SourceType.SYSTEM.id.toLong(),
+            device_id = systemDeviceId,
+        )
+    }
+
+    /** Fixed UUID for the built-in Starling strategy so it can be referenced reliably. */
+    private val starlingStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000005")
+
+    /**
+     * Seeds the built-in Starling Bank API import strategy. Starling is a flat two-level API like
+     * Monzo: a single Bearer token lists accounts, and each account's transaction feed is fetched
+     * from a path templated with the account id and its `defaultCategory`. Amounts are integer minor
+     * units and the direction lives in a separate `direction` field (IN/OUT). The whole feed is
+     * returned in one response, so no pagination is configured. The account holder is a single global
+     * object (`/api/v2/account-holder/individual`) linked to every imported account.
+     */
+    private fun MoneyManagerDatabaseWrapper.seedStarlingStrategy(systemDeviceId: Long) {
+        val config =
+            ApiStrategyConfigJson(
+                baseUrl = "https://api.starlingbank.com",
+                authType = ApiAuthType.BEARER_TOKEN,
+                accountsEndpoint =
+                    ApiEndpointConfig(
+                        path = "/api/v2/accounts",
+                        responseArrayKey = "accounts",
+                    ),
+                transactionsEndpoint =
+                    ApiEndpointConfig(
+                        // {account.defaultCategory} resolves the account's defaultCategory from its raw
+                        // JSON; the feed endpoint returns the full history in a single response.
+                        path = "/api/v2/feed/account/{account.id}/category/{account.defaultCategory}",
+                        responseArrayKey = "feedItems",
+                        // Starling requires a mandatory `changesSince` ISO-8601 bound; anchoring it to
+                        // the epoch returns the account's entire feed history in one response.
+                        queryParams =
+                            listOf(
+                                ApiQueryParam(name = "changesSince", value = "1970-01-01T00:00:00.000Z"),
+                            ),
+                    ),
+                accountMappings =
+                    ApiAccountMappings(
+                        idField = "accountUid",
+                        descriptionField = "name",
+                        currencyField = "currency",
+                        ownersArrayField = null,
+                    ),
+                transactionMappings =
+                    ApiTransactionMappings(
+                        amountField = "amount.minorUnits",
+                        currencyField = "amount.currency",
+                        timestampField = "transactionTime",
+                        descriptionField = "reference",
+                        amountFormat = ApiAmountFormat.MINOR_UNITS_INTEGER,
+                        signSource = ApiSignSource.FIELD,
+                        signField = "direction",
+                        creditValues = setOf("IN"),
+                        idField = "feedItemUid",
+                        counterpartyNameField = "counterPartyName",
+                        // The counterparty's stable id keys the counterparty account (stored as its
+                        // external-id attribute) so it survives name changes and dedupes across imports.
+                        counterpartyIdField = "counterPartyUid",
+                        // Declined feed items never moved money; import them but exclude from balances
+                        // (same treatment as Monzo's `decline_reason`), keyed off Starling's status.
+                        declineStatusField = "status",
+                        declinedStatusValues = setOf("DECLINED"),
+                        // Persist the feed item's stable id as a transaction attribute so each imported
+                        // transfer is uniquely identifiable and re-imports dedupe on it.
+                        customFields = mapOf("starling-transaction-id" to "feedItemUid"),
+                        uniqueIdentifierFields = setOf("starling-transaction-id"),
+                    ),
+                // Starling's counterparty fields are flat on the feed item (no nested object), so the
+                // counterparty object path is blank (the item itself). PAYEE/SENDER counterparties are
+                // people; MERCHANT/STARLING are not. counterPartyUid identifies the person.
+                peopleMappings =
+                    ApiPeopleMappings(
+                        counterpartyObjectField = "",
+                        beneficiaryAccountTypeField = "counterPartyType",
+                        personalBeneficiaryAccountTypeValues = setOf("PAYEE", "SENDER"),
+                        counterpartyNameField = "counterPartyName",
+                        counterpartyUserIdField = "counterPartyUid",
+                    ),
+                accountNamePrefix = "Starling: ",
+                counterpartyPrefix = "Starling Counterparty: ",
+                // The account holder is global (one per connection) and returned as a single object,
+                // so it is linked to every account imported in the session.
+                peopleDownload =
+                    ApiPersonImportConfig(
+                        endpoint = ApiEndpointConfig(path = "/api/v2/account-holder/individual", responseArrayKey = ""),
+                        firstNameField = "firstName",
+                        lastNameField = "lastName",
+                        ownsAllAccounts = true,
+                    ),
+                personExternalIdAttribute = "starling-external-id",
+            )
+        val now = Clock.System.now().toEpochMilliseconds()
+        apiImportStrategyQueries.insert(
+            id = starlingStrategyId.toString(),
+            name = "Starling",
+            config_json = ApiStrategyJsonCodec.encode(config),
+            created_at = now,
+            updated_at = now,
+        )
+        apiImportStrategyQueries.insertSource(
+            strategy_id = starlingStrategyId.toString(),
             revision_id = 1,
             source_type_id = SourceType.SYSTEM.id.toLong(),
             device_id = systemDeviceId,

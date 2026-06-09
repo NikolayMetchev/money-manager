@@ -157,7 +157,14 @@ enum class ApiSignSource {
  * @property idField Dot-path to the transaction's stable id, used for de-duplication
  * @property merchantNameField Optional dot-path to a merchant name; preferred counterparty name
  * @property counterpartyNameField Optional dot-path to a counterparty name; fallback for merchant
- * @property declineReasonField Optional dot-path to a decline reason for declined transactions
+ * @property declineReasonField Optional dot-path to a decline reason for declined transactions.
+ *                              Present-and-non-blank means declined (Monzo's `decline_reason` shape).
+ * @property declineStatusField Optional dot-path to a status field whose value flags declines
+ *                              (Starling's `status` shape, where the field is always present). When
+ *                              the resolved value is in [declinedStatusValues] the transaction is
+ *                              treated as declined — imported but excluded from balances — exactly
+ *                              like a non-blank [declineReasonField].
+ * @property declinedStatusValues Values of [declineStatusField] that mean "declined" (e.g. {"DECLINED"}).
  * @property localAmountField Optional dot-path to a local/original amount (foreign transactions)
  * @property localCurrencyField Optional dot-path to a local/original currency code
  */
@@ -176,6 +183,8 @@ data class ApiTransactionMappings(
     val counterpartyNameField: String? = null,
     val counterpartyIdField: String? = null,
     val declineReasonField: String? = null,
+    val declineStatusField: String? = null,
+    val declinedStatusValues: Set<String> = emptySet(),
     val localAmountField: String? = null,
     val localCurrencyField: String? = null,
     val customFields: Map<String, String> = emptyMap(),
@@ -184,9 +193,16 @@ data class ApiTransactionMappings(
 
 @Serializable
 data class ApiPeopleMappings(
+    // Blank resolves to the transaction item itself, for providers whose counterparty fields are flat
+    // (e.g. Starling) rather than nested under an object (e.g. Monzo's "counterparty").
     val counterpartyObjectField: String = "counterparty",
     val beneficiaryAccountTypeField: String = "beneficiary_account_type",
     val personalBeneficiaryAccountTypeValue: String = "Personal",
+    // Additional values of [beneficiaryAccountTypeField] that mark a counterparty as a person, for
+    // providers that classify person-like counterparties under several types (e.g. Starling's
+    // PAYEE/SENDER). A counterparty is personal when its type matches [personalBeneficiaryAccountTypeValue]
+    // or any of these.
+    val personalBeneficiaryAccountTypeValues: Set<String> = emptySet(),
     val counterpartyNameField: String = "name",
     val counterpartyUserIdField: String = "user_id",
     val counterpartySortCodeField: String = "sort_code",
@@ -292,6 +308,10 @@ data class ApiSigningConfig(
  * @property accountOwnerAncestorExpr When set, links each imported person to the accounts fetched
  *                                    under the matching ancestor value (e.g. "ancestor[0].id" links a
  *                                    profile to the balances fetched under that profile id).
+ * @property ownsAllAccounts When true, the holder(s) returned by [endpoint] are linked to every
+ *                           account imported in the session, regardless of ancestor/id. Use for flat
+ *                           providers with a single global account holder and no ancestor hierarchy
+ *                           (e.g. Starling). Mutually exclusive with [accountOwnerAncestorExpr].
  */
 @Serializable
 data class ApiPersonImportConfig(
@@ -302,6 +322,7 @@ data class ApiPersonImportConfig(
     val preferredNameField: String? = null,
     val fallbackNameField: String? = null,
     val accountOwnerAncestorExpr: String? = null,
+    val ownsAllAccounts: Boolean = false,
 )
 
 /**
