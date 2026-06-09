@@ -193,9 +193,16 @@ data class ApiTransactionMappings(
 
 @Serializable
 data class ApiPeopleMappings(
+    // Blank resolves to the transaction item itself, for providers whose counterparty fields are flat
+    // (e.g. Starling) rather than nested under an object (e.g. Monzo's "counterparty").
     val counterpartyObjectField: String = "counterparty",
     val beneficiaryAccountTypeField: String = "beneficiary_account_type",
     val personalBeneficiaryAccountTypeValue: String = "Personal",
+    // Additional values of [beneficiaryAccountTypeField] that mark a counterparty as a person, for
+    // providers that classify person-like counterparties under several types (e.g. Starling's
+    // PAYEE/SENDER). A counterparty is personal when its type matches [personalBeneficiaryAccountTypeValue]
+    // or any of these.
+    val personalBeneficiaryAccountTypeValues: Set<String> = emptySet(),
     val counterpartyNameField: String = "name",
     val counterpartyUserIdField: String = "user_id",
     val counterpartySortCodeField: String = "sort_code",

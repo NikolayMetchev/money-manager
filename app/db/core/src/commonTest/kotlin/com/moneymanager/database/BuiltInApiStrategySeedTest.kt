@@ -55,6 +55,18 @@ class BuiltInApiStrategySeedTest : DbTest() {
                 assertEquals("feedItemUid", idField)
                 assertEquals("status", declineStatusField)
                 assertEquals(setOf("DECLINED"), declinedStatusValues)
+                assertEquals("counterPartyUid", counterpartyIdField)
+                assertEquals(mapOf("starling-transaction-id" to "feedItemUid"), customFields)
+                assertEquals(setOf("starling-transaction-id"), uniqueIdentifierFields)
+            }
+
+            // PAYEE/SENDER counterparties are treated as people, read from flat feed-item fields.
+            with(starling.peopleMappings) {
+                assertEquals("", counterpartyObjectField)
+                assertEquals("counterPartyType", beneficiaryAccountTypeField)
+                assertEquals(setOf("PAYEE", "SENDER"), personalBeneficiaryAccountTypeValues)
+                assertEquals("counterPartyName", counterpartyNameField)
+                assertEquals("counterPartyUid", counterpartyUserIdField)
             }
 
             val people = assertNotNull(starling.peopleDownload, "Starling should configure a people download")

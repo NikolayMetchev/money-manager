@@ -13,6 +13,7 @@ import com.moneymanager.domain.model.apistrategy.ApiAmountFormat
 import com.moneymanager.domain.model.apistrategy.ApiAuthType
 import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
 import com.moneymanager.domain.model.apistrategy.ApiPaginationConfig
+import com.moneymanager.domain.model.apistrategy.ApiPeopleMappings
 import com.moneymanager.domain.model.apistrategy.ApiPersonImportConfig
 import com.moneymanager.domain.model.apistrategy.ApiQueryParam
 import com.moneymanager.domain.model.apistrategy.ApiSignSource
@@ -1085,10 +1086,28 @@ object DatabaseConfig {
                         creditValues = setOf("IN"),
                         idField = "feedItemUid",
                         counterpartyNameField = "counterPartyName",
+                        // The counterparty's stable id keys the counterparty account (stored as its
+                        // external-id attribute) so it survives name changes and dedupes across imports.
+                        counterpartyIdField = "counterPartyUid",
                         // Declined feed items never moved money; import them but exclude from balances
                         // (same treatment as Monzo's `decline_reason`), keyed off Starling's status.
                         declineStatusField = "status",
                         declinedStatusValues = setOf("DECLINED"),
+                        // Persist the feed item's stable id as a transaction attribute so each imported
+                        // transfer is uniquely identifiable and re-imports dedupe on it.
+                        customFields = mapOf("starling-transaction-id" to "feedItemUid"),
+                        uniqueIdentifierFields = setOf("starling-transaction-id"),
+                    ),
+                // Starling's counterparty fields are flat on the feed item (no nested object), so the
+                // counterparty object path is blank (the item itself). PAYEE/SENDER counterparties are
+                // people; MERCHANT/STARLING are not. counterPartyUid identifies the person.
+                peopleMappings =
+                    ApiPeopleMappings(
+                        counterpartyObjectField = "",
+                        beneficiaryAccountTypeField = "counterPartyType",
+                        personalBeneficiaryAccountTypeValues = setOf("PAYEE", "SENDER"),
+                        counterpartyNameField = "counterPartyName",
+                        counterpartyUserIdField = "counterPartyUid",
                     ),
                 accountNamePrefix = "Starling: ",
                 counterpartyPrefix = "Starling Counterparty: ",

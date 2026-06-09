@@ -3,7 +3,9 @@
 package com.moneymanager.ui.starling
 
 import com.moneymanager.database.port.DbEntitySource
+import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.ApiSessionId
+import com.moneymanager.domain.model.ApiSessionKind
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.createApiClient
@@ -47,7 +49,8 @@ private val ACCOUNTS_JSON =
 
 /**
  * One outgoing and one incoming feed item. The direction (IN/OUT) — not the amount sign — determines
- * which side is the user's account; amounts are integer minor units.
+ * which side is the user's account; amounts are integer minor units. The MERCHANT counterparty is not
+ * a person; the SENDER one is, so it should gain a linked person/owner.
  */
 private val FEED_JSON =
     """
@@ -60,6 +63,8 @@ private val FEED_JSON =
       "direction": "OUT",
       "transactionTime": "2024-06-03T09:15:00.000Z",
       "reference": "COFFEE SHOP",
+      "counterPartyType": "MERCHANT",
+      "counterPartyUid": "cp-coffee",
       "counterPartyName": "Coffee Shop"
     },
     {
@@ -69,6 +74,8 @@ private val FEED_JSON =
       "direction": "IN",
       "transactionTime": "2024-06-02T14:30:00.000Z",
       "reference": "SALARY",
+      "counterPartyType": "SENDER",
+      "counterPartyUid": "cp-acme",
       "counterPartyName": "ACME Ltd"
     }
   ]
@@ -112,6 +119,26 @@ private val FEED_WITH_DECLINED_JSON =
       "transactionTime": "2024-06-04T11:00:00.000Z",
       "reference": "CRYPTO.COM",
       "counterPartyName": "Crypto.com"
+    }
+  ]
+}
+    """.trimIndent()
+
+/** A single incoming item from a SENDER counterparty whose name matches the account holder (Ada Lovelace). */
+private val FEED_HOLDER_COUNTERPARTY_JSON =
+    """
+{
+  "feedItems": [
+    {
+      "feedItemUid": "f1",
+      "categoryUid": "$CATEGORY_UID",
+      "amount": { "currency": "GBP", "minorUnits": 50000 },
+      "direction": "IN",
+      "transactionTime": "2024-06-02T14:30:00.000Z",
+      "reference": "REPAYMENT",
+      "counterPartyType": "SENDER",
+      "counterPartyUid": "cp-ada",
+      "counterPartyName": "Ada Lovelace"
     }
   ]
 }
@@ -229,6 +256,86 @@ class StarlingImportE2ETest : DbTest() {
         }
 
     @Test
+    fun `starling import sets identifying attributes and makes personal counterparties owners`() =
+        runTest {
+            val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
+            val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
+            val sessionId = repositories.apiSessionRepository.createSession("test-starling-token", deviceId, now, null)
+            val strategy =
+                repositories.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .single { it.name == "Starling" }
+
+            val apiClient =
+                createApiClient(
+                    trafficRecorder =
+                        ApiSessionTrafficRecorder(sessionId = sessionId, apiSessionRepository = repositories.apiSessionRepository),
+                    engine = mockEngine(),
+                )
+
+            downloadApiSessionAccounts(
+                token = "test-starling-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+            downloadApiSessionTransactions(
+                token = "test-starling-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+            importApiSessionTransactions(
+                apiSessionRepository = repositories.apiSessionRepository,
+                accountRepository = repositories.accountRepository,
+                currencyRepository = repositories.currencyRepository,
+                transactionRepository = repositories.transactionRepository,
+                entitySource = DbEntitySource(repositories.entitySourceQueries, repositories.transferSourceQueries, deviceId),
+                personRepository = repositories.personRepository,
+                personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
+                personAttributeRepository = repositories.personAttributeRepository,
+                attributeTypeRepository = repositories.attributeTypeRepository,
+                accountAttributeRepository = repositories.accountAttributeRepository,
+                deviceId = deviceId,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+
+            val allAccounts = repositories.accountRepository.getAllAccounts().first()
+            val ownAccount = allAccounts.single { it.name == "Starling: Personal" }
+            val coffee = allAccounts.single { it.name == "Starling Counterparty: Coffee Shop" }
+            val acme = allAccounts.single { it.name == "Starling Counterparty: ACME Ltd" }
+
+            // Each transfer carries the feed item's stable id as an identifying attribute.
+            val transfers = repositories.transactionRepository.getTransactionsByAccount(ownAccount.id).first()
+            val txIds =
+                transfers.map { t -> t.attributes.single { it.attributeType.name == "starling-transaction-id" }.value }
+            assertEquals(setOf("f1", "f2"), txIds.toSet(), "Each transfer should record its feedItemUid")
+
+            // Counterparty accounts are keyed by counterPartyUid (stored as the external-id attribute).
+            suspend fun externalId(account: Account) =
+                repositories.accountAttributeRepository
+                    .getByAccount(account.id)
+                    .first()
+                    .single { it.attributeType.name == "account-external-id" }
+                    .value
+            assertEquals("cp-coffee", externalId(coffee))
+            assertEquals("cp-acme", externalId(acme))
+
+            // The SENDER counterparty is a person and becomes an owner; the MERCHANT is not.
+            val acmeOwners = repositories.personAccountOwnershipRepository.getOwnershipsByAccount(acme.id).first()
+            assertEquals(1, acmeOwners.size, "The SENDER counterparty should gain a linked owner")
+            val coffeeOwners = repositories.personAccountOwnershipRepository.getOwnershipsByAccount(coffee.id).first()
+            assertTrue(coffeeOwners.isEmpty(), "The MERCHANT counterparty should not gain an owner")
+
+            val acmePerson = repositories.personRepository.getAllPeople().first().single { it.firstName == "ACME" }
+            assertEquals(acmeOwners.single().personId, acmePerson.id)
+        }
+
+    @Test
     fun `starling account holder is imported and linked to every account`() =
         runTest {
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
@@ -309,6 +416,170 @@ class StarlingImportE2ETest : DbTest() {
                     .first()
             assertTrue(owners.any { it.personId == ada.id }, "The account holder should own the Starling account")
             assertNotNull(ada)
+        }
+
+    @Test
+    fun `account holder owns the own account even when people are imported before accounts`() =
+        runTest {
+            val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
+            val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
+            val strategy =
+                repositories.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .single { it.name == "Starling" }
+            // Sessions must share a credential so the accounts import can find the holder's people session.
+            val credentialId = repositories.apiSessionRepository.createCredential("test-starling-token", now)
+
+            fun clientFor(session: ApiSessionId) =
+                createApiClient(
+                    trafficRecorder =
+                        ApiSessionTrafficRecorder(sessionId = session, apiSessionRepository = repositories.apiSessionRepository),
+                    engine = mockEngine(),
+                )
+
+            // 1) People FIRST, before any accounts exist — the holder is created but can link to nothing.
+            val peopleSessionId =
+                repositories.apiSessionRepository
+                    .createSession("test-starling-token", deviceId, now, null, credentialId = credentialId, kind = ApiSessionKind.PEOPLE)
+            downloadApiSessionPeople(
+                token = "test-starling-token",
+                apiClient = clientFor(peopleSessionId),
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = peopleSessionId,
+                strategy = strategy,
+            )
+            importApiSessionPeople(
+                apiSessionRepository = repositories.apiSessionRepository,
+                accountRepository = repositories.accountRepository,
+                accountAttributeRepository = repositories.accountAttributeRepository,
+                personRepository = repositories.personRepository,
+                personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
+                personAttributeRepository = repositories.personAttributeRepository,
+                attributeTypeRepository = repositories.attributeTypeRepository,
+                entitySource = DbEntitySource(repositories.entitySourceQueries, repositories.transferSourceQueries, deviceId),
+                sessionId = peopleSessionId,
+                strategy = strategy,
+                accountsSessionId = null,
+            )
+
+            // 2) Accounts AFTER the holder — the accounts import must back-link the holder to the own account.
+            val accountsSessionId =
+                repositories.apiSessionRepository
+                    .createSession("test-starling-token", deviceId, now, null, credentialId = credentialId, kind = ApiSessionKind.ACCOUNTS)
+            downloadApiSessionAccounts(
+                token = "test-starling-token",
+                apiClient = clientFor(accountsSessionId),
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = accountsSessionId,
+                strategy = strategy,
+            )
+            importApiSessionTransactions(
+                apiSessionRepository = repositories.apiSessionRepository,
+                accountRepository = repositories.accountRepository,
+                currencyRepository = repositories.currencyRepository,
+                transactionRepository = repositories.transactionRepository,
+                entitySource = DbEntitySource(repositories.entitySourceQueries, repositories.transferSourceQueries, deviceId),
+                personRepository = repositories.personRepository,
+                personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
+                personAttributeRepository = repositories.personAttributeRepository,
+                attributeTypeRepository = repositories.attributeTypeRepository,
+                accountAttributeRepository = repositories.accountAttributeRepository,
+                deviceId = deviceId,
+                sessionId = accountsSessionId,
+                strategy = strategy,
+            )
+
+            val ada = repositories.personRepository.getAllPeople().first().single { it.firstName == "Ada" && it.lastName == "Lovelace" }
+            val ownAccount = repositories.accountRepository.getAllAccounts().first().single { it.name == "Starling: Personal" }
+            val owners = repositories.personAccountOwnershipRepository.getOwnershipsByAccount(ownAccount.id).first()
+            assertTrue(owners.any { it.personId == ada.id }, "The holder should own the own account regardless of import order")
+        }
+
+    @Test
+    fun `backfilling a matched person's external id does not create an orphan revision`() =
+        runTest {
+            val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
+            val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
+            val strategy =
+                repositories.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .single { it.name == "Starling" }
+
+            fun clientFor(session: ApiSessionId) =
+                createApiClient(
+                    trafficRecorder =
+                        ApiSessionTrafficRecorder(sessionId = session, apiSessionRepository = repositories.apiSessionRepository),
+                    engine = mockEngine(feedJson = FEED_HOLDER_COUNTERPARTY_JSON),
+                )
+
+            // Import the holder first — "Ada Lovelace" is created at revision 1 with no Starling external id.
+            val peopleSessionId = repositories.apiSessionRepository.createSession("test-starling-token", deviceId, now, null)
+            downloadApiSessionPeople(
+                token = "test-starling-token",
+                apiClient = clientFor(peopleSessionId),
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = peopleSessionId,
+                strategy = strategy,
+            )
+            importApiSessionPeople(
+                apiSessionRepository = repositories.apiSessionRepository,
+                accountRepository = repositories.accountRepository,
+                accountAttributeRepository = repositories.accountAttributeRepository,
+                personRepository = repositories.personRepository,
+                personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
+                personAttributeRepository = repositories.personAttributeRepository,
+                attributeTypeRepository = repositories.attributeTypeRepository,
+                entitySource = DbEntitySource(repositories.entitySourceQueries, repositories.transferSourceQueries, deviceId),
+                sessionId = peopleSessionId,
+                strategy = strategy,
+                accountsSessionId = null,
+            )
+
+            // Importing the SENDER counterparty "Ada Lovelace" matches the holder by name and backfills
+            // its external id — this must NOT bump the person to a new (source-less) revision.
+            val txSessionId = repositories.apiSessionRepository.createSession("test-starling-token", deviceId, now, null)
+            downloadApiSessionAccounts(
+                token = "test-starling-token",
+                apiClient = clientFor(txSessionId),
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = txSessionId,
+                strategy = strategy,
+            )
+            downloadApiSessionTransactions(
+                token = "test-starling-token",
+                apiClient = clientFor(txSessionId),
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = txSessionId,
+                strategy = strategy,
+            )
+            importApiSessionTransactions(
+                apiSessionRepository = repositories.apiSessionRepository,
+                accountRepository = repositories.accountRepository,
+                currencyRepository = repositories.currencyRepository,
+                transactionRepository = repositories.transactionRepository,
+                entitySource = DbEntitySource(repositories.entitySourceQueries, repositories.transferSourceQueries, deviceId),
+                personRepository = repositories.personRepository,
+                personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
+                personAttributeRepository = repositories.personAttributeRepository,
+                attributeTypeRepository = repositories.attributeTypeRepository,
+                accountAttributeRepository = repositories.accountAttributeRepository,
+                deviceId = deviceId,
+                sessionId = txSessionId,
+                strategy = strategy,
+            )
+
+            val ada = repositories.personRepository.getAllPeople().first().single { it.firstName == "Ada" && it.lastName == "Lovelace" }
+            assertEquals(1L, ada.revisionId, "Backfilling an external id must not bump the person revision")
+            // The backfill still happened: the external id is now stored.
+            val externalId =
+                repositories.personAttributeRepository
+                    .getByPerson(ada.id)
+                    .first()
+                    .single { it.attributeType.name == "starling-external-id" }
+                    .value
+            assertEquals("cp-ada", externalId)
         }
 
     @Test
