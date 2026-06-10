@@ -23,7 +23,8 @@ class CsvImportProvenance(
             csvImportId = csvImportId,
             rowIndexForTransfer = {
                 val rowKey = orderedRowKeys[callIndex++]
-                (rowKey as ImportRowKey.CsvRow).rowIndex
+                require(rowKey is ImportRowKey.CsvRow) { "Expected a CSV row key, got ${rowKey::class.simpleName}" }
+                rowKey.rowIndex
             },
         )
     }

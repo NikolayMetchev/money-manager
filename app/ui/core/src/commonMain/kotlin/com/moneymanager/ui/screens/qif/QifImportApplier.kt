@@ -325,9 +325,10 @@ internal suspend fun runImport(
         maintenance.refreshMaterializedViews()
     }
 
+    // Count like the CSV path: imported + updated transfers are "successes", duplicates exclude updates.
     return QifImportResult(
-        successCount = importResult.transfersImported,
-        duplicateCount = duplicateRecords.size + updatedRecords.size,
+        successCount = importResult.transfersImported + importResult.updated,
+        duplicateCount = importResult.duplicates,
         failedCount = finalPrep.errorRows.size,
     )
 }

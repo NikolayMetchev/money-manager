@@ -24,7 +24,8 @@ class ApiImportProvenance(
             private var callIndex = 0
 
             override fun insert(transfer: Transfer) {
-                val key = orderedRowKeys[callIndex++] as ImportRowKey.ApiJsonPath
+                val key = orderedRowKeys[callIndex++]
+                require(key is ImportRowKey.ApiJsonPath) { "Expected an API row key, got ${key::class.simpleName}" }
                 entitySource
                     .apiImportRecorder(
                         sessionId = sessionId,

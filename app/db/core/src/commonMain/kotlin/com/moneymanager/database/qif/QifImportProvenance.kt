@@ -23,7 +23,8 @@ class QifImportProvenance(
             qifImportId = qifImportId,
             recordIndexForTransfer = {
                 val rowKey = orderedRowKeys[callIndex++]
-                (rowKey as ImportRowKey.QifRecord).recordIndex
+                require(rowKey is ImportRowKey.QifRecord) { "Expected a QIF row key, got ${rowKey::class.simpleName}" }
+                rowKey.recordIndex
             },
         )
     }

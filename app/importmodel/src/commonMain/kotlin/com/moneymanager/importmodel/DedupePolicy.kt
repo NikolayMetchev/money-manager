@@ -3,6 +3,13 @@ package com.moneymanager.importmodel
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 
+/**
+ * Descriptions at or above this normalised similarity are treated as the same transaction. Single
+ * source of truth, shared by [DedupePolicy.FuzzyAllFields] and `StringSimilarity` (in the importer
+ * module, which depends on this one).
+ */
+const val DESCRIPTION_SIMILARITY_THRESHOLD = 0.85
+
 /** How the central import engine decides whether an incoming transfer already exists. */
 sealed interface DedupePolicy {
     /**
@@ -19,17 +26,12 @@ sealed interface DedupePolicy {
      * description similarity at or above [similarityThreshold]). Existing-only — does not dedupe
      * within the same batch. Used by CSV/QIF strategies without unique-identifier columns.
      *
-     * The default [similarityThreshold] mirrors `StringSimilarity.DESCRIPTION_SIMILARITY_THRESHOLD`
-     * (kept in sync intentionally; that constant lives in the engine module which this module can't see).
+     * The default [similarityThreshold] is [DESCRIPTION_SIMILARITY_THRESHOLD].
      */
     data class FuzzyAllFields(
         val dateTolerance: Duration = 3.days,
-        val similarityThreshold: Double = DEFAULT_SIMILARITY_THRESHOLD,
-    ) : DedupePolicy {
-        companion object {
-            const val DEFAULT_SIMILARITY_THRESHOLD = 0.85
-        }
-    }
+        val similarityThreshold: Double = DESCRIPTION_SIMILARITY_THRESHOLD,
+    ) : DedupePolicy
 
     /**
      * API multi-key dedupe: an incoming transfer is a DUPLICATE if it matches an existing transfer by

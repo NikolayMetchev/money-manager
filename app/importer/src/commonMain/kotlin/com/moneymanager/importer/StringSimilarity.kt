@@ -9,7 +9,7 @@ import kotlin.math.max
  */
 object StringSimilarity {
     /** Descriptions at or above this similarity are treated as the same transaction. */
-    const val DESCRIPTION_SIMILARITY_THRESHOLD = 0.85
+    const val DESCRIPTION_SIMILARITY_THRESHOLD = com.moneymanager.importmodel.DESCRIPTION_SIMILARITY_THRESHOLD
 
     /**
      * Normalised similarity in `[0.0, 1.0]`, where `1.0` means identical (after normalisation).

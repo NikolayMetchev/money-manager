@@ -2056,7 +2056,7 @@ private suspend fun importTransactionPages(
         responseRecords +=
             prepared.responseRecord(
                 state = state,
-                transactionId = outcome.transferId ?: TransferId(0),
+                transactionId = outcome.transferId,
                 excludedFromBalances =
                     state == ApiResponseTransactionState.IMPORTED && !prepared.item.declineReason.isNullOrBlank(),
             )
@@ -2226,7 +2226,7 @@ private suspend fun buildApiTransferAttributes(
 
 private fun PreparedApiTransaction.responseRecord(
     state: ApiResponseTransactionState,
-    transactionId: TransferId,
+    transactionId: TransferId?,
     excludedFromBalances: Boolean = false,
 ): ResponseTransactionImportRecord =
     ResponseTransactionImportRecord(
