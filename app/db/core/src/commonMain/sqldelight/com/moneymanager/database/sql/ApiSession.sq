@@ -24,7 +24,7 @@ CREATE TABLE api_credential (
 CREATE INDEX idx_api_credential_token ON api_credential(token);
 CREATE INDEX idx_api_credential_strategy_id ON api_credential(strategy_id);
 
--- kind: 'ACCOUNTS' for account-download sessions, 'TRANSACTIONS' for transaction-download sessions
+-- One session holds a full download: accounts, transactions and people are all fetched into it.
 CREATE TABLE api_session (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     type_id INTEGER NOT NULL,
@@ -33,7 +33,6 @@ CREATE TABLE api_session (
     created_at INTEGER NOT NULL,
     expires_at INTEGER,
     credential_id INTEGER,
-    kind TEXT,
     FOREIGN KEY (type_id) REFERENCES api_session_type(id),
     FOREIGN KEY (device_id) REFERENCES device(id),
     FOREIGN KEY (credential_id) REFERENCES api_credential(id) ON DELETE CASCADE
@@ -139,8 +138,8 @@ WHERE (expires_at IS NULL OR expires_at > ?)
 ORDER BY created_at DESC;
 
 insert:
-INSERT INTO api_session(type_id, token, device_id, created_at, expires_at, credential_id, kind)
-VALUES (?, ?, ?, ?, ?, ?, ?);
+INSERT INTO api_session(type_id, token, device_id, created_at, expires_at, credential_id)
+VALUES (?, ?, ?, ?, ?, ?);
 
 insertSessionType:
 INSERT INTO api_session_type(id, name) VALUES (?, ?);

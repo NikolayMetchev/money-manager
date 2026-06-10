@@ -30,19 +30,6 @@ value class MonzoCredentialId(
     override fun toString() = id.toString()
 }
 
-enum class ApiSessionKind(
-    val value: String,
-) {
-    ACCOUNTS("ACCOUNTS"),
-    TRANSACTIONS("TRANSACTIONS"),
-    PEOPLE("PEOPLE"),
-    ;
-
-    companion object {
-        fun fromValueOrNull(value: String?): ApiSessionKind? = value?.let { v -> entries.firstOrNull { it.value == v } }
-    }
-}
-
 data class ApiSession(
     val id: ApiSessionId,
     val type: ApiSessionType,
@@ -51,7 +38,6 @@ data class ApiSession(
     val createdAt: Instant,
     val expiresAt: Instant?,
     val credentialId: MonzoCredentialId?,
-    val kind: ApiSessionKind?,
     val importDurationMillis: Long? = null,
 )
 

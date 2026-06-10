@@ -42,7 +42,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.moneymanager.domain.model.ApiSessionKind
 import com.moneymanager.domain.model.apistrategy.ApiAccountMappings
 import com.moneymanager.domain.model.apistrategy.ApiAuthType
 import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
@@ -181,35 +180,21 @@ fun ApiStrategyEditDialog(
             } else {
                 allCredentials
             }
+        // Accounts, transactions and people all land in one session now, so scan each session's
+        // responses and pick the first item matching each response array key.
         for (credential in credentials) {
-            val sessions = apiSessionRepository.getSessionsByCredential(credential.id)
-            if (accountSampleItem == null) {
-                sessions
-                    .filter { it.kind == ApiSessionKind.ACCOUNTS }
-                    .maxByOrNull { it.createdAt }
-                    ?.let { session ->
-                        for (response in apiSessionRepository.getResponsesBySession(session.id)) {
-                            val item = extractFirstArrayItem(response.json, accountsResponseArrayKey)
-                            if (item != null) {
-                                accountSampleItem = item
-                                break
-                            }
-                        }
+            val sessions = apiSessionRepository.getSessionsByCredential(credential.id).sortedByDescending { it.createdAt }
+            for (session in sessions) {
+                for (response in apiSessionRepository.getResponsesBySession(session.id)) {
+                    if (accountSampleItem == null) {
+                        extractFirstArrayItem(response.json, accountsResponseArrayKey)?.let { accountSampleItem = it }
                     }
-            }
-            if (txSampleItem == null) {
-                sessions
-                    .filter { it.kind == ApiSessionKind.TRANSACTIONS }
-                    .maxByOrNull { it.createdAt }
-                    ?.let { session ->
-                        for (response in apiSessionRepository.getResponsesBySession(session.id)) {
-                            val item = extractFirstArrayItem(response.json, transactionsResponseArrayKey)
-                            if (item != null) {
-                                txSampleItem = item
-                                break
-                            }
-                        }
+                    if (txSampleItem == null) {
+                        extractFirstArrayItem(response.json, transactionsResponseArrayKey)?.let { txSampleItem = it }
                     }
+                    if (accountSampleItem != null && txSampleItem != null) break
+                }
+                if (accountSampleItem != null && txSampleItem != null) break
             }
             if (accountSampleItem != null && txSampleItem != null) break
         }
