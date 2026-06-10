@@ -37,6 +37,8 @@ import com.moneymanager.domain.model.csvstrategy.RowConditionOperator
 import com.moneymanager.domain.model.csvstrategy.TemplateAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.importer.StringSimilarity
+import com.moneymanager.importmodel.DESCRIPTION_SIMILARITY_THRESHOLD
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.LocalTime
@@ -952,7 +954,7 @@ class CsvTransferMapper(
             (transfer.timestamp - existing.timestamp).absoluteValue <= DUPLICATE_DATE_TOLERANCE
         if (!withinDateTolerance) return false
         return StringSimilarity.similarity(transfer.description, existing.description) >=
-            StringSimilarity.DESCRIPTION_SIMILARITY_THRESHOLD
+            DESCRIPTION_SIMILARITY_THRESHOLD
     }
 
     /**

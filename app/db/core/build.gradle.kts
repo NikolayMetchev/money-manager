@@ -12,6 +12,7 @@ kotlin {
             dependencies {
                 api(libs.kotlinx.coroutines.core)
                 api(libs.mappie.api)
+                api(projects.app.importmodel)
                 api(projects.app.model.core)
                 api(projects.utils.currency)
 
@@ -19,6 +20,7 @@ kotlin {
                 implementation(libs.kotlinx.datetime)
                 implementation(libs.kotlinx.serialization.json)
                 implementation(libs.sqldelight.coroutines.extensions)
+                implementation(projects.app.importer)
                 implementation(projects.utils.bigdecimal)
             }
         }
@@ -27,6 +29,7 @@ kotlin {
             dependencies {
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)
+                implementation(projects.app.importmodel)
                 implementation(projects.app.model.core)
                 implementation(projects.test.app.db)
             }

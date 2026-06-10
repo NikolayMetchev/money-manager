@@ -1,4 +1,4 @@
-package com.moneymanager.database.csv
+package com.moneymanager.importer
 
 import kotlin.math.max
 
@@ -8,9 +8,6 @@ import kotlin.math.max
  * are compared by normalised edit-distance rather than exact equality.
  */
 object StringSimilarity {
-    /** Descriptions at or above this similarity are treated as the same transaction. */
-    const val DESCRIPTION_SIMILARITY_THRESHOLD = 0.85
-
     /**
      * Normalised similarity in `[0.0, 1.0]`, where `1.0` means identical (after normalisation).
      * Inputs are trimmed, lower-cased and have internal whitespace collapsed before comparison.

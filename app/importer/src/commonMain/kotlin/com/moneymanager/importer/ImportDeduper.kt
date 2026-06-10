@@ -1,0 +1,225 @@
+@file:OptIn(kotlin.time.ExperimentalTime::class)
+
+package com.moneymanager.importer
+
+import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.AttributeTypeId
+import com.moneymanager.domain.model.Transfer
+import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.csv.ImportStatus
+import com.moneymanager.importmodel.AccountRef
+import com.moneymanager.importmodel.DedupePolicy
+import com.moneymanager.importmodel.ImportTransfer
+
+/**
+ * Information about an existing transfer, used by [ImportDeduper] for duplicate detection.
+ *
+ * @property attributes Existing attribute values keyed by type id (for identical-comparison).
+ * @property uniqueKey The transfer's unique-identifier values (builder-defined keys), or empty when
+ *   the dedupe policy does not use unique identifiers.
+ */
+data class ExistingTransferInfo(
+    val transferId: TransferId,
+    val transfer: Transfer,
+    val attributes: Map<AttributeTypeId, String> = emptyMap(),
+    val uniqueKey: Map<String, String> = emptyMap(),
+    val apiId: String? = null,
+)
+
+/**
+ * Classification of an [ImportTransfer] against existing transfers.
+ *
+ * @property existing The matched existing (database) transfer id, for DUPLICATE/UPDATED against the DB.
+ * @property inBatchMatchIndex For an in-batch DUPLICATE (it matched an earlier accepted transfer in the
+ *   same batch that has no id yet), the index of that earlier transfer in the classified list; the
+ *   engine resolves it to the earlier transfer's created id. Null otherwise.
+ */
+data class Classified(
+    val transfer: ImportTransfer,
+    val status: ImportStatus,
+    val existing: TransferId?,
+    val inBatchMatchIndex: Int? = null,
+)
+
+/**
+ * Deduplicates incoming transfers against existing ones according to a [DedupePolicy]. Account
+ * references on the incoming transfers must already be resolved to [AccountRef.Existing] (the engine
+ * does this before calling [classify]).
+ *
+ * Behaviour mirrors the previous CSV/API dedupe logic:
+ *  - [DedupePolicy.UniqueIdentifier]: match by [ImportTransfer.uniqueKey]; also dedupes within the
+ *    same batch (a later transfer whose key was already accepted in this batch is a DUPLICATE).
+ *  - [DedupePolicy.FuzzyAllFields]: exact core+attribute match, then fuzzy match; existing-only.
+ *  - [DedupePolicy.None]: everything IMPORTED.
+ */
+class ImportDeduper(
+    private val policy: DedupePolicy,
+    existing: List<ExistingTransferInfo>,
+) {
+    private val existingList = existing
+
+    private val existingByUniqueKey: Map<Map<String, String>, ExistingTransferInfo> =
+        existing.filter { it.uniqueKey.isNotEmpty() }.associateBy { it.uniqueKey }
+
+    /** Unique keys accepted (IMPORTED) earlier in this batch, for in-batch dedupe. */
+    private val seenInBatch = mutableSetOf<Map<String, String>>()
+
+    // For ApiMultiKey: existing-DB indexes (-> real id) plus running in-batch indexes (-> classified
+    // index of the accepted earlier transfer, resolved to its created id by the engine).
+    private val existingApiId: Map<String, TransferId> =
+        existing.mapNotNull { info -> info.apiId?.let { it to info.transferId } }.toMap()
+    private val existingUniqueKeyId: Map<Map<String, String>, TransferId> =
+        existing.filter { it.uniqueKey.isNotEmpty() }.associate { it.uniqueKey to it.transferId }
+    private val existingMatchCandidates: List<Pair<TransferId, Transfer>> =
+        existing.map { it.transferId to it.transfer }
+    private val batchApiId = mutableMapOf<String, Int>()
+    private val batchUniqueKey = mutableMapOf<Map<String, String>, Int>()
+    private val batchMatchCandidates = mutableListOf<Pair<Int, Transfer>>()
+
+    fun classify(transfers: List<ImportTransfer>): List<Classified> =
+        transfers.mapIndexed { index, transfer -> classifyOne(index, transfer) }
+
+    private fun classifyOne(
+        index: Int,
+        transfer: ImportTransfer,
+    ): Classified =
+        when (policy) {
+            is DedupePolicy.None -> Classified(transfer, ImportStatus.IMPORTED, null)
+            is DedupePolicy.UniqueIdentifier -> classifyByUniqueId(transfer)
+            is DedupePolicy.FuzzyAllFields -> classifyByAllFields(transfer, policy)
+            is DedupePolicy.ApiMultiKey -> classifyByApiMultiKey(index, transfer)
+        }
+
+    private fun classifyByApiMultiKey(
+        index: Int,
+        transfer: ImportTransfer,
+    ): Classified {
+        // Match an existing DB transfer first (yields its real id) ...
+        val existingId =
+            transfer.apiId?.let { existingApiId[it] }
+                ?: transfer.uniqueKey?.takeIf { it.isNotEmpty() }?.let { existingUniqueKeyId[it] }
+                ?: existingMatchCandidates.firstOrNull { (_, e) -> apiMatches(transfer, e) }?.first
+        if (existingId != null) return Classified(transfer, ImportStatus.DUPLICATE, existingId)
+
+        // ... then an earlier accepted transfer in this same batch (resolved to its created id later).
+        val batchMatchIndex =
+            transfer.apiId?.let { batchApiId[it] }
+                ?: transfer.uniqueKey?.takeIf { it.isNotEmpty() }?.let { batchUniqueKey[it] }
+                ?: batchMatchCandidates.firstOrNull { (_, e) -> apiMatches(transfer, e) }?.first
+        if (batchMatchIndex != null) {
+            return Classified(transfer, ImportStatus.DUPLICATE, existing = null, inBatchMatchIndex = batchMatchIndex)
+        }
+
+        // Accepted: register this transfer so later items in the batch dedupe against it.
+        transfer.apiId?.let { batchApiId[it] = index }
+        transfer.uniqueKey?.takeIf { it.isNotEmpty() }?.let { batchUniqueKey[it] = index }
+        batchMatchCandidates += index to transfer.toComparableTransfer(TransferId(0))
+        return Classified(transfer, ImportStatus.IMPORTED, null)
+    }
+
+    private fun apiMatches(
+        transfer: ImportTransfer,
+        existing: Transfer,
+    ): Boolean {
+        if (transfer.timestamp != existing.timestamp || transfer.amount != existing.amount) return false
+        val source = transfer.source.requireId()
+        val target = transfer.target.requireId()
+        return (source == existing.sourceAccountId && target == existing.targetAccountId) ||
+            (source == existing.targetAccountId && target == existing.sourceAccountId)
+    }
+
+    private fun ImportTransfer.toComparableTransfer(id: TransferId): Transfer =
+        Transfer(
+            id = id,
+            timestamp = timestamp,
+            description = description,
+            sourceAccountId = source.requireId(),
+            targetAccountId = target.requireId(),
+            amount = amount,
+        )
+
+    private fun classifyByUniqueId(transfer: ImportTransfer): Classified {
+        val key = transfer.uniqueKey
+        if (key.isNullOrEmpty()) return Classified(transfer, ImportStatus.IMPORTED, null)
+
+        val existing = existingByUniqueKey[key]
+        if (existing != null) {
+            val status =
+                if (transfersAreIdentical(transfer, existing)) ImportStatus.DUPLICATE else ImportStatus.UPDATED
+            return Classified(transfer, status, existing.transferId)
+        }
+
+        // Not in the database; check whether an earlier transfer in this same batch already claimed it.
+        if (!seenInBatch.add(key)) {
+            return Classified(transfer, ImportStatus.DUPLICATE, null)
+        }
+        return Classified(transfer, ImportStatus.IMPORTED, null)
+    }
+
+    private fun classifyByAllFields(
+        transfer: ImportTransfer,
+        policy: DedupePolicy.FuzzyAllFields,
+    ): Classified {
+        // First pass: an exact core-field match preserves the DUPLICATE/UPDATED distinction.
+        for (existing in existingList) {
+            if (coreFieldsMatch(transfer, existing.transfer)) {
+                val status =
+                    if (attributesAreIdentical(transfer, existing)) ImportStatus.DUPLICATE else ImportStatus.UPDATED
+                return Classified(transfer, status, existing.transferId)
+            }
+        }
+        // Second pass: tolerate bank re-export drift (close date, similar description).
+        for (existing in existingList) {
+            if (isFuzzyDuplicate(transfer, existing.transfer, policy)) {
+                return Classified(transfer, ImportStatus.DUPLICATE, existing.transferId)
+            }
+        }
+        return Classified(transfer, ImportStatus.IMPORTED, null)
+    }
+
+    private fun coreFieldsMatch(
+        transfer: ImportTransfer,
+        existing: Transfer,
+    ): Boolean =
+        transfer.timestamp == existing.timestamp &&
+            transfer.source.requireId() == existing.sourceAccountId &&
+            transfer.target.requireId() == existing.targetAccountId &&
+            transfer.amount == existing.amount &&
+            transfer.description == existing.description
+
+    private fun transfersAreIdentical(
+        transfer: ImportTransfer,
+        existing: ExistingTransferInfo,
+    ): Boolean = coreFieldsMatch(transfer, existing.transfer) && attributesAreIdentical(transfer, existing)
+
+    private fun attributesAreIdentical(
+        transfer: ImportTransfer,
+        existing: ExistingTransferInfo,
+    ): Boolean {
+        val newAttrs = transfer.attributes.associate { it.typeId to it.value }
+        return newAttrs == existing.attributes
+    }
+
+    private fun isFuzzyDuplicate(
+        transfer: ImportTransfer,
+        existing: Transfer,
+        policy: DedupePolicy.FuzzyAllFields,
+    ): Boolean {
+        if (transfer.amount != existing.amount) return false
+        val sharesAccount =
+            transfer.source.requireId() == existing.sourceAccountId ||
+                transfer.target.requireId() == existing.targetAccountId
+        if (!sharesAccount) return false
+        val withinDateTolerance =
+            (transfer.timestamp - existing.timestamp).absoluteValue <= policy.dateTolerance
+        if (!withinDateTolerance) return false
+        return StringSimilarity.similarity(transfer.description, existing.description) >= policy.similarityThreshold
+    }
+
+    private fun AccountRef.requireId(): AccountId =
+        when (this) {
+            is AccountRef.Existing -> id
+            is AccountRef.Local ->
+                error("ImportDeduper requires resolved account references; got unresolved $key")
+        }
+}

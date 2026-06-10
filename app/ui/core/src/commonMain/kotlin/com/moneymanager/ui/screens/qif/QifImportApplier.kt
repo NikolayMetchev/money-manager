@@ -3,9 +3,9 @@
 package com.moneymanager.ui.screens.qif
 
 import com.moneymanager.database.csv.CsvTransferMapper
-import com.moneymanager.database.csv.ExistingTransferInfo
 import com.moneymanager.database.csv.ImportPreparation
 import com.moneymanager.database.qif.QifCsvAdapter
+import com.moneymanager.database.qif.QifImportProvenance
 import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
@@ -26,7 +26,12 @@ import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CsvAccountMappingRepository
 import com.moneymanager.domain.repository.QifImportRepository
-import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.importer.ImportEngine
+import com.moneymanager.importmodel.AccountRef
+import com.moneymanager.importmodel.DedupePolicy
+import com.moneymanager.importmodel.ImportBatch
+import com.moneymanager.importmodel.ImportRowKey
+import com.moneymanager.importmodel.ImportTransfer
 import com.moneymanager.ui.screens.csv.buildAccountsToCreate
 import com.moneymanager.ui.screens.csv.buildPendingAccountMappings
 import kotlinx.coroutines.flow.first
@@ -68,11 +73,11 @@ internal suspend fun bulkApplyQif(
     currencies: List<Currency>,
     csvAccountMappingRepository: CsvAccountMappingRepository,
     accountRepository: AccountRepository,
-    transactionRepository: TransactionRepository,
     qifImportRepository: QifImportRepository,
     attributeTypeRepository: AttributeTypeRepository,
     maintenance: Maintenance,
     entitySource: EntitySource,
+    importEngine: ImportEngine,
     onProgress: (done: Int, total: Int) -> Unit,
 ): QifBulkResult {
     val qifStrategies = strategies.qifCompatible()
@@ -113,11 +118,11 @@ internal suspend fun bulkApplyQif(
                     currencies = currencies,
                     csvAccountMappingRepository = csvAccountMappingRepository,
                     accountRepository = accountRepository,
-                    transactionRepository = transactionRepository,
                     qifImportRepository = qifImportRepository,
                     attributeTypeRepository = attributeTypeRepository,
                     maintenance = maintenance,
                     entitySource = entitySource,
+                    importEngine = importEngine,
                     refreshViews = false,
                 )
             filesImported++
@@ -168,7 +173,6 @@ internal fun buildMapper(
     currencies: List<Currency>,
     accountMappings: List<CsvAccountMapping>,
     sourceAccountOverride: AccountId?,
-    existingTransfers: List<ExistingTransferInfo> = emptyList(),
 ): CsvTransferMapper =
     CsvTransferMapper(
         strategy = strategy,
@@ -176,37 +180,9 @@ internal fun buildMapper(
         existingAccounts = accounts.associateBy { it.name },
         existingCurrencies = currencies.associateBy { it.id },
         existingCurrenciesByCode = currencies.associateBy { it.code.uppercase() },
-        existingTransfers = existingTransfers,
         accountMappings = accountMappings,
         sourceAccountOverride = sourceAccountOverride,
     )
-
-/**
- * Loads existing transfers overlapping the import's accounts and date range so the mapper can flag
- * re-imported transactions as duplicates. QIF has no transaction id, so [CsvTransferMapper] matches
- * on date + accounts + amount + description (see its checkForDuplicateByAllFields).
- */
-internal suspend fun loadExistingTransfers(
-    prep: ImportPreparation,
-    transactionRepository: TransactionRepository,
-): List<ExistingTransferInfo> {
-    if (prep.validTransfers.isEmpty()) return emptyList()
-    val accountIds =
-        prep.validTransfers.flatMap { listOf(it.transfer.sourceAccountId, it.transfer.targetAccountId) }.toSet()
-    val minTs = prep.validTransfers.minOf { it.transfer.timestamp }
-    val maxTs = prep.validTransfers.maxOf { it.transfer.timestamp }
-    return accountIds
-        .flatMap { id -> transactionRepository.getTransactionsByAccountAndDateRange(id, minTs, maxTs).first() }
-        .distinctBy { it.id }
-        .map { transfer ->
-            ExistingTransferInfo(
-                transferId = transfer.id,
-                transfer = transfer,
-                attributes = transfer.attributes.map { it.attributeType.name to it.value },
-                uniqueIdentifierValues = emptyMap(),
-            )
-        }
-}
 
 /** Records that this strategy was applied to the import (so the import shows as imported). */
 internal suspend fun recordApplication(
@@ -219,8 +195,7 @@ internal suspend fun recordApplication(
     }.onFailure { logger.warn { "Could not record QIF import application: ${it.message}" } }
 }
 
-// Bulk transfer-creation mirrors the CSV ApplyStrategyDialog flow (shared import engine) by design.
-@Suppress("LongParameterList", "LongMethod", "DuplicatedCode")
+@Suppress("LongParameterList", "LongMethod")
 internal suspend fun runImport(
     qifImport: QifImport,
     rows: List<CsvRow>,
@@ -232,11 +207,11 @@ internal suspend fun runImport(
     currencies: List<Currency>,
     csvAccountMappingRepository: CsvAccountMappingRepository,
     accountRepository: AccountRepository,
-    transactionRepository: TransactionRepository,
     qifImportRepository: QifImportRepository,
     attributeTypeRepository: AttributeTypeRepository,
     maintenance: Maintenance,
     entitySource: EntitySource,
+    importEngine: ImportEngine,
     refreshViews: Boolean = true,
 ): QifImportResult {
     // Persist any "map to existing account" selections so future imports reuse them.
@@ -257,14 +232,11 @@ internal suspend fun runImport(
             .onFailure { logger.warn(it) { "Failed to bulk-create accounts" } }
     }
 
-    // Rebuild the mapper against the now-current accounts/mappings, then re-map with existing
-    // transfers loaded so re-imported transactions are detected as duplicates and skipped.
+    // Rebuild the mapper against the now-current accounts/mappings. Duplicate detection happens inside
+    // the central engine, so no existing transfers are loaded here.
     val latestAccounts = accountRepository.getAllAccounts().first()
     val latestMappings = csvAccountMappingRepository.getMappingsForStrategy(strategy.id).first()
-    val discoveryPrep =
-        buildMapper(strategy, latestAccounts, currencies, latestMappings, selectedSourceAccountId).prepareImport(rows)
-    val existingTransfers = loadExistingTransfers(discoveryPrep, transactionRepository)
-    val mapper = buildMapper(strategy, latestAccounts, currencies, latestMappings, selectedSourceAccountId, existingTransfers)
+    val mapper = buildMapper(strategy, latestAccounts, currencies, latestMappings, selectedSourceAccountId)
     val finalPrep = mapper.prepareImport(rows)
 
     // Surface mapping errors on their records.
@@ -273,31 +245,13 @@ internal suspend fun runImport(
         qifImportRepository.saveError(qifImport.id, errorRow.rowIndex, errorRow.errorMessage)
     }
 
-    val importedRows = finalPrep.validTransfers.filter { it.importStatus == ImportStatus.IMPORTED }
-    val importedRecordIndexes = importedRows.map { it.rowIndex }.toSet()
-    // Anything matching an existing transfer is skipped (not re-created). A split record counts as
-    // imported if any of its rows were imported.
-    val duplicateRows =
-        finalPrep.validTransfers.filter { it.importStatus != ImportStatus.IMPORTED && it.rowIndex !in importedRecordIndexes }
-    if (duplicateRows.isNotEmpty()) {
-        qifImportRepository.updateRecordStatusesBatch(
-            qifImport.id,
-            ImportStatus.DUPLICATE.name,
-            duplicateRows.associate { it.rowIndex to it.existingTransferId },
-        )
-    }
-    if (importedRows.isEmpty()) {
-        // Nothing new to create, but the strategy was still applied. Record it (unless the file was
-        // entirely errors) so the import shows as imported rather than unimported.
-        if (duplicateRows.isNotEmpty()) {
-            recordApplication(qifImportRepository, qifImport, strategy)
-        }
-        return QifImportResult(successCount = 0, duplicateCount = duplicateRows.size, failedCount = finalPrep.errorRows.size)
+    if (finalPrep.validTransfers.isEmpty()) {
+        return QifImportResult(successCount = 0, failedCount = finalPrep.errorRows.size)
     }
 
     // Pre-resolve attribute types.
     val attributeTypeIdByName =
-        importedRows
+        finalPrep.validTransfers
             .flatMap { it.attributes }
             .map { it.first }
             .toSet()
@@ -308,41 +262,74 @@ internal suspend fun runImport(
             attributeTypeIdByName[typeName]?.let { NewAttribute(it, value) }
         }
 
-    // Bulk-create transfers in a single batch. The mapper assigns the same placeholder id to every
-    // new transfer, so key attributes by unique temporary ids for the bulk call.
-    val transfersWithTempIds = importedRows.mapIndexed { index, row -> row.transfer.copy(id = TransferId(-(index + 1L))) }
-    val attributesByTempId = importedRows.mapIndexed { index, row -> TransferId(-(index + 1L)) to attributesFor(row.attributes) }.toMap()
-    // createTransfers invokes the source recorder once per transfer in list order, so a running index
-    // maps each recorded source back to its QIF record.
-    var recorderCallIndex = 0
-    val createdIds =
-        transactionRepository.createTransfers(
-            transfers = transfersWithTempIds,
-            newAttributes = attributesByTempId,
-            sourceRecorder =
-                entitySource.qifImportRecorder(
-                    qifImportId = qifImport.id,
-                    recordIndexForTransfer = { importedRows[recorderCallIndex++].rowIndex },
-                ),
-            batchSize = transfersWithTempIds.size,
+    // Build the unified import batch. Accounts are already resolved/created above, so transfers carry
+    // Existing refs. QIF splits expand to multiple transfers per record sharing one recordIndex, so a
+    // per-record split index keeps the row keys unique. QIF has no transaction id -> fuzzy dedupe.
+    val splitCounters = mutableMapOf<Long, Int>()
+    val importTransfers =
+        finalPrep.validTransfers.map { row ->
+            val splitIndex = splitCounters.getOrElse(row.rowIndex) { 0 }
+            splitCounters[row.rowIndex] = splitIndex + 1
+            ImportTransfer(
+                rowKey = ImportRowKey.QifRecord(row.rowIndex, splitIndex),
+                source = AccountRef.Existing(row.transfer.sourceAccountId),
+                target = AccountRef.Existing(row.transfer.targetAccountId),
+                timestamp = row.transfer.timestamp,
+                description = row.transfer.description,
+                amount = row.transfer.amount,
+                attributes = attributesFor(row.attributes),
+            )
+        }
+    val batch =
+        ImportBatch(
+            transfers = importTransfers,
+            dedupePolicy = DedupePolicy.FuzzyAllFields(),
+            provenance = QifImportProvenance(entitySource, qifImport.id),
         )
+    val importResult = importEngine.import(batch)
 
-    qifImportRepository.updateRecordStatusesBatch(
-        qifImport.id,
-        ImportStatus.IMPORTED.name,
-        importedRows.mapIndexed { index, row -> row.rowIndex to createdIds.getOrNull(index) }.toMap(),
-    )
-    qifImportRepository.clearErrors(qifImport.id, importedRows.map { it.rowIndex })
+    // Reconcile per-record statuses: a record is IMPORTED if any of its split rows imported, else
+    // UPDATED if any updated, else DUPLICATE.
+    val importedRecords = mutableMapOf<Long, TransferId?>()
+    val updatedRecords = mutableMapOf<Long, TransferId?>()
+    val duplicateRecords = mutableMapOf<Long, TransferId?>()
+    importResult.rowOutcomes.entries
+        .groupBy { (it.key as ImportRowKey.QifRecord).recordIndex }
+        .forEach { (recordIndex, entries) ->
+            val outcomes = entries.map { it.value }
+            val imported = outcomes.firstOrNull { it.status == ImportStatus.IMPORTED }
+            val updated = outcomes.firstOrNull { it.status == ImportStatus.UPDATED }
+            when {
+                imported != null -> importedRecords[recordIndex] = imported.transferId
+                updated != null -> updatedRecords[recordIndex] = updated.transferId
+                else -> duplicateRecords[recordIndex] = outcomes.firstOrNull()?.transferId
+            }
+        }
+    if (importedRecords.isNotEmpty()) {
+        qifImportRepository.updateRecordStatusesBatch(qifImport.id, ImportStatus.IMPORTED.name, importedRecords)
+        qifImportRepository.clearErrors(qifImport.id, importedRecords.keys.toList())
+    }
+    if (updatedRecords.isNotEmpty()) {
+        qifImportRepository.updateRecordStatusesBatch(qifImport.id, ImportStatus.UPDATED.name, updatedRecords)
+        qifImportRepository.clearErrors(qifImport.id, updatedRecords.keys.toList())
+    }
+    if (duplicateRecords.isNotEmpty()) {
+        qifImportRepository.updateRecordStatusesBatch(qifImport.id, ImportStatus.DUPLICATE.name, duplicateRecords)
+    }
 
-    recordApplication(qifImportRepository, qifImport, strategy)
+    if (importedRecords.isNotEmpty() || updatedRecords.isNotEmpty() || duplicateRecords.isNotEmpty()) {
+        recordApplication(qifImportRepository, qifImport, strategy)
+    }
 
     if (refreshViews) {
         maintenance.refreshMaterializedViews()
     }
 
+    // Count from the reconciled per-record statuses (a split record collapses to one status), so a
+    // mixed split isn't double-counted. Updated records count as successes, like the CSV path.
     return QifImportResult(
-        successCount = importedRows.size,
-        duplicateCount = duplicateRows.size,
+        successCount = importedRecords.size + updatedRecords.size,
+        duplicateCount = duplicateRecords.size,
         failedCount = finalPrep.errorRows.size,
     )
 }

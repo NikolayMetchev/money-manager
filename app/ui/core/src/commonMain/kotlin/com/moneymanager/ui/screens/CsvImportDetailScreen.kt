@@ -44,8 +44,8 @@ import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
-import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.domain.repository.TransferSourceRepository
+import com.moneymanager.importer.ImportEngine
 import com.moneymanager.ui.components.csv.CsvPreviewTable
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -63,13 +63,13 @@ fun CsvImportDetailScreen(
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
-    transactionRepository: TransactionRepository,
     attributeTypeRepository: AttributeTypeRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     maintenance: Maintenance,
     transferSourceRepository: TransferSourceRepository,
     entitySource: EntitySource,
+    importEngine: ImportEngine,
     onBack: () -> Unit,
     onDeleted: () -> Unit,
     onCreateStrategy: (CsvImportId) -> Unit = {},
@@ -409,12 +409,11 @@ fun CsvImportDetailScreen(
             currencyRepository = currencyRepository,
             personRepository = personRepository,
             personAccountOwnershipRepository = personAccountOwnershipRepository,
-            transactionRepository = transactionRepository,
             csvImportRepository = csvImportRepository,
             attributeTypeRepository = attributeTypeRepository,
             maintenance = maintenance,
             entitySource = entitySource,
-            transferSourceRepository = transferSourceRepository,
+            importEngine = importEngine,
             onDismiss = { showApplyStrategyDialog = false },
             onImportComplete = { result ->
                 showApplyStrategyDialog = false

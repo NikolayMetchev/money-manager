@@ -39,7 +39,7 @@ import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.QifImportRepository
 import com.moneymanager.domain.repository.SettingsRepository
-import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.importer.ImportEngine
 import com.moneymanager.ui.components.qif.QifRecordList
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -58,11 +58,11 @@ fun QifImportDetailScreen(
     currencyRepository: CurrencyRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    transactionRepository: TransactionRepository,
     attributeTypeRepository: AttributeTypeRepository,
     settingsRepository: SettingsRepository,
     maintenance: Maintenance,
     entitySource: EntitySource,
+    importEngine: ImportEngine,
     onBack: () -> Unit,
     onCreateStrategy: (QifImportId) -> Unit,
     onDeleted: () -> Unit,
@@ -149,12 +149,12 @@ fun QifImportDetailScreen(
             currencyRepository = currencyRepository,
             personRepository = personRepository,
             personAccountOwnershipRepository = personAccountOwnershipRepository,
-            transactionRepository = transactionRepository,
             qifImportRepository = qifImportRepository,
             attributeTypeRepository = attributeTypeRepository,
             settingsRepository = settingsRepository,
             maintenance = maintenance,
             entitySource = entitySource,
+            importEngine = importEngine,
             onDismiss = { showApplyDialog = false },
             onImportComplete = {
                 showApplyDialog = false

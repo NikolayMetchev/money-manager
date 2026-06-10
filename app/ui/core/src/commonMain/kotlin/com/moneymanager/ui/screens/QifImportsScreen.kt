@@ -47,7 +47,7 @@ import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.QifImportRepository
 import com.moneymanager.domain.repository.SettingsRepository
-import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.importer.ImportEngine
 import com.moneymanager.qif.QifParser
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -71,11 +71,11 @@ fun QifImportsScreen(
     currencyRepository: CurrencyRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    transactionRepository: TransactionRepository,
     attributeTypeRepository: AttributeTypeRepository,
     settingsRepository: SettingsRepository,
     maintenance: Maintenance,
     entitySource: EntitySource,
+    importEngine: ImportEngine,
     onImportClick: (QifImportId) -> Unit,
     onStrategiesClick: () -> Unit = {},
 ) {
@@ -234,12 +234,12 @@ fun QifImportsScreen(
                     currencyRepository = currencyRepository,
                     personRepository = personRepository,
                     personAccountOwnershipRepository = personAccountOwnershipRepository,
-                    transactionRepository = transactionRepository,
                     qifImportRepository = qifImportRepository,
                     attributeTypeRepository = attributeTypeRepository,
                     settingsRepository = settingsRepository,
                     maintenance = maintenance,
                     entitySource = entitySource,
+                    importEngine = importEngine,
                     onDismiss = { showImportAll = false },
                     onComplete = { showImportAll = false },
                 )
