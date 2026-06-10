@@ -325,10 +325,11 @@ internal suspend fun runImport(
         maintenance.refreshMaterializedViews()
     }
 
-    // Count like the CSV path: imported + updated transfers are "successes", duplicates exclude updates.
+    // Count from the reconciled per-record statuses (a split record collapses to one status), so a
+    // mixed split isn't double-counted. Updated records count as successes, like the CSV path.
     return QifImportResult(
-        successCount = importResult.transfersImported + importResult.updated,
-        duplicateCount = importResult.duplicates,
+        successCount = importedRecords.size + updatedRecords.size,
+        duplicateCount = duplicateRecords.size,
         failedCount = finalPrep.errorRows.size,
     )
 }
