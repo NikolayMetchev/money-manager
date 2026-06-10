@@ -173,6 +173,11 @@ fun ApiStrategyEditDialog(
     // Prefer credentials linked to this strategy; fall back to all credentials so
     // existing Monzo credentials (created before the strategy was linked) still work.
     LaunchedEffect(strategy?.id, accountsResponseArrayKey, transactionsResponseArrayKey) {
+        // Reset before rescanning so a key/strategy change discards the previous results
+        // instead of short-circuiting on stale samples.
+        accountSampleItem = null
+        txSampleItem = null
+
         val allCredentials = apiSessionRepository.getAllCredentials()
         val credentials =
             if (strategy != null) {
@@ -180,27 +185,29 @@ fun ApiStrategyEditDialog(
             } else {
                 allCredentials
             }
+        var foundAccountSample: String? = null
+        var foundTxSample: String? = null
         // Accounts, transactions and people all land in one session now, so scan each session's
         // responses and pick the first item matching each response array key.
         for (credential in credentials) {
             val sessions = apiSessionRepository.getSessionsByCredential(credential.id).sortedByDescending { it.createdAt }
             for (session in sessions) {
                 for (response in apiSessionRepository.getResponsesBySession(session.id)) {
-                    if (accountSampleItem == null) {
-                        extractFirstArrayItem(response.json, accountsResponseArrayKey)?.let { accountSampleItem = it }
+                    if (foundAccountSample == null) {
+                        extractFirstArrayItem(response.json, accountsResponseArrayKey)?.let { foundAccountSample = it }
                     }
-                    if (txSampleItem == null) {
-                        extractFirstArrayItem(response.json, transactionsResponseArrayKey)?.let { txSampleItem = it }
+                    if (foundTxSample == null) {
+                        extractFirstArrayItem(response.json, transactionsResponseArrayKey)?.let { foundTxSample = it }
                     }
-                    if (accountSampleItem != null && txSampleItem != null) break
+                    if (foundAccountSample != null && foundTxSample != null) break
                 }
-                if (accountSampleItem != null && txSampleItem != null) break
+                if (foundAccountSample != null && foundTxSample != null) break
             }
-            if (accountSampleItem != null && txSampleItem != null) break
+            if (foundAccountSample != null && foundTxSample != null) break
         }
-        // Mark as "searched but nothing found" so we don't show a loading state forever
-        if (accountSampleItem == null) accountSampleItem = ""
-        if (txSampleItem == null) txSampleItem = ""
+        // Empty string marks "searched but nothing found" so we don't show a loading state forever.
+        accountSampleItem = foundAccountSample ?: ""
+        txSampleItem = foundTxSample ?: ""
     }
 
     // Which field's setter is currently awaiting a path pick

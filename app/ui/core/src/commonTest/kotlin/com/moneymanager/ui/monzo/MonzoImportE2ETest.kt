@@ -1444,21 +1444,25 @@ class MonzoImportE2ETest : DbTest() {
                 sessionId = sessionId,
                 strategy = strategy,
             )
-            importApiSessionTransactions(
-                apiSessionRepository = repositories.apiSessionRepository,
-                accountRepository = repositories.accountRepository,
-                currencyRepository = repositories.currencyRepository,
-                transactionRepository = repositories.transactionRepository,
-                entitySource = DbEntitySource(repositories.entitySourceQueries, repositories.transferSourceQueries, deviceId),
-                personRepository = repositories.personRepository,
-                personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                personAttributeRepository = repositories.personAttributeRepository,
-                attributeTypeRepository = repositories.attributeTypeRepository,
-                accountAttributeRepository = repositories.accountAttributeRepository,
-                deviceId = deviceId,
-                sessionId = sessionId,
-                strategy = strategy,
-            )
+            val importResult =
+                importApiSessionTransactions(
+                    apiSessionRepository = repositories.apiSessionRepository,
+                    accountRepository = repositories.accountRepository,
+                    currencyRepository = repositories.currencyRepository,
+                    transactionRepository = repositories.transactionRepository,
+                    entitySource = DbEntitySource(repositories.entitySourceQueries, repositories.transferSourceQueries, deviceId),
+                    personRepository = repositories.personRepository,
+                    personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
+                    personAttributeRepository = repositories.personAttributeRepository,
+                    attributeTypeRepository = repositories.attributeTypeRepository,
+                    accountAttributeRepository = repositories.accountAttributeRepository,
+                    deviceId = deviceId,
+                    sessionId = sessionId,
+                    strategy = strategy,
+                )
+
+            assertEquals(1, importResult.transactionCount, "Transaction should be imported")
+            assertEquals(0, importResult.errorCount, "Should have no import errors")
 
             val allAccounts = repositories.accountRepository.getAllAccounts().first()
             val atmAccounts =
