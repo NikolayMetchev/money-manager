@@ -43,7 +43,7 @@ import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.QifImportRepository
 import com.moneymanager.domain.repository.SettingsRepository
-import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.importer.ImportEngine
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.CurrencyPicker
 import com.moneymanager.ui.components.LoadingTextButton
@@ -81,12 +81,12 @@ fun QifApplyStrategyDialog(
     currencyRepository: CurrencyRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    transactionRepository: TransactionRepository,
     qifImportRepository: QifImportRepository,
     attributeTypeRepository: AttributeTypeRepository,
     settingsRepository: SettingsRepository,
     maintenance: Maintenance,
     entitySource: EntitySource,
+    importEngine: ImportEngine,
     onDismiss: () -> Unit,
     onImportComplete: (QifImportResult) -> Unit,
 ) {
@@ -310,11 +310,11 @@ fun QifApplyStrategyDialog(
                                     currencies = currencies,
                                     csvAccountMappingRepository = csvAccountMappingRepository,
                                     accountRepository = accountRepository,
-                                    transactionRepository = transactionRepository,
                                     qifImportRepository = qifImportRepository,
                                     attributeTypeRepository = attributeTypeRepository,
                                     maintenance = maintenance,
                                     entitySource = entitySource,
+                                    importEngine = importEngine,
                                 )
                             // Remember the source account so the next QIF import pre-selects it.
                             selectedSourceAccountId?.let { settingsRepository.setLastQifAccountId(it) }

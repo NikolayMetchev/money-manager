@@ -1,31 +1,29 @@
 plugins {
     id("moneymanager.android-convention")
     id("moneymanager.kotlin-multiplatform-convention")
-    alias(libs.plugins.metro)
 }
 
 kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                api(projects.app.db.core)
-                api(projects.app.importer)
+                api(projects.app.importmodel)
                 api(projects.app.model.core)
+
+                implementation(libs.kotlinx.coroutines.core)
             }
         }
 
         val jvmMain by getting {
             dependencies {
-                api(libs.metro.runtime)
-                api(projects.app.db.core)
-                api(projects.app.importer)
+                api(projects.app.importmodel)
                 api(projects.app.model.core)
             }
         }
 
-        val androidMain by getting {
+        val commonTest by getting {
             dependencies {
-                api(libs.metro.runtime)
+                implementation(kotlin("test"))
             }
         }
     }

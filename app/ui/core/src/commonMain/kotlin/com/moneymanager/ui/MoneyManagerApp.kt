@@ -416,6 +416,7 @@ fun MoneyManagerApp(
                                         personRepository = services.people.personRepository,
                                         personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
                                         personAttributeRepository = services.people.personAttributeRepository,
+                                        importEngine = services.transactions.importEngine,
                                         deviceId = services.deviceId,
                                         onCsvImportClick = { importId ->
                                             navigationHistory.navigateTo(Screen.CsvImportDetail(importId))
@@ -466,13 +467,13 @@ fun MoneyManagerApp(
                                         accountRepository = services.accounts.accountRepository,
                                         categoryRepository = services.accounts.categoryRepository,
                                         currencyRepository = services.accounts.currencyRepository,
-                                        transactionRepository = services.transactions.transactionRepository,
                                         attributeTypeRepository = services.transactions.attributeTypeRepository,
                                         personRepository = services.people.personRepository,
                                         personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
                                         maintenance = services.imports.maintenance,
                                         transferSourceRepository = services.transactions.transferSourceRepository,
                                         entitySource = services.transactions.entitySource,
+                                        importEngine = services.transactions.importEngine,
                                         onBack = { navigationHistory.navigateBack() },
                                         onDeleted = { navigationHistory.navigateTo(Screen.Imports(ImportTab.CSV)) },
                                         onCreateStrategy = { importId ->
@@ -495,11 +496,11 @@ fun MoneyManagerApp(
                                         currencyRepository = services.accounts.currencyRepository,
                                         personRepository = services.people.personRepository,
                                         personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
-                                        transactionRepository = services.transactions.transactionRepository,
                                         attributeTypeRepository = services.transactions.attributeTypeRepository,
                                         settingsRepository = services.settings.settingsRepository,
                                         maintenance = services.imports.maintenance,
                                         entitySource = services.transactions.entitySource,
+                                        importEngine = services.transactions.importEngine,
                                         onBack = { navigationHistory.navigateBack() },
                                         onCreateStrategy = { qifImportId ->
                                             navigationHistory.navigateTo(Screen.QifStrategyEditor(qifImportId))

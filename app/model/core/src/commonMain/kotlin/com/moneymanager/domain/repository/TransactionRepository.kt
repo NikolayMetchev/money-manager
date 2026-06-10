@@ -132,4 +132,45 @@ interface TransactionRepository {
     )
 
     suspend fun deleteTransaction(id: Long)
+
+    /**
+     * Creates new transfers AND applies updates to existing ones in a SINGLE database transaction, so
+     * an import results in one bulk-insert transaction rather than many small ones. Used by the central
+     * import engine.
+     *
+     * @param transfers New transfers to create (with placeholder ids); attributes keyed by placeholder id.
+     * @param sourceRecorder Records the source of each created transfer (called once per transfer in order).
+     * @param updates Existing transfers to update, each with attributes to add.
+     * @param updateSourceRecorder Records the source of each updated transfer (once per update in order).
+     * @return Generated transaction ids in the same order as [transfers].
+     */
+    suspend fun importTransfers(
+        transfers: List<Transfer>,
+        newAttributes: Map<TransferId, List<NewAttribute>>,
+        sourceRecorder: SourceRecorder,
+        updates: List<TransferUpdate>,
+        updateSourceRecorder: SourceRecorder,
+    ): List<TransferId> {
+        // Default (non-atomic) implementation for fakes/alternative impls; the real impl overrides this
+        // to run everything in one transaction.
+        val created =
+            createTransfers(transfers = transfers, newAttributes = newAttributes, sourceRecorder = sourceRecorder)
+        updates.forEach { update ->
+            updateTransfer(
+                transfer = update.transfer,
+                deletedAttributeIds = emptySet(),
+                updatedAttributes = emptyMap(),
+                newAttributes = update.newAttributes,
+                transactionId = update.transfer.id,
+            )
+            updateSourceRecorder.insert(update.transfer)
+        }
+        return created
+    }
 }
+
+/** An existing transfer to update during an import, with attributes to add. */
+data class TransferUpdate(
+    val transfer: Transfer,
+    val newAttributes: List<NewAttribute>,
+)

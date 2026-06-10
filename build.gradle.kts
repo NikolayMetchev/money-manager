@@ -60,8 +60,15 @@ dependencyAnalysis {
             sourceSet("commonTest") {
                 onIncorrectConfiguration {
                     exclude(":app:model:core")
+                    exclude(":app:importmodel")
                 }
             }
+        }
+
+        // importmodel is a pure model module with no test sources; the multiplatform convention still
+        // injects kotlin("test") into commonTest, which DAGP then flags as unused.
+        project(":app:importmodel") {
+            ignoreSourceSet("commonTest")
         }
 
         project(":utils:compose:scrollbar") {

@@ -48,6 +48,7 @@ import com.moneymanager.domain.repository.SettingsRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.domain.repository.TransferAttributeRepository
 import com.moneymanager.domain.repository.TransferSourceRepository
+import com.moneymanager.importer.ImportEngine
 import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
@@ -176,4 +177,23 @@ interface RepositoryModule {
         database: MoneyManagerDatabaseWrapper,
         deviceRepository: DeviceRepository,
     ): TransferSourceRepository = TransferSourceRepositoryImpl(database, deviceRepository)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideImportEngine(
+        transactionRepository: TransactionRepository,
+        accountRepository: AccountRepository,
+        accountAttributeRepository: AccountAttributeRepository,
+        personRepository: PersonRepository,
+        personAttributeRepository: PersonAttributeRepository,
+        ownershipRepository: PersonAccountOwnershipRepository,
+    ): ImportEngine =
+        ImportEngine(
+            transactionRepository = transactionRepository,
+            accountRepository = accountRepository,
+            accountAttributeRepository = accountAttributeRepository,
+            personRepository = personRepository,
+            personAttributeRepository = personAttributeRepository,
+            ownershipRepository = ownershipRepository,
+        )
 }

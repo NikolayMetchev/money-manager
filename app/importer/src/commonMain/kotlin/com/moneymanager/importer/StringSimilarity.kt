@@ -1,4 +1,4 @@
-package com.moneymanager.database.csv
+package com.moneymanager.importer
 
 import kotlin.math.max
 

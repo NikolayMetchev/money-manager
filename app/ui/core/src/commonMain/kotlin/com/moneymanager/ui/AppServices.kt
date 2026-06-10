@@ -25,6 +25,7 @@ import com.moneymanager.domain.repository.QifImportRepository
 import com.moneymanager.domain.repository.SettingsRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.domain.repository.TransferSourceRepository
+import com.moneymanager.importer.ImportEngine
 
 data class AppServices(
     val accounts: AccountsDomain,
@@ -61,6 +62,7 @@ data class TransactionsDomain(
     val attributeTypeRepository: AttributeTypeRepository,
     val entitySource: EntitySource,
     val sampleEntitySource: EntitySource,
+    val importEngine: ImportEngine,
 )
 
 data class PeopleDomain(
@@ -106,6 +108,15 @@ fun Application.toAppServices() =
                 attributeTypeRepository = transactions.attributeTypeRepository,
                 entitySource = transactions.entitySource,
                 sampleEntitySource = transactions.sampleEntitySource,
+                importEngine =
+                    ImportEngine(
+                        transactionRepository = transactions.transactionRepository,
+                        accountRepository = accounts.accountRepository,
+                        accountAttributeRepository = accounts.accountAttributeRepository,
+                        personRepository = people.personRepository,
+                        personAttributeRepository = people.personAttributeRepository,
+                        ownershipRepository = people.personAccountOwnershipRepository,
+                    ),
             ),
         people =
             PeopleDomain(
