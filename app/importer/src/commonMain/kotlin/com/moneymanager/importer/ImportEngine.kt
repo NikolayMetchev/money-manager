@@ -113,7 +113,6 @@ class ImportEngine(
             transfersImported = toImport.size,
             duplicates = duplicates,
             updated = toUpdate.size,
-            errors = 0,
             excluded = excluded,
             createdTransferIds = createdTransferIds,
             rowOutcomes = rowOutcomes,
@@ -187,7 +186,7 @@ class ImportEngine(
         intent.attributes.forEach { attr ->
             accountAttributeRepository.insertInCreationMode(newId, attr.typeId, attr.value)
         }
-        batch.provenance.recordEntity(EntityType.ACCOUNT, newId.id, revisionId = 1, rowKey = null)
+        batch.provenance.recordEntity(EntityType.ACCOUNT, newId.id, revisionId = 1)
         return newId
     }
 
@@ -279,7 +278,7 @@ class ImportEngine(
             intent.attributes.forEach { attr ->
                 personAttributeRepository.insertInCreationMode(newId, attr.typeId, attr.value)
             }
-            batch.provenance.recordEntity(EntityType.PERSON, newId.id, revisionId = 1, rowKey = null)
+            batch.provenance.recordEntity(EntityType.PERSON, newId.id, revisionId = 1)
             created++
             keyToId[intent.key] = newId
             byNameKey.getOrPut(
@@ -348,7 +347,7 @@ class ImportEngine(
             ownershipRepository.getOwnershipsByAccount(accountId).first().any { it.personId == personId }
         if (alreadyLinked) return false
         val ownershipId = ownershipRepository.createOwnership(personId, accountId)
-        batch.provenance.recordEntity(EntityType.PERSON_ACCOUNT_OWNERSHIP, ownershipId, revisionId = 1, rowKey = null)
+        batch.provenance.recordEntity(EntityType.PERSON_ACCOUNT_OWNERSHIP, ownershipId, revisionId = 1)
         return true
     }
 
@@ -360,7 +359,7 @@ class ImportEngine(
         transfers: List<ImportTransfer>,
         batch: ImportBatch,
     ): List<ExistingTransferInfo> {
-        if (transfers.isEmpty() || batch.dedupePolicy is DedupePolicy.None) return emptyList()
+        if (transfers.isEmpty()) return emptyList()
 
         val accountIds =
             transfers
@@ -368,7 +367,7 @@ class ImportEngine(
                 .toSet()
 
         val rawTransfers =
-            when (val policy = batch.dedupePolicy) {
+            when (batch.dedupePolicy) {
                 is DedupePolicy.FuzzyAllFields -> {
                     val minTs = transfers.minOf { it.timestamp }
                     val maxTs = transfers.maxOf { it.timestamp }

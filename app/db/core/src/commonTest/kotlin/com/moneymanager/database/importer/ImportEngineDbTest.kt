@@ -34,7 +34,7 @@ import kotlin.time.Instant
 class ImportEngineDbTest : DbTest() {
     private val baseTime = Instant.fromEpochMilliseconds(1_700_000_000_000)
 
-    private suspend fun engine() =
+    private fun engine() =
         ImportEngine(
             transactionRepository = repositories.transactionRepository,
             accountRepository = repositories.accountRepository,
@@ -44,7 +44,7 @@ class ImportEngineDbTest : DbTest() {
             ownershipRepository = repositories.personAccountOwnershipRepository,
         )
 
-    private suspend fun testProvenance(): ImportProvenance {
+    private fun testProvenance(): ImportProvenance {
         val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
         return object : ImportProvenance {
             override fun transferRecorder(orderedRowKeys: List<ImportRowKey>): SourceRecorder =
@@ -54,7 +54,6 @@ class ImportEngineDbTest : DbTest() {
                 entityType: EntityType,
                 entityId: Long,
                 revisionId: Long,
-                rowKey: ImportRowKey?,
             ) = Unit
         }
     }
@@ -79,8 +78,10 @@ class ImportEngineDbTest : DbTest() {
         currency: Currency,
         description: String,
         provenance: ImportProvenance,
+        counterpartyKey: String = "coffee-shop",
+        counterpartyName: String = "Coffee Shop",
     ): ImportBatch {
-        val counterparty = LocalAccountKey("coffee-shop")
+        val counterparty = LocalAccountKey(counterpartyKey)
         return ImportBatch(
             transfers =
                 listOf(
@@ -99,8 +100,8 @@ class ImportEngineDbTest : DbTest() {
                 listOf(
                     ImportAccountIntent(
                         key = counterparty,
-                        match = AccountMatchKey.ByName("Coffee Shop"),
-                        name = "Coffee Shop",
+                        match = AccountMatchKey.ByName(counterpartyName),
+                        name = counterpartyName,
                         openingDate = baseTime,
                     ),
                 ),
@@ -142,22 +143,25 @@ class ImportEngineDbTest : DbTest() {
             val currency = gbp()
             val provenance = testProvenance()
 
-            engine().import(batchWithCounterparty(sourceId, currency, "Tesco groceries weekly shop", provenance))
+            engine().import(
+                batchWithCounterparty(sourceId, currency, "Tesco groceries weekly shop", provenance, "tesco", "Tesco"),
+            )
 
             // A genuinely different description (low similarity) must NOT be treated as a fuzzy duplicate.
-            val changedBatch = batchWithCounterparty(sourceId, currency, "British Gas direct debit", provenance)
+            val changedBatch =
+                batchWithCounterparty(sourceId, currency, "British Gas direct debit", provenance, "tesco", "Tesco")
             val result = engine().import(changedBatch)
             assertEquals(1, result.transfersImported)
             assertEquals(0, result.duplicates)
             assertEquals(0, result.accountsCreated) // counterparty reused by name
 
-            val coffeeShopId =
+            val tescoId =
                 repositories.accountRepository
                     .getAllAccounts()
                     .first()
-                    .first { it.name == "Coffee Shop" }
+                    .first { it.name == "Tesco" }
                     .id
-            val transfers = repositories.transactionRepository.getTransactionsByAccount(coffeeShopId).first()
+            val transfers = repositories.transactionRepository.getTransactionsByAccount(tescoId).first()
             assertEquals(2, transfers.size)
         }
 
@@ -167,30 +171,41 @@ class ImportEngineDbTest : DbTest() {
             val sourceId = createSourceAccount()
             val currency = gbp()
             val provenance = testProvenance()
-            val personKey = LocalPersonKey("alice")
+            val aliceKey = LocalPersonKey("alice")
+            val bobKey = LocalPersonKey("bob")
 
             val batch =
                 batchWithCounterparty(sourceId, currency, "Coffee", provenance).copy(
                     peopleToCreate =
                         listOf(
                             ImportPersonIntent(
-                                key = personKey,
+                                key = aliceKey,
                                 match = PersonMatchKey.ByNameKey("alice smith"),
                                 firstName = "Alice",
                                 lastName = "Smith",
                             ),
+                            ImportPersonIntent(
+                                key = bobKey,
+                                match = PersonMatchKey.ByNameKey("bob jones"),
+                                firstName = "Bob",
+                                lastName = "Jones",
+                            ),
                         ),
-                    ownerships = listOf(ImportOwnershipIntent(personKey, AccountRef.Existing(sourceId))),
+                    ownerships =
+                        listOf(
+                            ImportOwnershipIntent(aliceKey, AccountRef.Existing(sourceId)),
+                            ImportOwnershipIntent(bobKey, AccountRef.Existing(sourceId)),
+                        ),
                 )
 
             val result = engine().import(batch)
-            assertEquals(1, result.peopleCreated)
-            assertEquals(1, result.ownershipsCreated)
+            assertEquals(2, result.peopleCreated)
+            assertEquals(2, result.ownershipsCreated)
 
             val people = repositories.personRepository.getAllPeople().first()
-            assertEquals(1, people.size)
-            assertEquals("Alice Smith", people.single().fullName)
+            assertEquals(2, people.size)
+            assertEquals(setOf("Alice Smith", "Bob Jones"), people.map { it.fullName }.toSet())
             val ownerships = repositories.personAccountOwnershipRepository.getOwnershipsByAccount(sourceId).first()
-            assertEquals(1, ownerships.size)
+            assertEquals(2, ownerships.size)
         }
 }

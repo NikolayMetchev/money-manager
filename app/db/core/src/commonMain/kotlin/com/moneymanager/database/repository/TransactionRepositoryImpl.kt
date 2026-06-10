@@ -321,39 +321,7 @@ class TransactionRepositoryImpl(
                     // This allows initial attributes to be recorded at revision 1.
                     database.beginCreationMode()
                     try {
-                        batch.forEach { transfer ->
-                            // Generate new transaction ID (triggers INSERT audit)
-                            transactionIdQueries.insert()
-                            val generatedId = transactionIdQueries.lastInsertedId().executeAsOne()
-                            createdIds += TransferId(generatedId)
-
-                            // Create transfer with generated ID
-                            transferQueries.insert(
-                                id = generatedId,
-                                revision_id = transfer.revisionId,
-                                timestamp = transfer.timestamp.toEpochMilliseconds(),
-                                description = transfer.description,
-                                source_account_id = transfer.sourceAccountId.id,
-                                target_account_id = transfer.targetAccountId.id,
-                                currency_id = transfer.amount.currency.id.id,
-                                amount = transfer.amount.amount,
-                            )
-
-                            // Create transfer with updated ID for source recording
-                            val transferWithId = transfer.copy(id = TransferId(generatedId))
-
-                            // Insert attributes (creation mode records audit at rev 1 without bumping)
-                            newAttributes[transfer.id].orEmpty().forEach { attr ->
-                                transferAttributeQueries.insert(
-                                    transaction_id = generatedId,
-                                    attribute_type_id = attr.typeId.id,
-                                    attribute_value = attr.value,
-                                )
-                            }
-
-                            // Record source using strategy pattern
-                            sourceRecorder.insert(transferWithId)
-                        }
+                        createdIds += insertNewTransfers(batch, newAttributes, sourceRecorder)
                     } finally {
                         // Always restore normal trigger behavior
                         database.endCreationMode()
@@ -457,29 +425,7 @@ class TransactionRepositoryImpl(
                 if (transfers.isNotEmpty()) {
                     database.beginCreationMode()
                     try {
-                        transfers.forEach { transfer ->
-                            transactionIdQueries.insert()
-                            val generatedId = transactionIdQueries.lastInsertedId().executeAsOne()
-                            createdIds += TransferId(generatedId)
-                            transferQueries.insert(
-                                id = generatedId,
-                                revision_id = transfer.revisionId,
-                                timestamp = transfer.timestamp.toEpochMilliseconds(),
-                                description = transfer.description,
-                                source_account_id = transfer.sourceAccountId.id,
-                                target_account_id = transfer.targetAccountId.id,
-                                currency_id = transfer.amount.currency.id.id,
-                                amount = transfer.amount.amount,
-                            )
-                            newAttributes[transfer.id].orEmpty().forEach { attr ->
-                                transferAttributeQueries.insert(
-                                    transaction_id = generatedId,
-                                    attribute_type_id = attr.typeId.id,
-                                    attribute_value = attr.value,
-                                )
-                            }
-                            sourceRecorder.insert(transfer.copy(id = TransferId(generatedId)))
-                        }
+                        createdIds += insertNewTransfers(transfers, newAttributes, sourceRecorder)
                     } finally {
                         database.endCreationMode()
                     }
@@ -520,6 +466,42 @@ class TransactionRepositoryImpl(
                 createdIds
             }
         }
+
+    /**
+     * Inserts new transfers with their attributes and records their source. Must be called inside an
+     * open transaction with creation mode active. Returns the generated ids in input order.
+     */
+    private fun insertNewTransfers(
+        transfers: List<Transfer>,
+        newAttributes: Map<TransferId, List<NewAttribute>>,
+        sourceRecorder: SourceRecorder,
+    ): List<TransferId> {
+        val createdIds = mutableListOf<TransferId>()
+        transfers.forEach { transfer ->
+            transactionIdQueries.insert()
+            val generatedId = transactionIdQueries.lastInsertedId().executeAsOne()
+            createdIds += TransferId(generatedId)
+            transferQueries.insert(
+                id = generatedId,
+                revision_id = transfer.revisionId,
+                timestamp = transfer.timestamp.toEpochMilliseconds(),
+                description = transfer.description,
+                source_account_id = transfer.sourceAccountId.id,
+                target_account_id = transfer.targetAccountId.id,
+                currency_id = transfer.amount.currency.id.id,
+                amount = transfer.amount.amount,
+            )
+            newAttributes[transfer.id].orEmpty().forEach { attr ->
+                transferAttributeQueries.insert(
+                    transaction_id = generatedId,
+                    attribute_type_id = attr.typeId.id,
+                    attribute_value = attr.value,
+                )
+            }
+            sourceRecorder.insert(transfer.copy(id = TransferId(generatedId)))
+        }
+        return createdIds
+    }
 
     override suspend fun deleteTransaction(id: Long): Unit =
         withContext(Dispatchers.Default) {

@@ -195,8 +195,7 @@ internal suspend fun recordApplication(
     }.onFailure { logger.warn { "Could not record QIF import application: ${it.message}" } }
 }
 
-// Bulk transfer-creation mirrors the CSV ApplyStrategyDialog flow (shared import engine) by design.
-@Suppress("LongParameterList", "LongMethod", "DuplicatedCode")
+@Suppress("LongParameterList", "LongMethod")
 internal suspend fun runImport(
     qifImport: QifImport,
     rows: List<CsvRow>,
@@ -247,7 +246,7 @@ internal suspend fun runImport(
     }
 
     if (finalPrep.validTransfers.isEmpty()) {
-        return QifImportResult(successCount = 0, duplicateCount = 0, failedCount = finalPrep.errorRows.size)
+        return QifImportResult(successCount = 0, failedCount = finalPrep.errorRows.size)
     }
 
     // Pre-resolve attribute types.

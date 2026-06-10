@@ -610,11 +610,6 @@ fun ApplyStrategyDialog(
                                 }
 
                             logger.info { "Starting to import $validCount transfers" }
-                            // The engine import is atomic; any failure throws to the outer catch, so
-                            // there is no partial per-row failure list to accumulate here.
-                            val failedRows = emptyList<CsvImportResult.FailedRow>()
-                            var successCount = 0
-                            var duplicateCount = 0
 
                             // Convert attributes from (typeName, value) to NewAttribute
                             fun attributesFor(attributes: List<Pair<String, String>>): List<NewAttribute> =
@@ -714,10 +709,12 @@ fun ApplyStrategyDialog(
                                 )
                                 csvImportRepository.clearErrors(csvImport.id, updatedStatuses.keys.toList())
                             }
-                            successCount = importResult.transfersImported + importResult.updated
-                            duplicateCount = importResult.duplicates
+                            val successCount = importResult.transfersImported + importResult.updated
+                            val duplicateCount = importResult.duplicates
 
-                            logger.info { "Transfer creation complete: $successCount successes, ${failedRows.size} failures" }
+                            logger.info {
+                                "Transfer import complete: $successCount imported/updated, ${importResult.duplicates} duplicate(s)"
+                            }
 
                             // Note: CSV rows are updated with status and transfer IDs during import loop above
 
@@ -742,26 +739,14 @@ fun ApplyStrategyDialog(
 
                             logger.info { "Import completed successfully" }
 
-                            val result =
+                            // The engine import is atomic: on success there are no per-row failures
+                            // (any failure throws to the outer catch below), so the import is complete.
+                            onImportComplete(
                                 CsvImportResult(
                                     successCount = successCount,
-                                    failedRows = failedRows,
-                                )
-
-                            if (successCount == 0 && failedRows.isNotEmpty()) {
-                                // All rows failed - show error
-                                errorMessage =
-                                    "Import failed: all ${failedRows.size} rows failed due to database constraints"
-                                isImporting = false
-                            } else {
-                                // At least some rows succeeded (or no rows at all)
-                                if (failedRows.isNotEmpty()) {
-                                    logger.info {
-                                        "Import completed with $successCount successes and ${failedRows.size} failures"
-                                    }
-                                }
-                                onImportComplete(result)
-                            }
+                                    failedRows = emptyList(),
+                                ),
+                            )
                         } catch (expected: Exception) {
                             logger.error(expected) { "Import failed: ${expected.message}" }
                             errorMessage = "Import failed: ${expected.message}"

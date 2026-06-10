@@ -38,6 +38,5 @@ class ApiImportProvenance(
         entityType: EntityType,
         entityId: Long,
         revisionId: Long,
-        rowKey: ImportRowKey?,
     ) = Unit
 }

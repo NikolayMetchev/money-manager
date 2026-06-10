@@ -32,7 +32,6 @@ class QifImportProvenance(
         entityType: EntityType,
         entityId: Long,
         revisionId: Long,
-        rowKey: ImportRowKey?,
     ) {
         entitySource.record(entityType, entityId, revisionId)
     }
