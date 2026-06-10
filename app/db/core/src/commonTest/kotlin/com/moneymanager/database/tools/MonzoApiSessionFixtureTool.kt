@@ -73,7 +73,6 @@ private fun exportFixtures(
                 createdAt = row.getLong("created_at"),
                 expiresAt = row.getLongOrNull("expires_at"),
                 credentialId = row.getLongOrNull("credential_id"),
-                kind = row.getStringOrNull("kind"),
             )
         }
         exportTable(connection, outputDir, "api_import", "api_import.json", ApiImportRow.serializer()) { row ->
@@ -124,7 +123,7 @@ private fun exportFixtures(
                 jsonPath = row.getString("json_path"),
                 state = row.getLong("state"),
                 transactionId = row.getLongOrNull("transaction_id"),
-                errorMessage = row.getStringOrNull("error_message"),
+                errorMessage = row.getString("error_message"),
                 createdAt = row.getLong("created_at"),
             )
         }
@@ -162,7 +161,7 @@ private fun importFixtures(
             insertTable(inputDir, "api_session.json", ApiSessionRow.serializer()) { row ->
                 connection
                     .prepareStatement(
-                        "INSERT OR IGNORE INTO api_session(id, type_id, token, device_id, created_at, expires_at, credential_id, kind) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                        "INSERT OR IGNORE INTO api_session(id, type_id, token, device_id, created_at, expires_at, credential_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
                     ).use { ps ->
                         ps.setLong(1, row.id)
                         ps.setLong(2, row.typeId)
@@ -171,7 +170,6 @@ private fun importFixtures(
                         ps.setLong(5, row.createdAt)
                         if (row.expiresAt == null) ps.setNull(6, java.sql.Types.INTEGER) else ps.setLong(6, row.expiresAt)
                         if (row.credentialId == null) ps.setNull(7, java.sql.Types.INTEGER) else ps.setLong(7, row.credentialId)
-                        if (row.kind == null) ps.setNull(8, java.sql.Types.VARCHAR) else ps.setString(8, row.kind)
                         ps.executeUpdate()
                     }
             }
@@ -299,8 +297,6 @@ private fun printUsageAndExit(): Nothing {
     exitProcess(1)
 }
 
-private fun java.sql.ResultSet.getStringOrNull(column: String): String? = getString(column)
-
 private fun java.sql.ResultSet.getLongOrNull(column: String): Long? =
     getObject(column)?.let {
         when (it) {
@@ -334,7 +330,6 @@ private data class ApiSessionRow(
     val createdAt: Long,
     val expiresAt: Long? = null,
     val credentialId: Long? = null,
-    val kind: String? = null,
 )
 
 @Serializable

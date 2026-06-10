@@ -4,8 +4,6 @@ package com.moneymanager.ui.monzo
 
 import com.moneymanager.database.port.DbEntitySource
 import com.moneymanager.domain.model.ApiRequestId
-import com.moneymanager.domain.model.ApiSessionId
-import com.moneymanager.domain.model.ApiSessionKind
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.test.database.DbTest
@@ -35,7 +33,6 @@ private data class SessionFixture(
     val createdAt: Long,
     val expiresAt: Long? = null,
     val credentialId: Long? = null,
-    val kind: String? = null,
     val importedAt: Long? = null,
 )
 
@@ -76,25 +73,23 @@ class MonzoBalanceFixtureE2ETest : DbTest() {
             val responses = loadResponses()
 
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("fixture-machine", "fixture-os"))
-            val sessionIdMap = mutableMapOf<Long, ApiSessionId>()
             val requestIdMap = mutableMapOf<Long, ApiRequestId>()
 
-            sessions.sortedBy { it.id }.forEach { fixture ->
-                val created =
-                    repositories.apiSessionRepository.createSession(
-                        token = fixture.token,
-                        deviceId = deviceId,
-                        createdAt = Instant.fromEpochMilliseconds(fixture.createdAt),
-                        expiresAt = fixture.expiresAt?.let(Instant.Companion::fromEpochMilliseconds),
-                        kind = fixture.kind?.let(ApiSessionKind::valueOf),
-                    )
-                sessionIdMap[fixture.id] = created
-            }
+            // Accounts, transactions and people are now downloaded into one session, so collapse the
+            // fixture's separate accounts/transactions sessions (same token) into a single session.
+            val firstSession = sessions.minByOrNull { it.id } ?: return@runTest
+            val sessionId =
+                repositories.apiSessionRepository.createSession(
+                    token = firstSession.token,
+                    deviceId = deviceId,
+                    createdAt = Instant.fromEpochMilliseconds(firstSession.createdAt),
+                    expiresAt = firstSession.expiresAt?.let(Instant.Companion::fromEpochMilliseconds),
+                )
 
             requests.sortedBy { it.id }.forEach { fixture ->
                 val created =
                     repositories.apiSessionRepository.insertRequest(
-                        sessionId = sessionIdMap.getValue(fixture.sessionId),
+                        sessionId = sessionId,
                         method = fixture.method,
                         url = fixture.url,
                         headers = emptyMap(),
@@ -105,15 +100,11 @@ class MonzoBalanceFixtureE2ETest : DbTest() {
             responses.sortedBy { it.id }.forEach { fixture ->
                 repositories.apiSessionRepository.insertResponse(
                     requestId = requestIdMap.getValue(fixture.requestId),
-                    sessionId = sessionIdMap.getValue(fixture.sessionId),
+                    sessionId = sessionId,
                     json = fixture.json,
                 )
             }
 
-            val firstAccountsSession =
-                sessions.firstOrNull { it.kind == ApiSessionKind.ACCOUNTS.name }
-                    ?: return@runTest
-            val transactionSessions = sessions.filter { it.kind == ApiSessionKind.TRANSACTIONS.name }
             val strategy =
                 repositories.apiImportStrategyRepository
                     .getAllStrategies()
@@ -132,27 +123,9 @@ class MonzoBalanceFixtureE2ETest : DbTest() {
                 attributeTypeRepository = repositories.attributeTypeRepository,
                 accountAttributeRepository = repositories.accountAttributeRepository,
                 deviceId = DeviceId(deviceId.id),
-                sessionId = sessionIdMap.getValue(firstAccountsSession.id),
+                sessionId = sessionId,
                 strategy = strategy,
             )
-
-            transactionSessions.sortedBy { it.id }.forEach { fixture ->
-                importApiSessionTransactions(
-                    apiSessionRepository = repositories.apiSessionRepository,
-                    accountRepository = repositories.accountRepository,
-                    currencyRepository = repositories.currencyRepository,
-                    transactionRepository = repositories.transactionRepository,
-                    entitySource = DbEntitySource(database.entitySourceQueries, database.transferSourceQueries, DeviceId(deviceId.id)),
-                    personRepository = repositories.personRepository,
-                    personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                    personAttributeRepository = repositories.personAttributeRepository,
-                    attributeTypeRepository = repositories.attributeTypeRepository,
-                    accountAttributeRepository = repositories.accountAttributeRepository,
-                    deviceId = DeviceId(deviceId.id),
-                    sessionId = sessionIdMap.getValue(fixture.id),
-                    strategy = strategy,
-                )
-            }
 
             repositories.transactionRepository.getAccountBalances().first().let { actualBalances ->
                 val expectedBalances = json.decodeFromString<List<ExpectedBalance>>(balancesFile.readText())

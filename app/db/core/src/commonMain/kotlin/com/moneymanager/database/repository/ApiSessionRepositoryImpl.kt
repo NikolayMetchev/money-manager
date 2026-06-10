@@ -14,7 +14,6 @@ import com.moneymanager.domain.model.ApiResponseTransactionId
 import com.moneymanager.domain.model.ApiResponseTransactionState
 import com.moneymanager.domain.model.ApiSession
 import com.moneymanager.domain.model.ApiSessionId
-import com.moneymanager.domain.model.ApiSessionKind
 import com.moneymanager.domain.model.ApiSessionType
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.JsonPath
@@ -106,7 +105,6 @@ class ApiSessionRepositoryImpl(
         expiresAt: Instant?,
         type: ApiSessionType,
         credentialId: MonzoCredentialId?,
-        kind: ApiSessionKind?,
     ): ApiSessionId =
         withContext(Dispatchers.Default) {
             val id =
@@ -118,7 +116,6 @@ class ApiSessionRepositoryImpl(
                         created_at = createdAt.toEpochMilliseconds(),
                         expires_at = expiresAt?.toEpochMilliseconds(),
                         credential_id = credentialId?.id,
-                        kind = kind?.value,
                     )
                     queries.lastInsertRowId().executeAsOne()
                 }
@@ -362,7 +359,6 @@ class ApiSessionRepositoryImpl(
             createdAt = Instant.fromEpochMilliseconds(created_at),
             expiresAt = expires_at?.let { Instant.fromEpochMilliseconds(it) },
             credentialId = credential_id?.let { MonzoCredentialId(it) },
-            kind = ApiSessionKind.fromValueOrNull(kind),
             importDurationMillis = import_duration_millis,
         )
 

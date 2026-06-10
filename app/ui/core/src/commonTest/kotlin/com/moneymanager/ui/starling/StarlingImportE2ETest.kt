@@ -5,7 +5,6 @@ package com.moneymanager.ui.starling
 import com.moneymanager.database.port.DbEntitySource
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.ApiSessionId
-import com.moneymanager.domain.model.ApiSessionKind
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.createApiClient
@@ -350,22 +349,40 @@ class StarlingImportE2ETest : DbTest() {
                     .first()
                     .single { it.name == "Starling" }
 
-            fun clientFor(session: ApiSessionId) =
+            // One session holds accounts, transactions and the account holder.
+            val sessionId = repositories.apiSessionRepository.createSession("test-starling-token", deviceId, now, null)
+            val apiClient =
                 createApiClient(
                     trafficRecorder =
-                        ApiSessionTrafficRecorder(sessionId = session, apiSessionRepository = repositories.apiSessionRepository),
+                        ApiSessionTrafficRecorder(sessionId = sessionId, apiSessionRepository = repositories.apiSessionRepository),
                     engine = mockEngine(),
                 )
 
-            // Import accounts (and transactions) so the Starling account exists.
-            val accountsSessionId = repositories.apiSessionRepository.createSession("test-starling-token", deviceId, now, null)
             downloadApiSessionAccounts(
                 token = "test-starling-token",
-                apiClient = clientFor(accountsSessionId),
+                apiClient = apiClient,
                 apiSessionRepository = repositories.apiSessionRepository,
-                sessionId = accountsSessionId,
+                sessionId = sessionId,
                 strategy = strategy,
             )
+            downloadApiSessionTransactions(
+                token = "test-starling-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+            val downloadResult =
+                downloadApiSessionPeople(
+                    token = "test-starling-token",
+                    apiClient = apiClient,
+                    apiSessionRepository = repositories.apiSessionRepository,
+                    sessionId = sessionId,
+                    strategy = strategy,
+                )
+            assertEquals(1, downloadResult.personCount, "The single account holder object should be counted")
+
+            // Mirrors the UI's combined import: transactions first (creates accounts), then people.
             importApiSessionTransactions(
                 apiSessionRepository = repositories.apiSessionRepository,
                 accountRepository = repositories.accountRepository,
@@ -378,37 +395,22 @@ class StarlingImportE2ETest : DbTest() {
                 attributeTypeRepository = repositories.attributeTypeRepository,
                 accountAttributeRepository = repositories.accountAttributeRepository,
                 deviceId = deviceId,
-                sessionId = accountsSessionId,
+                sessionId = sessionId,
                 strategy = strategy,
             )
-
-            // Download + import the single global account holder.
-            val peopleSessionId = repositories.apiSessionRepository.createSession("test-starling-token", deviceId, now, null)
-            val downloadResult =
-                downloadApiSessionPeople(
-                    token = "test-starling-token",
-                    apiClient = clientFor(peopleSessionId),
-                    apiSessionRepository = repositories.apiSessionRepository,
-                    sessionId = peopleSessionId,
-                    strategy = strategy,
-                )
-            assertEquals(1, downloadResult.personCount, "The single account holder object should be counted")
-
-            val importResult =
-                importApiSessionPeople(
-                    apiSessionRepository = repositories.apiSessionRepository,
-                    accountRepository = repositories.accountRepository,
-                    accountAttributeRepository = repositories.accountAttributeRepository,
-                    personRepository = repositories.personRepository,
-                    personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                    personAttributeRepository = repositories.personAttributeRepository,
-                    attributeTypeRepository = repositories.attributeTypeRepository,
-                    entitySource = DbEntitySource(repositories.entitySourceQueries, repositories.transferSourceQueries, deviceId),
-                    sessionId = peopleSessionId,
-                    strategy = strategy,
-                    accountsSessionId = accountsSessionId,
-                )
-            assertEquals(1, importResult.personCount, "The account holder is created as a person")
+            importApiSessionPeople(
+                apiSessionRepository = repositories.apiSessionRepository,
+                accountRepository = repositories.accountRepository,
+                accountAttributeRepository = repositories.accountAttributeRepository,
+                personRepository = repositories.personRepository,
+                personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
+                personAttributeRepository = repositories.personAttributeRepository,
+                attributeTypeRepository = repositories.attributeTypeRepository,
+                entitySource = DbEntitySource(repositories.entitySourceQueries, repositories.transferSourceQueries, deviceId),
+                sessionId = sessionId,
+                strategy = strategy,
+                accountsSessionId = sessionId,
+            )
 
             val people = repositories.personRepository.getAllPeople().first()
             val ada = people.single { it.firstName == "Ada" && it.lastName == "Lovelace" }
@@ -432,27 +434,32 @@ class StarlingImportE2ETest : DbTest() {
                     .getAllStrategies()
                     .first()
                     .single { it.name == "Starling" }
-            // Sessions must share a credential so the accounts import can find the holder's people session.
-            val credentialId = repositories.apiSessionRepository.createCredential("test-starling-token", now)
 
-            fun clientFor(session: ApiSessionId) =
+            // Accounts and the holder are downloaded into one session; importing people before the
+            // transactions still ends with the holder owning the own account.
+            val sessionId = repositories.apiSessionRepository.createSession("test-starling-token", deviceId, now, null)
+            val apiClient =
                 createApiClient(
                     trafficRecorder =
-                        ApiSessionTrafficRecorder(sessionId = session, apiSessionRepository = repositories.apiSessionRepository),
+                        ApiSessionTrafficRecorder(sessionId = sessionId, apiSessionRepository = repositories.apiSessionRepository),
                     engine = mockEngine(),
                 )
-
-            // 1) People FIRST, before any accounts exist — the holder is created but can link to nothing.
-            val peopleSessionId =
-                repositories.apiSessionRepository
-                    .createSession("test-starling-token", deviceId, now, null, credentialId = credentialId, kind = ApiSessionKind.PEOPLE)
-            downloadApiSessionPeople(
+            downloadApiSessionAccounts(
                 token = "test-starling-token",
-                apiClient = clientFor(peopleSessionId),
+                apiClient = apiClient,
                 apiSessionRepository = repositories.apiSessionRepository,
-                sessionId = peopleSessionId,
+                sessionId = sessionId,
                 strategy = strategy,
             )
+            downloadApiSessionPeople(
+                token = "test-starling-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+
+            // 1) People FIRST, before any accounts exist — the holder is created but can link to nothing.
             importApiSessionPeople(
                 apiSessionRepository = repositories.apiSessionRepository,
                 accountRepository = repositories.accountRepository,
@@ -462,21 +469,13 @@ class StarlingImportE2ETest : DbTest() {
                 personAttributeRepository = repositories.personAttributeRepository,
                 attributeTypeRepository = repositories.attributeTypeRepository,
                 entitySource = DbEntitySource(repositories.entitySourceQueries, repositories.transferSourceQueries, deviceId),
-                sessionId = peopleSessionId,
+                sessionId = sessionId,
                 strategy = strategy,
+                accountsSessionId = sessionId,
             )
 
-            // 2) Accounts AFTER the holder — the accounts import must back-link the holder to the own account.
-            val accountsSessionId =
-                repositories.apiSessionRepository
-                    .createSession("test-starling-token", deviceId, now, null, credentialId = credentialId, kind = ApiSessionKind.ACCOUNTS)
-            downloadApiSessionAccounts(
-                token = "test-starling-token",
-                apiClient = clientFor(accountsSessionId),
-                apiSessionRepository = repositories.apiSessionRepository,
-                sessionId = accountsSessionId,
-                strategy = strategy,
-            )
+            // 2) Accounts AFTER the holder — the transactions import back-links the holder to the own
+            // account by reading the people responses from the same session.
             importApiSessionTransactions(
                 apiSessionRepository = repositories.apiSessionRepository,
                 accountRepository = repositories.accountRepository,
@@ -489,7 +488,7 @@ class StarlingImportE2ETest : DbTest() {
                 attributeTypeRepository = repositories.attributeTypeRepository,
                 accountAttributeRepository = repositories.accountAttributeRepository,
                 deviceId = deviceId,
-                sessionId = accountsSessionId,
+                sessionId = sessionId,
                 strategy = strategy,
             )
 

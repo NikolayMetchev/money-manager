@@ -62,7 +62,6 @@ import com.moneymanager.domain.model.ApiResponseTransaction
 import com.moneymanager.domain.model.ApiResponseTransactionState
 import com.moneymanager.domain.model.ApiSession
 import com.moneymanager.domain.model.ApiSessionId
-import com.moneymanager.domain.model.ApiSessionKind
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.MonzoCredential
 import com.moneymanager.domain.model.MonzoCredentialId
@@ -81,13 +80,13 @@ import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.ScaParams
 import com.moneymanager.rest.createApiClient
-import com.moneymanager.ui.api.ApiAccountsDownloadResult
 import com.moneymanager.ui.api.ApiCounterpartySuggestion
+import com.moneymanager.ui.api.ApiSessionDownloadResult
 import com.moneymanager.ui.api.ApiSessionImportProgress
 import com.moneymanager.ui.api.ApiSessionImportResult
 import com.moneymanager.ui.api.ApiTransactionsDownloadProgress
-import com.moneymanager.ui.api.ApiTransactionsDownloadResult
 import com.moneymanager.ui.api.discoverApiCounterpartiesToCreate
+import com.moneymanager.ui.api.displaySummary
 import com.moneymanager.ui.api.downloadApiSessionAccounts
 import com.moneymanager.ui.api.downloadApiSessionPeople
 import com.moneymanager.ui.api.downloadApiSessionTransactions
@@ -148,7 +147,6 @@ fun ApiSessionsScreen(
     var strategyNameByCredential by remember { mutableStateOf<Map<MonzoCredentialId, String>>(emptyMap()) }
     var requiresSigningByCredential by remember { mutableStateOf<Map<MonzoCredentialId, Boolean>>(emptyMap()) }
     var transactionsBlockReasonByCredential by remember { mutableStateOf<Map<MonzoCredentialId, String>>(emptyMap()) }
-    var peopleDownloadSupportedByCredential by remember { mutableStateOf<Map<MonzoCredentialId, Boolean>>(emptyMap()) }
     var isLoading by remember { mutableStateOf(true) }
     // Per-session import state
     var importResultBySession by remember { mutableStateOf<Map<ApiSessionId, ApiSessionImportResult>>(emptyMap()) }
@@ -156,8 +154,7 @@ fun ApiSessionsScreen(
     var importProgressBySession by remember { mutableStateOf<Map<ApiSessionId, ApiSessionImportProgress>>(emptyMap()) }
 
     // Per-credential download result state (cleared when a new download starts)
-    var accountsDownloadResultByCredential by remember { mutableStateOf<Map<MonzoCredentialId, ApiAccountsDownloadResult>>(emptyMap()) }
-    var downloadResultByCredential by remember { mutableStateOf<Map<MonzoCredentialId, ApiTransactionsDownloadResult>>(emptyMap()) }
+    var downloadResultByCredential by remember { mutableStateOf<Map<MonzoCredentialId, ApiSessionDownloadResult>>(emptyMap()) }
     var downloadProgressByCredential by remember { mutableStateOf<Map<MonzoCredentialId, ApiTransactionsDownloadProgress?>>(emptyMap()) }
     var pendingImport by remember { mutableStateOf<PendingApiImport?>(null) }
 
@@ -222,11 +219,6 @@ fun ApiSessionsScreen(
                         val strategy = credential.strategyId?.let { strategyById[it] } ?: fallbackStrategy
                         credential.id to (strategy?.signing != null)
                     }
-                peopleDownloadSupportedByCredential =
-                    allCredentials.associate { credential ->
-                        val strategy = credential.strategyId?.let { strategyById[it] } ?: fallbackStrategy
-                        credential.id to (strategy?.peopleDownload != null)
-                    }
                 val country = currentCountryCode()
                 transactionsBlockReasonByCredential =
                     allCredentials
@@ -252,64 +244,63 @@ fun ApiSessionsScreen(
 
     fun startImport(
         session: ApiSession,
-        accountsSession: ApiSession?,
         strategy: ApiImportStrategy,
         counterpartyAccountNames: Map<String, String>,
     ) {
-        val importLabel =
-            when (session.kind) {
-                ApiSessionKind.ACCOUNTS -> "Import Accounts"
-                ApiSessionKind.PEOPLE -> "Import People"
-                else -> "Import Transactions"
-            }
         backgroundTasks.startTask(
             key = monzoImportTaskKey(session.id),
-            title = importLabel,
-            initialDetail = "Starting $importLabel for session #${session.id}.",
+            title = "Import",
+            initialDetail = "Starting import for session #${session.id}.",
         ) {
             val importStartedAt = System.currentTimeMillis()
-            val result =
-                if (session.kind == ApiSessionKind.PEOPLE) {
-                    val peopleResult =
-                        importApiSessionPeople(
-                            apiSessionRepository = apiSessionRepository,
-                            accountRepository = accountRepository,
-                            accountAttributeRepository = accountAttributeRepository,
-                            personRepository = personRepository,
-                            personAccountOwnershipRepository = personAccountOwnershipRepository,
-                            personAttributeRepository = personAttributeRepository,
-                            attributeTypeRepository = attributeTypeRepository,
-                            entitySource = entitySource,
-                            sessionId = session.id,
-                            strategy = strategy,
-                            accountsSessionId = accountsSession?.id,
-                        )
-                    ApiSessionImportResult(accountCount = 0, transactionCount = 0, personCount = peopleResult.personCount)
-                } else {
-                    importApiSessionTransactions(
+            // Transactions import creates the accounts and the people derived from transactions/accounts.
+            val transactionsResult =
+                importApiSessionTransactions(
+                    apiSessionRepository = apiSessionRepository,
+                    accountRepository = accountRepository,
+                    currencyRepository = currencyRepository,
+                    transactionRepository = transactionRepository,
+                    entitySource = entitySource,
+                    personRepository = personRepository,
+                    personAccountOwnershipRepository = personAccountOwnershipRepository,
+                    personAttributeRepository = personAttributeRepository,
+                    attributeTypeRepository = attributeTypeRepository,
+                    accountAttributeRepository = accountAttributeRepository,
+                    deviceId = deviceId,
+                    sessionId = session.id,
+                    strategy = strategy,
+                    counterpartyAccountNames = counterpartyAccountNames,
+                    onProgress = { progress ->
+                        scope.launch {
+                            importProgressBySession = importProgressBySession + (session.id to progress)
+                        }
+                        update(progress.detail, progress.progress)
+                    },
+                )
+            // The dedicated people endpoint (account holders) is imported afterwards so the accounts
+            // it links owners to already exist. No-op when the strategy has no people-download config.
+            val peopleResult =
+                if (strategy.peopleDownload != null) {
+                    importApiSessionPeople(
                         apiSessionRepository = apiSessionRepository,
                         accountRepository = accountRepository,
-                        currencyRepository = currencyRepository,
-                        transactionRepository = transactionRepository,
-                        entitySource = entitySource,
+                        accountAttributeRepository = accountAttributeRepository,
                         personRepository = personRepository,
                         personAccountOwnershipRepository = personAccountOwnershipRepository,
                         personAttributeRepository = personAttributeRepository,
                         attributeTypeRepository = attributeTypeRepository,
-                        accountAttributeRepository = accountAttributeRepository,
-                        deviceId = deviceId,
+                        entitySource = entitySource,
                         sessionId = session.id,
-                        accountsSessionId = accountsSession?.id,
                         strategy = strategy,
-                        counterpartyAccountNames = counterpartyAccountNames,
-                        onProgress = { progress ->
-                            scope.launch {
-                                importProgressBySession = importProgressBySession + (session.id to progress)
-                            }
-                            update(progress.detail, progress.progress)
-                        },
+                        accountsSessionId = session.id,
                     )
+                } else {
+                    null
                 }
+            val result =
+                transactionsResult.copy(
+                    personCount = transactionsResult.personCount + (peopleResult?.personCount ?: 0),
+                )
             val importDurationMillis = System.currentTimeMillis() - importStartedAt
             apiSessionRepository.markSessionImported(
                 id = session.id,
@@ -366,16 +357,12 @@ fun ApiSessionsScreen(
                     LazyColumn(state = lazyListState, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         items(credentials) { credential ->
                             val credentialSessions = sessionsByCredential[credential.id].orEmpty()
-                            val isDownloadingAccounts = backgroundTasks.isRunning(monzoAccountsDownloadTaskKey(credential.id))
-                            val isDownloadingTransactions = backgroundTasks.isRunning(monzoTransactionsDownloadTaskKey(credential.id))
-                            val isDownloadingPeople = backgroundTasks.isRunning(monzoPeopleDownloadTaskKey(credential.id))
+                            val isDownloading = backgroundTasks.isRunning(monzoDownloadTaskKey(credential.id))
                             CredentialCard(
                                 credential = credential,
                                 providerLabel = strategyNameByCredential[credential.id],
                                 requiresSigning = requiresSigningByCredential[credential.id] == true,
                                 transactionsBlockReason = transactionsBlockReasonByCredential[credential.id],
-                                peopleDownloadSupported = peopleDownloadSupportedByCredential[credential.id] == true,
-                                isDownloadingPeople = isDownloadingPeople,
                                 onGenerateSigningKey = {
                                     scope.launch {
                                         val keyPair = withContext(Dispatchers.Default) { generateScaKeyPair() }
@@ -389,9 +376,7 @@ fun ApiSessionsScreen(
                                 },
                                 onCopyText = { text -> scope.launch { clipboard.setPlainText(text) } },
                                 sessions = credentialSessions,
-                                isDownloadingAccounts = isDownloadingAccounts,
-                                isDownloadingTransactions = isDownloadingTransactions,
-                                accountsDownloadResult = accountsDownloadResultByCredential[credential.id],
+                                isDownloading = isDownloading,
                                 downloadResult = downloadResultByCredential[credential.id],
                                 downloadProgress = downloadProgressByCredential[credential.id],
                                 importResultBySession = importResultBySession,
@@ -400,92 +385,10 @@ fun ApiSessionsScreen(
                                 importedSessionRevisions = importedSessionRevisions,
                                 selectedStrategyRevision = currentStrategyRevisionByCredential[credential.id],
                                 isImportingSession = { sessionId -> backgroundTasks.isRunning(monzoImportTaskKey(sessionId)) },
-                                onDownloadAccounts = {
-                                    accountsDownloadResultByCredential = accountsDownloadResultByCredential - credential.id
-                                    scope.launch {
-                                        val strategy = resolveStrategy(credential) ?: return@launch
-                                        val newSessionId =
-                                            apiSessionRepository.createSession(
-                                                token = credential.token,
-                                                deviceId = deviceId,
-                                                createdAt = Clock.System.now(),
-                                                expiresAt = null,
-                                                credentialId = credential.id,
-                                                kind = ApiSessionKind.ACCOUNTS,
-                                            )
-                                        refresh()
-                                        backgroundTasks.startTask(
-                                            key = monzoAccountsDownloadTaskKey(credential.id),
-                                            title = "Download Accounts",
-                                            initialDetail = "Starting accounts download for session #$newSessionId.",
-                                        ) {
-                                            val result =
-                                                downloadApiSessionAccounts(
-                                                    token = credential.token,
-                                                    apiClient =
-                                                        createApiClient(
-                                                            trafficRecorder =
-                                                                ApiSessionTrafficRecorder(
-                                                                    sessionId = newSessionId,
-                                                                    apiSessionRepository = apiSessionRepository,
-                                                                ),
-                                                            engine = null,
-                                                        ),
-                                                    apiSessionRepository = apiSessionRepository,
-                                                    sessionId = newSessionId,
-                                                    strategy = strategy,
-                                                    sca = scaParamsFor(strategy, credential),
-                                                )
-                                            accountsDownloadResultByCredential =
-                                                accountsDownloadResultByCredential + (credential.id to result)
-                                            result.displaySummary()
-                                        }
-                                    }
-                                },
-                                onDownloadPeople = {
-                                    scope.launch {
-                                        val strategy = resolveStrategy(credential) ?: return@launch
-                                        val newSessionId =
-                                            apiSessionRepository.createSession(
-                                                token = credential.token,
-                                                deviceId = deviceId,
-                                                createdAt = Clock.System.now(),
-                                                expiresAt = null,
-                                                credentialId = credential.id,
-                                                kind = ApiSessionKind.PEOPLE,
-                                            )
-                                        refresh()
-                                        backgroundTasks.startTask(
-                                            key = monzoPeopleDownloadTaskKey(credential.id),
-                                            title = "Download People",
-                                            initialDetail = "Starting people download for session #$newSessionId.",
-                                        ) {
-                                            val result =
-                                                downloadApiSessionPeople(
-                                                    token = credential.token,
-                                                    apiClient =
-                                                        createApiClient(
-                                                            trafficRecorder =
-                                                                ApiSessionTrafficRecorder(
-                                                                    sessionId = newSessionId,
-                                                                    apiSessionRepository = apiSessionRepository,
-                                                                ),
-                                                            engine = null,
-                                                        ),
-                                                    apiSessionRepository = apiSessionRepository,
-                                                    sessionId = newSessionId,
-                                                    strategy = strategy,
-                                                    sca = scaParamsFor(strategy, credential),
-                                                )
-                                            refresh()
-                                            "Downloaded ${result.personCount} ${if (result.personCount == 1) "person" else "people"}."
-                                        }
-                                    }
-                                },
-                                onDownloadTransactions = {
+                                onDownload = {
                                     downloadResultByCredential = downloadResultByCredential - credential.id
                                     downloadProgressByCredential = downloadProgressByCredential - credential.id
-                                    val accountsSession = credentialSessions.firstOrNull { it.kind == ApiSessionKind.ACCOUNTS }
+                                    val transactionsBlocked = transactionsBlockReasonByCredential[credential.id] != null
                                     scope.launch {
                                         val strategy = resolveStrategy(credential) ?: return@launch
                                         val newSessionId =
@@ -495,39 +398,77 @@ fun ApiSessionsScreen(
                                                 createdAt = Clock.System.now(),
                                                 expiresAt = null,
                                                 credentialId = credential.id,
-                                                kind = ApiSessionKind.TRANSACTIONS,
                                             )
                                         refresh()
                                         backgroundTasks.startTask(
-                                            key = monzoTransactionsDownloadTaskKey(credential.id),
-                                            title = "Download Transactions",
-                                            initialDetail = "Starting transactions download for session #$newSessionId.",
+                                            key = monzoDownloadTaskKey(credential.id),
+                                            title = "Download",
+                                            initialDetail = "Starting download for session #$newSessionId.",
                                         ) {
-                                            val result =
-                                                downloadApiSessionTransactions(
-                                                    token = credential.token,
-                                                    apiClient =
-                                                        createApiClient(
-                                                            trafficRecorder =
-                                                                ApiSessionTrafficRecorder(
-                                                                    sessionId = newSessionId,
-                                                                    apiSessionRepository = apiSessionRepository,
-                                                                ),
-                                                            engine = null,
+                                            // One client/session for accounts, transactions and people.
+                                            val apiClient =
+                                                createApiClient(
+                                                    trafficRecorder =
+                                                        ApiSessionTrafficRecorder(
+                                                            sessionId = newSessionId,
+                                                            apiSessionRepository = apiSessionRepository,
                                                         ),
+                                                    engine = null,
+                                                )
+                                            val sca = scaParamsFor(strategy, credential)
+                                            update("Downloading accounts...")
+                                            val accounts =
+                                                downloadApiSessionAccounts(
+                                                    token = credential.token,
+                                                    apiClient = apiClient,
                                                     apiSessionRepository = apiSessionRepository,
                                                     sessionId = newSessionId,
                                                     strategy = strategy,
-                                                    accountsSessionId = accountsSession?.id,
-                                                    sca = scaParamsFor(strategy, credential),
-                                                    onProgress = { progress ->
-                                                        downloadProgressByCredential =
-                                                            downloadProgressByCredential + (credential.id to progress)
-                                                        update(progress.downloadDetail())
-                                                    },
+                                                    sca = sca,
                                                 )
-                                            downloadResultByCredential = downloadResultByCredential + (credential.id to result)
+                                            val transactions =
+                                                if (transactionsBlocked) {
+                                                    null
+                                                } else {
+                                                    update("Downloading transactions...")
+                                                    downloadApiSessionTransactions(
+                                                        token = credential.token,
+                                                        apiClient = apiClient,
+                                                        apiSessionRepository = apiSessionRepository,
+                                                        sessionId = newSessionId,
+                                                        strategy = strategy,
+                                                        sca = sca,
+                                                        onProgress = { progress ->
+                                                            downloadProgressByCredential =
+                                                                downloadProgressByCredential + (credential.id to progress)
+                                                            update(progress.downloadDetail())
+                                                        },
+                                                    )
+                                                }
+                                            val people =
+                                                if (strategy.peopleDownload != null) {
+                                                    update("Downloading people...")
+                                                    downloadApiSessionPeople(
+                                                        token = credential.token,
+                                                        apiClient = apiClient,
+                                                        apiSessionRepository = apiSessionRepository,
+                                                        sessionId = newSessionId,
+                                                        strategy = strategy,
+                                                        sca = sca,
+                                                    )
+                                                } else {
+                                                    null
+                                                }
+                                            val result =
+                                                ApiSessionDownloadResult(
+                                                    accounts = accounts,
+                                                    transactions = transactions,
+                                                    people = people,
+                                                )
+                                            downloadResultByCredential =
+                                                downloadResultByCredential + (credential.id to result)
                                             downloadProgressByCredential = downloadProgressByCredential - credential.id
+                                            refresh()
                                             result.displaySummary()
                                         }
                                     }
@@ -535,14 +476,6 @@ fun ApiSessionsScreen(
                                 onImport = { session ->
                                     importResultBySession = importResultBySession - session.id
                                     importErrorBySession = importErrorBySession - session.id
-                                    // Transactions and People imports both correlate against the
-                                    // accounts session (to attach transactions / link owners to accounts).
-                                    val accountsSession =
-                                        if (session.kind == ApiSessionKind.TRANSACTIONS || session.kind == ApiSessionKind.PEOPLE) {
-                                            credentialSessions.firstOrNull { it.kind == ApiSessionKind.ACCOUNTS }
-                                        } else {
-                                            null
-                                        }
                                     scope.launch {
                                         val strategy =
                                             resolveStrategy(credential) ?: run {
@@ -550,25 +483,22 @@ fun ApiSessionsScreen(
                                                     importErrorBySession + (session.id to "No import strategy configured")
                                                 return@launch
                                             }
+                                        // Safe for all providers: returns empty when the strategy has no
+                                        // counterparty field, skipping the confirmation dialog.
                                         val suggestions =
-                                            if (session.kind == ApiSessionKind.TRANSACTIONS) {
-                                                discoverApiCounterpartiesToCreate(
-                                                    apiSessionRepository = apiSessionRepository,
-                                                    accountRepository = accountRepository,
-                                                    accountAttributeRepository = accountAttributeRepository,
-                                                    sessionId = session.id,
-                                                    strategy = strategy,
-                                                )
-                                            } else {
-                                                emptyList()
-                                            }
+                                            discoverApiCounterpartiesToCreate(
+                                                apiSessionRepository = apiSessionRepository,
+                                                accountRepository = accountRepository,
+                                                accountAttributeRepository = accountAttributeRepository,
+                                                sessionId = session.id,
+                                                strategy = strategy,
+                                            )
                                         if (suggestions.isEmpty()) {
-                                            startImport(session, accountsSession, strategy, emptyMap())
+                                            startImport(session, strategy, emptyMap())
                                         } else {
                                             pendingImport =
                                                 PendingApiImport(
                                                     session = session,
-                                                    accountsSession = accountsSession,
                                                     strategy = strategy,
                                                     counterparties = suggestions,
                                                 )
@@ -597,7 +527,6 @@ fun ApiSessionsScreen(
                 pendingImport = null
                 startImport(
                     session = import.session,
-                    accountsSession = import.accountsSession,
                     strategy = import.strategy,
                     counterpartyAccountNames = namesByCounterpartyId,
                 )
@@ -608,7 +537,6 @@ fun ApiSessionsScreen(
 
 private data class PendingApiImport(
     val session: ApiSession,
-    val accountsSession: ApiSession?,
     val strategy: ApiImportStrategy,
     val counterparties: List<ApiCounterpartySuggestion>,
 )
@@ -727,16 +655,11 @@ private fun CredentialCard(
     providerLabel: String?,
     requiresSigning: Boolean,
     transactionsBlockReason: String?,
-    peopleDownloadSupported: Boolean,
-    isDownloadingPeople: Boolean,
     onGenerateSigningKey: () -> Unit,
     onCopyText: (String) -> Unit,
-    onDownloadPeople: () -> Unit,
     sessions: List<ApiSession>,
-    isDownloadingAccounts: Boolean,
-    isDownloadingTransactions: Boolean,
-    accountsDownloadResult: ApiAccountsDownloadResult?,
-    downloadResult: ApiTransactionsDownloadResult?,
+    isDownloading: Boolean,
+    downloadResult: ApiSessionDownloadResult?,
     downloadProgress: ApiTransactionsDownloadProgress?,
     importResultBySession: Map<ApiSessionId, ApiSessionImportResult>,
     importErrorBySession: Map<ApiSessionId, String>,
@@ -744,8 +667,7 @@ private fun CredentialCard(
     importedSessionRevisions: Set<ApiSessionImportRevision>,
     selectedStrategyRevision: Long?,
     isImportingSession: (ApiSessionId) -> Boolean,
-    onDownloadAccounts: () -> Unit,
-    onDownloadTransactions: () -> Unit,
+    onDownload: () -> Unit,
     onImport: (ApiSession) -> Unit,
     onSessionClick: (ApiSession) -> Unit,
     onCopyError: (String) -> Unit,
@@ -756,8 +678,6 @@ private fun CredentialCard(
         } else {
             credential.token
         }
-    val isCredentialBusy = isDownloadingAccounts || isDownloadingTransactions || isDownloadingPeople
-
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
@@ -790,25 +710,15 @@ private fun CredentialCard(
                 )
             }
 
-            accountsDownloadResult?.let {
-                Text(text = it.displaySummary(), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
-            }
             downloadResult?.let {
                 Text(text = it.displaySummary(), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
             }
 
-            if (isDownloadingAccounts) {
-                Text(
-                    text = "Downloading accounts...",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            if (isDownloadingTransactions) {
+            if (isDownloading) {
                 Text(
                     text =
                         if (downloadProgress == null) {
-                            "Preparing download..."
+                            "Downloading..."
                         } else {
                             "Downloading account ${downloadProgress.accountIndex}/${downloadProgress.accountCount}, " +
                                 "page ${downloadProgress.page}. ${downloadProgress.downloadedResponsePageCount} response(s) so far."
@@ -818,24 +728,11 @@ private fun CredentialCard(
                 )
             }
 
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = onDownloadAccounts, enabled = !isCredentialBusy, modifier = Modifier.weight(1f)) {
-                    if (isDownloadingAccounts) {
-                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                    } else {
-                        Text("Download Accounts")
-                    }
-                }
-                Button(
-                    onClick = onDownloadTransactions,
-                    enabled = !isCredentialBusy && transactionsBlockReason == null,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    if (isDownloadingTransactions) {
-                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                    } else {
-                        Text("Download Transactions")
-                    }
+            Button(onClick = onDownload, enabled = !isDownloading, modifier = Modifier.fillMaxWidth()) {
+                if (isDownloading) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                } else {
+                    Text("Download")
                 }
             }
             transactionsBlockReason?.let { reason ->
@@ -844,19 +741,6 @@ private fun CredentialCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                 )
-            }
-            if (peopleDownloadSupported) {
-                OutlinedButton(
-                    onClick = onDownloadPeople,
-                    enabled = !isCredentialBusy,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    if (isDownloadingPeople) {
-                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                    } else {
-                        Text("Download People")
-                    }
-                }
             }
 
             if (sessions.isNotEmpty()) {
@@ -917,14 +801,7 @@ private fun SessionRow(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            val kindLabel =
-                when (session.kind) {
-                    ApiSessionKind.ACCOUNTS -> "Accounts session"
-                    ApiSessionKind.TRANSACTIONS -> "Transactions session"
-                    ApiSessionKind.PEOPLE -> "People session"
-                    null -> "Session"
-                }
-            Text(text = kindLabel, style = MaterialTheme.typography.labelLarge)
+            Text(text = "Session", style = MaterialTheme.typography.labelLarge)
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (isAlreadyImported) {
                     ImportedBadge()
@@ -952,14 +829,7 @@ private fun SessionRow(
         }
 
         if (isImporting) {
-            val importLabel =
-                when (session.kind) {
-                    ApiSessionKind.ACCOUNTS -> "Importing accounts..."
-                    ApiSessionKind.TRANSACTIONS -> "Importing transactions..."
-                    ApiSessionKind.PEOPLE -> "Importing people..."
-                    null -> "Importing..."
-                }
-            Text(text = importLabel, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+            Text(text = "Importing...", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             importProgress?.let {
                 val percent = it.progress?.let { p -> " (${(p * 100).toInt().coerceIn(0, 100)}%)" }.orEmpty()
                 Text(
@@ -983,13 +853,6 @@ private fun SessionRow(
         }
 
         if (isActive) {
-            val importButtonLabel =
-                when (session.kind) {
-                    ApiSessionKind.ACCOUNTS -> "Import Accounts"
-                    ApiSessionKind.TRANSACTIONS -> "Import Transactions"
-                    ApiSessionKind.PEOPLE -> "Import People"
-                    null -> "Import Transactions"
-                }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     onClick = onImport,
@@ -999,7 +862,7 @@ private fun SessionRow(
                     if (isImporting) {
                         CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                     } else {
-                        Text(importButtonLabel)
+                        Text("Import")
                     }
                 }
                 OutlinedButton(onClick = onOpenTraffic) { Text("Traffic") }
@@ -1767,16 +1630,6 @@ private fun ApiRequest.displayBody(): String =
         }
     }.trimEnd()
 
-private fun ApiAccountsDownloadResult.displaySummary(): String =
-    if (skipped) {
-        "Accounts already downloaded: $accountCount account(s) (skipped)."
-    } else {
-        "Accounts downloaded: $accountCount account(s)."
-    }
-
-private fun ApiTransactionsDownloadResult.displaySummary(): String =
-    "Transactions downloaded: $accountCount account(s), $transactionResponseCount new response page(s)."
-
 private fun ApiTransactionsDownloadProgress.downloadDetail(): String =
     "Downloading account $accountIndex/$accountCount, page $page. $downloadedResponsePageCount response page(s) downloaded so far."
 
@@ -1816,12 +1669,7 @@ private const val LEGACY_DEFAULT_STRATEGY_NAME = "Monzo"
 private fun legacyDefaultStrategy(strategies: List<ApiImportStrategy>): ApiImportStrategy? =
     strategies.firstOrNull { it.name == LEGACY_DEFAULT_STRATEGY_NAME }
 
-private fun monzoAccountsDownloadTaskKey(credentialId: MonzoCredentialId): String = "monzo-accounts-download-cred-${credentialId.id}"
-
-private fun monzoTransactionsDownloadTaskKey(credentialId: MonzoCredentialId): String =
-    "monzo-transactions-download-cred-${credentialId.id}"
-
-private fun monzoPeopleDownloadTaskKey(credentialId: MonzoCredentialId): String = "monzo-people-download-cred-${credentialId.id}"
+private fun monzoDownloadTaskKey(credentialId: MonzoCredentialId): String = "monzo-download-cred-${credentialId.id}"
 
 private fun monzoImportTaskKey(sessionId: ApiSessionId): String = "monzo-import-${sessionId.id}"
 

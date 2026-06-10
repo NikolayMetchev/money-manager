@@ -101,6 +101,40 @@ data class ApiPeopleDownloadResult(
     val skipped: Boolean = false,
 )
 
+/**
+ * The combined outcome of one download: accounts, plus transactions (null when region-blocked) and
+ * people (null when the strategy has no people-download endpoint), all into a single session.
+ */
+data class ApiSessionDownloadResult(
+    val accounts: ApiAccountsDownloadResult,
+    val transactions: ApiTransactionsDownloadResult?,
+    val people: ApiPeopleDownloadResult?,
+)
+
+fun ApiAccountsDownloadResult.displaySummary(): String =
+    if (skipped) {
+        "Accounts already downloaded: $accountCount account(s) (skipped)."
+    } else {
+        "Accounts downloaded: $accountCount account(s)."
+    }
+
+fun ApiTransactionsDownloadResult.displaySummary(): String =
+    "Transactions downloaded: $accountCount account(s), $transactionResponseCount new response page(s)."
+
+fun ApiPeopleDownloadResult.displaySummary(): String =
+    if (skipped) {
+        "People already downloaded: $personCount person(s) (skipped)."
+    } else {
+        "People downloaded: $personCount person(s)."
+    }
+
+fun ApiSessionDownloadResult.displaySummary(): String =
+    buildList {
+        add(accounts.displaySummary())
+        transactions?.let { add(it.displaySummary()) }
+        people?.let { add(it.displaySummary()) }
+    }.joinToString("\n")
+
 data class ApiPeopleImportResult(
     val personCount: Int,
     val ownershipCount: Int,
@@ -896,10 +930,10 @@ private suspend fun importPeopleFromSession(setup: ImportSetup): Int {
 
 /**
  * Links the global account holder to every own account in this import, sourcing the holder from the
- * credential's already-downloaded PEOPLE session(s). This makes `ownsAllAccounts` ownership
- * order-independent: [importApiSessionPeople] links the holder when the PEOPLE session is imported
- * after the accounts, and this covers the reverse — accounts imported after the holder — by re-linking
- * each time accounts are imported. Idempotent: [importOwnersForAccount] skips already-linked owners.
+ * people responses downloaded into this same session. This makes `ownsAllAccounts` ownership
+ * order-independent: [importApiSessionPeople] links the holder when run after accounts are imported,
+ * and this covers the reverse — the holder linked while transactions import — by re-linking each time
+ * accounts are imported. Idempotent: [importOwnersForAccount] skips already-linked owners.
  */
 private suspend fun linkGlobalHolderToOwnAccounts(
     setup: ImportSetup,
@@ -908,7 +942,6 @@ private suspend fun linkGlobalHolderToOwnAccounts(
     val config = setup.strategy.peopleDownload ?: return 0
     validatePeopleOwnershipConfig(config)
     if (!config.ownsAllAccounts || setup.accountsById.isEmpty()) return 0
-    val credentialId = setup.apiSessionRepository.getSessionById(setup.sessionId)?.credentialId ?: return 0
 
     // Resolve the AccountIds of the own accounts known to this import (idempotent — they already exist).
     val ownAccountIds =
@@ -918,32 +951,33 @@ private suspend fun linkGlobalHolderToOwnAccounts(
 
     val peopleIndex = loadPeopleIndex(setup.personRepository, setup.personAttributeRepository, externalIdAttributeTypeId)
     var newPeopleCount = 0
-    val peopleSessions =
-        setup.apiSessionRepository
-            .getSessionsByCredential(credentialId)
-            .filter { it.kind == ApiSessionKind.PEOPLE }
-    for (session in peopleSessions) {
-        for (response in setup.apiSessionRepository.getResponsesBySession(session.id)) {
-            responseItemsArray(response.json, config.endpoint.responseArrayKey)
-                ?.forEachIndexed { index, element ->
-                    val owner = (element as? JsonObject)?.toPersonOwner(config, index) ?: return@forEachIndexed
-                    for (accountId in ownAccountIds) {
-                        newPeopleCount +=
-                            importOwnersForAccount(
-                                owners = listOf(owner),
-                                accountId = accountId,
-                                peopleIndex = peopleIndex,
-                                personRepository = setup.personRepository,
-                                personAccountOwnershipRepository = setup.personAccountOwnershipRepository,
-                                personAttributeRepository = setup.personAttributeRepository,
-                                externalIdAttributeTypeId = externalIdAttributeTypeId,
-                                entitySource = setup.entitySource,
-                                sessionId = session.id,
-                                requestId = response.requestId,
-                            ).newPeople
-                    }
-                }
+    // People are downloaded into the same session as accounts/transactions; select the holder
+    // responses by matching the people endpoint path (the same predicate importApiSessionPeople uses).
+    val peopleResponses =
+        setup.apiSessionRepository.getResponsesBySession(setup.sessionId).filter { response ->
+            val path = setup.requestsById[response.requestId]?.encodedPath() ?: return@filter false
+            extractPathVariables(config.endpoint.path, path) != null
         }
+    for (response in peopleResponses) {
+        responseItemsArray(response.json, config.endpoint.responseArrayKey)
+            ?.forEachIndexed { index, element ->
+                val owner = (element as? JsonObject)?.toPersonOwner(config, index) ?: return@forEachIndexed
+                for (accountId in ownAccountIds) {
+                    newPeopleCount +=
+                        importOwnersForAccount(
+                            owners = listOf(owner),
+                            accountId = accountId,
+                            peopleIndex = peopleIndex,
+                            personRepository = setup.personRepository,
+                            personAccountOwnershipRepository = setup.personAccountOwnershipRepository,
+                            personAttributeRepository = setup.personAttributeRepository,
+                            externalIdAttributeTypeId = externalIdAttributeTypeId,
+                            entitySource = setup.entitySource,
+                            sessionId = setup.sessionId,
+                            requestId = response.requestId,
+                        ).newPeople
+                }
+            }
     }
     return newPeopleCount
 }
@@ -3018,7 +3052,9 @@ private fun RuleSign.matches(sign: Int): Boolean =
 private fun JsonObject.evaluatePredicate(predicate: RulePredicate): Boolean {
     val operand = predicate.value.orEmpty()
     return when (predicate.op) {
-        PredicateOp.EXISTS -> resolveJsonElementPath(predicate.path) != null
+        // A present-but-JSON-null field (e.g. Monzo sends `atm_fees_detailed: null` on every
+        // non-ATM transaction) does not count as existing, otherwise every transaction matches.
+        PredicateOp.EXISTS -> resolveJsonElementPath(predicate.path).let { it != null && it != JsonNull }
         PredicateOp.EQUALS -> resolveJsonPath(predicate.path) == predicate.value
         PredicateOp.EQUALS_IGNORE_CASE -> resolveJsonPath(predicate.path)?.equals(predicate.value, ignoreCase = true) == true
         PredicateOp.STARTS_WITH -> resolveJsonPath(predicate.path)?.startsWith(operand) == true

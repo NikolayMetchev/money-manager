@@ -11,7 +11,6 @@ import com.moneymanager.domain.model.ApiResponseTransactionId
 import com.moneymanager.domain.model.ApiResponseTransactionState
 import com.moneymanager.domain.model.ApiSession
 import com.moneymanager.domain.model.ApiSessionId
-import com.moneymanager.domain.model.ApiSessionKind
 import com.moneymanager.domain.model.ApiSessionType
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.JsonPath
@@ -87,7 +86,6 @@ interface ApiSessionRepository {
      * @param createdAt The creation timestamp
      * @param expiresAt Optional expiry timestamp; null means the session never expires
      * @param credentialId Optional credential this session was created from
-     * @param kind Whether this session downloaded accounts or transactions
      * @return The ID of the newly created session
      */
     suspend fun createSession(
@@ -97,7 +95,6 @@ interface ApiSessionRepository {
         expiresAt: Instant?,
         type: ApiSessionType = ApiSessionType.MONZO,
         credentialId: MonzoCredentialId? = null,
-        kind: ApiSessionKind? = null,
     ): ApiSessionId
 
     /**

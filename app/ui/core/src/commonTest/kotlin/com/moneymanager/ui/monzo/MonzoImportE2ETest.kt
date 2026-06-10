@@ -358,6 +358,32 @@ private val TRANSACTIONS_WITH_ATM_AND_COUNTERPARTY_IDS_JSON =
     """.trimIndent()
 
 /**
+ * A single ordinary (non-ATM) outgoing payment in the exact shape Monzo's real API returns: the
+ * `atm_fees_detailed` key is present on every transaction but set to JSON `null` unless it is an
+ * actual ATM withdrawal. The built-in ATM rule must NOT match this, or every payment becomes an ATM.
+ */
+private val TRANSACTION_WITH_NULL_ATM_FEES_JSON =
+    """
+{
+  "transactions": [
+    {
+      "id": "tx_00009TEST000000000050",
+      "account_id": "$ACCOUNT_ID",
+      "created": "2024-06-03T09:15:00.000Z",
+      "amount": -1250,
+      "currency": "GBP",
+      "description": "COFFEE SHOP LTD LONDON GBR",
+      "merchant": { "name": "Coffee Shop Ltd" },
+      "counterparty": {},
+      "metadata": {},
+      "labels": null,
+      "atm_fees_detailed": null
+    }
+  ]
+}
+    """.trimIndent()
+
+/**
  * A page that contains only declined transactions — no settled tx at all.
  * Used to verify that an all-declined page does not prematurely stop pagination.
  */
@@ -1360,6 +1386,93 @@ class MonzoImportE2ETest : DbTest() {
                         .any { it.attributeType.name == "built-in type" && it.value == "ATM" }
                 }
             assertEquals(1, atmAccounts.size, "All ATM withdrawals must consolidate into one built-in ATM account")
+        }
+
+    @Test
+    fun `ordinary payments with a null atm_fees_detailed field are not routed to the ATM account`() =
+        runTest {
+            val deviceId =
+                repositories.deviceRepository.getOrCreateDevice(
+                    DeviceInfo.Jvm("test-machine", "Test OS"),
+                )
+            val strategy =
+                repositories.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .single { it.name == "Monzo" }
+            val sessionId =
+                repositories.apiSessionRepository.createSession(
+                    token = "test-monzo-token",
+                    deviceId = deviceId,
+                    createdAt = Instant.fromEpochMilliseconds(1_700_000_000_000L),
+                    expiresAt = null,
+                )
+            val mockEngine =
+                MockEngine { request ->
+                    val url = request.url.toString()
+                    val json =
+                        when {
+                            url.contains("/accounts") -> ACCOUNTS_JSON
+                            url.contains("/transactions") && !url.contains("before=") ->
+                                TRANSACTION_WITH_NULL_ATM_FEES_JSON
+                            url.contains("/transactions") && url.contains("before=") -> EMPTY_TRANSACTIONS_JSON
+                            else -> error("Unexpected request: $url")
+                        }
+                    respond(
+                        content = json,
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                    )
+                }
+            val apiClient =
+                createApiClient(
+                    trafficRecorder = ApiSessionTrafficRecorder(sessionId, repositories.apiSessionRepository),
+                    engine = mockEngine,
+                )
+
+            downloadApiSessionAccounts(
+                token = "test-monzo-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+            downloadApiSessionTransactions(
+                token = "test-monzo-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+            val importResult =
+                importApiSessionTransactions(
+                    apiSessionRepository = repositories.apiSessionRepository,
+                    accountRepository = repositories.accountRepository,
+                    currencyRepository = repositories.currencyRepository,
+                    transactionRepository = repositories.transactionRepository,
+                    entitySource = DbEntitySource(repositories.entitySourceQueries, repositories.transferSourceQueries, deviceId),
+                    personRepository = repositories.personRepository,
+                    personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
+                    personAttributeRepository = repositories.personAttributeRepository,
+                    attributeTypeRepository = repositories.attributeTypeRepository,
+                    accountAttributeRepository = repositories.accountAttributeRepository,
+                    deviceId = deviceId,
+                    sessionId = sessionId,
+                    strategy = strategy,
+                )
+
+            assertEquals(1, importResult.transactionCount, "Transaction should be imported")
+            assertEquals(0, importResult.errorCount, "Should have no import errors")
+
+            val allAccounts = repositories.accountRepository.getAllAccounts().first()
+            val atmAccounts =
+                allAccounts.filter { account ->
+                    repositories.accountAttributeRepository
+                        .getByAccount(account.id)
+                        .first()
+                        .any { it.attributeType.name == "built-in type" && it.value == "ATM" }
+                }
+            assertEquals(0, atmAccounts.size, "A present-but-null atm_fees_detailed field must not create an ATM account")
         }
 
     @Test
