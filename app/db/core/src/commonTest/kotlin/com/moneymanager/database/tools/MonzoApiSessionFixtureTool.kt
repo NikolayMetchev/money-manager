@@ -123,7 +123,7 @@ private fun exportFixtures(
                 jsonPath = row.getString("json_path"),
                 state = row.getLong("state"),
                 transactionId = row.getLongOrNull("transaction_id"),
-                errorMessage = row.getStringOrNull("error_message"),
+                errorMessage = row.getString("error_message"),
                 createdAt = row.getLong("created_at"),
             )
         }
@@ -296,8 +296,6 @@ private fun printUsageAndExit(): Nothing {
     )
     exitProcess(1)
 }
-
-private fun java.sql.ResultSet.getStringOrNull(column: String): String? = getString(column)
 
 private fun java.sql.ResultSet.getLongOrNull(column: String): Long? =
     getObject(column)?.let {
