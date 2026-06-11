@@ -19,10 +19,12 @@ import java.awt.event.MouseEvent
 private val isLinux: Boolean =
     System.getProperty("os.name").orEmpty().contains("linux", ignoreCase = true)
 
-// On Linux (X11/XWayland) the physical back/forward side buttons arrive as AWT buttons 6/7
-// (buttons 4/5 are the horizontal scroll wheel). Compose only tracks buttons 1-3 as "pressed",
-// so it never dispatches 6/7 through its pointer pipeline and a Modifier.onPointerEvent never
-// sees them. We therefore listen at the AWT level on Linux instead.
+// Windows/macOS report the physical back/forward side buttons as AWT buttons 4/5, which Compose
+// recognises and delivers as PointerButton.Back/Forward. Linux (X11/XWayland) reserves buttons 4-7
+// for scroll axes, so the same side buttons arrive as AWT buttons 6/7 (4/5 are the horizontal
+// scroll wheel). Compose only tracks buttons 1-3 as "pressed", so it never dispatches 6/7 through
+// its pointer pipeline and a Modifier.onPointerEvent never sees them. We therefore listen for 6/7
+// at the AWT level on Linux instead.
 // See https://github.com/JetBrains/compose-multiplatform/issues/2058
 private const val AWT_BUTTON_BACK = 6
 private const val AWT_BUTTON_FORWARD = 7
