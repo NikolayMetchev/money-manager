@@ -175,14 +175,3 @@ fun CsvImportAllDialog(
         },
     )
 }
-
-// Mirrors QifBulkResult.toSummary() by design.
-@Suppress("DuplicatedCode")
-private fun CsvBulkResult.toSummary(): String =
-    buildString {
-        append("Imported $filesImported file${if (filesImported == 1) "" else "s"}")
-        append(" · $transfersCreated new")
-        if (duplicatesSkipped > 0) append(" · $duplicatesSkipped duplicates skipped")
-        if (filesSkippedNoStrategy > 0) append(" · $filesSkippedNoStrategy skipped (no strategy)")
-        if (filesFailed > 0) append(" · $filesFailed failed")
-    }

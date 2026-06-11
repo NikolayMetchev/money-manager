@@ -35,20 +35,21 @@ import com.moneymanager.importmodel.ExistingUniqueKeyExtractor
 import com.moneymanager.importmodel.ImportBatch
 import com.moneymanager.importmodel.ImportRowKey
 import com.moneymanager.importmodel.ImportTransfer
+import com.moneymanager.ui.screens.BulkImportResult
 import kotlinx.coroutines.flow.first
 import org.lighthousegames.logging.logging
 import kotlin.time.Clock
 
 private val logger = logging()
 
-/** Summary of a bulk CSV import run across many files. Mirrors QifBulkResult by design. */
+/** Summary of a bulk CSV import run across many files. */
 internal data class CsvBulkResult(
-    val filesImported: Int,
-    val transfersCreated: Int,
-    val duplicatesSkipped: Int,
-    val filesSkippedNoStrategy: Int,
-    val filesFailed: Int,
-)
+    override val filesImported: Int,
+    override val transfersCreated: Int,
+    override val duplicatesSkipped: Int,
+    override val filesSkippedNoStrategy: Int,
+    override val filesFailed: Int,
+) : BulkImportResult
 
 /**
  * Applies the matching strategy to every [imports] file. Each file's strategy is auto-matched from its
