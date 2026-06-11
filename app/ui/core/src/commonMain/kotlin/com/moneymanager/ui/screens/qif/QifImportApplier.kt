@@ -32,6 +32,7 @@ import com.moneymanager.importmodel.DedupePolicy
 import com.moneymanager.importmodel.ImportBatch
 import com.moneymanager.importmodel.ImportRowKey
 import com.moneymanager.importmodel.ImportTransfer
+import com.moneymanager.ui.screens.BulkImportResult
 import com.moneymanager.ui.screens.csv.buildAccountsToCreate
 import com.moneymanager.ui.screens.csv.buildPendingAccountMappings
 import kotlinx.coroutines.flow.first
@@ -43,12 +44,12 @@ private val logger = logging()
 
 /** Summary of a bulk QIF import run across many files. */
 internal data class QifBulkResult(
-    val filesImported: Int,
-    val transfersCreated: Int,
-    val duplicatesSkipped: Int,
-    val filesSkippedNoStrategy: Int,
-    val filesFailed: Int,
-)
+    override val filesImported: Int,
+    override val transfersCreated: Int,
+    override val duplicatesSkipped: Int,
+    override val filesSkippedNoStrategy: Int,
+    override val filesFailed: Int,
+) : BulkImportResult
 
 /**
  * Strategies usable for QIF imports: those whose identification columns are a (non-empty) subset of

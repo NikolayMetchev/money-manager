@@ -1,4 +1,4 @@
-package com.moneymanager.ui.screens.qif
+package com.moneymanager.ui.screens.csv
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -16,24 +16,23 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.moneymanager.database.csv.StrategyMatcher
 import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AccountId
-import com.moneymanager.domain.model.CurrencyId
-import com.moneymanager.domain.model.qif.QifImport
+import com.moneymanager.domain.model.csv.CsvImport
+import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CsvAccountMappingRepository
+import com.moneymanager.domain.repository.CsvImportRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
-import com.moneymanager.domain.repository.QifImportRepository
-import com.moneymanager.domain.repository.SettingsRepository
 import com.moneymanager.importer.ImportEngine
 import com.moneymanager.ui.components.AccountPicker
-import com.moneymanager.ui.components.CurrencyPicker
 import com.moneymanager.ui.components.LoadingTextButton
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -41,15 +40,16 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
- * Applies the matching QIF strategy to every unimported file in one go, using a single source account
- * and currency chosen here. The source account defaults to (and is remembered as) the last account
- * used for QIF imports. Payee accounts auto-create with their detected names.
+ * Applies the matching strategy to every unimported CSV file in one go. Each file's strategy is
+ * auto-matched from its column headers (files with no match are skipped). The shared source account
+ * chosen here is used only for files whose strategy needs a user-chosen source; strategies that
+ * hard-code or per-row-resolve the source ignore it. Payee accounts auto-create with detected names.
+ * Mirrors QifImportAllDialog by design (CSV has no currency choice — currency comes from the strategy).
  */
 @Composable
-// Shares the single-file QIF apply flow's source-account/currency selection by design.
 @Suppress("LongParameterList", "LongMethod", "DuplicatedCode")
-fun QifImportAllDialog(
-    unimported: List<QifImport>,
+fun CsvImportAllDialog(
+    unimported: List<CsvImport>,
     csvImportStrategyRepository: CsvImportStrategyRepository,
     csvAccountMappingRepository: CsvAccountMappingRepository,
     accountRepository: AccountRepository,
@@ -57,9 +57,8 @@ fun QifImportAllDialog(
     currencyRepository: CurrencyRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    qifImportRepository: QifImportRepository,
+    csvImportRepository: CsvImportRepository,
     attributeTypeRepository: AttributeTypeRepository,
-    settingsRepository: SettingsRepository,
     maintenance: Maintenance,
     entitySource: EntitySource,
     importEngine: ImportEngine,
@@ -69,26 +68,31 @@ fun QifImportAllDialog(
     val scope = rememberSchemaAwareCoroutineScope()
     val strategies by csvImportStrategyRepository.getAllStrategies().collectAsStateWithSchemaErrorHandling(emptyList())
     val currencies by currencyRepository.getAllCurrencies().collectAsStateWithSchemaErrorHandling(emptyList())
-    val accounts by accountRepository.getAllAccounts().collectAsStateWithSchemaErrorHandling(emptyList())
 
     var sourceAccountId by remember { mutableStateOf<AccountId?>(null) }
-    var selectedCurrencyId by remember { mutableStateOf<CurrencyId?>(null) }
     var isImporting by remember { mutableStateOf(false) }
     var progress by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     var summary by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(accounts) {
-        if (sourceAccountId == null) {
-            val last = settingsRepository.getLastQifAccountId().first()
-            if (last != null && accounts.any { it.id == last }) sourceAccountId = last
+    // Match each file's strategy by its columns, so we can tell how many files will be skipped (no
+    // matching strategy) and whether any matched strategy needs a user-chosen source account.
+    // getAllImports() doesn't populate columns, so load each file's columns before matching.
+    var matchedStrategies by remember { mutableStateOf<List<CsvImportStrategy?>?>(null) }
+    LaunchedEffect(unimported, strategies) {
+        if (strategies.isEmpty()) {
+            matchedStrategies = null
+            return@LaunchedEffect
         }
+        matchedStrategies =
+            unimported.map { listedImport ->
+                val fullImport = csvImportRepository.getImport(listedImport.id).first()
+                val columnNames = fullImport?.columns.orEmpty().map { it.originalName }
+                StrategyMatcher.findMatchingStrategy(columnNames, strategies)
+            }
     }
-    LaunchedEffect(currencies) {
-        if (selectedCurrencyId == null && currencies.isNotEmpty()) {
-            val defaultId = settingsRepository.getDefaultCurrencyId().first()
-            selectedCurrencyId = defaultId?.takeIf { id -> currencies.any { it.id == id } } ?: currencies.firstOrNull()?.id
-        }
-    }
+    val matches = matchedStrategies
+    val skippedNoStrategyCount = if (matches == null) 0 else unimported.size - matches.count { it != null }
+    val needsSourceAccount = matches?.any { it != null && it.needsSourceAccountOverride() } ?: false
 
     AlertDialog(
         onDismissRequest = { if (!isImporting) onDismiss() },
@@ -99,27 +103,30 @@ fun QifImportAllDialog(
                 if (currentSummary != null) {
                     Text(currentSummary, style = MaterialTheme.typography.bodyMedium)
                 } else {
-                    AccountPicker(
-                        selectedAccountId = sourceAccountId,
-                        onAccountSelected = { sourceAccountId = it },
-                        label = "Source account for all files",
-                        accountRepository = accountRepository,
-                        categoryRepository = categoryRepository,
-                        personRepository = personRepository,
-                        personAccountOwnershipRepository = personAccountOwnershipRepository,
-                        entitySource = entitySource,
-                        enabled = !isImporting,
-                        isError = sourceAccountId == null,
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    CurrencyPicker(
-                        selectedCurrencyId = selectedCurrencyId,
-                        onCurrencySelected = { selectedCurrencyId = it },
-                        label = "Currency",
-                        currencyRepository = currencyRepository,
-                        enabled = !isImporting,
-                        isError = selectedCurrencyId == null,
-                    )
+                    if (needsSourceAccount) {
+                        AccountPicker(
+                            selectedAccountId = sourceAccountId,
+                            onAccountSelected = { sourceAccountId = it },
+                            label = "Source account (for files whose strategy needs one)",
+                            accountRepository = accountRepository,
+                            categoryRepository = categoryRepository,
+                            personRepository = personRepository,
+                            personAccountOwnershipRepository = personAccountOwnershipRepository,
+                            entitySource = entitySource,
+                            enabled = !isImporting,
+                            isError = sourceAccountId == null,
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
+                    if (skippedNoStrategyCount > 0) {
+                        Text(
+                            text =
+                                "$skippedNoStrategyCount file${if (skippedNoStrategyCount == 1) "" else "s"} " +
+                                    "have no matching strategy and will be skipped.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     progress?.let { (done, total) ->
                         Spacer(modifier = Modifier.height(12.dp))
                         Text("Importing ${done.coerceAtMost(total)} of $total…", style = MaterialTheme.typography.bodySmall)
@@ -133,35 +140,32 @@ fun QifImportAllDialog(
             } else {
                 LoadingTextButton(
                     onClick = {
-                        val source = sourceAccountId ?: return@LoadingTextButton
-                        val currency = selectedCurrencyId ?: return@LoadingTextButton
+                        if (needsSourceAccount && sourceAccountId == null) return@LoadingTextButton
                         isImporting = true
                         scope.launch {
                             try {
                                 val result =
-                                    bulkApplyQif(
+                                    bulkApplyCsv(
                                         imports = unimported,
-                                        sourceAccountId = source,
-                                        currencyId = currency,
+                                        sourceAccountOverride = sourceAccountId,
                                         strategies = strategies,
                                         currencies = currencies,
                                         csvAccountMappingRepository = csvAccountMappingRepository,
                                         accountRepository = accountRepository,
-                                        qifImportRepository = qifImportRepository,
+                                        csvImportRepository = csvImportRepository,
                                         attributeTypeRepository = attributeTypeRepository,
                                         maintenance = maintenance,
                                         entitySource = entitySource,
                                         importEngine = importEngine,
                                         onProgress = { done, total -> progress = done to total },
                                     )
-                                settingsRepository.setLastQifAccountId(source)
                                 summary = result.toSummary()
                             } finally {
                                 isImporting = false
                             }
                         }
                     },
-                    enabled = !isImporting && sourceAccountId != null && selectedCurrencyId != null,
+                    enabled = !isImporting && (!needsSourceAccount || sourceAccountId != null),
                     loading = isImporting,
                     label = "Import ${unimported.size} files",
                 )

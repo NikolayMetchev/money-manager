@@ -92,6 +92,17 @@ fun ImportsScreen(
             ImportTab.CSV ->
                 CsvImportsScreen(
                     csvImportRepository = csvImportRepository,
+                    csvImportStrategyRepository = csvImportStrategyRepository,
+                    csvAccountMappingRepository = csvAccountMappingRepository,
+                    accountRepository = accountRepository,
+                    categoryRepository = categoryRepository,
+                    currencyRepository = currencyRepository,
+                    personRepository = personRepository,
+                    personAccountOwnershipRepository = personAccountOwnershipRepository,
+                    attributeTypeRepository = attributeTypeRepository,
+                    maintenance = maintenance,
+                    entitySource = entitySource,
+                    importEngine = importEngine,
                     onImportClick = onCsvImportClick,
                     onStrategiesClick = onCsvStrategiesClick,
                 )

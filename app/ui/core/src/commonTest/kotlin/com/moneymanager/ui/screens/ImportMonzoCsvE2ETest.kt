@@ -19,6 +19,8 @@ import androidx.compose.ui.test.waitUntilDoesNotExist
 import androidx.compose.ui.test.waitUntilExactlyOneExists
 import com.moneymanager.database.DatabaseManager
 import com.moneymanager.di.database.DatabaseComponent
+import com.moneymanager.domain.model.Account
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
@@ -380,10 +382,97 @@ class ImportMonzoCsvE2ETest {
             onNodeWithText("Imports", useUnmergedTree = true).performClick()
             waitForIdle()
 
-            waitUntilExactlyOneExists(hasText("already_imported.csv"), timeoutMillis = 15000)
+            // The Unimported tab (default) shows only the file that hasn't been imported yet.
             waitUntilExactlyOneExists(hasText("not_imported_yet.csv"), timeoutMillis = 15000)
-            waitUntilExactlyOneExists(hasText("via Monzo", substring = true), timeoutMillis = 10000)
             waitUntilExactlyOneExists(hasText("Not imported yet"), timeoutMillis = 10000)
+
+            // The already-imported file lives on the Imported tab, with its strategy name shown.
+            onNodeWithText("Imported (1)").performClick()
+            waitForIdle()
+            waitUntilExactlyOneExists(hasText("already_imported.csv"), timeoutMillis = 15000)
+            waitUntilExactlyOneExists(hasText("via Monzo", substring = true), timeoutMillis = 10000)
+        }
+
+    /**
+     * "Import all" auto-matches each file's strategy by its columns (the built-in "Monzo CSV" strategy
+     * here) and applies it to every unimported file in one click. This guards the regression where
+     * getAllImports() returned imports without their columns, so column-based matching skipped every file.
+     */
+    @Test
+    fun importAll_matchesFilesByColumnsAndImportsThemAll() =
+        runMoneyManagerComposeUiTest {
+            testDbLocation = createTestDatabaseLocation()
+            val databaseManager = createTestDatabaseManager()
+
+            runBlocking {
+                val db = databaseManager.openDatabase(testDbLocation!!)
+                val databaseComponent = DatabaseComponent.create(db)
+
+                databaseComponent.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
+                // A source account for the bulk dialog (the built-in Monzo CSV strategy has no source mapping).
+                databaseComponent.accountRepository.createAccount(
+                    Account(id = AccountId(0), name = "My Monzo", openingDate = Instant.fromEpochMilliseconds(1700000000000L)),
+                )
+
+                val csvContent = loadTestCsvContent()
+                val lines = csvContent.lines().filter { it.isNotBlank() }
+                val headers = parseCsvLine(lines.first())
+                val rows = lines.drop(1).take(2).map { parseCsvLine(it) }
+
+                // Rely on the seeded built-in "Monzo CSV" strategy — matching is purely by columns.
+                databaseComponent.csvImportRepository.createImport(
+                    fileName = "first.csv",
+                    headers = headers,
+                    rows = rows,
+                    fileChecksum = "import_all_first",
+                    fileLastModified = Instant.fromEpochMilliseconds(1700000000000L),
+                )
+                databaseComponent.csvImportRepository.createImport(
+                    fileName = "second.csv",
+                    headers = headers,
+                    rows = rows,
+                    fileChecksum = "import_all_second",
+                    fileLastModified = Instant.fromEpochMilliseconds(1700000000001L),
+                )
+            }
+
+            setContent {
+                MoneyManagerTestApp(
+                    databaseManager = SimpleDatabaseManager(databaseManager, testDbLocation!!),
+                    appVersion = AppVersion("1.0.0-test"),
+                )
+            }
+
+            waitForIdle()
+            waitUntilAtLeastOneExists(hasText("Your Accounts"), timeoutMillis = 20000)
+            waitUntilAtLeastOneExists(hasText("Imports"), timeoutMillis = 10000)
+            onNodeWithText("Imports", useUnmergedTree = true).performClick()
+            waitForIdle()
+
+            // The Unimported tab offers a single "Import all (2)" action.
+            waitUntilExactlyOneExists(hasText("Import all (2)"), timeoutMillis = 15000)
+            onNodeWithText("Import all (2)").performClick()
+
+            // The dialog shows a source picker (the strategy has no source mapping); choose "My Monzo".
+            waitUntilExactlyOneExists(hasText("Import all unimported files"), timeoutMillis = 15000)
+            waitUntilAtLeastOneExists(hasText("Select..."), timeoutMillis = 15000)
+            onNodeWithText("Select...").performClick()
+            waitUntilAtLeastOneExists(hasText("My Monzo"), timeoutMillis = 10000)
+            onNodeWithText("My Monzo").performClick()
+            waitForIdle()
+
+            waitUntilAtLeastOneExists(hasText("Import 2 files") and isEnabled(), timeoutMillis = 15000)
+            onNodeWithText("Import 2 files").performClick()
+
+            // Both files matched the Monzo CSV strategy by columns and imported in one click.
+            waitUntilAtLeastOneExists(hasText("Imported 2 files", substring = true), timeoutMillis = 20000)
+            onNodeWithText("Done").performClick()
+            waitForIdle()
+
+            onNodeWithText("Imported (2)").performClick()
+            waitForIdle()
+            waitUntilExactlyOneExists(hasText("second.csv"), timeoutMillis = 15000)
+            onNodeWithText("Unimported (0)").assertExists()
         }
 
     /**
