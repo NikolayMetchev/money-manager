@@ -1,0 +1,561 @@
+@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
+
+package com.moneymanager.ui.screens.csv
+
+import com.moneymanager.database.csv.CsvImportProvenance
+import com.moneymanager.database.csv.CsvTransferMapper
+import com.moneymanager.database.csv.DiscoveredAccountMapping
+import com.moneymanager.database.csv.ImportPreparation
+import com.moneymanager.database.csv.NewAccount
+import com.moneymanager.database.csv.StrategyMatcher
+import com.moneymanager.domain.EntitySource
+import com.moneymanager.domain.Maintenance
+import com.moneymanager.domain.model.Account
+import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.Currency
+import com.moneymanager.domain.model.NewAttribute
+import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.csv.CsvColumn
+import com.moneymanager.domain.model.csv.CsvImport
+import com.moneymanager.domain.model.csv.CsvRow
+import com.moneymanager.domain.model.csv.ImportStatus
+import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
+import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
+import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
+import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.repository.AccountRepository
+import com.moneymanager.domain.repository.AttributeTypeRepository
+import com.moneymanager.domain.repository.CsvAccountMappingRepository
+import com.moneymanager.domain.repository.CsvImportRepository
+import com.moneymanager.importer.ImportEngine
+import com.moneymanager.importmodel.AccountRef
+import com.moneymanager.importmodel.DedupePolicy
+import com.moneymanager.importmodel.ExistingUniqueKeyExtractor
+import com.moneymanager.importmodel.ImportBatch
+import com.moneymanager.importmodel.ImportRowKey
+import com.moneymanager.importmodel.ImportTransfer
+import kotlinx.coroutines.flow.first
+import org.lighthousegames.logging.logging
+import kotlin.time.Clock
+
+private val logger = logging()
+
+/** Summary of a bulk CSV import run across many files. Mirrors QifBulkResult by design. */
+internal data class CsvBulkResult(
+    val filesImported: Int,
+    val transfersCreated: Int,
+    val duplicatesSkipped: Int,
+    val filesSkippedNoStrategy: Int,
+    val filesFailed: Int,
+)
+
+/**
+ * Applies the matching strategy to every [imports] file. Each file's strategy is auto-matched from its
+ * column headers, so files from different banks each get the right strategy; files with no match are
+ * skipped and counted. Payee/counterparty accounts auto-create with their detected names (no per-file
+ * confirmation). The shared [sourceAccountOverride] is used only for files whose strategy needs a
+ * user-chosen source (no SOURCE_ACCOUNT mapping); hard-coded and per-row strategies resolve their own.
+ * Refreshes materialized views once at the end. Reports progress via [onProgress].
+ */
+@Suppress("LongParameterList")
+internal suspend fun bulkApplyCsv(
+    imports: List<CsvImport>,
+    sourceAccountOverride: AccountId?,
+    strategies: List<CsvImportStrategy>,
+    currencies: List<Currency>,
+    csvAccountMappingRepository: CsvAccountMappingRepository,
+    accountRepository: AccountRepository,
+    csvImportRepository: CsvImportRepository,
+    attributeTypeRepository: AttributeTypeRepository,
+    maintenance: Maintenance,
+    entitySource: EntitySource,
+    importEngine: ImportEngine,
+    onProgress: (done: Int, total: Int) -> Unit,
+): CsvBulkResult {
+    var filesImported = 0
+    var transfers = 0
+    var duplicates = 0
+    var skippedNoStrategy = 0
+    var failed = 0
+
+    imports.forEachIndexed { index, listedImport ->
+        onProgress(index, imports.size)
+        // getAllImports() doesn't populate columns, so re-fetch the full import (which loads them)
+        // for the column-based strategy match below.
+        val csvImport = csvImportRepository.getImport(listedImport.id).first() ?: listedImport
+        val columnNames = csvImport.columns.map { it.originalName }
+        val matched = StrategyMatcher.findMatchingStrategy(columnNames, strategies)
+        if (matched == null) {
+            skippedNoStrategy++
+            return@forEachIndexed
+        }
+        try {
+            val allRows = csvImportRepository.getImportRows(csvImport.id, limit = csvImport.rowCount.coerceAtLeast(1), offset = 0)
+            val rows = allRows.filter { it.importStatus == null || it.importStatus == ImportStatus.ERROR }
+            if (rows.isEmpty()) return@forEachIndexed
+
+            // The shared override only applies to strategies that need a user-chosen source. A
+            // hard-coded mapping resolves its own account; a per-row mapping decides per row.
+            val effectiveSource = effectiveSourceFor(matched, sourceAccountOverride)
+
+            // Re-fetch accounts so payee accounts created by earlier files are seen.
+            val accounts = accountRepository.getAllAccounts().first()
+            val mappings = csvAccountMappingRepository.getMappingsForStrategy(matched.id).first()
+            val basePrep =
+                buildCsvMapper(matched, csvImport.columns, accounts, currencies, mappings, effectiveSource)
+                    .prepareImport(rows)
+
+            val result =
+                runCsvImport(
+                    csvImport = csvImport,
+                    rows = rows,
+                    columns = csvImport.columns,
+                    strategy = matched,
+                    basePrep = basePrep,
+                    selectedExistingAccounts = emptyMap(),
+                    selectedNewAccountNames = emptyMap(),
+                    selectedSourceAccountId = effectiveSource,
+                    currencies = currencies,
+                    csvAccountMappingRepository = csvAccountMappingRepository,
+                    accountRepository = accountRepository,
+                    csvImportRepository = csvImportRepository,
+                    attributeTypeRepository = attributeTypeRepository,
+                    maintenance = maintenance,
+                    entitySource = entitySource,
+                    importEngine = importEngine,
+                    refreshViews = false,
+                )
+            filesImported++
+            transfers += result.successCount
+            duplicates += result.duplicateCount
+        } catch (expected: Exception) {
+            logger.error(expected) { "Bulk CSV import failed for ${csvImport.originalFileName}: ${expected.message}" }
+            failed++
+        }
+    }
+
+    onProgress(imports.size, imports.size)
+    maintenance.refreshMaterializedViews()
+
+    return CsvBulkResult(
+        filesImported = filesImported,
+        transfersCreated = transfers,
+        duplicatesSkipped = duplicates,
+        filesSkippedNoStrategy = skippedNoStrategy,
+        filesFailed = failed,
+    )
+}
+
+/**
+ * Resolves the source account to use for a file under [strategy]:
+ * - a [HardCodedAccountMapping] resolves its own account (the override is ignored),
+ * - a per-row SOURCE_ACCOUNT mapping decides per row (null override),
+ * - no SOURCE_ACCOUNT mapping falls back to the shared [override].
+ */
+internal fun effectiveSourceFor(
+    strategy: CsvImportStrategy,
+    override: AccountId?,
+): AccountId? =
+    when (val mapping = strategy.fieldMappings[TransferField.SOURCE_ACCOUNT]) {
+        is HardCodedAccountMapping -> mapping.accountId
+        null -> override
+        else -> null
+    }
+
+/** True when [strategy] needs a user-chosen source account (no SOURCE_ACCOUNT mapping of its own). */
+internal fun CsvImportStrategy.needsSourceAccountOverride(): Boolean = fieldMappings[TransferField.SOURCE_ACCOUNT] == null
+
+internal fun buildCsvMapper(
+    strategy: CsvImportStrategy,
+    columns: List<CsvColumn>,
+    accounts: List<Account>,
+    currencies: List<Currency>,
+    accountMappings: List<CsvAccountMapping>,
+    sourceAccountOverride: AccountId?,
+): CsvTransferMapper =
+    CsvTransferMapper(
+        strategy = strategy,
+        columns = columns,
+        existingAccounts = accounts.associateBy { it.name },
+        existingCurrencies = currencies.associateBy { it.id },
+        existingCurrenciesByCode = currencies.associateBy { it.code.uppercase() },
+        accountMappings = accountMappings,
+        sourceAccountOverride = sourceAccountOverride,
+    )
+
+/**
+ * Saves [mappings] in a single batch, falling back to per-mapping saves if the atomic batch fails so
+ * one bad mapping doesn't block the rest. [kind] just labels log messages ("selected"/"auto-captured").
+ */
+private suspend fun persistMappingsWithFallback(
+    csvAccountMappingRepository: CsvAccountMappingRepository,
+    mappings: List<CsvAccountMapping>,
+    kind: String,
+) {
+    if (mappings.isEmpty()) return
+    try {
+        csvAccountMappingRepository.createMappings(mappings)
+        logger.info { "Saved ${mappings.size} $kind account mappings" }
+    } catch (expected: Exception) {
+        // Batch is atomic, nothing was committed — retry per mapping so one bad mapping doesn't block the rest
+        logger.warn(expected) { "Bulk $kind mapping save failed, falling back to per-mapping save" }
+        for (mapping in mappings) {
+            try {
+                csvAccountMappingRepository.createMapping(
+                    strategyId = mapping.strategyId,
+                    columnName = mapping.columnName,
+                    valuePattern = mapping.valuePattern,
+                    accountId = mapping.accountId,
+                )
+            } catch (expectedMappingError: Exception) {
+                logger.warn(expectedMappingError) { "Failed to save $kind mapping '${mapping.valuePattern.pattern}'" }
+            }
+        }
+    }
+}
+
+/**
+ * Creates the [accountsToCreate] (bulk, with per-account fallback) and returns the names actually
+ * created. Failures are skipped — transfers referencing a missing account fail later.
+ */
+private suspend fun createNewAccounts(
+    accountRepository: AccountRepository,
+    accountsToCreate: List<NewAccount>,
+): Set<String> {
+    if (accountsToCreate.isEmpty()) return emptySet()
+    val createdAccountNames = mutableSetOf<String>()
+    val newAccounts =
+        accountsToCreate.map { newAccount ->
+            Account(
+                id = AccountId(0),
+                name = newAccount.name,
+                openingDate = Clock.System.now(),
+                categoryId = newAccount.categoryId,
+            )
+        }
+    try {
+        // Bulk-create all accounts in a single database transaction
+        accountRepository.createAccountsBatch(newAccounts)
+        createdAccountNames.addAll(accountsToCreate.map { it.name })
+        logger.info { "Created ${accountsToCreate.size} new accounts" }
+    } catch (expected: Exception) {
+        // Batch is atomic, nothing was committed — fall back to per-account creation to skip only failing accounts
+        logger.warn(expected) { "Bulk account creation failed, falling back to per-account creation" }
+        for (account in newAccounts) {
+            try {
+                accountRepository.createAccount(account)
+                createdAccountNames.add(account.name)
+                logger.info { "Created new account: ${account.name}" }
+            } catch (expectedAccountError: Exception) {
+                logger.warn(expectedAccountError) { "Skipping account '${account.name}': ${expectedAccountError.message}" }
+            }
+        }
+    }
+    return createdAccountNames
+}
+
+/**
+ * Builds account mappings for the just-created accounts from the rows' discovered mappings: regex
+ * matches deduped by pattern, exact matches deduped by CSV value, so only one mapping is created per
+ * rule. Only mappings whose target was actually created are kept.
+ */
+private fun buildAutoCapturedMappings(
+    accountsByName: Map<String, Account>,
+    discoveredMappings: List<DiscoveredAccountMapping>,
+    createdAccountNames: Set<String>,
+    selectedNewAccountNames: Map<String, String>,
+    strategyId: CsvImportStrategyId,
+): List<CsvAccountMapping> {
+    // Regex matches (matchedPattern != null) deduped by pattern; exact matches deduped by csvValue
+    val regexMappings = discoveredMappings.filter { it.matchedPattern != null }.distinctBy { it.matchedPattern }
+    val exactMappings = discoveredMappings.filter { it.matchedPattern == null }.distinctBy { it.csvValue }
+    val mappingCreatedAt = Clock.System.now()
+    return (regexMappings + exactMappings).mapIndexedNotNull { index, discoveredMapping ->
+        val createdAccountName =
+            selectedNewAccountNames[discoveredMapping.targetAccountName]
+                ?.trim()
+                ?.takeIf { it.isNotBlank() }
+                ?: discoveredMapping.targetAccountName
+
+        // Look up the account by the final name created for this detected value
+        val createdAccount =
+            accountsByName[createdAccountName]
+                ?.takeIf { it.name in createdAccountNames }
+                ?: return@mapIndexedNotNull null
+
+        // Use the matched regex pattern if available, otherwise an exact-match pattern for the CSV value
+        val matchedPattern = discoveredMapping.matchedPattern
+        val pattern =
+            if (matchedPattern != null) {
+                Regex(matchedPattern, RegexOption.IGNORE_CASE)
+            } else {
+                Regex("^${Regex.escape(discoveredMapping.csvValue)}$", RegexOption.IGNORE_CASE)
+            }
+        CsvAccountMapping(
+            id = -(index + 1).toLong(),
+            strategyId = strategyId,
+            columnName = discoveredMapping.columnName,
+            valuePattern = pattern,
+            accountId = createdAccount.id,
+            createdAt = mappingCreatedAt,
+            updatedAt = mappingCreatedAt,
+        )
+    }
+}
+
+/**
+ * Applies [strategy] to [rows] of a single [csvImport] and writes back per-row statuses. Creates new
+ * accounts the user accepted, persists/auto-captures account mappings, runs the central import engine,
+ * and records the strategy application. Shared by the single-file dialog and the bulk path; the bulk
+ * path passes [refreshViews] = false and refreshes once at the end. Mirrors QifImportApplier.runImport.
+ */
+@Suppress("LongParameterList", "LongMethod", "CyclomaticComplexMethod")
+internal suspend fun runCsvImport(
+    csvImport: CsvImport,
+    rows: List<CsvRow>,
+    columns: List<CsvColumn>,
+    strategy: CsvImportStrategy,
+    basePrep: ImportPreparation,
+    selectedExistingAccounts: Map<String, AccountId>,
+    selectedNewAccountNames: Map<String, String>,
+    selectedSourceAccountId: AccountId?,
+    currencies: List<Currency>,
+    csvAccountMappingRepository: CsvAccountMappingRepository,
+    accountRepository: AccountRepository,
+    csvImportRepository: CsvImportRepository,
+    attributeTypeRepository: AttributeTypeRepository,
+    maintenance: Maintenance,
+    entitySource: EntitySource,
+    importEngine: ImportEngine,
+    refreshViews: Boolean = true,
+): CsvImportResult {
+    logger.info { "Starting CSV import with ${basePrep.validTransfers.size} valid transfers" }
+
+    val accountsToCreate =
+        buildAccountsToCreate(
+            preparation = basePrep,
+            existingAccountSelections = selectedExistingAccounts,
+            newAccountNames = selectedNewAccountNames,
+        )
+    val selectedMappingsToPersist =
+        buildPendingAccountMappings(
+            preparation = basePrep,
+            strategyId = strategy.id,
+            accountSelections = selectedExistingAccounts,
+        )
+    persistMappingsWithFallback(csvAccountMappingRepository, selectedMappingsToPersist, "selected")
+
+    // Create new accounts first (skip failures - transfers using them will fail later)
+    val createdAccountNames = createNewAccounts(accountRepository, accountsToCreate)
+
+    // Auto-capture mappings for newly created accounts
+    if (createdAccountNames.isNotEmpty()) {
+        val mappingsToCapture =
+            buildAutoCapturedMappings(
+                accountsByName = accountRepository.getAllAccounts().first().associateBy { it.name },
+                discoveredMappings = basePrep.validTransfers.flatMap { it.discoveredMappings },
+                createdAccountNames = createdAccountNames,
+                selectedNewAccountNames = selectedNewAccountNames,
+                strategyId = strategy.id,
+            )
+        persistMappingsWithFallback(csvAccountMappingRepository, mappingsToCapture, "auto-captured")
+    }
+
+    // Re-map with new account IDs
+    logger.info { "Re-mapping transfers with updated account IDs" }
+    val updatedAccounts = accountRepository.getAllAccounts().first()
+    val accountsByName = updatedAccounts.associateBy { it.name }
+    val currenciesById = currencies.associateBy { it.id }
+    val currenciesByCode = currencies.associateBy { it.code.uppercase() }
+
+    // Duplicate detection now happens inside the central import engine, which
+    // loads existing transfers itself — the mapper only maps rows to transfers.
+    val latestAccountMappings =
+        csvAccountMappingRepository.getMappingsForStrategy(strategy.id).first()
+
+    val mapper =
+        CsvTransferMapper(
+            strategy = strategy,
+            columns = columns,
+            existingAccounts = accountsByName,
+            existingCurrencies = currenciesById,
+            existingCurrenciesByCode = currenciesByCode,
+            accountMappings = latestAccountMappings,
+            sourceAccountOverride = selectedSourceAccountId,
+        )
+
+    // Handle case when all rows are already processed (rows is already filtered by the caller)
+    if (rows.isEmpty()) {
+        logger.info { "No rows to process - all rows already imported" }
+        return CsvImportResult(successCount = 0, failedRows = emptyList())
+    }
+
+    val finalPrep = mapper.prepareImport(rows)
+    val validCount = finalPrep.validTransfers.size
+    val errorCount = finalPrep.errorRows.size
+    logger.info { "Prepared $validCount valid transfers, $errorCount error rows" }
+
+    // Mark mapping errors as ERROR status in database and save error messages
+    for (errorRow in finalPrep.errorRows) {
+        csvImportRepository.updateRowStatus(
+            csvImport.id,
+            errorRow.rowIndex,
+            ImportStatus.ERROR.name,
+        )
+        csvImportRepository.saveError(
+            csvImport.id,
+            errorRow.rowIndex,
+            errorRow.errorMessage,
+        )
+    }
+
+    // Pre-resolve attribute types
+    val allAttributeTypeNames =
+        finalPrep.validTransfers
+            .flatMap { it.attributes }
+            .map { it.first }
+            .toSet()
+    val attributeTypeIdByName =
+        allAttributeTypeNames.associateWith { name ->
+            attributeTypeRepository.getOrCreate(name)
+        }
+
+    logger.info { "Starting to import $validCount transfers" }
+
+    // Convert attributes from (typeName, value) to NewAttribute
+    fun attributesFor(attributes: List<Pair<String, String>>): List<NewAttribute> =
+        attributes.mapNotNull { (typeName, value) ->
+            val typeId = attributeTypeIdByName[typeName]
+            if (typeId != null) NewAttribute(typeId, value) else null
+        }
+
+    // Build the unified import batch. Accounts were already resolved/created
+    // above, so transfers carry Existing refs and the central engine only
+    // dedupes, writes transfers, applies updates and records sources.
+    val uniqueIdTypeNames =
+        strategy.attributeMappings
+            .filter { it.isUniqueIdentifier }
+            .map { it.attributeTypeName }
+            .toSet()
+
+    val importTransfers =
+        finalPrep.validTransfers.map { row ->
+            val uniqueKey =
+                if (uniqueIdTypeNames.isEmpty()) {
+                    null
+                } else {
+                    row.attributes
+                        .filter { (name, _) -> name in uniqueIdTypeNames }
+                        .associate { (name, value) -> name to value }
+                }
+            ImportTransfer(
+                rowKey = ImportRowKey.CsvRow(row.rowIndex),
+                source = AccountRef.Existing(row.transfer.sourceAccountId),
+                target = AccountRef.Existing(row.transfer.targetAccountId),
+                timestamp = row.transfer.timestamp,
+                description = row.transfer.description,
+                amount = row.transfer.amount,
+                attributes = attributesFor(row.attributes),
+                uniqueKey = uniqueKey,
+            )
+        }
+
+    val batch =
+        ImportBatch(
+            transfers = importTransfers,
+            dedupePolicy =
+                if (uniqueIdTypeNames.isEmpty()) {
+                    DedupePolicy.FuzzyAllFields()
+                } else {
+                    DedupePolicy.UniqueIdentifier
+                },
+            provenance = CsvImportProvenance(entitySource, csvImport.id),
+            uniqueKeyExtractor =
+                if (uniqueIdTypeNames.isEmpty()) {
+                    null
+                } else {
+                    ExistingUniqueKeyExtractor { transfer ->
+                        transfer.attributes
+                            .filter { it.attributeType.name in uniqueIdTypeNames }
+                            .associate { it.attributeType.name to it.value }
+                    }
+                },
+        )
+
+    val importResult = importEngine.import(batch)
+
+    // Write back per-row CSV statuses from the engine outcome.
+    val importedStatuses = mutableMapOf<Long, TransferId?>()
+    val duplicateStatuses = mutableMapOf<Long, TransferId?>()
+    val updatedStatuses = mutableMapOf<Long, TransferId?>()
+    for ((rowKey, outcome) in importResult.rowOutcomes) {
+        val rowIndex = (rowKey as ImportRowKey.CsvRow).rowIndex
+        when (outcome.status) {
+            ImportStatus.IMPORTED -> importedStatuses[rowIndex] = outcome.transferId
+            ImportStatus.DUPLICATE -> duplicateStatuses[rowIndex] = outcome.transferId
+            ImportStatus.UPDATED -> updatedStatuses[rowIndex] = outcome.transferId
+            ImportStatus.ERROR -> Unit
+        }
+    }
+    if (importedStatuses.isNotEmpty()) {
+        csvImportRepository.updateRowStatusesBatch(
+            csvImport.id,
+            ImportStatus.IMPORTED.name,
+            importedStatuses,
+        )
+        csvImportRepository.clearErrors(csvImport.id, importedStatuses.keys.toList())
+    }
+    if (duplicateStatuses.isNotEmpty()) {
+        csvImportRepository.updateRowStatusesBatch(
+            csvImport.id,
+            ImportStatus.DUPLICATE.name,
+            duplicateStatuses,
+        )
+    }
+    if (updatedStatuses.isNotEmpty()) {
+        csvImportRepository.updateRowStatusesBatch(
+            csvImport.id,
+            ImportStatus.UPDATED.name,
+            updatedStatuses,
+        )
+        csvImportRepository.clearErrors(csvImport.id, updatedStatuses.keys.toList())
+    }
+    val successCount = importResult.transfersImported + importResult.updated
+    val duplicateCount = importResult.duplicates
+
+    logger.info {
+        "Transfer import complete: $successCount imported/updated, ${importResult.duplicates} duplicate(s)"
+    }
+
+    // Refresh materialized views so transfers are visible (skipped in bulk; refreshed once at the end)
+    if (refreshViews) {
+        logger.info { "Refreshing materialized views" }
+        maintenance.refreshMaterializedViews()
+    }
+
+    if ((successCount + duplicateCount) > 0) {
+        runCatching {
+            csvImportRepository.recordImportApplication(
+                id = csvImport.id,
+                strategyId = strategy.id,
+                strategyName = strategy.name,
+                appliedAt = Clock.System.now(),
+            )
+        }.onFailure { error ->
+            logger.warn {
+                "Import application history could not be recorded for import ${csvImport.id}: ${error.message}"
+            }
+        }
+    }
+
+    logger.info { "Import completed successfully" }
+
+    // The engine import is atomic: on success there are no per-row failures
+    // (any failure throws to the caller), so the import is complete.
+    return CsvImportResult(
+        successCount = successCount,
+        failedRows = emptyList(),
+        duplicateCount = duplicateCount,
+    )
+}

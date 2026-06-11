@@ -15,11 +15,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SecondaryTabRow
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -30,24 +32,47 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.moneymanager.compose.filepicker.rememberFilePicker
+import com.moneymanager.compose.filepicker.rememberMultipleFilePicker
 import com.moneymanager.csv.CsvParseOptions
 import com.moneymanager.csv.CsvParser
+import com.moneymanager.domain.EntitySource
+import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvImportId
+import com.moneymanager.domain.repository.AccountRepository
+import com.moneymanager.domain.repository.AttributeTypeRepository
+import com.moneymanager.domain.repository.CategoryRepository
+import com.moneymanager.domain.repository.CsvAccountMappingRepository
 import com.moneymanager.domain.repository.CsvImportRepository
+import com.moneymanager.domain.repository.CsvImportStrategyRepository
+import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
+import com.moneymanager.domain.repository.PersonRepository
+import com.moneymanager.importer.ImportEngine
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.ui.screens.csv.CsvImportAllDialog
 import com.moneymanager.ui.util.displayDateTime
 import com.moneymanager.ui.util.sha256Hex
 import kotlinx.coroutines.launch
 import kotlin.time.Clock
 
-// The QIF imports screen mirrors this one (QIF reuses the CSV import engine); overlap is intentional.
-@Suppress("DuplicatedCode")
+// Mirrors QifImportsScreen (QIF reuses the CSV import engine); overlap is intentional.
+@Suppress("LongParameterList", "DuplicatedCode")
 @Composable
 fun CsvImportsScreen(
     csvImportRepository: CsvImportRepository,
+    csvImportStrategyRepository: CsvImportStrategyRepository,
+    csvAccountMappingRepository: CsvAccountMappingRepository,
+    accountRepository: AccountRepository,
+    categoryRepository: CategoryRepository,
+    currencyRepository: CurrencyRepository,
+    personRepository: PersonRepository,
+    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
+    attributeTypeRepository: AttributeTypeRepository,
+    maintenance: Maintenance,
+    entitySource: EntitySource,
+    importEngine: ImportEngine,
     onImportClick: (CsvImportId) -> Unit,
     onStrategiesClick: () -> Unit = {},
 ) {
@@ -56,58 +81,60 @@ fun CsvImportsScreen(
         .getAllImports()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
     var isImporting by remember { mutableStateOf(false) }
-    var importError by remember { mutableStateOf<String?>(null) }
-    var duplicateImport by remember { mutableStateOf<CsvImport?>(null) }
+    var importMessage by remember { mutableStateOf<String?>(null) }
+    var importMessageIsError by remember { mutableStateOf(false) }
 
     val filePicker =
-        rememberFilePicker(
+        rememberMultipleFilePicker(
             mimeTypes = listOf("text/csv", "text/plain", "text/comma-separated-values"),
-        ) { result ->
-            if (result != null) {
+        ) { results ->
+            if (results.isNotEmpty()) {
                 isImporting = true
-                importError = null
+                importMessage = null
                 scope.launch {
-                    try {
-                        val checksum = sha256Hex(result.content)
-                        val existing = csvImportRepository.findImportsByChecksum(checksum)
-                        if (existing.isNotEmpty()) {
-                            duplicateImport = existing.first()
-                            isImporting = false
-                            return@launch
-                        }
-                        val parser = CsvParser()
-                        val delimiter = parser.detectDelimiter(result.content)
-                        val parseResult =
-                            parser.parse(
-                                result.content,
-                                CsvParseOptions(delimiter = delimiter),
+                    var imported = 0
+                    var skipped = 0
+                    val failures = mutableListOf<String>()
+                    for (result in results) {
+                        try {
+                            val checksum = sha256Hex(result.content)
+                            if (csvImportRepository.findImportsByChecksum(checksum).isNotEmpty()) {
+                                skipped++
+                                continue
+                            }
+                            val parser = CsvParser()
+                            val delimiter = parser.detectDelimiter(result.content)
+                            val parseResult =
+                                parser.parse(
+                                    result.content,
+                                    CsvParseOptions(delimiter = delimiter),
+                                )
+                            csvImportRepository.createImport(
+                                fileName = result.fileName,
+                                headers = parseResult.headers,
+                                rows = parseResult.rows,
+                                fileChecksum = checksum,
+                                fileLastModified = result.lastModified ?: Clock.System.now(),
                             )
-                        csvImportRepository.createImport(
-                            fileName = result.fileName,
-                            headers = parseResult.headers,
-                            rows = parseResult.rows,
-                            fileChecksum = checksum,
-                            fileLastModified = result.lastModified ?: Clock.System.now(),
-                        )
-                    } catch (expected: Exception) {
-                        importError = "Failed to import CSV: ${expected.message}"
-                    } finally {
-                        isImporting = false
+                            imported++
+                        } catch (expected: Exception) {
+                            failures.add("${result.fileName}: ${expected.message}")
+                        }
                     }
+                    isImporting = false
+                    importMessageIsError = failures.isNotEmpty()
+                    importMessage =
+                        buildString {
+                            append("Imported $imported file${if (imported == 1) "" else "s"}")
+                            if (skipped > 0) append(", skipped $skipped already imported")
+                            if (failures.isNotEmpty()) {
+                                append(", ${failures.size} failed: ")
+                                append(failures.joinToString("; "))
+                            }
+                        }
                 }
             }
         }
-
-    duplicateImport?.let { existing ->
-        DuplicateImportDialog(
-            existingImport = existing,
-            onDismiss = { duplicateImport = null },
-            onViewExisting = {
-                duplicateImport = null
-                onImportClick(existing.id)
-            },
-        )
-    }
 
     Column(
         modifier =
@@ -147,11 +174,11 @@ fun CsvImportsScreen(
             }
         }
 
-        importError?.let { error ->
+        importMessage?.let { message ->
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = error,
-                color = MaterialTheme.colorScheme.error,
+                text = message,
+                color = if (importMessageIsError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,
             )
         }
@@ -164,20 +191,86 @@ fun CsvImportsScreen(
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = "No CSV files imported yet. Click '+ Import CSV' to add one.",
+                    text = "No CSV files imported yet. Click '+ Import CSV' to add one or more.",
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         } else {
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                items(imports) { import ->
-                    CsvImportCard(
-                        import = import,
-                        onClick = { onImportClick(import.id) },
+            // Split files into those still needing a strategy applied vs. already imported, so a large
+            // set of files is easy to work through. The Unimported tab is the default/actionable one.
+            val unimported = remember(imports) { imports.filter { it.lastAppliedAt == null } }
+            val importedList = remember(imports) { imports.filter { it.lastAppliedAt != null } }
+            var selectedTab by remember { mutableStateOf(0) }
+
+            SecondaryTabRow(selectedTabIndex = selectedTab) {
+                Tab(
+                    selected = selectedTab == 0,
+                    onClick = { selectedTab = 0 },
+                    text = { Text("Unimported (${unimported.size})") },
+                )
+                Tab(
+                    selected = selectedTab == 1,
+                    onClick = { selectedTab = 1 },
+                    text = { Text("Imported (${importedList.size})") },
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            var showImportAll by remember { mutableStateOf(false) }
+            if (selectedTab == 0 && unimported.isNotEmpty()) {
+                Button(
+                    onClick = { showImportAll = true },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Import all (${unimported.size})")
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
+            if (showImportAll) {
+                CsvImportAllDialog(
+                    unimported = unimported,
+                    csvImportStrategyRepository = csvImportStrategyRepository,
+                    csvAccountMappingRepository = csvAccountMappingRepository,
+                    accountRepository = accountRepository,
+                    categoryRepository = categoryRepository,
+                    currencyRepository = currencyRepository,
+                    personRepository = personRepository,
+                    personAccountOwnershipRepository = personAccountOwnershipRepository,
+                    csvImportRepository = csvImportRepository,
+                    attributeTypeRepository = attributeTypeRepository,
+                    maintenance = maintenance,
+                    entitySource = entitySource,
+                    importEngine = importEngine,
+                    onDismiss = { showImportAll = false },
+                    onComplete = { showImportAll = false },
+                )
+            }
+
+            val shown = if (selectedTab == 0) unimported else importedList
+            if (shown.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = if (selectedTab == 0) "All files have been imported." else "No files imported yet.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+            } else {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(shown, key = { it.id.toString() }) { import ->
+                        CsvImportCard(
+                            import = import,
+                            onClick = { onImportClick(import.id) },
+                        )
+                    }
                 }
             }
         }
@@ -322,32 +415,4 @@ private fun ImportStateBadge(isImported: Boolean) {
             color = contentColor,
         )
     }
-}
-
-@Composable
-private fun DuplicateImportDialog(
-    existingImport: CsvImport,
-    onDismiss: () -> Unit,
-    onViewExisting: () -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("File Already Imported") },
-        text = {
-            Text(
-                "This file has already been imported as \"${existingImport.originalFileName}\" " +
-                    "on ${existingImport.importTimestamp.displayDateTime()}.",
-            )
-        },
-        confirmButton = {
-            TextButton(onClick = onViewExisting) {
-                Text("View Existing")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Dismiss")
-            }
-        },
-    )
 }
