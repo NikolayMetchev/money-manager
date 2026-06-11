@@ -176,6 +176,8 @@ fun CsvImportAllDialog(
     )
 }
 
+// Mirrors QifBulkResult.toSummary() by design.
+@Suppress("DuplicatedCode")
 private fun CsvBulkResult.toSummary(): String =
     buildString {
         append("Imported $filesImported file${if (filesImported == 1) "" else "s"}")

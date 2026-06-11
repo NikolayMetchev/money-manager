@@ -361,7 +361,6 @@ fun ApplyStrategyDialog(
                 onClick = {
                     val strategy = selectedStrategy ?: return@LoadingTextButton
                     val basePrep = baseImportPreparation ?: return@LoadingTextButton
-                    val prep = importPreparation ?: return@LoadingTextButton
 
                     isImporting = true
                     errorMessage = null
