@@ -33,6 +33,13 @@ class PersonAccountOwnershipRepositoryImpl(
             .mapToList(Dispatchers.Default)
             .map(PersonAccountOwnershipMapper::mapList)
 
+    override fun getAllOwnerships(): Flow<List<PersonAccountOwnership>> =
+        queries
+            .ownershipSelectAll()
+            .asFlow()
+            .mapToList(Dispatchers.Default)
+            .map(PersonAccountOwnershipMapper::mapList)
+
     override fun getOwnershipById(id: Long): Flow<PersonAccountOwnership?> =
         queries
             .ownershipSelectById(id)

@@ -10,6 +10,8 @@ interface PersonAccountOwnershipRepository {
 
     fun getOwnershipsByAccount(accountId: AccountId): Flow<List<PersonAccountOwnership>>
 
+    fun getAllOwnerships(): Flow<List<PersonAccountOwnership>>
+
     fun getOwnershipById(id: Long): Flow<PersonAccountOwnership?>
 
     suspend fun createOwnership(

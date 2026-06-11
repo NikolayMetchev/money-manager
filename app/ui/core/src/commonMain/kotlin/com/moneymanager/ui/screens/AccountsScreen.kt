@@ -23,6 +23,7 @@ import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Category
+import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
@@ -66,8 +67,32 @@ fun AccountsScreen(
     val categories by categoryRepository
         .getAllCategories()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val people by personRepository
+        .getAllPeople()
+        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    val ownerships by personAccountOwnershipRepository
+        .getAllOwnerships()
+        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
     var showCreateDialog by remember { mutableStateOf(false) }
     var accountToEdit by remember { mutableStateOf<Account?>(null) }
+    var selectedOwnerIds by remember { mutableStateOf<Set<Long>>(emptySet()) }
+
+    // Drop selections for owners that no longer exist (e.g. a person was deleted).
+    val availableOwnerIds = people.map { it.id.id }.toSet()
+    LaunchedEffect(availableOwnerIds) {
+        selectedOwnerIds = selectedOwnerIds intersect availableOwnerIds
+    }
+
+    val ownerIdsByAccount: Map<AccountId, Set<Long>> =
+        ownerships.groupBy({ it.accountId }, { it.personId.id }).mapValues { it.value.toSet() }
+    val displayedAccounts =
+        if (selectedOwnerIds.isEmpty()) {
+            accounts
+        } else {
+            accounts.filter { account ->
+                ownerIdsByAccount[account.id].orEmpty().any { it in selectedOwnerIds }
+            }
+        }
 
     Column(
         modifier =
@@ -102,12 +127,35 @@ fun AccountsScreen(
                 )
             }
         } else {
+            if (people.isNotEmpty()) {
+                OwnerFilterDropdown(
+                    people = people,
+                    selectedOwnerIds = selectedOwnerIds,
+                    onSelectionChange = { selectedOwnerIds = it },
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
+            if (displayedAccounts.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "No accounts match the selected owner(s).",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                return@Column
+            }
+
             val lazyListState = rememberLazyListState()
 
             // Scroll to the specified account when navigating back
-            LaunchedEffect(scrollToAccountId, accounts) {
-                if (scrollToAccountId != null && accounts.isNotEmpty()) {
-                    val index = accounts.indexOfFirst { it.id == scrollToAccountId }
+            LaunchedEffect(scrollToAccountId, displayedAccounts) {
+                if (scrollToAccountId != null && displayedAccounts.isNotEmpty()) {
+                    val index = displayedAccounts.indexOfFirst { it.id == scrollToAccountId }
                     if (index >= 0) {
                         lazyListState.animateScrollToItem(index)
                     }
@@ -119,7 +167,7 @@ fun AccountsScreen(
                     state = lazyListState,
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    items(accounts, key = { it.id.id }) { account ->
+                    items(displayedAccounts, key = { it.id.id }) { account ->
                         val accountBalances = balances.filter { it.accountId == account.id }
                         val category = categories.find { it.id == account.categoryId }
                         AccountCard(
@@ -168,6 +216,84 @@ fun AccountsScreen(
             entitySource = entitySource,
             onDismiss = { accountToEdit = null },
         )
+    }
+}
+
+@Composable
+private fun OwnerFilterDropdown(
+    people: List<Person>,
+    selectedOwnerIds: Set<Long>,
+    onSelectionChange: (Set<Long>) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+
+    val selectionLabel =
+        when (selectedOwnerIds.size) {
+            0 -> "All owners"
+            1 -> people.find { it.id.id in selectedOwnerIds }?.fullName ?: "1 owner"
+            else -> "${selectedOwnerIds.size} owners"
+        }
+
+    val filteredPeople =
+        remember(people, searchQuery) {
+            if (searchQuery.isBlank()) {
+                people
+            } else {
+                people.filter { it.fullName.contains(searchQuery, ignoreCase = true) }
+            }
+        }
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = !expanded },
+    ) {
+        OutlinedTextField(
+            // Editable while expanded so the user can type to filter (like the account/currency pickers);
+            // shows the current selection summary when collapsed.
+            value = if (expanded) searchQuery else selectionLabel,
+            onValueChange = { searchQuery = it },
+            label = { Text("Filter by owner") },
+            placeholder = { Text("Type to search...") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable),
+            singleLine = true,
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = {
+                expanded = false
+                searchQuery = ""
+            },
+        ) {
+            DropdownMenuItem(
+                text = { Text("All owners") },
+                onClick = { onSelectionChange(emptySet()) },
+            )
+            filteredPeople.forEach { person ->
+                DropdownMenuItem(
+                    text = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(
+                                checked = selectedOwnerIds.contains(person.id.id),
+                                onCheckedChange = null,
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(person.fullName)
+                        }
+                    },
+                    onClick = {
+                        onSelectionChange(
+                            if (selectedOwnerIds.contains(person.id.id)) {
+                                selectedOwnerIds - person.id.id
+                            } else {
+                                selectedOwnerIds + person.id.id
+                            },
+                        )
+                    },
+                )
+            }
+        }
     }
 }
 
