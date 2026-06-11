@@ -143,23 +143,26 @@ fun CsvImportAllDialog(
                         if (needsSourceAccount && sourceAccountId == null) return@LoadingTextButton
                         isImporting = true
                         scope.launch {
-                            val result =
-                                bulkApplyCsv(
-                                    imports = unimported,
-                                    sourceAccountOverride = sourceAccountId,
-                                    strategies = strategies,
-                                    currencies = currencies,
-                                    csvAccountMappingRepository = csvAccountMappingRepository,
-                                    accountRepository = accountRepository,
-                                    csvImportRepository = csvImportRepository,
-                                    attributeTypeRepository = attributeTypeRepository,
-                                    maintenance = maintenance,
-                                    entitySource = entitySource,
-                                    importEngine = importEngine,
-                                    onProgress = { done, total -> progress = done to total },
-                                )
-                            summary = result.toSummary()
-                            isImporting = false
+                            try {
+                                val result =
+                                    bulkApplyCsv(
+                                        imports = unimported,
+                                        sourceAccountOverride = sourceAccountId,
+                                        strategies = strategies,
+                                        currencies = currencies,
+                                        csvAccountMappingRepository = csvAccountMappingRepository,
+                                        accountRepository = accountRepository,
+                                        csvImportRepository = csvImportRepository,
+                                        attributeTypeRepository = attributeTypeRepository,
+                                        maintenance = maintenance,
+                                        entitySource = entitySource,
+                                        importEngine = importEngine,
+                                        onProgress = { done, total -> progress = done to total },
+                                    )
+                                summary = result.toSummary()
+                            } finally {
+                                isImporting = false
+                            }
                         }
                     },
                     enabled = !isImporting && (!needsSourceAccount || sourceAccountId != null),

@@ -137,25 +137,28 @@ fun QifImportAllDialog(
                         val currency = selectedCurrencyId ?: return@LoadingTextButton
                         isImporting = true
                         scope.launch {
-                            val result =
-                                bulkApplyQif(
-                                    imports = unimported,
-                                    sourceAccountId = source,
-                                    currencyId = currency,
-                                    strategies = strategies,
-                                    currencies = currencies,
-                                    csvAccountMappingRepository = csvAccountMappingRepository,
-                                    accountRepository = accountRepository,
-                                    qifImportRepository = qifImportRepository,
-                                    attributeTypeRepository = attributeTypeRepository,
-                                    maintenance = maintenance,
-                                    entitySource = entitySource,
-                                    importEngine = importEngine,
-                                    onProgress = { done, total -> progress = done to total },
-                                )
-                            settingsRepository.setLastQifAccountId(source)
-                            summary = result.toSummary()
-                            isImporting = false
+                            try {
+                                val result =
+                                    bulkApplyQif(
+                                        imports = unimported,
+                                        sourceAccountId = source,
+                                        currencyId = currency,
+                                        strategies = strategies,
+                                        currencies = currencies,
+                                        csvAccountMappingRepository = csvAccountMappingRepository,
+                                        accountRepository = accountRepository,
+                                        qifImportRepository = qifImportRepository,
+                                        attributeTypeRepository = attributeTypeRepository,
+                                        maintenance = maintenance,
+                                        entitySource = entitySource,
+                                        importEngine = importEngine,
+                                        onProgress = { done, total -> progress = done to total },
+                                    )
+                                settingsRepository.setLastQifAccountId(source)
+                                summary = result.toSummary()
+                            } finally {
+                                isImporting = false
+                            }
                         }
                     },
                     enabled = !isImporting && sourceAccountId != null && selectedCurrencyId != null,
