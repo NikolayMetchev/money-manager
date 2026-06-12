@@ -7,6 +7,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.NewAttribute
+import com.moneymanager.domain.model.NewRelationship
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.Transfer
@@ -415,9 +416,10 @@ class ImportEngine(
     ): List<TransferId> {
         if (toImport.isEmpty() && toUpdate.isEmpty()) return emptyList()
 
-        // Assign negative temp ids so newAttributes can be keyed before real ids exist.
+        // Assign negative temp ids so newAttributes/newRelationships can be keyed before real ids exist.
         val transfersToCreate = mutableListOf<Transfer>()
         val newAttributes = mutableMapOf<TransferId, List<NewAttribute>>()
+        val newRelationships = mutableMapOf<TransferId, List<NewRelationship>>()
         val orderedRowKeys = mutableListOf<ImportRowKey>()
         toImport.forEachIndexed { index, classified ->
             val tempId = TransferId(-(index + 1).toLong())
@@ -432,6 +434,7 @@ class ImportEngine(
                     amount = t.amount,
                 )
             if (t.attributes.isNotEmpty()) newAttributes[tempId] = t.attributes
+            if (t.relationships.isNotEmpty()) newRelationships[tempId] = t.relationships
             orderedRowKeys += t.rowKey
         }
 
@@ -460,6 +463,7 @@ class ImportEngine(
             transactionRepository.importTransfers(
                 transfers = transfersToCreate,
                 newAttributes = newAttributes,
+                newRelationships = newRelationships,
                 sourceRecorder = batch.provenance.transferRecorder(orderedRowKeys),
                 updates = updates,
                 updateSourceRecorder = batch.provenance.updatedTransferRecorder(orderedUpdateRowKeys),

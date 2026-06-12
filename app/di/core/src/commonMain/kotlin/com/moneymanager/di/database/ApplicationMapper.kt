@@ -38,6 +38,8 @@ fun DatabaseComponent.toApplication() =
                 transactionRepository = transactionRepository,
                 transferSourceRepository = transferSourceRepository,
                 attributeTypeRepository = attributeTypeRepository,
+                relationshipTypeRepository = relationshipTypeRepository,
+                transferRelationshipRepository = transferRelationshipRepository,
                 entitySource = DbEntitySource(entitySourceQueries, transferSourceQueries, deviceId),
                 sampleEntitySource = DbSampleEntitySource(entitySourceQueries, transferSourceQueries, deviceId),
             ),

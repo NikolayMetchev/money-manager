@@ -26,6 +26,7 @@ object AccountRowMapper {
         sourceAccountId: Long,
         targetAccountId: Long,
         isExcluded: Long,
+        isReconciled: Long,
     ): AccountRow =
         AccountRow(
             transactionId = TransferId(id),
@@ -55,5 +56,6 @@ object AccountRowMapper {
             sourceAccountId = AccountId(sourceAccountId),
             targetAccountId = AccountId(targetAccountId),
             isExcluded = isExcluded != 0L,
+            isReconciled = isReconciled != 0L,
         )
 }

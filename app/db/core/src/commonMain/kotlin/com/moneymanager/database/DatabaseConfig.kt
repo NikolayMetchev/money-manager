@@ -71,6 +71,12 @@ object DatabaseConfig {
     /** Stable ID for the "account number" account attribute type used for personal counterparties. */
     const val ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID: Long = -6
 
+    /** Stable ID for the "reconciled" relationship type: id1 mirrors id2 seen from another source. */
+    const val RECONCILED_RELATIONSHIP_TYPE_ID: Long = 1
+
+    /** Stable ID for the "fee" relationship type: id1 is the main transaction, id2 its fee transfer. */
+    const val FEE_RELATIONSHIP_TYPE_ID: Long = 2
+
     /**
      * SQL statements to execute when opening a database connection.
      * Applied to all database connections (JVM, Android, etc.)
@@ -823,6 +829,11 @@ object DatabaseConfig {
             attributeTypeQueries.insertWithId(id = BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID, name = "built-in type")
             attributeTypeQueries.insertWithId(id = ACCOUNT_SORT_CODE_ATTR_TYPE_ID, name = "account-sort-code")
             attributeTypeQueries.insertWithId(id = ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID, name = "account-account-number")
+
+            // Seed well-known relationship types with stable IDs so importers can reference them
+            // without a DB lookup.
+            relationshipTypeQueries.insertWithId(id = RECONCILED_RELATIONSHIP_TYPE_ID, name = "reconciled")
+            relationshipTypeQueries.insertWithId(id = FEE_RELATIONSHIP_TYPE_ID, name = "fee")
 
             // Seed the built-in Monzo, Wise and Starling API import strategies (after triggers and
             // system device are created so the INSERT trigger records the initial audit entry/source)

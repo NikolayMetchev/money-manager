@@ -14,4 +14,5 @@ data class AccountRow(
     val sourceAccountId: AccountId,
     val targetAccountId: AccountId,
     val isExcluded: Boolean = false,
+    val isReconciled: Boolean = false,
 )

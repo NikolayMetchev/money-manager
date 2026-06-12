@@ -19,9 +19,11 @@ import com.moneymanager.database.repository.PersonAccountOwnershipRepositoryImpl
 import com.moneymanager.database.repository.PersonAttributeRepositoryImpl
 import com.moneymanager.database.repository.PersonRepositoryImpl
 import com.moneymanager.database.repository.QifImportRepositoryImpl
+import com.moneymanager.database.repository.RelationshipTypeRepositoryImpl
 import com.moneymanager.database.repository.SettingsRepositoryImpl
 import com.moneymanager.database.repository.TransactionRepositoryImpl
 import com.moneymanager.database.repository.TransferAttributeRepositoryImpl
+import com.moneymanager.database.repository.TransferRelationshipRepositoryImpl
 import com.moneymanager.database.repository.TransferSourceRepositoryImpl
 import com.moneymanager.database.service.CsvStrategyExportService
 import com.moneymanager.database.sql.EntitySourceQueries
@@ -44,9 +46,11 @@ import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonAttributeRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.QifImportRepository
+import com.moneymanager.domain.repository.RelationshipTypeRepository
 import com.moneymanager.domain.repository.SettingsRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.domain.repository.TransferAttributeRepository
+import com.moneymanager.domain.repository.TransferRelationshipRepository
 import com.moneymanager.domain.repository.TransferSourceRepository
 import com.moneymanager.importer.ImportEngine
 import dev.zacsweers.metro.ContributesTo
@@ -166,6 +170,16 @@ interface RepositoryModule {
     @SingleIn(DatabaseScope::class)
     fun provideTransferAttributeRepository(database: MoneyManagerDatabaseWrapper): TransferAttributeRepository =
         TransferAttributeRepositoryImpl(database)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideRelationshipTypeRepository(database: MoneyManagerDatabaseWrapper): RelationshipTypeRepository =
+        RelationshipTypeRepositoryImpl(database)
+
+    @Provides
+    @SingleIn(DatabaseScope::class)
+    fun provideTransferRelationshipRepository(database: MoneyManagerDatabaseWrapper): TransferRelationshipRepository =
+        TransferRelationshipRepositoryImpl(database)
 
     @Provides
     @SingleIn(DatabaseScope::class)

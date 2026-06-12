@@ -1,0 +1,19 @@
+CREATE TABLE relationship_type (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE
+);
+
+selectAll:
+SELECT * FROM relationship_type ORDER BY name;
+
+selectById:
+SELECT * FROM relationship_type WHERE id = ?;
+
+selectByName:
+SELECT * FROM relationship_type WHERE name = ?;
+
+insert:
+INSERT INTO relationship_type (name) VALUES (?);
+
+insertWithId:
+INSERT INTO relationship_type (id, name) VALUES (?, ?);

@@ -8,6 +8,7 @@ import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
+import com.moneymanager.domain.model.NewRelationship
 import com.moneymanager.domain.model.Transfer
 import kotlin.jvm.JvmInline
 import kotlin.time.Instant
@@ -127,6 +128,7 @@ data class ImportOwnershipIntent(
  *
  * @property rowKey Opaque per-row provenance + status-writeback key.
  * @property attributes Transfer attributes with type ids already resolved by the builder.
+ * @property relationships Relationships to existing transfers, created once this transfer's id exists.
  * @property uniqueKey Unique-identifier dedupe key (attribute name -> value), or null for fuzzy dedupe.
  */
 data class ImportTransfer(
@@ -137,6 +139,7 @@ data class ImportTransfer(
     val description: String,
     val amount: Money,
     val attributes: List<NewAttribute> = emptyList(),
+    val relationships: List<NewRelationship> = emptyList(),
     val uniqueKey: Map<String, String>? = null,
     // API transaction id, for DedupePolicy.ApiMultiKey.
     val apiId: String? = null,

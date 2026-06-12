@@ -113,6 +113,8 @@ class MoneyManagerDatabaseWrapper(
             "device",
             "attribute_type",
             "transfer_attribute",
+            "relationship_type",
+            "transfer_relationship",
             "account_attribute",
             "person_attribute",
             "_import_batch",

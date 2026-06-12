@@ -686,6 +686,15 @@ fun AccountTransactionsScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
+                        text = "Rec.",
+                        style = headerStyle,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        softWrap = false,
+                        modifier = Modifier.width(40.dp),
+                    )
+                    Text(
                         text = "Date",
                         style = headerStyle,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,

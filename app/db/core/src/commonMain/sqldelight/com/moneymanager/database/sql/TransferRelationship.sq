@@ -1,0 +1,39 @@
+-- A typed relationship between two transfers. The composite primary key allows a pair of transfers
+-- to carry more than one relationship (a different relationship_type_id per row).
+--   id1 = the primary/owning transfer (the reconciled duplicate; later: the main transaction)
+--   id2 = the related transfer       (the original it mirrors; later: the fee transfer)
+-- FKs reference transaction_id(id) (the permanent id table), matching transfer.id's own FK.
+CREATE TABLE transfer_relationship (
+    id1 INTEGER NOT NULL,
+    id2 INTEGER NOT NULL,
+    relationship_type_id INTEGER NOT NULL,
+    PRIMARY KEY (id1, id2, relationship_type_id),
+    FOREIGN KEY (id1) REFERENCES transaction_id(id) ON DELETE CASCADE,
+    FOREIGN KEY (id2) REFERENCES transaction_id(id) ON DELETE CASCADE,
+    FOREIGN KEY (relationship_type_id) REFERENCES relationship_type(id) ON DELETE RESTRICT
+);
+
+CREATE INDEX idx_transfer_relationship_id1 ON transfer_relationship(id1);
+CREATE INDEX idx_transfer_relationship_id2 ON transfer_relationship(id2);
+CREATE INDEX idx_transfer_relationship_type ON transfer_relationship(relationship_type_id);
+
+-- All relationships touching a transfer, from either side of the pair.
+selectByTransfer:
+SELECT
+    transfer_relationship.id1,
+    transfer_relationship.id2,
+    transfer_relationship.relationship_type_id,
+    relationship_type.id AS relationship_type_id,
+    relationship_type.name AS relationship_type_name
+FROM transfer_relationship
+JOIN relationship_type ON transfer_relationship.relationship_type_id = relationship_type.id
+WHERE transfer_relationship.id1 = ? OR transfer_relationship.id2 = ?
+ORDER BY relationship_type.name;
+
+insert:
+INSERT INTO transfer_relationship (id1, id2, relationship_type_id)
+VALUES (?, ?, ?);
+
+delete:
+DELETE FROM transfer_relationship
+WHERE id1 = ? AND id2 = ? AND relationship_type_id = ?;
