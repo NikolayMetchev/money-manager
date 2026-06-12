@@ -2,9 +2,14 @@
 name: Deploy static content to Pages
 
 on:
-  # Runs on pushes targeting the default branch
+  # Runs on pushes targeting the default branch, but only when the published
+  # content or the database schema (which drives the generated schema docs) changes
   push:
     branches: ["main"]
+    paths:
+      - 'webpage/**'
+      - 'app/db/core/src/commonMain/sqldelight/**'
+      - '.github/workflows/static.yml'
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -44,8 +49,8 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v5
         with:
-          # Publish only the documentation, not the whole repository
-          path: 'docs'
+          # Publish only the webpage content, not the whole repository
+          path: 'webpage'
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
