@@ -39,3 +39,6 @@ app/main/android/src/main/assets/VERSION
 .qodana
 # Monzo API session transcript fixtures
 app/db/core/src/commonTest/resources/monzo/sample-apis/
+
+# Generated SchemaSpy database docs (regenerated and published by CI)
+docs/database/

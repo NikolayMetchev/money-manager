@@ -101,3 +101,16 @@ tasks.register<JavaExec>("generateSchemaSpyDocs") {
         println("Open: ${outputDir.absolutePath}${File.separator}index.html")
     }
 }
+
+val publishedDocsDir = layout.projectDirectory.dir("../../../docs/database")
+
+tasks.register<Sync>("publishSchemaSpyDocs") {
+    group = "documentation"
+    description = "Copy generated SchemaSpy HTML into the published docs site (docs/database)"
+
+    dependsOn("generateSchemaSpyDocs")
+
+    // Sync mirrors the source, removing stale files (e.g. dropped tables/views)
+    from(layout.buildDirectory.dir("schemaspy"))
+    into(publishedDocsDir)
+}
