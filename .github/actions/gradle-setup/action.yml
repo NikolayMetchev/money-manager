@@ -22,7 +22,7 @@ runs:
       uses: actions/setup-java@v5
       with:
         # JVM version sync: keep this aligned with gradle/libs.versions.toml,
-        # .github/workflows/lint-format.yml, and AGENTS.md.
+        # .github/workflows/build.yml, and AGENTS.md.
         java-version: '25'
         distribution: 'corretto'  # Corretto includes jmod files required by ProGuard (Temurin removed them in JDK 24+ per JEP 493)
 
@@ -30,6 +30,6 @@ runs:
       uses: gradle/actions/setup-gradle@v6
       with:
         # Gradle version sync: keep this aligned with gradle/wrapper/gradle-wrapper.properties
-        # and .github/workflows/lint-format.yml.
+        # and .github/workflows/build.yml.
         gradle-version: 9.5.0
         cache-read-only: ${{ inputs.cache-read-only }}
