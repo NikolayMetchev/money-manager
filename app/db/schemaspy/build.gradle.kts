@@ -102,11 +102,11 @@ tasks.register<JavaExec>("generateSchemaSpyDocs") {
     }
 }
 
-val publishedDocsDir = layout.projectDirectory.dir("../../../docs/database")
+val publishedDocsDir = layout.projectDirectory.dir("../../../webpage/database")
 
 tasks.register<Sync>("publishSchemaSpyDocs") {
     group = "documentation"
-    description = "Copy generated SchemaSpy HTML into the published docs site (docs/database)"
+    description = "Copy generated SchemaSpy HTML into the published docs site (webpage/database)"
 
     dependsOn("generateSchemaSpyDocs")
 

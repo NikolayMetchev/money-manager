@@ -41,4 +41,4 @@ app/main/android/src/main/assets/VERSION
 app/db/core/src/commonTest/resources/monzo/sample-apis/
 
 # Generated SchemaSpy database docs (regenerated and published by CI)
-docs/database/
+webpage/database/
