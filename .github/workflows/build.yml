@@ -10,7 +10,7 @@ name: CI
 on:
   workflow_dispatch:
   push:
-    branches: [ main, 'releases/*' ]
+    branches: [ main ]
   pull_request:
     branches: [ main ]
 
@@ -48,6 +48,7 @@ jobs:
               - '!docs/**'
               - '!webpage/**'
               - '!**/*.md'
+              - '!.github/workflows/static.yml'
 
   build:
     name: Build and Test
