@@ -5,6 +5,7 @@ package com.moneymanager.importer
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.NewAttribute
+import com.moneymanager.domain.model.NewRelationship
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.ImportStatus
@@ -132,14 +133,15 @@ class ImportDeduper(
     /**
      * Classifies [transfer] as a cross-source reconciliation of an existing transfer when the policy
      * enables it and a same source+target+amount transfer from a different source exists within the
-     * reconcile window. The returned transfer carries an extra exclusion attribute
-     * (value "reconciled:<existingId>") so it is kept and linked but excluded from balance totals;
-     * null when reconciliation is disabled or no match is found.
+     * reconcile window. The returned transfer carries a plain exclusion attribute (value "reconciled")
+     * so it is kept but excluded from balance totals, plus a `reconciled` relationship linking it
+     * (id1) to the existing transfer (id2). Null when reconciliation is disabled or no match is found.
      */
     private fun classifyAsReconciled(transfer: ImportTransfer): Classified? {
         val apiPolicy = policy as? DedupePolicy.ApiMultiKey ?: return null
         val window = apiPolicy.reconcileWindow ?: return null
         val exclusionTypeId = apiPolicy.reconciledExclusionAttributeTypeId ?: return null
+        val relationshipTypeId = apiPolicy.reconciledRelationshipTypeId ?: return null
         val matchId =
             reconcileCandidates.firstOrNull { (_, existing) -> reconcileMatches(transfer, existing, window) }?.first
                 ?: return null
@@ -147,9 +149,14 @@ class ImportDeduper(
             if (transfer.attributes.any { it.typeId == exclusionTypeId }) {
                 transfer.attributes
             } else {
-                transfer.attributes + NewAttribute(exclusionTypeId, "reconciled:${matchId.id}")
+                transfer.attributes + NewAttribute(exclusionTypeId, "reconciled")
             }
-        return Classified(transfer.copy(attributes = attributes), ImportStatus.IMPORTED, existing = null)
+        val relationships = transfer.relationships + NewRelationship(relatedTransferId = matchId, typeId = relationshipTypeId)
+        return Classified(
+            transfer.copy(attributes = attributes, relationships = relationships),
+            ImportStatus.IMPORTED,
+            existing = null,
+        )
     }
 
     private fun reconcileMatches(

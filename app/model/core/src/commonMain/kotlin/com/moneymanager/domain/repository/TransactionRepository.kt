@@ -6,6 +6,7 @@ import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
 import com.moneymanager.domain.model.NewAttribute
+import com.moneymanager.domain.model.NewRelationship
 import com.moneymanager.domain.model.PageWithTargetIndex
 import com.moneymanager.domain.model.PagingInfo
 import com.moneymanager.domain.model.PagingResult
@@ -139,6 +140,8 @@ interface TransactionRepository {
      * import engine.
      *
      * @param transfers New transfers to create (with placeholder ids); attributes keyed by placeholder id.
+     * @param newRelationships Relationships to create per new transfer, keyed by placeholder id; the new
+     *   transfer becomes id1 and [NewRelationship.relatedTransferId] (an existing transfer) becomes id2.
      * @param sourceRecorder Records the source of each created transfer (called once per transfer in order).
      * @param updates Existing transfers to update, each with attributes to add.
      * @param updateSourceRecorder Records the source of each updated transfer (once per update in order).
@@ -147,10 +150,16 @@ interface TransactionRepository {
     suspend fun importTransfers(
         transfers: List<Transfer>,
         newAttributes: Map<TransferId, List<NewAttribute>>,
+        newRelationships: Map<TransferId, List<NewRelationship>> = emptyMap(),
         sourceRecorder: SourceRecorder,
         updates: List<TransferUpdate>,
         updateSourceRecorder: SourceRecorder,
     ): List<TransferId> {
+        // The default path delegates to createTransfers, which has no way to persist relationships.
+        // Fail loudly rather than silently dropping them; the real DB impl overrides this method.
+        require(newRelationships.isEmpty()) {
+            "Default importTransfers does not persist newRelationships; override importTransfers in this implementation."
+        }
         // Default (non-atomic) implementation for fakes/alternative impls; the real impl overrides this
         // to run everything in one transaction.
         val created =

@@ -21,8 +21,10 @@ import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonAttributeRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.QifImportRepository
+import com.moneymanager.domain.repository.RelationshipTypeRepository
 import com.moneymanager.domain.repository.SettingsRepository
 import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.domain.repository.TransferRelationshipRepository
 import com.moneymanager.domain.repository.TransferSourceRepository
 
 data class Application(
@@ -58,6 +60,8 @@ data class Transactions(
     val transactionRepository: TransactionRepository,
     val transferSourceRepository: TransferSourceRepository,
     val attributeTypeRepository: AttributeTypeRepository,
+    val relationshipTypeRepository: RelationshipTypeRepository,
+    val transferRelationshipRepository: TransferRelationshipRepository,
     val entitySource: EntitySource,
     val sampleEntitySource: EntitySource,
 )

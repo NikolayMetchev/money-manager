@@ -2202,6 +2202,7 @@ private suspend fun importTransactionPages(
                 DedupePolicy.ApiMultiKey(
                     reconcileWindow = RECONCILE_WINDOW,
                     reconciledExclusionAttributeTypeId = AttributeTypeId(DatabaseConfig.EXCLUDED_ATTR_TYPE_ID),
+                    reconciledRelationshipTypeId = RelationshipTypeId(DatabaseConfig.RECONCILED_RELATIONSHIP_TYPE_ID),
                 ),
             provenance = ApiImportProvenance(setup.entitySource, setup.sessionId),
             apiIdExtractor =

@@ -23,9 +23,11 @@ import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonAttributeRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.QifImportRepository
+import com.moneymanager.domain.repository.RelationshipTypeRepository
 import com.moneymanager.domain.repository.SettingsRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.domain.repository.TransferAttributeRepository
+import com.moneymanager.domain.repository.TransferRelationshipRepository
 import com.moneymanager.domain.repository.TransferSourceRepository
 import dev.zacsweers.metro.DependencyGraph
 import dev.zacsweers.metro.Provides
@@ -54,9 +56,11 @@ interface DatabaseComponent {
     val personAttributeRepository: PersonAttributeRepository
     val personRepository: PersonRepository
     val qifImportRepository: QifImportRepository
+    val relationshipTypeRepository: RelationshipTypeRepository
     val settingsRepository: SettingsRepository
     val transactionRepository: TransactionRepository
     val transferAttributeRepository: TransferAttributeRepository
+    val transferRelationshipRepository: TransferRelationshipRepository
     val transferSourceRepository: TransferSourceRepository
     val transferSourceQueries: TransferSourceQueries
     val entitySourceQueries: EntitySourceQueries

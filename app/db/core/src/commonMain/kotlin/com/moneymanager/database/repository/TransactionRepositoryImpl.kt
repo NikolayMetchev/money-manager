@@ -16,6 +16,7 @@ import com.moneymanager.domain.model.AccountRow
 import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.NewAttribute
+import com.moneymanager.domain.model.NewRelationship
 import com.moneymanager.domain.model.PageWithTargetIndex
 import com.moneymanager.domain.model.PagingInfo
 import com.moneymanager.domain.model.PagingResult
@@ -39,6 +40,7 @@ class TransactionRepositoryImpl(
     private val transferQueries = database.transferQueries
     private val transactionIdQueries = database.transactionIdQueries
     private val transferAttributeQueries = database.transferAttributeQueries
+    private val transferRelationshipQueries = database.transferRelationshipQueries
 
     private fun loadAttributesForTransfers(transfers: List<Transfer>): List<Transfer> {
         if (transfers.isEmpty()) return transfers
@@ -321,7 +323,7 @@ class TransactionRepositoryImpl(
                     // This allows initial attributes to be recorded at revision 1.
                     database.beginCreationMode()
                     try {
-                        createdIds += insertNewTransfers(batch, newAttributes, sourceRecorder)
+                        createdIds += insertNewTransfers(batch, newAttributes, newRelationships = emptyMap(), sourceRecorder)
                     } finally {
                         // Always restore normal trigger behavior
                         database.endCreationMode()
@@ -413,6 +415,7 @@ class TransactionRepositoryImpl(
     override suspend fun importTransfers(
         transfers: List<Transfer>,
         newAttributes: Map<TransferId, List<NewAttribute>>,
+        newRelationships: Map<TransferId, List<NewRelationship>>,
         sourceRecorder: SourceRecorder,
         updates: List<TransferUpdate>,
         updateSourceRecorder: SourceRecorder,
@@ -425,7 +428,7 @@ class TransactionRepositoryImpl(
                 if (transfers.isNotEmpty()) {
                     database.beginCreationMode()
                     try {
-                        createdIds += insertNewTransfers(transfers, newAttributes, sourceRecorder)
+                        createdIds += insertNewTransfers(transfers, newAttributes, newRelationships, sourceRecorder)
                     } finally {
                         database.endCreationMode()
                     }
@@ -474,6 +477,7 @@ class TransactionRepositoryImpl(
     private fun insertNewTransfers(
         transfers: List<Transfer>,
         newAttributes: Map<TransferId, List<NewAttribute>>,
+        newRelationships: Map<TransferId, List<NewRelationship>>,
         sourceRecorder: SourceRecorder,
     ): List<TransferId> {
         val createdIds = mutableListOf<TransferId>()
@@ -496,6 +500,14 @@ class TransactionRepositoryImpl(
                     transaction_id = generatedId,
                     attribute_type_id = attr.typeId.id,
                     attribute_value = attr.value,
+                )
+            }
+            // The just-created transfer is id1; the related (existing) transfer is id2.
+            newRelationships[transfer.id].orEmpty().forEach { rel ->
+                transferRelationshipQueries.insert(
+                    id1 = generatedId,
+                    id2 = rel.relatedTransferId.id,
+                    relationship_type_id = rel.typeId.id,
                 )
             }
             sourceRecorder.insert(transfer.copy(id = TransferId(generatedId)))

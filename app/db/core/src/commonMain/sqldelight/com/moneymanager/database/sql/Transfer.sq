@@ -335,7 +335,12 @@ SELECT
     currency.scale_factor AS currency_scale_factor,
     transfer.source_account_id,
     transfer.target_account_id,
-    running_balance_materialized_view.is_excluded
+    running_balance_materialized_view.is_excluded,
+    CASE WHEN EXISTS (
+        SELECT 1 FROM transfer_relationship tr
+        WHERE (tr.id1 = running_balance_materialized_view.id OR tr.id2 = running_balance_materialized_view.id)
+          AND tr.relationship_type_id = 1   -- RECONCILED_RELATIONSHIP_TYPE_ID; mirrors the hardcoded -1 used for is_excluded
+    ) THEN 1 ELSE 0 END AS is_reconciled
 FROM running_balance_materialized_view
 JOIN currency ON running_balance_materialized_view.currency_id = currency.id
 JOIN transfer ON running_balance_materialized_view.id = transfer.id
@@ -363,7 +368,12 @@ SELECT
     currency.scale_factor AS currency_scale_factor,
     transfer.source_account_id,
     transfer.target_account_id,
-    running_balance_materialized_view.is_excluded
+    running_balance_materialized_view.is_excluded,
+    CASE WHEN EXISTS (
+        SELECT 1 FROM transfer_relationship tr
+        WHERE (tr.id1 = running_balance_materialized_view.id OR tr.id2 = running_balance_materialized_view.id)
+          AND tr.relationship_type_id = 1   -- RECONCILED_RELATIONSHIP_TYPE_ID; mirrors the hardcoded -1 used for is_excluded
+    ) THEN 1 ELSE 0 END AS is_reconciled
 FROM running_balance_materialized_view
 JOIN currency ON running_balance_materialized_view.currency_id = currency.id
 JOIN transfer ON running_balance_materialized_view.id = transfer.id
@@ -398,7 +408,12 @@ SELECT
     currency.scale_factor AS currency_scale_factor,
     transfer.source_account_id,
     transfer.target_account_id,
-    running_balance_materialized_view.is_excluded
+    running_balance_materialized_view.is_excluded,
+    CASE WHEN EXISTS (
+        SELECT 1 FROM transfer_relationship tr
+        WHERE (tr.id1 = running_balance_materialized_view.id OR tr.id2 = running_balance_materialized_view.id)
+          AND tr.relationship_type_id = 1   -- RECONCILED_RELATIONSHIP_TYPE_ID; mirrors the hardcoded -1 used for is_excluded
+    ) THEN 1 ELSE 0 END AS is_reconciled
 FROM running_balance_materialized_view
 JOIN currency ON running_balance_materialized_view.currency_id = currency.id
 JOIN transfer ON running_balance_materialized_view.id = transfer.id

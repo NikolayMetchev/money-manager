@@ -8,6 +8,8 @@ import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
+import com.moneymanager.domain.model.NewRelationship
+import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.ImportStatus
@@ -208,6 +210,7 @@ class ImportDeduperTest {
         DedupePolicy.ApiMultiKey(
             reconcileWindow = 5.minutes,
             reconciledExclusionAttributeTypeId = AttributeTypeId(-1),
+            reconciledRelationshipTypeId = RelationshipTypeId(1),
         )
 
     @Test
@@ -221,9 +224,15 @@ class ImportDeduperTest {
                 .classify(listOf(importTransfer(0, description = "from other bank", apiId = "monzo-1", timestamp = baseTime + 1.minutes)))
                 .single()
         assertEquals(ImportStatus.IMPORTED, result.status)
+        // The duplicate keeps a plain exclusion attribute (no embedded id) so balances still exclude it...
         assertEquals(
-            NewAttribute(AttributeTypeId(-1), "reconciled:9"),
+            NewAttribute(AttributeTypeId(-1), "reconciled"),
             result.transfer.attributes.single { it.typeId == AttributeTypeId(-1) },
+        )
+        // ...and the link to the existing transfer lives in a reconciled relationship instead.
+        assertEquals(
+            NewRelationship(relatedTransferId = TransferId(9), typeId = RelationshipTypeId(1)),
+            result.transfer.relationships.single(),
         )
     }
 
