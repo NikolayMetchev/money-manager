@@ -59,12 +59,19 @@ import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.*
 import kotlin.math.absoluteValue
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
 private val ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID = AttributeTypeId(DatabaseConfig.ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID)
 private val BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID = AttributeTypeId(DatabaseConfig.BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID)
 private val ACCOUNT_SORT_CODE_ATTR_TYPE_ID = AttributeTypeId(DatabaseConfig.ACCOUNT_SORT_CODE_ATTR_TYPE_ID)
 private val ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID = AttributeTypeId(DatabaseConfig.ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID)
+
+// How far apart two providers may timestamp the same real movement and still be reconciled as one
+// (a Faster Payment is near-instant; this absorbs send-vs-settle timing differences between banks).
+// Reconciliation is additionally restricted to cross-source matches, so this window does not collapse
+// genuine repeat transfers from the same provider.
+private val RECONCILE_WINDOW = 5.minutes
 
 data class ApiSessionImportResult(
     val accountCount: Int,
@@ -1197,7 +1204,9 @@ private suspend fun precreateCounterparties(
                                 counterpartyId = counterpartyId,
                                 downloadedName = downloadedName,
                                 apiSource = AccountApiSource(sessionId, request.id, item.counterpartyJsonPath(strategy.peopleMappings)),
-                                dedupeKey = item.rawJson.personalCounterpartyIdentity(strategy.peopleMappings)?.dedupeKey,
+                                dedupeKey =
+                                    item.rawJson.personalCounterpartyIdentity(strategy.peopleMappings)?.dedupeKey
+                                        ?: bankDedupeKeyFromCounterpartyId(counterpartyId),
                             )
                         }
                     }
@@ -1467,7 +1476,7 @@ private suspend fun importPeopleFromCounterparties(
                     counterpartyId = counterpartyId,
                     builtInType = null,
                     name = nameMappings.counterpartyPrefix + counterpartyName,
-                    dedupeKey = identity?.dedupeKey,
+                    dedupeKey = identity?.dedupeKey ?: bankDedupeKeyFromCounterpartyId(counterpartyId),
                     apiSource = AccountApiSource(sessionId, request.id, item.counterpartyJsonPath(strategy.peopleMappings)),
                     personalIdentity = identity,
                 )
@@ -2189,7 +2198,11 @@ private suspend fun importTransactionPages(
     val batch =
         ImportBatch(
             transfers = importTransfers,
-            dedupePolicy = DedupePolicy.ApiMultiKey,
+            dedupePolicy =
+                DedupePolicy.ApiMultiKey(
+                    reconcileWindow = RECONCILE_WINDOW,
+                    reconciledExclusionAttributeTypeId = AttributeTypeId(DatabaseConfig.EXCLUDED_ATTR_TYPE_ID),
+                ),
             provenance = ApiImportProvenance(setup.entitySource, setup.sessionId),
             apiIdExtractor =
                 ExistingApiIdExtractor { transfer ->
@@ -2337,7 +2350,7 @@ private suspend fun prepareValidTransactionItem(
             val personalCounterpartyIdentity = item.rawJson?.personalCounterpartyIdentity(setup.strategy.peopleMappings)
             setup.accountCache.getOrCreateCounterpartyAccountId(
                 counterpartyId = counterpartyId,
-                dedupeKey = personalCounterpartyIdentity?.dedupeKey,
+                dedupeKey = personalCounterpartyIdentity?.dedupeKey ?: bankDedupeKeyFromCounterpartyId(counterpartyId),
                 builtInType = builtInCounterpartyType,
                 name =
                     setup.nameMappings.counterpartyPrefix +
@@ -3225,6 +3238,19 @@ private fun JsonObject.bankIdentity(peopleMappings: ApiPeopleMappings): String? 
     val accountNumber =
         counterparty.stringOrNull(peopleMappings.counterpartyAccountNumberField)?.takeIf { it.isNotBlank() } ?: return null
     return "bank:$sortCode:$accountNumber"
+}
+
+/**
+ * Derives the bank dedupe key ("sortCode|accountNumber") from a counterparty id of the form
+ * "bank:<sortCode>:<accountNumber>" (produced by [bankIdentity] / [resolveCounterpartyIdentity]), or
+ * null for any other id. This lets a counterparty resolved purely by bank identity merge with an
+ * account carrying the same sort code + account number even when it is not flagged a personal
+ * beneficiary — so every representation of one real bank account collapses to a single account.
+ */
+private fun bankDedupeKeyFromCounterpartyId(counterpartyId: String?): String? {
+    if (counterpartyId == null || !counterpartyId.startsWith("bank:")) return null
+    val (sortCode, accountNumber) = counterpartyId.removePrefix("bank:").split(":").takeIf { it.size == 2 } ?: return null
+    return if (sortCode.isNotBlank() && accountNumber.isNotBlank()) "$sortCode|$accountNumber" else null
 }
 
 private fun JsonObject.resolveJsonObjectPath(dotPath: String): JsonObject? {

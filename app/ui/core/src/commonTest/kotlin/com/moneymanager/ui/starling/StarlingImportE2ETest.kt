@@ -375,12 +375,14 @@ class StarlingImportE2ETest : DbTest() {
                 transfers.map { t -> t.attributes.single { it.attributeType.name == "starling-transaction-id" }.value }
             assertEquals(setOf("f1", "f2"), txIds.toSet(), "Each transfer should record its feedItemUid")
 
-            suspend fun attr(account: Account, typeName: String) =
-                repositories.accountAttributeRepository
-                    .getByAccount(account.id)
-                    .first()
-                    .firstOrNull { it.attributeType.name == typeName }
-                    ?.value
+            suspend fun attr(
+                account: Account,
+                typeName: String,
+            ) = repositories.accountAttributeRepository
+                .getByAccount(account.id)
+                .first()
+                .firstOrNull { it.attributeType.name == typeName }
+                ?.value
 
             // The MERCHANT has no bank details, so its account is keyed by counterPartyUid.
             assertEquals("cp-coffee", attr(coffee, "account-external-id"))
@@ -717,7 +719,11 @@ class StarlingImportE2ETest : DbTest() {
 
             // The own account carries the sort code + account number returned by the identifiers endpoint,
             // so cross-provider counterparties for this same account can later match and merge into it.
-            val ownAccount = repositories.accountRepository.getAllAccounts().first().single { it.name == "Starling: Personal" }
+            val ownAccount =
+                repositories.accountRepository
+                    .getAllAccounts()
+                    .first()
+                    .single { it.name == "Starling: Personal" }
             val attrs = repositories.accountAttributeRepository.getByAccount(ownAccount.id).first()
             assertEquals("099999", attrs.single { it.attributeType.name == "account-sort-code" }.value)
             assertEquals("55556666", attrs.single { it.attributeType.name == "account-account-number" }.value)

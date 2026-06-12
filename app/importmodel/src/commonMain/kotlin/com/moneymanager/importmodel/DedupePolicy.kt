@@ -1,5 +1,6 @@
 package com.moneymanager.importmodel
 
+import com.moneymanager.domain.model.AttributeTypeId
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 
@@ -40,8 +41,19 @@ sealed interface DedupePolicy {
      * it is IMPORTED. Also dedupes within the same batch. Never produces UPDATED — API imports skip
      * matches rather than updating them. Requires [ImportBatch.apiIdExtractor]/[ImportBatch.uniqueKeyExtractor]
      * to derive the same keys from existing transfers.
+     *
+     * Cross-source reconciliation: when [reconcileWindow] and [reconciledExclusionAttributeTypeId] are
+     * set, an incoming transfer that does NOT match by id/key/exact-fields but does match an existing
+     * transfer from a *different* source (same source+target+amount, timestamp within [reconcileWindow])
+     * is still IMPORTED — but tagged with the exclusion attribute (value "reconciled:<otherId>") so it is
+     * kept and linked yet excluded from balance totals, leaving the movement counted once. Restricted to
+     * existing transfers this provider cannot itself identify (apiId == null) so genuine repeat transfers
+     * from the same provider are never collapsed.
      */
-    data object ApiMultiKey : DedupePolicy
+    data class ApiMultiKey(
+        val reconcileWindow: Duration? = null,
+        val reconciledExclusionAttributeTypeId: AttributeTypeId? = null,
+    ) : DedupePolicy
 
     /** No deduplication — every transfer is imported. */
     data object None : DedupePolicy
