@@ -302,7 +302,9 @@ class ImportQifE2ETest {
             }
 
             // Both files have moved to the Imported tab — including the all-duplicate second file —
-            // and the Unimported tab is now empty.
+            // and the Unimported tab is now empty. Wait for the tab count to reflect both imports:
+            // the count is driven by an async repository flow, so waitForIdle alone may race it.
+            waitUntilExactlyOneExists(hasText("Imported (2)"), timeoutMillis = 15000)
             onNodeWithText("Imported (2)").performClick()
             waitForIdle()
             waitUntilExactlyOneExists(hasText("second.qif"), timeoutMillis = 15000)
@@ -363,7 +365,8 @@ class ImportQifE2ETest {
             onNodeWithText("Done").performClick()
             waitForIdle()
 
-            // Both files are now imported in one click.
+            // Both files are now imported in one click. Wait for the async count flow to catch up.
+            waitUntilExactlyOneExists(hasText("Imported (2)"), timeoutMillis = 15000)
             onNodeWithText("Imported (2)").performClick()
             waitForIdle()
             waitUntilExactlyOneExists(hasText("second.qif"), timeoutMillis = 15000)

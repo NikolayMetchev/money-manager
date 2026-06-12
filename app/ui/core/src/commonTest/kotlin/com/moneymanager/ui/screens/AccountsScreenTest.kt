@@ -502,6 +502,7 @@ class AccountsScreenTest {
         mock(MockMode.autoUnit) {
             every { getOwnershipsByPerson(any()) } returns flowOf(emptyList())
             every { getOwnershipsByAccount(any()) } returns flowOf(emptyList())
+            every { getAllOwnerships() } returns flowOf(emptyList())
             every { getOwnershipById(any()) } returns flowOf(null)
             everySuspend { createOwnership(any(), any()) } returns 0L
         }

@@ -60,6 +60,9 @@ SELECT * FROM person_account_ownership WHERE person_id = ?;
 ownershipSelectByAccount:
 SELECT * FROM person_account_ownership WHERE account_id = ?;
 
+ownershipSelectAll:
+SELECT * FROM person_account_ownership;
+
 ownershipSelectById:
 SELECT * FROM person_account_ownership WHERE id = ?;
 
