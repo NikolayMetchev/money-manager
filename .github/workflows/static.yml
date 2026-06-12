@@ -33,6 +33,14 @@ jobs:
         uses: actions/checkout@v6
       - name: Setup Pages
         uses: actions/configure-pages@v6
+      - name: Install Graphviz
+        # SchemaSpy needs the `dot` binary to render schema relationship diagrams
+        run: sudo apt-get update && sudo apt-get install -y graphviz
+      - name: Generate database schema docs
+        uses: ./.github/actions/gradle-run
+        with:
+          command: ':app:db:schemaspy:publishSchemaSpyDocs --stacktrace'
+          cache-read-only: true
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v5
         with:
