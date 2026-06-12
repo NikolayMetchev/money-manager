@@ -32,14 +32,16 @@ fun DependencySubstitutions.substitute(coordinate: String, versionRef: String) {
 }
 
 // Align divergent transitive deps to a single version across every module's compile/runtime/lint
-// classpaths. Modules that pull these only transitively (e.g. utils/compose/scrollbar via compose-ui)
-// otherwise resolve older versions than the assembled app; this pins them to the catalog version.
-// Scoped to app classpaths so Gradle tooling classpaths (kotlin compiler, detekt, kover, ktlint) are
-// untouched. Add one substitute(...) line per dependency to align.
+// classpaths and KMP source-set metadata. Modules that pull these only transitively (e.g.
+// utils/compose/scrollbar via compose-ui) otherwise resolve older versions than the assembled app;
+// this pins them to the catalog version. Scoped to app classpaths/metadata so Gradle and test tooling
+// classpaths (kotlin compiler, detekt, kover, ktlint, unified-test-platform, compose hot reload,
+// schemaspy) are untouched. Add one substitute(...) line per dependency to align.
 configurations.matching {
     it.name.endsWith("CompileClasspath") ||
         it.name.endsWith("RuntimeClasspath") ||
-        it.name.endsWith("LintChecksClasspath")
+        it.name.endsWith("LintChecksClasspath") ||
+        it.name.endsWith("DependenciesMetadata")
 }.all {
     resolutionStrategy {
         dependencySubstitution {
@@ -77,6 +79,8 @@ configurations.matching {
             substitute("org.jetbrains.kotlinx:kotlinx-coroutines-android", "kotlinx-coroutines")
             substitute("org.jetbrains.kotlinx:kotlinx-coroutines-bom", "kotlinx-coroutines")
             substitute("org.jetbrains.kotlinx:kotlinx-serialization-core-jvm", "kotlinx-serialization")
+            substitute("org.jetbrains.kotlinx:kotlinx-serialization-json", "kotlinx-serialization")
+            substitute("org.jetbrains.kotlinx:kotlinx-serialization-json-jvm", "kotlinx-serialization")
             substitute("org.jetbrains.kotlinx:kotlinx-serialization-bom", "kotlinx-serialization")
         }
     }
