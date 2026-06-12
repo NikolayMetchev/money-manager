@@ -122,6 +122,30 @@ class TransferRelationshipReconciliationTest : DbTest() {
         }
 
     @Test
+    fun deletingTransfer_cascadeDeletesItsRelationships() =
+        runTest {
+            val currency = gbp()
+            val sourceId = createAccount("Checking")
+            val targetId = createAccount("Coffee Shop")
+
+            val (originalId, duplicateId) = importReconciledPair(currency, sourceId, targetId)
+            assertEquals(
+                1,
+                repositories.transferRelationshipRepository
+                    .getByTransfer(originalId)
+                    .first()
+                    .size,
+            )
+
+            // Deleting one side of the pair must remove the relationship (FK transfer(id) ON DELETE CASCADE),
+            // leaving no stale reconciliation link on the surviving transfer.
+            repositories.transactionRepository.deleteTransaction(duplicateId.id)
+
+            assertEquals(emptyList(), repositories.transferRelationshipRepository.getByTransfer(originalId).first())
+            assertEquals(emptyList(), repositories.transferRelationshipRepository.getByTransfer(duplicateId).first())
+        }
+
+    @Test
     fun runningBalanceRows_flagBothSidesOfReconciledPairAsReconciled() =
         runTest {
             val currency = gbp()

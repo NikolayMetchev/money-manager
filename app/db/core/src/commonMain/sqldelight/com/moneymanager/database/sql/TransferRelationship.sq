@@ -2,14 +2,15 @@
 -- to carry more than one relationship (a different relationship_type_id per row).
 --   id1 = the primary/owning transfer (the reconciled duplicate; later: the main transaction)
 --   id2 = the related transfer       (the original it mirrors; later: the fee transfer)
--- FKs reference transaction_id(id) (the permanent id table), matching transfer.id's own FK.
+-- FKs reference transfer(id) ON DELETE CASCADE so deleting either transfer removes the link
+-- (transaction_id rows are never deleted, so referencing them would leave stale links behind).
 CREATE TABLE transfer_relationship (
     id1 INTEGER NOT NULL,
     id2 INTEGER NOT NULL,
     relationship_type_id INTEGER NOT NULL,
     PRIMARY KEY (id1, id2, relationship_type_id),
-    FOREIGN KEY (id1) REFERENCES transaction_id(id) ON DELETE CASCADE,
-    FOREIGN KEY (id2) REFERENCES transaction_id(id) ON DELETE CASCADE,
+    FOREIGN KEY (id1) REFERENCES transfer(id) ON DELETE CASCADE,
+    FOREIGN KEY (id2) REFERENCES transfer(id) ON DELETE CASCADE,
     FOREIGN KEY (relationship_type_id) REFERENCES relationship_type(id) ON DELETE RESTRICT
 );
 

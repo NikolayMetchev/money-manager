@@ -155,6 +155,11 @@ interface TransactionRepository {
         updates: List<TransferUpdate>,
         updateSourceRecorder: SourceRecorder,
     ): List<TransferId> {
+        // The default path delegates to createTransfers, which has no way to persist relationships.
+        // Fail loudly rather than silently dropping them; the real DB impl overrides this method.
+        require(newRelationships.isEmpty()) {
+            "Default importTransfers does not persist newRelationships; override importTransfers in this implementation."
+        }
         // Default (non-atomic) implementation for fakes/alternative impls; the real impl overrides this
         // to run everything in one transaction.
         val created =
