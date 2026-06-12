@@ -660,6 +660,17 @@ class StarlingImportE2ETest : DbTest() {
                 allAccounts.filter { hasBankDetails(it) }.map { it.id },
                 "Exactly one account should carry 099999/55556666",
             )
+
+            // The adopted account gains the accounts-endpoint origin, so the audit trail can jump to its
+            // "$.accounts[0]" source rather than only the counterparty row it was first created from.
+            val originPaths =
+                repositories.auditRepository
+                    .getAuditHistoryForAccount(ownAccount.id)
+                    .mapNotNull { it.source?.apiSource?.jsonPath }
+            assertTrue(
+                originPaths.contains(JsonPath("$.accounts[0]")),
+                "Adopted source account should record the accounts-endpoint origin: $originPaths",
+            )
         }
 
     @Test

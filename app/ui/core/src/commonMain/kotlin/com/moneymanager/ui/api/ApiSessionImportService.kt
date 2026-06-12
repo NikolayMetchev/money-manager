@@ -2874,7 +2874,9 @@ private class AccountCache(
      * Re-purposes an existing account (typically a counterparty another provider created for this same
      * bank account) as a source/own account: renames it and repoints its external-id attribute so future
      * imports of this provider resolve it by id. Its sort code + account number attributes are kept, so
-     * the other provider keeps matching it by bank details.
+     * the other provider keeps matching it by bank details. Also records this provider's accounts-endpoint
+     * origin for the adopted account so the audit trail can jump to its "$.accounts[...]" source instead of
+     * only the counterparty/feed-item row it was first created from.
      */
     private suspend fun adoptAccountAsSource(
         existingId: AccountId,
@@ -2890,6 +2892,26 @@ private class AccountCache(
         accountAttributeRepository.upsertAccountAttribute(attributes, existingId, ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID, externalId)
         sourceAccountExternalIdIndex[externalId] = existingId
         counterpartyIdIndex[externalId] = existingId
+        accountApiSourceByExternalId[externalId]?.let { source ->
+            // Attach the source to the account's current revision (after the rename/attribute writes) so
+            // the audit entry for the adoption resolves to the accounts response.
+            val revisionId =
+                accountRepository
+                    .getAllAccounts()
+                    .first()
+                    .firstOrNull { it.id == existingId }
+                    ?.revisionId ?: 1L
+            entitySource.recordFromApi(
+                ApiEntitySourceRecord(
+                    entityType = EntityType.ACCOUNT,
+                    entityId = existingId.id,
+                    revisionId = revisionId,
+                    sessionId = source.sessionId,
+                    requestId = source.requestId,
+                    jsonPath = source.jsonPath,
+                ),
+            )
+        }
         return existingId
     }
 
