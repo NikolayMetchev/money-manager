@@ -96,6 +96,11 @@ data class ApiTransactionsDownloadResult(
     val transactionResponseCount: Int,
 )
 
+data class ApiAccountIdentifiersDownloadResult(
+    val accountCount: Int,
+    val skipped: Boolean = false,
+)
+
 data class ApiPeopleDownloadResult(
     val personCount: Int,
     val skipped: Boolean = false,
@@ -337,6 +342,66 @@ suspend fun downloadApiSessionTransactions(
         accountCount = accountEntries.size,
         transactionResponseCount = transactionResponseCount,
     )
+}
+
+/**
+ * Downloads the per-account identifiers endpoint (the account's own sort code + account number) into
+ * [sessionId], one request per account. Only applies to strategies that configure
+ * [com.moneymanager.domain.model.apistrategy.ApiImportStrategy.accountIdentifiersEndpoint] (e.g.
+ * Starling, whose `/accounts` response omits bank details); a no-op otherwise. Incremental: an account
+ * whose identifiers URL is already stored is skipped.
+ *
+ * Call [downloadApiSessionAccounts] first so that an accounts response exists.
+ */
+suspend fun downloadApiSessionAccountIdentifiers(
+    token: String,
+    apiClient: ApiClient,
+    apiSessionRepository: ApiSessionRepository,
+    sessionId: ApiSessionId,
+    strategy: ApiImportStrategy,
+    accountsSessionId: ApiSessionId? = null,
+    sca: ScaParams? = null,
+): ApiAccountIdentifiersDownloadResult {
+    val endpoint = strategy.accountIdentifiersEndpoint ?: return ApiAccountIdentifiersDownloadResult(0, skipped = true)
+
+    val existingRequests = apiSessionRepository.getRequestsBySession(sessionId)
+    val existingResponsesByRequestId = apiSessionRepository.getResponsesBySession(sessionId).associateBy { it.requestId }
+    val existingRequestsByUrl = existingRequests.associateBy { it.url }
+
+    val resolvedAccountsSessionId = accountsSessionId ?: sessionId
+    val accountsRequests =
+        if (accountsSessionId != null && accountsSessionId != sessionId) {
+            apiSessionRepository.getRequestsBySession(resolvedAccountsSessionId)
+        } else {
+            existingRequests
+        }
+    val accountsResponses =
+        if (accountsSessionId != null && accountsSessionId != sessionId) {
+            apiSessionRepository.getResponsesBySession(resolvedAccountsSessionId)
+        } else {
+            apiSessionRepository.getResponsesBySession(sessionId)
+        }
+    val accountsRequestsById = accountsRequests.associateBy { it.id }
+
+    val accountEntries =
+        accountsResponses.flatMap { response ->
+            val request = accountsRequestsById[response.requestId] ?: return@flatMap emptyList()
+            if (!request.isAccountsRequest(strategy)) return@flatMap emptyList()
+            val ancestorVars = request.ancestorVars(strategy)
+            parseAccounts(response.json, strategy).map { it to ancestorVars }
+        }
+
+    var fetched = 0
+    for ((account, ancestorVars) in accountEntries) {
+        val ctx = ImportUrlContext(account = account, ancestorVars = ancestorVars)
+        val url = buildEndpointRequestUrl(strategy.baseUrl, endpoint, ctx)
+        val alreadyStored = existingRequestsByUrl[url]?.let { existingResponsesByRequestId[it.id] } != null
+        if (!alreadyStored) {
+            fetchResponse(url = url, token = token, apiClient = apiClient, sca = sca)
+            fetched += 1
+        }
+    }
+    return ApiAccountIdentifiersDownloadResult(accountCount = accountEntries.size, skipped = fetched == 0)
 }
 
 /**
@@ -619,8 +684,36 @@ suspend fun importApiSessionTransactions(
  */
 private suspend fun ensureSourceAccounts(setup: ImportSetup) {
     for (account in setup.accountsById.values) {
-        setup.accountCache.getOrCreateAccountId(account.id, account.displayName(setup.strategy))
+        val (sortCode, accountNumber) = account.bankDetails()
+        val accountId =
+            setup.accountCache.getOrCreateAccountId(
+                externalId = account.id,
+                name = account.displayName(setup.strategy),
+                dedupeKey = if (sortCode != null && accountNumber != null) "$sortCode|$accountNumber" else null,
+            )
+        // Persist the source account's own bank details (e.g. from Starling's identifiers endpoint) so
+        // counterparties another provider creates for this same real account can match and merge into it.
+        if (sortCode != null && accountNumber != null) {
+            setup.accountAttributeRepository.ensureCounterpartyPersonalAttributesInCreationMode(
+                accountId = accountId,
+                sortCode = sortCode,
+                accountNumber = accountNumber,
+            )
+        }
     }
+}
+
+/**
+ * The own account's bank details (sort code, account number), taken from the account itself (filled
+ * directly from the accounts response or from the account-identifiers endpoint) or, failing that, from
+ * its owners. Either element is null when absent.
+ */
+private fun ApiImportAccount.bankDetails(): Pair<String?, String?> {
+    val sortCode =
+        sortCode?.takeIf { it.isNotBlank() } ?: owners.firstOrNull { !it.sortCode.isNullOrBlank() }?.sortCode
+    val accountNumber =
+        accountNumber?.takeIf { it.isNotBlank() } ?: owners.firstOrNull { !it.accountNumber.isNullOrBlank() }?.accountNumber
+    return sortCode to accountNumber
 }
 
 /** Mutable progress counters shared between the setup, parallel import, and progress callback. */
@@ -740,10 +833,16 @@ private suspend fun setupImportSession(
                 }
             }.toMap()
 
-    val accountsById =
+    val parsedAccountsById =
         accountOnlyResponses
             .flatMap { response -> parseAccounts(response.json, strategy) }
             .associateBy { it.id }
+    // Fold in per-account bank details fetched from the account-identifiers endpoint (e.g. Starling),
+    // whose responses live alongside the transaction/account traffic of either session.
+    val identifierResponsePairs =
+        responses.mapNotNull { response -> requestsById[response.requestId]?.let { it to response } } +
+            accountsResponses.mapNotNull { response -> accountsRequestsById[response.requestId]?.let { it to response } }
+    val accountsById = enrichAccountsWithIdentifiers(parsedAccountsById, strategy, identifierResponsePairs)
     val transactionResponses = responses.filter { requestsById[it.requestId]?.resolveAccountExternalId(strategy) != null }
 
     val currencyCache = CurrencyCache(currencyRepository)
@@ -904,7 +1003,6 @@ private suspend fun importPeopleFromSession(setup: ImportSetup): Int {
         personRepository = setup.personRepository,
         personAccountOwnershipRepository = setup.personAccountOwnershipRepository,
         personAttributeRepository = setup.personAttributeRepository,
-        accountAttributeRepository = setup.accountAttributeRepository,
         entitySource = setup.entitySource,
         accountApiSourceByExternalId = setup.accountCache.accountApiSourceByExternalId,
         sessionId = setup.sessionId,
@@ -1098,7 +1196,8 @@ private suspend fun precreateCounterparties(
                             CounterpartyImportCandidate(
                                 counterpartyId = counterpartyId,
                                 downloadedName = downloadedName,
-                                apiSource = AccountApiSource(sessionId, request.id, JsonPath("${item.jsonPath.value}.counterparty")),
+                                apiSource = AccountApiSource(sessionId, request.id, item.counterpartyJsonPath(strategy.peopleMappings)),
+                                dedupeKey = item.rawJson.personalCounterpartyIdentity(strategy.peopleMappings)?.dedupeKey,
                             )
                         }
                     }
@@ -1119,6 +1218,7 @@ private suspend fun precreateCounterparties(
                     counterpartyId = counterpartyId,
                     name = accountName,
                     apiSource = candidates.first().apiSource,
+                    dedupeKey = candidates.firstNotNullOfOrNull { it.dedupeKey },
                 )
             }
         accountCache.precreateCounterpartyAccountsBatch(requests)
@@ -1200,7 +1300,10 @@ private suspend fun loadPersonalCounterpartyKeyIndex(
         val sortCode = attributes.firstOrNull { it.attributeType.id == ACCOUNT_SORT_CODE_ATTR_TYPE_ID }?.value
         val accountNumber = attributes.firstOrNull { it.attributeType.id == ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID }?.value
         if (!sortCode.isNullOrBlank() && !accountNumber.isNullOrBlank()) {
-            index["${account.name.lowercase()}|$sortCode|$accountNumber"] = account.id
+            // Keyed by sort code + account number only (no name): a bank account is the same
+            // counterparty regardless of the display name Starling/Monzo returns for it. Must match
+            // the runtime PersonalCounterpartyIdentity.dedupeKey format.
+            index["$sortCode|$accountNumber"] = account.id
         }
     }
     return index
@@ -1269,12 +1372,17 @@ private data class CounterpartyImportCandidate(
     val counterpartyId: String,
     val downloadedName: String,
     val apiSource: AccountApiSource,
+    // Bank identity ("sortCode|accountNumber") when the counterparty carries one; lets precreate
+    // merge it into an existing account that shares those bank details (e.g. your own account at
+    // another provider) instead of minting a duplicate.
+    val dedupeKey: String?,
 )
 
 private data class CounterpartyBatchCreateRequest(
     val counterpartyId: String,
     val name: String,
     val apiSource: AccountApiSource,
+    val dedupeKey: String?,
 )
 
 private suspend fun importPeopleFromAccounts(
@@ -1284,7 +1392,6 @@ private suspend fun importPeopleFromAccounts(
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     personAttributeRepository: PersonAttributeRepository,
-    accountAttributeRepository: AccountAttributeRepository,
     entitySource: EntitySource? = null,
     accountApiSourceByExternalId: Map<String, AccountApiSource> = emptyMap(),
     sessionId: ApiSessionId? = null,
@@ -1296,20 +1403,9 @@ private suspend fun importPeopleFromAccounts(
     for (account in accountsById.values) {
         if (account.owners.isEmpty()) continue
 
+        // The account's own bank details are persisted by ensureSourceAccounts (which also covers
+        // owner-less accounts); here we only link its owners.
         val accountId = accountCache.getOrCreateAccountId(account.id, account.displayName(strategy))
-        val sortCode =
-            account.rawJson?.stringOrNull(strategy.accountMappings.sortCodeField)?.takeIf { it.isNotBlank() }
-                ?: account.owners.firstOrNull { !it.sortCode.isNullOrBlank() }?.sortCode
-        val accountNumber =
-            account.rawJson?.stringOrNull(strategy.accountMappings.accountNumberField)?.takeIf { it.isNotBlank() }
-                ?: account.owners.firstOrNull { !it.accountNumber.isNullOrBlank() }?.accountNumber
-        if (sortCode != null || accountNumber != null) {
-            accountAttributeRepository.ensureCounterpartyPersonalAttributesInCreationMode(
-                accountId = accountId,
-                sortCode = sortCode,
-                accountNumber = accountNumber,
-            )
-        }
         newPeopleCount +=
             importOwnersForAccount(
                 owners = account.owners,
@@ -1372,7 +1468,7 @@ private suspend fun importPeopleFromCounterparties(
                     builtInType = null,
                     name = nameMappings.counterpartyPrefix + counterpartyName,
                     dedupeKey = identity?.dedupeKey,
-                    apiSource = AccountApiSource(sessionId, request.id, JsonPath("${item.jsonPath.value}.counterparty")),
+                    apiSource = AccountApiSource(sessionId, request.id, item.counterpartyJsonPath(strategy.peopleMappings)),
                     personalIdentity = identity,
                 )
             if (identity != null) {
@@ -1767,6 +1863,20 @@ private fun ApiPeopleMappings.isPersonalBeneficiaryType(type: String?): Boolean 
     return personalBeneficiaryAccountTypeValues.any { it.equals(type, ignoreCase = true) }
 }
 
+/**
+ * The JSON path to the counterparty within this transaction item, for linking an imported account
+ * back to its API-traffic origin. Points at the nested counterparty object when one exists
+ * ([ApiPeopleMappings.counterpartyObjectField] set, e.g. Monzo's "counterparty"); for providers whose
+ * counterparty fields are flat on the item (blank field, e.g. Starling) it points at the item itself,
+ * so the audit-trail "origin" expands a node that actually exists.
+ */
+private fun ApiTransactionPageItem.counterpartyJsonPath(peopleMappings: ApiPeopleMappings): JsonPath =
+    if (peopleMappings.counterpartyObjectField.isBlank()) {
+        jsonPath
+    } else {
+        JsonPath("${jsonPath.value}.${peopleMappings.counterpartyObjectField}")
+    }
+
 private fun ApiTransactionPageItem.personalCounterpartyOwner(peopleMappings: ApiPeopleMappings): ApiImportAccountOwner? {
     val counterparty = rawJson?.resolveJsonObjectPath(peopleMappings.counterpartyObjectField) ?: return null
     val beneficiaryAccountType = counterparty.stringOrNull(peopleMappings.beneficiaryAccountTypeField)
@@ -1782,7 +1892,7 @@ private fun ApiTransactionPageItem.personalCounterpartyOwner(peopleMappings: Api
         preferredName = name,
         sortCode = sortCode,
         accountNumber = accountNumber,
-        jsonPath = JsonPath("${jsonPath.value}.counterparty"),
+        jsonPath = counterpartyJsonPath(peopleMappings),
     )
 }
 
@@ -1816,6 +1926,46 @@ private fun accountsItemJsonPath(
     strategy: ApiImportStrategy,
     index: Int,
 ): JsonPath = arrayItemJsonPath(strategy.accountsEndpoint.responseArrayKey, index)
+
+/**
+ * Returns [accounts] with each account's bank details (sort code + account number) filled from the
+ * matching account-identifiers response, when [ApiImportStrategy.accountIdentifiersEndpoint] is set.
+ * Each identifiers response is matched to its account via the `account.id` captured from the request
+ * path, and the sort code / account number are read using the strategy's account field mappings.
+ * A no-op for strategies without the endpoint, or when no identifiers responses are present.
+ */
+private fun enrichAccountsWithIdentifiers(
+    accounts: Map<String, ApiImportAccount>,
+    strategy: ApiImportStrategy,
+    responsePairs: List<Pair<ApiRequest, ApiResponse>>,
+): Map<String, ApiImportAccount> {
+    val endpoint = strategy.accountIdentifiersEndpoint ?: return accounts
+    val identifiersByAccountId =
+        responsePairs
+            .mapNotNull { (request, response) ->
+                val accountExternalId =
+                    extractPathVariables(endpoint.path, request.encodedPath())?.get("account.id") ?: return@mapNotNull null
+                parseJsonObjectOrNull(response.json)?.let { accountExternalId to it }
+            }.toMap()
+    if (identifiersByAccountId.isEmpty()) return accounts
+
+    val mappings = strategy.accountMappings
+    return accounts.mapValues { (id, account) ->
+        val identifiers = identifiersByAccountId[id] ?: return@mapValues account
+        account.copy(
+            sortCode = identifiers.stringOrNull(mappings.sortCodeField)?.takeIf { it.isNotBlank() } ?: account.sortCode,
+            accountNumber = identifiers.stringOrNull(mappings.accountNumberField)?.takeIf { it.isNotBlank() } ?: account.accountNumber,
+        )
+    }
+}
+
+private fun parseJsonObjectOrNull(json: String): JsonObject? =
+    try {
+        Json.parseToJsonElement(json) as? JsonObject
+    } catch (e: SerializationException) {
+        logger.error(e) { "Failed to parse API identifiers response as a JSON object" }
+        null
+    }
 
 private fun parseAccount(
     account: JsonObject,
@@ -2172,7 +2322,7 @@ private suspend fun prepareValidTransactionItem(
         AccountApiSource(
             sessionId = setup.sessionId,
             requestId = context.requestId,
-            jsonPath = JsonPath("${item.jsonPath.value}.counterparty"),
+            jsonPath = item.counterpartyJsonPath(setup.strategy.peopleMappings),
         )
     val counterpartyAccountId =
         if (item.isZeroAmount) {
@@ -2684,15 +2834,51 @@ private class AccountCache(
         externalId: String?,
         name: String,
         explicitApiSource: AccountApiSource? = null,
+        dedupeKey: String? = null,
     ): AccountId =
         mutex.withLock {
             val normalizedName = name.ifBlank { "Unknown" }
             if (externalId != null) {
                 sourceAccountExternalIdIndex[externalId]?.let { return@withLock it }
             }
-            loadAccounts()[normalizedName]?.let { return@withLock it.id }
-            createAccount(externalId, normalizedName, explicitApiSource)
+            // Adopt a pre-existing account that already carries these bank details — e.g. a counterparty
+            // another provider's import created for this same real account. This keeps cross-provider
+            // imports order-independent: whichever provider sees the account first owns the row, and the
+            // other merges into it instead of creating a duplicate.
+            if (dedupeKey != null && externalId != null) {
+                personalCounterpartyKeyIndex[dedupeKey]?.let {
+                    return@withLock adoptAccountAsSource(it, externalId, normalizedName)
+                }
+            }
+            val accountId = loadAccounts()[normalizedName]?.id ?: createAccount(externalId, normalizedName, explicitApiSource)
+            // Register the source account's bank identity so a counterparty for this same account (even
+            // within this same import) merges into it rather than spawning a duplicate.
+            if (dedupeKey != null) personalCounterpartyKeyIndex.getOrPut(dedupeKey) { accountId }
+            accountId
         }
+
+    /**
+     * Re-purposes an existing account (typically a counterparty another provider created for this same
+     * bank account) as a source/own account: renames it and repoints its external-id attribute so future
+     * imports of this provider resolve it by id. Its sort code + account number attributes are kept, so
+     * the other provider keeps matching it by bank details.
+     */
+    private suspend fun adoptAccountAsSource(
+        existingId: AccountId,
+        externalId: String,
+        name: String,
+    ): AccountId {
+        val existing = loadAccounts().values.firstOrNull { it.id == existingId }
+        if (existing != null && existing.name != name) {
+            accountRepository.updateAccount(existing.copy(name = name))
+            accountsByName = null
+        }
+        val attributes = accountAttributeRepository.getByAccount(existingId).first()
+        accountAttributeRepository.upsertAccountAttribute(attributes, existingId, ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID, externalId)
+        sourceAccountExternalIdIndex[externalId] = existingId
+        counterpartyIdIndex[externalId] = existingId
+        return existingId
+    }
 
     /**
      * Finds or creates a counterparty account.
@@ -2757,6 +2943,24 @@ private class AccountCache(
             accountId
         }
 
+    /**
+     * Whether a brand-new account must be created for [request]. Returns false (and links the
+     * counterparty id to the existing account) when an account with the same name already represents
+     * this same counterparty id; true otherwise.
+     */
+    private fun shouldCreateCounterparty(
+        request: CounterpartyBatchCreateRequest,
+        accountMap: Map<String, Account>,
+    ): Boolean {
+        val existingByName = accountMap[request.name] ?: return true
+        val existingExternalIdForAccount = counterpartyIdIndex.entries.firstOrNull { it.value == existingByName.id }?.key
+        if (existingExternalIdForAccount == request.counterpartyId) {
+            counterpartyIdIndex[request.counterpartyId] = existingByName.id
+            return false
+        }
+        return true
+    }
+
     suspend fun precreateCounterpartyAccountsBatch(requests: List<CounterpartyBatchCreateRequest>) {
         if (requests.isEmpty()) return
 
@@ -2766,26 +2970,14 @@ private class AccountCache(
             val toCreate = mutableListOf<CounterpartyBatchCreateRequest>()
 
             for (request in requests) {
-                val existingByCounterpartyId = counterpartyIdIndex[request.counterpartyId]
-                if (existingByCounterpartyId != null) {
-                    continue
-                }
-                val existingByName = accountMap[request.name]
-                val shouldCreate =
-                    if (existingByName != null) {
-                        val existingExternalIdForAccount =
-                            counterpartyIdIndex.entries.firstOrNull { it.value == existingByName.id }?.key
-                        if (existingExternalIdForAccount == request.counterpartyId) {
-                            counterpartyIdIndex[request.counterpartyId] = existingByName.id
-                            false
-                        } else {
-                            true
-                        }
-                    } else {
-                        true
-                    }
-                if (shouldCreate) {
-                    toCreate += request
+                // Merge into an existing account that already carries these bank details (sort code +
+                // account number) — e.g. your own account at another provider, or a counterparty created
+                // under a different id — before considering name. Avoids a duplicate for one real account.
+                val existingByBank = request.dedupeKey?.let { personalCounterpartyKeyIndex[it] }
+                when {
+                    counterpartyIdIndex[request.counterpartyId] != null -> Unit
+                    existingByBank != null -> counterpartyIdIndex[request.counterpartyId] = existingByBank
+                    else -> if (shouldCreateCounterparty(request, accountMap)) toCreate += request
                 }
             }
 
@@ -2802,6 +2994,9 @@ private class AccountCache(
 
             toCreate.zip(createdIds).forEach { (request, accountId) ->
                 counterpartyIdIndex[request.counterpartyId] = accountId
+                // Index the new account's bank identity so later requests in this batch with the same
+                // sort code + account number (under a different counterparty id) merge into it.
+                request.dedupeKey?.let { personalCounterpartyKeyIndex.getOrPut(it) { accountId } }
                 val createdAccount = Account(id = accountId, name = request.name.ifBlank { "Unknown" }, openingDate = now)
                 accountMap[createdAccount.name] = createdAccount
                 counterpartyAttributeWrites +=
@@ -2980,6 +3175,14 @@ private fun JsonObject.resolveCounterpartyIdentity(
     counterpartyIdField: String?,
     peopleMappings: ApiPeopleMappings,
 ): String? {
+    // The bank sub-entity (sort code + account number) is the most reliable account identity for
+    // providers like Starling, where a single real account can otherwise be split across several
+    // counterparty ids. When configured, it wins over the explicit id; the id (and then the name)
+    // remain the fallback for counterparties without bank details.
+    if (peopleMappings.preferBankIdentity) {
+        bankIdentity(peopleMappings)?.let { return it }
+    }
+
     if (counterpartyIdField == null) return null
 
     resolveJsonPath(counterpartyIdField)?.takeIf { it.isNotBlank() }?.let { return it }
@@ -2995,13 +3198,9 @@ private fun JsonObject.resolveCounterpartyIdentity(
         resolveJsonPath(accountIdField)?.takeIf { it.isNotBlank() }?.let { return it }
     }
 
-    val counterparty = resolveJsonObjectPath(peopleMappings.counterpartyObjectField) ?: return null
-    val sortCode = counterparty.stringOrNull(peopleMappings.counterpartySortCodeField)?.takeIf { it.isNotBlank() }
-    val accountNumber = counterparty.stringOrNull(peopleMappings.counterpartyAccountNumberField)?.takeIf { it.isNotBlank() }
-    if (sortCode != null && accountNumber != null) {
-        return "bank:$sortCode:$accountNumber"
-    }
+    bankIdentity(peopleMappings)?.let { return it }
 
+    val counterparty = resolveJsonObjectPath(peopleMappings.counterpartyObjectField) ?: return null
     val serviceUserNumber = counterparty.stringOrNull(peopleMappings.counterpartyServiceUserNumberField)?.takeIf { it.isNotBlank() }
     if (serviceUserNumber != null) {
         return "service_user:$serviceUserNumber"
@@ -3013,6 +3212,19 @@ private fun JsonObject.resolveCounterpartyIdentity(
     }
 
     return null
+}
+
+/**
+ * The counterparty's bank identity ("bank:<sortCode>:<accountNumber>") when both the sort code and
+ * account number are present, else null. Resolved relative to [ApiPeopleMappings.counterpartyObjectField]
+ * (blank means the transaction item itself, for providers with flat counterparty fields).
+ */
+private fun JsonObject.bankIdentity(peopleMappings: ApiPeopleMappings): String? {
+    val counterparty = resolveJsonObjectPath(peopleMappings.counterpartyObjectField) ?: return null
+    val sortCode = counterparty.stringOrNull(peopleMappings.counterpartySortCodeField)?.takeIf { it.isNotBlank() } ?: return null
+    val accountNumber =
+        counterparty.stringOrNull(peopleMappings.counterpartyAccountNumberField)?.takeIf { it.isNotBlank() } ?: return null
+    return "bank:$sortCode:$accountNumber"
 }
 
 private fun JsonObject.resolveJsonObjectPath(dotPath: String): JsonObject? {

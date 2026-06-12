@@ -87,6 +87,7 @@ import com.moneymanager.ui.api.ApiSessionImportResult
 import com.moneymanager.ui.api.ApiTransactionsDownloadProgress
 import com.moneymanager.ui.api.discoverApiCounterpartiesToCreate
 import com.moneymanager.ui.api.displaySummary
+import com.moneymanager.ui.api.downloadApiSessionAccountIdentifiers
 import com.moneymanager.ui.api.downloadApiSessionAccounts
 import com.moneymanager.ui.api.downloadApiSessionPeople
 import com.moneymanager.ui.api.downloadApiSessionTransactions
@@ -426,6 +427,17 @@ fun ApiSessionsScreen(
                                                     strategy = strategy,
                                                     sca = sca,
                                                 )
+                                            if (strategy.accountIdentifiersEndpoint != null) {
+                                                update("Downloading account identifiers...")
+                                                downloadApiSessionAccountIdentifiers(
+                                                    token = credential.token,
+                                                    apiClient = apiClient,
+                                                    apiSessionRepository = apiSessionRepository,
+                                                    sessionId = newSessionId,
+                                                    strategy = strategy,
+                                                    sca = sca,
+                                                )
+                                            }
                                             val transactions =
                                                 if (transactionsBlocked) {
                                                     null
@@ -1387,11 +1399,16 @@ internal fun shouldHighlightPair(
             responseTransactions.any {
                 highlightJsonPath.startsWithJsonPath(it.jsonPath.value)
             }
+    // A known request id pins the pair on its own, so highlight it (and let the JSON tree expand the
+    // path) even when the response has no parsed transactions to match against — e.g. the accounts
+    // response, whose own-account origin is "$.accounts[0]". This still requires a response to expand
+    // into; with no response and an unmatched path there is nothing to show. Transaction matching is
+    // only needed to disambiguate which page holds a source when no request id is supplied.
     return (highlightRequestId != null || highlightJsonPath != null) &&
         requestMatches &&
         (
             jsonPathMatches ||
-                (highlightRequestId != null && highlightJsonPath == null)
+                (highlightRequestId != null && (highlightJsonPath == null || pair.response != null))
         )
 }
 

@@ -2,6 +2,7 @@ package com.moneymanager.ui.screens
 
 import com.moneymanager.domain.model.ApiRequest
 import com.moneymanager.domain.model.ApiRequestId
+import com.moneymanager.domain.model.ApiResponse
 import com.moneymanager.domain.model.ApiResponseId
 import com.moneymanager.domain.model.ApiResponseTransaction
 import com.moneymanager.domain.model.ApiResponseTransactionId
@@ -85,6 +86,22 @@ class ApiSessionsScreenLogicTest {
         assertTrue(highlighted)
     }
 
+    @Test
+    fun shouldHighlightPair_highlightsRequestWithResponseEvenWhenJsonPathHasNoTransactions() {
+        // An account origin like "$.accounts[0]" targets the accounts response, which has no parsed
+        // response transactions. The matched request id plus a present response must still highlight
+        // the pair so the JSON tree can expand the node.
+        val pair = ApiTrafficPair(request = request(7), response = response(7))
+        val highlighted =
+            shouldHighlightPair(
+                pair = pair,
+                responseTransactions = emptyList(),
+                highlightRequestId = ApiRequestId(7),
+                highlightJsonPath = "$.accounts[0]",
+            )
+        assertTrue(highlighted)
+    }
+
     private fun request(id: Long) =
         ApiRequest(
             id = ApiRequestId(id),
@@ -93,5 +110,14 @@ class ApiSessionsScreenLogicTest {
             method = "GET",
             url = "https://example.com",
             headers = emptyList(),
+        )
+
+    private fun response(requestId: Long) =
+        ApiResponse(
+            id = ApiResponseId(requestId),
+            requestId = ApiRequestId(requestId),
+            sessionId = ApiSessionId(1),
+            respondedAt = Instant.DISTANT_PAST,
+            json = """{"accounts":[{"accountUid":"a"}]}""",
         )
 }

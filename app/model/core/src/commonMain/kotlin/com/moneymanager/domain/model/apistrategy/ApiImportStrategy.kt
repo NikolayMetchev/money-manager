@@ -17,6 +17,12 @@ import kotlin.time.Instant
  * @property accountNamePrefix Prefix prepended to account names on import (e.g. "Monzo: ")
  * @property counterpartyPrefix Prefix prepended to counterparty account names (e.g. "Monzo Counterparty: ")
  * @property peopleMappings JSON field paths/values for people and personal counterparties
+ * @property accountIdentifiersEndpoint Optional per-account endpoint fetched after accounts that
+ *                                      returns the account's own bank details (sort code + account
+ *                                      number) when they are not present on the accounts response
+ *                                      itself (e.g. Starling's `/accounts/{account.id}/identifiers`).
+ *                                      The sort code / account number fields within its response are
+ *                                      read using [accountMappings] sortCode/accountNumber fields.
  * @property ancestorEndpoints Resource endpoints fetched before accounts whose items supply context
  *                             for templating descendant endpoint paths/params (e.g. Wise "profiles")
  * @property builtInCounterpartyRules Declarative rules routing matching transactions to a single
@@ -36,6 +42,7 @@ data class ApiImportStrategy(
     val accountNamePrefix: String,
     val counterpartyPrefix: String,
     val peopleMappings: ApiPeopleMappings = ApiPeopleMappings(),
+    val accountIdentifiersEndpoint: ApiEndpointConfig? = null,
     val ancestorEndpoints: List<ApiEndpointConfig> = emptyList(),
     val builtInCounterpartyRules: List<BuiltInCounterpartyRule> = emptyList(),
     val signing: ApiSigningConfig? = null,

@@ -26,6 +26,7 @@ data class ApiStrategyConfigJson(
     val accountNamePrefix: String,
     val counterpartyPrefix: String,
     val peopleMappings: ApiPeopleMappings = ApiPeopleMappings(),
+    val accountIdentifiersEndpoint: ApiEndpointConfig? = null,
     val ancestorEndpoints: List<ApiEndpointConfig> = emptyList(),
     val builtInCounterpartyRules: List<BuiltInCounterpartyRule> = emptyList(),
     val signing: ApiSigningConfig? = null,
