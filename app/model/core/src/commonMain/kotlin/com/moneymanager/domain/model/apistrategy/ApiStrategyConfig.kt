@@ -209,6 +209,12 @@ data class ApiPeopleMappings(
     val counterpartyAccountNumberField: String = "account_number",
     val counterpartyServiceUserNumberField: String = "service_user_number",
     val fallbackCounterpartyAccountIdSuffix: String = ".account_id",
+    // When true, a counterparty's bank sub-entity (sort code + account number) identifies the
+    // counterparty account in preference to [ApiTransactionMappings.counterpartyIdField]. Set for
+    // providers (e.g. Starling) whose per-counterparty id can still split a single real bank account
+    // across entries — the same account may appear under several counterparty ids (as a payee and a
+    // sender). The id remains the fallback when no bank details are present, then the name.
+    val preferBankIdentity: Boolean = false,
 )
 
 /** Sign gate for a [BuiltInCounterpartyRule]; restricts the rule to incoming or outgoing transactions. */
@@ -345,6 +351,7 @@ data class ApiStrategyConfig(
     val accountNamePrefix: String,
     val counterpartyPrefix: String,
     val peopleMappings: ApiPeopleMappings,
+    val accountIdentifiersEndpoint: ApiEndpointConfig? = null,
     val ancestorEndpoints: List<ApiEndpointConfig> = emptyList(),
     val builtInCounterpartyRules: List<BuiltInCounterpartyRule> = emptyList(),
     val signing: ApiSigningConfig? = null,

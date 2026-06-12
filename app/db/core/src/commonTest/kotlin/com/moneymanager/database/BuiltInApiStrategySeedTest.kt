@@ -45,6 +45,13 @@ class BuiltInApiStrategySeedTest : DbTest() {
 
             assertEquals("accountUid", starling.accountMappings.idField)
             assertEquals("currency", starling.accountMappings.currencyField)
+            // Own bank details come from the per-account identifiers endpoint, not the /accounts response.
+            assertEquals("bankIdentifier", starling.accountMappings.sortCodeField)
+            assertEquals("accountIdentifier", starling.accountMappings.accountNumberField)
+            assertEquals(
+                "/api/v2/accounts/{account.id}/identifiers",
+                assertNotNull(starling.accountIdentifiersEndpoint, "Starling should configure an identifiers endpoint").path,
+            )
 
             with(starling.transactionMappings) {
                 assertEquals("amount.minorUnits", amountField)
@@ -67,6 +74,10 @@ class BuiltInApiStrategySeedTest : DbTest() {
                 assertEquals(setOf("PAYEE", "SENDER"), personalBeneficiaryAccountTypeValues)
                 assertEquals("counterPartyName", counterpartyNameField)
                 assertEquals("counterPartyUid", counterpartyUserIdField)
+                assertEquals("counterPartySubEntityIdentifier", counterpartySortCodeField)
+                assertEquals("counterPartySubEntitySubIdentifier", counterpartyAccountNumberField)
+                // Bank details (sub-entity) identify the counterparty account ahead of the uid.
+                assertTrue(preferBankIdentity)
             }
 
             val people = assertNotNull(starling.peopleDownload, "Starling should configure a people download")

@@ -2,13 +2,19 @@
 
 package com.moneymanager.ui.starling
 
+import com.moneymanager.database.DatabaseConfig
 import com.moneymanager.database.port.DbEntitySource
 import com.moneymanager.domain.model.Account
+import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.ApiSessionId
+import com.moneymanager.domain.model.AttributeTypeId
+import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.DeviceInfo
+import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.createApiClient
 import com.moneymanager.test.database.DbTest
+import com.moneymanager.ui.api.downloadApiSessionAccountIdentifiers
 import com.moneymanager.ui.api.downloadApiSessionAccounts
 import com.moneymanager.ui.api.downloadApiSessionPeople
 import com.moneymanager.ui.api.downloadApiSessionTransactions
@@ -46,6 +52,17 @@ private val ACCOUNTS_JSON =
 }
     """.trimIndent()
 
+/** The own account's bank details, as returned by Starling's per-account identifiers endpoint. */
+private val IDENTIFIERS_JSON =
+    """
+{
+  "accountIdentifier": "55556666",
+  "bankIdentifier": "099999",
+  "iban": "GB00SRLG09999955556666",
+  "bic": "SRLGGB2L"
+}
+    """.trimIndent()
+
 /**
  * One outgoing and one incoming feed item. The direction (IN/OUT) — not the amount sign — determines
  * which side is the user's account; amounts are integer minor units. The MERCHANT counterparty is not
@@ -75,7 +92,48 @@ private val FEED_JSON =
       "reference": "SALARY",
       "counterPartyType": "SENDER",
       "counterPartyUid": "cp-acme",
-      "counterPartyName": "ACME Ltd"
+      "counterPartyName": "ACME Ltd",
+      "counterPartySubEntityIdentifier": "040004",
+      "counterPartySubEntitySubIdentifier": "12345678"
+    }
+  ]
+}
+    """.trimIndent()
+
+/**
+ * Two incoming feed items from what Starling reports as two different counterparties (distinct
+ * counterPartyUid and counterPartyName) but the SAME bank account (sub-entity sort code + account
+ * number). They must collapse into a single counterparty account, since the uid is per-payment.
+ */
+private val FEED_SAME_BANK_JSON =
+    """
+{
+  "feedItems": [
+    {
+      "feedItemUid": "f1",
+      "categoryUid": "$CATEGORY_UID",
+      "amount": { "currency": "GBP", "minorUnits": 1000 },
+      "direction": "IN",
+      "transactionTime": "2024-06-02T14:30:00.000Z",
+      "reference": "PAYMENT ONE",
+      "counterPartyType": "SENDER",
+      "counterPartyUid": "cp-one",
+      "counterPartyName": "ACME Ltd",
+      "counterPartySubEntityIdentifier": "040004",
+      "counterPartySubEntitySubIdentifier": "12345678"
+    },
+    {
+      "feedItemUid": "f2",
+      "categoryUid": "$CATEGORY_UID",
+      "amount": { "currency": "GBP", "minorUnits": 2000 },
+      "direction": "IN",
+      "transactionTime": "2024-06-03T14:30:00.000Z",
+      "reference": "PAYMENT TWO",
+      "counterPartyType": "SENDER",
+      "counterPartyUid": "cp-two",
+      "counterPartyName": "ACME Limited",
+      "counterPartySubEntityIdentifier": "040004",
+      "counterPartySubEntitySubIdentifier": "12345678"
     }
   ]
 }
@@ -159,16 +217,19 @@ class StarlingImportE2ETest : DbTest() {
     private fun mockEngine(
         feedJson: String = FEED_JSON,
         feedRequestUrls: MutableList<String>? = null,
+        accountsJson: String = ACCOUNTS_JSON,
+        identifiersJson: String? = null,
     ) = MockEngine { request ->
         val url = request.url.toString()
         val json =
             when {
                 url.contains("/account-holder/individual") -> ACCOUNT_HOLDER_JSON
+                url.contains("/identifiers") -> identifiersJson ?: error("Unexpected identifiers request: $url")
                 url.contains("/feed/account/") -> {
                     feedRequestUrls?.add(url)
                     feedJson
                 }
-                url.contains("/api/v2/accounts") -> ACCOUNTS_JSON
+                url.contains("/api/v2/accounts") -> accountsJson
                 else -> error("Unexpected request: $url")
             }
         respond(content = json, status = HttpStatusCode.OK, headers = headersOf(HttpHeaders.ContentType, "application/json"))
@@ -314,15 +375,36 @@ class StarlingImportE2ETest : DbTest() {
                 transfers.map { t -> t.attributes.single { it.attributeType.name == "starling-transaction-id" }.value }
             assertEquals(setOf("f1", "f2"), txIds.toSet(), "Each transfer should record its feedItemUid")
 
-            // Counterparty accounts are keyed by counterPartyUid (stored as the external-id attribute).
-            suspend fun externalId(account: Account) =
-                repositories.accountAttributeRepository
-                    .getByAccount(account.id)
-                    .first()
-                    .single { it.attributeType.name == "account-external-id" }
-                    .value
-            assertEquals("cp-coffee", externalId(coffee))
-            assertEquals("cp-acme", externalId(acme))
+            suspend fun attr(
+                account: Account,
+                typeName: String,
+            ) = repositories.accountAttributeRepository
+                .getByAccount(account.id)
+                .first()
+                .firstOrNull { it.attributeType.name == typeName }
+                ?.value
+
+            // The MERCHANT has no bank details, so its account is keyed by counterPartyUid.
+            assertEquals("cp-coffee", attr(coffee, "account-external-id"))
+            assertEquals(null, attr(coffee, "account-sort-code"))
+
+            // The SENDER carries sub-entity bank details, which take precedence: the account is keyed
+            // by its bank identity and the sort code + account number are stored as attributes.
+            assertEquals("bank:040004:12345678", attr(acme, "account-external-id"))
+            assertEquals("040004", attr(acme, "account-sort-code"))
+            assertEquals("12345678", attr(acme, "account-account-number"))
+
+            // Audit-trail origin points at the feed item itself — Starling's counterparty fields are
+            // flat on the item, so there is no ".counterparty" node to expand in the API-traffic view.
+            suspend fun originPath(account: Account): JsonPath? =
+                repositories.auditRepository
+                    .getAuditHistoryForAccount(account.id)
+                    .first { it.auditType == AuditType.INSERT }
+                    .source
+                    ?.apiSource
+                    ?.jsonPath
+            assertEquals(JsonPath("$.feedItems[0]"), originPath(coffee))
+            assertEquals(JsonPath("$.feedItems[1]"), originPath(acme))
 
             // The SENDER counterparty is a person and becomes an owner; the MERCHANT is not.
             val acmeOwners = repositories.personAccountOwnershipRepository.getOwnershipsByAccount(acme.id).first()
@@ -336,6 +418,326 @@ class StarlingImportE2ETest : DbTest() {
                     .first()
                     .single { it.firstName == "ACME" }
             assertEquals(acmeOwners.single().personId, acmePerson.id)
+        }
+
+    @Test
+    fun `starling counterparties sharing a bank account collapse into one despite different uids`() =
+        runTest {
+            val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
+            val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
+            val sessionId = repositories.apiSessionRepository.createSession("test-starling-token", deviceId, now, null)
+            val strategy =
+                repositories.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .single { it.name == "Starling" }
+
+            val apiClient =
+                createApiClient(
+                    trafficRecorder =
+                        ApiSessionTrafficRecorder(sessionId = sessionId, apiSessionRepository = repositories.apiSessionRepository),
+                    engine = mockEngine(feedJson = FEED_SAME_BANK_JSON),
+                )
+
+            downloadApiSessionAccounts(
+                token = "test-starling-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+            downloadApiSessionTransactions(
+                token = "test-starling-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+            importApiSessionTransactions(
+                apiSessionRepository = repositories.apiSessionRepository,
+                accountRepository = repositories.accountRepository,
+                currencyRepository = repositories.currencyRepository,
+                transactionRepository = repositories.transactionRepository,
+                entitySource = DbEntitySource(repositories.entitySourceQueries, repositories.transferSourceQueries, deviceId),
+                personRepository = repositories.personRepository,
+                personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
+                personAttributeRepository = repositories.personAttributeRepository,
+                attributeTypeRepository = repositories.attributeTypeRepository,
+                accountAttributeRepository = repositories.accountAttributeRepository,
+                deviceId = deviceId,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+
+            val allAccounts = repositories.accountRepository.getAllAccounts().first()
+            val ownAccount = allAccounts.single { it.name == "Starling: Personal" }
+
+            // Both feed items name a different counterparty (cp-one/"ACME Ltd" vs cp-two/"ACME Limited")
+            // but the same bank account, so exactly one counterparty account must be created.
+            val counterparties = allAccounts.filter { it.name.startsWith("Starling Counterparty: ") }
+            assertEquals(1, counterparties.size, "The shared bank account must yield a single counterparty: $counterparties")
+            val counterparty = counterparties.single()
+
+            val sortCode =
+                repositories.accountAttributeRepository
+                    .getByAccount(counterparty.id)
+                    .first()
+                    .single { it.attributeType.name == "account-sort-code" }
+                    .value
+            assertEquals("040004", sortCode)
+
+            // Both incoming transfers arrive from that single counterparty account.
+            val transfers = repositories.transactionRepository.getTransactionsByAccount(ownAccount.id).first()
+            assertEquals(2, transfers.size)
+            assertEquals(
+                setOf(counterparty.id),
+                transfers.map { it.sourceAccountId }.toSet(),
+                "Both transfers should originate from the one deduped counterparty account",
+            )
+        }
+
+    @Test
+    fun `starling counterparty merges into a pre-existing account that shares its bank details`() =
+        runTest {
+            val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
+            val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
+
+            // An account that already carries these bank details — e.g. your own account imported from
+            // another provider. ACME in FEED_JSON has the same sort code + account number (040004/12345678).
+            val existingId =
+                repositories.accountRepository.createAccount(
+                    Account(id = AccountId(0), name = "Monzo: Personal", openingDate = now),
+                )
+            repositories.accountAttributeRepository
+                .insert(existingId, AttributeTypeId(DatabaseConfig.ACCOUNT_SORT_CODE_ATTR_TYPE_ID), "040004")
+            repositories.accountAttributeRepository
+                .insert(existingId, AttributeTypeId(DatabaseConfig.ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID), "12345678")
+
+            val sessionId = repositories.apiSessionRepository.createSession("test-starling-token", deviceId, now, null)
+            val strategy =
+                repositories.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .single { it.name == "Starling" }
+            val apiClient =
+                createApiClient(
+                    trafficRecorder =
+                        ApiSessionTrafficRecorder(sessionId = sessionId, apiSessionRepository = repositories.apiSessionRepository),
+                    engine = mockEngine(),
+                )
+
+            downloadApiSessionAccounts(
+                token = "test-starling-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+            downloadApiSessionTransactions(
+                token = "test-starling-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+            importApiSessionTransactions(
+                apiSessionRepository = repositories.apiSessionRepository,
+                accountRepository = repositories.accountRepository,
+                currencyRepository = repositories.currencyRepository,
+                transactionRepository = repositories.transactionRepository,
+                entitySource = DbEntitySource(repositories.entitySourceQueries, repositories.transferSourceQueries, deviceId),
+                personRepository = repositories.personRepository,
+                personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
+                personAttributeRepository = repositories.personAttributeRepository,
+                attributeTypeRepository = repositories.attributeTypeRepository,
+                accountAttributeRepository = repositories.accountAttributeRepository,
+                deviceId = deviceId,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+
+            val allAccounts = repositories.accountRepository.getAllAccounts().first()
+
+            // No separate "Starling Counterparty: ACME Ltd" account should be created — the counterparty
+            // merges into the pre-existing account sharing 040004/12345678.
+            assertTrue(
+                allAccounts.none { it.name == "Starling Counterparty: ACME Ltd" },
+                "ACME must merge into the existing account, not create a counterparty duplicate: $allAccounts",
+            )
+
+            // The incoming ACME transfer originates from the pre-existing account.
+            val ownAccount = allAccounts.single { it.name == "Starling: Personal" }
+            val transfers = repositories.transactionRepository.getTransactionsByAccount(ownAccount.id).first()
+            val acmeIncoming = transfers.single { it.amount.amount == 50000L }
+            assertEquals(existingId, acmeIncoming.sourceAccountId, "The ACME transfer should link to the pre-existing account")
+        }
+
+    @Test
+    fun `starling source account adopts a pre-existing account that shares its bank details`() =
+        runTest {
+            val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
+            val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
+
+            // A counterparty another provider already created for this same bank account (the Starling own
+            // account's identifiers report 099999/55556666). The Starling import must adopt it as its
+            // source account rather than creating a duplicate — making cross-provider order irrelevant.
+            val existingId =
+                repositories.accountRepository.createAccount(
+                    Account(id = AccountId(0), name = "Monzo Counterparty: Nikolay", openingDate = now),
+                )
+            repositories.accountAttributeRepository
+                .insert(existingId, AttributeTypeId(DatabaseConfig.ACCOUNT_SORT_CODE_ATTR_TYPE_ID), "099999")
+            repositories.accountAttributeRepository
+                .insert(existingId, AttributeTypeId(DatabaseConfig.ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID), "55556666")
+
+            val sessionId = repositories.apiSessionRepository.createSession("test-starling-token", deviceId, now, null)
+            val strategy =
+                repositories.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .single { it.name == "Starling" }
+            val apiClient =
+                createApiClient(
+                    trafficRecorder =
+                        ApiSessionTrafficRecorder(sessionId = sessionId, apiSessionRepository = repositories.apiSessionRepository),
+                    engine = mockEngine(identifiersJson = IDENTIFIERS_JSON),
+                )
+
+            downloadApiSessionAccounts(
+                token = "test-starling-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+            downloadApiSessionAccountIdentifiers(
+                token = "test-starling-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+            downloadApiSessionTransactions(
+                token = "test-starling-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+            importApiSessionTransactions(
+                apiSessionRepository = repositories.apiSessionRepository,
+                accountRepository = repositories.accountRepository,
+                currencyRepository = repositories.currencyRepository,
+                transactionRepository = repositories.transactionRepository,
+                entitySource = DbEntitySource(repositories.entitySourceQueries, repositories.transferSourceQueries, deviceId),
+                personRepository = repositories.personRepository,
+                personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
+                personAttributeRepository = repositories.personAttributeRepository,
+                attributeTypeRepository = repositories.attributeTypeRepository,
+                accountAttributeRepository = repositories.accountAttributeRepository,
+                deviceId = deviceId,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+
+            val allAccounts = repositories.accountRepository.getAllAccounts().first()
+
+            // The Starling source account IS the adopted pre-existing account (same id), now renamed; the
+            // old counterparty name is gone and no second account carries 099999/55556666.
+            val ownAccount = allAccounts.single { it.name == "Starling: Personal" }
+            assertEquals(existingId, ownAccount.id, "The source account should reuse the pre-existing account's id")
+            assertTrue(
+                allAccounts.none { it.name == "Monzo Counterparty: Nikolay" },
+                "The adopted account should have been renamed, not left as a duplicate: $allAccounts",
+            )
+
+            suspend fun hasBankDetails(account: Account): Boolean {
+                val attrs = repositories.accountAttributeRepository.getByAccount(account.id).first()
+                return attrs.any { it.attributeType.name == "account-sort-code" && it.value == "099999" }
+            }
+            assertEquals(
+                listOf(existingId),
+                allAccounts.filter { hasBankDetails(it) }.map { it.id },
+                "Exactly one account should carry 099999/55556666",
+            )
+
+            // The adopted account gains the accounts-endpoint origin, so the audit trail can jump to its
+            // "$.accounts[0]" source rather than only the counterparty row it was first created from.
+            val originPaths =
+                repositories.auditRepository
+                    .getAuditHistoryForAccount(ownAccount.id)
+                    .mapNotNull { it.source?.apiSource?.jsonPath }
+            assertTrue(
+                originPaths.contains(JsonPath("$.accounts[0]")),
+                "Adopted source account should record the accounts-endpoint origin: $originPaths",
+            )
+        }
+
+    @Test
+    fun `starling source account gets its bank details from the identifiers endpoint`() =
+        runTest {
+            val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
+            val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
+            val sessionId = repositories.apiSessionRepository.createSession("test-starling-token", deviceId, now, null)
+            val strategy =
+                repositories.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .single { it.name == "Starling" }
+            val apiClient =
+                createApiClient(
+                    trafficRecorder =
+                        ApiSessionTrafficRecorder(sessionId = sessionId, apiSessionRepository = repositories.apiSessionRepository),
+                    engine = mockEngine(identifiersJson = IDENTIFIERS_JSON),
+                )
+
+            downloadApiSessionAccounts(
+                token = "test-starling-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+            downloadApiSessionAccountIdentifiers(
+                token = "test-starling-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+            downloadApiSessionTransactions(
+                token = "test-starling-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+            importApiSessionTransactions(
+                apiSessionRepository = repositories.apiSessionRepository,
+                accountRepository = repositories.accountRepository,
+                currencyRepository = repositories.currencyRepository,
+                transactionRepository = repositories.transactionRepository,
+                entitySource = DbEntitySource(repositories.entitySourceQueries, repositories.transferSourceQueries, deviceId),
+                personRepository = repositories.personRepository,
+                personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
+                personAttributeRepository = repositories.personAttributeRepository,
+                attributeTypeRepository = repositories.attributeTypeRepository,
+                accountAttributeRepository = repositories.accountAttributeRepository,
+                deviceId = deviceId,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+
+            // The own account carries the sort code + account number returned by the identifiers endpoint,
+            // so cross-provider counterparties for this same account can later match and merge into it.
+            val ownAccount =
+                repositories.accountRepository
+                    .getAllAccounts()
+                    .first()
+                    .single { it.name == "Starling: Personal" }
+            val attrs = repositories.accountAttributeRepository.getByAccount(ownAccount.id).first()
+            assertEquals("099999", attrs.single { it.attributeType.name == "account-sort-code" }.value)
+            assertEquals("55556666", attrs.single { it.attributeType.name == "account-account-number" }.value)
         }
 
     @Test

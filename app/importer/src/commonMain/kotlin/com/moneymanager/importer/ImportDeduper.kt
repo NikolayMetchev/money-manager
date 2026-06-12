@@ -4,12 +4,14 @@ package com.moneymanager.importer
 
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeTypeId
+import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.importmodel.AccountRef
 import com.moneymanager.importmodel.DedupePolicy
 import com.moneymanager.importmodel.ImportTransfer
+import kotlin.time.Duration
 
 /**
  * Information about an existing transfer, used by [ImportDeduper] for duplicate detection.
@@ -72,6 +74,12 @@ class ImportDeduper(
         existing.filter { it.uniqueKey.isNotEmpty() }.associate { it.uniqueKey to it.transferId }
     private val existingMatchCandidates: List<Pair<TransferId, Transfer>> =
         existing.map { it.transferId to it.transfer }
+
+    // Reconciliation only considers existing transfers this provider cannot identify by its own id
+    // (apiId == null) — i.e. transfers from a different source — so genuine repeats from the same
+    // provider (which carry an apiId) are never reconciled away.
+    private val reconcileCandidates: List<Pair<TransferId, Transfer>> =
+        existing.filter { it.apiId == null }.map { it.transferId to it.transfer }
     private val batchApiId = mutableMapOf<String, Int>()
     private val batchUniqueKey = mutableMapOf<Map<String, String>, Int>()
     private val batchMatchCandidates = mutableListOf<Pair<Int, Transfer>>()
@@ -101,6 +109,10 @@ class ImportDeduper(
                 ?: existingMatchCandidates.firstOrNull { (_, e) -> apiMatches(transfer, e) }?.first
         if (existingId != null) return Classified(transfer, ImportStatus.DUPLICATE, existingId)
 
+        // Cross-source reconciliation: the same real movement seen from another provider. Keep this
+        // record but tag it excluded-and-linked so the movement is counted once (see ApiMultiKey docs).
+        classifyAsReconciled(transfer)?.let { return it }
+
         // ... then an earlier accepted transfer in this same batch (resolved to its created id later).
         val batchMatchIndex =
             transfer.apiId?.let { batchApiId[it] }
@@ -115,6 +127,41 @@ class ImportDeduper(
         transfer.uniqueKey?.takeIf { it.isNotEmpty() }?.let { batchUniqueKey[it] = index }
         batchMatchCandidates += index to transfer.toComparableTransfer(TransferId(0))
         return Classified(transfer, ImportStatus.IMPORTED, null)
+    }
+
+    /**
+     * Classifies [transfer] as a cross-source reconciliation of an existing transfer when the policy
+     * enables it and a same source+target+amount transfer from a different source exists within the
+     * reconcile window. The returned transfer carries an extra exclusion attribute
+     * (value "reconciled:<existingId>") so it is kept and linked but excluded from balance totals;
+     * null when reconciliation is disabled or no match is found.
+     */
+    private fun classifyAsReconciled(transfer: ImportTransfer): Classified? {
+        val apiPolicy = policy as? DedupePolicy.ApiMultiKey ?: return null
+        val window = apiPolicy.reconcileWindow ?: return null
+        val exclusionTypeId = apiPolicy.reconciledExclusionAttributeTypeId ?: return null
+        val matchId =
+            reconcileCandidates.firstOrNull { (_, existing) -> reconcileMatches(transfer, existing, window) }?.first
+                ?: return null
+        val attributes =
+            if (transfer.attributes.any { it.typeId == exclusionTypeId }) {
+                transfer.attributes
+            } else {
+                transfer.attributes + NewAttribute(exclusionTypeId, "reconciled:${matchId.id}")
+            }
+        return Classified(transfer.copy(attributes = attributes), ImportStatus.IMPORTED, existing = null)
+    }
+
+    private fun reconcileMatches(
+        transfer: ImportTransfer,
+        existing: Transfer,
+        window: Duration,
+    ): Boolean {
+        if (transfer.amount != existing.amount) return false
+        if (transfer.source.requireId() != existing.sourceAccountId) return false
+        if (transfer.target.requireId() != existing.targetAccountId) return false
+        val delta = (transfer.timestamp - existing.timestamp).absoluteValue
+        return delta <= window
     }
 
     private fun apiMatches(

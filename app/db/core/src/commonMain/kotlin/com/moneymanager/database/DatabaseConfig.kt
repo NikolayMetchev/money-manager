@@ -1077,6 +1077,18 @@ object DatabaseConfig {
                         descriptionField = "name",
                         currencyField = "currency",
                         ownersArrayField = null,
+                        // Starling's /accounts response omits bank details; they come from the
+                        // account-identifiers endpoint below, where the sort code is `bankIdentifier`
+                        // and the account number is `accountIdentifier`.
+                        sortCodeField = "bankIdentifier",
+                        accountNumberField = "accountIdentifier",
+                    ),
+                // Per-account endpoint that returns the account's own sort code + account number, so the
+                // source account can be matched/merged with counterparties other providers create for it.
+                accountIdentifiersEndpoint =
+                    ApiEndpointConfig(
+                        path = "/api/v2/accounts/{account.id}/identifiers",
+                        responseArrayKey = "",
                     ),
                 transactionMappings =
                     ApiTransactionMappings(
@@ -1090,8 +1102,10 @@ object DatabaseConfig {
                         creditValues = setOf("IN"),
                         idField = "feedItemUid",
                         counterpartyNameField = "counterPartyName",
-                        // The counterparty's stable id keys the counterparty account (stored as its
-                        // external-id attribute) so it survives name changes and dedupes across imports.
+                        // counterPartyUid is the fallback counterparty-account id; bank details
+                        // (sub-entity sort code + account number) take precedence where present, see
+                        // peopleMappings.preferBankIdentity. A single real account can otherwise be
+                        // split across uids (e.g. the same account as both a payee and a sender).
                         counterpartyIdField = "counterPartyUid",
                         // Declined feed items never moved money; import them but exclude from balances
                         // (same treatment as Monzo's `decline_reason`), keyed off Starling's status.
@@ -1112,6 +1126,12 @@ object DatabaseConfig {
                         personalBeneficiaryAccountTypeValues = setOf("PAYEE", "SENDER"),
                         counterpartyNameField = "counterPartyName",
                         counterpartyUserIdField = "counterPartyUid",
+                        // Starling exposes the counterparty's bank details flat on the feed item;
+                        // together they uniquely identify the account and take precedence over the
+                        // per-counterparty uid when de-duplicating counterparty accounts.
+                        counterpartySortCodeField = "counterPartySubEntityIdentifier",
+                        counterpartyAccountNumberField = "counterPartySubEntitySubIdentifier",
+                        preferBankIdentity = true,
                     ),
                 accountNamePrefix = "Starling: ",
                 counterpartyPrefix = "Starling Counterparty: ",

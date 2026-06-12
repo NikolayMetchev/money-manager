@@ -17,7 +17,9 @@ import com.moneymanager.importmodel.ImportRowKey
 import com.moneymanager.importmodel.ImportTransfer
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 
 class ImportDeduperTest {
@@ -179,7 +181,7 @@ class ImportDeduperTest {
 
     @Test
     fun apiMultiKey_apiIdMatchIsDuplicate() {
-        val deduper = ImportDeduper(DedupePolicy.ApiMultiKey, existing = listOf(existing(9, apiId = "feed-1")))
+        val deduper = ImportDeduper(DedupePolicy.ApiMultiKey(), existing = listOf(existing(9, apiId = "feed-1")))
         val result = deduper.classify(listOf(importTransfer(0, description = "different", apiId = "feed-1"))).single()
         assertEquals(ImportStatus.DUPLICATE, result.status)
         assertEquals(TransferId(9), result.existing)
@@ -188,7 +190,7 @@ class ImportDeduperTest {
     @Test
     fun apiMultiKey_uniqueKeyMatchIsDuplicate() {
         val key = mapOf("starling-id" to "abc")
-        val deduper = ImportDeduper(DedupePolicy.ApiMultiKey, existing = listOf(existing(9, uniqueKey = key)))
+        val deduper = ImportDeduper(DedupePolicy.ApiMultiKey(), existing = listOf(existing(9, uniqueKey = key)))
         val result = deduper.classify(listOf(importTransfer(0, uniqueKey = key))).single()
         assertEquals(ImportStatus.DUPLICATE, result.status)
     }
@@ -197,14 +199,58 @@ class ImportDeduperTest {
     fun apiMultiKey_fieldMatchBidirectionalIsDuplicate() {
         // Same timestamp + amount, accounts swapped -> still a duplicate.
         val deduper =
-            ImportDeduper(DedupePolicy.ApiMultiKey, existing = listOf(existing(9, src = target, tgt = source)))
+            ImportDeduper(DedupePolicy.ApiMultiKey(), existing = listOf(existing(9, src = target, tgt = source)))
         val result = deduper.classify(listOf(importTransfer(0, description = "anything"))).single()
         assertEquals(ImportStatus.DUPLICATE, result.status)
     }
 
+    private val reconcilingPolicy =
+        DedupePolicy.ApiMultiKey(
+            reconcileWindow = 5.minutes,
+            reconciledExclusionAttributeTypeId = AttributeTypeId(-1),
+        )
+
+    @Test
+    fun apiMultiKey_reconcilesCrossSourceMirrorWithinWindow() {
+        // An existing transfer from a different source (apiId == null) with the same source+target+amount
+        // and a near (within-window) timestamp: keep the incoming record but tag it excluded + linked.
+        // existing(9) defaults apiId to null: a transfer from a different source.
+        val deduper = ImportDeduper(reconcilingPolicy, existing = listOf(existing(9)))
+        val result =
+            deduper
+                .classify(listOf(importTransfer(0, description = "from other bank", apiId = "monzo-1", timestamp = baseTime + 1.minutes)))
+                .single()
+        assertEquals(ImportStatus.IMPORTED, result.status)
+        assertEquals(
+            NewAttribute(AttributeTypeId(-1), "reconciled:9"),
+            result.transfer.attributes.single { it.typeId == AttributeTypeId(-1) },
+        )
+    }
+
+    @Test
+    fun apiMultiKey_doesNotReconcileSameProviderRepeat() {
+        // The existing transfer is from THIS provider (apiId set), so a genuine repeat with a different
+        // id is imported as a normal new transfer, never reconciled away.
+        val deduper = ImportDeduper(reconcilingPolicy, existing = listOf(existing(9, apiId = "monzo-0")))
+        val result =
+            deduper.classify(listOf(importTransfer(0, apiId = "monzo-1", timestamp = baseTime + 1.minutes))).single()
+        assertEquals(ImportStatus.IMPORTED, result.status)
+        assertTrue(result.transfer.attributes.none { it.typeId == AttributeTypeId(-1) })
+    }
+
+    @Test
+    fun apiMultiKey_doesNotReconcileOutsideWindow() {
+        // existing(9) defaults apiId to null: a transfer from a different source.
+        val deduper = ImportDeduper(reconcilingPolicy, existing = listOf(existing(9)))
+        val result =
+            deduper.classify(listOf(importTransfer(0, apiId = "monzo-1", timestamp = baseTime + 10.minutes))).single()
+        assertEquals(ImportStatus.IMPORTED, result.status)
+        assertTrue(result.transfer.attributes.none { it.typeId == AttributeTypeId(-1) })
+    }
+
     @Test
     fun apiMultiKey_newIsImportedAndDedupesInBatch() {
-        val deduper = ImportDeduper(DedupePolicy.ApiMultiKey, existing = emptyList())
+        val deduper = ImportDeduper(DedupePolicy.ApiMultiKey(), existing = emptyList())
         val result =
             deduper.classify(
                 listOf(
