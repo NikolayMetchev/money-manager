@@ -91,7 +91,8 @@ class ApiSessionsScreenLogicTest {
         // An account origin like "$.accounts[0]" targets the accounts response, which has no parsed
         // response transactions. The matched request id plus a present response must still highlight
         // the pair so the JSON tree can expand the node.
-        val pair = ApiTrafficPair(request = request(7), response = response(7))
+        val request = request(7)
+        val pair = ApiTrafficPair(request = request, response = responseFor(request))
         val highlighted =
             shouldHighlightPair(
                 pair = pair,
@@ -112,10 +113,10 @@ class ApiSessionsScreenLogicTest {
             headers = emptyList(),
         )
 
-    private fun response(requestId: Long) =
+    private fun responseFor(request: ApiRequest) =
         ApiResponse(
-            id = ApiResponseId(requestId),
-            requestId = ApiRequestId(requestId),
+            id = ApiResponseId(request.id.id),
+            requestId = request.id,
             sessionId = ApiSessionId(1),
             respondedAt = Instant.DISTANT_PAST,
             json = """{"accounts":[{"accountUid":"a"}]}""",

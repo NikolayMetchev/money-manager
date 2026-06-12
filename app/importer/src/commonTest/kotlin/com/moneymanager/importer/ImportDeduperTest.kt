@@ -214,7 +214,8 @@ class ImportDeduperTest {
     fun apiMultiKey_reconcilesCrossSourceMirrorWithinWindow() {
         // An existing transfer from a different source (apiId == null) with the same source+target+amount
         // and a near (within-window) timestamp: keep the incoming record but tag it excluded + linked.
-        val deduper = ImportDeduper(reconcilingPolicy, existing = listOf(existing(9, apiId = null)))
+        // existing(9) defaults apiId to null: a transfer from a different source.
+        val deduper = ImportDeduper(reconcilingPolicy, existing = listOf(existing(9)))
         val result =
             deduper
                 .classify(listOf(importTransfer(0, description = "from other bank", apiId = "monzo-1", timestamp = baseTime + 1.minutes)))
@@ -239,7 +240,8 @@ class ImportDeduperTest {
 
     @Test
     fun apiMultiKey_doesNotReconcileOutsideWindow() {
-        val deduper = ImportDeduper(reconcilingPolicy, existing = listOf(existing(9, apiId = null)))
+        // existing(9) defaults apiId to null: a transfer from a different source.
+        val deduper = ImportDeduper(reconcilingPolicy, existing = listOf(existing(9)))
         val result =
             deduper.classify(listOf(importTransfer(0, apiId = "monzo-1", timestamp = baseTime + 10.minutes))).single()
         assertEquals(ImportStatus.IMPORTED, result.status)
