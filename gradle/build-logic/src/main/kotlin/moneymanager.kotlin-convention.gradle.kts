@@ -19,10 +19,13 @@ val MinimalExternalModuleDependency.versionedModule: String
     get() = "$module:${versionConstraint.requiredVersion}"
 
 // Pin a catalog library to its catalog version.
+fun DependencySubstitutions.substitute(dependency: MinimalExternalModuleDependency) {
+    substitute(module(dependency.module.toString()))
+        .using(module(dependency.versionedModule))
+}
+
 fun DependencySubstitutions.substitute(dependency: Provider<MinimalExternalModuleDependency>) {
-    val dep = dependency.get()
-    substitute(module(dep.module.toString()))
-        .using(module(dep.versionedModule))
+    substitute(dependency.get())
 }
 
 // Pin an arbitrary (transitive-only) module coordinate to a catalog [versions] version.
@@ -82,6 +85,18 @@ configurations.matching {
             substitute("org.jetbrains.kotlinx:kotlinx-serialization-json", "kotlinx-serialization")
             substitute("org.jetbrains.kotlinx:kotlinx-serialization-json-jvm", "kotlinx-serialization")
             substitute("org.jetbrains.kotlinx:kotlinx-serialization-bom", "kotlinx-serialization")
+        }
+    }
+}
+
+// Align build-time/tooling transitive deps (AGP test platform, annotation processors, etc.) across
+// every configuration in this module, sourced from the catalog build-tool-pins bundle. The bundle is
+// the safelist, so kotlin compiler/stdlib/dagger (not listed) are left untouched even though this
+// applies to all configs.
+configurations.all {
+    resolutionStrategy {
+        dependencySubstitution {
+            libs.findBundle("build-tool-pins").get().get().forEach { substitute(it) }
         }
     }
 }

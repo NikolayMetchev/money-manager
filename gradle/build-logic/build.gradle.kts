@@ -23,6 +23,21 @@ tasks.withType<JavaCompile>().configureEach {
     options.compilerArgs.addAll(listOf("-Xlint:all", "-Werror"))
 }
 
+// Align build-time/tooling transitive deps on build-logic's own plugin classpath, sourced from the
+// catalog build-tool-pins bundle (same bundle used by moneymanager.kotlin-convention).
+val buildToolPins = extensions.getByType<VersionCatalogsExtension>().named("libs")
+    .findBundle("build-tool-pins").get().get()
+configurations.all {
+    resolutionStrategy {
+        dependencySubstitution {
+            buildToolPins.forEach { dep ->
+                substitute(module(dep.module.toString()))
+                    .using(module("${dep.module}:${dep.versionConstraint.requiredVersion}"))
+            }
+        }
+    }
+}
+
 dependencies {
     compileOnly(libs.develocity.gradle.plugin)
     implementation(libs.android.gradle.plugin)
