@@ -2,7 +2,7 @@
 # Android API level sync: keep compile SDK, target SDK, the Gradle managed device, CI emulator,
 # and IntelliJ Android Tests run configuration aligned. API 37 is beta.
 android-compileSdk = "36"
-develocity = "4.4.1"
+develocity = "4.4.2"
 android-gradle-plugin = "9.2.1"
 android-minSdk = "30"
 android-targetSdk = "36"
@@ -58,6 +58,30 @@ slf4j = "2.0.18"
 sort-dependencies = "0.18.0"
 sqldelight = "2.3.2"
 turbine = "1.2.1"
+# Build-tool transitive-alignment versions: pin tooling transitives (Gradle plugins, annotation
+# processors, AGP test platform) to one version across all build classpaths. Consumed via the
+# build-tool-pins bundle in moneymanager.kotlin-convention and gradle/build-logic/build.gradle.kts.
+buildtool-animal-sniffer = "1.24"
+buildtool-asm = "9.9"
+buildtool-checker-qual = "3.43.0"
+buildtool-commons-io = "2.16.1"
+buildtool-errorprone = "2.43.0"
+buildtool-grpc = "1.69.1"
+buildtool-gson = "2.11.0"
+buildtool-guava = "33.5.0-jre"
+buildtool-guava-failureaccess = "1.0.3"
+buildtool-httpclient = "4.5.14"
+buildtool-j2objc = "3.1"
+buildtool-javawriter = "2.5.0"
+buildtool-jsr305 = "3.0.2"
+buildtool-kotlinpoet = "2.2.0"
+buildtool-logback = "1.4.12"
+buildtool-netty = "4.1.110.Final"
+buildtool-perfmark = "0.27.0"
+buildtool-poko = "0.23.0"
+buildtool-proto-google-common-protos = "2.48.0"
+buildtool-protobuf = "4.28.3"
+buildtool-tink = "1.18.0"
 
 [libraries]
 android-gradle-plugin = { module = "com.android.tools.build:gradle", version.ref = "android-gradle-plugin" }
@@ -145,6 +169,107 @@ sqldelight-gradle-plugin = { module = "app.cash.sqldelight:gradle-plugin", versi
 sqldelight-runtime = { module = "app.cash.sqldelight:runtime", version.ref = "sqldelight" }
 sqldelight-sqlite-driver = { module = "app.cash.sqldelight:sqlite-driver", version.ref = "sqldelight" }
 turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
+
+# Build-tool transitive pins — consumed only as the build-tool-pins bundle for dependency
+# substitution (not declared as dependencies). Keep alphabetized with the bundle below.
+buildtool-animal-sniffer = { module = "org.codehaus.mojo:animal-sniffer-annotations", version.ref = "buildtool-animal-sniffer" }
+buildtool-asm = { module = "org.ow2.asm:asm", version.ref = "buildtool-asm" }
+buildtool-asm-analysis = { module = "org.ow2.asm:asm-analysis", version.ref = "buildtool-asm" }
+buildtool-asm-commons = { module = "org.ow2.asm:asm-commons", version.ref = "buildtool-asm" }
+buildtool-asm-tree = { module = "org.ow2.asm:asm-tree", version.ref = "buildtool-asm" }
+buildtool-asm-util = { module = "org.ow2.asm:asm-util", version.ref = "buildtool-asm" }
+buildtool-checker-qual = { module = "org.checkerframework:checker-qual", version.ref = "buildtool-checker-qual" }
+buildtool-commons-io = { module = "commons-io:commons-io", version.ref = "buildtool-commons-io" }
+buildtool-errorprone = { module = "com.google.errorprone:error_prone_annotations", version.ref = "buildtool-errorprone" }
+buildtool-grpc-api = { module = "io.grpc:grpc-api", version.ref = "buildtool-grpc" }
+buildtool-grpc-context = { module = "io.grpc:grpc-context", version.ref = "buildtool-grpc" }
+buildtool-grpc-core = { module = "io.grpc:grpc-core", version.ref = "buildtool-grpc" }
+buildtool-grpc-netty = { module = "io.grpc:grpc-netty", version.ref = "buildtool-grpc" }
+buildtool-grpc-protobuf = { module = "io.grpc:grpc-protobuf", version.ref = "buildtool-grpc" }
+buildtool-grpc-protobuf-lite = { module = "io.grpc:grpc-protobuf-lite", version.ref = "buildtool-grpc" }
+buildtool-grpc-stub = { module = "io.grpc:grpc-stub", version.ref = "buildtool-grpc" }
+buildtool-gson = { module = "com.google.code.gson:gson", version.ref = "buildtool-gson" }
+buildtool-guava = { module = "com.google.guava:guava", version.ref = "buildtool-guava" }
+buildtool-guava-failureaccess = { module = "com.google.guava:failureaccess", version.ref = "buildtool-guava-failureaccess" }
+buildtool-httpclient = { module = "org.apache.httpcomponents:httpclient", version.ref = "buildtool-httpclient" }
+buildtool-j2objc = { module = "com.google.j2objc:j2objc-annotations", version.ref = "buildtool-j2objc" }
+buildtool-javawriter = { module = "com.squareup:javawriter", version.ref = "buildtool-javawriter" }
+buildtool-jsr305 = { module = "com.google.code.findbugs:jsr305", version.ref = "buildtool-jsr305" }
+buildtool-kotlinpoet = { module = "com.squareup:kotlinpoet", version.ref = "buildtool-kotlinpoet" }
+buildtool-kotlinpoet-jvm = { module = "com.squareup:kotlinpoet-jvm", version.ref = "buildtool-kotlinpoet" }
+buildtool-logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "buildtool-logback" }
+buildtool-logback-core = { module = "ch.qos.logback:logback-core", version.ref = "buildtool-logback" }
+buildtool-netty-buffer = { module = "io.netty:netty-buffer", version.ref = "buildtool-netty" }
+buildtool-netty-codec = { module = "io.netty:netty-codec", version.ref = "buildtool-netty" }
+buildtool-netty-codec-http = { module = "io.netty:netty-codec-http", version.ref = "buildtool-netty" }
+buildtool-netty-codec-http2 = { module = "io.netty:netty-codec-http2", version.ref = "buildtool-netty" }
+buildtool-netty-codec-socks = { module = "io.netty:netty-codec-socks", version.ref = "buildtool-netty" }
+buildtool-netty-common = { module = "io.netty:netty-common", version.ref = "buildtool-netty" }
+buildtool-netty-handler = { module = "io.netty:netty-handler", version.ref = "buildtool-netty" }
+buildtool-netty-handler-proxy = { module = "io.netty:netty-handler-proxy", version.ref = "buildtool-netty" }
+buildtool-netty-resolver = { module = "io.netty:netty-resolver", version.ref = "buildtool-netty" }
+buildtool-netty-transport = { module = "io.netty:netty-transport", version.ref = "buildtool-netty" }
+buildtool-netty-transport-native-unix-common = { module = "io.netty:netty-transport-native-unix-common", version.ref = "buildtool-netty" }
+buildtool-perfmark = { module = "io.perfmark:perfmark-api", version.ref = "buildtool-perfmark" }
+buildtool-poko-annotations = { module = "dev.drewhamilton.poko:poko-annotations", version.ref = "buildtool-poko" }
+buildtool-poko-annotations-jvm = { module = "dev.drewhamilton.poko:poko-annotations-jvm", version.ref = "buildtool-poko" }
+buildtool-proto-google-common-protos = { module = "com.google.api.grpc:proto-google-common-protos", version.ref = "buildtool-proto-google-common-protos" }
+buildtool-protobuf-java = { module = "com.google.protobuf:protobuf-java", version.ref = "buildtool-protobuf" }
+buildtool-protobuf-java-util = { module = "com.google.protobuf:protobuf-java-util", version.ref = "buildtool-protobuf" }
+buildtool-tink = { module = "com.google.crypto.tink:tink", version.ref = "buildtool-tink" }
+
+[bundles]
+# Tooling transitive deps pinned to one version across all build classpaths via dependency
+# substitution. NOTE: compose-internal annotation/collection are deliberately NOT pinned — forcing
+# them desyncs the Compose runtime and breaks Compose UI tests. Kotlin compiler/stdlib/reflect and
+# dagger are also excluded (each plugin needs its own compatible version).
+build-tool-pins = [
+    "buildtool-animal-sniffer",
+    "buildtool-asm",
+    "buildtool-asm-analysis",
+    "buildtool-asm-commons",
+    "buildtool-asm-tree",
+    "buildtool-asm-util",
+    "buildtool-checker-qual",
+    "buildtool-commons-io",
+    "buildtool-errorprone",
+    "buildtool-grpc-api",
+    "buildtool-grpc-context",
+    "buildtool-grpc-core",
+    "buildtool-grpc-netty",
+    "buildtool-grpc-protobuf",
+    "buildtool-grpc-protobuf-lite",
+    "buildtool-grpc-stub",
+    "buildtool-gson",
+    "buildtool-guava",
+    "buildtool-guava-failureaccess",
+    "buildtool-httpclient",
+    "buildtool-j2objc",
+    "buildtool-javawriter",
+    "buildtool-jsr305",
+    "buildtool-kotlinpoet",
+    "buildtool-kotlinpoet-jvm",
+    "buildtool-logback-classic",
+    "buildtool-logback-core",
+    "buildtool-netty-buffer",
+    "buildtool-netty-codec",
+    "buildtool-netty-codec-http",
+    "buildtool-netty-codec-http2",
+    "buildtool-netty-codec-socks",
+    "buildtool-netty-common",
+    "buildtool-netty-handler",
+    "buildtool-netty-handler-proxy",
+    "buildtool-netty-resolver",
+    "buildtool-netty-transport",
+    "buildtool-netty-transport-native-unix-common",
+    "buildtool-perfmark",
+    "buildtool-poko-annotations",
+    "buildtool-poko-annotations-jvm",
+    "buildtool-proto-google-common-protos",
+    "buildtool-protobuf-java",
+    "buildtool-protobuf-java-util",
+    "buildtool-tink",
+]
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "android-gradle-plugin" }
