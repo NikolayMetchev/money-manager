@@ -27,6 +27,8 @@
             <option value="$PROJECT_DIR$/app/db/schemaspy" />
             <option value="$PROJECT_DIR$/app/di" />
             <option value="$PROJECT_DIR$/app/di/core" />
+            <option value="$PROJECT_DIR$/app/importer" />
+            <option value="$PROJECT_DIR$/app/importmodel" />
             <option value="$PROJECT_DIR$/app/main" />
             <option value="$PROJECT_DIR$/app/main/android" />
             <option value="$PROJECT_DIR$/app/main/jvm" />
@@ -46,6 +48,7 @@
             <option value="$PROJECT_DIR$/utils/currency" />
             <option value="$PROJECT_DIR$/utils/parsers" />
             <option value="$PROJECT_DIR$/utils/parsers/csv" />
+            <option value="$PROJECT_DIR$/utils/parsers/qif" />
             <option value="$PROJECT_DIR$/utils/rest" />
           </set>
         </option>

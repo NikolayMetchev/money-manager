@@ -60,6 +60,7 @@ import com.moneymanager.ui.screens.QifImportDetailScreen
 import com.moneymanager.ui.screens.SettingsScreen
 import com.moneymanager.ui.screens.apistrategy.ApiImportStrategyAuditScreen
 import com.moneymanager.ui.screens.apistrategy.ApiStrategiesScreen
+import com.moneymanager.ui.screens.apistrategy.editor.ApiStrategyEditorScreen
 import com.moneymanager.ui.screens.csvstrategy.CsvStrategiesScreen
 import com.moneymanager.ui.screens.csvstrategy.editor.CsvStrategyEditorScreen
 import com.moneymanager.ui.screens.qif.QifStrategyEditorScreen
@@ -204,6 +205,7 @@ fun MoneyManagerApp(
                                         currentScreen is Screen.CsvStrategies ||
                                         currentScreen is Screen.CsvStrategyEditor ||
                                         currentScreen is Screen.ApiStrategies ||
+                                        currentScreen is Screen.ApiStrategyEditor ||
                                         currentScreen is Screen.ApiStrategyAuditHistory ||
                                         currentScreen is Screen.ApiSessionTraffic ||
                                         currentScreen is Screen.ConnectApi,
@@ -212,7 +214,8 @@ fun MoneyManagerApp(
                                         Screen.Imports(
                                             when (currentScreen) {
                                                 is Screen.ApiSessionTraffic, is Screen.ConnectApi,
-                                                is Screen.ApiStrategies, is Screen.ApiStrategyAuditHistory,
+                                                is Screen.ApiStrategies, is Screen.ApiStrategyEditor,
+                                                is Screen.ApiStrategyAuditHistory,
                                                 -> ImportTab.API
                                                 is Screen.QifImportDetail, is Screen.QifStrategyEditor -> ImportTab.QIF
                                                 is Screen.Imports -> currentScreen.tab
@@ -454,13 +457,30 @@ fun MoneyManagerApp(
                                     }
                                     ApiStrategiesScreen(
                                         apiImportStrategyRepository = services.imports.apiImportStrategyRepository,
-                                        apiSessionRepository = services.imports.apiSessionRepository,
                                         onBack = { navigationHistory.navigateBack() },
+                                        onCreateStrategy = {
+                                            navigationHistory.navigateTo(Screen.ApiStrategyEditor())
+                                        },
+                                        onEditStrategy = { strategyId ->
+                                            navigationHistory.navigateTo(Screen.ApiStrategyEditor(strategyId))
+                                        },
                                         onAuditHistoryClick = { strategy ->
                                             navigationHistory.navigateTo(
                                                 Screen.ApiStrategyAuditHistory(strategy.id, strategy.name),
                                             )
                                         },
+                                    )
+                                }
+                                is Screen.ApiStrategyEditor -> {
+                                    LaunchedEffect(Unit) {
+                                        currentlyViewedAccountId = null
+                                        currentlyViewedCurrencyId = null
+                                    }
+                                    ApiStrategyEditorScreen(
+                                        strategyId = screen.strategyId,
+                                        apiImportStrategyRepository = services.imports.apiImportStrategyRepository,
+                                        apiSessionRepository = services.imports.apiSessionRepository,
+                                        onBack = { navigationHistory.navigateBack() },
                                     )
                                 }
                                 is Screen.CsvImportDetail -> {
