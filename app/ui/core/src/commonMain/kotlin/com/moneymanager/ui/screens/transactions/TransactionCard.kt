@@ -1,10 +1,10 @@
 package com.moneymanager.ui.screens.transactions
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -19,6 +19,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -41,6 +43,7 @@ fun AccountTransactionCard(
     onAccountClick: (AccountId) -> Unit = {},
     onEditClick: (Transfer) -> Unit = {},
     onAuditClick: (TransferId) -> Unit = {},
+    onFeeLinkClick: (TransferId) -> Unit = {},
 ) {
     // Determine which account to display based on the current view
     // The account column should show the OTHER account in the transaction
@@ -141,18 +144,39 @@ fun AccountTransactionCard(
                         },
             )
 
-            // Description column
-            if (runningBalance.description.isNotBlank()) {
-                Text(
-                    text = runningBalance.description,
-                    style = cellStyle,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = mutedAlpha),
-                    maxLines = 1,
-                    autoSize = cellAutoSize,
-                    modifier = Modifier.weight(0.25f).padding(horizontal = 8.dp),
-                )
-            } else {
-                Spacer(modifier = Modifier.weight(0.25f))
+            // Description column, prefixed with a fee badge. A main transaction that incurred a fee shows
+            // "Has fee"; the fee movement itself shows "Fee". Clicking either jumps to the linked transfer.
+            Row(
+                modifier = Modifier.weight(0.25f).padding(horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                runningBalance.feeTransferId?.let { linkedFeeId ->
+                    FeeBadge(
+                        text = "Has fee",
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = mutedAlpha),
+                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = mutedAlpha),
+                        onClick = { onFeeLinkClick(linkedFeeId) },
+                    )
+                }
+                runningBalance.feeParentTransferId?.let { linkedParentId ->
+                    FeeBadge(
+                        text = "Fee",
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = mutedAlpha),
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = mutedAlpha),
+                        onClick = { onFeeLinkClick(linkedParentId) },
+                    )
+                }
+                if (runningBalance.description.isNotBlank()) {
+                    Text(
+                        text = runningBalance.description,
+                        style = cellStyle,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = mutedAlpha),
+                        maxLines = 1,
+                        autoSize = cellAutoSize,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
 
             // Amount column
@@ -231,4 +255,26 @@ fun AccountTransactionCard(
             }
         }
     }
+}
+
+/** A small, clickable pill labelling a transfer's fee relationship; tapping jumps to the linked transfer. */
+@Composable
+private fun FeeBadge(
+    text: String,
+    containerColor: Color,
+    contentColor: Color,
+    onClick: () -> Unit,
+) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        color = contentColor,
+        maxLines = 1,
+        modifier =
+            Modifier
+                .clip(MaterialTheme.shapes.small)
+                .background(color = containerColor)
+                .clickable(onClick = onClick)
+                .padding(horizontal = 6.dp, vertical = 2.dp),
+    )
 }

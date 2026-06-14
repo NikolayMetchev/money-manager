@@ -9,6 +9,7 @@ import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.NewRelationship
+import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Transfer
 import kotlin.jvm.JvmInline
 import kotlin.time.Instant
@@ -123,6 +124,30 @@ data class ImportOwnershipIntent(
 )
 
 /**
+ * A fee charged on a transaction, modelled as its own movement linked to the main transfer via a
+ * `fee` [NewRelationship] (main = id1, fee = id2). The engine expands this into a second [Transfer]
+ * created in the same batch; producers don't allocate ids. The fee is a real movement and counts in
+ * balances unless the main transfer is itself excluded (declined/reconciled), in which case it inherits
+ * the exclusion so a duplicate's fee isn't double-counted.
+ *
+ * @property source Where the fee money leaves (typically the main transfer's own account).
+ * @property target The consolidated per-provider fee account.
+ * @property relationshipTypeId The `fee` relationship type id (supplied by the producer, mirroring how
+ *   reconciliation passes its type id via [DedupePolicy]), used to link the fee (id2) to its main (id1).
+ * @property rowKey Provenance key for the fee movement; when null the engine falls back to the main
+ *   transfer's row key. Producers set this to point the audit trail at the fee's own source node (e.g.
+ *   the `atm_fees_detailed.fee_amount` JSON node) rather than the whole transaction.
+ */
+data class ImportFee(
+    val source: AccountRef,
+    val target: AccountRef,
+    val amount: Money,
+    val description: String,
+    val relationshipTypeId: RelationshipTypeId,
+    val rowKey: ImportRowKey? = null,
+)
+
+/**
  * A transfer to import. Account references may be [AccountRef.Existing] (resolved by the builder) or
  * [AccountRef.Local] (resolved by the engine from [ImportBatch.accountsToCreate]).
  *
@@ -130,6 +155,7 @@ data class ImportOwnershipIntent(
  * @property attributes Transfer attributes with type ids already resolved by the builder.
  * @property relationships Relationships to existing transfers, created once this transfer's id exists.
  * @property uniqueKey Unique-identifier dedupe key (attribute name -> value), or null for fuzzy dedupe.
+ * @property fee An optional fee charged on this transaction, expanded by the engine into a linked transfer.
  */
 data class ImportTransfer(
     val rowKey: ImportRowKey,
@@ -144,6 +170,7 @@ data class ImportTransfer(
     // API transaction id, for DedupePolicy.ApiMultiKey.
     val apiId: String? = null,
     val excludedFromBalances: Boolean = false,
+    val fee: ImportFee? = null,
 )
 
 /** Opaque per-row provenance + status-writeback key, identifying the source row of a transfer. */

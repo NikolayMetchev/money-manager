@@ -371,17 +371,23 @@ fun MoneyManagerApp(
                                         onCurrencyIdChange = { currencyId ->
                                             currentlyViewedCurrencyId = currencyId
                                         },
-                                        onAccountClick = { accountId, accountName, currencyId ->
+                                        onAccountClick = { accountId, accountName, currencyId, transferId ->
                                             navigationHistory.navigateTo(
                                                 Screen.AccountTransactions(
                                                     accountId = accountId,
                                                     accountName = accountName,
                                                     selectedCurrencyId = currencyId,
+                                                    scrollToTransferId = transferId,
                                                 ),
                                             )
                                         },
                                         onAuditClick = { transferId ->
                                             navigationHistory.navigateTo(Screen.AuditHistory(transferId))
+                                        },
+                                        // Clicking a fee badge jumps to the linked transfer, landing on its
+                                        // (own) account scrolled to it.
+                                        onFeeLinkClick = { transferId ->
+                                            navigateToTransferAccount(transferId, isPositiveAmount = false)
                                         },
                                         scrollToTransferId = screen.scrollToTransferId,
                                         initialCurrencyId = screen.selectedCurrencyId,

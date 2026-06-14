@@ -481,10 +481,15 @@ class TransactionRepositoryImpl(
         sourceRecorder: SourceRecorder,
     ): List<TransferId> {
         val createdIds = mutableListOf<TransferId>()
+        // Pass 1: insert transfers + attributes and record source, building the input(temp) id -> real id
+        // map so relationships can reference siblings created in the same batch (e.g. a fee transfer).
+        val idMap = mutableMapOf<TransferId, TransferId>()
         transfers.forEach { transfer ->
             transactionIdQueries.insert()
             val generatedId = transactionIdQueries.lastInsertedId().executeAsOne()
-            createdIds += TransferId(generatedId)
+            val realId = TransferId(generatedId)
+            createdIds += realId
+            idMap[transfer.id] = realId
             transferQueries.insert(
                 id = generatedId,
                 revision_id = transfer.revisionId,
@@ -502,15 +507,21 @@ class TransactionRepositoryImpl(
                     attribute_value = attr.value,
                 )
             }
-            // The just-created transfer is id1; the related (existing) transfer is id2.
+            sourceRecorder.insert(transfer.copy(id = realId))
+        }
+        // Pass 2: insert relationships now that every in-batch transfer has a real id. The owning transfer
+        // is id1; the related transfer (id2) may be a pre-existing transfer (reconciliation) or a sibling
+        // created in this same batch (a fee transfer), resolved via [idMap].
+        transfers.forEach { transfer ->
+            val id1 = idMap.getValue(transfer.id).id
             newRelationships[transfer.id].orEmpty().forEach { rel ->
+                val id2 = idMap[rel.relatedTransferId]?.id ?: rel.relatedTransferId.id
                 transferRelationshipQueries.insert(
-                    id1 = generatedId,
-                    id2 = rel.relatedTransferId.id,
+                    id1 = id1,
+                    id2 = id2,
                     relationship_type_id = rel.typeId.id,
                 )
             }
-            sourceRecorder.insert(transfer.copy(id = TransferId(generatedId)))
         }
         return createdIds
     }

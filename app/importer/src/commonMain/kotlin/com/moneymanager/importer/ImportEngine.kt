@@ -417,25 +417,53 @@ class ImportEngine(
         if (toImport.isEmpty() && toUpdate.isEmpty()) return emptyList()
 
         // Assign negative temp ids so newAttributes/newRelationships can be keyed before real ids exist.
+        // A main transfer carrying a fee expands into two transfers (main + fee) created in this same
+        // batch; the fee is linked to the main via a `fee` relationship resolved by the repository's
+        // in-batch id map. We track each main's position so only main ids are returned, aligned to toImport.
         val transfersToCreate = mutableListOf<Transfer>()
         val newAttributes = mutableMapOf<TransferId, List<NewAttribute>>()
         val newRelationships = mutableMapOf<TransferId, List<NewRelationship>>()
         val orderedRowKeys = mutableListOf<ImportRowKey>()
-        toImport.forEachIndexed { index, classified ->
-            val tempId = TransferId(-(index + 1).toLong())
+        val mainResultIndices = mutableListOf<Int>()
+        var tempCounter = 0
+        toImport.forEach { classified ->
             val t = classified.transfer
+            val mainTempId = TransferId(-(++tempCounter).toLong())
+            val fee = t.fee
+            val feeTempId = if (fee != null) TransferId(-(++tempCounter).toLong()) else null
+            val relationships =
+                if (fee != null && feeTempId != null) {
+                    t.relationships + NewRelationship(relatedTransferId = feeTempId, typeId = fee.relationshipTypeId)
+                } else {
+                    t.relationships
+                }
+            mainResultIndices += transfersToCreate.size
             transfersToCreate +=
                 Transfer(
-                    id = tempId,
+                    id = mainTempId,
                     timestamp = t.timestamp,
                     description = t.description,
                     sourceAccountId = requireId(t.source),
                     targetAccountId = requireId(t.target),
                     amount = t.amount,
                 )
-            if (t.attributes.isNotEmpty()) newAttributes[tempId] = t.attributes
-            if (t.relationships.isNotEmpty()) newRelationships[tempId] = t.relationships
+            if (t.attributes.isNotEmpty()) newAttributes[mainTempId] = t.attributes
+            if (relationships.isNotEmpty()) newRelationships[mainTempId] = relationships
             orderedRowKeys += t.rowKey
+            if (fee != null && feeTempId != null) {
+                transfersToCreate +=
+                    Transfer(
+                        id = feeTempId,
+                        timestamp = t.timestamp,
+                        description = fee.description,
+                        sourceAccountId = requireId(fee.source),
+                        targetAccountId = requireId(fee.target),
+                        amount = fee.amount,
+                    )
+                // The fee uses its own row key when provided (so the audit trail points at the fee's
+                // source node), else the main's. The source recorder maps calls to keys positionally.
+                orderedRowKeys += fee.rowKey ?: t.rowKey
+            }
         }
 
         val updates = mutableListOf<TransferUpdate>()
@@ -459,7 +487,7 @@ class ImportEngine(
             orderedUpdateRowKeys += t.rowKey
         }
 
-        val createdIds =
+        val allCreatedIds =
             transactionRepository.importTransfers(
                 transfers = transfersToCreate,
                 newAttributes = newAttributes,
@@ -468,6 +496,8 @@ class ImportEngine(
                 updates = updates,
                 updateSourceRecorder = batch.provenance.updatedTransferRecorder(orderedUpdateRowKeys),
             )
+        // Return only the main transfers' ids (fee transfers are interleaved), aligned to [toImport].
+        val createdIds = mainResultIndices.map { allCreatedIds[it] }
         require(toImport.size == createdIds.size)
         return createdIds
     }

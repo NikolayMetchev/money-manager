@@ -40,6 +40,7 @@ import com.moneymanager.importmodel.DedupePolicy
 import com.moneymanager.importmodel.ExistingApiIdExtractor
 import com.moneymanager.importmodel.ExistingUniqueKeyExtractor
 import com.moneymanager.importmodel.ImportBatch
+import com.moneymanager.importmodel.ImportFee
 import com.moneymanager.importmodel.ImportResult
 import com.moneymanager.importmodel.ImportRowKey
 import com.moneymanager.importmodel.ImportTransfer
@@ -1313,6 +1314,12 @@ private suspend fun loadPersonalCounterpartyKeyIndex(
             // counterparty regardless of the display name Starling/Monzo returns for it. Must match
             // the runtime PersonalCounterpartyIdentity.dedupeKey format.
             index["$sortCode|$accountNumber"] = account.id
+        } else {
+            // Fallback for accounts whose only bank identity is a synthetic "bank:<sort>:<account>"
+            // external-id (e.g. a bank-derived counterparty created before its sort/account were persisted
+            // as attributes). Don't overwrite an attribute-backed entry — those are authoritative.
+            val externalId = attributes.firstOrNull { it.attributeType.id == ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID }?.value
+            bankDedupeKeyFromCounterpartyId(externalId)?.let { index.getOrPut(it) { account.id } }
         }
     }
     return index
@@ -2058,9 +2065,15 @@ private data class ApiTransactionPageItem(
     val rawJson: JsonObject? = null,
     val localAmountMinorUnits: Long? = null,
     val localCurrencyCode: String? = null,
+    // Fee charged on the transaction (magnitude only; a fee is always money out of the own account).
+    val feeAmountMinorUnits: Long? = null,
+    val feeAmountDecimalMajor: BigDecimal? = null,
+    val feeCurrencyCode: String? = null,
+    val feeDescription: String? = null,
 ) {
     val isZeroAmount: Boolean get() = amountSign == 0
     val isIncoming: Boolean get() = amountSign > 0
+    val hasFee: Boolean get() = feeAmountMinorUnits != null || feeAmountDecimalMajor != null
 }
 
 private data class CounterpartyNameMappings(
@@ -2103,6 +2116,7 @@ private data class PreparedApiTransaction(
     val attributes: List<NewAttribute>,
     val transactionApiId: String?,
     val uniqueKey: Map<String, String>?,
+    val fee: ImportFee? = null,
 )
 
 private data class ResponseTransactionImportRecord(
@@ -2191,6 +2205,7 @@ private suspend fun importTransactionPages(
                 uniqueKey = prepared.uniqueKey,
                 apiId = prepared.transactionApiId,
                 excludedFromBalances = !prepared.item.declineReason.isNullOrBlank(),
+                fee = prepared.fee,
             )
         }
 
@@ -2360,7 +2375,6 @@ private suspend fun prepareValidTransactionItem(
                 personalIdentity = personalCounterpartyIdentity,
             )
         }
-    val transfer = item.toTransfer(context.ownAccountId, counterpartyAccountId, currency)
     val transactionApiId = item.rawJson?.resolveJsonPath(setup.strategy.transactionMappings.idField)?.takeIf { it.isNotBlank() }
     val uniqueKey =
         if (setup.uniqueIdTxFields.isNotEmpty() && item.rawJson != null) {
@@ -2369,6 +2383,30 @@ private suspend fun prepareValidTransactionItem(
             }
         } else {
             null
+        }
+
+    // A fee is its own movement out of the own account into a consolidated per-strategy fee account,
+    // linked to the main transfer via a `fee` relationship. Skipped for declined items (no real movement).
+    val fee =
+        if (item.hasFee && item.declineReason.isNullOrBlank()) {
+            buildImportFee(item, context.ownAccountId, currency, counterpartyApiSource, setup)
+        } else {
+            null
+        }
+
+    // When the provider's amount is GROSS (already includes the fee, e.g. Monzo's ATM withdrawal where
+    // amount = withdrawal_amount + fee_amount), carve the fee out of the main transfer so main + fee sum
+    // back to the original amount instead of double-charging the fee.
+    val baseTransfer = item.toTransfer(context.ownAccountId, counterpartyAccountId, currency)
+    val transfer =
+        if (fee != null &&
+            setup.strategy.transactionMappings.feeIncludedInAmount &&
+            fee.amount.currency.id == baseTransfer.amount.currency.id
+        ) {
+            val carved = (baseTransfer.amount.amount - fee.amount.amount).coerceAtLeast(0L)
+            baseTransfer.copy(amount = Money(carved, baseTransfer.amount.currency))
+        } else {
+            baseTransfer
         }
 
     return PreparedApiTransaction(
@@ -2387,6 +2425,59 @@ private suspend fun prepareValidTransactionItem(
             ),
         transactionApiId = transactionApiId,
         uniqueKey = uniqueKey,
+        fee = fee,
+    )
+}
+
+/**
+ * Builds the [ImportFee] for a transaction that carries a fee: resolves the fee currency (falling back
+ * to the transaction currency), gets-or-creates the consolidated "<strategy> Fees" account, and pays the
+ * fee from the own account into it. Returns null when the fee currency is unknown or the fee is zero.
+ */
+private suspend fun buildImportFee(
+    item: ApiTransactionPageItem,
+    ownAccountId: AccountId,
+    transactionCurrency: Currency,
+    apiSource: AccountApiSource,
+    setup: ImportSetup,
+): ImportFee? {
+    // Only fall back to the transaction currency when no fee currency was configured. If one WAS
+    // provided but can't be resolved, skip the fee rather than persisting it under the wrong currency
+    // (which would also let a feeIncludedInAmount carve-out subtract a mismatched-currency amount).
+    val feeCurrency =
+        when (val code = item.feeCurrencyCode?.takeIf { it.isNotBlank() }) {
+            null -> transactionCurrency
+            else -> setup.currencyCache.getCurrency(code) ?: return null
+        }
+    val feeMoney =
+        when {
+            item.feeAmountMinorUnits != null -> Money(item.feeAmountMinorUnits.absoluteValue, feeCurrency)
+            item.feeAmountDecimalMajor != null -> Money.fromDisplayValue(item.feeAmountDecimalMajor, feeCurrency)
+            else -> return null
+        }
+    if (feeMoney.amount == 0L) return null
+    val feeAccountId =
+        setup.accountCache.getOrCreateAccountId(
+            name = "${setup.strategy.name} Fees",
+            transactionApiSource = apiSource,
+        )
+    // Point the fee's audit trail at the JSON object that holds the fee (e.g. `atm_fees_detailed`)
+    // rather than the whole transaction or the bare amount leaf, by extending the transaction path with
+    // the fee field's parent (its last `.`-segment dropped). A flat fee field (no parent) falls back to
+    // the transaction node.
+    val feeNodePath =
+        setup.strategy.transactionMappings.feeAmountField
+            ?.substringBeforeLast('.', missingDelimiterValue = "")
+            ?.takeIf { it.isNotBlank() }
+    val feeJsonPath =
+        if (feeNodePath != null) "${item.jsonPath.value}.$feeNodePath" else item.jsonPath.value
+    return ImportFee(
+        source = AccountRef.Existing(ownAccountId),
+        target = AccountRef.Existing(feeAccountId),
+        amount = feeMoney,
+        description = item.feeDescription?.ifBlank { null } ?: "Fee",
+        relationshipTypeId = RelationshipTypeId(DatabaseConfig.FEE_RELATIONSHIP_TYPE_ID),
+        rowKey = ImportRowKey.ApiJsonPath(apiSource.requestId, feeJsonPath),
     )
 }
 
@@ -2485,6 +2576,9 @@ private fun parseTransactionsWithPath(
                 val declineReason = resolveDeclineReason(obj, mappings)
                 val localAmount = mappings.localAmountField?.let { obj.resolveJsonPath(it) }?.toLongOrNull()
                 val localCurrency = mappings.localCurrencyField?.let { obj.resolveJsonPath(it) }
+                val fee = parseFeeAmount(obj, mappings)
+                val feeCurrency = mappings.feeCurrencyField?.let { obj.resolveJsonPath(it) }
+                val feeDescription = mappings.feeDescriptionField?.let { obj.resolveJsonPath(it) }
                 if (created != null && amount != null && currency != null) {
                     ApiTransactionPageItem(
                         amountMinorUnits = amount.minorUnits,
@@ -2500,6 +2594,10 @@ private fun parseTransactionsWithPath(
                         rawJson = obj,
                         localAmountMinorUnits = localAmount,
                         localCurrencyCode = localCurrency?.uppercase(),
+                        feeAmountMinorUnits = fee?.minorUnits,
+                        feeAmountDecimalMajor = fee?.decimalMajor,
+                        feeCurrencyCode = feeCurrency?.uppercase(),
+                        feeDescription = feeDescription,
                     )
                 } else {
                     logger.error {
@@ -2540,6 +2638,31 @@ private fun parseAmount(
             val magnitudeSign = decimal.compareTo(BigDecimal.ZERO).coerceIn(-1, 1)
             val sign = resolveSign(obj, mappings, magnitudeSign) ?: return null
             ParsedAmount(minorUnits = null, decimalMajor = decimal.abs(), sign = sign)
+        }
+    }
+}
+
+/**
+ * Parses the optional fee amount per the strategy's [ApiAmountFormat], as a magnitude (sign is
+ * irrelevant — a fee is always money out of the own account). Returns null when no fee field is
+ * configured, the field is absent/unparseable, or the fee is zero.
+ */
+private fun parseFeeAmount(
+    obj: JsonObject,
+    mappings: ApiTransactionMappings,
+): ParsedAmount? {
+    val field = mappings.feeAmountField ?: return null
+    val raw = obj.resolveJsonPath(field) ?: return null
+    return when (mappings.amountFormat) {
+        ApiAmountFormat.MINOR_UNITS_INTEGER -> {
+            val value = raw.toLongOrNull() ?: return null
+            if (value == 0L) return null
+            ParsedAmount(minorUnits = value.absoluteValue, decimalMajor = null, sign = 0)
+        }
+        ApiAmountFormat.DECIMAL_MAJOR_UNITS -> {
+            val decimal = runCatching { BigDecimal(raw) }.getOrNull() ?: return null
+            if (decimal.compareTo(BigDecimal.ZERO) == 0) return null
+            ParsedAmount(minorUnits = null, decimalMajor = decimal.abs(), sign = 0)
         }
     }
 }
@@ -2972,8 +3095,16 @@ private class AccountCache(
             }
             if (dedupeKey != null) {
                 personalCounterpartyKeyIndex[dedupeKey] = accountId
-                if (personalIdentity != null) {
-                    pendingPersonalCounterpartyAttributes.add(accountId to personalIdentity)
+                // Persist the bank identity (sort code + account number) so a later import of the OTHER
+                // provider can bank-match this account by attribute — not only when it's a flagged personal
+                // beneficiary. This is what keeps cross-provider reconciliation order-independent.
+                val identity =
+                    personalIdentity
+                        ?: bankIdentityFromDedupeKey(dedupeKey)?.let { (sortCode, accountNumber) ->
+                            PersonalCounterpartyIdentity(normalizedName, sortCode, accountNumber)
+                        }
+                if (identity != null) {
+                    pendingPersonalCounterpartyAttributes.add(accountId to identity)
                 }
             }
             accountId
@@ -3041,6 +3172,13 @@ private class AccountCache(
                         attributeTypeId = ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID,
                         value = request.counterpartyId,
                     )
+                // Also persist the bank identity as sort-code/account-number attributes so the index a later
+                // (other-provider) import builds can bank-match this account, keeping imports order-independent.
+                bankIdentityFromDedupeKey(request.dedupeKey)?.let { (sortCode, accountNumber) ->
+                    counterpartyAttributeWrites += AccountAttributeCreateInput(accountId, ACCOUNT_SORT_CODE_ATTR_TYPE_ID, sortCode)
+                    counterpartyAttributeWrites +=
+                        AccountAttributeCreateInput(accountId, ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID, accountNumber)
+                }
                 counterpartySourceWrites +=
                     ApiEntitySourceRecord(
                         entityType = EntityType.ACCOUNT,
@@ -3274,6 +3412,18 @@ private fun bankDedupeKeyFromCounterpartyId(counterpartyId: String?): String? {
     if (counterpartyId == null || !counterpartyId.startsWith("bank:")) return null
     val (sortCode, accountNumber) = counterpartyId.removePrefix("bank:").split(":").takeIf { it.size == 2 } ?: return null
     return if (sortCode.isNotBlank() && accountNumber.isNotBlank()) "$sortCode|$accountNumber" else null
+}
+
+/**
+ * Splits a bank dedupe key ("sortCode|accountNumber", as produced by [PersonalCounterpartyIdentity.dedupeKey]
+ * and [bankDedupeKeyFromCounterpartyId]) back into its sort code + account number, or null if it isn't one.
+ * Lets a bank-identified counterparty persist its identity as sort-code/account-number attributes even when
+ * it wasn't flagged a personal beneficiary, so a later import of the other provider can bank-match it.
+ */
+private fun bankIdentityFromDedupeKey(dedupeKey: String?): Pair<String, String>? {
+    val parts = dedupeKey?.split("|")?.takeIf { it.size == 2 } ?: return null
+    val (sortCode, accountNumber) = parts
+    return if (sortCode.isNotBlank() && accountNumber.isNotBlank()) sortCode to accountNumber else null
 }
 
 private fun JsonObject.resolveJsonObjectPath(dotPath: String): JsonObject? {

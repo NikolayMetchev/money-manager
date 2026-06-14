@@ -76,6 +76,7 @@ kotlin {
                 api(libs.compose.ui.unit.desktop)
                 api(projects.app.db.core)
                 api(projects.app.importer)
+                api(projects.app.importmodel)
                 api(projects.app.model.core)
                 api(projects.utils.bigdecimal)
                 api(projects.utils.rest)

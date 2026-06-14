@@ -384,6 +384,32 @@ private val TRANSACTION_WITH_NULL_ATM_FEES_JSON =
     """.trimIndent()
 
 /**
+ * A foreign ATM withdrawal that carries a non-zero `atm_fees_detailed.fee_amount` (£3.50), the shape
+ * Monzo returns when a cash withdrawal exceeds the fee-free allowance. The withdrawal itself is routed
+ * to the consolidated ATM counterparty by the built-in rules; the fee must import as its own movement
+ * into the "Monzo Fees" account, linked to the withdrawal via a `fee` relationship.
+ */
+private val TRANSACTION_WITH_ATM_FEE_JSON =
+    """
+{
+  "transactions": [
+    {
+      "id": "tx_00009TEST_ATM_FEE_001",
+      "account_id": "$ACCOUNT_ID",
+      "created": "2024-08-01T10:00:00.000Z",
+      "amount": -20000,
+      "currency": "GBP",
+      "description": "FOREIGN ATM MADRID ESP",
+      "category": "cash",
+      "merchant": null,
+      "counterparty": {},
+      "atm_fees_detailed": { "fee_amount": 350, "withdrawal_amount": -20000, "withdrawal_currency": "GBP" }
+    }
+  ]
+}
+    """.trimIndent()
+
+/**
  * A page that contains only declined transactions — no settled tx at all.
  * Used to verify that an all-declined page does not prematurely stop pagination.
  */
@@ -1037,12 +1063,19 @@ class MonzoImportE2ETest : DbTest() {
             val allAccounts = repositories.accountRepository.getAllAccounts().first()
             val counterpartyAccounts = allAccounts.filter { it.name.startsWith("Monzo Counterparty:") }
             assertEquals(1, counterpartyAccounts.size, "Matching bank details should create one counterparty account")
-            val counterpartyAttribute =
+            val counterpartyAttrs =
                 repositories.accountAttributeRepository
                     .getByAccount(counterpartyAccounts.single().id)
                     .first()
-                    .single { it.attributeType.name == "account-external-id" }
-            assertEquals("bank:041307:29900313", counterpartyAttribute.value)
+            assertEquals(
+                "bank:041307:29900313",
+                counterpartyAttrs.single { it.attributeType.name == "account-external-id" }.value,
+            )
+            // The bank identity is ALSO persisted as sort-code / account-number attributes (not only the
+            // synthetic external-id), so a later import of another provider can bank-match this account by
+            // attribute — this is what makes cross-provider reconciliation order-independent.
+            assertEquals("041307", counterpartyAttrs.single { it.attributeType.name == "account-sort-code" }.value)
+            assertEquals("29900313", counterpartyAttrs.single { it.attributeType.name == "account-account-number" }.value)
         }
 
     @Test
@@ -1705,5 +1738,124 @@ class MonzoImportE2ETest : DbTest() {
             val domesticTransfer = transfers.single { it.description == "DOMESTIC SPEND" }
             assertEquals("GBP", domesticTransfer.amount.currency.code, "Domestic transfer should remain in account currency")
             assertEquals(5000L, domesticTransfer.amount.amount, "Domestic transfer should use the main GBP amount")
+        }
+
+    @Test
+    fun `atm withdrawal fee imports as its own transfer linked to the withdrawal`() =
+        runTest {
+            val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
+            val sessionId =
+                repositories.apiSessionRepository.createSession(
+                    token = "test-monzo-token",
+                    deviceId = deviceId,
+                    createdAt = Instant.fromEpochMilliseconds(1_700_000_000_000L),
+                    expiresAt = null,
+                )
+
+            val mockEngine =
+                MockEngine { request ->
+                    val url = request.url.toString()
+                    val json =
+                        when {
+                            url.contains("/accounts") -> ACCOUNTS_JSON
+                            url.contains("/transactions") && !url.contains("before=") -> TRANSACTION_WITH_ATM_FEE_JSON
+                            url.contains("/transactions") && url.contains("before=") -> EMPTY_TRANSACTIONS_JSON
+                            else -> error("Unexpected request: $url")
+                        }
+                    respond(
+                        content = json,
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                    )
+                }
+            val apiClient =
+                createApiClient(
+                    trafficRecorder = ApiSessionTrafficRecorder(sessionId, repositories.apiSessionRepository),
+                    engine = mockEngine,
+                )
+            // Use the seeded Monzo strategy unchanged: it already maps the fee via atm_fees_detailed.fee_amount.
+            val strategy =
+                repositories.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .single { it.name == "Monzo" }
+
+            downloadApiSessionAccounts(
+                token = "test-monzo-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+            downloadApiSessionTransactions(
+                token = "test-monzo-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+
+            val importResult =
+                importApiSessionTransactions(
+                    apiSessionRepository = repositories.apiSessionRepository,
+                    accountRepository = repositories.accountRepository,
+                    currencyRepository = repositories.currencyRepository,
+                    transactionRepository = repositories.transactionRepository,
+                    entitySource = DbEntitySource(repositories.entitySourceQueries, repositories.transferSourceQueries, deviceId),
+                    personRepository = repositories.personRepository,
+                    personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
+                    personAttributeRepository = repositories.personAttributeRepository,
+                    attributeTypeRepository = repositories.attributeTypeRepository,
+                    accountAttributeRepository = repositories.accountAttributeRepository,
+                    deviceId = deviceId,
+                    sessionId = sessionId,
+                    strategy = strategy,
+                )
+
+            // The fee is a separate movement, so it is not counted as an imported transaction.
+            assertEquals(1, importResult.transactionCount, "Only the withdrawal counts as an imported transaction")
+            assertEquals(0, importResult.errorCount, "Should have no import errors")
+
+            val allAccounts = repositories.accountRepository.getAllAccounts().first()
+            val monzoAccount = allAccounts.single { it.name == "Monzo: $ACCOUNT_DESCRIPTION" }
+            val feeAccount = allAccounts.single { it.name == "Monzo Fees" }
+
+            // The Monzo account has two movements: the £200 withdrawal and the £3.50 fee.
+            val transfers =
+                repositories.transactionRepository
+                    .getTransactionsByAccount(monzoAccount.id)
+                    .first()
+            assertEquals(2, transfers.size, "Withdrawal plus its fee")
+
+            // Monzo's `amount` (-20000) is gross: it already includes the £3.50 fee, so the fee is carved
+            // out (main 19650 + fee 350 = 20000) rather than double-charged.
+            val withdrawal = transfers.single { it.description == "FOREIGN ATM MADRID ESP" }
+            assertEquals(19650L, withdrawal.amount.amount, "Fee is carved out of the gross amount")
+
+            val feeTransfer = transfers.single { it.description == "Fee" }
+            assertEquals(350L, feeTransfer.amount.amount, "Fee transfer carries the atm fee amount")
+            assertEquals("GBP", feeTransfer.amount.currency.code)
+            assertEquals(monzoAccount.id, feeTransfer.sourceAccountId, "Fee leaves the Monzo account")
+            assertEquals(feeAccount.id, feeTransfer.targetAccountId, "Fee goes to the consolidated Monzo Fees account")
+
+            // The withdrawal (id1) links to the fee transfer (id2) via a `fee` relationship.
+            val relationship =
+                repositories.transferRelationshipRepository
+                    .getByTransfer(withdrawal.id)
+                    .first()
+                    .single()
+            assertEquals(withdrawal.id, relationship.id1)
+            assertEquals(feeTransfer.id, relationship.id2)
+            assertEquals("fee", relationship.relationshipType.name)
+
+            // The fee's audit trail points at the JSON object holding the fee (atm_fees_detailed), not the
+            // whole transaction nor the bare fee_amount leaf, so the user lands on that node in the viewer.
+            val feeSource =
+                repositories.auditRepository
+                    .getAuditHistoryForTransfer(feeTransfer.id)
+                    .single()
+                    .source
+            assertNotNull(feeSource?.apiSource)
+            assertEquals("$.transactions[0].atm_fees_detailed", feeSource.apiSource?.jsonPath?.value)
         }
 }

@@ -894,6 +894,12 @@ object DatabaseConfig {
                         declineReasonField = "decline_reason",
                         localAmountField = "local_amount",
                         localCurrencyField = "local_currency",
+                        // Foreign ATM withdrawals above the fee-free allowance carry a charge in
+                        // `atm_fees_detailed.fee_amount` (integer minor units; null/0 otherwise). Import it
+                        // as its own linked fee transfer. Monzo's `amount` is gross (= withdrawal_amount +
+                        // fee_amount), so the fee is carved out of the main transfer rather than added on top.
+                        feeAmountField = "atm_fees_detailed.fee_amount",
+                        feeIncludedInAmount = true,
                     ),
                 accountNamePrefix = "Monzo: ",
                 counterpartyPrefix = "Monzo Counterparty: ",

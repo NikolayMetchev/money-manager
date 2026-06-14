@@ -2,6 +2,7 @@
 
 package com.moneymanager.ui.screens.csv
 
+import com.moneymanager.database.DatabaseConfig
 import com.moneymanager.database.csv.CsvImportProvenance
 import com.moneymanager.database.csv.CsvTransferMapper
 import com.moneymanager.database.csv.DiscoveredAccountMapping
@@ -14,6 +15,7 @@ import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.NewAttribute
+import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvImport
@@ -33,6 +35,7 @@ import com.moneymanager.importmodel.AccountRef
 import com.moneymanager.importmodel.DedupePolicy
 import com.moneymanager.importmodel.ExistingUniqueKeyExtractor
 import com.moneymanager.importmodel.ImportBatch
+import com.moneymanager.importmodel.ImportFee
 import com.moneymanager.importmodel.ImportRowKey
 import com.moneymanager.importmodel.ImportTransfer
 import com.moneymanager.ui.screens.BulkImportResult
@@ -440,6 +443,23 @@ internal suspend fun runCsvImport(
             .map { it.attributeTypeName }
             .toSet()
 
+    // Resolve a single consolidated "<strategy> Fees" account when any row carries a fee, so per-row
+    // fees are modelled as their own movements linked to the main transfer.
+    val feeAccountId: AccountId? =
+        if (finalPrep.validTransfers.any { it.feeAmount != null }) {
+            val feeAccountName = "${strategy.name} Fees"
+            accountsByName[feeAccountName]?.id
+                ?: accountRepository.createAccount(
+                    Account(
+                        id = AccountId(0),
+                        name = feeAccountName,
+                        openingDate = Clock.System.now(),
+                    ),
+                )
+        } else {
+            null
+        }
+
     val importTransfers =
         finalPrep.validTransfers.map { row ->
             val uniqueKey =
@@ -450,6 +470,16 @@ internal suspend fun runCsvImport(
                         .filter { (name, _) -> name in uniqueIdTypeNames }
                         .associate { (name, value) -> name to value }
                 }
+            val fee =
+                row.feeAmount?.let { feeMoney ->
+                    ImportFee(
+                        source = AccountRef.Existing(row.transfer.sourceAccountId),
+                        target = AccountRef.Existing(feeAccountId!!),
+                        amount = feeMoney,
+                        description = "Fee",
+                        relationshipTypeId = RelationshipTypeId(DatabaseConfig.FEE_RELATIONSHIP_TYPE_ID),
+                    )
+                }
             ImportTransfer(
                 rowKey = ImportRowKey.CsvRow(row.rowIndex),
                 source = AccountRef.Existing(row.transfer.sourceAccountId),
@@ -459,6 +489,7 @@ internal suspend fun runCsvImport(
                 amount = row.transfer.amount,
                 attributes = attributesFor(row.attributes),
                 uniqueKey = uniqueKey,
+                fee = fee,
             )
         }
 

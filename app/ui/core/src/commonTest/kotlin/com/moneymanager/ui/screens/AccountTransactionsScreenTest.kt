@@ -2,12 +2,14 @@
 
 package com.moneymanager.ui.screens
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
@@ -55,7 +57,9 @@ import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
 import com.moneymanager.ui.error.ProvideSchemaAwareScope
+import com.moneymanager.ui.screens.transactions.AccountTransactionCard
 import com.moneymanager.ui.screens.transactions.AccountTransactionsScreen
+import com.moneymanager.ui.screens.transactions.ScreenSizeClass
 import com.moneymanager.ui.screens.transactions.TransactionAuditScreen
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import dev.mokkery.MockMode
@@ -263,6 +267,203 @@ class AccountTransactionsScreenTest {
             // [0] = Matrix header
             // [1] = Transaction row (the "other" account from Savings' view)
             onAllNodesWithText("Checking").assertCountEquals(2)
+        }
+
+    @Test
+    fun clickingAccountInTransaction_passesTransferIdSoTheOtherAccountScrollsToIt() =
+        runMoneyManagerComposeUiTest {
+            // Given: two accounts with a transfer between them
+            val now = Clock.System.now()
+            val usdCurrency = Currency(id = CurrencyId(1L), code = "USD", name = "US Dollar")
+            val checking = Account(id = AccountId(1L), name = "Checking", openingDate = now)
+            val savings = Account(id = AccountId(2L), name = "Savings", openingDate = now)
+            val transfer =
+                Transfer(
+                    id = TransferId(42L),
+                    timestamp = now,
+                    description = "Transfer to savings",
+                    sourceAccountId = checking.id,
+                    targetAccountId = savings.id,
+                    amount = Money.fromDisplayValue("100", usdCurrency),
+                )
+
+            val accountRepository = createAccountRepository(listOf(checking, savings))
+            val transactionRepository = createTransactionRepository(listOf(transfer))
+
+            // Capture the navigation callback args the way MoneyManagerApp wires them into the route.
+            var clickedAccountId: AccountId? = null
+            var clickedTransferId: TransferId? = null
+
+            setContent {
+                ProvideSchemaAwareScope {
+                    AccountTransactionsScreen(
+                        accountId = checking.id,
+                        transactionRepository = transactionRepository,
+                        transferSourceRepository = createTransferSourceRepository(),
+                        entitySource = createStubEntitySource(),
+                        accountRepository = accountRepository,
+                        accountAttributeRepository = createAccountAttributeRepository(),
+                        categoryRepository = createCategoryRepository(),
+                        currencyRepository = createCurrencyRepository(listOf(usdCurrency)),
+                        attributeTypeRepository = createAttributeTypeRepository(),
+                        personRepository = createPersonRepository(),
+                        personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
+                        maintenance = createMaintenance(),
+                        onAccountClick = { accountId, _, _, transferId ->
+                            clickedAccountId = accountId
+                            clickedTransferId = transferId
+                        },
+                    )
+                }
+            }
+
+            waitForIdle()
+
+            // When: clicking the other account ("Savings") in the transaction row (index [1]; [0] is the matrix).
+            onAllNodesWithText("Savings")[1].performClick()
+            waitForIdle()
+
+            // Then: navigation targets the other account AND carries this transfer's id, so the destination
+            // screen scrolls to the same transfer instead of landing on the first page.
+            assertEquals(savings.id, clickedAccountId)
+            assertEquals(transfer.id, clickedTransferId)
+        }
+
+    @Test
+    fun feeBadges_distinguishMainAndFee_andEachLinksToTheOther() =
+        runMoneyManagerComposeUiTest {
+            val now = Clock.System.now()
+            val usd = Currency(id = CurrencyId(1L), code = "USD", name = "US Dollar")
+            val own = Account(id = AccountId(1L), name = "Checking", openingDate = now)
+            val feesAccount = Account(id = AccountId(2L), name = "Checking Fees", openingDate = now)
+            val mainId = TransferId(10L)
+            val feeId = TransferId(11L)
+
+            // The main transaction links forward to its fee; the fee links back to its main.
+            val mainRow =
+                AccountRow(
+                    transactionId = mainId,
+                    timestamp = now,
+                    description = "Coffee",
+                    accountId = own.id,
+                    transactionAmount = Money(-500, usd),
+                    runningBalance = Money(-500, usd),
+                    sourceAccountId = own.id,
+                    targetAccountId = feesAccount.id,
+                    feeTransferId = feeId,
+                )
+            val feeRow =
+                AccountRow(
+                    transactionId = feeId,
+                    timestamp = now,
+                    description = "Card charge",
+                    accountId = own.id,
+                    transactionAmount = Money(-29, usd),
+                    runningBalance = Money(-529, usd),
+                    sourceAccountId = own.id,
+                    targetAccountId = feesAccount.id,
+                    feeParentTransferId = mainId,
+                )
+
+            var linkClicked: TransferId? = null
+            setContent {
+                ProvideSchemaAwareScope {
+                    Column {
+                        AccountTransactionCard(
+                            runningBalance = mainRow,
+                            accounts = listOf(own, feesAccount),
+                            screenSizeClass = ScreenSizeClass.Expanded,
+                            onFeeLinkClick = { linkClicked = it },
+                        )
+                        AccountTransactionCard(
+                            runningBalance = feeRow,
+                            accounts = listOf(own, feesAccount),
+                            screenSizeClass = ScreenSizeClass.Expanded,
+                            onFeeLinkClick = { linkClicked = it },
+                        )
+                    }
+                }
+            }
+            waitForIdle()
+
+            // Two distinct badges: "Has fee" on the main transaction, "Fee" on the fee movement.
+            onNodeWithText("Has fee").assertIsDisplayed()
+            onNodeWithText("Fee").assertIsDisplayed()
+
+            // Clicking the main's badge jumps to the fee transfer...
+            onNodeWithText("Has fee").performClick()
+            waitForIdle()
+            assertEquals(feeId, linkClicked)
+
+            // ...and clicking the fee's badge jumps back to the main transaction.
+            onNodeWithText("Fee").performClick()
+            waitForIdle()
+            assertEquals(mainId, linkClicked)
+        }
+
+    @Test
+    fun clickingFeeBadge_whenLinkedTransferAlreadyInList_doesNotNavigate() =
+        runMoneyManagerComposeUiTest {
+            // Given: an account showing both a transaction and its linked fee (both fit on screen).
+            val now = Clock.System.now()
+            val usd = Currency(id = CurrencyId(1L), code = "USD", name = "US Dollar")
+            val own = Account(id = AccountId(1L), name = "Checking", openingDate = now)
+            val shop = Account(id = AccountId(2L), name = "Coffee Shop", openingDate = now)
+            val feesAccount = Account(id = AccountId(3L), name = "Checking Fees", openingDate = now)
+            val mainTransfer =
+                Transfer(
+                    id = TransferId(10L),
+                    timestamp = now,
+                    description = "Coffee",
+                    sourceAccountId = own.id,
+                    targetAccountId = shop.id,
+                    amount = Money.fromDisplayValue("100", usd),
+                )
+            val feeTransfer =
+                Transfer(
+                    id = TransferId(11L),
+                    timestamp = now,
+                    description = "Card charge",
+                    sourceAccountId = own.id,
+                    targetAccountId = feesAccount.id,
+                    amount = Money.fromDisplayValue("1", usd),
+                )
+
+            val accountRepository = createAccountRepository(listOf(own, shop, feesAccount))
+            val transactionRepository =
+                createTransactionRepository(listOf(mainTransfer, feeTransfer), feeLinks = mapOf(10L to 11L))
+
+            // The navigation fallback must NOT fire when the linked transfer is already in the list.
+            var navigated = false
+
+            setContent {
+                ProvideSchemaAwareScope {
+                    AccountTransactionsScreen(
+                        accountId = own.id,
+                        transactionRepository = transactionRepository,
+                        transferSourceRepository = createTransferSourceRepository(),
+                        entitySource = createStubEntitySource(),
+                        accountRepository = accountRepository,
+                        accountAttributeRepository = createAccountAttributeRepository(),
+                        categoryRepository = createCategoryRepository(),
+                        currencyRepository = createCurrencyRepository(listOf(usd)),
+                        attributeTypeRepository = createAttributeTypeRepository(),
+                        personRepository = createPersonRepository(),
+                        personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
+                        maintenance = createMaintenance(),
+                        onFeeLinkClick = { navigated = true },
+                    )
+                }
+            }
+
+            waitForIdle()
+
+            // When: clicking the fee badge whose linked main transaction is already on screen.
+            onNodeWithText("Fee").performClick()
+            waitForIdle()
+
+            // Then: it's handled in place (highlight) — no navigation to another screen.
+            assertEquals(false, navigated)
         }
 
     @Test
@@ -848,7 +1049,10 @@ class AccountTransactionsScreenTest {
             everySuspend { getTransfersBetweenAccounts(any(), any()) } returns emptyList()
         }
 
-    private fun createTransactionRepository(transfers: List<Transfer>): TransactionRepository =
+    private fun createTransactionRepository(
+        transfers: List<Transfer>,
+        feeLinks: Map<Long, Long> = emptyMap(),
+    ): TransactionRepository =
         mock(MockMode.autoUnit) {
             every { getTransactionById(any()) } calls { (id: Long) -> flowOf(transfers.find { it.id.id == id }) }
             every { getTransactionsByAccount(any()) } calls { (accountId: AccountId) ->
@@ -859,7 +1063,7 @@ class AccountTransactionsScreenTest {
             every { getAccountBalances() } returns flowOf(emptyList())
             everySuspend { getRunningBalanceByAccountPaginated(any(), any(), any()) } calls
                 { (accountId: AccountId, pageSize: Int, _: PagingInfo?) ->
-                    val allRows = buildAccountRows(transfers, accountId)
+                    val allRows = buildAccountRows(transfers, accountId, feeLinks)
                     val items = allRows.take(pageSize)
                     PagingResult(
                         items = items,
@@ -875,7 +1079,7 @@ class AccountTransactionsScreenTest {
                 PagingResult(emptyList(), PagingInfo(null, null, false))
             everySuspend { getPageContainingTransaction(any(), any(), any()) } calls
                 { (accountId: AccountId, transactionId: TransferId, pageSize: Int) ->
-                    val allRows = buildAccountRows(transfers, accountId)
+                    val allRows = buildAccountRows(transfers, accountId, feeLinks)
                     val targetIndex = allRows.indexOfFirst { it.transactionId.id == transactionId.id }
                     val items = allRows.take(pageSize)
                     PageWithTargetIndex(
@@ -895,9 +1099,13 @@ class AccountTransactionsScreenTest {
     private fun buildAccountRows(
         transfers: List<Transfer>,
         accountId: AccountId,
+        feeLinks: Map<Long, Long> = emptyMap(),
     ): List<AccountRow> =
         transfers
             .flatMap { transfer ->
+                // A row is the main of a fee link if its id is a key; the fee itself if its id is a value.
+                val feeTransferId = feeLinks[transfer.id.id]?.let { TransferId(it) }
+                val feeParentTransferId = feeLinks.entries.firstOrNull { it.value == transfer.id.id }?.let { TransferId(it.key) }
                 listOf(
                     AccountRow(
                         transactionId = transfer.id,
@@ -908,6 +1116,8 @@ class AccountTransactionsScreenTest {
                         runningBalance = transfer.amount,
                         sourceAccountId = transfer.sourceAccountId,
                         targetAccountId = transfer.targetAccountId,
+                        feeTransferId = feeTransferId,
+                        feeParentTransferId = feeParentTransferId,
                     ),
                     AccountRow(
                         transactionId = transfer.id,
@@ -918,6 +1128,8 @@ class AccountTransactionsScreenTest {
                         runningBalance = transfer.amount,
                         sourceAccountId = transfer.sourceAccountId,
                         targetAccountId = transfer.targetAccountId,
+                        feeTransferId = feeTransferId,
+                        feeParentTransferId = feeParentTransferId,
                     ),
                 )
             }.filter { it.accountId == accountId }
