@@ -71,16 +71,20 @@ fun ApiStrategyEditorScreen(
         if (isEditMode) StrategyLoad.Loading else StrategyLoad.Loaded(null),
     )
     val existingStrategy = (strategyLoad as? StrategyLoad.Loaded)?.strategy
-    val strategyLoaded = strategyLoad is StrategyLoad.Loaded
 
-    if (!strategyLoaded) {
-        EditorPlaceholder(isEditMode = isEditMode, onBack = onBack) { CircularProgressIndicator() }
-        return
-    }
-    if (isEditMode && existingStrategy == null) {
-        EditorPlaceholder(isEditMode = true, onBack = onBack) {
-            Text("Strategy not found.", style = MaterialTheme.typography.bodyLarge)
+    // Render a placeholder until the strategy resolves, or a terminal message if the id is gone.
+    val placeholder: (@Composable () -> Unit)? =
+        when {
+            strategyLoad !is StrategyLoad.Loaded -> {
+                { CircularProgressIndicator() }
+            }
+            isEditMode && existingStrategy == null -> {
+                { Text("Strategy not found.", style = MaterialTheme.typography.bodyLarge) }
+            }
+            else -> null
         }
+    if (placeholder != null) {
+        EditorPlaceholder(isEditMode = isEditMode, onBack = onBack, content = placeholder)
         return
     }
 

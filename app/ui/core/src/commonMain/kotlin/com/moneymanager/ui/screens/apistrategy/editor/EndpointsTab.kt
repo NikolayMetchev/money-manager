@@ -103,7 +103,7 @@ internal fun EndpointsTab(
         }
         TextButton(
             onClick = {
-                state.ancestorEndpoints = state.ancestorEndpoints + ApiEndpointConfig(path = "", responseArrayKey = "")
+                state.ancestorEndpoints += ApiEndpointConfig(path = "", responseArrayKey = "")
             },
             enabled = enabled,
         ) {

@@ -93,7 +93,7 @@ class ApiStrategyEditorStateTest {
                             ),
                     ),
                 ),
-            signing = ApiSigningConfig(triggerStatus = 403, statementCountries = setOf("GB", "US")),
+            signing = ApiSigningConfig(triggerStatus = 401, statementCountries = setOf("GB", "US")),
             peopleDownload =
                 ApiPersonImportConfig(
                     endpoint = ApiEndpointConfig(path = "/profiles", responseArrayKey = ""),
@@ -107,7 +107,7 @@ class ApiStrategyEditorStateTest {
         )
 
     @Test
-    fun `round-trips every nested config field through extract, state, and build`() {
+    fun `round-trips every nested config field through extract then state then build`() {
         val strategy = fullStrategy()
 
         val extracted = extractFormStateFromStrategy(strategy)

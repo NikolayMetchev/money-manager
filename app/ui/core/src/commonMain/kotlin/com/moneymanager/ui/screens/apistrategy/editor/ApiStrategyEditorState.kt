@@ -107,9 +107,6 @@ internal class ApiStrategyEditorState(
                     rule.predicates.any { it.path.isBlank() || (it.op.requiresValue() && it.value.isNullOrBlank()) }
             }
 
-    val advancedHasError: Boolean
-        get() = false
-
     fun tabHasError(tab: EditorTab): Boolean =
         when (tab) {
             EditorTab.GENERAL -> generalHasError
@@ -118,7 +115,8 @@ internal class ApiStrategyEditorState(
             EditorTab.TRANSACTION_MAPPINGS -> transactionMappingsHasError
             EditorTab.PEOPLE -> peopleHasError
             EditorTab.RULES -> rulesHasError
-            EditorTab.ADVANCED -> advancedHasError
+            // The Advanced tab (request signing) has no required fields, so it never blocks saving.
+            EditorTab.ADVANCED -> false
         }
 
     val isValid: Boolean
@@ -128,8 +126,7 @@ internal class ApiStrategyEditorState(
                 !accountMappingsHasError &&
                 !transactionMappingsHasError &&
                 !peopleHasError &&
-                !rulesHasError &&
-                !advancedHasError
+                !rulesHasError
 
     fun toFormState(): ApiStrategyFormState =
         ApiStrategyFormState(
