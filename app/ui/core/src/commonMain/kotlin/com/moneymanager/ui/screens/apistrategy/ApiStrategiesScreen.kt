@@ -36,24 +36,23 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
+import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
 import com.moneymanager.domain.repository.ApiImportStrategyRepository
-import com.moneymanager.domain.repository.ApiSessionRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import kotlinx.coroutines.launch
 
 @Composable
 fun ApiStrategiesScreen(
     apiImportStrategyRepository: ApiImportStrategyRepository,
-    apiSessionRepository: ApiSessionRepository,
     onBack: () -> Unit = {},
+    onCreateStrategy: () -> Unit = {},
+    onEditStrategy: (ApiImportStrategyId) -> Unit = {},
     onAuditHistoryClick: ((ApiImportStrategy) -> Unit)? = null,
 ) {
     val strategies by apiImportStrategyRepository
         .getAllStrategies()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
 
-    var strategyToEdit by remember { mutableStateOf<ApiImportStrategy?>(null) }
-    var showCreateDialog by remember { mutableStateOf(false) }
     var strategyPendingDelete by remember { mutableStateOf<ApiImportStrategy?>(null) }
     val scope = rememberCoroutineScope()
 
@@ -74,7 +73,7 @@ fun ApiStrategiesScreen(
                     text = "API Import Strategies",
                     style = MaterialTheme.typography.headlineSmall,
                 )
-                TextButton(onClick = { showCreateDialog = true }) { Text("+ New") }
+                TextButton(onClick = onCreateStrategy) { Text("+ New") }
             }
 
             if (strategies.isEmpty()) {
@@ -97,7 +96,7 @@ fun ApiStrategiesScreen(
                         items(strategies) { strategy ->
                             StrategyCard(
                                 strategy = strategy,
-                                onClick = { strategyToEdit = strategy },
+                                onClick = { onEditStrategy(strategy.id) },
                                 onDelete = { strategyPendingDelete = strategy },
                                 onAuditHistory = onAuditHistoryClick?.let { handler -> { handler(strategy) } },
                             )
@@ -133,34 +132,6 @@ fun ApiStrategiesScreen(
             dismissButton = {
                 TextButton(onClick = { strategyPendingDelete = null }) { Text("Cancel") }
             },
-        )
-    }
-
-    if (showCreateDialog) {
-        ApiStrategyEditDialog(
-            strategy = null,
-            apiSessionRepository = apiSessionRepository,
-            onSave = { newStrategy ->
-                scope.launch {
-                    apiImportStrategyRepository.createStrategy(newStrategy)
-                }
-                showCreateDialog = false
-            },
-            onDismiss = { showCreateDialog = false },
-        )
-    }
-
-    strategyToEdit?.let { strategy ->
-        ApiStrategyEditDialog(
-            strategy = strategy,
-            apiSessionRepository = apiSessionRepository,
-            onSave = { updated ->
-                scope.launch {
-                    apiImportStrategyRepository.updateStrategy(updated)
-                }
-                strategyToEdit = null
-            },
-            onDismiss = { strategyToEdit = null },
         )
     }
 }

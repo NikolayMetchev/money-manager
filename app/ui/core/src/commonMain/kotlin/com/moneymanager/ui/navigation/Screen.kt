@@ -45,6 +45,10 @@ sealed class Screen(
 
     data object ApiStrategies : Screen("API Import Strategies")
 
+    data class ApiStrategyEditor(
+        val strategyId: ApiImportStrategyId? = null,
+    ) : Screen(if (strategyId == null) "Create API Strategy" else "Edit API Strategy")
+
     data object Settings : Screen("Settings")
 
     data class AccountTransactions(
