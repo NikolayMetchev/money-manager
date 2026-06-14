@@ -30,6 +30,12 @@
       <module name="money-manager.app.di.core" options="-Xlint:all -Werror" />
       <module name="money-manager.app.di.core.jvmMain" options="-Xlint:all -Werror" />
       <module name="money-manager.app.di.core.jvmTest" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.importer" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.importer.jvmMain" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.importer.jvmTest" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.importmodel" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.importmodel.jvmMain" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.importmodel.jvmTest" options="-Xlint:all -Werror" />
       <module name="money-manager.app.main.jvm" options="-Xlint:all -Werror" />
       <module name="money-manager.app.main.jvm.dev" options="-Xlint:all -Werror" />
       <module name="money-manager.app.main.jvm.main" options="-Xlint:all -Werror" />
@@ -61,6 +67,9 @@
       <module name="money-manager.utils.parsers.csv" options="-Xlint:all -Werror" />
       <module name="money-manager.utils.parsers.csv.jvmMain" options="-Xlint:all -Werror" />
       <module name="money-manager.utils.parsers.csv.jvmTest" options="-Xlint:all -Werror" />
+      <module name="money-manager.utils.parsers.qif" options="-Xlint:all -Werror" />
+      <module name="money-manager.utils.parsers.qif.jvmMain" options="-Xlint:all -Werror" />
+      <module name="money-manager.utils.parsers.qif.jvmTest" options="-Xlint:all -Werror" />
       <module name="money-manager.utils.rest" options="-Xlint:all -Werror" />
       <module name="money-manager.utils.rest.jvmMain" options="-Xlint:all -Werror" />
       <module name="money-manager.utils.rest.jvmTest" options="-Xlint:all -Werror" />
