@@ -214,8 +214,9 @@ class WiseCsvMapperTest {
     }
 
     @Test
-    fun `OUT fee is added to the debit so ATM withdrawals match the balance movement`() {
-        // Real export shape: 200.00 withdrawn, 7.29 fee, 207.29 left the balance
+    fun `OUT fee is split into its own fee movement, not folded into the amount`() {
+        // Real export shape: 200.00 withdrawn, 7.29 fee. The main transfer is the 200.00 movement and
+        // the 7.29 fee becomes its own linked fee transfer.
         val row =
             wiseRow(
                 id = "CARD_TRANSACTION-3683129415",
@@ -230,11 +231,12 @@ class WiseCsvMapperTest {
         val result = mapper(accounts).mapRow(row)
 
         assertIs<MappingResult.Success>(result)
-        assertEquals(20729L, result.transfer.amount.amount)
+        assertEquals(20000L, result.transfer.amount.amount)
+        assertEquals(729L, result.feeAmount?.amount)
     }
 
     @Test
-    fun `IN rows never add the sender's fee to the credited amount`() {
+    fun `IN rows never produce a fee movement`() {
         val row =
             wiseRow(
                 id = "TRANSFER-42",
@@ -252,10 +254,11 @@ class WiseCsvMapperTest {
 
         assertIs<MappingResult.Success>(result)
         assertEquals(9900L, result.transfer.amount.amount)
+        assertEquals(null, result.feeAmount)
     }
 
     @Test
-    fun `cross-currency payment to another person records the Wise-side amount`() {
+    fun `cross-currency payment records the Wise-side amount and a separate fee`() {
         val row =
             wiseRow(
                 id = "TRANSFER-876114969",
@@ -273,9 +276,11 @@ class WiseCsvMapperTest {
         assertIs<MappingResult.Success>(result)
         assertEquals(wiseGbp.id, result.transfer.sourceAccountId)
         assertEquals(teodora.id, result.transfer.targetAccountId)
-        // 89.19 converted + 1.18 fee = 90.37 debited from the GBP balance
-        assertEquals(9037L, result.transfer.amount.amount)
+        // 89.19 converted is the main movement; the 1.18 fee is its own linked fee transfer.
+        assertEquals(8919L, result.transfer.amount.amount)
+        assertEquals(118L, result.feeAmount?.amount)
         assertEquals(gbp, result.transfer.amount.currency)
+        assertEquals(gbp, result.feeAmount?.currency)
         assertTrue(result.attributes.contains("wise-exchange-rate" to "2.24251"))
     }
 

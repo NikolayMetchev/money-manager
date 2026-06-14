@@ -153,7 +153,9 @@ class ImportDeduper(
             }
         val relationships = transfer.relationships + NewRelationship(relatedTransferId = matchId, typeId = relationshipTypeId)
         return Classified(
-            transfer.copy(attributes = attributes, relationships = relationships),
+            // Drop any fee: a cross-source duplicate's fee is itself a duplicate, so it must not be
+            // re-created (it would double-count) — the original source's fee already covers it.
+            transfer.copy(attributes = attributes, relationships = relationships, fee = null),
             ImportStatus.IMPORTED,
             existing = null,
         )

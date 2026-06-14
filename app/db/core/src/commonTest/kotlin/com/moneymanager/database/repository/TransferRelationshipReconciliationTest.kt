@@ -146,6 +146,82 @@ class TransferRelationshipReconciliationTest : DbTest() {
         }
 
     @Test
+    fun feeTransfer_inBatchRelationshipResolvesToSiblingsRealId() =
+        runTest {
+            val currency = gbp()
+            val checkingId = createAccount("Checking")
+            val shopId = createAccount("Coffee Shop")
+            val feeAccountId = createAccount("Monzo Fees")
+            val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
+
+            fun recorder() = SampleGeneratorSourceRecorder(transferSourceQueries, deviceId)
+
+            val feeTypeId = RelationshipTypeId(DatabaseConfig.FEE_RELATIONSHIP_TYPE_ID)
+            // Both the main transfer and its fee are created in the same batch with temp ids; the fee
+            // relationship on the main (id1) references the fee's temp id (-2), which the two-pass insert
+            // must resolve to the fee's real generated id (id2).
+            val main =
+                Transfer(
+                    id = TransferId(-1),
+                    timestamp = baseTime,
+                    description = "Coffee",
+                    sourceAccountId = checkingId,
+                    targetAccountId = shopId,
+                    amount = Money(500, currency),
+                )
+            val fee =
+                Transfer(
+                    id = TransferId(-2),
+                    timestamp = baseTime,
+                    description = "Fee",
+                    sourceAccountId = checkingId,
+                    targetAccountId = feeAccountId,
+                    amount = Money(29, currency),
+                )
+
+            val createdIds =
+                repositories.transactionRepository.importTransfers(
+                    transfers = listOf(main, fee),
+                    newAttributes = emptyMap(),
+                    newRelationships =
+                        mapOf(TransferId(-1) to listOf(NewRelationship(relatedTransferId = TransferId(-2), typeId = feeTypeId))),
+                    sourceRecorder = recorder(),
+                    updates = emptyList(),
+                    updateSourceRecorder = recorder(),
+                )
+            assertEquals(2, createdIds.size)
+            val mainId = createdIds[0]
+            val feeId = createdIds[1]
+
+            // The link is main (id1) -> fee (id2), type fee, with the temp id resolved to the real fee id.
+            val relationship =
+                repositories.transferRelationshipRepository
+                    .getByTransfer(mainId)
+                    .first()
+                    .single()
+            assertEquals(mainId, relationship.id1)
+            assertEquals(feeId, relationship.id2)
+            assertEquals("fee", relationship.relationshipType.name)
+
+            // The fee transfer is a real movement: it carries no excluded attribute, so it counts in balances.
+            val feeAttributes = repositories.transferAttributeRepository.getByTransaction(feeId).first()
+            assertEquals(true, feeAttributes.none { it.attributeType.name == "excluded" })
+
+            // The running-balance rows distinguish the two sides for the UI: the main transaction links
+            // forward to its fee transfer, and the fee transfer links back to its main transaction.
+            repositories.maintenanceService.fullRefreshMaterializedViews()
+            val checkingRows =
+                repositories.transactionRepository
+                    .getRunningBalanceByAccountPaginated(checkingId, pageSize = 50, pagingInfo = null)
+                    .items
+                    .associateBy { it.transactionId }
+            assertEquals(feeId, checkingRows.getValue(mainId).feeTransferId)
+            assertEquals(null, checkingRows.getValue(mainId).feeParentTransferId)
+            assertEquals(mainId, checkingRows.getValue(feeId).feeParentTransferId)
+            assertEquals(null, checkingRows.getValue(feeId).feeTransferId)
+        }
+
+    @Test
     fun runningBalanceRows_flagBothSidesOfReconciledPairAsReconciled() =
         runTest {
             val currency = gbp()

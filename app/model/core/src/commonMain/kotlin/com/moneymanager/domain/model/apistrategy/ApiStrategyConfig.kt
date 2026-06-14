@@ -167,6 +167,18 @@ enum class ApiSignSource {
  * @property declinedStatusValues Values of [declineStatusField] that mean "declined" (e.g. {"DECLINED"}).
  * @property localAmountField Optional dot-path to a local/original amount (foreign transactions)
  * @property localCurrencyField Optional dot-path to a local/original currency code
+ * @property feeAmountField Optional dot-path to a fee amount charged on the transaction. When present
+ *                          and non-zero, the fee is imported as its own transfer linked to the main
+ *                          transaction via a `fee` relationship. Encoded using [amountFormat].
+ * @property feeCurrencyField Optional dot-path to the fee's currency code; defaults to the
+ *                            transaction currency when absent.
+ * @property feeDescriptionField Optional dot-path to a description for the fee transfer; defaults to
+ *                               a generic "Fee" label when absent.
+ * @property feeIncludedInAmount Whether [amountField] is GROSS (already includes the fee). When true the
+ *                               fee is carved OUT of the main transfer (main = amount - fee) so the two
+ *                               sum back to the original amount — Monzo's `atm_fees_detailed` shape, where
+ *                               `amount = withdrawal_amount + fee_amount`. When false (default) the fee is
+ *                               an additional movement on top of a net amount.
  */
 @Serializable
 data class ApiTransactionMappings(
@@ -187,6 +199,10 @@ data class ApiTransactionMappings(
     val declinedStatusValues: Set<String> = emptySet(),
     val localAmountField: String? = null,
     val localCurrencyField: String? = null,
+    val feeAmountField: String? = null,
+    val feeCurrencyField: String? = null,
+    val feeDescriptionField: String? = null,
+    val feeIncludedInAmount: Boolean = false,
     val customFields: Map<String, String> = emptyMap(),
     val uniqueIdentifierFields: Set<String> = emptySet(),
 )

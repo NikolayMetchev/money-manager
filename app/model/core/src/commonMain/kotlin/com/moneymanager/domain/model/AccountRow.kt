@@ -15,4 +15,8 @@ data class AccountRow(
     val targetAccountId: AccountId,
     val isExcluded: Boolean = false,
     val isReconciled: Boolean = false,
+    /** When this row is the main transaction of a fee link, the id of its linked fee transfer. */
+    val feeTransferId: TransferId? = null,
+    /** When this row IS a fee transfer, the id of the main transaction it belongs to. */
+    val feeParentTransferId: TransferId? = null,
 )

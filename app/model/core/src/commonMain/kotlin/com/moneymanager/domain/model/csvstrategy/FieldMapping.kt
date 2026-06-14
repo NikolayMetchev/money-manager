@@ -177,10 +177,10 @@ data class DirectColumnMapping(
  * the source and target accounts are swapped. This is useful for bank statements
  * where positive values indicate money flowing INTO the statement account.
  *
- * When [feeColumnName] is set, that column's value (if non-blank) is added to the
- * amount's magnitude whenever all [feeConditions] hold (empty = always). This handles
- * exports like Wise's, where the amount column is net of fees but the fee also left
- * the account (e.g. ATM withdrawals: 200.00 withdrawn + 7.29 fee = 207.29 debited).
+ * When [feeColumnName] is set, that column's value (if non-blank) is imported as its own fee
+ * transfer linked to the main transaction (via a `fee` relationship), whenever all [feeConditions]
+ * hold (empty = always). This handles exports like Wise's, where the amount column is net of fees but
+ * the fee also left the account (e.g. ATM withdrawals: 200.00 withdrawn + a 7.29 fee movement).
  */
 @Serializable
 data class AmountParsingMapping(

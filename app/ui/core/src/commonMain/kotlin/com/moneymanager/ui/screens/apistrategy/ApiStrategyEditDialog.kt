@@ -119,6 +119,10 @@ fun ApiStrategyEditDialog(
     var txDeclineReasonField by remember { mutableStateOf(strategy?.transactionMappings?.declineReasonField ?: "") }
     var txLocalAmountField by remember { mutableStateOf(strategy?.transactionMappings?.localAmountField ?: "") }
     var txLocalCurrencyField by remember { mutableStateOf(strategy?.transactionMappings?.localCurrencyField ?: "") }
+    var txFeeAmountField by remember { mutableStateOf(strategy?.transactionMappings?.feeAmountField ?: "") }
+    var txFeeCurrencyField by remember { mutableStateOf(strategy?.transactionMappings?.feeCurrencyField ?: "") }
+    var txFeeDescriptionField by remember { mutableStateOf(strategy?.transactionMappings?.feeDescriptionField ?: "") }
+    var txFeeIncludedInAmount by remember { mutableStateOf(strategy?.transactionMappings?.feeIncludedInAmount ?: false) }
     var peopleCounterpartyObjectField by remember { mutableStateOf(strategy?.peopleMappings?.counterpartyObjectField ?: "counterparty") }
     var peopleBeneficiaryAccountTypeField by remember {
         mutableStateOf(
@@ -529,6 +533,46 @@ fun ApiStrategyEditDialog(
                         pickingForSetter = setter
                     },
                 )
+                FieldMappingRow(
+                    label = "Fee Amount (optional)",
+                    value = txFeeAmountField,
+                    onValueChange = { txFeeAmountField = it },
+                    paths = txJsonPaths,
+                    onPickRequest = { setter ->
+                        pickingPaths = txJsonPaths
+                        pickingForSetter = setter
+                    },
+                )
+                FieldMappingRow(
+                    label = "Fee Currency (optional, ISO 4217)",
+                    value = txFeeCurrencyField,
+                    onValueChange = { txFeeCurrencyField = it },
+                    paths = txJsonPaths,
+                    onPickRequest = { setter ->
+                        pickingPaths = txJsonPaths
+                        pickingForSetter = setter
+                    },
+                )
+                FieldMappingRow(
+                    label = "Fee Description (optional)",
+                    value = txFeeDescriptionField,
+                    onValueChange = { txFeeDescriptionField = it },
+                    paths = txJsonPaths,
+                    onPickRequest = { setter ->
+                        pickingPaths = txJsonPaths
+                        pickingForSetter = setter
+                    },
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Switch(checked = txFeeIncludedInAmount, onCheckedChange = { txFeeIncludedInAmount = it })
+                    Text(
+                        text = "Fee included in amount (carve out)",
+                        modifier = Modifier.padding(start = 8.dp),
+                    )
+                }
                 Spacer(Modifier.height(4.dp))
                 HorizontalDivider()
                 SectionHeader("People Mappings")
@@ -678,6 +722,10 @@ fun ApiStrategyEditDialog(
                                     declineReasonField = txDeclineReasonField.trim().ifBlank { null },
                                     localAmountField = txLocalAmountField.trim().ifBlank { null },
                                     localCurrencyField = txLocalCurrencyField.trim().ifBlank { null },
+                                    feeAmountField = txFeeAmountField.trim().ifBlank { null },
+                                    feeCurrencyField = txFeeCurrencyField.trim().ifBlank { null },
+                                    feeDescriptionField = txFeeDescriptionField.trim().ifBlank { null },
+                                    feeIncludedInAmount = txFeeIncludedInAmount,
                                     customFields =
                                         customTxFields
                                             .filter { it.name.isNotBlank() }

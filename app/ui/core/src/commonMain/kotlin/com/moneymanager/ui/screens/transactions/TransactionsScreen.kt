@@ -121,8 +121,9 @@ fun AccountTransactionsScreen(
     maintenance: Maintenance,
     onAccountIdChange: (AccountId) -> Unit = {},
     onCurrencyIdChange: (CurrencyId?) -> Unit = {},
-    onAccountClick: (AccountId, String, CurrencyId?) -> Unit = { _, _, _ -> },
+    onAccountClick: (AccountId, String, CurrencyId?, TransferId?) -> Unit = { _, _, _, _ -> },
     onAuditClick: (TransferId) -> Unit = {},
+    onFeeLinkClick: (TransferId) -> Unit = {},
     scrollToTransferId: TransferId? = null,
     initialCurrencyId: CurrencyId? = null,
     externalRefreshTrigger: Int = 0,
@@ -458,7 +459,7 @@ fun AccountTransactionsScreen(
                                                 ).clickable {
                                                     selectedAccountId = account.id
                                                     selectedCurrencyId = null // Clear currency to show all currencies
-                                                    onAccountClick(account.id, account.name, null)
+                                                    onAccountClick(account.id, account.name, null, null)
                                                 }.padding(vertical = 4.dp),
                                         contentAlignment = Alignment.Center,
                                     ) {
@@ -574,7 +575,7 @@ fun AccountTransactionsScreen(
                                                             .clickable(enabled = balance != null) {
                                                                 selectedAccountId = account.id
                                                                 selectedCurrencyId = currencyId
-                                                                onAccountClick(account.id, account.name, currencyId)
+                                                                onAccountClick(account.id, account.name, currencyId, null)
                                                             }.padding(vertical = 4.dp),
                                                     contentAlignment = Alignment.Center,
                                                 ) {
@@ -774,8 +775,18 @@ fun AccountTransactionsScreen(
                                 }.indexOfFirst { it.transactionId.id == targetTransferId.id }
 
                         if (index >= 0) {
-                            // Scroll to the transaction
-                            listState.animateScrollToItem(index)
+                            // Centre the target in the viewport instead of pinning it to the very top.
+                            // animateScrollToItem places the item's top at viewport top + scrollOffset, so a
+                            // negative offset of (half viewport - half row) drops it to the middle. Wait for
+                            // the list to be measured first, otherwise viewportSize is still 0.
+                            val viewportHeight =
+                                snapshotFlow { listState.layoutInfo.viewportSize.height }.first { it > 0 }
+                            val rowHeight =
+                                listState.layoutInfo.visibleItemsInfo
+                                    .firstOrNull()
+                                    ?.size ?: 0
+                            val centeringOffset = -(viewportHeight / 2 - rowHeight / 2)
+                            listState.animateScrollToItem(index, centeringOffset)
 
                             // Scroll matrix to show the account and currency
                             val accountIndex = allAccounts.indexOfFirst { it.id == accountId }
@@ -858,6 +869,31 @@ fun AccountTransactionsScreen(
                                     transactionIdToEdit = transfer.id
                                 },
                                 onAuditClick = onAuditClick,
+                                onFeeLinkClick = { linkedTransferId ->
+                                    val targetIndex =
+                                        displayedRunningBalances.indexOfFirst { it.transactionId.id == linkedTransferId.id }
+                                    if (targetIndex < 0) {
+                                        // The linked transfer isn't in the current list (different account/currency,
+                                        // or not yet loaded): navigate, which loads its page and scrolls to it.
+                                        onFeeLinkClick(linkedTransferId)
+                                    } else {
+                                        // It's in this list: just move the highlight. Only scroll when it's
+                                        // off-screen — if it's already visible, leave the scroll position alone.
+                                        highlightedTransactionId = linkedTransferId
+                                        val alreadyVisible =
+                                            listState.layoutInfo.visibleItemsInfo.any { it.index == targetIndex }
+                                        if (!alreadyVisible) {
+                                            scrollScope.launch {
+                                                val viewportHeight = listState.layoutInfo.viewportSize.height
+                                                val rowHeight =
+                                                    listState.layoutInfo.visibleItemsInfo
+                                                        .firstOrNull()
+                                                        ?.size ?: 0
+                                                listState.animateScrollToItem(targetIndex, -(viewportHeight / 2 - rowHeight / 2))
+                                            }
+                                        }
+                                    }
+                                },
                                 onAccountClick = { clickedAccountId ->
                                     highlightedTransactionId = runningBalance.transactionId
                                     selectedCurrencyId = runningBalance.transactionAmount.currency.id
@@ -899,13 +935,15 @@ fun AccountTransactionsScreen(
                                         }
                                     }
 
-                                    // Navigate to the clicked account (adds to navigation history)
+                                    // Navigate to the clicked account (adds to navigation history),
+                                    // scrolling to this same transfer as seen from the other account's side.
                                     val clickedAccount = allAccounts.find { it.id == clickedAccountId }
                                     if (clickedAccount != null) {
                                         onAccountClick(
                                             clickedAccountId,
                                             clickedAccount.name,
                                             runningBalance.transactionAmount.currency.id,
+                                            TransferId(runningBalance.transactionId.id),
                                         )
                                     }
                                 },

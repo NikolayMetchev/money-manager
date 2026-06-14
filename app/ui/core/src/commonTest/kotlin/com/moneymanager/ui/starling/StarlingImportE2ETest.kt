@@ -674,6 +674,82 @@ class StarlingImportE2ETest : DbTest() {
         }
 
     @Test
+    fun `starling source account adopts a pre-existing account identified only by a bank external-id`() =
+        runTest {
+            val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
+            val now = Instant.fromEpochMilliseconds(1_700_000_000_000L)
+
+            // A counterparty another provider created for this same bank account (099999/55556666) whose only
+            // identity is the synthetic "bank:<sort>:<account>" external-id — no sort-code/account-number
+            // attributes. The bank-match index must still recognise it so the Starling source adopts it
+            // rather than creating a duplicate, keeping cross-provider imports order-independent.
+            val existingId =
+                repositories.accountRepository.createAccount(
+                    Account(id = AccountId(0), name = "Monzo Counterparty: Nikolay", openingDate = now),
+                )
+            repositories.accountAttributeRepository
+                .insert(existingId, AttributeTypeId(DatabaseConfig.ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID), "bank:099999:55556666")
+
+            val sessionId = repositories.apiSessionRepository.createSession("test-starling-token", deviceId, now, null)
+            val strategy =
+                repositories.apiImportStrategyRepository
+                    .getAllStrategies()
+                    .first()
+                    .single { it.name == "Starling" }
+            val apiClient =
+                createApiClient(
+                    trafficRecorder =
+                        ApiSessionTrafficRecorder(sessionId = sessionId, apiSessionRepository = repositories.apiSessionRepository),
+                    engine = mockEngine(identifiersJson = IDENTIFIERS_JSON),
+                )
+
+            downloadApiSessionAccounts(
+                token = "test-starling-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+            downloadApiSessionAccountIdentifiers(
+                token = "test-starling-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+            downloadApiSessionTransactions(
+                token = "test-starling-token",
+                apiClient = apiClient,
+                apiSessionRepository = repositories.apiSessionRepository,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+            importApiSessionTransactions(
+                apiSessionRepository = repositories.apiSessionRepository,
+                accountRepository = repositories.accountRepository,
+                currencyRepository = repositories.currencyRepository,
+                transactionRepository = repositories.transactionRepository,
+                entitySource = DbEntitySource(repositories.entitySourceQueries, repositories.transferSourceQueries, deviceId),
+                personRepository = repositories.personRepository,
+                personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
+                personAttributeRepository = repositories.personAttributeRepository,
+                attributeTypeRepository = repositories.attributeTypeRepository,
+                accountAttributeRepository = repositories.accountAttributeRepository,
+                deviceId = deviceId,
+                sessionId = sessionId,
+                strategy = strategy,
+            )
+
+            val allAccounts = repositories.accountRepository.getAllAccounts().first()
+            val ownAccount = allAccounts.single { it.name == "Starling: Personal" }
+            assertEquals(existingId, ownAccount.id, "The source account should adopt the bank-external-id account")
+            assertTrue(
+                allAccounts.none { it.name == "Monzo Counterparty: Nikolay" },
+                "The adopted account should have been renamed, not left as a duplicate: $allAccounts",
+            )
+        }
+
+    @Test
     fun `starling source account gets its bank details from the identifiers endpoint`() =
         runTest {
             val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))

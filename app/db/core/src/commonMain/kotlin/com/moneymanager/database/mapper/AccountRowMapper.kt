@@ -27,6 +27,8 @@ object AccountRowMapper {
         targetAccountId: Long,
         isExcluded: Long,
         isReconciled: Long,
+        feeTransferId: Long?,
+        feeParentTransferId: Long?,
     ): AccountRow =
         AccountRow(
             transactionId = TransferId(id),
@@ -57,5 +59,7 @@ object AccountRowMapper {
             targetAccountId = AccountId(targetAccountId),
             isExcluded = isExcluded != 0L,
             isReconciled = isReconciled != 0L,
+            feeTransferId = feeTransferId?.let { TransferId(it) },
+            feeParentTransferId = feeParentTransferId?.let { TransferId(it) },
         )
 }
