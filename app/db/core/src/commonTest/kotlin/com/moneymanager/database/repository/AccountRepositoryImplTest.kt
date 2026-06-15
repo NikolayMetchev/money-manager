@@ -4,6 +4,8 @@ package com.moneymanager.database.repository
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AuditType
+import com.moneymanager.domain.model.DeviceId
+import com.moneymanager.domain.model.EntityProvenance
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonId
@@ -25,6 +27,53 @@ import kotlin.test.assertTrue
 import kotlin.time.Clock
 
 class AccountRepositoryImplTest : DbTest() {
+    @Test
+    fun `manual owner add and remove each bump the account revision and record an audit entry`() =
+        runTest {
+            val now = Clock.System.now()
+            val person =
+                repositories.personRepository.createPerson(
+                    Person(id = PersonId(0), firstName = "Owner", middleName = null, lastName = "One"),
+                )
+            val accountId =
+                repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Acct", openingDate = now))
+            val manual = EntityProvenance.Manual(DeviceId(1))
+
+            // Adding an owner is a change to the account: it must become a new revision.
+            val ownershipId = repositories.personAccountOwnershipRepository.createOwnership(person, accountId, manual)
+            val afterAdd = repositories.accountRepository.getAccountById(accountId).first()
+            assertEquals(2L, afterAdd!!.revisionId)
+
+            // Removing the owner is another change: another revision.
+            repositories.personAccountOwnershipRepository.deleteOwnership(ownershipId)
+            val afterRemove = repositories.accountRepository.getAccountById(accountId).first()
+            assertEquals(3L, afterRemove!!.revisionId)
+
+            // The account audit trail records all three: create + owner-added + owner-removed.
+            val audit = repositories.auditRepository.getAuditHistoryForAccount(accountId)
+            assertEquals(listOf(3L, 2L, 1L), audit.map { it.revisionId })
+            assertEquals(AuditType.INSERT, audit.last().auditType)
+            assertTrue(audit.take(2).all { it.auditType == AuditType.UPDATE })
+        }
+
+    @Test
+    fun `import-provenance owner add does not bump the account revision`() =
+        runTest {
+            val now = Clock.System.now()
+            val person =
+                repositories.personRepository.createPerson(
+                    Person(id = PersonId(0), firstName = "Owner", middleName = null, lastName = "One"),
+                )
+            val accountId =
+                repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Acct", openingDate = now))
+
+            // Default test provenance is SampleGenerator (a bulk/non-manual source): no revision bump.
+            repositories.personAccountOwnershipRepository.createOwnership(person, accountId)
+
+            val account = repositories.accountRepository.getAccountById(accountId).first()
+            assertEquals(1L, account!!.revisionId)
+        }
+
     @Test
     fun `createAccount should insert account and return generated id`() =
         runTest {
