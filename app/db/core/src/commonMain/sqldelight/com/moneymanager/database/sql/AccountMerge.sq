@@ -37,10 +37,10 @@ CREATE INDEX idx_account_merge_transfer_merge ON account_merge_transfer(merge_id
 
 -- Note: neither attributes nor ownerships are snapshotted here. The merge's cascade delete records
 -- each one as a DELETE in account_attribute_audit / person_account_ownership_audit (the attribute
--- delete trigger is revision-decoupled so it fires even after the parent account is gone), so unmerge
--- reconstructs both from the audit trail (Audit.sq selectDeletedAttributesForAccount /
--- selectDeletedOwnershipPersonIds). Only the deleted account's own core fields are snapshotted above,
--- since the cascade delete leaves no recoverable trace of them.
+-- delete trigger uses the attribute's own stamped revision_id, so it fires even after the parent
+-- account is gone), so unmerge reconstructs both from the audit trail (Audit.sq
+-- selectDeletedAttributesForAccount / selectDeletedOwnershipPersonIds). Only the deleted account's own
+-- core fields are snapshotted above, since the cascade delete leaves no recoverable trace of them.
 
 insertMerge:
 INSERT INTO account_merge(

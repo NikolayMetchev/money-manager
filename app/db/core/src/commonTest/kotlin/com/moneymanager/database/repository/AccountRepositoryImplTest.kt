@@ -437,6 +437,14 @@ class AccountRepositoryImplTest : DbTest() {
             assertEquals(1, restoredAttrs.size)
             assertEquals("green", restoredAttrs.single().value)
 
+            // The cascade-delete audit row carries the EXACT revision the attribute's value became
+            // effective at (3 = create→1, insert blue→2, update green→3), proving the attribute's
+            // stamped revision_id is used as the fallback rather than a guessed value.
+            val attrAudit = repositories.auditRepository.getAttributeAuditByAccount(accountA)
+            val deleteEntry = attrAudit.single { it.auditType == AuditType.DELETE }
+            assertEquals("green", deleteEntry.value)
+            assertEquals(3L, deleteEntry.revisionId)
+
             // The merge is no longer reversible
             assertEquals(
                 0,

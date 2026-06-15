@@ -318,7 +318,8 @@ WHERE account_id = :accountId
 -- The attribute (type, value) pairs that were removed in the most recent deletion of this account
 -- (e.g. a merge's cascade delete). Used by unmerge to restore the account's attributes without a
 -- dedicated snapshot table — the delete trigger records each cascade-deleted attribute as a DELETE
--- here (revision-decoupled, so the parent account no longer needs to exist).
+-- here using the attribute's own stamped revision_id, so it fires even after the parent account row
+-- is gone.
 selectDeletedAttributesForAccount:
 SELECT attribute_type_id, attribute_value
 FROM account_attribute_audit

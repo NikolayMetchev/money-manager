@@ -451,6 +451,13 @@ object DatabaseConfig {
                 INSERT INTO transfer_attribute_audit (audit_timestamp, audit_type_id, transfer_id, revision_id, attribute_type_id, attribute_value)
                 SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, NEW.transaction_id, revision_id, NEW.attribute_type_id, NEW.attribute_value
                 FROM transfer WHERE id = NEW.transaction_id;
+
+                -- Stamp the attribute with the (post-bump) transfer revision so a later cascade delete can
+                -- record the exact revision. Re-fires this table's UPDATE trigger but its WHEN guard skips
+                -- it (attribute_value is unchanged), so there is no recursion or double audit.
+                UPDATE transfer_attribute
+                SET revision_id = (SELECT revision_id FROM transfer WHERE id = NEW.transaction_id)
+                WHERE id = NEW.id;
             END
             """.trimIndent(),
             0,
@@ -476,6 +483,11 @@ object DatabaseConfig {
                 INSERT INTO transfer_attribute_audit (audit_timestamp, audit_type_id, transfer_id, revision_id, attribute_type_id, attribute_value)
                 SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, NEW.transaction_id, revision_id, NEW.attribute_type_id, OLD.attribute_value
                 FROM transfer WHERE id = NEW.transaction_id;
+
+                -- Advance the attribute's stamped revision to the new value's revision (guarded re-fire).
+                UPDATE transfer_attribute
+                SET revision_id = (SELECT revision_id FROM transfer WHERE id = NEW.transaction_id)
+                WHERE id = NEW.id;
             END
             """.trimIndent(),
             0,
@@ -497,16 +509,15 @@ object DatabaseConfig {
                   AND NOT EXISTS (SELECT 1 FROM _creation_mode);
 
                 -- Always record the deletion in audit table (OLD value - what was deleted).
-                -- No FROM transfer: on a cascade delete the parent transfer is already gone, so a
-                -- join would record nothing. A bare SELECT always yields one row; revision falls back
-                -- to the audit trail (then 1) when the parent revision is no longer readable.
+                -- VALUES (not SELECT FROM transfer): on a cascade delete the parent transfer is already
+                -- gone, so a join would record nothing. The revision falls back to the attribute's own
+                -- stamped revision_id (kept current by the insert/update triggers) when the parent
+                -- revision is no longer readable.
                 INSERT INTO transfer_attribute_audit (audit_timestamp, audit_type_id, transfer_id, revision_id, attribute_type_id, attribute_value)
-                SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, OLD.transaction_id,
-                    COALESCE(
-                        (SELECT revision_id FROM transfer WHERE id = OLD.transaction_id),
-                        (SELECT MAX(revision_id) + 1 FROM transfer_attribute_audit WHERE transfer_id = OLD.transaction_id),
-                        1),
-                    OLD.attribute_type_id, OLD.attribute_value;
+                VALUES (
+                    CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, OLD.transaction_id,
+                    COALESCE((SELECT revision_id FROM transfer WHERE id = OLD.transaction_id), OLD.revision_id),
+                    OLD.attribute_type_id, OLD.attribute_value);
             END
             """.trimIndent(),
             0,
@@ -549,6 +560,13 @@ object DatabaseConfig {
                 INSERT INTO account_attribute_audit (audit_timestamp, audit_type_id, account_id, revision_id, attribute_type_id, attribute_value)
                 SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, NEW.account_id, revision_id, NEW.attribute_type_id, NEW.attribute_value
                 FROM account WHERE id = NEW.account_id;
+
+                -- Stamp the attribute with the (post-bump) account revision so a later cascade delete can
+                -- record the exact revision. Re-fires this table's UPDATE trigger but its WHEN guard skips
+                -- it (attribute_value is unchanged), so there is no recursion or double audit.
+                UPDATE account_attribute
+                SET revision_id = (SELECT revision_id FROM account WHERE id = NEW.account_id)
+                WHERE id = NEW.id;
             END
             """.trimIndent(),
             0,
@@ -574,6 +592,11 @@ object DatabaseConfig {
                 INSERT INTO account_attribute_audit (audit_timestamp, audit_type_id, account_id, revision_id, attribute_type_id, attribute_value)
                 SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, NEW.account_id, revision_id, NEW.attribute_type_id, OLD.attribute_value
                 FROM account WHERE id = NEW.account_id;
+
+                -- Advance the attribute's stamped revision to the new value's revision (guarded re-fire).
+                UPDATE account_attribute
+                SET revision_id = (SELECT revision_id FROM account WHERE id = NEW.account_id)
+                WHERE id = NEW.id;
             END
             """.trimIndent(),
             0,
@@ -595,18 +618,17 @@ object DatabaseConfig {
                   AND NOT EXISTS (SELECT 1 FROM _creation_mode);
 
                 -- Always record the deletion in audit table (OLD value - what was deleted).
-                -- No FROM account: on a cascade delete (e.g. account merge) the parent account is
-                -- already gone, so a join would record nothing and the deleted attribute values would
-                -- be unrecoverable. A bare SELECT always yields one row; revision falls back to the
-                -- audit trail (then 1) when the parent revision is no longer readable. This makes
-                -- merged-away attributes reconstructable from the audit (see unmergeAccount).
+                -- VALUES (not SELECT FROM account): on a cascade delete (e.g. account merge) the parent
+                -- account is already gone, so a join would record nothing and the deleted attribute
+                -- values would be unrecoverable. The revision falls back to the attribute's own stamped
+                -- revision_id (kept current by the insert/update triggers) when the parent revision is no
+                -- longer readable. This makes merged-away attributes reconstructable from the audit (see
+                -- unmergeAccount).
                 INSERT INTO account_attribute_audit (audit_timestamp, audit_type_id, account_id, revision_id, attribute_type_id, attribute_value)
-                SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, OLD.account_id,
-                    COALESCE(
-                        (SELECT revision_id FROM account WHERE id = OLD.account_id),
-                        (SELECT MAX(revision_id) + 1 FROM account_attribute_audit WHERE account_id = OLD.account_id),
-                        1),
-                    OLD.attribute_type_id, OLD.attribute_value;
+                VALUES (
+                    CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, OLD.account_id,
+                    COALESCE((SELECT revision_id FROM account WHERE id = OLD.account_id), OLD.revision_id),
+                    OLD.attribute_type_id, OLD.attribute_value);
             END
             """.trimIndent(),
             0,
@@ -716,6 +738,13 @@ object DatabaseConfig {
                 INSERT INTO person_attribute_audit (audit_timestamp, audit_type_id, person_id, revision_id, attribute_type_id, attribute_value)
                 SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, NEW.person_id, revision_id, NEW.attribute_type_id, NEW.attribute_value
                 FROM person WHERE id = NEW.person_id;
+
+                -- Stamp the attribute with the (post-bump) person revision so a later cascade delete can
+                -- record the exact revision. Re-fires this table's UPDATE trigger but its WHEN guard skips
+                -- it (attribute_value is unchanged), so there is no recursion or double audit.
+                UPDATE person_attribute
+                SET revision_id = (SELECT revision_id FROM person WHERE id = NEW.person_id)
+                WHERE id = NEW.id;
             END
             """.trimIndent(),
             0,
@@ -737,6 +766,11 @@ object DatabaseConfig {
                 INSERT INTO person_attribute_audit (audit_timestamp, audit_type_id, person_id, revision_id, attribute_type_id, attribute_value)
                 SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, NEW.person_id, revision_id, NEW.attribute_type_id, OLD.attribute_value
                 FROM person WHERE id = NEW.person_id;
+
+                -- Advance the attribute's stamped revision to the new value's revision (guarded re-fire).
+                UPDATE person_attribute
+                SET revision_id = (SELECT revision_id FROM person WHERE id = NEW.person_id)
+                WHERE id = NEW.id;
             END
             """.trimIndent(),
             0,
@@ -754,16 +788,15 @@ object DatabaseConfig {
                 WHERE id = OLD.person_id
                   AND NOT EXISTS (SELECT 1 FROM _creation_mode);
 
-                -- No FROM person: on a cascade delete the parent person is already gone, so a join
-                -- would record nothing. A bare SELECT always yields one row; revision falls back to
-                -- the audit trail (then 1) when the parent revision is no longer readable.
+                -- VALUES (not SELECT FROM person): on a cascade delete the parent person is already gone,
+                -- so a join would record nothing. The revision falls back to the attribute's own stamped
+                -- revision_id (kept current by the insert/update triggers) when the parent revision is no
+                -- longer readable.
                 INSERT INTO person_attribute_audit (audit_timestamp, audit_type_id, person_id, revision_id, attribute_type_id, attribute_value)
-                SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, OLD.person_id,
-                    COALESCE(
-                        (SELECT revision_id FROM person WHERE id = OLD.person_id),
-                        (SELECT MAX(revision_id) + 1 FROM person_attribute_audit WHERE person_id = OLD.person_id),
-                        1),
-                    OLD.attribute_type_id, OLD.attribute_value;
+                VALUES (
+                    CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, OLD.person_id,
+                    COALESCE((SELECT revision_id FROM person WHERE id = OLD.person_id), OLD.revision_id),
+                    OLD.attribute_type_id, OLD.attribute_value);
             END
             """.trimIndent(),
             0,

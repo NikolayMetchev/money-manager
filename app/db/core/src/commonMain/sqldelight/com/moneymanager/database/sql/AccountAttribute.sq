@@ -3,6 +3,11 @@ CREATE TABLE account_attribute (
     account_id INTEGER NOT NULL,
     attribute_type_id INTEGER NOT NULL,
     attribute_value TEXT NOT NULL,
+    -- The account revision at which this attribute's current value became effective. Maintained by the
+    -- attribute insert/update triggers (set to the parent account's post-bump revision). Lets the DELETE
+    -- audit trigger record the correct revision even on a cascade delete, when the parent account row is
+    -- already gone (see createAccountAttributeTriggers in DatabaseConfig).
+    revision_id INTEGER NOT NULL DEFAULT 1,
     FOREIGN KEY (account_id) REFERENCES account(id) ON DELETE CASCADE,
     FOREIGN KEY (attribute_type_id) REFERENCES attribute_type(id) ON DELETE RESTRICT,
     UNIQUE (account_id, attribute_type_id)
@@ -35,8 +40,10 @@ JOIN attribute_type ON account_attribute.attribute_type_id = attribute_type.id
 WHERE account_attribute.id = ?;
 
 insert:
-INSERT INTO account_attribute (account_id, attribute_type_id, attribute_value)
-VALUES (?, ?, ?);
+-- Seed revision_id from the parent account's current revision so it is correct even on the import path
+-- (where triggers are skipped); the insert trigger refreshes it to the post-bump revision otherwise.
+INSERT INTO account_attribute (account_id, attribute_type_id, attribute_value, revision_id)
+VALUES (:account_id, :attribute_type_id, :attribute_value, (SELECT revision_id FROM account WHERE id = :account_id));
 
 selectLastInsertedId:
 SELECT last_insert_rowid();
