@@ -227,79 +227,121 @@ internal fun computeAccountAuditDiffs(
         return OwnershipChanges(ownersAdded, ownersRemoved, ownershipSource)
     }
 
-    return entries.mapIndexed { index, entry ->
-        val ownershipChanges = findOwnershipChangesForEntry(entry)
-        val effectiveSource = entry.source ?: ownershipChanges.source
-        val mergeNote = mergeNoteFor(entry)
+    // A standalone ownership change (adding/removing an owner) doesn't touch the account row, so it
+    // produces no account audit entry to attach to. Surface such orphans as their own entries below.
+    fun isWithinWindow(
+        a: kotlin.time.Instant,
+        b: kotlin.time.Instant,
+    ): Boolean = kotlin.math.abs(a.toEpochMilliseconds() - b.toEpochMilliseconds()) <= timestampWindowMs
 
-        when (entry.auditType) {
-            AuditType.INSERT ->
-                AccountAuditDiff(
-                    id = entry.id,
-                    auditTimestamp = entry.auditTimestamp,
-                    auditType = entry.auditType,
-                    revisionId = entry.revisionId,
-                    name = FieldChange.Created(entry.name),
-                    openingDate = FieldChange.Created(entry.openingDate),
-                    categoryName = FieldChange.Created(entry.categoryName),
-                    ownersAdded = ownershipChanges.ownersAdded,
-                    ownersRemoved = ownershipChanges.ownersRemoved,
-                    attributeChanges = entry.attributeChanges,
-                    source = effectiveSource,
-                    mergeNote = mergeNote,
-                )
-            AuditType.DELETE ->
-                AccountAuditDiff(
-                    id = entry.id,
-                    auditTimestamp = entry.auditTimestamp,
-                    auditType = entry.auditType,
-                    revisionId = entry.revisionId,
-                    name = FieldChange.Deleted(entry.name),
-                    openingDate = FieldChange.Deleted(entry.openingDate),
-                    categoryName = FieldChange.Deleted(entry.categoryName),
-                    ownersAdded = ownershipChanges.ownersAdded,
-                    ownersRemoved = ownershipChanges.ownersRemoved,
-                    attributeChanges = entry.attributeChanges,
-                    source = effectiveSource,
-                    mergeNote = mergeNote,
-                )
-            AuditType.UPDATE -> {
-                val previousEntry = entries.getOrNull(index - 1)
+    fun ownershipOnlyDiff(group: List<PersonAccountOwnershipAuditEntry>): AccountAuditDiff {
+        val first = group.first()
+        val fallback = entries.firstOrNull()
+        return AccountAuditDiff(
+            // Negative id: account_audit ids are positive, so this can't collide as a LazyColumn key.
+            id = -first.id,
+            auditTimestamp = first.auditTimestamp,
+            auditType = AuditType.UPDATE,
+            revisionId = first.revisionId,
+            name = FieldChange.Unchanged(currentAccount?.name ?: fallback?.name ?: ""),
+            openingDate = FieldChange.Unchanged(currentAccount?.openingDate ?: fallback?.openingDate ?: first.auditTimestamp),
+            categoryName = FieldChange.Unchanged(currentCategoryName),
+            ownersAdded = group.filter { it.auditType == AuditType.INSERT },
+            ownersRemoved = group.filter { it.auditType == AuditType.DELETE },
+            attributeChanges = emptyList(),
+            source = group.firstNotNullOfOrNull { it.source },
+        )
+    }
 
-                AccountAuditDiff(
-                    id = entry.id,
-                    auditTimestamp = entry.auditTimestamp,
-                    auditType = entry.auditType,
-                    revisionId = entry.revisionId,
-                    name =
-                        resolveUpdateChange(
-                            index = index,
-                            currentEntry = currentAccount,
-                            previousEntry = previousEntry,
-                            entryValue = entry.name,
-                            currentValue = { it.name },
-                            previousValue = { it.name },
-                        ),
-                    openingDate = FieldChange.Unchanged(entry.openingDate),
-                    categoryName =
-                        resolveUpdateChange(
-                            index = index,
-                            currentEntry = currentAccount,
-                            previousEntry = previousEntry,
-                            entryValue = entry.categoryName,
-                            // currentAccount only carries categoryId; the resolved current name is
-                            // captured here so the newest change compares against the live category.
-                            currentValue = { currentCategoryName },
-                            previousValue = { it.categoryName },
-                        ),
-                    ownersAdded = ownershipChanges.ownersAdded,
-                    ownersRemoved = ownershipChanges.ownersRemoved,
-                    attributeChanges = entry.attributeChanges,
-                    source = effectiveSource,
-                )
+    val accountDiffs =
+        entries.mapIndexed { index, entry ->
+            val ownershipChanges = findOwnershipChangesForEntry(entry)
+            val effectiveSource = entry.source ?: ownershipChanges.source
+            val mergeNote = mergeNoteFor(entry)
+
+            when (entry.auditType) {
+                AuditType.INSERT ->
+                    AccountAuditDiff(
+                        id = entry.id,
+                        auditTimestamp = entry.auditTimestamp,
+                        auditType = entry.auditType,
+                        revisionId = entry.revisionId,
+                        name = FieldChange.Created(entry.name),
+                        openingDate = FieldChange.Created(entry.openingDate),
+                        categoryName = FieldChange.Created(entry.categoryName),
+                        ownersAdded = ownershipChanges.ownersAdded,
+                        ownersRemoved = ownershipChanges.ownersRemoved,
+                        attributeChanges = entry.attributeChanges,
+                        source = effectiveSource,
+                        mergeNote = mergeNote,
+                    )
+                AuditType.DELETE ->
+                    AccountAuditDiff(
+                        id = entry.id,
+                        auditTimestamp = entry.auditTimestamp,
+                        auditType = entry.auditType,
+                        revisionId = entry.revisionId,
+                        name = FieldChange.Deleted(entry.name),
+                        openingDate = FieldChange.Deleted(entry.openingDate),
+                        categoryName = FieldChange.Deleted(entry.categoryName),
+                        ownersAdded = ownershipChanges.ownersAdded,
+                        ownersRemoved = ownershipChanges.ownersRemoved,
+                        attributeChanges = entry.attributeChanges,
+                        source = effectiveSource,
+                        mergeNote = mergeNote,
+                    )
+                AuditType.UPDATE -> {
+                    val previousEntry = entries.getOrNull(index - 1)
+
+                    AccountAuditDiff(
+                        id = entry.id,
+                        auditTimestamp = entry.auditTimestamp,
+                        auditType = entry.auditType,
+                        revisionId = entry.revisionId,
+                        name =
+                            resolveUpdateChange(
+                                index = index,
+                                currentEntry = currentAccount,
+                                previousEntry = previousEntry,
+                                entryValue = entry.name,
+                                currentValue = { it.name },
+                                previousValue = { it.name },
+                            ),
+                        openingDate = FieldChange.Unchanged(entry.openingDate),
+                        categoryName =
+                            resolveUpdateChange(
+                                index = index,
+                                currentEntry = currentAccount,
+                                previousEntry = previousEntry,
+                                entryValue = entry.categoryName,
+                                // currentAccount only carries categoryId; the resolved current name is
+                                // captured here so the newest change compares against the live category.
+                                currentValue = { currentCategoryName },
+                                previousValue = { it.categoryName },
+                            ),
+                        ownersAdded = ownershipChanges.ownersAdded,
+                        ownersRemoved = ownershipChanges.ownersRemoved,
+                        attributeChanges = entry.attributeChanges,
+                        source = effectiveSource,
+                    )
+                }
             }
         }
-    }
+
+    val matchedOwnershipIds =
+        entries.flatMapTo(mutableSetOf<Long>()) { entry ->
+            ownershipEntries
+                .filter { isWithinWindow(it.auditTimestamp, entry.auditTimestamp) }
+                .map { it.id }
+        }
+    val ownershipOnlyDiffs =
+        ownershipEntries
+            .filterNot { it.id in matchedOwnershipIds }
+            .groupBy { it.auditTimestamp.toEpochMilliseconds() }
+            .map { (_, group) -> ownershipOnlyDiff(group) }
+
+    return (accountDiffs + ownershipOnlyDiffs)
+        .sortedWith(compareByDescending<AccountAuditDiff> { it.auditTimestamp }.thenByDescending { it.id })
 }
 
 @Composable
