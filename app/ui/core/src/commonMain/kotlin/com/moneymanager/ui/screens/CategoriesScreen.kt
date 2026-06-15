@@ -71,8 +71,10 @@ import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CategoryBalance
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.EntityProvenance
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.ui.LocalDeviceId
 import com.moneymanager.ui.components.ErrorMessageText
 import com.moneymanager.ui.components.LoadingTextButton
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
@@ -97,6 +99,7 @@ fun CategoriesScreen(
     currencyRepository: CurrencyRepository,
     onAuditClick: (Category) -> Unit = {},
 ) {
+    val deviceId = LocalDeviceId.current
     val categories by categoryRepository
         .getAllCategories()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
@@ -315,6 +318,7 @@ fun CategoriesScreen(
                                                 try {
                                                     categoryRepository.updateCategory(
                                                         draggedCategory.copy(parentId = newParentId),
+                                                        EntityProvenance.Manual(deviceId),
                                                     )
                                                 } catch (expected: Exception) {
                                                     logger.error(expected) {
@@ -622,6 +626,7 @@ fun EditCategoryDialog(
     categoryRepository: CategoryRepository,
     onDismiss: () -> Unit,
 ) {
+    val deviceId = LocalDeviceId.current
     var name by remember { mutableStateOf(category.name) }
     var selectedParentId by remember { mutableStateOf(category.parentId) }
     var expanded by remember { mutableStateOf(false) }
@@ -705,6 +710,7 @@ fun EditCategoryDialog(
                                 name = trimmedName,
                                 parentId = selectedParentId,
                             ),
+                            EntityProvenance.Manual(deviceId),
                         )
                     }
                 },

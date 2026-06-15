@@ -2,25 +2,24 @@ package com.moneymanager.domain
 
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiSessionId
-import com.moneymanager.domain.model.EntityType
+import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.SourceRecorder
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.qif.QifImportId
 
+/**
+ * Provides per-source recorders for **transfers** and the device identity for the current source.
+ *
+ * Entity provenance (account/person/ownership/category/currency) is no longer recorded here — it is
+ * recorded atomically inside the repository create/update methods via a required
+ * [com.moneymanager.domain.model.EntityProvenance] parameter, so it can never be forgotten. Callers
+ * use [deviceId] to build that provenance.
+ */
 interface EntitySource {
-    fun record(
-        entityType: EntityType,
-        entityId: Long,
-        revisionId: Long,
-    )
-
-    fun recordFromApi(record: ApiEntitySourceRecord)
-
-    fun recordFromApiBatch(records: List<ApiEntitySourceRecord>) {
-        records.forEach(::recordFromApi)
-    }
+    /** The device this source records against; used to construct `EntityProvenance`. */
+    val deviceId: DeviceId
 
     fun manualRecorder(): SourceRecorder
 
@@ -42,12 +41,3 @@ interface EntitySource {
         recordIndexForTransfer: (TransferId) -> Long,
     ): SourceRecorder
 }
-
-data class ApiEntitySourceRecord(
-    val entityType: EntityType,
-    val entityId: Long,
-    val revisionId: Long,
-    val sessionId: ApiSessionId,
-    val requestId: ApiRequestId,
-    val jsonPath: JsonPath,
-)

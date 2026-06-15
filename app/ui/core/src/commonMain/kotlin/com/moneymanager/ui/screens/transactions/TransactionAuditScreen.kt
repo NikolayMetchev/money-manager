@@ -11,7 +11,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -66,6 +70,13 @@ fun TransactionAuditScreen(
         .getAllAccounts()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
 
+    // Last-known names for accounts that no longer exist (e.g. merged-away/deleted), so the audit
+    // trail can show a real name instead of a bare id and avoid linking to a missing account.
+    var auditedAccountNames by remember { mutableStateOf<Map<Long, String>>(emptyMap()) }
+    LaunchedEffect(transferId) {
+        auditedAccountNames = auditRepository.getLatestAuditedAccountNames()
+    }
+
     AuditScreen(
         defaultTitle = "Audit History: $transferId",
         entityTypeName = "transaction",
@@ -111,6 +122,7 @@ fun TransactionAuditScreen(
             TransactionAuditDiffCard(
                 diff = diff,
                 accounts = accounts,
+                auditedAccountNames = auditedAccountNames,
                 currentDeviceId = currentDeviceId,
                 onCsvSourceClick = onCsvSourceClick,
                 onApiSourceClick = onApiSourceClick,
@@ -124,6 +136,7 @@ fun TransactionAuditScreen(
 private fun TransactionAuditDiffCard(
     diff: AuditEntryDiff,
     accounts: List<Account>,
+    auditedAccountNames: Map<Long, String>,
     currentDeviceId: DeviceId? = null,
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
     onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
@@ -135,9 +148,12 @@ private fun TransactionAuditDiffCard(
         revisionId = diff.revisionId,
     ) {
         when (diff.auditType) {
-            AuditType.INSERT -> InsertDiffContent(diff, accounts, currentDeviceId, onCsvSourceClick, onApiSourceClick, onAccountClick)
-            AuditType.UPDATE -> UpdateDiffContent(diff, accounts, currentDeviceId, onCsvSourceClick, onApiSourceClick, onAccountClick)
-            AuditType.DELETE -> DeleteDiffContent(diff, accounts, currentDeviceId, onCsvSourceClick, onApiSourceClick, onAccountClick)
+            AuditType.INSERT ->
+                InsertDiffContent(diff, accounts, auditedAccountNames, currentDeviceId, onCsvSourceClick, onApiSourceClick, onAccountClick)
+            AuditType.UPDATE ->
+                UpdateDiffContent(diff, accounts, auditedAccountNames, currentDeviceId, onCsvSourceClick, onApiSourceClick, onAccountClick)
+            AuditType.DELETE ->
+                DeleteDiffContent(diff, accounts, auditedAccountNames, currentDeviceId, onCsvSourceClick, onApiSourceClick, onAccountClick)
         }
     }
 }
@@ -146,6 +162,7 @@ private fun TransactionAuditDiffCard(
 private fun InsertDiffContent(
     diff: AuditEntryDiff,
     accounts: List<Account>,
+    auditedAccountNames: Map<Long, String>,
     currentDeviceId: DeviceId? = null,
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
     onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
@@ -159,8 +176,8 @@ private fun InsertDiffContent(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         FieldValueRow("Date", "${transactionDateTime.date} ${transactionDateTime.time}", labelWidth = LABEL_WIDTH)
-        AccountLinkRow("From", diff.sourceAccountId.value(), accounts, onAccountClick)
-        AccountLinkRow("To", diff.targetAccountId.value(), accounts, onAccountClick)
+        AccountLinkRow("From", diff.sourceAccountId.value(), accounts, auditedAccountNames, onAccountClick)
+        AccountLinkRow("To", diff.targetAccountId.value(), accounts, auditedAccountNames, onAccountClick)
         FieldValueRow("Amount", formatAmount(diff.amount.value()), labelWidth = LABEL_WIDTH)
         FieldValueRow("Description", diff.description.value().ifBlank { "(none)" }, labelWidth = LABEL_WIDTH)
         AttributesSection(diff.attributeChanges)
@@ -177,6 +194,7 @@ private fun InsertDiffContent(
 private fun UpdateDiffContent(
     diff: AuditEntryDiff,
     accounts: List<Account>,
+    auditedAccountNames: Map<Long, String>,
     currentDeviceId: DeviceId? = null,
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
     onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
@@ -212,11 +230,11 @@ private fun UpdateDiffContent(
             }
             val sourceChange = diff.sourceAccountId
             if (sourceChange is FieldChange.Changed) {
-                AccountChangeRow("From", sourceChange.oldValue, sourceChange.newValue, accounts, onAccountClick)
+                AccountChangeRow("From", sourceChange.oldValue, sourceChange.newValue, accounts, auditedAccountNames, onAccountClick)
             }
             val targetChange = diff.targetAccountId
             if (targetChange is FieldChange.Changed) {
-                AccountChangeRow("To", targetChange.oldValue, targetChange.newValue, accounts, onAccountClick)
+                AccountChangeRow("To", targetChange.oldValue, targetChange.newValue, accounts, auditedAccountNames, onAccountClick)
             }
             val amountChange = diff.amount
             if (amountChange is FieldChange.Changed) {
@@ -256,6 +274,7 @@ private fun UpdateDiffContent(
 private fun DeleteDiffContent(
     diff: AuditEntryDiff,
     accounts: List<Account>,
+    auditedAccountNames: Map<Long, String>,
     currentDeviceId: DeviceId? = null,
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
     onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
@@ -270,8 +289,8 @@ private fun DeleteDiffContent(
             color = errorColor.copy(alpha = 0.8f),
         )
         FieldValueRow("Date", "${transactionDateTime.date} ${transactionDateTime.time}", errorColor, labelWidth = LABEL_WIDTH)
-        AccountLinkRow("From", diff.sourceAccountId.value(), accounts, onAccountClick)
-        AccountLinkRow("To", diff.targetAccountId.value(), accounts, onAccountClick)
+        AccountLinkRow("From", diff.sourceAccountId.value(), accounts, auditedAccountNames, onAccountClick)
+        AccountLinkRow("To", diff.targetAccountId.value(), accounts, auditedAccountNames, onAccountClick)
         FieldValueRow("Amount", formatAmount(diff.amount.value()), errorColor, labelWidth = LABEL_WIDTH)
         FieldValueRow("Description", diff.description.value().ifBlank { "(none)" }, errorColor, labelWidth = LABEL_WIDTH)
         AttributesSection(diff.attributeChanges, errorColor)
@@ -533,6 +552,12 @@ private fun SourceInfoSection(
             SourceType.SYSTEM -> {
                 FieldValueRow("Origin", "System", labelWidth = LABEL_WIDTH)
             }
+            SourceType.MERGE, SourceType.MERGE_UNDO -> {
+                val thisDeviceSuffix = if (isThisDevice) " (This Device)" else ""
+                val origin = if (source.sourceType == SourceType.MERGE) "Merge" else "Undo Merge"
+                FieldValueRow("Origin", "$origin$thisDeviceSuffix", labelWidth = LABEL_WIDTH)
+                DeviceInfoFields(source.deviceInfo)
+            }
             SourceType.API -> {
                 val apiSource = source.apiSource
                 val deviceInfo = source.deviceInfo
@@ -577,11 +602,67 @@ private fun DeviceInfoFields(deviceInfo: DeviceInfo?) {
     }
 }
 
+/**
+ * Renders an account reference in the audit trail as "Name (#id)". Accounts that still exist are
+ * clickable links; accounts that no longer exist (e.g. merged-away/deleted) are shown struck-through
+ * and non-clickable, labelled with their last-known name from the audit history.
+ */
+@Composable
+private fun AccountReference(
+    accountId: AccountId,
+    accounts: List<Account>,
+    auditedAccountNames: Map<Long, String>,
+    onAccountClick: (AccountId) -> Unit,
+    struckThrough: Boolean = false,
+    struckThroughColor: Color = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+) {
+    val exists = accounts.any { it.id == accountId }
+    val label = accountAuditLabel(accountId, accounts, auditedAccountNames)
+    // A struck-through "old value" stays struck through whether or not the account still exists;
+    // a deleted account is always struck through. Deleted accounts are never clickable.
+    val showStrikethrough = struckThrough || !exists
+    val textStyle =
+        if (showStrikethrough) {
+            MaterialTheme.typography.bodyMedium.copy(textDecoration = TextDecoration.LineThrough)
+        } else {
+            MaterialTheme.typography.bodyMedium
+        }
+    if (exists) {
+        TextButton(
+            onClick = { onAccountClick(accountId) },
+            contentPadding = PaddingValues(0.dp),
+        ) {
+            Text(
+                text = label,
+                style = textStyle,
+                color = if (struckThrough) struckThroughColor else Color.Unspecified,
+            )
+        }
+    } else {
+        Text(
+            text = label,
+            style = textStyle,
+            color = struckThroughColor,
+        )
+    }
+}
+
+/** "Name (#id)" for an existing or audited account, or "#id" when even the name is unknown. */
+private fun accountAuditLabel(
+    accountId: AccountId,
+    accounts: List<Account>,
+    auditedAccountNames: Map<Long, String>,
+): String {
+    val name = accounts.find { it.id == accountId }?.name ?: auditedAccountNames[accountId.id]
+    return if (name != null) "$name (#${accountId.id})" else "#${accountId.id}"
+}
+
 @Composable
 private fun AccountLinkRow(
     label: String,
     accountId: AccountId,
     accounts: List<Account>,
+    auditedAccountNames: Map<Long, String>,
     onAccountClick: (AccountId) -> Unit,
 ) {
     Row(
@@ -595,12 +676,7 @@ private fun AccountLinkRow(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.width(LABEL_WIDTH),
         )
-        TextButton(
-            onClick = { onAccountClick(accountId) },
-            contentPadding = PaddingValues(0.dp),
-        ) {
-            Text(resolveAccountName(accountId, accounts))
-        }
+        AccountReference(accountId, accounts, auditedAccountNames, onAccountClick)
     }
 }
 
@@ -610,6 +686,7 @@ private fun AccountChangeRow(
     oldAccountId: AccountId,
     newAccountId: AccountId,
     accounts: List<Account>,
+    auditedAccountNames: Map<Long, String>,
     onAccountClick: (AccountId) -> Unit,
 ) {
     Row(
@@ -623,30 +700,20 @@ private fun AccountChangeRow(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.width(LABEL_WIDTH),
         )
-        TextButton(
-            onClick = { onAccountClick(oldAccountId) },
-            contentPadding = PaddingValues(0.dp),
-        ) {
-            Text(
-                text = resolveAccountName(oldAccountId, accounts),
-                style =
-                    MaterialTheme.typography.bodyMedium.copy(
-                        textDecoration = TextDecoration.LineThrough,
-                    ),
-                color = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
-            )
-        }
+        // The old account is struck through; if it was deleted (e.g. merged away) it is also non-clickable.
+        AccountReference(
+            accountId = oldAccountId,
+            accounts = accounts,
+            auditedAccountNames = auditedAccountNames,
+            onAccountClick = onAccountClick,
+            struckThrough = true,
+        )
         Text(
             text = "\u2192",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        TextButton(
-            onClick = { onAccountClick(newAccountId) },
-            contentPadding = PaddingValues(0.dp),
-        ) {
-            Text(resolveAccountName(newAccountId, accounts))
-        }
+        AccountReference(newAccountId, accounts, auditedAccountNames, onAccountClick)
     }
 }
 

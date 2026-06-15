@@ -24,6 +24,12 @@ enum class SourceType(
 
     /** Imported from QIF file */
     QIF_IMPORT(6),
+
+    /** Recreated by undoing an account merge */
+    MERGE_UNDO(7),
+
+    /** Deleted by merging the account into another */
+    MERGE(8),
     ;
 
     companion object {

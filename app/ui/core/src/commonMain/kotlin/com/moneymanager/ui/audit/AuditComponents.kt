@@ -22,6 +22,7 @@ import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.EntitySource
 import com.moneymanager.domain.model.SourceType
+import com.moneymanager.domain.model.csv.CsvImportId
 
 @Composable
 fun FieldValueRow(
@@ -128,6 +129,7 @@ fun SourceInfoSection(
     labelColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     labelWidth: Dp = 100.dp,
     onApiSourceClick: ((ApiSessionId, ApiRequestId, String) -> Unit)? = null,
+    onCsvSourceClick: ((CsvImportId, Long) -> Unit)? = null,
 ) {
     Column(
         modifier = Modifier.padding(top = 8.dp),
@@ -163,9 +165,31 @@ fun SourceInfoSection(
                     }
                 }
                 SourceType.CSV_IMPORT -> {
-                    val deviceInfo = source.deviceInfo
+                    val csvSource = source.csvSource
+                    val importId = csvSource?.importId
+                    val fileName = csvSource?.fileName
                     FieldValueRow("Origin", "CSV Import", labelWidth = labelWidth)
-                    DeviceInfoRows(deviceInfo, labelWidth)
+                    if (csvSource != null && importId != null && onCsvSourceClick != null) {
+                        CsvSourceLinkRow(
+                            label = "File",
+                            value = fileName ?: "Unknown file",
+                            importId = importId,
+                            rowIndex = csvSource.rowIndex,
+                            onCsvSourceClick = onCsvSourceClick,
+                            labelWidth = labelWidth,
+                        )
+                        CsvSourceLinkRow(
+                            label = "Row",
+                            value = csvSource.rowIndex.toString(),
+                            importId = importId,
+                            rowIndex = csvSource.rowIndex,
+                            onCsvSourceClick = onCsvSourceClick,
+                            labelWidth = labelWidth,
+                        )
+                    } else if (fileName != null) {
+                        FieldValueRow("File", fileName, labelWidth = labelWidth)
+                    }
+                    DeviceInfoRows(source.deviceInfo, labelWidth)
                 }
                 SourceType.QIF_IMPORT -> {
                     // Entities (accounts/people/currencies) are not QIF-sourced; QIF only creates
@@ -190,6 +214,14 @@ fun SourceInfoSection(
                 }
                 SourceType.SYSTEM -> {
                     FieldValueRow("Origin", "System", labelWidth = labelWidth)
+                }
+                SourceType.MERGE -> {
+                    FieldValueRow("Origin", "Merge", labelWidth = labelWidth)
+                    DeviceInfoRows(source.deviceInfo, labelWidth)
+                }
+                SourceType.MERGE_UNDO -> {
+                    FieldValueRow("Origin", "Undo Merge", labelWidth = labelWidth)
+                    DeviceInfoRows(source.deviceInfo, labelWidth)
                 }
                 SourceType.API -> {
                     val deviceInfo = source.deviceInfo
@@ -226,6 +258,35 @@ private fun DeviceInfoRows(
             FieldValueRow("Device", "${deviceInfo.deviceMake} ${deviceInfo.deviceModel}", labelWidth = labelWidth)
         }
         null -> {}
+    }
+}
+
+@Composable
+private fun CsvSourceLinkRow(
+    label: String,
+    value: String,
+    importId: CsvImportId,
+    rowIndex: Long,
+    onCsvSourceClick: (CsvImportId, Long) -> Unit,
+    labelWidth: Dp = 100.dp,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "$label:",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.width(labelWidth),
+        )
+        TextButton(
+            onClick = { onCsvSourceClick(importId, rowIndex) },
+            contentPadding = PaddingValues(0.dp),
+        ) {
+            Text(value)
+        }
     }
 }
 

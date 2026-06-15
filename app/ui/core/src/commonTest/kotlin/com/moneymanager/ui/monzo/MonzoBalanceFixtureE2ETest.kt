@@ -116,7 +116,7 @@ class MonzoBalanceFixtureE2ETest : DbTest() {
                 accountRepository = repositories.accountRepository,
                 currencyRepository = repositories.currencyRepository,
                 transactionRepository = repositories.transactionRepository,
-                entitySource = DbEntitySource(database.entitySourceQueries, database.transferSourceQueries, DeviceId(deviceId.id)),
+                entitySource = DbEntitySource(database.transferSourceQueries, DeviceId(deviceId.id)),
                 personRepository = repositories.personRepository,
                 personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                 personAttributeRepository = repositories.personAttributeRepository,
