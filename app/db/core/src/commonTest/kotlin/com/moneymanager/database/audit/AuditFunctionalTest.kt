@@ -13,6 +13,7 @@ import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.createCategory
 import com.moneymanager.test.database.updateAccount
+import com.moneymanager.test.database.updateCategory
 import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest

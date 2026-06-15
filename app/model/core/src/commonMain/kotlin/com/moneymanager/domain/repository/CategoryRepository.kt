@@ -21,7 +21,10 @@ interface CategoryRepository {
         provenance: EntityProvenance,
     ): Long
 
-    suspend fun updateCategory(category: Category)
+    suspend fun updateCategory(
+        category: Category,
+        provenance: EntityProvenance,
+    )
 
     suspend fun deleteCategory(id: Long)
 }

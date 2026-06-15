@@ -2990,10 +2990,12 @@ private class AccountCache(
         name: String,
     ): AccountId {
         val existing = loadAccounts().values.firstOrNull { it.id == existingId }
-        if (existing != null && existing.name != name) {
-            // The rename's source is this provider's accounts-endpoint origin (recorded by the repo).
+        if (existing != null) {
+            // Record this provider's accounts-endpoint origin for the adopted account, even when the
+            // name already matches (otherwise an unchanged-name adoption would never get this source).
+            val renamed = existing.name != name
             accountRepository.updateAccount(existing.copy(name = name), apiProvenance(accountApiSourceByExternalId[externalId]))
-            accountsByName = null
+            if (renamed) accountsByName = null
         }
         val attributes = accountAttributeRepository.getByAccount(existingId).first()
         accountAttributeRepository.upsertAccountAttribute(attributes, existingId, ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID, externalId)
@@ -3118,8 +3120,15 @@ private class AccountCache(
                 toCreate.map { request ->
                     Account(id = AccountId(0L), name = request.name.ifBlank { "Unknown" }, openingDate = now)
                 }
-            val provenanceByName = toCreate.associate { it.name.ifBlank { "Unknown" } to apiProvenance(it.apiSource) }
-            val createdIds = accountRepository.createAccountsBatch(accountsToCreate) { provenanceByName.getValue(it.name) }
+            // Key per-name FIFO queues, not a single value, so duplicate counterparty names in one
+            // batch each keep their own request's API source. createAccountsBatch invokes the lambda in
+            // list order, and groupBy preserves encounter order, so removing the head aligns them.
+            val provenanceByName =
+                toCreate
+                    .groupBy { it.name.ifBlank { "Unknown" } }
+                    .mapValues { (_, requests) -> requests.mapTo(ArrayDeque()) { apiProvenance(it.apiSource) } }
+            val createdIds =
+                accountRepository.createAccountsBatch(accountsToCreate) { provenanceByName.getValue(it.name).removeFirst() }
             val counterpartyAttributeWrites = mutableListOf<AccountAttributeCreateInput>()
 
             toCreate.zip(createdIds).forEach { (request, accountId) ->

@@ -90,13 +90,20 @@ class CategoryRepositoryImpl(
             }
         }
 
-    override suspend fun updateCategory(category: Category): Unit =
+    override suspend fun updateCategory(
+        category: Category,
+        provenance: EntityProvenance,
+    ): Unit =
         withContext(Dispatchers.Default) {
-            queries.update(
-                name = category.name,
-                parent_id = category.parentId,
-                id = category.id,
-            )
+            queries.transactionWithResult {
+                queries.update(
+                    name = category.name,
+                    parent_id = category.parentId,
+                    id = category.id,
+                )
+                val revision = queries.selectRevisionById(category.id).executeAsOne()
+                entitySourceQueries.recordEntityProvenance(EntityType.CATEGORY, category.id, revision, provenance)
+            }
         }
 
     override suspend fun deleteCategory(id: Long): Unit =

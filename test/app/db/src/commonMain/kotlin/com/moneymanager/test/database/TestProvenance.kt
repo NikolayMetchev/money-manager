@@ -66,6 +66,8 @@ suspend fun PersonAccountOwnershipRepository.createOwnership(
 
 suspend fun CategoryRepository.createCategory(category: Category): Long = createCategory(category, TEST_PROVENANCE)
 
+suspend fun CategoryRepository.updateCategory(category: Category): Unit = updateCategory(category, TEST_PROVENANCE)
+
 suspend fun CurrencyRepository.upsertCurrencyByCode(
     code: String,
     name: String,

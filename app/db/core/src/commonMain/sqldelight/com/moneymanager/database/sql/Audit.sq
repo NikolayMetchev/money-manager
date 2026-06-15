@@ -303,7 +303,9 @@ ORDER BY person_account_ownership_audit.audit_timestamp DESC, person_account_own
 
 -- The person ids whose ownership of this account was removed in the most recent deletion of the
 -- account (e.g. a merge's cascade delete). Used by unmerge to restore the account's owners without
--- a dedicated snapshot table — the cascade delete records each ownership as a DELETE here.
+-- a dedicated snapshot table — the cascade delete records each ownership as a DELETE here. Anchored to
+-- the account's own delete timestamp (the cascade fires in the same transaction, so they share it) so
+-- that a most-recent delete with no owners doesn't fall back to an older, unrelated delete's owners.
 selectDeletedOwnershipPersonIds:
 SELECT person_id
 FROM person_account_ownership_audit
@@ -311,7 +313,7 @@ WHERE account_id = :accountId
   AND audit_type_id = 3
   AND audit_timestamp = (
       SELECT MAX(audit_timestamp)
-      FROM person_account_ownership_audit
+      FROM account_audit
       WHERE account_id = :accountId AND audit_type_id = 3
   );
 
@@ -319,7 +321,8 @@ WHERE account_id = :accountId
 -- (e.g. a merge's cascade delete). Used by unmerge to restore the account's attributes without a
 -- dedicated snapshot table — the delete trigger records each cascade-deleted attribute as a DELETE
 -- here using the attribute's own stamped revision_id, so it fires even after the parent account row
--- is gone.
+-- is gone. Anchored to the account's own delete timestamp (see selectDeletedOwnershipPersonIds) so a
+-- most-recent delete with no attributes doesn't fall back to an older, unrelated delete's attributes.
 selectDeletedAttributesForAccount:
 SELECT attribute_type_id, attribute_value
 FROM account_attribute_audit
@@ -327,7 +330,7 @@ WHERE account_id = :accountId
   AND audit_type_id = 3
   AND audit_timestamp = (
       SELECT MAX(audit_timestamp)
-      FROM account_attribute_audit
+      FROM account_audit
       WHERE account_id = :accountId AND audit_type_id = 3
   );
 

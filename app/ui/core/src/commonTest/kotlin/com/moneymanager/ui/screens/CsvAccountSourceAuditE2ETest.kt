@@ -10,12 +10,14 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import androidx.compose.ui.test.waitUntilDoesNotExist
 import com.moneymanager.database.DatabaseManager
+import com.moneymanager.database.csv.CsvTransferMapper
 import com.moneymanager.database.port.DbEntitySource
 import com.moneymanager.database.port.DbMaintenance
 import com.moneymanager.di.database.DatabaseComponent
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AppVersion
+import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.csv.CsvColumn
@@ -107,7 +109,7 @@ class CsvAccountSourceAuditE2ETest {
                 val strategy = createStrategy(sourceAccountId, gbp.id)
 
                 val mapper =
-                    com.moneymanager.database.csv.CsvTransferMapper(
+                    CsvTransferMapper(
                         strategy = strategy,
                         columns = columns,
                         existingAccounts =
@@ -170,6 +172,7 @@ class CsvAccountSourceAuditE2ETest {
             // with the file name and originating row rendered as clickable links.
             waitUntilAtLeastOneExists(hasText("CSV Import"), timeoutMillis = 10000)
             waitUntilDoesNotExist(hasText("Source data missing"), timeoutMillis = 3000)
+            waitForIdle()
             waitUntilAtLeastOneExists(hasText(CSV_FILE_NAME), timeoutMillis = 5000)
             waitUntilAtLeastOneExists(hasText("Row:"), timeoutMillis = 5000)
 
@@ -181,7 +184,7 @@ class CsvAccountSourceAuditE2ETest {
 
     private fun createStrategy(
         sourceAccountId: AccountId,
-        currencyId: com.moneymanager.domain.model.CurrencyId,
+        currencyId: CurrencyId,
     ): CsvImportStrategy {
         val now = Clock.System.now()
         return CsvImportStrategy(

@@ -403,7 +403,7 @@ class CategoriesScreenTest {
 
             // Then - dialog should be dismissed
             onNodeWithText("Edit Category").assertDoesNotExist()
-            verifySuspend { repository.updateCategory(matches { it.name == "Food" }) }
+            verifySuspend { repository.updateCategory(matches { it.name == "Food" }, any()) }
         }
 
     @Test
@@ -760,7 +760,7 @@ class CategoriesScreenTest {
             waitForIdle()
 
             // Then
-            verifySuspend { repository.updateCategory(matches { it.parentId == 1L }) }
+            verifySuspend { repository.updateCategory(matches { it.parentId == 1L }, any()) }
         }
 
     // endregion
@@ -890,7 +890,7 @@ class CategoriesScreenTest {
                 flow.value += newCat
                 newId
             }
-            everySuspend { updateCategory(any()) } calls { (cat: Category) ->
+            everySuspend { updateCategory(any(), any()) } calls { (cat: Category, _: EntityProvenance) ->
                 flow.value = flow.value.map { if (it.id == cat.id) cat else it }
             }
             everySuspend { deleteCategory(any()) } calls { (id: Long) ->

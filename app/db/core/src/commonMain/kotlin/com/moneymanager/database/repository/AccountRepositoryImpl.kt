@@ -191,6 +191,10 @@ class AccountRepositoryImpl(
     ): MergeId =
         withContext(Dispatchers.Default) {
             database.transactionWithResult {
+                // Merging an account into itself would reassign its transfers to itself and then delete
+                // it, destroying the "surviving" account; refuse it.
+                require(deletedAccount != survivingAccount) { "Cannot merge an account into itself" }
+
                 // Guard: transfers directly between the two accounts would become invalid
                 // self-transfers (CHECK source != target) once reassigned, so refuse the merge.
                 val between =

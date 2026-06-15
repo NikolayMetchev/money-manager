@@ -7,7 +7,7 @@ CREATE TABLE transfer_attribute (
     -- attribute insert/update triggers; lets the DELETE audit trigger record the correct revision even
     -- on a cascade delete, when the parent transfer row is already gone.
     revision_id INTEGER NOT NULL DEFAULT 1,
-    FOREIGN KEY (transaction_id) REFERENCES transaction_id(id) ON DELETE CASCADE,
+    FOREIGN KEY (transaction_id) REFERENCES transfer(id) ON DELETE CASCADE,
     FOREIGN KEY (attribute_type_id) REFERENCES attribute_type(id) ON DELETE RESTRICT,
     UNIQUE (transaction_id, attribute_type_id)
 );
