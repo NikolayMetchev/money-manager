@@ -200,15 +200,13 @@ class AccountRepositoryImpl(
                     "Cannot merge: ${between.size} transaction(s) exist between the accounts"
                 }
 
-                // Snapshot the deleted account (it is gone after the merge) so it can be restored.
-                // Attributes must be snapshotted: their current values aren't recoverable from the audit
-                // trail (the cascade delete records nothing, and attribute updates store the OLD value).
-                // Ownerships are NOT snapshotted — the cascade delete records them in
-                // person_account_ownership_audit, so unmerge reconstructs them from there.
+                // Snapshot only the deleted account's core fields (name/opening date/category/revision),
+                // which the cascade delete leaves no trace of. Attributes and ownerships are NOT
+                // snapshotted: the cascade delete records each one as a DELETE in account_attribute_audit
+                // / person_account_ownership_audit, so unmerge reconstructs them from the audit trail.
                 val account = queries.selectById(deletedAccount.id).executeAsOne()
                 val sourceTransferIds = transferQueries.selectTransferIdsBySourceAccount(deletedAccount.id).executeAsList()
                 val targetTransferIds = transferQueries.selectTransferIdsByTargetAccount(deletedAccount.id).executeAsList()
-                val attributes = attributeQueries.selectByAccount(deletedAccount.id).executeAsList()
 
                 mergeQueries.insertMerge(
                     merged_at = Clock.System.now().toEpochMilliseconds(),
@@ -231,10 +229,6 @@ class AccountRepositoryImpl(
                         moved_target = if (transferId in targetSet) 1 else 0,
                     )
                 }
-                attributes.forEach {
-                    mergeQueries.insertMergeAttribute(mergeId, it.attribute_type_id, it.attribute_value)
-                }
-
                 transferQueries.moveTransfersSourceAccount(
                     targetAccount = survivingAccount.id,
                     accountToDelete = deletedAccount.id,
@@ -318,10 +312,12 @@ class AccountRepositoryImpl(
                     category_id = merge.deleted_account_category_id,
                 )
 
-                // Restore attributes without bumping the account revision (preserve the snapshot revision).
+                // Restore attributes from the audit trail (no bump): the merge's cascade delete recorded
+                // each attribute as a DELETE in account_attribute_audit, and the latest such batch for
+                // this account is exactly the set removed by this merge.
                 database.beginCreationMode()
                 try {
-                    mergeQueries.selectAttributesForMerge(mergeId.id).executeAsList().forEach {
+                    auditQueries.selectDeletedAttributesForAccount(merge.deleted_account_id).executeAsList().forEach {
                         attributeQueries.insert(
                             account_id = merge.deleted_account_id,
                             attribute_type_id = it.attribute_type_id,

@@ -349,6 +349,14 @@ class AccountRepositoryImplTest : DbTest() {
                 )
             repositories.personAccountOwnershipRepository.createOwnership(personId, accountA)
 
+            // Give account A an attribute and then change it, so the live value ("green") differs from
+            // the value the UPDATE trigger recorded ("blue"). After unmerge the attribute must come back
+            // as "green": proving it is reconstructed from the cascade-delete audit row (the current
+            // value at deletion), not from a stale audited OLD value.
+            val colorTypeId = repositories.attributeTypeRepository.getOrCreate("color")
+            val attrId = repositories.accountAttributeRepository.insert(accountA, colorTypeId, "blue")
+            repositories.accountAttributeRepository.updateValue(attrId, "green")
+
             createTransfer(
                 Transfer(
                     id = TransferId(0L),
@@ -385,11 +393,13 @@ class AccountRepositoryImplTest : DbTest() {
 
             // The undo is recorded as a NEW forward revision (one past the merge's delete revision), so
             // it shows in the audit trail as an "undo merge" step rather than colliding with the delete.
-            assertEquals(2L, restored.revisionId)
+            // Account A reached revision 3 before the merge (created=1, attribute insert=2, update=3), so
+            // it is restored at 4.
+            assertEquals(4L, restored.revisionId)
             val accountAudit = repositories.auditRepository.getAuditHistoryForAccount(accountA)
             val restoreEntry = accountAudit.first() // newest first
             assertEquals(AuditType.INSERT, restoreEntry.auditType)
-            assertEquals(2L, restoreEntry.revisionId)
+            assertEquals(4L, restoreEntry.revisionId)
             assertTrue(
                 accountAudit.any { it.auditType == AuditType.DELETE },
                 "the merge's delete must remain in the audit trail",
@@ -397,7 +407,7 @@ class AccountRepositoryImplTest : DbTest() {
             // The merge context lets the audit screen label these entries.
             val mergeContext = repositories.accountRepository.getMergesForDeletedAccount(accountA).single()
             assertTrue(mergeContext.reversed)
-            assertEquals(1L, mergeContext.deletedAccountRevisionId)
+            assertEquals(3L, mergeContext.deletedAccountRevisionId)
             assertEquals(accountB, mergeContext.survivingAccountId)
 
             // The transfers reference account A again
@@ -421,6 +431,11 @@ class AccountRepositoryImplTest : DbTest() {
             val owners = repositories.personAccountOwnershipRepository.getOwnershipsByAccount(accountA).first()
             assertEquals(1, owners.size)
             assertEquals(personId, owners.first().personId)
+
+            // Attributes are restored from the audit trail at their current (pre-merge) value.
+            val restoredAttrs = repositories.accountAttributeRepository.getByAccount(accountA).first()
+            assertEquals(1, restoredAttrs.size)
+            assertEquals("green", restoredAttrs.single().value)
 
             // The merge is no longer reversible
             assertEquals(

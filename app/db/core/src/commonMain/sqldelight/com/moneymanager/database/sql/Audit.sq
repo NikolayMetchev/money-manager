@@ -315,6 +315,21 @@ WHERE account_id = :accountId
       WHERE account_id = :accountId AND audit_type_id = 3
   );
 
+-- The attribute (type, value) pairs that were removed in the most recent deletion of this account
+-- (e.g. a merge's cascade delete). Used by unmerge to restore the account's attributes without a
+-- dedicated snapshot table — the delete trigger records each cascade-deleted attribute as a DELETE
+-- here (revision-decoupled, so the parent account no longer needs to exist).
+selectDeletedAttributesForAccount:
+SELECT attribute_type_id, attribute_value
+FROM account_attribute_audit
+WHERE account_id = :accountId
+  AND audit_type_id = 3
+  AND audit_timestamp = (
+      SELECT MAX(audit_timestamp)
+      FROM account_attribute_audit
+      WHERE account_id = :accountId AND audit_type_id = 3
+  );
+
 -- Get ownership audit history for a specific account
 -- entity_type_id = 4 for PERSON_ACCOUNT_OWNERSHIP
 selectOwnershipAuditHistoryForAccount:

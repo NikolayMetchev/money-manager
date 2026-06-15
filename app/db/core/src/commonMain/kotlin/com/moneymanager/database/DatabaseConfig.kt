@@ -496,10 +496,17 @@ object DatabaseConfig {
                 WHERE id = OLD.transaction_id
                   AND NOT EXISTS (SELECT 1 FROM _creation_mode);
 
-                -- Always record the deletion in audit table (OLD value - what was deleted)
+                -- Always record the deletion in audit table (OLD value - what was deleted).
+                -- No FROM transfer: on a cascade delete the parent transfer is already gone, so a
+                -- join would record nothing. A bare SELECT always yields one row; revision falls back
+                -- to the audit trail (then 1) when the parent revision is no longer readable.
                 INSERT INTO transfer_attribute_audit (audit_timestamp, audit_type_id, transfer_id, revision_id, attribute_type_id, attribute_value)
-                SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, OLD.transaction_id, revision_id, OLD.attribute_type_id, OLD.attribute_value
-                FROM transfer WHERE id = OLD.transaction_id;
+                SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, OLD.transaction_id,
+                    COALESCE(
+                        (SELECT revision_id FROM transfer WHERE id = OLD.transaction_id),
+                        (SELECT MAX(revision_id) + 1 FROM transfer_attribute_audit WHERE transfer_id = OLD.transaction_id),
+                        1),
+                    OLD.attribute_type_id, OLD.attribute_value;
             END
             """.trimIndent(),
             0,
@@ -587,10 +594,19 @@ object DatabaseConfig {
                 WHERE id = OLD.account_id
                   AND NOT EXISTS (SELECT 1 FROM _creation_mode);
 
-                -- Always record the deletion in audit table (OLD value - what was deleted)
+                -- Always record the deletion in audit table (OLD value - what was deleted).
+                -- No FROM account: on a cascade delete (e.g. account merge) the parent account is
+                -- already gone, so a join would record nothing and the deleted attribute values would
+                -- be unrecoverable. A bare SELECT always yields one row; revision falls back to the
+                -- audit trail (then 1) when the parent revision is no longer readable. This makes
+                -- merged-away attributes reconstructable from the audit (see unmergeAccount).
                 INSERT INTO account_attribute_audit (audit_timestamp, audit_type_id, account_id, revision_id, attribute_type_id, attribute_value)
-                SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, OLD.account_id, revision_id, OLD.attribute_type_id, OLD.attribute_value
-                FROM account WHERE id = OLD.account_id;
+                SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, OLD.account_id,
+                    COALESCE(
+                        (SELECT revision_id FROM account WHERE id = OLD.account_id),
+                        (SELECT MAX(revision_id) + 1 FROM account_attribute_audit WHERE account_id = OLD.account_id),
+                        1),
+                    OLD.attribute_type_id, OLD.attribute_value;
             END
             """.trimIndent(),
             0,
@@ -738,9 +754,16 @@ object DatabaseConfig {
                 WHERE id = OLD.person_id
                   AND NOT EXISTS (SELECT 1 FROM _creation_mode);
 
+                -- No FROM person: on a cascade delete the parent person is already gone, so a join
+                -- would record nothing. A bare SELECT always yields one row; revision falls back to
+                -- the audit trail (then 1) when the parent revision is no longer readable.
                 INSERT INTO person_attribute_audit (audit_timestamp, audit_type_id, person_id, revision_id, attribute_type_id, attribute_value)
-                SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, OLD.person_id, revision_id, OLD.attribute_type_id, OLD.attribute_value
-                FROM person WHERE id = OLD.person_id;
+                SELECT CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, OLD.person_id,
+                    COALESCE(
+                        (SELECT revision_id FROM person WHERE id = OLD.person_id),
+                        (SELECT MAX(revision_id) + 1 FROM person_attribute_audit WHERE person_id = OLD.person_id),
+                        1),
+                    OLD.attribute_type_id, OLD.attribute_value;
             END
             """.trimIndent(),
             0,
