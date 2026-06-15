@@ -125,7 +125,6 @@ class MoneyManagerDatabaseWrapper(
             "account_merge",
             "account_merge_transfer",
             "account_merge_attribute",
-            "account_merge_ownership",
             "settings",
             "api_session_type",
             "api_credential",

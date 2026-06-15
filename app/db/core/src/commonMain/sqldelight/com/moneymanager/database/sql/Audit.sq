@@ -301,6 +301,20 @@ LEFT JOIN api_entity_source ON entity_source.id = api_entity_source.id
 WHERE person_account_ownership_audit.person_account_ownership_id = ?
 ORDER BY person_account_ownership_audit.audit_timestamp DESC, person_account_ownership_audit.id DESC;
 
+-- The person ids whose ownership of this account was removed in the most recent deletion of the
+-- account (e.g. a merge's cascade delete). Used by unmerge to restore the account's owners without
+-- a dedicated snapshot table — the cascade delete records each ownership as a DELETE here.
+selectDeletedOwnershipPersonIds:
+SELECT person_id
+FROM person_account_ownership_audit
+WHERE account_id = :accountId
+  AND audit_type_id = 3
+  AND audit_timestamp = (
+      SELECT MAX(audit_timestamp)
+      FROM person_account_ownership_audit
+      WHERE account_id = :accountId AND audit_type_id = 3
+  );
+
 -- Get ownership audit history for a specific account
 -- entity_type_id = 4 for PERSON_ACCOUNT_OWNERSHIP
 selectOwnershipAuditHistoryForAccount:

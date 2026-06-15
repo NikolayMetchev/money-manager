@@ -34,6 +34,7 @@ class AccountRepositoryImpl(
     private val attributeQueries = database.accountAttributeQueries
     private val mergeQueries = database.accountMergeQueries
     private val personQueries = database.personQueries
+    private val auditQueries = database.auditQueries
     private val entitySourceQueries = database.entitySourceQueries
 
     override fun getAllAccounts(): Flow<List<Account>> =
@@ -200,11 +201,14 @@ class AccountRepositoryImpl(
                 }
 
                 // Snapshot the deleted account (it is gone after the merge) so it can be restored.
+                // Attributes must be snapshotted: their current values aren't recoverable from the audit
+                // trail (the cascade delete records nothing, and attribute updates store the OLD value).
+                // Ownerships are NOT snapshotted — the cascade delete records them in
+                // person_account_ownership_audit, so unmerge reconstructs them from there.
                 val account = queries.selectById(deletedAccount.id).executeAsOne()
                 val sourceTransferIds = transferQueries.selectTransferIdsBySourceAccount(deletedAccount.id).executeAsList()
                 val targetTransferIds = transferQueries.selectTransferIdsByTargetAccount(deletedAccount.id).executeAsList()
                 val attributes = attributeQueries.selectByAccount(deletedAccount.id).executeAsList()
-                val ownerships = personQueries.ownershipSelectByAccount(deletedAccount.id).executeAsList()
 
                 mergeQueries.insertMerge(
                     merged_at = Clock.System.now().toEpochMilliseconds(),
@@ -229,9 +233,6 @@ class AccountRepositoryImpl(
                 }
                 attributes.forEach {
                     mergeQueries.insertMergeAttribute(mergeId, it.attribute_type_id, it.attribute_value)
-                }
-                ownerships.forEach {
-                    mergeQueries.insertMergeOwnership(mergeId, it.person_id)
                 }
 
                 transferQueries.moveTransfersSourceAccount(
@@ -331,7 +332,10 @@ class AccountRepositoryImpl(
                     database.endCreationMode()
                 }
 
-                mergeQueries.selectOwnershipsForMerge(mergeId.id).executeAsList().forEach { personId ->
+                // Restore ownerships from the audit trail: the merge's cascade delete recorded each
+                // ownership as a DELETE in person_account_ownership_audit, and the latest such batch for
+                // this account is exactly the set deleted by this merge.
+                auditQueries.selectDeletedOwnershipPersonIds(merge.deleted_account_id).executeAsList().forEach { personId ->
                     personQueries.ownershipInsert(person_id = personId, account_id = merge.deleted_account_id)
                 }
 

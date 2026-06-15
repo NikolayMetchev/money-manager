@@ -46,15 +46,10 @@ CREATE TABLE account_merge_attribute (
 
 CREATE INDEX idx_account_merge_attribute_merge ON account_merge_attribute(merge_id);
 
--- Snapshot of the deleted account's person-ownership links (cascade-deleted with the account on merge).
-CREATE TABLE account_merge_ownership (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    merge_id INTEGER NOT NULL,
-    person_id INTEGER NOT NULL,
-    FOREIGN KEY (merge_id) REFERENCES account_merge(id) ON DELETE CASCADE
-);
-
-CREATE INDEX idx_account_merge_ownership_merge ON account_merge_ownership(merge_id);
+-- Note: ownerships are NOT snapshotted here. The merge's cascade delete records each ownership as a
+-- DELETE in person_account_ownership_audit (verified), and ownerships have no mutable value, so unmerge
+-- reconstructs them from the audit trail (Audit.sq selectDeletedOwnershipPersonIds). Attributes, by
+-- contrast, ARE snapshotted above because their current values aren't recoverable from the audit.
 
 insertMerge:
 INSERT INTO account_merge(
@@ -73,10 +68,6 @@ VALUES (?, ?, ?, ?);
 insertMergeAttribute:
 INSERT INTO account_merge_attribute(merge_id, attribute_type_id, attribute_value)
 VALUES (?, ?, ?);
-
-insertMergeOwnership:
-INSERT INTO account_merge_ownership(merge_id, person_id)
-VALUES (?, ?);
 
 -- Reversible (not yet undone) merges with a count of affected transfers, for the unmerge UI.
 selectReversible:
@@ -128,9 +119,6 @@ SELECT transfer_id, moved_source, moved_target FROM account_merge_transfer WHERE
 
 selectAttributesForMerge:
 SELECT attribute_type_id, attribute_value FROM account_merge_attribute WHERE merge_id = ?;
-
-selectOwnershipsForMerge:
-SELECT person_id FROM account_merge_ownership WHERE merge_id = ?;
 
 markReversed:
 UPDATE account_merge SET reversed = 1 WHERE id = ?;
