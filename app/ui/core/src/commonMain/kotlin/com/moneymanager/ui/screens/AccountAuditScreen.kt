@@ -11,20 +11,29 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountAttributeAuditEntry
 import com.moneymanager.domain.model.AccountAuditEntry
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.AccountMerge
+import com.moneymanager.domain.model.AccountMergeContext
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.EntitySource
 import com.moneymanager.domain.model.PersonAccountOwnershipAuditEntry
 import com.moneymanager.domain.model.PersonId
+import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AuditRepository
 import com.moneymanager.ui.audit.AuditDiffCard
@@ -37,6 +46,7 @@ import com.moneymanager.ui.audit.FieldChangeRow
 import com.moneymanager.ui.audit.FieldValueRow
 import com.moneymanager.ui.audit.NoVisibleChangesText
 import com.moneymanager.ui.audit.SourceInfoSection
+import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import kotlinx.coroutines.flow.first
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -46,10 +56,23 @@ fun AccountAuditScreen(
     accountId: AccountId,
     auditRepository: AuditRepository,
     accountRepository: AccountRepository,
+    maintenance: Maintenance,
     onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
+    onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
     onOwnerClick: (PersonId) -> Unit = {},
     onBack: () -> Unit,
 ) {
+    // All merges where this account is the survivor (reversed or not). The merge/unmerge only modify
+    // the merged-away account + the transfers, so the survivor's own audit rows show nothing about
+    // them; surface them here so the trail records what happened. Reversible ones also offer undo.
+    val mergesIntoThisAccount by accountRepository
+        .getMergesForSurvivingAccount(accountId)
+        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+    var mergeToUndo by remember { mutableStateOf<AccountMerge?>(null) }
+    val currentAccount by accountRepository
+        .getAccountById(accountId)
+        .collectAsStateWithSchemaErrorHandling(initial = null)
+
     AuditScreen(
         defaultTitle = "Account Audit: $accountId",
         entityTypeName = "account",
@@ -57,17 +80,68 @@ fun AccountAuditScreen(
         loadData = {
             val entries = auditRepository.getAuditHistoryForAccount(accountId)
             val ownershipEntries = auditRepository.getOwnershipAuditHistoryForAccount(accountId)
-            val currentAccount = accountRepository.getAccountById(accountId).first()
-            val diffs = computeAccountAuditDiffs(entries, ownershipEntries, currentAccount)
+            val account = accountRepository.getAccountById(accountId).first()
+            val mergeContexts = accountRepository.getMergesForDeletedAccount(accountId)
+            val diffs = computeAccountAuditDiffs(entries, ownershipEntries, account, mergeContexts)
             AuditScreenData(
-                title = "Account Audit: ${currentAccount?.name ?: accountId}",
+                title = "Account Audit: ${account?.name ?: accountId}",
                 diffs = diffs,
             )
         },
         diffKey = { it.id },
         onBack = onBack,
-        diffCard = { diff -> AccountAuditDiffCard(diff, onApiSourceClick, onOwnerClick) },
+        diffCard = { diff -> AccountAuditDiffCard(diff, onApiSourceClick, onCsvSourceClick, onOwnerClick) },
+        header = {
+            MergeUndoSection(merges = mergesIntoThisAccount, onUndoClick = { mergeToUndo = it })
+        },
     )
+
+    val currentMergeToUndo = mergeToUndo
+    if (currentMergeToUndo != null) {
+        UnmergeAccountDialog(
+            merge = currentMergeToUndo,
+            survivingAccountName = currentAccount?.name ?: "this account",
+            accountRepository = accountRepository,
+            maintenance = maintenance,
+            onDismiss = { mergeToUndo = null },
+        )
+    }
+}
+
+@Composable
+private fun MergeUndoSection(
+    merges: List<AccountMerge>,
+    onUndoClick: (AccountMerge) -> Unit,
+) {
+    if (merges.isEmpty()) return
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        AuditSectionLabel("Merge history")
+        merges.forEach { merge ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            ) {
+                val description =
+                    "Merged from \"${merge.deletedAccountName}\" · ${merge.transferCount} transaction(s)" +
+                        if (merge.reversed) " — undone" else ""
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                )
+                if (!merge.reversed) {
+                    TextButton(onClick = { onUndoClick(merge) }) {
+                        Text("Undo merge")
+                    }
+                }
+            }
+        }
+    }
 }
 
 private data class AccountAuditDiff(
@@ -82,6 +156,7 @@ private data class AccountAuditDiff(
     val ownersRemoved: List<PersonAccountOwnershipAuditEntry>,
     val attributeChanges: List<AccountAttributeAuditEntry>,
     val source: EntitySource?,
+    val mergeNote: String? = null,
 ) {
     val hasFieldChanges: Boolean
         get() = listOf(name, openingDate, categoryName).any { it is FieldChange.Changed }
@@ -97,8 +172,25 @@ private fun computeAccountAuditDiffs(
     entries: List<AccountAuditEntry>,
     ownershipEntries: List<PersonAccountOwnershipAuditEntry>,
     currentAccount: Account?,
+    mergeContexts: List<AccountMergeContext>,
 ): List<AccountAuditDiff> {
     val timestampWindowMs = 2000L
+
+    // The merge deleted this account at deleted_account_revision_id; the undo recreated it at the next
+    // revision. Label those audit entries so the trail reads as a merge/undo rather than a bare
+    // delete/create. Matched by revision, which is exact (no fragile timestamp window).
+    fun mergeNoteFor(entry: AccountAuditEntry): String? =
+        when (entry.auditType) {
+            AuditType.DELETE ->
+                mergeContexts
+                    .firstOrNull { it.deletedAccountRevisionId == entry.revisionId }
+                    ?.let { "Merged into \"${it.survivingAccountName ?: "another account"}\"" }
+            AuditType.INSERT ->
+                mergeContexts
+                    .firstOrNull { it.reversed && it.deletedAccountRevisionId + 1 == entry.revisionId }
+                    ?.let { "Restored — merge with \"${it.survivingAccountName ?: "another account"}\" undone" }
+            AuditType.UPDATE -> null
+        }
 
     data class OwnershipChanges(
         val ownersAdded: List<PersonAccountOwnershipAuditEntry>,
@@ -132,6 +224,7 @@ private fun computeAccountAuditDiffs(
     return entries.mapIndexed { index, entry ->
         val ownershipChanges = findOwnershipChangesForEntry(entry)
         val effectiveSource = entry.source ?: ownershipChanges.source
+        val mergeNote = mergeNoteFor(entry)
 
         when (entry.auditType) {
             AuditType.INSERT ->
@@ -147,6 +240,7 @@ private fun computeAccountAuditDiffs(
                     ownersRemoved = ownershipChanges.ownersRemoved,
                     attributeChanges = entry.attributeChanges,
                     source = effectiveSource,
+                    mergeNote = mergeNote,
                 )
             AuditType.DELETE ->
                 AccountAuditDiff(
@@ -161,6 +255,7 @@ private fun computeAccountAuditDiffs(
                     ownersRemoved = ownershipChanges.ownersRemoved,
                     attributeChanges = entry.attributeChanges,
                     source = effectiveSource,
+                    mergeNote = mergeNote,
                 )
             AuditType.UPDATE -> {
                 val previousEntry = entries.getOrNull(index - 1)
@@ -201,6 +296,7 @@ private fun computeAccountAuditDiffs(
 private fun AccountAuditDiffCard(
     diff: AccountAuditDiff,
     onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
+    onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
     onOwnerClick: (PersonId) -> Unit = {},
 ) {
     AuditDiffCard(
@@ -208,6 +304,14 @@ private fun AccountAuditDiffCard(
         auditTimestamp = diff.auditTimestamp,
         revisionId = diff.revisionId,
     ) {
+        diff.mergeNote?.let { note ->
+            Text(
+                text = note,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(bottom = 4.dp),
+            )
+        }
         when (diff.auditType) {
             AuditType.INSERT -> {
                 AuditSectionLabel("Created with:")
@@ -217,7 +321,7 @@ private fun AccountAuditDiffCard(
                 FieldValueRow("Category", diff.categoryName.value() ?: "Uncategorized")
                 OwnershipChangesSection(diff.ownersAdded, diff.ownersRemoved, onOwnerClick)
                 AccountAttributeChangesSection(diff.attributeChanges)
-                SourceInfoSection(diff.source, onApiSourceClick = onApiSourceClick)
+                SourceInfoSection(diff.source, onApiSourceClick = onApiSourceClick, onCsvSourceClick = onCsvSourceClick)
             }
             AuditType.UPDATE -> {
                 if (!diff.hasChanges) {
@@ -239,7 +343,7 @@ private fun AccountAuditDiffCard(
                     OwnershipChangesSection(diff.ownersAdded, diff.ownersRemoved, onOwnerClick)
                     AccountAttributeChangesSection(diff.attributeChanges)
                 }
-                SourceInfoSection(diff.source, onApiSourceClick = onApiSourceClick)
+                SourceInfoSection(diff.source, onApiSourceClick = onApiSourceClick, onCsvSourceClick = onCsvSourceClick)
             }
             AuditType.DELETE -> {
                 val errorColor = MaterialTheme.colorScheme.error
@@ -250,7 +354,12 @@ private fun AccountAuditDiffCard(
                 FieldValueRow("Category", diff.categoryName.value() ?: "Uncategorized", errorColor)
                 OwnershipChangesSection(diff.ownersAdded, diff.ownersRemoved, onOwnerClick)
                 AccountAttributeChangesSection(diff.attributeChanges, errorColor)
-                SourceInfoSection(diff.source, labelColor = errorColor.copy(alpha = 0.8f), onApiSourceClick = onApiSourceClick)
+                SourceInfoSection(
+                    diff.source,
+                    labelColor = errorColor.copy(alpha = 0.8f),
+                    onApiSourceClick = onApiSourceClick,
+                    onCsvSourceClick = onCsvSourceClick,
+                )
             }
         }
     }

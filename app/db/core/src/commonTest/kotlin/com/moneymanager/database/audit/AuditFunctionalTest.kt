@@ -1,7 +1,6 @@
 @file:OptIn(kotlin.time.ExperimentalTime::class)
 
 package com.moneymanager.database.audit
-
 import app.cash.sqldelight.db.QueryResult
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
@@ -11,6 +10,10 @@ import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.test.database.DbTest
+import com.moneymanager.test.database.createAccount
+import com.moneymanager.test.database.createCategory
+import com.moneymanager.test.database.updateAccount
+import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test

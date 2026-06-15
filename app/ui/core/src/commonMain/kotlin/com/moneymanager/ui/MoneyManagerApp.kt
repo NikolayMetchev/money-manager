@@ -126,7 +126,10 @@ fun MoneyManagerApp(
         }
 
         MaterialTheme {
-            CompositionLocalProvider(LocalBackgroundTaskManager provides backgroundTaskManager) {
+            CompositionLocalProvider(
+                LocalBackgroundTaskManager provides backgroundTaskManager,
+                LocalDeviceId provides services.deviceId,
+            ) {
                 // Handle system back button (Android) when there's navigation history
                 PlatformBackHandler(enabled = navigationHistory.canGoBack) {
                     navigationHistory.navigateBack()
@@ -291,7 +294,6 @@ fun MoneyManagerApp(
                                     }
                                     CurrenciesScreen(
                                         currencyRepository = services.accounts.currencyRepository,
-                                        entitySource = services.transactions.entitySource,
                                         onAuditClick = { currency ->
                                             navigationHistory.navigateTo(Screen.CurrencyAuditHistory(currency.id, currency.code))
                                         },
@@ -629,6 +631,7 @@ fun MoneyManagerApp(
                                         accountId = screen.accountId,
                                         auditRepository = services.audit.auditRepository,
                                         accountRepository = services.accounts.accountRepository,
+                                        maintenance = services.imports.maintenance,
                                         onApiSourceClick = { sessionId, requestId, jsonPath ->
                                             navigationHistory.navigateTo(
                                                 Screen.ApiSessionTraffic(
@@ -637,6 +640,9 @@ fun MoneyManagerApp(
                                                     highlightJsonPath = jsonPath,
                                                 ),
                                             )
+                                        },
+                                        onCsvSourceClick = { importId, rowIndex ->
+                                            navigationHistory.navigateTo(Screen.CsvImportDetail(importId, rowIndex))
                                         },
                                         onOwnerClick = { personId ->
                                             navigationHistory.navigateTo(

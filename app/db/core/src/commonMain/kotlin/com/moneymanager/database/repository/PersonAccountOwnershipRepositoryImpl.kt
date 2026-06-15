@@ -4,8 +4,11 @@ import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
 import com.moneymanager.database.mapper.PersonAccountOwnershipMapper
+import com.moneymanager.database.recordEntityProvenance
 import com.moneymanager.database.sql.MoneyManagerDatabase
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.EntityProvenance
+import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.PersonAccountOwnership
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
@@ -18,6 +21,7 @@ class PersonAccountOwnershipRepositoryImpl(
     database: MoneyManagerDatabase,
 ) : PersonAccountOwnershipRepository {
     private val queries = database.personQueries
+    private val entitySourceQueries = database.entitySourceQueries
 
     override fun getOwnershipsByPerson(personId: PersonId): Flow<List<PersonAccountOwnership>> =
         queries
@@ -50,6 +54,7 @@ class PersonAccountOwnershipRepositoryImpl(
     override suspend fun createOwnership(
         personId: PersonId,
         accountId: AccountId,
+        provenance: EntityProvenance,
     ): Long =
         withContext(Dispatchers.Default) {
             queries.transactionWithResult {
@@ -57,7 +62,9 @@ class PersonAccountOwnershipRepositoryImpl(
                     person_id = personId.id,
                     account_id = accountId.id,
                 )
-                queries.ownershipLastInsertRowId().executeAsOne()
+                val id = queries.ownershipLastInsertRowId().executeAsOne()
+                entitySourceQueries.recordEntityProvenance(EntityType.PERSON_ACCOUNT_OWNERSHIP, id, 1L, provenance)
+                id
             }
         }
 

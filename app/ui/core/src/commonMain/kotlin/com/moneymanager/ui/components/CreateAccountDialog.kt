@@ -26,7 +26,7 @@ import androidx.compose.ui.Modifier
 import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
-import com.moneymanager.domain.model.EntityType
+import com.moneymanager.domain.model.EntityProvenance
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
@@ -180,17 +180,14 @@ fun CreateAccountDialog(
                                         openingDate = now,
                                         categoryId = accountState.selectedCategoryId,
                                     )
-                                val accountId = accountRepository.createAccount(newAccount)
-                                // Record source for audit trail
-                                entitySource.record(EntityType.ACCOUNT, accountId.id, 1L)
+                                val provenance = EntityProvenance.Manual(entitySource.deviceId)
+                                val accountId = accountRepository.createAccount(newAccount, provenance)
                                 selectedOwnerIds.forEach { personId ->
-                                    val ownershipId =
-                                        personAccountOwnershipRepository.createOwnership(
-                                            personId = PersonId(personId),
-                                            accountId = accountId,
-                                        )
-                                    // Record source for ownership audit trail
-                                    entitySource.record(EntityType.PERSON_ACCOUNT_OWNERSHIP, ownershipId, 1L)
+                                    personAccountOwnershipRepository.createOwnership(
+                                        personId = PersonId(personId),
+                                        accountId = accountId,
+                                        provenance = provenance,
+                                    )
                                 }
                                 onAccountCreated?.invoke(accountId)
                                 onDismiss()

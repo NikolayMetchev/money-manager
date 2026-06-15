@@ -17,6 +17,12 @@ insert:
 INSERT INTO account(name, opening_date, category_id)
 VALUES (?, ?, ?);
 
+-- Recreate an account with an explicit id (used by unmerge to restore a merged-away account so the
+-- transfers reassigned during the merge can be pointed back at their original account id).
+insertWithId:
+INSERT INTO account(id, revision_id, name, opening_date, category_id)
+VALUES (?, ?, ?, ?, ?);
+
 update:
 UPDATE account
 SET revision_id = revision_id + 1,

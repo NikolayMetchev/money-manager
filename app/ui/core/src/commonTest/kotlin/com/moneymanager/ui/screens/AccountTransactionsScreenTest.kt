@@ -1,7 +1,6 @@
 @file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
 
 package com.moneymanager.ui.screens
-
 import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -56,6 +55,7 @@ import com.moneymanager.domain.repository.TransferSourceRepository
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
+import com.moneymanager.test.database.testProvenance
 import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import com.moneymanager.ui.screens.transactions.AccountTransactionCard
 import com.moneymanager.ui.screens.transactions.AccountTransactionsScreen
@@ -497,6 +497,7 @@ class AccountTransactionsScreenTest {
                             name = "E2E Test Checking",
                             openingDate = now,
                         ),
+                        repositories.testProvenance,
                     )
                 savingsAccountId =
                     repositories.accountRepository.createAccount(
@@ -505,6 +506,7 @@ class AccountTransactionsScreenTest {
                             name = "E2E Test Savings",
                             openingDate = now,
                         ),
+                        repositories.testProvenance,
                     )
 
                 // Create a transfer
@@ -701,6 +703,7 @@ class AccountTransactionsScreenTest {
                             name = "Audit Test Checking",
                             openingDate = now,
                         ),
+                        repositories.testProvenance,
                     )
                 savingsAccountId =
                     repositories.accountRepository.createAccount(
@@ -709,6 +712,7 @@ class AccountTransactionsScreenTest {
                             name = "Audit Test Savings",
                             openingDate = now,
                         ),
+                        repositories.testProvenance,
                     )
 
                 // Create a transfer (revision 1)
@@ -880,6 +884,7 @@ class AccountTransactionsScreenTest {
                             name = "Combined Edit Checking",
                             openingDate = now,
                         ),
+                        repositories.testProvenance,
                     )
                 savingsAccountId =
                     repositories.accountRepository.createAccount(
@@ -888,6 +893,7 @@ class AccountTransactionsScreenTest {
                             name = "Combined Edit Savings",
                             openingDate = now,
                         ),
+                        repositories.testProvenance,
                     )
 
                 // Create a transfer (revision 1)
@@ -1041,10 +1047,10 @@ class AccountTransactionsScreenTest {
         mock(MockMode.autoUnit) {
             every { getAllAccounts() } returns flowOf(accounts)
             every { getAccountById(any()) } calls { (id: AccountId) -> flowOf(accounts.find { it.id == id }) }
-            everySuspend { createAccount(any()) } returns AccountId(999L)
-            everySuspend { createAccountsBatch(any()) } returns emptyList()
-            everySuspend { updateAccount(any()) } returns 1L
-            everySuspend { updateAccountWithAttributes(any(), any(), any(), any(), any()) } returns 1L
+            everySuspend { createAccount(any(), any()) } returns AccountId(999L)
+            everySuspend { createAccountsBatch(any(), any()) } returns emptyList()
+            everySuspend { updateAccount(any(), any()) } returns 1L
+            everySuspend { updateAccountWithAttributes(any(), any(), any(), any(), any(), any()) } returns 1L
             everySuspend { countTransfersByAccount(any()) } returns 0L
             everySuspend { getTransfersBetweenAccounts(any(), any()) } returns emptyList()
         }
@@ -1140,7 +1146,7 @@ class AccountTransactionsScreenTest {
             every { getAllCurrencies() } returns flowOf(currencies)
             every { getCurrencyById(any()) } calls { (id: CurrencyId) -> flowOf(currencies.find { it.id == id }) }
             every { getCurrencyByCode(any()) } calls { (code: String) -> flowOf(currencies.find { it.code == code }) }
-            everySuspend { upsertCurrencyByCode(any(), any()) } returns CurrencyId(1L)
+            everySuspend { upsertCurrencyByCode(any(), any(), any()) } returns CurrencyId(1L)
         }
 
     private fun createCategoryRepository(): CategoryRepository =
@@ -1156,7 +1162,7 @@ class AccountTransactionsScreenTest {
             every { getCategoryById(any()) } calls { (id: Long) -> flowOf(categories.find { it.id == id }) }
             every { getTopLevelCategories() } returns flowOf(categories.filter { it.parentId == null })
             every { getCategoriesByParent(any()) } calls { (parentId: Long) -> flowOf(categories.filter { it.parentId == parentId }) }
-            everySuspend { createCategory(any()) } returns 0L
+            everySuspend { createCategory(any(), any()) } returns 0L
         }
 
     private fun createTransferSourceRepository(): TransferSourceRepository =
@@ -1184,7 +1190,7 @@ class AccountTransactionsScreenTest {
         mock(MockMode.autoUnit) {
             every { getAllPeople() } returns flowOf(emptyList())
             every { getPersonById(any()) } returns flowOf(null)
-            everySuspend { createPerson(any()) } returns PersonId(0L)
+            everySuspend { createPerson(any(), any()) } returns PersonId(0L)
         }
 
     private fun createPersonAccountOwnershipRepository(): PersonAccountOwnershipRepository =
@@ -1193,7 +1199,7 @@ class AccountTransactionsScreenTest {
             every { getOwnershipsByAccount(any()) } returns flowOf(emptyList())
             every { getAllOwnerships() } returns flowOf(emptyList())
             every { getOwnershipById(any()) } returns flowOf(null)
-            everySuspend { createOwnership(any(), any()) } returns 0L
+            everySuspend { createOwnership(any(), any(), any()) } returns 0L
         }
 
     private fun createMaintenance(): Maintenance =
@@ -1218,5 +1224,5 @@ class AccountTransactionsScreenTest {
     private fun createDbMaintenance(repositories: DatabaseComponent): Maintenance = DbMaintenance(repositories.maintenanceService)
 
     private fun createDbEntitySource(repositories: DatabaseComponent): EntitySource =
-        DbEntitySource(repositories.entitySourceQueries, repositories.transferSourceQueries, repositories.deviceId)
+        DbEntitySource(repositories.transferSourceQueries, repositories.deviceId)
 }

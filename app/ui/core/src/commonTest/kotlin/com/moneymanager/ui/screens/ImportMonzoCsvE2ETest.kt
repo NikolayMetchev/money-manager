@@ -1,7 +1,6 @@
 @file:OptIn(ExperimentalTime::class, ExperimentalUuidApi::class)
 
 package com.moneymanager.ui.screens
-
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
@@ -25,9 +24,11 @@ import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
+import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
+import com.moneymanager.test.database.upsertCurrencyByCode
 import com.moneymanager.ui.test.MoneyManagerTestApp
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import kotlinx.coroutines.runBlocking

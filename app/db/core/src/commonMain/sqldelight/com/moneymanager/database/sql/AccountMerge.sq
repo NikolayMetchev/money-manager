@@ -1,0 +1,136 @@
+-- Records a reversible account merge so it can be undone (unmerge).
+-- When account D ("deleted") is merged into account S ("surviving"), D's transactions are
+-- reassigned to S and D is deleted. To reverse this we must remember D's own data (it is gone
+-- after the merge) and exactly which transfers were reassigned, since after the move there is no
+-- way to tell which transfers originally belonged to D versus those already on S.
+--
+-- These tables are excluded from the audit trail (see EXCLUDED_FROM_AUDIT in
+-- MoneyManagerDatabaseWrapper): they ARE the reversal record, not user-facing entities.
+CREATE TABLE account_merge (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    merged_at INTEGER NOT NULL,
+    surviving_account_id INTEGER NOT NULL,
+    -- Snapshot of the deleted account so it can be recreated on unmerge.
+    deleted_account_id INTEGER NOT NULL,
+    deleted_account_name TEXT NOT NULL,
+    deleted_account_opening_date INTEGER NOT NULL,
+    deleted_account_category_id INTEGER NOT NULL,
+    deleted_account_revision_id INTEGER NOT NULL,
+    reversed INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (surviving_account_id) REFERENCES account(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_account_merge_surviving ON account_merge(surviving_account_id);
+
+-- The transfers reassigned by the merge and which side (source/target) pointed at the deleted
+-- account, so unmerge moves back exactly those references.
+CREATE TABLE account_merge_transfer (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    merge_id INTEGER NOT NULL,
+    transfer_id INTEGER NOT NULL,
+    moved_source INTEGER NOT NULL DEFAULT 0,
+    moved_target INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (merge_id) REFERENCES account_merge(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_account_merge_transfer_merge ON account_merge_transfer(merge_id);
+
+-- Snapshot of the deleted account's attributes (cascade-deleted with the account on merge).
+CREATE TABLE account_merge_attribute (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    merge_id INTEGER NOT NULL,
+    attribute_type_id INTEGER NOT NULL,
+    attribute_value TEXT NOT NULL,
+    FOREIGN KEY (merge_id) REFERENCES account_merge(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_account_merge_attribute_merge ON account_merge_attribute(merge_id);
+
+-- Snapshot of the deleted account's person-ownership links (cascade-deleted with the account on merge).
+CREATE TABLE account_merge_ownership (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    merge_id INTEGER NOT NULL,
+    person_id INTEGER NOT NULL,
+    FOREIGN KEY (merge_id) REFERENCES account_merge(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_account_merge_ownership_merge ON account_merge_ownership(merge_id);
+
+insertMerge:
+INSERT INTO account_merge(
+    merged_at, surviving_account_id, deleted_account_id, deleted_account_name,
+    deleted_account_opening_date, deleted_account_category_id, deleted_account_revision_id
+)
+VALUES (?, ?, ?, ?, ?, ?, ?);
+
+lastInsertRowId:
+SELECT last_insert_rowid();
+
+insertMergeTransfer:
+INSERT INTO account_merge_transfer(merge_id, transfer_id, moved_source, moved_target)
+VALUES (?, ?, ?, ?);
+
+insertMergeAttribute:
+INSERT INTO account_merge_attribute(merge_id, attribute_type_id, attribute_value)
+VALUES (?, ?, ?);
+
+insertMergeOwnership:
+INSERT INTO account_merge_ownership(merge_id, person_id)
+VALUES (?, ?);
+
+-- Reversible (not yet undone) merges with a count of affected transfers, for the unmerge UI.
+selectReversible:
+SELECT
+    account_merge.id,
+    account_merge.merged_at,
+    account_merge.surviving_account_id,
+    account_merge.deleted_account_id,
+    account_merge.deleted_account_name,
+    (SELECT COUNT(*) FROM account_merge_transfer WHERE account_merge_transfer.merge_id = account_merge.id) AS transfer_count
+FROM account_merge
+WHERE account_merge.reversed = 0
+ORDER BY account_merge.merged_at DESC;
+
+selectById:
+SELECT * FROM account_merge WHERE id = ?;
+
+-- All merges (reversed or not) in which this account is the SURVIVOR, for its audit trail. The
+-- merge/unmerge only modify the deleted account + the transfers, so the survivor's own audit rows
+-- show nothing about them; the audit screen renders these as explicit "merged in"/"undone" entries.
+selectBySurvivingAccount:
+SELECT
+    account_merge.id,
+    account_merge.merged_at,
+    account_merge.surviving_account_id,
+    account_merge.deleted_account_id,
+    account_merge.deleted_account_name,
+    account_merge.reversed,
+    (SELECT COUNT(*) FROM account_merge_transfer WHERE account_merge_transfer.merge_id = account_merge.id) AS transfer_count
+FROM account_merge
+WHERE account_merge.surviving_account_id = ?
+ORDER BY account_merge.merged_at DESC;
+
+-- Merges where this account was the one merged away, with the surviving account's name. Used by the
+-- account audit screen to label the delete (merge) and the restore (undo merge) entries: the merge
+-- deletes the account at deleted_account_revision_id and the undo recreates it at that revision + 1.
+selectByDeletedAccount:
+SELECT
+    account_merge.deleted_account_revision_id,
+    account_merge.surviving_account_id,
+    account_merge.reversed,
+    surviving.name AS surviving_account_name
+FROM account_merge
+LEFT JOIN account AS surviving ON account_merge.surviving_account_id = surviving.id
+WHERE account_merge.deleted_account_id = ?;
+
+selectTransfersForMerge:
+SELECT transfer_id, moved_source, moved_target FROM account_merge_transfer WHERE merge_id = ?;
+
+selectAttributesForMerge:
+SELECT attribute_type_id, attribute_value FROM account_merge_attribute WHERE merge_id = ?;
+
+selectOwnershipsForMerge:
+SELECT person_id FROM account_merge_ownership WHERE merge_id = ?;
+
+markReversed:
+UPDATE account_merge SET reversed = 1 WHERE id = ?;

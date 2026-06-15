@@ -160,7 +160,8 @@ interface RepositoryModule {
         accountRepository: AccountRepository,
         currencyRepository: CurrencyRepository,
         categoryRepository: CategoryRepository,
-    ): CsvStrategyExportService = CsvStrategyExportService(accountRepository, currencyRepository, categoryRepository)
+        deviceId: DeviceId,
+    ): CsvStrategyExportService = CsvStrategyExportService(accountRepository, currencyRepository, categoryRepository, deviceId)
 
     @Provides
     @SingleIn(DatabaseScope::class)

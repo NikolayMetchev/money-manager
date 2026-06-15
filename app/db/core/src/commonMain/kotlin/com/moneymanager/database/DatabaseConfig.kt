@@ -8,6 +8,8 @@ import com.moneymanager.database.json.ApiStrategyJsonCodec
 import com.moneymanager.database.json.FieldMappingJsonCodec
 import com.moneymanager.database.qif.QifCsvAdapter
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.DeviceId
+import com.moneymanager.domain.model.EntityProvenance
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.SourceType
 import com.moneymanager.domain.model.apistrategy.ApiAccountMappings
@@ -844,16 +846,10 @@ object DatabaseConfig {
             // Seed the built-in CSV import strategies
             seedBuiltInCsvStrategies()
 
-            // Seed currencies with source tracking
+            // Seed currencies with source tracking (recorded atomically inside upsertCurrencyByCode).
+            val systemCurrencyProvenance = EntityProvenance.System(DeviceId(systemDeviceId))
             allCurrencies.forEach { currency ->
-                val currencyId = currencyRepository.upsertCurrencyByCode(currency.code, currency.displayName)
-                entitySourceQueries.insertSource(
-                    entity_type_id = EntityType.CURRENCY.id,
-                    entity_id = currencyId.id,
-                    revision_id = 1,
-                    source_type_id = SourceType.SYSTEM.id.toLong(),
-                    device_id = systemDeviceId,
-                )
+                currencyRepository.upsertCurrencyByCode(currency.code, currency.displayName, systemCurrencyProvenance)
             }
         }
     }

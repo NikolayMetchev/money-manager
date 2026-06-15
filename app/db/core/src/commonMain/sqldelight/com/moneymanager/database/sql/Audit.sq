@@ -369,7 +369,10 @@ SELECT
     entity_source.created_at AS source_created_at,
     api_entity_source.api_session_id AS source_api_session_id,
     api_entity_source.api_request_id AS source_api_request_id,
-    api_entity_source.json_path AS source_api_json_path
+    api_entity_source.json_path AS source_api_json_path,
+    csv_entity_source.csv_import_id AS source_csv_import_id,
+    csv_entity_source.csv_row_index AS source_csv_row_index,
+    csv_import_metadata.original_file_name AS source_csv_file_name
 FROM account_audit
 JOIN audit_type ON account_audit.audit_type_id = audit_type.id
 LEFT JOIN category ON account_audit.category_id = category.id
@@ -379,8 +382,18 @@ LEFT JOIN entity_source ON account_audit.account_id = entity_source.entity_id
 LEFT JOIN source_type ON entity_source.source_type_id = source_type.id
 LEFT JOIN device_view ON entity_source.device_id = device_view.id
 LEFT JOIN api_entity_source ON entity_source.id = api_entity_source.id
+LEFT JOIN csv_entity_source ON entity_source.id = csv_entity_source.id
+LEFT JOIN csv_import_metadata ON csv_entity_source.csv_import_id = csv_import_metadata.id
 WHERE account_audit.account_id = ?
 ORDER BY account_audit.audit_timestamp DESC, account_audit.id DESC;
+
+-- Last-known name for every account that has audit history, keyed by account id.
+-- Used to label accounts (e.g. merged-away/deleted ones) that no longer exist in the account table.
+-- The highest audit id per account is its most recent audit row, whose name is the latest known name.
+selectLatestAuditedAccountNames:
+SELECT account_id, name
+FROM account_audit
+WHERE id IN (SELECT MAX(id) FROM account_audit GROUP BY account_id);
 
 -- Get audit history for a person
 -- entity_type_id = 2 for PERSON

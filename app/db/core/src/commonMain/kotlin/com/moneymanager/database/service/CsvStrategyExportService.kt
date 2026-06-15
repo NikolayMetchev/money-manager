@@ -8,6 +8,8 @@ import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.DeviceId
+import com.moneymanager.domain.model.EntityProvenance
 import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping
@@ -129,7 +131,11 @@ class CsvStrategyExportService(
     private val accountRepository: AccountRepository,
     private val currencyRepository: CurrencyRepository,
     private val categoryRepository: CategoryRepository,
+    private val deviceId: DeviceId,
 ) {
+    // Entities created while importing a strategy are a manual user action on this device.
+    private val provenance = EntityProvenance.Manual(deviceId)
+
     /**
      * Converts a CsvImportStrategy to its portable export format.
      * Resolves all database IDs to human-readable names/codes.
@@ -301,12 +307,12 @@ class CsvStrategyExportService(
                                 name = resolution.name,
                                 openingDate = Instant.fromEpochMilliseconds(System.currentTimeMillis()),
                             )
-                        val id = accountRepository.createAccount(account)
+                        val id = accountRepository.createAccount(account, provenance)
                         createdAccounts[ref.name] = id
                     }
                     ReferenceType.CATEGORY -> {
                         val category = Category(name = resolution.name)
-                        val id = categoryRepository.createCategory(category)
+                        val id = categoryRepository.createCategory(category, provenance)
                         createdCategories[ref.name] = id
                     }
                     ReferenceType.CURRENCY -> {
@@ -314,6 +320,7 @@ class CsvStrategyExportService(
                             currencyRepository.upsertCurrencyByCode(
                                 code = resolution.name,
                                 name = resolution.name,
+                                provenance = provenance,
                             )
                         createdCurrencies[ref.name] = id
                     }

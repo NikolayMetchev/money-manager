@@ -4,10 +4,13 @@ import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
 import com.moneymanager.database.mapper.CurrencyMapper
+import com.moneymanager.database.recordEntityProvenance
 import com.moneymanager.database.sql.MoneyManagerDatabase
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.CurrencyScaleFactors
+import com.moneymanager.domain.model.EntityProvenance
+import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.repository.CurrencyRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -18,6 +21,7 @@ class CurrencyRepositoryImpl(
     database: MoneyManagerDatabase,
 ) : CurrencyRepository {
     private val queries = database.currencyQueries
+    private val entitySourceQueries = database.entitySourceQueries
 
     override fun getAllCurrencies(): Flow<List<Currency>> =
         queries
@@ -43,6 +47,7 @@ class CurrencyRepositoryImpl(
     override suspend fun upsertCurrencyByCode(
         code: String,
         name: String,
+        provenance: EntityProvenance,
     ): CurrencyId =
         withContext(Dispatchers.Default) {
             queries.transactionWithResult {
@@ -52,6 +57,8 @@ class CurrencyRepositoryImpl(
                         val scaleFactor = CurrencyScaleFactors.getScaleFactor(code)
                         queries.insert(code, name, scaleFactor.toLong())
                         val newId = queries.lastInsertedId().executeAsOne()
+                        // Only a freshly inserted currency records a source (the existing branch keeps its own).
+                        entitySourceQueries.recordEntityProvenance(EntityType.CURRENCY, newId, 1L, provenance)
                         CurrencyId(newId)
                     }
             }
