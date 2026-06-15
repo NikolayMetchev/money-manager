@@ -66,11 +66,14 @@ interface AccountRepository {
      * Throws if any transfers exist directly between the two accounts (they would become invalid
      * self-transfers); callers should surface this to the user before invoking.
      *
+     * The deleted account's DELETE audit entry is sourced as a merge on [deviceId].
+     *
      * @return the id of the recorded merge.
      */
     suspend fun mergeAccounts(
         deletedAccount: AccountId,
         survivingAccount: AccountId,
+        deviceId: DeviceId,
     ): MergeId
 
     /** Reversible (not yet undone) merges, most recent first, for surfacing an "undo merge" action. */

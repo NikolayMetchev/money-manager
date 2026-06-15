@@ -16,6 +16,8 @@ import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.createOwnership
 import com.moneymanager.test.database.createPerson
+import com.moneymanager.test.database.mergeAccounts
+import com.moneymanager.test.database.unmergeAccount
 import com.moneymanager.test.database.updateAccount
 import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
@@ -434,7 +436,7 @@ class AccountRepositoryImplTest : DbTest() {
                     survivingAccount = accountB,
                 )
 
-            repositories.accountRepository.unmergeAccount(mergeId, DeviceId(1))
+            repositories.accountRepository.unmergeAccount(mergeId)
 
             // Account A is recreated with its original id and name
             val restored = repositories.accountRepository.getAccountById(accountA).first()
@@ -452,9 +454,11 @@ class AccountRepositoryImplTest : DbTest() {
             assertEquals(5L, restoreEntry.revisionId)
             // The recreated account is sourced as a merge-undo (not "source data missing").
             assertEquals(SourceType.MERGE_UNDO, restoreEntry.source?.sourceType)
-            // The delete is recorded at its own revision (4), distinct from the prior change at revision 3.
+            // The delete is recorded at its own revision (4), distinct from the prior change at revision 3,
+            // and is sourced as a merge (not "source data missing").
             val accountDeleteEntry = accountAudit.single { it.auditType == AuditType.DELETE }
             assertEquals(4L, accountDeleteEntry.revisionId)
+            assertEquals(SourceType.MERGE, accountDeleteEntry.source?.sourceType)
             // The merge context lets the audit screen label these entries.
             val mergeContext = repositories.accountRepository.getMergesForDeletedAccount(accountA).single()
             assertTrue(mergeContext.reversed)

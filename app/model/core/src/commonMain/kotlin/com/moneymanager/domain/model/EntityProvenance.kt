@@ -30,6 +30,11 @@ sealed interface EntityProvenance {
         override val deviceId: DeviceId,
     ) : EntityProvenance
 
+    /** Deleted by merging the account into another (see AccountRepository.mergeAccounts). */
+    data class Merge(
+        override val deviceId: DeviceId,
+    ) : EntityProvenance
+
     /** Recreated by undoing an account merge (see AccountRepository.unmergeAccount). */
     data class MergeUndo(
         override val deviceId: DeviceId,

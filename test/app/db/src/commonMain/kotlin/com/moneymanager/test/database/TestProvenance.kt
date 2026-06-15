@@ -7,6 +7,7 @@ import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.EntityProvenance
+import com.moneymanager.domain.model.MergeId
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonId
@@ -34,6 +35,14 @@ val DatabaseComponent.testProvenance: EntityProvenance
     get() = EntityProvenance.SampleGenerator(deviceId)
 
 suspend fun AccountRepository.createAccount(account: Account): AccountId = createAccount(account, TEST_PROVENANCE)
+
+/** Merge against the seeded SYSTEM device (id 1); the merge source type is fixed regardless of device. */
+suspend fun AccountRepository.mergeAccounts(
+    deletedAccount: AccountId,
+    survivingAccount: AccountId,
+): MergeId = mergeAccounts(deletedAccount, survivingAccount, DeviceId(1))
+
+suspend fun AccountRepository.unmergeAccount(mergeId: MergeId): Unit = unmergeAccount(mergeId, DeviceId(1))
 
 suspend fun AccountRepository.createAccountsBatch(accounts: List<Account>): List<AccountId> =
     createAccountsBatch(accounts) { TEST_PROVENANCE }

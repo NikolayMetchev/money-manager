@@ -215,6 +215,10 @@ fun SourceInfoSection(
                 SourceType.SYSTEM -> {
                     FieldValueRow("Origin", "System", labelWidth = labelWidth)
                 }
+                SourceType.MERGE -> {
+                    FieldValueRow("Origin", "Merge", labelWidth = labelWidth)
+                    DeviceInfoRows(source.deviceInfo, labelWidth)
+                }
                 SourceType.MERGE_UNDO -> {
                     FieldValueRow("Origin", "Undo Merge", labelWidth = labelWidth)
                     DeviceInfoRows(source.deviceInfo, labelWidth)

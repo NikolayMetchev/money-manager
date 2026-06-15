@@ -858,6 +858,7 @@ object DatabaseConfig {
             sourceTypeQueries.insert(id = 5, name = "API")
             sourceTypeQueries.insert(id = 6, name = "QIF_IMPORT")
             sourceTypeQueries.insert(id = 7, name = "MERGE_UNDO")
+            sourceTypeQueries.insert(id = 8, name = "MERGE")
 
             // Seed API session type lookup table
             apiSessionQueries.insertSessionType(id = 1, name = "Monzo")

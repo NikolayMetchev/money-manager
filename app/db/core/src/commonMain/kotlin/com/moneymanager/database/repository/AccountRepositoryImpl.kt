@@ -185,6 +185,7 @@ class AccountRepositoryImpl(
     override suspend fun mergeAccounts(
         deletedAccount: AccountId,
         survivingAccount: AccountId,
+        deviceId: DeviceId,
     ): MergeId =
         withContext(Dispatchers.Default) {
             database.transactionWithResult {
@@ -242,6 +243,15 @@ class AccountRepositoryImpl(
                     accountToDelete = deletedAccount.id,
                 )
                 queries.delete(deletedAccount.id)
+                // Source the deleted account's DELETE audit entry (recorded at revision_id + 1 by the
+                // custom account delete trigger) as a merge, so the trail shows where it went rather than
+                // "source data missing". entity_source is independent of the now-deleted account row.
+                entitySourceQueries.recordEntityProvenance(
+                    EntityType.ACCOUNT,
+                    deletedAccount.id,
+                    account.revision_id + 1,
+                    EntityProvenance.Merge(deviceId),
+                )
 
                 MergeId(mergeId)
             }

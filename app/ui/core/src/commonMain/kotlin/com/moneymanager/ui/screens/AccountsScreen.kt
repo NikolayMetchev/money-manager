@@ -454,6 +454,7 @@ fun DeleteAccountDialog(
     var dropdownExpanded by remember { mutableStateOf(false) }
     var targetSearchQuery by remember { mutableStateOf("") }
     val scope = rememberSchemaAwareCoroutineScope()
+    val deviceId = LocalDeviceId.current
 
     val allAccounts by accountRepository
         .getAllAccounts()
@@ -606,6 +607,7 @@ fun DeleteAccountDialog(
                                 accountRepository.mergeAccounts(
                                     deletedAccount = account.id,
                                     survivingAccount = selectedTargetAccount!!.id,
+                                    deviceId = deviceId,
                                 )
                                 maintenance.fullRefreshMaterializedViews()
                             } else {
