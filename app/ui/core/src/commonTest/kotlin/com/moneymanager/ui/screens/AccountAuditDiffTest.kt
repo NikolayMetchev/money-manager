@@ -112,7 +112,7 @@ class AccountAuditDiffTest {
     fun `owner add concurrent with an account change attaches to that entry`() {
         val entries = listOf(entry(id = 1, auditType = AuditType.INSERT, revisionId = 1, categoryName = null))
         // Within the 2s window of the account INSERT (id=1 -> timestamp 1000ms).
-        val ownershipEntries = listOf(ownership(id = 5, auditType = AuditType.INSERT, timestampMs = 1500, personName = "Alice"))
+        val ownershipEntries = listOf(ownership(id = 6, auditType = AuditType.INSERT, timestampMs = 1500, personName = "Bob"))
 
         val diffs =
             computeAccountAuditDiffs(
@@ -124,7 +124,7 @@ class AccountAuditDiffTest {
             )
 
         assertEquals(1, diffs.size)
-        assertEquals(listOf("Alice"), diffs.single().ownersAdded.map { it.personFullName })
+        assertEquals(listOf("Bob"), diffs.single().ownersAdded.map { it.personFullName })
     }
 
     // An older category change resolves its NEW value from the next (newer) audit row, not the live one.

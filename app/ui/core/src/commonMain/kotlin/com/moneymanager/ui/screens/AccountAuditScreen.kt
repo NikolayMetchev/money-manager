@@ -329,7 +329,7 @@ internal fun computeAccountAuditDiffs(
         }
 
     val matchedOwnershipIds =
-        entries.flatMapTo(mutableSetOf<Long>()) { entry ->
+        entries.flatMapTo(mutableSetOf()) { entry ->
             ownershipEntries
                 .filter { isWithinWindow(it.auditTimestamp, entry.auditTimestamp) }
                 .map { it.id }

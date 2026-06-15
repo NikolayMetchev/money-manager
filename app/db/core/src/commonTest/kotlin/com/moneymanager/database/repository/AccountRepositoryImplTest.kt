@@ -376,7 +376,7 @@ class AccountRepositoryImplTest : DbTest() {
         }
 
     @Test
-    fun `unmergeAccount should recreate the account, restore owners and move transfers back`() =
+    fun `unmergeAccount should recreate the account then restore owners and move transfers back`() =
         runTest {
             val now = Clock.System.now()
             val accountA =
