@@ -197,7 +197,11 @@ jobs:
         uses: JetBrains/qodana-action@v2026.1
         with:
           upload-result: true
-          pr-mode: false
+          # On PRs analyse only the changed files and fail solely on problems they introduce. The
+          # whole-project + cloud-baseline approach didn't subtract main's pre-existing problems on PR
+          # runs (they were all reported as "new"); push-to-main runs still do a full scan and refresh
+          # the baseline.
+          pr-mode: ${{ github.event_name == 'pull_request' }}
           use-caches: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/releases/') }}
         env:
           QODANA_TOKEN: ${{ secrets.QODANA_TOKEN_1874207222 }}

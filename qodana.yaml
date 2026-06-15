@@ -83,47 +83,15 @@ exclude:
       - gradle/build-logic/build
       - app/db/core/build
       - app/ui/core/build
-  # Android `actual` platform implementations that are intentional no-op/stub bodies (the JVM target
-  # provides the real behaviour), plus cross-module test/util helpers Qodana can't see used from here.
-  - name: unused
-    paths:
-      - app/db/core/src/androidMain/kotlin/com/moneymanager/database/AndroidDatabaseManager.kt
-      - app/ui/core/src/androidMain/kotlin/com/moneymanager/ui/navigation/MouseButtonNavigation.android.kt
-      - utils/compose/scrollbar/src/androidMain/kotlin/com/moneymanager/compose/scrollbar/PlatformScrollbar.kt
-  - name: EmptyMethod
-    paths:
-      - app/db/core/src/androidMain/kotlin/com/moneymanager/database/AndroidDatabaseManager.kt
-      - utils/compose/scrollbar/src/androidMain/kotlin/com/moneymanager/compose/scrollbar/PlatformScrollbar.kt
-  - name: HasPlatformType
-    paths:
-      - app/db/core/src/androidMain/kotlin/com/moneymanager/database/AndroidDatabaseManager.kt
-      - app/ui/core/src/commonMain/kotlin/com/moneymanager/ui/util/FormatTimestamp.kt
-  - name: SameReturnValue
-    paths:
-      - app/model/core/src/androidMain/kotlin/com/moneymanager/domain/model/DbLocation.kt
-  - name: UnusedReceiverParameter
-    paths:
-      - app/ui/core/src/commonMain/kotlin/com/moneymanager/ui/util/FormatTimestamp.kt
+  # False positives in a PR-touched test: `setValue` is used via 17 `by` delegations, and the mockery
+  # `calls { (code) -> ... it.code == code }` lambda isn't a constant condition. (PR runs analyse changed
+  # files, so these surface even though the lines are unchanged.)
   - name: KotlinUnusedImport
     paths:
-      - app/ui/core/src/commonMain/kotlin/com/moneymanager/ui/util/FormatTimestamp.kt
       - app/ui/core/src/commonTest/kotlin/com/moneymanager/ui/screens/AccountTransactionsScreenTest.kt
   - name: KotlinConstantConditions
     paths:
       - app/ui/core/src/commonTest/kotlin/com/moneymanager/ui/screens/AccountTransactionsScreenTest.kt
-  - name: UnusedSymbol
-    paths:
-      - app/db/core/src/androidMain/kotlin/com/moneymanager/database/AndroidDatabaseManager.kt
-      - app/di/core/src/androidMain/kotlin/com/moneymanager/di/VersionReader.android.kt
-      - utils/compose/scrollbar/src/androidMain/kotlin/com/moneymanager/compose/scrollbar/PlatformScrollbar.kt
-      - app/db/core/src/commonMain/kotlin/com/moneymanager/database/csv/CsvTransferMapper.kt
-      - app/db/core/src/commonMain/kotlin/com/moneymanager/database/csv/StrategyMatcher.kt
-      - app/ui/core/src/commonMain/kotlin/com/moneymanager/ui/screens/transactions/TransactionComponents.kt
-      - test/app/db/src/androidMain/kotlin/com/moneymanager/test/database/TestDatabaseHelper.kt
-      - test/app/db/src/androidMain/kotlin/com/moneymanager/test/database/TestDatabaseLoader.kt
-      - test/app/db/src/androidMain/kotlin/com/moneymanager/test/database/TestDatabaseManagerFactory.kt
-      - test/app/db/src/jvmMain/kotlin/com/moneymanager/test/database/TestDatabaseLoader.kt
-      - test/app/db/src/jvmMain/kotlin/com/moneymanager/test/database/TestDatabaseManagerFactory.kt
 include:
   - name: CheckDependencyLicenses
 failureConditions:
