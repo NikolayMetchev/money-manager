@@ -18,6 +18,12 @@ exclude:
   - name: KotlinUnreachableCode
     paths:
       - app/ui/core/src/commonTest/kotlin/com/moneymanager/ui/screens/MonzoImportAuditE2ETest.kt
+      - app/ui/core/src/commonTest/kotlin/com/moneymanager/ui/screens/CsvAccountSourceAuditE2ETest.kt
+  # account_merge tables keep an AUTOINCREMENT PK that is never SELECTed (rows are looked up by other
+  # columns); Qodana flags the unread PK column.
+  - name: UnusedColumn
+    paths:
+      - app/db/core/src/commonMain/sqldelight/com/moneymanager/database/sql/AccountMerge.sq
   - name: UnnecessaryModuleDependencyInspection
   - name: RedundantSuppression
     paths:
@@ -57,6 +63,8 @@ exclude:
       - app/di/core/src/commonMain/kotlin/com/moneymanager/di/AppComponent.kt
       - app/di/core/src/commonMain/kotlin/com/moneymanager/di/database/DatabaseComponent.kt
       - test/app/db/src/commonMain/kotlin/com/moneymanager/test/database/DbTest.kt
+      # Provenance test helpers: used cross-module (app/db/core tests), which Qodana misses here.
+      - test/app/db/src/commonMain/kotlin/com/moneymanager/test/database/TestProvenance.kt
       - utils/compose/scrollbar/src/jvmMain/kotlin/com/moneymanager/compose/scrollbar/PlatformScrollbar.kt
       - app/ui/core/src/jvmMain/kotlin/com/moneymanager/ui/DatabaseSelectionDialog.kt
       - app/ui/core/src/commonMain/kotlin/com/moneymanager/ui/MinimalErrorScreen.kt

@@ -292,7 +292,7 @@ class AccountRepositoryImplTest : DbTest() {
         }
 
     @Test
-    fun `getLatestAuditedAccountNames resolves a merged-away account's name`() =
+    fun `getLatestAuditedAccountNames resolves a merged-away account name`() =
         runTest {
             val now = Clock.System.now()
             val accountA =

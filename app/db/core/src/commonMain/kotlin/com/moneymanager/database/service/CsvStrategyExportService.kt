@@ -131,7 +131,7 @@ class CsvStrategyExportService(
     private val accountRepository: AccountRepository,
     private val currencyRepository: CurrencyRepository,
     private val categoryRepository: CategoryRepository,
-    private val deviceId: DeviceId,
+    deviceId: DeviceId,
 ) {
     // Entities created while importing a strategy are a manual user action on this device.
     private val provenance = EntityProvenance.Manual(deviceId)
