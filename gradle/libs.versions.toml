@@ -80,7 +80,7 @@ buildtool-netty = "4.2.15.Final"
 buildtool-perfmark = "0.27.0"
 buildtool-poko = "0.23.1"
 buildtool-proto-google-common-protos = "2.48.0"
-buildtool-protobuf = "4.28.3"
+buildtool-protobuf = "4.35.1"
 buildtool-tink = "1.18.0"
 
 [libraries]
