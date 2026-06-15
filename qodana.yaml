@@ -92,6 +92,17 @@ exclude:
   - name: KotlinConstantConditions
     paths:
       - app/ui/core/src/commonTest/kotlin/com/moneymanager/ui/screens/AccountTransactionsScreenTest.kt
+  # Static unused-symbol/parameter analysis is unreliable for test code: helpers, fixtures and
+  # repository factories are referenced only by `@Test` methods, which the PR-diff analysis doesn't
+  # treat as roots (verified false positives, e.g. helpers used 11-15x). Don't fail PRs on it in tests.
+  - name: UnusedSymbol
+    paths:
+      - app/ui/core/src/commonTest
+      - app/db/core/src/commonTest
+  - name: unused
+    paths:
+      - app/ui/core/src/commonTest
+      - app/db/core/src/commonTest
 include:
   - name: CheckDependencyLicenses
 failureConditions:
