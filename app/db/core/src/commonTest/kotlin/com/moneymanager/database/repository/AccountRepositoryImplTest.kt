@@ -5,6 +5,7 @@ import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.DeviceId
+import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.EntityProvenance
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Person
@@ -17,7 +18,6 @@ import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.createOwnership
 import com.moneymanager.test.database.createPerson
 import com.moneymanager.test.database.mergeAccounts
-import com.moneymanager.test.database.unmergeAccount
 import com.moneymanager.test.database.updateAccount
 import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
@@ -430,13 +430,17 @@ class AccountRepositoryImplTest : DbTest() {
                 ),
             )
 
+            // Merge/unmerge with a real (JVM) device, as the app does, so the recorded merge sources
+            // carry resolvable device info.
+            val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
             val mergeId =
                 repositories.accountRepository.mergeAccounts(
                     deletedAccount = accountA,
                     survivingAccount = accountB,
+                    deviceId = deviceId,
                 )
 
-            repositories.accountRepository.unmergeAccount(mergeId)
+            repositories.accountRepository.unmergeAccount(mergeId, deviceId)
 
             // Account A is recreated with its original id and name
             val restored = repositories.accountRepository.getAccountById(accountA).first()
@@ -472,6 +476,16 @@ class AccountRepositoryImplTest : DbTest() {
             assertEquals(accountA, movedBackSource.sourceAccountId)
             val movedBackTarget = accountATransfers.first { it.description == "C to A" }
             assertEquals(accountA, movedBackTarget.targetAccountId)
+
+            // The reassignment bumps each moved transfer's revision; those revisions are sourced too — a
+            // MERGE when the merge moved it out and a MERGE_UNDO when the undo moved it back — rather than
+            // leaving the transaction audit trail with "source data missing".
+            val transferSourceTypes =
+                repositories.auditRepository
+                    .getAuditHistoryForTransfer(movedBackSource.id)
+                    .mapNotNull { it.source?.sourceType }
+            assertTrue(SourceType.MERGE in transferSourceTypes, "the merge reassignment must be sourced")
+            assertTrue(SourceType.MERGE_UNDO in transferSourceTypes, "the unmerge reassignment must be sourced")
 
             // Account B keeps only its own (zero) transfers
             assertEquals(

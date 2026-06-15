@@ -18,6 +18,7 @@ import com.moneymanager.domain.model.EntityProvenance
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.MergeId
 import com.moneymanager.domain.model.NewAttribute
+import com.moneymanager.domain.model.SourceType
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.repository.AccountRepository
 import kotlinx.coroutines.Dispatchers
@@ -37,6 +38,7 @@ class AccountRepositoryImpl(
     private val personQueries = database.personQueries
     private val auditQueries = database.auditQueries
     private val entitySourceQueries = database.entitySourceQueries
+    private val transferSourceQueries = database.transferSourceQueries
 
     override fun getAllAccounts(): Flow<List<Account>> =
         queries
@@ -242,6 +244,12 @@ class AccountRepositoryImpl(
                     targetAccount = survivingAccount.id,
                     accountToDelete = deletedAccount.id,
                 )
+                // The reassignment bumped each affected transfer's revision; source those new revisions
+                // as a merge so the transaction audit trail isn't left with "source data missing".
+                (sourceSet + targetSet).forEach { transferId ->
+                    recordTransferSource(transferId, SourceType.MERGE, deviceId)
+                }
+
                 queries.delete(deletedAccount.id)
                 // Source the deleted account's DELETE audit entry (recorded at revision_id + 1 by the
                 // custom account delete trigger) as a merge, so the trail shows where it went rather than
@@ -368,9 +376,25 @@ class AccountRepositoryImpl(
                     if (row.moved_target != 0L) {
                         transferQueries.setTransferTargetAccount(targetAccount = merge.deleted_account_id, id = row.transfer_id)
                     }
+                    // Moving a transfer back bumped its revision; source that new revision as a merge-undo.
+                    recordTransferSource(row.transfer_id, SourceType.MERGE_UNDO, deviceId)
                 }
 
                 mergeQueries.markReversed(mergeId.id)
             }
         }
+
+    /** Records [transferId]'s current revision as [sourceType] from [deviceId] in transfer_source. */
+    private fun recordTransferSource(
+        transferId: Long,
+        sourceType: SourceType,
+        deviceId: DeviceId,
+    ) {
+        transferSourceQueries.insertSource(
+            transaction_id = transferId,
+            revision_id = transferQueries.selectRevisionById(transferId).executeAsOne(),
+            source_type_id = sourceType.id.toLong(),
+            device_id = deviceId.id,
+        )
+    }
 }

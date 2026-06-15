@@ -502,6 +502,10 @@ UPDATE transfer
 SET revision_id = revision_id + 1, target_account_id = :targetAccount
 WHERE target_account_id = :accountToDelete;
 
+-- Current revision of a single transfer, for recording its source after a merge/unmerge reassignment.
+selectRevisionById:
+SELECT revision_id FROM transfer WHERE id = ?;
+
 -- Captured before a merge moves them, so unmerge can move back exactly the affected transfers.
 selectTransferIdsBySourceAccount:
 SELECT id FROM transfer WHERE source_account_id = ?;
