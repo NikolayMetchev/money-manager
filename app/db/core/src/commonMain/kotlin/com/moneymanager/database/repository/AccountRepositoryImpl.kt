@@ -13,6 +13,7 @@ import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountMerge
 import com.moneymanager.domain.model.AccountMergeContext
+import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.EntityProvenance
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.MergeId
@@ -215,7 +216,10 @@ class AccountRepositoryImpl(
                     deleted_account_name = account.name,
                     deleted_account_opening_date = account.opening_date,
                     deleted_account_category_id = account.category_id,
-                    deleted_account_revision_id = account.revision_id,
+                    // The delete is recorded as its own revision (OLD.revision_id + 1, see the custom
+                    // account delete trigger); store that so the merge note matches the DELETE entry and
+                    // unmerge recreates the account at the next revision after it.
+                    deleted_account_revision_id = account.revision_id + 1,
                 )
                 val mergeId = mergeQueries.lastInsertRowId().executeAsOne()
 
@@ -293,7 +297,10 @@ class AccountRepositoryImpl(
                 }.executeAsList()
         }
 
-    override suspend fun unmergeAccount(mergeId: MergeId): Unit =
+    override suspend fun unmergeAccount(
+        mergeId: MergeId,
+        deviceId: DeviceId,
+    ): Unit =
         withContext(Dispatchers.Default) {
             database.transaction {
                 val merge = mergeQueries.selectById(mergeId.id).executeAsOneOrNull() ?: return@transaction
@@ -304,12 +311,21 @@ class AccountRepositoryImpl(
                 // was deleted at, so the undo is recorded as a new forward revision in the audit trail
                 // (rather than colliding with the merge's delete revision and looking like a fresh
                 // account / wiped history).
+                val restoredRevision = merge.deleted_account_revision_id + 1
                 queries.insertWithId(
                     id = merge.deleted_account_id,
-                    revision_id = merge.deleted_account_revision_id + 1,
+                    revision_id = restoredRevision,
                     name = merge.deleted_account_name,
                     opening_date = merge.deleted_account_opening_date,
                     category_id = merge.deleted_account_category_id,
+                )
+                // Source the recreated account's INSERT audit entry as a merge-undo so the trail shows
+                // where it came from (rather than "source data missing").
+                entitySourceQueries.recordEntityProvenance(
+                    EntityType.ACCOUNT,
+                    merge.deleted_account_id,
+                    restoredRevision,
+                    EntityProvenance.MergeUndo(deviceId),
                 )
 
                 // Restore attributes from the audit trail (no bump): the merge's cascade delete recorded

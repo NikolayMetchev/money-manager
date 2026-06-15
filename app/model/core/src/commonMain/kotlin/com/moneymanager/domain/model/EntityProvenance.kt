@@ -30,6 +30,11 @@ sealed interface EntityProvenance {
         override val deviceId: DeviceId,
     ) : EntityProvenance
 
+    /** Recreated by undoing an account merge (see AccountRepository.unmergeAccount). */
+    data class MergeUndo(
+        override val deviceId: DeviceId,
+    ) : EntityProvenance
+
     /** Created during a CSV import; [rowIndex] is the originating row when known. */
     data class CsvImport(
         override val deviceId: DeviceId,

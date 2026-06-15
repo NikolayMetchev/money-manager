@@ -552,6 +552,10 @@ private fun SourceInfoSection(
             SourceType.SYSTEM -> {
                 FieldValueRow("Origin", "System", labelWidth = LABEL_WIDTH)
             }
+            SourceType.MERGE_UNDO -> {
+                // Only accounts are merge-undo sourced; included for exhaustiveness.
+                FieldValueRow("Origin", "Undo Merge", labelWidth = LABEL_WIDTH)
+            }
             SourceType.API -> {
                 val apiSource = source.apiSource
                 val deviceInfo = source.deviceInfo

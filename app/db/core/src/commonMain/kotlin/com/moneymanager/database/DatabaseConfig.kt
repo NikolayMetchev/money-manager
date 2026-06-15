@@ -414,6 +414,37 @@ object DatabaseConfig {
     }
 
     /**
+     * Custom account DELETE audit trigger (created before the generic one via IF NOT EXISTS).
+     *
+     * Records the deletion at OLD.revision_id + 1 instead of OLD.revision_id, so deleting an account
+     * (e.g. merging it away) is its own forward revision in the audit trail rather than sharing the
+     * revision of the change that preceded it. The merge stores this same delete revision so unmerge
+     * recreates the account at the next revision after it.
+     */
+    private fun MoneyManagerDatabaseWrapper.createAccountDeleteAuditTrigger() =
+        execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_account_delete_audit
+            AFTER DELETE ON account
+            FOR EACH ROW
+            BEGIN
+                INSERT INTO account_audit (audit_timestamp, audit_type_id, account_id, revision_id, name, opening_date, category_id)
+                VALUES (
+                    CAST(strftime('%s', 'now') AS INTEGER) * 1000,
+                    3,
+                    OLD.id,
+                    OLD.revision_id + 1,
+                    OLD.name,
+                    OLD.opening_date,
+                    OLD.category_id
+                );
+            END
+            """.trimIndent(),
+            0,
+        )
+
+    /**
      * Creates triggers for transfer attribute auditing.
      *
      * Each attribute change (INSERT/UPDATE/DELETE) bumps the transfer revision
@@ -826,6 +857,7 @@ object DatabaseConfig {
             sourceTypeQueries.insert(id = 4, name = "SYSTEM")
             sourceTypeQueries.insert(id = 5, name = "API")
             sourceTypeQueries.insert(id = 6, name = "QIF_IMPORT")
+            sourceTypeQueries.insert(id = 7, name = "MERGE_UNDO")
 
             // Seed API session type lookup table
             apiSessionQueries.insertSessionType(id = 1, name = "Monzo")
@@ -861,6 +893,10 @@ object DatabaseConfig {
             // Create custom category audit triggers (must be before generic ones)
             // These include parent_name denormalization via subquery
             createCategoryAuditTriggers()
+
+            // Custom account DELETE trigger (must be before the generic one) so a delete is recorded as
+            // its own forward revision rather than colliding with the prior change's revision.
+            createAccountDeleteAuditTrigger()
 
             // Create audit triggers for all main tables
             // Category triggers are skipped because custom ones already exist (IF NOT EXISTS)

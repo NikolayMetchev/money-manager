@@ -657,6 +657,7 @@ fun UnmergeAccountDialog(
     var isUnmerging by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val scope = rememberSchemaAwareCoroutineScope()
+    val deviceId = LocalDeviceId.current
 
     AlertDialog(
         onDismissRequest = { if (!isUnmerging) onDismiss() },
@@ -691,7 +692,7 @@ fun UnmergeAccountDialog(
                     errorMessage = null
                     scope.launch {
                         try {
-                            accountRepository.unmergeAccount(merge.id)
+                            accountRepository.unmergeAccount(merge.id, deviceId)
                             maintenance.fullRefreshMaterializedViews()
                             onDismiss()
                         } catch (expected: Exception) {

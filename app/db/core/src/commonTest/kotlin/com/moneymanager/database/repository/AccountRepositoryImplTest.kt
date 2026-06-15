@@ -9,6 +9,7 @@ import com.moneymanager.domain.model.EntityProvenance
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonId
+import com.moneymanager.domain.model.SourceType
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.test.database.DbTest
@@ -433,30 +434,31 @@ class AccountRepositoryImplTest : DbTest() {
                     survivingAccount = accountB,
                 )
 
-            repositories.accountRepository.unmergeAccount(mergeId)
+            repositories.accountRepository.unmergeAccount(mergeId, DeviceId(1))
 
             // Account A is recreated with its original id and name
             val restored = repositories.accountRepository.getAccountById(accountA).first()
             assertNotNull(restored)
             assertEquals("Account A", restored.name)
 
-            // The undo is recorded as a NEW forward revision (one past the merge's delete revision), so
-            // it shows in the audit trail as an "undo merge" step rather than colliding with the delete.
-            // Account A reached revision 3 before the merge (created=1, attribute insert=2, update=3), so
-            // it is restored at 4.
-            assertEquals(4L, restored.revisionId)
+            // Account A reached revision 3 before the merge (created=1, attribute insert=2, update=3).
+            // The merge's delete is its own forward revision (4), and the undo is the next one (5), so the
+            // trail reads created → … → deleted → restored rather than collapsing the delete into the
+            // prior change's revision.
+            assertEquals(5L, restored.revisionId)
             val accountAudit = repositories.auditRepository.getAuditHistoryForAccount(accountA)
             val restoreEntry = accountAudit.first() // newest first
             assertEquals(AuditType.INSERT, restoreEntry.auditType)
-            assertEquals(4L, restoreEntry.revisionId)
-            assertTrue(
-                accountAudit.any { it.auditType == AuditType.DELETE },
-                "the merge's delete must remain in the audit trail",
-            )
+            assertEquals(5L, restoreEntry.revisionId)
+            // The recreated account is sourced as a merge-undo (not "source data missing").
+            assertEquals(SourceType.MERGE_UNDO, restoreEntry.source?.sourceType)
+            // The delete is recorded at its own revision (4), distinct from the prior change at revision 3.
+            val accountDeleteEntry = accountAudit.single { it.auditType == AuditType.DELETE }
+            assertEquals(4L, accountDeleteEntry.revisionId)
             // The merge context lets the audit screen label these entries.
             val mergeContext = repositories.accountRepository.getMergesForDeletedAccount(accountA).single()
             assertTrue(mergeContext.reversed)
-            assertEquals(3L, mergeContext.deletedAccountRevisionId)
+            assertEquals(4L, mergeContext.deletedAccountRevisionId)
             assertEquals(accountB, mergeContext.survivingAccountId)
 
             // The transfers reference account A again

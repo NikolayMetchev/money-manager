@@ -25,6 +25,7 @@ internal fun EntitySourceQueries.recordEntityProvenance(
             is EntityProvenance.Manual -> SourceType.MANUAL
             is EntityProvenance.SampleGenerator -> SourceType.SAMPLE_GENERATOR
             is EntityProvenance.System -> SourceType.SYSTEM
+            is EntityProvenance.MergeUndo -> SourceType.MERGE_UNDO
             is EntityProvenance.CsvImport -> SourceType.CSV_IMPORT
             is EntityProvenance.QifImport -> SourceType.QIF_IMPORT
             is EntityProvenance.ApiImport -> SourceType.API
@@ -74,7 +75,11 @@ internal fun EntitySourceQueries.recordEntityProvenance(
                 }
             }
         }
-        is EntityProvenance.Manual, is EntityProvenance.SampleGenerator, is EntityProvenance.System -> Unit
+        is EntityProvenance.Manual,
+        is EntityProvenance.SampleGenerator,
+        is EntityProvenance.System,
+        is EntityProvenance.MergeUndo,
+        -> Unit
     }
 }
 

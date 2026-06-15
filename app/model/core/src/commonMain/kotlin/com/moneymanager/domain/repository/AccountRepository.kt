@@ -4,6 +4,7 @@ import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountMerge
 import com.moneymanager.domain.model.AccountMergeContext
+import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.EntityProvenance
 import com.moneymanager.domain.model.MergeId
 import com.moneymanager.domain.model.NewAttribute
@@ -84,6 +85,10 @@ interface AccountRepository {
     /**
      * Reverses a previous [mergeAccounts]: recreates the deleted account (with its original id,
      * attributes and owners) and moves the reassigned transactions back. No-op if already reversed.
+     * The recreated account's audit entry is sourced as a merge-undo on [deviceId].
      */
-    suspend fun unmergeAccount(mergeId: MergeId)
+    suspend fun unmergeAccount(
+        mergeId: MergeId,
+        deviceId: DeviceId,
+    )
 }
