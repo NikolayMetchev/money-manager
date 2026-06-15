@@ -36,6 +36,7 @@ import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AuditRepository
+import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.ui.audit.AuditDiffCard
 import com.moneymanager.ui.audit.AuditScreen
 import com.moneymanager.ui.audit.AuditScreenData
@@ -56,6 +57,7 @@ fun AccountAuditScreen(
     accountId: AccountId,
     auditRepository: AuditRepository,
     accountRepository: AccountRepository,
+    categoryRepository: CategoryRepository,
     maintenance: Maintenance,
     onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
@@ -81,8 +83,11 @@ fun AccountAuditScreen(
             val entries = auditRepository.getAuditHistoryForAccount(accountId)
             val ownershipEntries = auditRepository.getOwnershipAuditHistoryForAccount(accountId)
             val account = accountRepository.getAccountById(accountId).first()
+            // The UPDATE audit rows store the OLD category; the newest change's NEW category lives only
+            // on the live account, so resolve its name here to detect/label the most recent change.
+            val currentCategoryName = account?.let { categoryRepository.getCategoryById(it.categoryId).first()?.name }
             val mergeContexts = accountRepository.getMergesForDeletedAccount(accountId)
-            val diffs = computeAccountAuditDiffs(entries, ownershipEntries, account, mergeContexts)
+            val diffs = computeAccountAuditDiffs(entries, ownershipEntries, account, currentCategoryName, mergeContexts)
             AuditScreenData(
                 title = "Account Audit: ${account?.name ?: accountId}",
                 diffs = diffs,
@@ -144,7 +149,7 @@ private fun MergeUndoSection(
     }
 }
 
-private data class AccountAuditDiff(
+internal data class AccountAuditDiff(
     val id: Long,
     val auditTimestamp: kotlin.time.Instant,
     val auditType: AuditType,
@@ -168,10 +173,11 @@ private data class AccountAuditDiff(
         get() = hasFieldChanges || hasOwnershipChanges || attributeChanges.isNotEmpty()
 }
 
-private fun computeAccountAuditDiffs(
+internal fun computeAccountAuditDiffs(
     entries: List<AccountAuditEntry>,
     ownershipEntries: List<PersonAccountOwnershipAuditEntry>,
     currentAccount: Account?,
+    currentCategoryName: String?,
     mergeContexts: List<AccountMergeContext>,
 ): List<AccountAuditDiff> {
     val timestampWindowMs = 2000L
@@ -278,8 +284,12 @@ private fun computeAccountAuditDiffs(
                     categoryName =
                         resolveUpdateChange(
                             index = index,
+                            currentEntry = currentAccount,
                             previousEntry = previousEntry,
                             entryValue = entry.categoryName,
+                            // currentAccount only carries categoryId; the resolved current name is
+                            // captured here so the newest change compares against the live category.
+                            currentValue = { currentCategoryName },
                             previousValue = { it.categoryName },
                         ),
                     ownersAdded = ownershipChanges.ownersAdded,

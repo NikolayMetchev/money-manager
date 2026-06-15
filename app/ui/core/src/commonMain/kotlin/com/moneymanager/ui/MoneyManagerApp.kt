@@ -631,6 +631,7 @@ fun MoneyManagerApp(
                                         accountId = screen.accountId,
                                         auditRepository = services.audit.auditRepository,
                                         accountRepository = services.accounts.accountRepository,
+                                        categoryRepository = services.accounts.categoryRepository,
                                         maintenance = services.imports.maintenance,
                                         onApiSourceClick = { sessionId, requestId, jsonPath ->
                                             navigationHistory.navigateTo(
