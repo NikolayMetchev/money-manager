@@ -480,12 +480,16 @@ class AccountRepositoryImplTest : DbTest() {
             // The reassignment bumps each moved transfer's revision; those revisions are sourced too — a
             // MERGE when the merge moved it out and a MERGE_UNDO when the undo moved it back — rather than
             // leaving the transaction audit trail with "source data missing".
-            val transferSourceTypes =
+            val transferSources =
                 repositories.auditRepository
                     .getAuditHistoryForTransfer(movedBackSource.id)
-                    .mapNotNull { it.source?.sourceType }
+                    .mapNotNull { it.source }
+            val transferSourceTypes = transferSources.map { it.sourceType }
             assertTrue(SourceType.MERGE in transferSourceTypes, "the merge reassignment must be sourced")
             assertTrue(SourceType.MERGE_UNDO in transferSourceTypes, "the unmerge reassignment must be sourced")
+            // Those sources also carry the acting device (not just a bare source type).
+            val mergeSource = transferSources.first { it.sourceType == SourceType.MERGE }
+            assertEquals(DeviceInfo.Jvm("test-machine", "Test OS"), mergeSource.deviceInfo)
 
             // Account B keeps only its own (zero) transfers
             assertEquals(
