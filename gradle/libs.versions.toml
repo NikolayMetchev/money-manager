@@ -81,7 +81,7 @@ buildtool-perfmark = "0.27.0"
 buildtool-poko = "0.23.1"
 buildtool-proto-google-common-protos = "2.48.0"
 buildtool-protobuf = "4.35.1"
-buildtool-tink = "1.18.0"
+buildtool-tink = "1.21.0"
 
 [libraries]
 android-gradle-plugin = { module = "com.android.tools.build:gradle", version.ref = "android-gradle-plugin" }
