@@ -22,6 +22,7 @@ import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.AccountMerge
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.Transfer
@@ -32,10 +33,12 @@ import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.ui.LocalDeviceId
 import com.moneymanager.ui.components.CreateAccountDialog
 import com.moneymanager.ui.components.EditAccountDialog
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.ui.manualProvenance
 import com.moneymanager.ui.util.formatAmount
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
@@ -449,12 +452,20 @@ fun DeleteAccountDialog(
     var conflictingTransfers by remember { mutableStateOf(emptyList<Transfer>()) }
     var selectedTargetAccount by remember { mutableStateOf<Account?>(null) }
     var dropdownExpanded by remember { mutableStateOf(false) }
+    var targetSearchQuery by remember { mutableStateOf("") }
     val scope = rememberSchemaAwareCoroutineScope()
+    val deviceId = LocalDeviceId.current
 
     val allAccounts by accountRepository
         .getAllAccounts()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
     val otherAccounts = allAccounts.filter { it.id != account.id }
+    val filteredTargetAccounts =
+        if (targetSearchQuery.isBlank()) {
+            otherAccounts
+        } else {
+            otherAccounts.filter { it.name.contains(targetSearchQuery, ignoreCase = true) }
+        }
 
     LaunchedEffect(Unit) {
         transferCount = accountRepository.countTransfersByAccount(account.id)
@@ -483,7 +494,7 @@ fun DeleteAccountDialog(
                 style = MaterialTheme.typography.headlineMedium,
             )
         },
-        title = { Text("Delete Account?") },
+        title = { Text(if (hasTransactions) "Merge Account?" else "Delete Account?") },
         text = {
             Column(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -499,7 +510,9 @@ fun DeleteAccountDialog(
                     )
                 } else if (hasTransactions) {
                     Text(
-                        text = "This account has $transferCount transaction(s). Choose an account to move them to:",
+                        text =
+                            "\"${account.name}\" will be deleted and its $transferCount transaction(s) merged into the " +
+                                "surviving account you choose below. You can undo this later from the surviving account.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -512,27 +525,37 @@ fun DeleteAccountDialog(
                     } else {
                         ExposedDropdownMenuBox(
                             expanded = dropdownExpanded,
-                            onExpandedChange = { dropdownExpanded = !dropdownExpanded && !isDeleting },
+                            onExpandedChange = { if (!isDeleting) dropdownExpanded = !dropdownExpanded },
                         ) {
                             OutlinedTextField(
-                                value = selectedTargetAccount?.name ?: "Select account",
-                                onValueChange = {},
-                                readOnly = true,
-                                label = { Text("Move transactions to") },
+                                // Editable while expanded so the user can type to filter; shows the
+                                // selected account name when collapsed.
+                                value = if (dropdownExpanded) targetSearchQuery else (selectedTargetAccount?.name ?: ""),
+                                onValueChange = {
+                                    targetSearchQuery = it
+                                    dropdownExpanded = true
+                                },
+                                label = { Text("Merge into (surviving account)") },
+                                placeholder = { Text("Type to search...") },
                                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = dropdownExpanded) },
-                                modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+                                modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable),
                                 enabled = !isDeleting,
+                                singleLine = true,
                             )
                             ExposedDropdownMenu(
                                 expanded = dropdownExpanded,
-                                onDismissRequest = { dropdownExpanded = false },
+                                onDismissRequest = {
+                                    dropdownExpanded = false
+                                    targetSearchQuery = ""
+                                },
                             ) {
-                                otherAccounts.forEach { targetAccount ->
+                                filteredTargetAccounts.forEach { targetAccount ->
                                     DropdownMenuItem(
                                         text = { Text(targetAccount.name) },
                                         onClick = {
                                             selectedTargetAccount = targetAccount
                                             dropdownExpanded = false
+                                            targetSearchQuery = ""
                                         },
                                     )
                                 }
@@ -541,9 +564,9 @@ fun DeleteAccountDialog(
                         if (hasConflicts) {
                             Text(
                                 text =
-                                    "Cannot move to \"${selectedTargetAccount?.name}\": " +
+                                    "Cannot merge into \"${selectedTargetAccount?.name}\": " +
                                         "${conflictingTransfers.size} transaction(s) between these accounts " +
-                                        "would be deleted. Choose a different account.",
+                                        "would become invalid. Choose a different account.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.error,
                             )
@@ -581,9 +604,10 @@ fun DeleteAccountDialog(
                     scope.launch {
                         try {
                             if (hasTransactions) {
-                                accountRepository.deleteAccountAndMoveTransactions(
-                                    accountToDelete = account.id,
-                                    targetAccount = selectedTargetAccount!!.id,
+                                accountRepository.mergeAccounts(
+                                    deletedAccount = account.id,
+                                    survivingAccount = selectedTargetAccount!!.id,
+                                    deviceId = deviceId,
                                 )
                                 maintenance.fullRefreshMaterializedViews()
                             } else {
@@ -591,8 +615,8 @@ fun DeleteAccountDialog(
                             }
                             onDismiss()
                         } catch (expected: Exception) {
-                            logger.error(expected) { "Failed to delete account: ${expected.message}" }
-                            errorMessage = "Failed to delete account: ${expected.message}"
+                            logger.error(expected) { "Failed to remove account: ${expected.message}" }
+                            errorMessage = "Failed to remove account: ${expected.message}"
                             isDeleting = false
                         }
                     }
@@ -609,7 +633,7 @@ fun DeleteAccountDialog(
                         strokeWidth = 2.dp,
                     )
                 } else {
-                    Text("Delete")
+                    Text(if (hasTransactions) "Merge" else "Delete")
                 }
             }
         },
@@ -617,6 +641,85 @@ fun DeleteAccountDialog(
             TextButton(
                 onClick = onDismiss,
                 enabled = !isDeleting,
+            ) {
+                Text("Cancel")
+            }
+        },
+    )
+}
+
+@Composable
+fun UnmergeAccountDialog(
+    merge: AccountMerge,
+    survivingAccountName: String,
+    accountRepository: AccountRepository,
+    maintenance: Maintenance,
+    onDismiss: () -> Unit,
+) {
+    var isUnmerging by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    val scope = rememberSchemaAwareCoroutineScope()
+    val deviceId = LocalDeviceId.current
+
+    AlertDialog(
+        onDismissRequest = { if (!isUnmerging) onDismiss() },
+        icon = {
+            Text(
+                text = "↩️",
+                style = MaterialTheme.typography.headlineMedium,
+            )
+        },
+        title = { Text("Undo Merge?") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text =
+                        "This will recreate \"${merge.deletedAccountName}\" and move its " +
+                            "${merge.transferCount} transaction(s) back out of \"$survivingAccountName\".",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                errorMessage?.let { error ->
+                    Text(
+                        text = error,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    isUnmerging = true
+                    errorMessage = null
+                    scope.launch {
+                        try {
+                            accountRepository.unmergeAccount(merge.id, deviceId)
+                            maintenance.fullRefreshMaterializedViews()
+                            onDismiss()
+                        } catch (expected: Exception) {
+                            logger.error(expected) { "Failed to undo merge: ${expected.message}" }
+                            errorMessage = "Failed to undo merge: ${expected.message}"
+                            isUnmerging = false
+                        }
+                    }
+                },
+                enabled = !isUnmerging,
+            ) {
+                if (isUnmerging) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Text("Undo merge")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !isUnmerging,
             ) {
                 Text("Cancel")
             }
@@ -635,6 +738,7 @@ fun CreateCategoryDialog(
     var expanded by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
+    val provenance = manualProvenance(LocalDeviceId.current)
 
     val categories by categoryRepository
         .getAllCategories()
@@ -695,7 +799,7 @@ fun CreateCategoryDialog(
                                         name = name.trim(),
                                         parentId = selectedParentId,
                                     )
-                                val categoryId = categoryRepository.createCategory(newCategory)
+                                val categoryId = categoryRepository.createCategory(newCategory, provenance)
                                 onCategoryCreated(categoryId, name.trim())
                             } catch (expected: Exception) {
                                 logger.error(expected) { "Failed to create category: ${expected.message}" }

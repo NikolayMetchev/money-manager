@@ -8,7 +8,7 @@ import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Category
-import com.moneymanager.domain.model.EntityType
+import com.moneymanager.domain.model.EntityProvenance
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Person
@@ -104,11 +104,12 @@ suspend fun generateSampleData(
         ),
     )
 
+    val sampleProvenance = EntityProvenance.SampleGenerator(entitySource.deviceId)
     val categoryIds = mutableListOf<Long>()
     var categoriesCreated = 0
 
     for (parent in categoryHierarchy) {
-        val parentId = categoryRepository.createCategory(parent.category)
+        val parentId = categoryRepository.createCategory(parent.category, sampleProvenance)
         categoryIds.add(parentId)
         categoriesCreated++
 
@@ -124,6 +125,7 @@ suspend fun generateSampleData(
             val childId =
                 categoryRepository.createCategory(
                     child.copy(parentId = parentId),
+                    sampleProvenance,
                 )
             categoryIds.add(childId)
             categoriesCreated++
@@ -170,10 +172,8 @@ suspend fun generateSampleData(
                 middleName = middleName,
                 lastName = lastName,
             )
-        val personId = personRepository.createPerson(person)
+        val personId = personRepository.createPerson(person, sampleProvenance)
         personIds.add(personId)
-        // Record source for person (initial revision is 1)
-        entitySource.record(EntityType.PERSON, personId.id, 1L)
     }
 
     progressFlow.emit(
@@ -240,12 +240,7 @@ suspend fun generateSampleData(
             )
         }
 
-    val accountIds = accountRepository.createAccountsBatch(accountsToCreate)
-
-    // Record source for all accounts (initial revision is 1)
-    for (accountId in accountIds) {
-        entitySource.record(EntityType.ACCOUNT, accountId.id, 1L)
-    }
+    val accountIds = accountRepository.createAccountsBatch(accountsToCreate) { sampleProvenance }
 
     progressFlow.emit(
         GenerationProgress(
@@ -274,13 +269,11 @@ suspend fun generateSampleData(
         val selectedOwners = personIds.shuffled(random).take(ownerCount)
 
         for (personId in selectedOwners) {
-            val ownershipId =
-                personAccountOwnershipRepository.createOwnership(
-                    personId = personId,
-                    accountId = accountId,
-                )
-            // Record source for ownership (initial revision is 1)
-            entitySource.record(EntityType.PERSON_ACCOUNT_OWNERSHIP, ownershipId, 1L)
+            personAccountOwnershipRepository.createOwnership(
+                personId = personId,
+                accountId = accountId,
+                provenance = sampleProvenance,
+            )
         }
     }
 

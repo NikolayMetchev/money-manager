@@ -1,5 +1,6 @@
 package com.moneymanager.domain.repository
 
+import com.moneymanager.domain.model.EntityProvenance
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonId
@@ -10,7 +11,10 @@ interface PersonRepository {
 
     fun getPersonById(id: PersonId): Flow<Person?>
 
-    suspend fun createPerson(person: Person): PersonId
+    suspend fun createPerson(
+        person: Person,
+        provenance: EntityProvenance,
+    ): PersonId
 
     suspend fun updatePerson(person: Person)
 

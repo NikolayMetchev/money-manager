@@ -458,10 +458,10 @@ class AccountsScreenTest {
         mock(MockMode.autoUnit) {
             every { getAllAccounts() } returns flowOf(accounts)
             every { getAccountById(any()) } returns flowOf(null)
-            everySuspend { createAccount(any()) } returns AccountId(999L)
-            everySuspend { createAccountsBatch(any()) } returns emptyList()
-            everySuspend { updateAccount(any()) } returns 1L
-            everySuspend { updateAccountWithAttributes(any(), any(), any(), any(), any()) } returns 1L
+            everySuspend { createAccount(any(), any()) } returns AccountId(999L)
+            everySuspend { createAccountsBatch(any(), any()) } returns emptyList()
+            everySuspend { updateAccount(any(), any()) } returns 1L
+            everySuspend { updateAccountWithAttributes(any(), any(), any(), any(), any(), any()) } returns 1L
             everySuspend { countTransfersByAccount(any()) } returns 0L
             everySuspend { getTransfersBetweenAccounts(any(), any()) } returns emptyList()
         }
@@ -488,14 +488,14 @@ class AccountsScreenTest {
             every { getCategoryById(any()) } returns flowOf(null)
             every { getTopLevelCategories() } returns flowOf(emptyList())
             every { getCategoriesByParent(any()) } returns flowOf(emptyList())
-            everySuspend { createCategory(any()) } returns 0L
+            everySuspend { createCategory(any(), any()) } returns 0L
         }
 
     private fun createPersonRepository(people: List<Person> = emptyList()): PersonRepository =
         mock(MockMode.autoUnit) {
             every { getAllPeople() } returns flowOf(people)
             every { getPersonById(any()) } returns flowOf(null)
-            everySuspend { createPerson(any()) } returns PersonId(0L)
+            everySuspend { createPerson(any(), any()) } returns PersonId(0L)
         }
 
     private fun createPersonAccountOwnershipRepository(): PersonAccountOwnershipRepository =
@@ -504,7 +504,7 @@ class AccountsScreenTest {
             every { getOwnershipsByAccount(any()) } returns flowOf(emptyList())
             every { getAllOwnerships() } returns flowOf(emptyList())
             every { getOwnershipById(any()) } returns flowOf(null)
-            everySuspend { createOwnership(any(), any()) } returns 0L
+            everySuspend { createOwnership(any(), any(), any()) } returns 0L
         }
 
     private fun createMaintenance(): Maintenance =

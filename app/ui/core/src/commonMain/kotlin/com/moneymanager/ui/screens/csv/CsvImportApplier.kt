@@ -14,11 +14,13 @@ import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
+import com.moneymanager.domain.model.EntityProvenance
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvImport
+import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
@@ -226,6 +228,9 @@ private suspend fun persistMappingsWithFallback(
 private suspend fun createNewAccounts(
     accountRepository: AccountRepository,
     accountsToCreate: List<NewAccount>,
+    entitySource: EntitySource,
+    csvImportId: CsvImportId,
+    firstRowByAccountName: Map<String, Long>,
 ): Set<String> {
     if (accountsToCreate.isEmpty()) return emptySet()
     val createdAccountNames = mutableSetOf<String>()
@@ -238,17 +243,22 @@ private suspend fun createNewAccounts(
                 categoryId = newAccount.categoryId,
             )
         }
+    // CSV provenance pointing each account at the first row that referenced it (its creation row);
+    // row-less when unknown. Recorded atomically by the repository.
+    val provenanceFor: (Account) -> EntityProvenance = { account ->
+        EntityProvenance.CsvImport(entitySource.deviceId, csvImportId, firstRowByAccountName[account.name])
+    }
     try {
         // Bulk-create all accounts in a single database transaction
-        accountRepository.createAccountsBatch(newAccounts)
-        createdAccountNames.addAll(accountsToCreate.map { it.name })
+        val createdIds = accountRepository.createAccountsBatch(newAccounts, provenanceFor)
+        newAccounts.zip(createdIds).forEach { (account, _) -> createdAccountNames.add(account.name) }
         logger.info { "Created ${accountsToCreate.size} new accounts" }
     } catch (expected: Exception) {
         // Batch is atomic, nothing was committed — fall back to per-account creation to skip only failing accounts
         logger.warn(expected) { "Bulk account creation failed, falling back to per-account creation" }
         for (account in newAccounts) {
             try {
-                accountRepository.createAccount(account)
+                accountRepository.createAccount(account, provenanceFor(account))
                 createdAccountNames.add(account.name)
                 logger.info { "Created new account: ${account.name}" }
             } catch (expectedAccountError: Exception) {
@@ -257,6 +267,30 @@ private suspend fun createNewAccounts(
         }
     }
     return createdAccountNames
+}
+
+/**
+ * Maps each new account's final name to the earliest CSV row that referenced it (its creation row),
+ * so account provenance can point at the relevant row. Keyed by the final (possibly user-renamed)
+ * account name to match the accounts actually created.
+ */
+private fun buildFirstRowByAccountName(
+    preparation: ImportPreparation,
+    newAccountNames: Map<String, String>,
+): Map<String, Long> {
+    val firstRow = mutableMapOf<String, Long>()
+    preparation.validTransfers
+        .sortedBy { it.rowIndex }
+        .forEach { transfer ->
+            transfer.discoveredMappings.forEach { mapping ->
+                val finalName =
+                    (newAccountNames[mapping.targetAccountName] ?: mapping.targetAccountName).trim()
+                if (finalName.isNotBlank() && finalName !in firstRow) {
+                    firstRow[finalName] = transfer.rowIndex
+                }
+            }
+        }
+    return firstRow
 }
 
 /**
@@ -350,8 +384,17 @@ internal suspend fun runCsvImport(
         )
     persistMappingsWithFallback(csvAccountMappingRepository, selectedMappingsToPersist, "selected")
 
-    // Create new accounts first (skip failures - transfers using them will fail later)
-    val createdAccountNames = createNewAccounts(accountRepository, accountsToCreate)
+    // Create new accounts first (skip failures - transfers using them will fail later).
+    // Record CSV provenance pointing each account at the first row that referenced it.
+    val firstRowByAccountName = buildFirstRowByAccountName(basePrep, selectedNewAccountNames)
+    val createdAccountNames =
+        createNewAccounts(
+            accountRepository = accountRepository,
+            accountsToCreate = accountsToCreate,
+            entitySource = entitySource,
+            csvImportId = csvImport.id,
+            firstRowByAccountName = firstRowByAccountName,
+        )
 
     // Auto-capture mappings for newly created accounts
     if (createdAccountNames.isNotEmpty()) {
@@ -455,6 +498,7 @@ internal suspend fun runCsvImport(
                         name = feeAccountName,
                         openingDate = Clock.System.now(),
                     ),
+                    EntityProvenance.CsvImport(entitySource.deviceId, csvImport.id),
                 )
         } else {
             null
