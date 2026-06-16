@@ -95,6 +95,8 @@ class MoneyManagerDatabaseWrapper(
             "transaction_id",
             "source_type",
             "entity_source",
+            "csv_entity_source",
+            "qif_entity_source",
             "entity_type",
             "transfer_source",
             "csv_transfer_source",
@@ -119,6 +121,9 @@ class MoneyManagerDatabaseWrapper(
             "person_attribute",
             "_import_batch",
             "_creation_mode",
+            // Account-merge reversal records; they are the audit/undo data, not audited entities.
+            "account_merge",
+            "account_merge_transfer",
             "settings",
             "api_session_type",
             "api_credential",

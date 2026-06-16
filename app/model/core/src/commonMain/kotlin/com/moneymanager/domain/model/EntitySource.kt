@@ -32,4 +32,5 @@ data class EntitySource(
     val deviceInfo: DeviceInfo?,
     val createdAt: Instant,
     val apiSource: ApiSourceDetails? = null,
+    val csvSource: CsvSourceDetails? = null,
 )

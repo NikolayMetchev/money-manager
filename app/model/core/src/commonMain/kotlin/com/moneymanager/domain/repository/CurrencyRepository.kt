@@ -4,6 +4,7 @@ package com.moneymanager.domain.repository
 
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.EntityProvenance
 import kotlinx.coroutines.flow.Flow
 
 interface CurrencyRepository {
@@ -22,6 +23,7 @@ interface CurrencyRepository {
     suspend fun upsertCurrencyByCode(
         code: String,
         name: String,
+        provenance: EntityProvenance,
     ): CurrencyId
 
     suspend fun updateCurrency(currency: Currency)

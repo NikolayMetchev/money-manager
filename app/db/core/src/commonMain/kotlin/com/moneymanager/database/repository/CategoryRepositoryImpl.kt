@@ -4,11 +4,14 @@ import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
 import com.moneymanager.database.mapper.CategoryMapper
+import com.moneymanager.database.recordEntityProvenance
 import com.moneymanager.database.sql.MoneyManagerDatabase
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CategoryBalance
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.EntityProvenance
+import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.repository.CategoryRepository
 import kotlinx.coroutines.Dispatchers
@@ -20,6 +23,7 @@ class CategoryRepositoryImpl(
     database: MoneyManagerDatabase,
 ) : CategoryRepository {
     private val queries = database.categoryQueries
+    private val entitySourceQueries = database.entitySourceQueries
 
     override fun getAllCategories(): Flow<List<Category>> =
         queries
@@ -70,24 +74,36 @@ class CategoryRepositoryImpl(
             .mapToList(Dispatchers.Default)
             .map(CategoryMapper::mapList)
 
-    override suspend fun createCategory(category: Category): Long =
+    override suspend fun createCategory(
+        category: Category,
+        provenance: EntityProvenance,
+    ): Long =
         withContext(Dispatchers.Default) {
             queries.transactionWithResult {
                 queries.insert(
                     name = category.name,
                     parent_id = category.parentId,
                 )
-                queries.lastInsertRowId().executeAsOne()
+                val id = queries.lastInsertRowId().executeAsOne()
+                entitySourceQueries.recordEntityProvenance(EntityType.CATEGORY, id, 1L, provenance)
+                id
             }
         }
 
-    override suspend fun updateCategory(category: Category): Unit =
+    override suspend fun updateCategory(
+        category: Category,
+        provenance: EntityProvenance,
+    ): Unit =
         withContext(Dispatchers.Default) {
-            queries.update(
-                name = category.name,
-                parent_id = category.parentId,
-                id = category.id,
-            )
+            queries.transactionWithResult {
+                queries.update(
+                    name = category.name,
+                    parent_id = category.parentId,
+                    id = category.id,
+                )
+                val revision = queries.selectRevisionById(category.id).executeAsOne()
+                entitySourceQueries.recordEntityProvenance(EntityType.CATEGORY, category.id, revision, provenance)
+            }
         }
 
     override suspend fun deleteCategory(id: Long): Unit =
