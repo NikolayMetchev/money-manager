@@ -11,6 +11,7 @@ import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
@@ -38,7 +39,6 @@ import com.moneymanager.importengineapi.bankKeyFromExternalId
 import com.moneymanager.importengineapi.forRow
 import com.moneymanager.importengineapi.normalizeNameKey
 import com.moneymanager.importengineapi.personalCounterpartyKey
-import com.moneymanager.domain.model.WellKnownIds
 import kotlinx.coroutines.flow.first
 
 /**
@@ -312,9 +312,7 @@ class ImportEngineImpl(
      * already created for the same real bank account (cross-provider, order-independent). Only built when
      * the batch actually carries personal-counterparty match keys, so name-only batches pay nothing.
      */
-    private suspend fun buildExistingPersonalKeyIndex(
-        intents: List<ImportAccountIntent>,
-    ): MutableMap<String, AccountId> {
+    private suspend fun buildExistingPersonalKeyIndex(intents: List<ImportAccountIntent>): MutableMap<String, AccountId> {
         // Built when the batch carries any bank identity — a personal-counterparty match key, or an intent
         // (e.g. a source account) whose attributes include sort code + account number that may adopt an
         // existing account for the same real bank account.

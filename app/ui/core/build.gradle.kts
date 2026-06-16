@@ -14,10 +14,10 @@ kotlin {
                 api(projects.app.apiimporter)
                 api(projects.app.csvimporter)
                 api(projects.app.db.core)
-                api(projects.app.importer)
                 api(projects.app.importengineapi)
-                api(projects.app.qifimporter)
+                api(projects.app.importer)
                 api(projects.app.model.core)
+                api(projects.app.qifimporter)
                 api(projects.utils.bigdecimal)
                 api(projects.utils.rest)
 
@@ -85,8 +85,6 @@ kotlin {
                 api(projects.utils.bigdecimal)
 
                 implementation(libs.androidx.compose.runtime.annotation)
-                implementation(projects.app.apiimporter)
-                implementation(projects.app.importer)
                 implementation(libs.compose.animation.core.desktop)
                 implementation(libs.compose.animation.desktop)
                 implementation(libs.compose.material.desktop)
@@ -99,6 +97,8 @@ kotlin {
                 implementation(libs.kotlinx.serialization.core)
                 implementation(libs.ktor.client.core)
                 implementation(libs.ktor.http)
+                implementation(projects.app.apiimporter)
+                implementation(projects.app.importer)
                 implementation(projects.utils.rest)
 
                 runtimeOnly(libs.kotlinx.coroutines.swing)
