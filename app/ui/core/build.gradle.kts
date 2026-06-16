@@ -11,6 +11,7 @@ kotlin {
                 api(libs.kotlinx.coroutines.core)
                 api(libs.kotlinx.datetime)
                 api(libs.kotlinx.serialization.json)
+                api(projects.app.apiimporter)
                 api(projects.app.csvimporter)
                 api(projects.app.db.core)
                 api(projects.app.importer)
@@ -82,9 +83,9 @@ kotlin {
                 api(projects.app.model.core)
                 api(projects.app.qifimporter)
                 api(projects.utils.bigdecimal)
-                api(projects.utils.rest)
 
                 implementation(libs.androidx.compose.runtime.annotation)
+                implementation(projects.app.apiimporter)
                 implementation(projects.app.importer)
                 implementation(libs.compose.animation.core.desktop)
                 implementation(libs.compose.animation.desktop)
@@ -98,6 +99,7 @@ kotlin {
                 implementation(libs.kotlinx.serialization.core)
                 implementation(libs.ktor.client.core)
                 implementation(libs.ktor.http)
+                implementation(projects.utils.rest)
 
                 runtimeOnly(libs.kotlinx.coroutines.swing)
             }

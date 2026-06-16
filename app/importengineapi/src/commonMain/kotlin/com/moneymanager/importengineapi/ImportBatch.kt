@@ -95,13 +95,30 @@ data class ImportAccountIntent(
     val openingDate: Instant,
     val categoryId: Long = Category.UNCATEGORIZED_ID,
     val attributes: List<NewAttribute> = emptyList(),
+    /** Per-account origin (e.g. the API `$.accounts[i]` node), used in place of [ImportBatch.source]. */
+    val source: Source? = null,
+    /**
+     * When this intent reuses (adopts) a pre-existing account via the bank-identity fallback, whether to
+     * re-point that account onto this intent — renaming it and adding this intent's attributes (e.g. the
+     * provider external id). Set for own/source accounts so they take over a counterparty another provider
+     * created for the same real account; left false for counterparties, which merge in silently without
+     * renaming the account they merge into.
+     */
+    val adoptOnBankMatch: Boolean = false,
 )
 
 /** How the engine decides whether a person already exists before creating them. */
 sealed interface PersonMatchKey {
+    /**
+     * Match by an external-id attribute value. [nameKeyFallback], when set, lets the engine fall back to
+     * a normalised-name match if no person carries the external id (cross-provider matching), backfilling
+     * the external id onto the matched person so a later import resolves them by id. This mirrors the API
+     * importer's identity chain (provider id, then name) without losing the id when matched by name.
+     */
     data class ByExternalId(
         val typeId: AttributeTypeId,
         val value: String,
+        val nameKeyFallback: String? = null,
     ) : PersonMatchKey
 
     /** Match by a normalised full-name key. */
@@ -117,11 +134,15 @@ data class ImportPersonIntent(
     val middleName: String? = null,
     val lastName: String? = null,
     val attributes: List<NewAttribute> = emptyList(),
+    /** Per-person origin (e.g. the API node the holder came from), used in place of [ImportBatch.source]. */
+    val source: Source? = null,
 )
 
 data class ImportOwnershipIntent(
     val personKey: LocalPersonKey,
     val account: AccountRef,
+    /** Per-ownership origin (the API node the link came from), used in place of [ImportBatch.source]. */
+    val source: Source? = null,
 )
 
 /**

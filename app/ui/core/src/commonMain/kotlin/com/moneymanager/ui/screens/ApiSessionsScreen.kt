@@ -79,19 +79,20 @@ import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.ScaParams
 import com.moneymanager.rest.createApiClient
-import com.moneymanager.ui.api.ApiCounterpartySuggestion
-import com.moneymanager.ui.api.ApiSessionDownloadResult
-import com.moneymanager.ui.api.ApiSessionImportProgress
-import com.moneymanager.ui.api.ApiSessionImportResult
-import com.moneymanager.ui.api.ApiTransactionsDownloadProgress
-import com.moneymanager.ui.api.discoverApiCounterpartiesToCreate
-import com.moneymanager.ui.api.displaySummary
-import com.moneymanager.ui.api.downloadApiSessionAccountIdentifiers
-import com.moneymanager.ui.api.downloadApiSessionAccounts
-import com.moneymanager.ui.api.downloadApiSessionPeople
-import com.moneymanager.ui.api.downloadApiSessionTransactions
-import com.moneymanager.ui.api.importApiSessionPeople
-import com.moneymanager.ui.api.importApiSessionTransactions
+import com.moneymanager.apiimporter.ApiCounterpartySuggestion
+import com.moneymanager.apiimporter.ApiSessionDownloadResult
+import com.moneymanager.apiimporter.ApiSessionImportProgress
+import com.moneymanager.apiimporter.ApiSessionImportResult
+import com.moneymanager.apiimporter.ApiTransactionsDownloadProgress
+import com.moneymanager.apiimporter.discoverApiCounterpartiesToCreate
+import com.moneymanager.apiimporter.displaySummary
+import com.moneymanager.apiimporter.downloadApiSessionAccountIdentifiers
+import com.moneymanager.apiimporter.downloadApiSessionAccounts
+import com.moneymanager.apiimporter.downloadApiSessionPeople
+import com.moneymanager.apiimporter.downloadApiSessionTransactions
+import com.moneymanager.apiimporter.importApiSessionPeople
+import com.moneymanager.apiimporter.importApiSessionTransactions
+import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.ui.api.sca.generateScaKeyPair
 import com.moneymanager.ui.api.sca.signScaChallenge
 import com.moneymanager.ui.background.LocalBackgroundTaskManager
@@ -124,11 +125,8 @@ fun ApiSessionsScreen(
     accountAttributeRepository: AccountAttributeRepository,
     accountRepository: AccountRepository,
     currencyRepository: CurrencyRepository,
-    transactionRepository: TransactionRepository,
     maintenance: Maintenance,
-    personRepository: PersonRepository,
-    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    personAttributeRepository: PersonAttributeRepository,
+    importEngine: ImportEngine,
     deviceId: DeviceId,
     onMonzoConnectClick: () -> Unit = {},
     onApiStrategiesClick: () -> Unit = {},
@@ -256,17 +254,11 @@ fun ApiSessionsScreen(
             val transactionsResult =
                 importApiSessionTransactions(
                     apiSessionRepository = apiSessionRepository,
-                    accountRepository = accountRepository,
                     currencyRepository = currencyRepository,
-                    transactionRepository = transactionRepository,
-                    personRepository = personRepository,
-                    personAccountOwnershipRepository = personAccountOwnershipRepository,
-                    personAttributeRepository = personAttributeRepository,
                     attributeTypeRepository = attributeTypeRepository,
-                    accountAttributeRepository = accountAttributeRepository,
-                    deviceId = deviceId,
                     sessionId = session.id,
                     strategy = strategy,
+                    importEngine = importEngine,
                     counterpartyAccountNames = counterpartyAccountNames,
                     onProgress = { progress ->
                         scope.launch {
@@ -283,10 +275,8 @@ fun ApiSessionsScreen(
                         apiSessionRepository = apiSessionRepository,
                         accountRepository = accountRepository,
                         accountAttributeRepository = accountAttributeRepository,
-                        personRepository = personRepository,
-                        personAccountOwnershipRepository = personAccountOwnershipRepository,
-                        personAttributeRepository = personAttributeRepository,
                         attributeTypeRepository = attributeTypeRepository,
+                        importEngine = importEngine,
                         sessionId = session.id,
                         strategy = strategy,
                         accountsSessionId = session.id,

@@ -34,6 +34,7 @@ import com.moneymanager.importengineapi.LocalAccountKey
 import com.moneymanager.importengineapi.LocalPersonKey
 import com.moneymanager.importengineapi.PersonMatchKey
 import com.moneymanager.importengineapi.RowOutcome
+import com.moneymanager.importengineapi.bankKeyFromExternalId
 import com.moneymanager.importengineapi.forRow
 import com.moneymanager.importengineapi.normalizeNameKey
 import com.moneymanager.importengineapi.personalCounterpartyKey
@@ -70,12 +71,20 @@ class ImportEngineImpl(
         onProgress?.invoke(ImportProgress("Linking ownerships"))
         val ownershipsCreated = createOwnerships(batch, personKeyToId, accountResolution.keyToId)
 
-        // Resolve every transfer's account references to real ids.
+        // Resolve every transfer's account references to real ids, including a fee's own source/target
+        // (an API fee pays from the own account into the consolidated fee account, both of which may be
+        // batch-local accounts created in this same import).
         val resolvedTransfers =
             batch.transfers.map { transfer ->
+                val fee = transfer.fee
                 transfer.copy(
                     source = resolveRef(transfer.source, accountResolution.keyToId),
                     target = resolveRef(transfer.target, accountResolution.keyToId),
+                    fee =
+                        fee?.copy(
+                            source = resolveRef(fee.source, accountResolution.keyToId),
+                            target = resolveRef(fee.target, accountResolution.keyToId),
+                        ),
                 )
             }
 
@@ -148,9 +157,12 @@ class ImportEngineImpl(
         val keyToId = mutableMapOf<LocalAccountKey, AccountId>()
         var created = 0
         for (intent in batch.accountsToCreate) {
-            val existingId = matchAccount(intent.match, byName, byAttr, byPersonalKey)
-            if (existingId != null) {
-                keyToId[intent.key] = existingId
+            val match = matchAccount(intent, byName, byAttr, byPersonalKey)
+            if (match != null) {
+                // A bank-identity (adopted) match re-points the existing account onto this intent only for
+                // own/source accounts; counterparties merge in silently keeping the existing account as-is.
+                if (match.adopted && intent.adoptOnBankMatch) adoptAccount(intent, match.id, batch, byName, byAttr)
+                keyToId[intent.key] = match.id
                 continue
             }
             val newId = createAccount(intent, batch)
@@ -161,19 +173,69 @@ class ImportEngineImpl(
         return AccountResolution(keyToId, created)
     }
 
+    /** A matched existing account; [adopted] is true for a bank-key fallback match that must be re-pointed. */
+    private class AccountMatch(
+        val id: AccountId,
+        val adopted: Boolean,
+    )
+
     private fun matchAccount(
-        match: AccountMatchKey,
+        intent: ImportAccountIntent,
         byName: Map<String, AccountId>,
         byAttr: Map<Pair<AttributeTypeId, String>, AccountId>,
         byPersonalKey: Map<String, AccountId>,
-    ): AccountId? =
-        when (match) {
-            is AccountMatchKey.ByName -> byName[match.name]
-            is AccountMatchKey.ByExternalId -> byAttr[match.typeId to match.value]
-            is AccountMatchKey.ByBuiltInType -> byAttr[match.typeId to match.value]
-            is AccountMatchKey.ByPersonalCounterparty -> byPersonalKey[match.key]
-            is AccountMatchKey.AlwaysCreate -> null
+    ): AccountMatch? {
+        val primary =
+            when (val match = intent.match) {
+                is AccountMatchKey.ByName -> byName[match.name]
+                is AccountMatchKey.ByExternalId -> byAttr[match.typeId to match.value]
+                is AccountMatchKey.ByBuiltInType -> byAttr[match.typeId to match.value]
+                is AccountMatchKey.ByPersonalCounterparty -> byPersonalKey[match.key]
+                is AccountMatchKey.AlwaysCreate -> null
+            }
+        if (primary != null) return AccountMatch(primary, adopted = false)
+        // Fallback: an intent that carries bank details (sort code + account number attributes) but didn't
+        // match by its primary key adopts a pre-existing account for the same real bank account — e.g. a
+        // source account adopting a counterparty another provider created, keeping imports order-independent.
+        // The matched account is re-pointed (renamed + the intent's own attributes added) so this provider
+        // resolves it by id next time, while its bank attributes keep the other provider matching it.
+        return intentBankKey(intent)?.let { byPersonalKey[it] }?.let { AccountMatch(it, adopted = true) }
+    }
+
+    /**
+     * Re-purposes a bank-key-matched account as this intent's account: renames it to [intent]'s name and
+     * writes any of the intent's attributes it doesn't already have (e.g. this provider's external id).
+     */
+    private suspend fun adoptAccount(
+        intent: ImportAccountIntent,
+        id: AccountId,
+        batch: ImportBatch,
+        byName: MutableMap<String, AccountId>,
+        byAttr: MutableMap<Pair<AttributeTypeId, String>, AccountId>,
+    ) {
+        val existing = accountRepository.getAccountById(id).first() ?: return
+        if (existing.name != intent.name) {
+            accountRepository.updateAccount(existing.copy(name = intent.name), intent.source ?: batch.source)
+            byName.getOrPut(intent.name) { id }
         }
+        val currentAttrs = accountAttributeRepository.getByAccount(id).first()
+        for (attr in intent.attributes) {
+            val present = currentAttrs.any { it.attributeType.id == attr.typeId && it.value == attr.value }
+            if (!present) {
+                runCatching { accountAttributeRepository.insertInCreationMode(id, attr.typeId, attr.value) }
+                byAttr.getOrPut(attr.typeId to attr.value) { id }
+            }
+        }
+    }
+
+    /** The personal-counterparty bank key from an intent's sort-code + account-number attributes, if both present. */
+    private fun intentBankKey(intent: ImportAccountIntent): String? {
+        val sortCodeTypeId = AttributeTypeId(WellKnownIds.ACCOUNT_SORT_CODE_ATTR_TYPE_ID)
+        val accountNumberTypeId = AttributeTypeId(WellKnownIds.ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID)
+        val sortCode = intent.attributes.firstOrNull { it.typeId == sortCodeTypeId }?.value
+        val accountNumber = intent.attributes.firstOrNull { it.typeId == accountNumberTypeId }?.value
+        return if (sortCode != null && accountNumber != null) personalCounterpartyKey(sortCode, accountNumber) else null
+    }
 
     private suspend fun createAccount(
         intent: ImportAccountIntent,
@@ -187,7 +249,7 @@ class ImportEngineImpl(
                     openingDate = intent.openingDate,
                     categoryId = intent.categoryId,
                 ),
-                batch.source,
+                intent.source ?: batch.source,
             )
         intent.attributes.forEach { attr ->
             accountAttributeRepository.insertInCreationMode(newId, attr.typeId, attr.value)
@@ -208,6 +270,9 @@ class ImportEngineImpl(
             is AccountMatchKey.ByPersonalCounterparty -> byPersonalKey.getOrPut(match.key) { id }
             else -> Unit
         }
+        // Register the new account's bank identity (from its sort/account attributes) so a later intent in
+        // this batch sharing those details merges into it instead of creating a duplicate.
+        intentBankKey(intent)?.let { byPersonalKey.getOrPut(it) { id } }
     }
 
     /**
@@ -250,11 +315,17 @@ class ImportEngineImpl(
     private suspend fun buildExistingPersonalKeyIndex(
         intents: List<ImportAccountIntent>,
     ): MutableMap<String, AccountId> {
-        val hasPersonalKeys = intents.any { it.match is AccountMatchKey.ByPersonalCounterparty }
+        // Built when the batch carries any bank identity — a personal-counterparty match key, or an intent
+        // (e.g. a source account) whose attributes include sort code + account number that may adopt an
+        // existing account for the same real bank account.
+        val hasPersonalKeys =
+            intents.any { it.match is AccountMatchKey.ByPersonalCounterparty } ||
+                intents.any { intentBankKey(it) != null }
         if (!hasPersonalKeys) return mutableMapOf()
 
         val sortCodeTypeId = AttributeTypeId(WellKnownIds.ACCOUNT_SORT_CODE_ATTR_TYPE_ID)
         val accountNumberTypeId = AttributeTypeId(WellKnownIds.ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID)
+        val externalIdTypeId = AttributeTypeId(WellKnownIds.ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID)
 
         val index = mutableMapOf<String, AccountId>()
         for (account in accountRepository.getAllAccounts().first()) {
@@ -263,6 +334,12 @@ class ImportEngineImpl(
             val accountNumber = attrs.firstOrNull { it.attributeType.id == accountNumberTypeId }?.value
             if (sortCode != null && accountNumber != null) {
                 index.getOrPut(personalCounterpartyKey(sortCode, accountNumber)) { account.id }
+            } else {
+                // Fallback: an account whose only bank identity is a synthetic "bank:<sort>:<account>"
+                // external-id (created before its sort/account were persisted as attributes). Don't
+                // overwrite an attribute-backed entry — those are authoritative.
+                val externalId = attrs.firstOrNull { it.attributeType.id == externalIdTypeId }?.value
+                bankKeyFromExternalId(externalId)?.let { index.getOrPut(it) { account.id } }
             }
         }
         return index
@@ -289,9 +366,24 @@ class ImportEngineImpl(
         val keyToId = mutableMapOf<LocalPersonKey, PersonId>()
         var created = 0
         for (intent in batch.peopleToCreate) {
+            val match = intent.match
             val existingId =
-                when (val match = intent.match) {
-                    is PersonMatchKey.ByExternalId -> byAttr[match.typeId to match.value]
+                when (match) {
+                    is PersonMatchKey.ByExternalId -> {
+                        // Try the external id first, then (when given) fall back to a name match and
+                        // backfill this provider's external id onto the matched person so future imports
+                        // resolve them by id. Creation mode records the attribute at the person's existing
+                        // revision rather than bumping a new one (no orphan revision).
+                        byAttr[match.typeId to match.value]
+                            ?: match.nameKeyFallback?.let { byNameKey[it] }?.also { matchedId ->
+                                if (byAttr[match.typeId to match.value] == null) {
+                                    runCatching {
+                                        personAttributeRepository.insertInCreationMode(matchedId, match.typeId, match.value)
+                                    }
+                                    byAttr[match.typeId to match.value] = matchedId
+                                }
+                            }
+                    }
                     is PersonMatchKey.ByNameKey -> byNameKey[match.nameKey]
                 }
             if (existingId != null) {
@@ -306,7 +398,7 @@ class ImportEngineImpl(
                         middleName = intent.middleName,
                         lastName = intent.lastName,
                     ),
-                    batch.source,
+                    intent.source ?: batch.source,
                 )
             intent.attributes.forEach { attr ->
                 personAttributeRepository.insertInCreationMode(newId, attr.typeId, attr.value)
@@ -316,8 +408,11 @@ class ImportEngineImpl(
             byNameKey.getOrPut(
                 normalizeNameKey(personFullName(intent.firstName, intent.middleName, intent.lastName)),
             ) { newId }
-            when (val match = intent.match) {
-                is PersonMatchKey.ByExternalId -> byAttr.getOrPut(match.typeId to match.value) { newId }
+            when (match) {
+                is PersonMatchKey.ByExternalId -> {
+                    byAttr.getOrPut(match.typeId to match.value) { newId }
+                    match.nameKeyFallback?.let { byNameKey.getOrPut(it) { newId } }
+                }
                 is PersonMatchKey.ByNameKey -> Unit
             }
         }
@@ -378,7 +473,7 @@ class ImportEngineImpl(
         val alreadyLinked =
             ownershipRepository.getOwnershipsByAccount(accountId).first().any { it.personId == personId }
         if (alreadyLinked) return false
-        ownershipRepository.createOwnership(personId, accountId, batch.source)
+        ownershipRepository.createOwnership(personId, accountId, intent.source ?: batch.source)
         return true
     }
 

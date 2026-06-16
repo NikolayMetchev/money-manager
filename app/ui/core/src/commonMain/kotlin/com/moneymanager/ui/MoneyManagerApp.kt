@@ -421,7 +421,6 @@ fun MoneyManagerApp(
                                         maintenance = services.imports.maintenance,
                                         personRepository = services.people.personRepository,
                                         personAccountOwnershipRepository = services.people.personAccountOwnershipRepository,
-                                        personAttributeRepository = services.people.personAttributeRepository,
                                         importEngine = services.transactions.importEngine,
                                         deviceId = services.deviceId,
                                         onCsvImportClick = { importId ->

@@ -29,6 +29,7 @@ import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.domain.repository.TransferAttributeRepository
 import com.moneymanager.domain.repository.TransferRelationshipRepository
 import com.moneymanager.domain.repository.TransferSourceRepository
+import com.moneymanager.importengineapi.ImportEngine
 import dev.zacsweers.metro.DependencyGraph
 import dev.zacsweers.metro.Provides
 
@@ -65,6 +66,7 @@ interface DatabaseComponent {
     val transferSourceQueries: TransferSourceQueries
     val entitySourceQueries: EntitySourceQueries
     val deviceId: DeviceId
+    val importEngine: ImportEngine
 
     @DependencyGraph.Factory
     interface Factory {
