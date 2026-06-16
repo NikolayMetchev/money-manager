@@ -404,7 +404,7 @@ class ImportEngineImpl(
             created++
             keyToId[intent.key] = newId
             byNameKey.getOrPut(
-                normalizeNameKey(personFullName(intent.firstName, null, intent.lastName)),
+                normalizeNameKey(personFullName(intent.firstName, intent.lastName)),
             ) { newId }
             when (match) {
                 is PersonMatchKey.ByExternalId -> {
@@ -647,12 +647,10 @@ class ImportEngineImpl(
 
     private fun personFullName(
         firstName: String,
-        middleName: String?,
         lastName: String?,
     ): String =
         buildString {
             append(firstName)
-            if (!middleName.isNullOrBlank()) append(" ").append(middleName)
             if (!lastName.isNullOrBlank()) append(" ").append(lastName)
         }
 }
