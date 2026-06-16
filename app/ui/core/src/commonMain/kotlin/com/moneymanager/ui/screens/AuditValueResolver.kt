@@ -46,20 +46,3 @@ internal fun <T, C, E> resolveUpdateChange(
                 entryValue = entryValue,
             ),
     )
-
-internal fun <T, E> resolveUpdateChange(
-    index: Int,
-    previousEntry: E?,
-    entryValue: T,
-    previousValue: (E) -> T,
-): FieldChange<T> =
-    changedOrUnchanged(
-        oldValue = entryValue,
-        newValue =
-            resolveUpdateValue(
-                index = index,
-                currentValue = null,
-                previousValue = previousEntry?.let { ResolvedValue(previousValue(it)) },
-                entryValue = entryValue,
-            ),
-    )

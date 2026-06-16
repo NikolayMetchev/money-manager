@@ -74,6 +74,9 @@ internal fun buildEntitySource(
     sourceApiSessionId: Long? = null,
     sourceApiRequestId: Long? = null,
     sourceApiJsonPath: String? = null,
+    sourceCsvImportId: String? = null,
+    sourceCsvRowIndex: Long? = null,
+    sourceCsvFileName: String? = null,
 ): EntitySource =
     auditEntitySource(
         sourceId = sourceId,
@@ -96,5 +99,11 @@ internal fun buildEntitySource(
                 sessionId = sourceApiSessionId,
                 requestId = sourceApiRequestId,
                 jsonPath = sourceApiJsonPath,
+            ),
+        csvSource =
+            auditCsvSource(
+                importId = sourceCsvImportId,
+                rowIndex = sourceCsvRowIndex,
+                fileName = sourceCsvFileName,
             ),
     ) ?: error("Audit source fields are required")

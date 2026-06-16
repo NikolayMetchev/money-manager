@@ -1,7 +1,6 @@
 @file:OptIn(kotlin.time.ExperimentalTime::class)
 
 package com.moneymanager.ui.wise
-
 import com.moneymanager.database.port.DbEntitySource
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.DeviceInfo
@@ -10,6 +9,7 @@ import com.moneymanager.domain.model.PersonId
 import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.createApiClient
 import com.moneymanager.test.database.DbTest
+import com.moneymanager.test.database.createPerson
 import com.moneymanager.ui.api.downloadApiSessionAccounts
 import com.moneymanager.ui.api.downloadApiSessionPeople
 import com.moneymanager.ui.api.downloadApiSessionTransactions
@@ -148,7 +148,7 @@ class WiseImportE2ETest : DbTest() {
                     accountRepository = repositories.accountRepository,
                     currencyRepository = repositories.currencyRepository,
                     transactionRepository = repositories.transactionRepository,
-                    entitySource = DbEntitySource(repositories.entitySourceQueries, repositories.transferSourceQueries, deviceId),
+                    entitySource = DbEntitySource(repositories.transferSourceQueries, deviceId),
                     personRepository = repositories.personRepository,
                     personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                     personAttributeRepository = repositories.personAttributeRepository,
@@ -238,7 +238,7 @@ class WiseImportE2ETest : DbTest() {
                     accountRepository = repositories.accountRepository,
                     currencyRepository = repositories.currencyRepository,
                     transactionRepository = repositories.transactionRepository,
-                    entitySource = DbEntitySource(repositories.entitySourceQueries, repositories.transferSourceQueries, deviceId),
+                    entitySource = DbEntitySource(repositories.transferSourceQueries, deviceId),
                     personRepository = repositories.personRepository,
                     personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                     personAttributeRepository = repositories.personAttributeRepository,
@@ -305,7 +305,7 @@ class WiseImportE2ETest : DbTest() {
                 accountRepository = repositories.accountRepository,
                 currencyRepository = repositories.currencyRepository,
                 transactionRepository = repositories.transactionRepository,
-                entitySource = DbEntitySource(repositories.entitySourceQueries, repositories.transferSourceQueries, deviceId),
+                entitySource = DbEntitySource(repositories.transferSourceQueries, deviceId),
                 personRepository = repositories.personRepository,
                 personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                 personAttributeRepository = repositories.personAttributeRepository,
@@ -338,7 +338,7 @@ class WiseImportE2ETest : DbTest() {
                     personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                     personAttributeRepository = repositories.personAttributeRepository,
                     attributeTypeRepository = repositories.attributeTypeRepository,
-                    entitySource = DbEntitySource(repositories.entitySourceQueries, repositories.transferSourceQueries, deviceId),
+                    entitySource = DbEntitySource(repositories.transferSourceQueries, deviceId),
                     sessionId = peopleSessionId,
                     strategy = strategy,
                     accountsSessionId = accountsSessionId,
@@ -402,7 +402,7 @@ class WiseImportE2ETest : DbTest() {
                 personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                 personAttributeRepository = repositories.personAttributeRepository,
                 attributeTypeRepository = repositories.attributeTypeRepository,
-                entitySource = DbEntitySource(repositories.entitySourceQueries, repositories.transferSourceQueries, deviceId),
+                entitySource = DbEntitySource(repositories.transferSourceQueries, deviceId),
                 sessionId = peopleSessionId,
                 strategy = strategy,
             )

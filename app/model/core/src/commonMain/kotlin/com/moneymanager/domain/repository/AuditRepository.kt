@@ -39,6 +39,13 @@ interface AuditRepository {
     suspend fun getAuditHistoryForAccount(accountId: AccountId): List<AccountAuditEntry>
 
     /**
+     * Returns the last-known name of every account that has audit history, keyed by account id.
+     * Lets audit screens label accounts that no longer exist (e.g. merged-away/deleted accounts)
+     * by their name instead of a bare id.
+     */
+    suspend fun getLatestAuditedAccountNames(): Map<Long, String>
+
+    /**
      * Gets the audit history for a specific person.
      * Returns entries ordered by audit timestamp descending (most recent first).
      * Each entry includes its source/provenance if available.

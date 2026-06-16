@@ -5,9 +5,9 @@ package com.moneymanager.ui.api
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.database.DatabaseConfig
 import com.moneymanager.database.api.ApiImportProvenance
-import com.moneymanager.domain.ApiEntitySourceRecord
 import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.model.*
+import com.moneymanager.domain.model.EntityProvenance
 import com.moneymanager.domain.model.apistrategy.ApiAmountFormat
 import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
@@ -899,6 +899,7 @@ private suspend fun setupImportSession(
             accountRepository = accountRepository,
             accountAttributeRepository = accountAttributeRepository,
             entitySource = entitySource,
+            sessionId = sessionId,
             accountApiSourceByExternalId = accountApiSourceByExternalId,
             sourceAccountExternalIdIndex = sourceAccountExternalIdIndex,
             counterpartyIdIndex = counterpartyIdIndex,
@@ -1408,9 +1409,9 @@ private suspend fun importPeopleFromAccounts(
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     personAttributeRepository: PersonAttributeRepository,
-    entitySource: EntitySource? = null,
+    entitySource: EntitySource,
     accountApiSourceByExternalId: Map<String, AccountApiSource> = emptyMap(),
-    sessionId: ApiSessionId? = null,
+    sessionId: ApiSessionId,
     externalIdAttributeTypeId: AttributeTypeId? = null,
 ): Int {
     val peopleIndex = loadPeopleIndex(personRepository, personAttributeRepository, externalIdAttributeTypeId)
@@ -1521,8 +1522,8 @@ private suspend fun importOwnersForAccount(
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     personAttributeRepository: PersonAttributeRepository,
     externalIdAttributeTypeId: AttributeTypeId?,
-    entitySource: EntitySource? = null,
-    sessionId: ApiSessionId? = null,
+    entitySource: EntitySource,
+    sessionId: ApiSessionId,
     requestId: ApiRequestId? = null,
     jsonPath: JsonPath? = null,
 ): OwnerImportCounts {
@@ -1548,26 +1549,14 @@ private suspend fun importOwnersForAccount(
             ) ?: continue
 
         if (person.id !in existingOwnerPersonIds) {
-            val ownershipId = personAccountOwnershipRepository.createOwnership(person.id, accountId)
+            personAccountOwnershipRepository.createOwnership(
+                person.id,
+                accountId,
+                EntityProvenance.ApiImport(entitySource.deviceId, sessionId, requestId, jsonPath ?: owner.jsonPath),
+            )
             // Track the new link so duplicate owner entries in the same payload don't re-insert it.
             existingOwnerPersonIds += person.id
             newOwnershipCount++
-            if (entitySource != null && sessionId != null && requestId != null) {
-                entitySource.recordFromApi(
-                    ApiEntitySourceRecord(
-                        entityType = EntityType.PERSON_ACCOUNT_OWNERSHIP,
-                        entityId = ownershipId,
-                        revisionId = 1L,
-                        sessionId = sessionId,
-                        requestId = requestId,
-                        jsonPath =
-                            (
-                                jsonPath
-                                    ?: owner.jsonPath
-                            ),
-                    ),
-                )
-            }
         }
         if (wasCreated) {
             newPeopleCount++
@@ -1589,8 +1578,8 @@ private suspend fun resolveOrCreatePerson(
     personRepository: PersonRepository,
     personAttributeRepository: PersonAttributeRepository,
     externalIdAttributeTypeId: AttributeTypeId?,
-    entitySource: EntitySource? = null,
-    sessionId: ApiSessionId? = null,
+    entitySource: EntitySource,
+    sessionId: ApiSessionId,
     requestId: ApiRequestId? = null,
 ): Pair<Person, Boolean>? {
     val bankKey = owner.bankKey()
@@ -1624,22 +1613,14 @@ private suspend fun resolveOrCreatePerson(
             middleName = null,
             lastName = nameParts.getOrNull(1)?.ifBlank { null },
         )
-    val newId = personRepository.createPerson(person)
+    val newId =
+        personRepository.createPerson(
+            person,
+            EntityProvenance.ApiImport(entitySource.deviceId, sessionId, requestId, owner.jsonPath),
+        )
     val createdPerson = person.copy(id = newId)
     if (externalIdAttributeTypeId != null && externalId != null) {
         personAttributeRepository.insertInCreationMode(createdPerson.id, externalIdAttributeTypeId, externalId)
-    }
-    if (entitySource != null && sessionId != null && requestId != null) {
-        entitySource.recordFromApi(
-            ApiEntitySourceRecord(
-                entityType = EntityType.PERSON,
-                entityId = createdPerson.id.id,
-                revisionId = 1L,
-                sessionId = sessionId,
-                requestId = requestId,
-                jsonPath = owner.jsonPath,
-            ),
-        )
     }
     peopleIndex.add(createdPerson, externalId, bankKey)
     return createdPerson to true
@@ -2932,6 +2913,7 @@ private class AccountCache(
     private val accountRepository: AccountRepository,
     private val accountAttributeRepository: AccountAttributeRepository,
     private val entitySource: EntitySource,
+    private val sessionId: ApiSessionId,
     val accountApiSourceByExternalId: Map<String, AccountApiSource>,
     private val sourceAccountExternalIdIndex: MutableMap<String, AccountId>,
     // Pre-built by the caller in the serial section before concurrent import starts
@@ -3008,34 +2990,17 @@ private class AccountCache(
         name: String,
     ): AccountId {
         val existing = loadAccounts().values.firstOrNull { it.id == existingId }
-        if (existing != null && existing.name != name) {
-            accountRepository.updateAccount(existing.copy(name = name))
-            accountsByName = null
+        if (existing != null) {
+            // Record this provider's accounts-endpoint origin for the adopted account, even when the
+            // name already matches (otherwise an unchanged-name adoption would never get this source).
+            val renamed = existing.name != name
+            accountRepository.updateAccount(existing.copy(name = name), apiProvenance(accountApiSourceByExternalId[externalId]))
+            if (renamed) accountsByName = null
         }
         val attributes = accountAttributeRepository.getByAccount(existingId).first()
         accountAttributeRepository.upsertAccountAttribute(attributes, existingId, ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID, externalId)
         sourceAccountExternalIdIndex[externalId] = existingId
         counterpartyIdIndex[externalId] = existingId
-        accountApiSourceByExternalId[externalId]?.let { source ->
-            // Attach the source to the account's current revision (after the rename/attribute writes) so
-            // the audit entry for the adoption resolves to the accounts response.
-            val revisionId =
-                accountRepository
-                    .getAllAccounts()
-                    .first()
-                    .firstOrNull { it.id == existingId }
-                    ?.revisionId ?: 1L
-            entitySource.recordFromApi(
-                ApiEntitySourceRecord(
-                    entityType = EntityType.ACCOUNT,
-                    entityId = existingId.id,
-                    revisionId = revisionId,
-                    sessionId = source.sessionId,
-                    requestId = source.requestId,
-                    jsonPath = source.jsonPath,
-                ),
-            )
-        }
         return existingId
     }
 
@@ -3155,9 +3120,16 @@ private class AccountCache(
                 toCreate.map { request ->
                     Account(id = AccountId(0L), name = request.name.ifBlank { "Unknown" }, openingDate = now)
                 }
-            val createdIds = accountRepository.createAccountsBatch(accountsToCreate)
+            // Key per-name FIFO queues, not a single value, so duplicate counterparty names in one
+            // batch each keep their own request's API source. createAccountsBatch invokes the lambda in
+            // list order, and groupBy preserves encounter order, so removing the head aligns them.
+            val provenanceByName =
+                toCreate
+                    .groupBy { it.name.ifBlank { "Unknown" } }
+                    .mapValues { (_, requests) -> requests.mapTo(ArrayDeque()) { apiProvenance(it.apiSource) } }
+            val createdIds =
+                accountRepository.createAccountsBatch(accountsToCreate) { provenanceByName.getValue(it.name).removeFirst() }
             val counterpartyAttributeWrites = mutableListOf<AccountAttributeCreateInput>()
-            val counterpartySourceWrites = mutableListOf<ApiEntitySourceRecord>()
 
             toCreate.zip(createdIds).forEach { (request, accountId) ->
                 counterpartyIdIndex[request.counterpartyId] = accountId
@@ -3179,18 +3151,8 @@ private class AccountCache(
                     counterpartyAttributeWrites +=
                         AccountAttributeCreateInput(accountId, ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID, accountNumber)
                 }
-                counterpartySourceWrites +=
-                    ApiEntitySourceRecord(
-                        entityType = EntityType.ACCOUNT,
-                        entityId = accountId.id,
-                        revisionId = 1L,
-                        sessionId = request.apiSource.sessionId,
-                        requestId = request.apiSource.requestId,
-                        jsonPath = request.apiSource.jsonPath,
-                    )
             }
             accountAttributeRepository.insertInCreationModeBatch(counterpartyAttributeWrites)
-            entitySource.recordFromApiBatch(counterpartySourceWrites)
             accountsByName = accountMap
             createdCount = toCreate.size
         }
@@ -3225,9 +3187,11 @@ private class AccountCache(
         apiSource: AccountApiSource?,
     ): AccountId {
         val now = Clock.System.now()
+        val resolvedSource = externalId?.let { accountApiSourceByExternalId[it] } ?: apiSource
         val newId =
             accountRepository.createAccount(
                 Account(id = AccountId(0L), name = normalizedName, openingDate = now),
+                apiProvenance(resolvedSource),
             )
         accountsByName = (accountsByName ?: emptyMap()) + (normalizedName to Account(id = newId, name = normalizedName, openingDate = now))
         onAccountCreated(externalId != null)
@@ -3235,21 +3199,16 @@ private class AccountCache(
             accountAttributeRepository.insertInCreationMode(newId, ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID, externalId)
             sourceAccountExternalIdIndex[externalId] = newId
         }
-        val resolvedSource = externalId?.let { accountApiSourceByExternalId[it] } ?: apiSource
-        if (resolvedSource != null) {
-            entitySource.recordFromApi(
-                ApiEntitySourceRecord(
-                    entityType = EntityType.ACCOUNT,
-                    entityId = newId.id,
-                    revisionId = 1L,
-                    sessionId = resolvedSource.sessionId,
-                    requestId = resolvedSource.requestId,
-                    jsonPath = resolvedSource.jsonPath,
-                ),
-            )
-        }
         return newId
     }
+
+    /** API provenance from a per-entity source when known, else the session-level fallback. */
+    private fun apiProvenance(source: AccountApiSource?): EntityProvenance =
+        if (source != null) {
+            EntityProvenance.ApiImport(entitySource.deviceId, source.sessionId, source.requestId, source.jsonPath)
+        } else {
+            EntityProvenance.ApiImport(entitySource.deviceId, sessionId)
+        }
 
     private suspend fun loadAccounts(): Map<String, Account> {
         accountsByName?.let { return it }
