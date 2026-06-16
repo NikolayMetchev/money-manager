@@ -7,7 +7,7 @@ import androidx.compose.runtime.Composable
 import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CategoryAuditEntry
-import com.moneymanager.domain.model.EntitySource
+import com.moneymanager.domain.model.SourceRecord
 import com.moneymanager.domain.repository.AuditRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.ui.audit.AuditDiffCard
@@ -57,7 +57,7 @@ private data class CategoryAuditDiff(
     val revisionId: Long,
     val name: FieldChange<String>,
     val parent: FieldChange<String>,
-    val source: EntitySource?,
+    val source: SourceRecord?,
 ) {
     val hasChanges: Boolean
         get() = listOf(name, parent).any { it is FieldChange.Changed }

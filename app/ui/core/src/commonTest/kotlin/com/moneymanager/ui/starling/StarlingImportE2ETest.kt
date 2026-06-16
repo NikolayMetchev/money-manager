@@ -1,6 +1,12 @@
 @file:OptIn(kotlin.time.ExperimentalTime::class)
 
 package com.moneymanager.ui.starling
+import com.moneymanager.apiimporter.downloadApiSessionAccountIdentifiers
+import com.moneymanager.apiimporter.downloadApiSessionAccounts
+import com.moneymanager.apiimporter.downloadApiSessionPeople
+import com.moneymanager.apiimporter.downloadApiSessionTransactions
+import com.moneymanager.apiimporter.importApiSessionPeople
+import com.moneymanager.apiimporter.importApiSessionTransactions
 import com.moneymanager.database.DatabaseConfig
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
@@ -9,16 +15,11 @@ import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.JsonPath
+import com.moneymanager.domain.model.Source
 import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.createApiClient
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
-import com.moneymanager.apiimporter.downloadApiSessionAccountIdentifiers
-import com.moneymanager.apiimporter.downloadApiSessionAccounts
-import com.moneymanager.apiimporter.downloadApiSessionPeople
-import com.moneymanager.apiimporter.downloadApiSessionTransactions
-import com.moneymanager.apiimporter.importApiSessionPeople
-import com.moneymanager.apiimporter.importApiSessionTransactions
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpHeaders
@@ -386,7 +387,8 @@ class StarlingImportE2ETest : DbTest() {
                     .getAuditHistoryForAccount(account.id)
                     .first { it.auditType == AuditType.INSERT }
                     .source
-                    ?.apiSource
+                    ?.source
+                    ?.let { it as? Source.Api }
                     ?.jsonPath
             assertEquals(JsonPath("$.feedItems[0]"), originPath(coffee))
             assertEquals(JsonPath("$.feedItems[1]"), originPath(acme))
@@ -630,7 +632,7 @@ class StarlingImportE2ETest : DbTest() {
             val originPaths =
                 repositories.auditRepository
                     .getAuditHistoryForAccount(ownAccount.id)
-                    .mapNotNull { it.source?.apiSource?.jsonPath }
+                    .mapNotNull { (it.source?.source as? Source.Api)?.jsonPath }
             assertTrue(
                 originPaths.contains(JsonPath("$.accounts[0]")),
                 "Adopted source account should record the accounts-endpoint origin: $originPaths",

@@ -20,8 +20,8 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.DeviceInfo
-import com.moneymanager.domain.model.EntitySource
-import com.moneymanager.domain.model.SourceType
+import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.SourceRecord
 import com.moneymanager.domain.model.csv.CsvImportId
 
 @Composable
@@ -125,7 +125,7 @@ fun DeletedFinalValuesLabel(errorColor: Color) {
 
 @Composable
 fun SourceInfoSection(
-    source: EntitySource?,
+    source: SourceRecord?,
     labelColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     labelWidth: Dp = 100.dp,
     onApiSourceClick: ((ApiSessionId, ApiRequestId, String) -> Unit)? = null,
@@ -148,8 +148,8 @@ fun SourceInfoSection(
                 color = MaterialTheme.colorScheme.error,
             )
         } else {
-            when (source.sourceType) {
-                SourceType.MANUAL -> {
+            when (val origin = source.source) {
+                Source.Manual -> {
                     when (val deviceInfo = source.deviceInfo) {
                         is DeviceInfo.Jvm -> {
                             FieldValueRow("Origin", "Manual (Desktop)", labelWidth = labelWidth)
@@ -164,25 +164,24 @@ fun SourceInfoSection(
                         }
                     }
                 }
-                SourceType.CSV_IMPORT -> {
-                    val csvSource = source.csvSource
-                    val importId = csvSource?.importId
-                    val fileName = csvSource?.fileName
+                is Source.Csv -> {
+                    val rowIndex = origin.rowIndex ?: 0
+                    val fileName = source.fileName
                     FieldValueRow("Origin", "CSV Import", labelWidth = labelWidth)
-                    if (csvSource != null && importId != null && onCsvSourceClick != null) {
+                    if (onCsvSourceClick != null) {
                         CsvSourceLinkRow(
                             label = "File",
                             value = fileName ?: "Unknown file",
-                            importId = importId,
-                            rowIndex = csvSource.rowIndex,
+                            importId = origin.importId,
+                            rowIndex = rowIndex,
                             onCsvSourceClick = onCsvSourceClick,
                             labelWidth = labelWidth,
                         )
                         CsvSourceLinkRow(
                             label = "Row",
-                            value = csvSource.rowIndex.toString(),
-                            importId = importId,
-                            rowIndex = csvSource.rowIndex,
+                            value = rowIndex.toString(),
+                            importId = origin.importId,
+                            rowIndex = rowIndex,
                             onCsvSourceClick = onCsvSourceClick,
                             labelWidth = labelWidth,
                         )
@@ -191,13 +190,13 @@ fun SourceInfoSection(
                     }
                     DeviceInfoRows(source.deviceInfo, labelWidth)
                 }
-                SourceType.QIF_IMPORT -> {
-                    // Entities (accounts/people/currencies) are not QIF-sourced; QIF only creates
-                    // transfers. This branch keeps the when exhaustive.
+                is Source.Qif -> {
                     FieldValueRow("Origin", "QIF Import", labelWidth = labelWidth)
+                    FieldValueRow("File", source.fileName ?: "Unknown file", labelWidth = labelWidth)
+                    origin.recordIndex?.let { FieldValueRow("Record", it.toString(), labelWidth = labelWidth) }
                     DeviceInfoRows(source.deviceInfo, labelWidth)
                 }
-                SourceType.SAMPLE_GENERATOR -> {
+                Source.SampleGenerator -> {
                     when (val deviceInfo = source.deviceInfo) {
                         is DeviceInfo.Jvm -> {
                             FieldValueRow("Origin", "Sample Generator (Desktop)", labelWidth = labelWidth)
@@ -212,25 +211,26 @@ fun SourceInfoSection(
                         }
                     }
                 }
-                SourceType.SYSTEM -> {
+                Source.System -> {
                     FieldValueRow("Origin", "System", labelWidth = labelWidth)
                 }
-                SourceType.MERGE -> {
+                Source.Merge -> {
                     FieldValueRow("Origin", "Merge", labelWidth = labelWidth)
                     DeviceInfoRows(source.deviceInfo, labelWidth)
                 }
-                SourceType.MERGE_UNDO -> {
+                Source.Unmerge -> {
                     FieldValueRow("Origin", "Undo Merge", labelWidth = labelWidth)
                     DeviceInfoRows(source.deviceInfo, labelWidth)
                 }
-                SourceType.API -> {
+                is Source.Api -> {
                     val deviceInfo = source.deviceInfo
-                    val apiSource = source.apiSource
-                    if (apiSource != null && onApiSourceClick != null) {
+                    val requestId = origin.requestId
+                    val jsonPath = origin.jsonPath
+                    if (requestId != null && jsonPath != null && onApiSourceClick != null) {
                         ApiSourceLinkRow(
-                            sessionId = apiSource.sessionId,
-                            requestId = apiSource.requestId,
-                            jsonPath = apiSource.jsonPath.value,
+                            sessionId = origin.sessionId,
+                            requestId = requestId,
+                            jsonPath = jsonPath.value,
                             onApiSourceClick = onApiSourceClick,
                             labelWidth = labelWidth,
                         )

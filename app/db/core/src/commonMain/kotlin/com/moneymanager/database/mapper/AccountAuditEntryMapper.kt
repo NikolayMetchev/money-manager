@@ -4,8 +4,8 @@ package com.moneymanager.database.mapper
 
 import com.moneymanager.database.sql.SelectAuditHistoryForAccount
 import com.moneymanager.domain.model.AccountAuditEntry
-import com.moneymanager.domain.model.EntitySource
 import com.moneymanager.domain.model.EntityType
+import com.moneymanager.domain.model.SourceRecord
 import tech.mappie.api.ObjectMappie
 
 object AccountAuditEntryMapper :
@@ -15,35 +15,33 @@ object AccountAuditEntryMapper :
     AuditTypeConversions {
     override fun map(from: SelectAuditHistoryForAccount): AccountAuditEntry =
         mapping {
-            AccountAuditEntry::source fromValue from.toEntitySource()
+            AccountAuditEntry::source fromValue from.toSourceRecord()
         }
 }
 
-private fun SelectAuditHistoryForAccount.toEntitySource(): EntitySource? {
-    val sourceId = source_id ?: return null
-    source_type_id ?: return null
-    val sourceTypeName = source_type_name ?: return null
-    val deviceId = source_device_id ?: return null
-    val createdAt = source_created_at ?: return null
-
-    return buildEntitySource(
-        sourceId = sourceId,
-        sourceTypeName = sourceTypeName,
-        deviceId = deviceId,
-        sourcePlatformName = source_platform_name,
-        sourceMachineName = source_machine_name,
-        sourceOsName = source_os_name,
-        sourceDeviceMake = source_device_make,
-        sourceDeviceModel = source_device_model,
-        createdAt = createdAt,
-        entityType = EntityType.ACCOUNT,
-        entityId = account_id,
-        revisionId = revision_id,
-        sourceApiSessionId = source_api_session_id,
-        sourceApiRequestId = source_api_request_id,
-        sourceApiJsonPath = source_api_json_path,
-        sourceCsvImportId = source_csv_import_id,
-        sourceCsvRowIndex = source_csv_row_index,
-        sourceCsvFileName = source_csv_file_name,
+private fun SelectAuditHistoryForAccount.toSourceRecord(): SourceRecord? =
+    buildSourceRecord(
+        SourceColumns(
+            sourceId = source_id,
+            sourceTypeName = source_type_name,
+            deviceId = source_device_id,
+            createdAt = source_created_at,
+            entityType = EntityType.ACCOUNT,
+            entityId = account_id,
+            revisionId = revision_id,
+            platformName = source_platform_name,
+            osName = source_os_name,
+            machineName = source_machine_name,
+            deviceMake = source_device_make,
+            deviceModel = source_device_model,
+            csvImportId = source_csv_import_id,
+            csvRowIndex = source_csv_row_index,
+            csvFileName = source_csv_file_name,
+            qifImportId = source_qif_import_id,
+            qifRecordIndex = source_qif_record_index,
+            qifFileName = source_qif_file_name,
+            apiSessionId = source_api_session_id,
+            apiRequestId = source_api_request_id,
+            apiJsonPath = source_api_json_path,
+        ),
     )
-}

@@ -17,11 +17,11 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.AuditType
-import com.moneymanager.domain.model.EntitySource
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonAttributeAuditEntry
 import com.moneymanager.domain.model.PersonAuditEntry
 import com.moneymanager.domain.model.PersonId
+import com.moneymanager.domain.model.SourceRecord
 import com.moneymanager.domain.repository.AuditRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.ui.audit.AuditDiffCard
@@ -70,7 +70,7 @@ private data class PersonAuditDiff(
     val middleName: FieldChange<String?>,
     val lastName: FieldChange<String?>,
     val attributeChanges: List<PersonAttributeAuditEntry>,
-    val source: EntitySource?,
+    val source: SourceRecord?,
 ) {
     val hasChanges: Boolean
         get() = listOf(firstName, middleName, lastName).any { it is FieldChange.Changed } || attributeChanges.isNotEmpty()

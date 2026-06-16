@@ -5,8 +5,8 @@ package com.moneymanager.ui.audit
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.Money
+import com.moneymanager.domain.model.SourceRecord
 import com.moneymanager.domain.model.TransferId
-import com.moneymanager.domain.model.TransferSource
 import kotlin.time.Instant
 
 /**
@@ -25,7 +25,7 @@ data class AuditEntryDiff(
     val sourceAccountId: FieldChange<AccountId>,
     val targetAccountId: FieldChange<AccountId>,
     val amount: FieldChange<Money>,
-    val source: TransferSource? = null,
+    val source: SourceRecord? = null,
     val attributeChanges: List<AttributeChange> = emptyList(),
 ) {
     /**

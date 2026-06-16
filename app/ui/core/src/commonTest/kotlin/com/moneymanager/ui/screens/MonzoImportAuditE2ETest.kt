@@ -11,6 +11,9 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import androidx.compose.ui.test.waitUntilDoesNotExist
+import com.moneymanager.apiimporter.downloadApiSessionAccounts
+import com.moneymanager.apiimporter.downloadApiSessionTransactions
+import com.moneymanager.apiimporter.importApiSessionTransactions
 import com.moneymanager.database.DatabaseManager
 import com.moneymanager.di.database.DatabaseComponent
 import com.moneymanager.domain.model.AppVersion
@@ -21,9 +24,6 @@ import com.moneymanager.rest.createApiClient
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
-import com.moneymanager.apiimporter.downloadApiSessionAccounts
-import com.moneymanager.apiimporter.downloadApiSessionTransactions
-import com.moneymanager.apiimporter.importApiSessionTransactions
 import com.moneymanager.ui.test.MoneyManagerTestApp
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import io.ktor.client.engine.mock.MockEngine

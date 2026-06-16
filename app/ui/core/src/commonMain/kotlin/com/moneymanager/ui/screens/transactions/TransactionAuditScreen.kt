@@ -28,9 +28,9 @@ import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.DeviceInfo
-import com.moneymanager.domain.model.SourceType
+import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.SourceRecord
 import com.moneymanager.domain.model.TransferId
-import com.moneymanager.domain.model.TransferSource
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AuditRepository
@@ -455,7 +455,7 @@ private fun AttributeChangesSection(attributeChanges: List<AttributeChange>) {
 
 @Composable
 private fun SourceInfoSection(
-    source: TransferSource?,
+    source: SourceRecord?,
     currentDeviceId: DeviceId? = null,
     labelColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
@@ -464,6 +464,7 @@ private fun SourceInfoSection(
     if (source == null) return
 
     val isThisDevice = currentDeviceId != null && source.deviceId == currentDeviceId.id
+    val thisDeviceSuffix = if (isThisDevice) " (This Device)" else ""
 
     Column(
         modifier = Modifier.padding(top = 8.dp),
@@ -475,11 +476,9 @@ private fun SourceInfoSection(
             color = labelColor,
         )
 
-        when (source.sourceType) {
-            SourceType.MANUAL -> {
-                val deviceInfo = source.deviceInfo
-                val thisDeviceSuffix = if (isThisDevice) " (This Device)" else ""
-                when (deviceInfo) {
+        when (val origin = source.source) {
+            Source.Manual -> {
+                when (val deviceInfo = source.deviceInfo) {
                     is DeviceInfo.Jvm -> {
                         FieldValueRow("Origin", "Manual (Desktop)$thisDeviceSuffix", labelWidth = LABEL_WIDTH)
                         FieldValueRow("Machine", deviceInfo.machineName, labelWidth = LABEL_WIDTH)
@@ -489,55 +488,37 @@ private fun SourceInfoSection(
                         FieldValueRow("Origin", "Manual (Android)$thisDeviceSuffix", labelWidth = LABEL_WIDTH)
                         FieldValueRow("Device", "${deviceInfo.deviceMake} ${deviceInfo.deviceModel}", labelWidth = LABEL_WIDTH)
                     }
+                    null -> FieldValueRow("Origin", "Manual$thisDeviceSuffix", labelWidth = LABEL_WIDTH)
                 }
             }
-            SourceType.CSV_IMPORT -> {
-                val csvSource = source.csvSource
-                val deviceInfo = source.deviceInfo
-                val thisDeviceSuffix = if (isThisDevice) " (This Device)" else ""
-                if (csvSource != null) {
-                    val fileName = csvSource.fileName ?: "Unknown file"
-                    FieldValueRow("Origin", "CSV Import$thisDeviceSuffix", labelWidth = LABEL_WIDTH)
-                    val csvImportId = csvSource.importId
-                    if (csvImportId != null) {
-                        CsvSourceLinkRow(
-                            label = "File",
-                            value = fileName,
-                            csvImportId = csvImportId,
-                            rowIndex = csvSource.rowIndex,
-                            onCsvSourceClick = onCsvSourceClick,
-                        )
-                        CsvSourceLinkRow(
-                            label = "Row",
-                            value = csvSource.rowIndex.toString(),
-                            csvImportId = csvImportId,
-                            rowIndex = csvSource.rowIndex,
-                            onCsvSourceClick = onCsvSourceClick,
-                        )
-                    } else {
-                        FieldValueRow("File", fileName, labelWidth = LABEL_WIDTH)
-                        FieldValueRow("Row", csvSource.rowIndex.toString(), labelWidth = LABEL_WIDTH)
-                    }
-                } else {
-                    FieldValueRow("Origin", "CSV Import$thisDeviceSuffix", labelWidth = LABEL_WIDTH)
-                }
-                DeviceInfoFields(deviceInfo)
+            is Source.Csv -> {
+                val fileName = source.fileName ?: "Unknown file"
+                val rowIndex = origin.rowIndex ?: 0
+                FieldValueRow("Origin", "CSV Import$thisDeviceSuffix", labelWidth = LABEL_WIDTH)
+                CsvSourceLinkRow(
+                    label = "File",
+                    value = fileName,
+                    csvImportId = origin.importId,
+                    rowIndex = rowIndex,
+                    onCsvSourceClick = onCsvSourceClick,
+                )
+                CsvSourceLinkRow(
+                    label = "Row",
+                    value = rowIndex.toString(),
+                    csvImportId = origin.importId,
+                    rowIndex = rowIndex,
+                    onCsvSourceClick = onCsvSourceClick,
+                )
+                DeviceInfoFields(source.deviceInfo)
             }
-            SourceType.QIF_IMPORT -> {
-                val qifSource = source.qifSource
-                val deviceInfo = source.deviceInfo
-                val thisDeviceSuffix = if (isThisDevice) " (This Device)" else ""
+            is Source.Qif -> {
                 FieldValueRow("Origin", "QIF Import$thisDeviceSuffix", labelWidth = LABEL_WIDTH)
-                if (qifSource != null) {
-                    FieldValueRow("File", qifSource.fileName ?: "Unknown file", labelWidth = LABEL_WIDTH)
-                    FieldValueRow("Record", qifSource.recordIndex.toString(), labelWidth = LABEL_WIDTH)
-                }
-                DeviceInfoFields(deviceInfo)
+                FieldValueRow("File", source.fileName ?: "Unknown file", labelWidth = LABEL_WIDTH)
+                origin.recordIndex?.let { FieldValueRow("Record", it.toString(), labelWidth = LABEL_WIDTH) }
+                DeviceInfoFields(source.deviceInfo)
             }
-            SourceType.SAMPLE_GENERATOR -> {
-                val deviceInfo = source.deviceInfo
-                val thisDeviceSuffix = if (isThisDevice) " (This Device)" else ""
-                when (deviceInfo) {
+            Source.SampleGenerator -> {
+                when (val deviceInfo = source.deviceInfo) {
                     is DeviceInfo.Jvm -> {
                         FieldValueRow("Origin", "Sample Generator (Desktop)$thisDeviceSuffix", labelWidth = LABEL_WIDTH)
                         FieldValueRow("Machine", deviceInfo.machineName, labelWidth = LABEL_WIDTH)
@@ -547,42 +528,41 @@ private fun SourceInfoSection(
                         FieldValueRow("Origin", "Sample Generator (Android)$thisDeviceSuffix", labelWidth = LABEL_WIDTH)
                         FieldValueRow("Device", "${deviceInfo.deviceMake} ${deviceInfo.deviceModel}", labelWidth = LABEL_WIDTH)
                     }
+                    null -> FieldValueRow("Origin", "Sample Generator$thisDeviceSuffix", labelWidth = LABEL_WIDTH)
                 }
             }
-            SourceType.SYSTEM -> {
+            Source.System -> {
                 FieldValueRow("Origin", "System", labelWidth = LABEL_WIDTH)
             }
-            SourceType.MERGE, SourceType.MERGE_UNDO -> {
-                val thisDeviceSuffix = if (isThisDevice) " (This Device)" else ""
-                val origin = if (source.sourceType == SourceType.MERGE) "Merge" else "Undo Merge"
-                FieldValueRow("Origin", "$origin$thisDeviceSuffix", labelWidth = LABEL_WIDTH)
+            Source.Merge, Source.Unmerge -> {
+                val originLabel = if (origin == Source.Merge) "Merge" else "Undo Merge"
+                FieldValueRow("Origin", "$originLabel$thisDeviceSuffix", labelWidth = LABEL_WIDTH)
                 DeviceInfoFields(source.deviceInfo)
             }
-            SourceType.API -> {
-                val apiSource = source.apiSource
-                val deviceInfo = source.deviceInfo
-                val thisDeviceSuffix = if (isThisDevice) " (This Device)" else ""
+            is Source.Api -> {
                 FieldValueRow("Origin", "API Import$thisDeviceSuffix", labelWidth = LABEL_WIDTH)
-                if (apiSource != null) {
+                val requestId = origin.requestId
+                val jsonPath = origin.jsonPath
+                if (requestId != null && jsonPath != null) {
                     ApiSourceLinkRow(
                         label = "Session",
-                        value = apiSource.sessionId.id.toString(),
-                        sessionId = apiSource.sessionId,
-                        requestId = apiSource.requestId,
-                        jsonPath = apiSource.jsonPath.value,
+                        value = origin.sessionId.id.toString(),
+                        sessionId = origin.sessionId,
+                        requestId = requestId,
+                        jsonPath = jsonPath.value,
                         onApiSourceClick = onApiSourceClick,
                     )
-                    FieldValueRow("Request", apiSource.requestId.id.toString(), labelWidth = LABEL_WIDTH)
+                    FieldValueRow("Request", requestId.id.toString(), labelWidth = LABEL_WIDTH)
                     ApiSourceLinkRow(
                         label = "JSON Path",
-                        value = apiSource.jsonPath.value,
-                        sessionId = apiSource.sessionId,
-                        requestId = apiSource.requestId,
-                        jsonPath = apiSource.jsonPath.value,
+                        value = jsonPath.value,
+                        sessionId = origin.sessionId,
+                        requestId = requestId,
+                        jsonPath = jsonPath.value,
                         onApiSourceClick = onApiSourceClick,
                     )
                 }
-                DeviceInfoFields(deviceInfo)
+                DeviceInfoFields(source.deviceInfo)
             }
         }
     }

@@ -2,11 +2,10 @@
 
 package com.moneymanager.ui.monzo
 
+import com.moneymanager.apiimporter.importApiSessionTransactions
 import com.moneymanager.domain.model.ApiRequestId
-import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.test.database.DbTest
-import com.moneymanager.apiimporter.importApiSessionTransactions
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.Serializable

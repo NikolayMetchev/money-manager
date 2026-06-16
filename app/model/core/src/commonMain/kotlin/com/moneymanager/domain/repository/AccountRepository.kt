@@ -88,7 +88,5 @@ interface AccountRepository {
      * attributes and owners) and moves the reassigned transactions back. No-op if already reversed.
      * The recreated account's audit entry is sourced as a merge-undo on the current device.
      */
-    suspend fun unmergeAccount(
-        mergeId: MergeId,
-    )
+    suspend fun unmergeAccount(mergeId: MergeId)
 }

@@ -8,7 +8,6 @@ import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.Source
-import com.moneymanager.domain.model.SourceType
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.test.database.DbTest
@@ -452,12 +451,12 @@ class AccountRepositoryImplTest : DbTest() {
             assertEquals(AuditType.INSERT, restoreEntry.auditType)
             assertEquals(5L, restoreEntry.revisionId)
             // The recreated account is sourced as a merge-undo (not "source data missing").
-            assertEquals(SourceType.MERGE_UNDO, restoreEntry.source?.sourceType)
+            assertEquals(Source.Unmerge, restoreEntry.source?.source)
             // The delete is recorded at its own revision (4), distinct from the prior change at revision 3,
             // and is sourced as a merge (not "source data missing").
             val accountDeleteEntry = accountAudit.single { it.auditType == AuditType.DELETE }
             assertEquals(4L, accountDeleteEntry.revisionId)
-            assertEquals(SourceType.MERGE, accountDeleteEntry.source?.sourceType)
+            assertEquals(Source.Merge, accountDeleteEntry.source?.source)
             // The merge context lets the audit screen label these entries.
             val mergeContext = repositories.accountRepository.getMergesForDeletedAccount(accountA).single()
             assertTrue(mergeContext.reversed)
@@ -479,11 +478,11 @@ class AccountRepositoryImplTest : DbTest() {
                 repositories.auditRepository
                     .getAuditHistoryForTransfer(movedBackSource.id)
                     .mapNotNull { it.source }
-            val transferSourceTypes = transferSources.map { it.sourceType }
-            assertTrue(SourceType.MERGE in transferSourceTypes, "the merge reassignment must be sourced")
-            assertTrue(SourceType.MERGE_UNDO in transferSourceTypes, "the unmerge reassignment must be sourced")
+            val transferSourceOrigins = transferSources.map { it.source }
+            assertTrue(Source.Merge in transferSourceOrigins, "the merge reassignment must be sourced")
+            assertTrue(Source.Unmerge in transferSourceOrigins, "the unmerge reassignment must be sourced")
             // Those sources also carry the acting device (not just a bare source type).
-            val mergeSource = transferSources.first { it.sourceType == SourceType.MERGE }
+            val mergeSource = transferSources.first { it.source == Source.Merge }
             assertNotNull(mergeSource.deviceInfo)
 
             // Account B keeps only its own (zero) transfers
