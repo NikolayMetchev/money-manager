@@ -35,6 +35,9 @@ import com.moneymanager.importengineapi.LocalPersonKey
 import com.moneymanager.importengineapi.PersonMatchKey
 import com.moneymanager.importengineapi.RowOutcome
 import com.moneymanager.importengineapi.forRow
+import com.moneymanager.importengineapi.normalizeNameKey
+import com.moneymanager.importengineapi.personalCounterpartyKey
+import com.moneymanager.domain.model.WellKnownIds
 import kotlinx.coroutines.flow.first
 
 /**
@@ -140,7 +143,7 @@ class ImportEngineImpl(
                 .associate { it.name to it.id }
                 .toMutableMap()
         val byAttr = buildExistingAccountAttrIndex(batch.accountsToCreate)
-        val byPersonalKey = mutableMapOf<String, AccountId>()
+        val byPersonalKey = buildExistingPersonalKeyIndex(batch.accountsToCreate)
 
         val keyToId = mutableMapOf<LocalAccountKey, AccountId>()
         var created = 0
@@ -233,6 +236,33 @@ class ImportEngineImpl(
                 if (attr.attributeType.id in relevantTypeIds) {
                     index.getOrPut(attr.attributeType.id to attr.value) { account.id }
                 }
+            }
+        }
+        return index
+    }
+
+    /**
+     * Builds an index of existing accounts by their sort-code/account-number composite key, so an
+     * incoming [AccountMatchKey.ByPersonalCounterparty] reconciles onto an account a *previous* import
+     * already created for the same real bank account (cross-provider, order-independent). Only built when
+     * the batch actually carries personal-counterparty match keys, so name-only batches pay nothing.
+     */
+    private suspend fun buildExistingPersonalKeyIndex(
+        intents: List<ImportAccountIntent>,
+    ): MutableMap<String, AccountId> {
+        val hasPersonalKeys = intents.any { it.match is AccountMatchKey.ByPersonalCounterparty }
+        if (!hasPersonalKeys) return mutableMapOf()
+
+        val sortCodeTypeId = AttributeTypeId(WellKnownIds.ACCOUNT_SORT_CODE_ATTR_TYPE_ID)
+        val accountNumberTypeId = AttributeTypeId(WellKnownIds.ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID)
+
+        val index = mutableMapOf<String, AccountId>()
+        for (account in accountRepository.getAllAccounts().first()) {
+            val attrs = accountAttributeRepository.getByAccount(account.id).first()
+            val sortCode = attrs.firstOrNull { it.attributeType.id == sortCodeTypeId }?.value
+            val accountNumber = attrs.firstOrNull { it.attributeType.id == accountNumberTypeId }?.value
+            if (sortCode != null && accountNumber != null) {
+                index.getOrPut(personalCounterpartyKey(sortCode, accountNumber)) { account.id }
             }
         }
         return index
@@ -533,10 +563,3 @@ class ImportEngineImpl(
             if (!lastName.isNullOrBlank()) append(" ").append(lastName)
         }
 }
-
-/**
- * Normalises a full name into a stable matching key (trim, collapse internal whitespace, lower-case).
- * Shared so importers that produce [PersonMatchKey.ByNameKey] derive the same key the engine uses to
- * index existing people.
- */
-fun normalizeNameKey(fullName: String): String = fullName.trim().replace(Regex("\\s+"), " ").lowercase()
