@@ -21,8 +21,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.moneymanager.database.csv.ImportPreparation
-import com.moneymanager.database.qif.QifCsvAdapter
+import com.moneymanager.csvimporter.ImportPreparation
+import com.moneymanager.csvimporter.buildCreatedAccountNameOverrides
+import com.moneymanager.csvimporter.buildPendingAccountMappings
+import com.moneymanager.csvimporter.hasBlankNewAccountNames
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CurrencyId
@@ -43,6 +45,11 @@ import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.QifImportRepository
 import com.moneymanager.domain.repository.SettingsRepository
 import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.qifimporter.QifCsvAdapter
+import com.moneymanager.qifimporter.QifImportResult
+import com.moneymanager.qifimporter.buildMapper
+import com.moneymanager.qifimporter.runImport
+import com.moneymanager.qifimporter.withQifCurrency
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.CurrencyPicker
 import com.moneymanager.ui.components.LoadingTextButton
@@ -51,9 +58,6 @@ import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.screens.csv.ImportPreviewSection
 import com.moneymanager.ui.screens.csv.NewAccountResolutionSection
 import com.moneymanager.ui.screens.csv.StrategySelector
-import com.moneymanager.ui.screens.csv.buildCreatedAccountNameOverrides
-import com.moneymanager.ui.screens.csv.buildPendingAccountMappings
-import com.moneymanager.ui.screens.csv.hasBlankNewAccountNames
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging

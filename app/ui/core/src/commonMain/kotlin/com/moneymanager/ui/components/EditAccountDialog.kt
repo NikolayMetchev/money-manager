@@ -24,9 +24,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AttributeType
-import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.PersonId
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository

@@ -1,6 +1,6 @@
 @file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
 
-package com.moneymanager.database.csv
+package com.moneymanager.csvimporter
 
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CurrencyId

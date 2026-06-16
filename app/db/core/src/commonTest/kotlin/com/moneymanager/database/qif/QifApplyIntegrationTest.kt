@@ -1,8 +1,8 @@
 @file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
 
 package com.moneymanager.database.qif
-import com.moneymanager.database.csv.CsvTransferMapper
-import com.moneymanager.database.csv.ExistingTransferInfo
+import com.moneymanager.csvimporter.CsvTransferMapper
+import com.moneymanager.csvimporter.ExistingTransferInfo
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
@@ -21,6 +21,7 @@ import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.model.qif.QifImportRecord
 import com.moneymanager.domain.model.qif.QifRecordSplit
+import com.moneymanager.qifimporter.QifCsvAdapter
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.upsertCurrencyByCode

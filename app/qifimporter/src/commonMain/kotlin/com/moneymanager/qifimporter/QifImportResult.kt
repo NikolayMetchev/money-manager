@@ -1,4 +1,4 @@
-package com.moneymanager.ui.screens.qif
+package com.moneymanager.qifimporter
 
 /** Result of a QIF import run. */
 data class QifImportResult(

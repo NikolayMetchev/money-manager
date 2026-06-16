@@ -37,7 +37,6 @@ import kotlin.time.Duration
 
 @OptIn(ExperimentalTestApi::class)
 class AccountsScreenTest {
-
     @Test
     fun accountsScreen_displaysEmptyState_whenNoAccounts() =
         runMoneyManagerComposeUiTest {

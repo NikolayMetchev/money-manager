@@ -1,12 +1,8 @@
 @file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
 
-package com.moneymanager.ui.screens.csv
+package com.moneymanager.csvimporter
 
 import com.moneymanager.bigdecimal.BigDecimal
-import com.moneymanager.database.csv.CsvTransferWithAttributes
-import com.moneymanager.database.csv.DiscoveredAccountMapping
-import com.moneymanager.database.csv.ImportPreparation
-import com.moneymanager.database.csv.NewAccount
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId

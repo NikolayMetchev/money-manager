@@ -322,9 +322,7 @@ class AccountRepositoryImpl(
                 }.executeAsList()
         }
 
-    override suspend fun unmergeAccount(
-        mergeId: MergeId,
-    ): Unit =
+    override suspend fun unmergeAccount(mergeId: MergeId): Unit =
         withContext(Dispatchers.Default) {
             database.transaction {
                 val merge = mergeQueries.selectById(mergeId.id).executeAsOneOrNull() ?: return@transaction

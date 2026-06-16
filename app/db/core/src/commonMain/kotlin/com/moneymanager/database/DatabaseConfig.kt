@@ -6,13 +6,13 @@ import com.moneymanager.currency.Currency
 import com.moneymanager.database.json.ApiStrategyConfigJson
 import com.moneymanager.database.json.ApiStrategyJsonCodec
 import com.moneymanager.database.json.FieldMappingJsonCodec
-import com.moneymanager.database.qif.QifCsvAdapter
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.CurrencyScaleFactors
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.SourceType
+import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.apistrategy.ApiAccountMappings
 import com.moneymanager.domain.model.apistrategy.ApiAmountFormat
 import com.moneymanager.domain.model.apistrategy.ApiAuthType
@@ -49,7 +49,7 @@ import com.moneymanager.domain.model.csvstrategy.RowConditionOperator
 import com.moneymanager.domain.model.csvstrategy.RowPreprocessingRule
 import com.moneymanager.domain.model.csvstrategy.TemplateAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
-import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.domain.model.qif.QifColumns
 import kotlin.time.Clock
 import kotlin.time.Instant
 import kotlin.uuid.Uuid
@@ -59,26 +59,16 @@ import kotlin.uuid.Uuid
  * These settings are applied per-connection (not persisted to the database file).
  */
 object DatabaseConfig {
-    /** Stable ID for the "excluded" attribute type. Excluded transactions are hidden from balances. */
-    const val EXCLUDED_ATTR_TYPE_ID: Long = -1
-
-    /** Stable ID for the "account-external-id" attribute type (e.g. counterparty.id value). */
-    const val ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID: Long = -2
-
-    /** Stable ID for the "built-in type" attribute type used by built-in counterparty accounts. */
-    const val BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID: Long = -3
-
-    /** Stable ID for the "sort code" account attribute type used for personal counterparties. */
-    const val ACCOUNT_SORT_CODE_ATTR_TYPE_ID: Long = -5
-
-    /** Stable ID for the "account number" account attribute type used for personal counterparties. */
-    const val ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID: Long = -6
-
-    /** Stable ID for the "reconciled" relationship type: id1 mirrors id2 seen from another source. */
-    const val RECONCILED_RELATIONSHIP_TYPE_ID: Long = 1
-
-    /** Stable ID for the "fee" relationship type: id1 is the main transaction, id2 its fee transfer. */
-    const val FEE_RELATIONSHIP_TYPE_ID: Long = 2
+    // Canonical values live in WellKnownIds (db-free, so the import modules can reference them); these
+    // aliases keep existing db-layer call sites and the seeding below working. The database seeds
+    // exactly these ids.
+    const val EXCLUDED_ATTR_TYPE_ID: Long = WellKnownIds.EXCLUDED_ATTR_TYPE_ID
+    const val ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID: Long = WellKnownIds.ACCOUNT_EXTERNAL_ID_ATTR_TYPE_ID
+    const val BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID: Long = WellKnownIds.BUILT_IN_COUNTERPARTY_TYPE_ATTR_TYPE_ID
+    const val ACCOUNT_SORT_CODE_ATTR_TYPE_ID: Long = WellKnownIds.ACCOUNT_SORT_CODE_ATTR_TYPE_ID
+    const val ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID: Long = WellKnownIds.ACCOUNT_ACCOUNT_NUMBER_ATTR_TYPE_ID
+    const val RECONCILED_RELATIONSHIP_TYPE_ID: Long = WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID
+    const val FEE_RELATIONSHIP_TYPE_ID: Long = WellKnownIds.FEE_RELATIONSHIP_TYPE_ID
 
     /**
      * SQL statements to execute when opening a database connection.
@@ -841,9 +831,7 @@ object DatabaseConfig {
      *
      * @param database The database to seed
      */
-    suspend fun seedDatabase(
-        database: MoneyManagerDatabaseWrapper,
-    ) {
+    suspend fun seedDatabase(database: MoneyManagerDatabaseWrapper) {
         with(database) {
             // Seed AuditType lookup table
             auditTypeQueries.insert(id = 1, name = "INSERT")
@@ -1483,7 +1471,7 @@ object DatabaseConfig {
 
     /**
      * Built-in strategy for QIF imports. QIF reuses the CSV strategy engine over a fixed set of
-     * columns (see [QifCsvAdapter]), so its identification columns are exactly those fixed fields and
+     * columns (see [QifColumns]), so its identification columns are exactly those fixed fields and
      * it matches any QIF file. The source account and currency are chosen at import time (QIF data
      * carries neither): the seeded CURRENCY mapping is a placeholder the QIF apply flow overrides.
      */
@@ -1496,22 +1484,22 @@ object DatabaseConfig {
                     AccountLookupMapping(
                         id = qifMappingId(1),
                         fieldType = TransferField.TARGET_ACCOUNT,
-                        columnName = QifCsvAdapter.COL_TRANSFER_ACCOUNT,
-                        fallbackColumns = listOf(QifCsvAdapter.COL_PAYEE, QifCsvAdapter.COL_CATEGORY),
+                        columnName = QifColumns.COL_TRANSFER_ACCOUNT,
+                        fallbackColumns = listOf(QifColumns.COL_PAYEE, QifColumns.COL_CATEGORY),
                     ),
                 TransferField.TIMESTAMP to
                     DateTimeParsingMapping(
                         id = qifMappingId(2),
                         fieldType = TransferField.TIMESTAMP,
-                        dateColumnName = QifCsvAdapter.COL_DATE,
+                        dateColumnName = QifColumns.COL_DATE,
                         dateFormat = "dd/MM/yyyy",
                     ),
                 TransferField.DESCRIPTION to
                     DirectColumnMapping(
                         id = qifMappingId(3),
                         fieldType = TransferField.DESCRIPTION,
-                        columnName = QifCsvAdapter.COL_PAYEE,
-                        fallbackColumns = listOf(QifCsvAdapter.COL_MEMO),
+                        columnName = QifColumns.COL_PAYEE,
+                        fallbackColumns = listOf(QifColumns.COL_MEMO),
                     ),
                 // QIF amounts are signed: negative = money out of the account, positive = money in,
                 // so positive amounts flip source/target.
@@ -1520,7 +1508,7 @@ object DatabaseConfig {
                         id = qifMappingId(4),
                         fieldType = TransferField.AMOUNT,
                         mode = AmountMode.SINGLE_COLUMN,
-                        amountColumnName = QifCsvAdapter.COL_AMOUNT,
+                        amountColumnName = QifColumns.COL_AMOUNT,
                         flipAccountsOnPositive = true,
                     ),
                 TransferField.CURRENCY to
@@ -1540,7 +1528,7 @@ object DatabaseConfig {
         return CsvImportStrategy(
             id = CsvImportStrategyId(qifStrategyId),
             name = "QIF",
-            identificationColumns = QifCsvAdapter.headers.toSet(),
+            identificationColumns = QifColumns.headers.toSet(),
             fieldMappings = fieldMappings,
             createdAt = now,
             updatedAt = now,

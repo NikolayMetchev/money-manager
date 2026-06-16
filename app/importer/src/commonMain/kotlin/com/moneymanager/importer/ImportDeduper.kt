@@ -12,6 +12,7 @@ import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.ImportTransfer
+import com.moneymanager.importengineapi.StringSimilarity
 import kotlin.time.Duration
 
 /**

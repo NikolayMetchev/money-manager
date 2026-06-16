@@ -1,21 +1,16 @@
 @file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
 
-package com.moneymanager.ui.screens.csv
+package com.moneymanager.csvimporter
 
-import com.moneymanager.database.DatabaseConfig
-import com.moneymanager.database.csv.CsvTransferMapper
-import com.moneymanager.database.csv.DiscoveredAccountMapping
-import com.moneymanager.database.csv.ImportPreparation
-import com.moneymanager.database.csv.NewAccount
-import com.moneymanager.database.csv.StrategyMatcher
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
-import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.RelationshipTypeId
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvImportId
@@ -30,15 +25,14 @@ import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CsvAccountMappingRepository
 import com.moneymanager.domain.repository.CsvImportRepository
-import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.ExistingUniqueKeyExtractor
 import com.moneymanager.importengineapi.ImportBatch
+import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportFee
 import com.moneymanager.importengineapi.ImportRowKey
 import com.moneymanager.importengineapi.ImportTransfer
-import com.moneymanager.ui.screens.BulkImportResult
 import kotlinx.coroutines.flow.first
 import org.lighthousegames.logging.logging
 import kotlin.time.Clock
@@ -46,7 +40,7 @@ import kotlin.time.Clock
 private val logger = logging()
 
 /** Summary of a bulk CSV import run across many files. */
-internal data class CsvBulkResult(
+data class CsvBulkResult(
     override val filesImported: Int,
     override val transfersCreated: Int,
     override val duplicatesSkipped: Int,
@@ -63,7 +57,7 @@ internal data class CsvBulkResult(
  * Refreshes materialized views once at the end. Reports progress via [onProgress].
  */
 @Suppress("LongParameterList")
-internal suspend fun bulkApplyCsv(
+suspend fun bulkApplyCsv(
     imports: List<CsvImport>,
     sourceAccountOverride: AccountId?,
     strategies: List<CsvImportStrategy>,
@@ -155,7 +149,7 @@ internal suspend fun bulkApplyCsv(
  * - a per-row SOURCE_ACCOUNT mapping decides per row (null override),
  * - no SOURCE_ACCOUNT mapping falls back to the shared [override].
  */
-internal fun effectiveSourceFor(
+fun effectiveSourceFor(
     strategy: CsvImportStrategy,
     override: AccountId?,
 ): AccountId? =
@@ -166,9 +160,9 @@ internal fun effectiveSourceFor(
     }
 
 /** True when [strategy] needs a user-chosen source account (no SOURCE_ACCOUNT mapping of its own). */
-internal fun CsvImportStrategy.needsSourceAccountOverride(): Boolean = fieldMappings[TransferField.SOURCE_ACCOUNT] == null
+fun CsvImportStrategy.needsSourceAccountOverride(): Boolean = fieldMappings[TransferField.SOURCE_ACCOUNT] == null
 
-internal fun buildCsvMapper(
+fun buildCsvMapper(
     strategy: CsvImportStrategy,
     columns: List<CsvColumn>,
     accounts: List<Account>,
@@ -344,7 +338,7 @@ private fun buildAutoCapturedMappings(
  * path passes [refreshViews] = false and refreshes once at the end. Mirrors QifImportApplier.runImport.
  */
 @Suppress("LongParameterList", "LongMethod", "CyclomaticComplexMethod")
-internal suspend fun runCsvImport(
+suspend fun runCsvImport(
     csvImport: CsvImport,
     rows: List<CsvRow>,
     columns: List<CsvColumn>,
@@ -514,7 +508,7 @@ internal suspend fun runCsvImport(
                         target = AccountRef.Existing(feeAccountId!!),
                         amount = feeMoney,
                         description = "Fee",
-                        relationshipTypeId = RelationshipTypeId(DatabaseConfig.FEE_RELATIONSHIP_TYPE_ID),
+                        relationshipTypeId = RelationshipTypeId(WellKnownIds.FEE_RELATIONSHIP_TYPE_ID),
                     )
                 }
             ImportTransfer(

@@ -1,6 +1,7 @@
 package com.moneymanager.importer
 
 import com.moneymanager.importengineapi.DESCRIPTION_SIMILARITY_THRESHOLD
+import com.moneymanager.importengineapi.StringSimilarity
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

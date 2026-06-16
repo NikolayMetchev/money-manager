@@ -1,4 +1,4 @@
-package com.moneymanager.database.qif
+package com.moneymanager.qifimporter
 
 import com.moneymanager.domain.model.qif.QifImportRecord
 import com.moneymanager.domain.model.qif.QifRecordSplit

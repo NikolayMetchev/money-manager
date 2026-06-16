@@ -1,7 +1,6 @@
 package com.moneymanager.database
 
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
-import com.moneymanager.database.repository.CurrencyRepositoryImpl
 import com.moneymanager.database.sql.MoneyManagerDatabase
 import com.moneymanager.domain.model.DEFAULT_DATABASE_PATH
 import com.moneymanager.domain.model.DbLocation

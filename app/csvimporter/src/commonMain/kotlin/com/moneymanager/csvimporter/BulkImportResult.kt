@@ -1,10 +1,10 @@
-package com.moneymanager.ui.screens
+package com.moneymanager.csvimporter
 
 /**
  * Outcome of a bulk import run across many files (CSV or QIF). Both flows produce identical summary
  * text, so [toSummary] lives here and the format stays in one place.
  */
-internal interface BulkImportResult {
+interface BulkImportResult {
     val filesImported: Int
     val transfersCreated: Int
     val duplicatesSkipped: Int

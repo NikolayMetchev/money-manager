@@ -1,4 +1,4 @@
-package com.moneymanager.database.csv
+package com.moneymanager.csvimporter
 
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 

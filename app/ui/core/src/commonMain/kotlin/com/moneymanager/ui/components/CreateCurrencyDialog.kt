@@ -18,8 +18,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.CurrencyId
-import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging

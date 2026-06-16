@@ -22,7 +22,6 @@ import com.moneymanager.domain.repository.TransferUpdate
 import com.moneymanager.importengineapi.AccountMatchKey
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.DedupePolicy
-import com.moneymanager.importengineapi.forRow
 import com.moneymanager.importengineapi.ImportAccountIntent
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
@@ -35,6 +34,7 @@ import com.moneymanager.importengineapi.LocalAccountKey
 import com.moneymanager.importengineapi.LocalPersonKey
 import com.moneymanager.importengineapi.PersonMatchKey
 import com.moneymanager.importengineapi.RowOutcome
+import com.moneymanager.importengineapi.forRow
 import kotlinx.coroutines.flow.first
 
 /**

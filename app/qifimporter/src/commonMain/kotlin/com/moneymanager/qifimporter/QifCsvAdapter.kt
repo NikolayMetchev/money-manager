@@ -1,17 +1,18 @@
 @file:OptIn(ExperimentalUuidApi::class)
 
-package com.moneymanager.database.qif
+package com.moneymanager.qifimporter
 
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvColumnId
 import com.moneymanager.domain.model.csv.CsvRow
+import com.moneymanager.domain.model.qif.QifColumns
 import com.moneymanager.domain.model.qif.QifImportRecord
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 /**
  * Bridges QIF imports onto the CSV strategy engine. QIF records have a fixed field set, so they
- * are presented to [com.moneymanager.database.csv.CsvTransferMapper] as rows over a fixed set of
+ * are presented to [com.moneymanager.csvimporter.CsvTransferMapper] as rows over a fixed set of
  * "columns" named after the QIF fields. This lets QIF reuse the entire CSV strategy machinery
  * (strategies, field mappings, account mappings, the editor) without duplication.
  *
@@ -20,29 +21,20 @@ import kotlin.uuid.Uuid
  * [CsvRow.rowIndex] = `recordIndex`, so all resulting transfers link back to the source record.
  */
 object QifCsvAdapter {
-    const val COL_DATE = "Date"
-    const val COL_AMOUNT = "Amount"
-    const val COL_PAYEE = "Payee"
-    const val COL_MEMO = "Memo"
-    const val COL_CATEGORY = "Category"
-    const val COL_TRANSFER_ACCOUNT = "Transfer Account"
-    const val COL_CHECK_NUMBER = "Check Number"
-    const val COL_CLEARED = "Cleared"
-    const val COL_ACCOUNT = "Account"
+    // The fixed column names are owned by QifColumns (db-free domain vocabulary) so the database can
+    // seed the built-in QIF strategy against the same names without depending on this adapter.
+    const val COL_DATE = QifColumns.COL_DATE
+    const val COL_AMOUNT = QifColumns.COL_AMOUNT
+    const val COL_PAYEE = QifColumns.COL_PAYEE
+    const val COL_MEMO = QifColumns.COL_MEMO
+    const val COL_CATEGORY = QifColumns.COL_CATEGORY
+    const val COL_TRANSFER_ACCOUNT = QifColumns.COL_TRANSFER_ACCOUNT
+    const val COL_CHECK_NUMBER = QifColumns.COL_CHECK_NUMBER
+    const val COL_CLEARED = QifColumns.COL_CLEARED
+    const val COL_ACCOUNT = QifColumns.COL_ACCOUNT
 
     /** Fixed column headers, in order, presented to the CSV engine. */
-    val headers: List<String> =
-        listOf(
-            COL_DATE,
-            COL_AMOUNT,
-            COL_PAYEE,
-            COL_MEMO,
-            COL_CATEGORY,
-            COL_TRANSFER_ACCOUNT,
-            COL_CHECK_NUMBER,
-            COL_CLEARED,
-            COL_ACCOUNT,
-        )
+    val headers: List<String> = QifColumns.headers
 
     /** Fixed columns, in order. */
     val columns: List<CsvColumn> =

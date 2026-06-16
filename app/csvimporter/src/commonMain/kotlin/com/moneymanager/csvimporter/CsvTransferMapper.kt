@@ -4,7 +4,7 @@
     kotlinx.datetime.format.FormatStringsInDatetimeFormats::class,
 )
 
-package com.moneymanager.database.csv
+package com.moneymanager.csvimporter
 
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.model.Account
@@ -37,8 +37,8 @@ import com.moneymanager.domain.model.csvstrategy.RowConditionOperator
 import com.moneymanager.domain.model.csvstrategy.TemplateAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TimezoneLookupMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
-import com.moneymanager.importer.StringSimilarity
 import com.moneymanager.importengineapi.DESCRIPTION_SIMILARITY_THRESHOLD
+import com.moneymanager.importengineapi.StringSimilarity
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.LocalTime

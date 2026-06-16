@@ -1,10 +1,12 @@
 @file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
 
-package com.moneymanager.ui.screens.qif
+package com.moneymanager.qifimporter
 
-import com.moneymanager.database.csv.CsvTransferMapper
-import com.moneymanager.database.csv.ImportPreparation
-import com.moneymanager.database.qif.QifCsvAdapter
+import com.moneymanager.csvimporter.BulkImportResult
+import com.moneymanager.csvimporter.CsvTransferMapper
+import com.moneymanager.csvimporter.ImportPreparation
+import com.moneymanager.csvimporter.buildAccountsToCreate
+import com.moneymanager.csvimporter.buildPendingAccountMappings
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
@@ -25,15 +27,12 @@ import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CsvAccountMappingRepository
 import com.moneymanager.domain.repository.QifImportRepository
-import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.ImportBatch
+import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportRowKey
 import com.moneymanager.importengineapi.ImportTransfer
-import com.moneymanager.ui.screens.BulkImportResult
-import com.moneymanager.ui.screens.csv.buildAccountsToCreate
-import com.moneymanager.ui.screens.csv.buildPendingAccountMappings
 import kotlinx.coroutines.flow.first
 import org.lighthousegames.logging.logging
 import kotlin.time.Clock
@@ -42,7 +41,7 @@ import kotlin.uuid.Uuid
 private val logger = logging()
 
 /** Summary of a bulk QIF import run across many files. */
-internal data class QifBulkResult(
+data class QifBulkResult(
     override val filesImported: Int,
     override val transfersCreated: Int,
     override val duplicatesSkipped: Int,
@@ -54,7 +53,7 @@ internal data class QifBulkResult(
  * Strategies usable for QIF imports: those whose identification columns are a (non-empty) subset of
  * QIF's fixed columns. Excludes CSV strategies (Wise/Monzo) whose columns aren't QIF columns.
  */
-internal fun List<CsvImportStrategy>.qifCompatible(): List<CsvImportStrategy> {
+fun List<CsvImportStrategy>.qifCompatible(): List<CsvImportStrategy> {
     val qifHeaders = QifCsvAdapter.headers.toSet()
     return filter { it.identificationColumns.isNotEmpty() && it.identificationColumns.all { col -> col in qifHeaders } }
 }
@@ -65,7 +64,7 @@ internal fun List<CsvImportStrategy>.qifCompatible(): List<CsvImportStrategy> {
  * confirmation). Refreshes materialized views once at the end. Reports progress via [onProgress].
  */
 @Suppress("LongParameterList")
-internal suspend fun bulkApplyQif(
+suspend fun bulkApplyQif(
     imports: List<QifImport>,
     sourceAccountId: AccountId,
     currencyId: CurrencyId,
@@ -149,7 +148,7 @@ internal suspend fun bulkApplyQif(
  * currency. When [currencyId] is null the strategy is returned unchanged (the import button is
  * disabled until a currency is chosen).
  */
-internal fun CsvImportStrategy.withQifCurrency(currencyId: CurrencyId?): CsvImportStrategy {
+fun CsvImportStrategy.withQifCurrency(currencyId: CurrencyId?): CsvImportStrategy {
     if (currencyId == null) return this
     return copy(
         fieldMappings =
@@ -165,7 +164,7 @@ internal fun CsvImportStrategy.withQifCurrency(currencyId: CurrencyId?): CsvImpo
     )
 }
 
-internal fun buildMapper(
+fun buildMapper(
     strategy: CsvImportStrategy,
     accounts: List<Account>,
     currencies: List<Currency>,
@@ -183,7 +182,7 @@ internal fun buildMapper(
     )
 
 /** Records that this strategy was applied to the import (so the import shows as imported). */
-internal suspend fun recordApplication(
+suspend fun recordApplication(
     qifImportRepository: QifImportRepository,
     qifImport: QifImport,
     strategy: CsvImportStrategy,
@@ -194,7 +193,7 @@ internal suspend fun recordApplication(
 }
 
 @Suppress("LongParameterList", "LongMethod")
-internal suspend fun runImport(
+suspend fun runImport(
     qifImport: QifImport,
     rows: List<CsvRow>,
     strategy: CsvImportStrategy,

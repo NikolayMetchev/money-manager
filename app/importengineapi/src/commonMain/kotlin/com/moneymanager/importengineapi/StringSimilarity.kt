@@ -1,4 +1,4 @@
-package com.moneymanager.importer
+package com.moneymanager.importengineapi
 
 import kotlin.math.max
 
