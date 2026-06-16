@@ -1,23 +1,22 @@
 @file:OptIn(kotlin.time.ExperimentalTime::class)
 
 package com.moneymanager.ui.monzo
-import com.moneymanager.database.port.DbEntitySource
+import com.moneymanager.apiimporter.discoverApiCounterpartiesToCreate
+import com.moneymanager.apiimporter.downloadApiSessionAccounts
+import com.moneymanager.apiimporter.downloadApiSessionTransactions
+import com.moneymanager.apiimporter.importApiSessionTransactions
 import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonId
-import com.moneymanager.domain.model.SourceType
+import com.moneymanager.domain.model.Source
 import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.createApiClient
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createPerson
 import com.moneymanager.test.database.updateAccount
 import com.moneymanager.test.database.upsertCurrencyByCode
-import com.moneymanager.ui.api.discoverApiCounterpartiesToCreate
-import com.moneymanager.ui.api.downloadApiSessionAccounts
-import com.moneymanager.ui.api.downloadApiSessionTransactions
-import com.moneymanager.ui.api.importApiSessionTransactions
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpHeaders
@@ -27,6 +26,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Instant
@@ -577,18 +577,11 @@ class MonzoImportE2ETest : DbTest() {
             val importResult =
                 importApiSessionTransactions(
                     apiSessionRepository = repositories.apiSessionRepository,
-                    accountRepository = repositories.accountRepository,
                     currencyRepository = repositories.currencyRepository,
-                    transactionRepository = repositories.transactionRepository,
-                    entitySource = DbEntitySource(repositories.transferSourceQueries, deviceId),
-                    personRepository = repositories.personRepository,
-                    personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                    personAttributeRepository = repositories.personAttributeRepository,
                     attributeTypeRepository = repositories.attributeTypeRepository,
-                    accountAttributeRepository = repositories.accountAttributeRepository,
-                    deviceId = deviceId,
                     sessionId = sessionId,
                     strategy = strategy,
+                    importEngine = repositories.importEngine,
                 )
 
             // THEN — import counts (declined tx5 is stored but marked excluded)
@@ -607,12 +600,13 @@ class MonzoImportE2ETest : DbTest() {
             assertEquals(AuditType.INSERT, accountAudit.auditType)
             val accountSource = accountAudit.source
             assertNotNull(accountSource, "Account audit entry must have a source")
-            assertEquals(SourceType.API, accountSource.sourceType)
-            assertEquals(sessionId, accountSource.apiSource?.sessionId)
-            assertEquals(JsonPath("$.accounts[0]"), accountSource.apiSource?.jsonPath)
+            val accountApiSource = accountSource.source
+            assertIs<Source.Api>(accountApiSource, "Account source should be API")
+            assertEquals(sessionId, accountApiSource.sessionId)
+            assertEquals(JsonPath("$.accounts[0]"), accountApiSource.jsonPath)
 
             // The accounts list is request #1; its request_id must be present
-            val accountsRequestId = accountSource.apiSource?.requestId
+            val accountsRequestId = accountApiSource.requestId
             assertNotNull(accountsRequestId, "Account source must reference the API request")
 
             // --- Transfer audit ---
@@ -643,15 +637,15 @@ class MonzoImportE2ETest : DbTest() {
                 assertEquals(AuditType.INSERT, txAudit.auditType)
                 val txSource = txAudit.source
                 assertNotNull(txSource, "Transfer audit entry must have a source")
-                assertEquals(SourceType.API, txSource.sourceType)
-                val txApiSource = txSource.apiSource
-                assertNotNull(txApiSource, "Transfer $index source must have API details")
+                val txApiSource = txSource.source
+                assertIs<Source.Api>(txApiSource, "Transfer $index source should be API")
                 assertEquals(
                     sessionId,
                     txApiSource.sessionId,
                     "Transfer $index source session should match the download session",
                 )
-                val path = txApiSource.jsonPath.value
+                val path = txApiSource.jsonPath?.value
+                assertNotNull(path, "Transfer $index source must have a json_path")
                 assert(path.startsWith("$.transactions[")) {
                     "Transfer $index json_path '$path' should be a $.transactions[N] path"
                 }
@@ -662,8 +656,7 @@ class MonzoImportE2ETest : DbTest() {
                 transfers
                     .mapNotNull { t ->
                         val entry = repositories.auditRepository.getAuditHistoryForTransfer(t.id).single()
-                        val src = entry.source
-                        src?.apiSource?.jsonPath
+                        (entry.source?.source as? Source.Api)?.jsonPath
                     }.toSet()
             assertEquals(5, jsonPaths.size, "Each transaction should have a distinct json_path")
 
@@ -678,13 +671,14 @@ class MonzoImportE2ETest : DbTest() {
                 val cpAudit = auditEntries.single()
                 val cpSource = cpAudit.source
                 assertNotNull(cpSource, "${counterparty.name} audit must have a source — not 'Source data missing'")
-                assertEquals(SourceType.API, cpSource.sourceType, "${counterparty.name} source should be API")
-                val cpApiSource = cpSource.apiSource
-                assertNotNull(cpApiSource, "${counterparty.name} must have API source details")
+                val cpApiSource = cpSource.source
+                assertIs<Source.Api>(cpApiSource, "${counterparty.name} source should be API")
                 assertEquals(sessionId, cpApiSource.sessionId)
                 // The json_path points to the counterparty section of the transaction
-                assert(cpApiSource.jsonPath.value.matches(Regex("""^\$\.transactions\[\d+]\.counterparty$"""))) {
-                    "${counterparty.name} json_path '${cpApiSource.jsonPath.value}' should be a $.transactions[N].counterparty path"
+                val cpJsonPath = cpApiSource.jsonPath?.value
+                assertNotNull(cpJsonPath, "${counterparty.name} must have API json_path details")
+                assert(cpJsonPath.matches(Regex("""^\$\.transactions\[\d+]\.counterparty$"""))) {
+                    "${counterparty.name} json_path '$cpJsonPath' should be a $.transactions[N].counterparty path"
                 }
             }
         }
@@ -766,18 +760,11 @@ class MonzoImportE2ETest : DbTest() {
             val importResult =
                 importApiSessionTransactions(
                     apiSessionRepository = repositories.apiSessionRepository,
-                    accountRepository = repositories.accountRepository,
                     currencyRepository = repositories.currencyRepository,
-                    transactionRepository = repositories.transactionRepository,
-                    entitySource = DbEntitySource(repositories.transferSourceQueries, deviceId),
-                    personRepository = repositories.personRepository,
-                    personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                    personAttributeRepository = repositories.personAttributeRepository,
                     attributeTypeRepository = repositories.attributeTypeRepository,
-                    accountAttributeRepository = repositories.accountAttributeRepository,
-                    deviceId = deviceId,
                     sessionId = sessionId,
                     strategy = strategy,
+                    importEngine = repositories.importEngine,
                 )
 
             // Pagination must have continued past the all-declined page to reach the settled tx
@@ -865,18 +852,11 @@ class MonzoImportE2ETest : DbTest() {
             val importResult =
                 importApiSessionTransactions(
                     apiSessionRepository = repositories.apiSessionRepository,
-                    accountRepository = repositories.accountRepository,
                     currencyRepository = repositories.currencyRepository,
-                    transactionRepository = repositories.transactionRepository,
-                    entitySource = DbEntitySource(repositories.transferSourceQueries, deviceId),
-                    personRepository = repositories.personRepository,
-                    personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                    personAttributeRepository = repositories.personAttributeRepository,
                     attributeTypeRepository = repositories.attributeTypeRepository,
-                    accountAttributeRepository = repositories.accountAttributeRepository,
-                    deviceId = deviceId,
                     sessionId = sessionId,
                     strategy = strategy,
+                    importEngine = repositories.importEngine,
                 )
 
             assertEquals(2, importResult.transactionCount)
@@ -950,18 +930,11 @@ class MonzoImportE2ETest : DbTest() {
             val importResult =
                 importApiSessionTransactions(
                     apiSessionRepository = repositories.apiSessionRepository,
-                    accountRepository = repositories.accountRepository,
                     currencyRepository = repositories.currencyRepository,
-                    transactionRepository = repositories.transactionRepository,
-                    entitySource = DbEntitySource(repositories.transferSourceQueries, deviceId),
-                    personRepository = repositories.personRepository,
-                    personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                    personAttributeRepository = repositories.personAttributeRepository,
                     attributeTypeRepository = repositories.attributeTypeRepository,
-                    accountAttributeRepository = repositories.accountAttributeRepository,
-                    deviceId = deviceId,
                     sessionId = sessionId,
                     strategy = strategy,
+                    importEngine = repositories.importEngine,
                 )
 
             assertEquals(1, importResult.personCount)
@@ -1048,18 +1021,11 @@ class MonzoImportE2ETest : DbTest() {
 
             importApiSessionTransactions(
                 apiSessionRepository = repositories.apiSessionRepository,
-                accountRepository = repositories.accountRepository,
                 currencyRepository = repositories.currencyRepository,
-                transactionRepository = repositories.transactionRepository,
-                entitySource = DbEntitySource(repositories.transferSourceQueries, deviceId),
-                personRepository = repositories.personRepository,
-                personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                personAttributeRepository = repositories.personAttributeRepository,
                 attributeTypeRepository = repositories.attributeTypeRepository,
-                accountAttributeRepository = repositories.accountAttributeRepository,
-                deviceId = deviceId,
                 sessionId = sessionId,
                 strategy = strategy,
+                importEngine = repositories.importEngine,
             )
 
             val allAccounts = repositories.accountRepository.getAllAccounts().first()
@@ -1147,18 +1113,11 @@ class MonzoImportE2ETest : DbTest() {
             val importResult =
                 importApiSessionTransactions(
                     apiSessionRepository = repositories.apiSessionRepository,
-                    accountRepository = repositories.accountRepository,
                     currencyRepository = repositories.currencyRepository,
-                    transactionRepository = repositories.transactionRepository,
-                    entitySource = DbEntitySource(repositories.transferSourceQueries, deviceId),
-                    personRepository = repositories.personRepository,
-                    personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                    personAttributeRepository = repositories.personAttributeRepository,
                     attributeTypeRepository = repositories.attributeTypeRepository,
-                    accountAttributeRepository = repositories.accountAttributeRepository,
-                    deviceId = deviceId,
                     sessionId = sessionId,
                     strategy = strategy,
+                    importEngine = repositories.importEngine,
                 )
             assertEquals(2, importResult.transactionCount, "Should import both personal-counterparty transactions")
             assertEquals(1, importResult.personCount, "Should create one person for the shared external id")
@@ -1301,18 +1260,11 @@ class MonzoImportE2ETest : DbTest() {
             val importResult =
                 importApiSessionTransactions(
                     apiSessionRepository = repositories.apiSessionRepository,
-                    accountRepository = repositories.accountRepository,
                     currencyRepository = repositories.currencyRepository,
-                    transactionRepository = repositories.transactionRepository,
-                    entitySource = DbEntitySource(repositories.transferSourceQueries, deviceId),
-                    personRepository = repositories.personRepository,
-                    personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                    personAttributeRepository = repositories.personAttributeRepository,
                     attributeTypeRepository = repositories.attributeTypeRepository,
-                    accountAttributeRepository = repositories.accountAttributeRepository,
-                    deviceId = deviceId,
                     sessionId = sessionId,
                     strategy = strategy,
+                    importEngine = repositories.importEngine,
                 )
 
             assertEquals(0, importResult.personCount, "Middle-name variants should match the existing first/last person")
@@ -1398,18 +1350,11 @@ class MonzoImportE2ETest : DbTest() {
 
             importApiSessionTransactions(
                 apiSessionRepository = repositories.apiSessionRepository,
-                accountRepository = repositories.accountRepository,
                 currencyRepository = repositories.currencyRepository,
-                transactionRepository = repositories.transactionRepository,
-                entitySource = DbEntitySource(repositories.transferSourceQueries, deviceId),
-                personRepository = repositories.personRepository,
-                personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                personAttributeRepository = repositories.personAttributeRepository,
                 attributeTypeRepository = repositories.attributeTypeRepository,
-                accountAttributeRepository = repositories.accountAttributeRepository,
-                deviceId = deviceId,
                 sessionId = sessionId,
                 strategy = strategy,
+                importEngine = repositories.importEngine,
             )
 
             val allAccounts = repositories.accountRepository.getAllAccounts().first()
@@ -1482,18 +1427,11 @@ class MonzoImportE2ETest : DbTest() {
             val importResult =
                 importApiSessionTransactions(
                     apiSessionRepository = repositories.apiSessionRepository,
-                    accountRepository = repositories.accountRepository,
                     currencyRepository = repositories.currencyRepository,
-                    transactionRepository = repositories.transactionRepository,
-                    entitySource = DbEntitySource(repositories.transferSourceQueries, deviceId),
-                    personRepository = repositories.personRepository,
-                    personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                    personAttributeRepository = repositories.personAttributeRepository,
                     attributeTypeRepository = repositories.attributeTypeRepository,
-                    accountAttributeRepository = repositories.accountAttributeRepository,
-                    deviceId = deviceId,
                     sessionId = sessionId,
                     strategy = strategy,
+                    importEngine = repositories.importEngine,
                 )
 
             assertEquals(1, importResult.transactionCount, "Transaction should be imported")
@@ -1572,18 +1510,11 @@ class MonzoImportE2ETest : DbTest() {
                 )
                 importApiSessionTransactions(
                     apiSessionRepository = repositories.apiSessionRepository,
-                    accountRepository = repositories.accountRepository,
                     currencyRepository = repositories.currencyRepository,
-                    transactionRepository = repositories.transactionRepository,
-                    entitySource = DbEntitySource(repositories.transferSourceQueries, deviceId),
-                    personRepository = repositories.personRepository,
-                    personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                    personAttributeRepository = repositories.personAttributeRepository,
                     attributeTypeRepository = repositories.attributeTypeRepository,
-                    accountAttributeRepository = repositories.accountAttributeRepository,
-                    deviceId = deviceId,
                     sessionId = sessionId,
                     strategy = strategy,
+                    importEngine = repositories.importEngine,
                 )
             }
 
@@ -1707,18 +1638,11 @@ class MonzoImportE2ETest : DbTest() {
             val importResult =
                 importApiSessionTransactions(
                     apiSessionRepository = repositories.apiSessionRepository,
-                    accountRepository = repositories.accountRepository,
                     currencyRepository = repositories.currencyRepository,
-                    transactionRepository = repositories.transactionRepository,
-                    entitySource = DbEntitySource(repositories.transferSourceQueries, deviceId),
-                    personRepository = repositories.personRepository,
-                    personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                    personAttributeRepository = repositories.personAttributeRepository,
                     attributeTypeRepository = repositories.attributeTypeRepository,
-                    accountAttributeRepository = repositories.accountAttributeRepository,
-                    deviceId = deviceId,
                     sessionId = sessionId,
                     strategy = strategy,
+                    importEngine = repositories.importEngine,
                 )
 
             assertEquals(2, importResult.transactionCount, "Both transactions should be imported")
@@ -1800,18 +1724,11 @@ class MonzoImportE2ETest : DbTest() {
             val importResult =
                 importApiSessionTransactions(
                     apiSessionRepository = repositories.apiSessionRepository,
-                    accountRepository = repositories.accountRepository,
                     currencyRepository = repositories.currencyRepository,
-                    transactionRepository = repositories.transactionRepository,
-                    entitySource = DbEntitySource(repositories.transferSourceQueries, deviceId),
-                    personRepository = repositories.personRepository,
-                    personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                    personAttributeRepository = repositories.personAttributeRepository,
                     attributeTypeRepository = repositories.attributeTypeRepository,
-                    accountAttributeRepository = repositories.accountAttributeRepository,
-                    deviceId = deviceId,
                     sessionId = sessionId,
                     strategy = strategy,
+                    importEngine = repositories.importEngine,
                 )
 
             // The fee is a separate movement, so it is not counted as an imported transaction.
@@ -1857,7 +1774,8 @@ class MonzoImportE2ETest : DbTest() {
                     .getAuditHistoryForTransfer(feeTransfer.id)
                     .single()
                     .source
-            assertNotNull(feeSource?.apiSource)
-            assertEquals("$.transactions[0].atm_fees_detailed", feeSource.apiSource?.jsonPath?.value)
+            val feeApiSource = feeSource?.source
+            assertIs<Source.Api>(feeApiSource)
+            assertEquals("$.transactions[0].atm_fees_detailed", feeApiSource.jsonPath?.value)
         }
 }

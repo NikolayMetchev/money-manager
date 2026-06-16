@@ -3,7 +3,6 @@ package com.moneymanager.ui
 import com.moneymanager.database.Application
 import com.moneymanager.database.service.CsvStrategyExportService
 import com.moneymanager.domain.CsvStrategyImportExport
-import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.repository.AccountAttributeRepository
@@ -25,7 +24,8 @@ import com.moneymanager.domain.repository.QifImportRepository
 import com.moneymanager.domain.repository.SettingsRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.domain.repository.TransferSourceRepository
-import com.moneymanager.importer.ImportEngine
+import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importer.ImportEngineImpl
 
 data class AppServices(
     val accounts: AccountsDomain,
@@ -60,8 +60,6 @@ data class TransactionsDomain(
     val transactionRepository: TransactionRepository,
     val transferSourceRepository: TransferSourceRepository,
     val attributeTypeRepository: AttributeTypeRepository,
-    val entitySource: EntitySource,
-    val sampleEntitySource: EntitySource,
     val importEngine: ImportEngine,
 )
 
@@ -106,10 +104,8 @@ fun Application.toAppServices() =
                 transactionRepository = transactions.transactionRepository,
                 transferSourceRepository = transactions.transferSourceRepository,
                 attributeTypeRepository = transactions.attributeTypeRepository,
-                entitySource = transactions.entitySource,
-                sampleEntitySource = transactions.sampleEntitySource,
                 importEngine =
-                    ImportEngine(
+                    ImportEngineImpl(
                         transactionRepository = transactions.transactionRepository,
                         accountRepository = accounts.accountRepository,
                         accountAttributeRepository = accounts.accountAttributeRepository,

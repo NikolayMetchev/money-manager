@@ -42,12 +42,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.moneymanager.database.csv.CsvTransferMapper
-import com.moneymanager.database.csv.DiscoveredAccountMapping
-import com.moneymanager.database.csv.ImportPreparation
-import com.moneymanager.database.csv.NewAccount
-import com.moneymanager.database.csv.StrategyMatcher
-import com.moneymanager.domain.EntitySource
+import com.moneymanager.csvimporter.CsvImportResult
+import com.moneymanager.csvimporter.CsvTransferMapper
+import com.moneymanager.csvimporter.DiscoveredAccountMapping
+import com.moneymanager.csvimporter.ImportPreparation
+import com.moneymanager.csvimporter.NewAccount
+import com.moneymanager.csvimporter.StrategyMatcher
+import com.moneymanager.csvimporter.buildCreatedAccountNameOverrides
+import com.moneymanager.csvimporter.buildPendingAccountMappings
+import com.moneymanager.csvimporter.hasBlankNewAccountNames
+import com.moneymanager.csvimporter.runCsvImport
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
@@ -58,7 +62,6 @@ import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
-import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.domain.repository.AccountRepository
@@ -70,7 +73,7 @@ import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
-import com.moneymanager.importer.ImportEngine
+import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.LoadingTextButton
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
@@ -78,24 +81,8 @@ import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
-import kotlin.time.Clock
-import kotlin.time.Instant
 
 private val logger = logging()
-
-/**
- * Result of a CSV import operation.
- */
-data class CsvImportResult(
-    val successCount: Int,
-    val failedRows: List<FailedRow>,
-    val duplicateCount: Int = 0,
-) {
-    data class FailedRow(
-        val rowIndex: Long,
-        val errorMessage: String,
-    )
-}
 
 // QIF reuses the CSV import engine, so its apply dialog/applier mirror this one by design.
 @Suppress("DuplicatedCode")
@@ -113,7 +100,6 @@ fun ApplyStrategyDialog(
     csvImportRepository: CsvImportRepository,
     attributeTypeRepository: AttributeTypeRepository,
     maintenance: Maintenance,
-    entitySource: EntitySource,
     importEngine: ImportEngine,
     onDismiss: () -> Unit,
     onImportComplete: (CsvImportResult) -> Unit,
@@ -295,7 +281,6 @@ fun ApplyStrategyDialog(
                         categoryRepository = categoryRepository,
                         personRepository = personRepository,
                         personAccountOwnershipRepository = personAccountOwnershipRepository,
-                        entitySource = entitySource,
                         enabled = !isImporting,
                         isError = selectedSourceAccountId == null,
                     )
@@ -383,7 +368,6 @@ fun ApplyStrategyDialog(
                                     csvImportRepository = csvImportRepository,
                                     attributeTypeRepository = attributeTypeRepository,
                                     maintenance = maintenance,
-                                    entitySource = entitySource,
                                     importEngine = importEngine,
                                 )
                             onImportComplete(result)
@@ -775,98 +759,6 @@ internal fun ImportPreviewSection(
         }
     }
 }
-
-internal fun buildPendingAccountMappings(
-    preparation: ImportPreparation,
-    strategyId: CsvImportStrategyId,
-    accountSelections: Map<String, AccountId>,
-    now: Instant = Clock.System.now(),
-): List<CsvAccountMapping> {
-    if (accountSelections.isEmpty()) {
-        return emptyList()
-    }
-
-    return preparation.validTransfers
-        .asSequence()
-        .flatMap { it.discoveredMappings }
-        .filter { discoveredMapping -> discoveredMapping.targetAccountName in accountSelections }
-        .map { discoveredMapping ->
-            val selectedAccountId = accountSelections.getValue(discoveredMapping.targetAccountName)
-            PendingAccountMappingKey(
-                columnName = discoveredMapping.columnName,
-                pattern =
-                    discoveredMapping.matchedPattern
-                        ?: "^${Regex.escape(discoveredMapping.csvValue)}$",
-                accountId = selectedAccountId,
-            )
-        }.distinct()
-        .toList()
-        .mapIndexed { index, mapping ->
-            CsvAccountMapping(
-                id = -(index + 1).toLong(),
-                strategyId = strategyId,
-                columnName = mapping.columnName,
-                valuePattern = Regex(mapping.pattern, RegexOption.IGNORE_CASE),
-                accountId = mapping.accountId,
-                createdAt = now,
-                updatedAt = now,
-            )
-        }
-}
-
-internal fun buildCreatedAccountNameOverrides(
-    preparation: ImportPreparation?,
-    existingAccountSelections: Map<String, AccountId>,
-    newAccountNames: Map<String, String>,
-): Map<String, String> {
-    val safePreparation = preparation ?: return emptyMap()
-    return safePreparation.newAccounts
-        .filter { it.name !in existingAccountSelections }
-        .mapNotNull { account ->
-            val renamed = newAccountNames[account.name]?.trim()?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
-            account.name to renamed
-        }.toMap()
-}
-
-internal fun buildAccountsToCreate(
-    preparation: ImportPreparation,
-    existingAccountSelections: Map<String, AccountId>,
-    newAccountNames: Map<String, String>,
-): List<NewAccount> =
-    preparation.newAccounts
-        .asSequence()
-        .filter { it.name !in existingAccountSelections }
-        .mapNotNull { account ->
-            // A missing entry means the user kept the detected name
-            val finalName =
-                (newAccountNames[account.name] ?: account.name)
-                    .trim()
-                    .takeIf { it.isNotBlank() } ?: return@mapNotNull null
-            NewAccount(
-                name = finalName,
-                categoryId = account.categoryId,
-            )
-        }.distinctBy { it.name }
-        .toList()
-
-internal fun hasBlankNewAccountNames(
-    preparation: ImportPreparation?,
-    existingAccountSelections: Map<String, AccountId>,
-    newAccountNames: Map<String, String>,
-): Boolean {
-    val safePreparation = preparation ?: return false
-    return safePreparation.newAccounts.any { account ->
-        account.name !in existingAccountSelections &&
-            // A missing entry means the user kept the detected name; only an explicit blank blocks
-            (newAccountNames[account.name] ?: account.name).isBlank()
-    }
-}
-
-private data class PendingAccountMappingKey(
-    val columnName: String,
-    val pattern: String,
-    val accountId: AccountId,
-)
 
 @Composable
 private fun StatCard(

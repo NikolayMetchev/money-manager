@@ -27,7 +27,7 @@ data class PersonAuditEntry(
     val middleName: String?,
     val lastName: String?,
     val attributeChanges: List<PersonAttributeAuditEntry> = emptyList(),
-    val source: EntitySource? = null,
+    val source: SourceRecord? = null,
 ) {
     val fullName: String
         get() =

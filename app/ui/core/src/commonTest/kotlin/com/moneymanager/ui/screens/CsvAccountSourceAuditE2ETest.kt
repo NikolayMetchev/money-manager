@@ -9,9 +9,9 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import androidx.compose.ui.test.waitUntilDoesNotExist
+import com.moneymanager.csvimporter.CsvTransferMapper
+import com.moneymanager.csvimporter.runCsvImport
 import com.moneymanager.database.DatabaseManager
-import com.moneymanager.database.csv.CsvTransferMapper
-import com.moneymanager.database.port.DbEntitySource
 import com.moneymanager.database.port.DbMaintenance
 import com.moneymanager.di.database.DatabaseComponent
 import com.moneymanager.domain.model.Account
@@ -19,7 +19,6 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DbLocation
-import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvColumnId
 import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
@@ -33,12 +32,11 @@ import com.moneymanager.domain.model.csvstrategy.FieldMappingId
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
-import com.moneymanager.importer.ImportEngine
+import com.moneymanager.importer.ImportEngineImpl
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
-import com.moneymanager.ui.screens.csv.runCsvImport
 import com.moneymanager.ui.test.MoneyManagerTestApp
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import kotlinx.coroutines.flow.first
@@ -82,8 +80,6 @@ class CsvAccountSourceAuditE2ETest {
             runBlocking {
                 val db = databaseManager.openDatabase(testDbLocation!!)
                 val dc = DatabaseComponent.create(db)
-                val deviceId = dc.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
-
                 // A manually-created source account the imported transfer flows out of.
                 val sourceAccountId =
                     dc.accountRepository.createAccount(
@@ -139,9 +135,8 @@ class CsvAccountSourceAuditE2ETest {
                     csvImportRepository = dc.csvImportRepository,
                     attributeTypeRepository = dc.attributeTypeRepository,
                     maintenance = DbMaintenance(dc.maintenanceService),
-                    entitySource = DbEntitySource(db.transferSourceQueries, deviceId),
                     importEngine =
-                        ImportEngine(
+                        ImportEngineImpl(
                             transactionRepository = dc.transactionRepository,
                             accountRepository = dc.accountRepository,
                             accountAttributeRepository = dc.accountAttributeRepository,

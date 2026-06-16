@@ -9,9 +9,10 @@ import com.moneymanager.domain.model.NewRelationship
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.ImportStatus
-import com.moneymanager.importmodel.AccountRef
-import com.moneymanager.importmodel.DedupePolicy
-import com.moneymanager.importmodel.ImportTransfer
+import com.moneymanager.importengineapi.AccountRef
+import com.moneymanager.importengineapi.DedupePolicy
+import com.moneymanager.importengineapi.ImportTransfer
+import com.moneymanager.importengineapi.StringSimilarity
 import kotlin.time.Duration
 
 /**

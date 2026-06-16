@@ -30,9 +30,9 @@ import com.moneymanager.domain.model.AccountMergeContext
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.AuditType
-import com.moneymanager.domain.model.EntitySource
 import com.moneymanager.domain.model.PersonAccountOwnershipAuditEntry
 import com.moneymanager.domain.model.PersonId
+import com.moneymanager.domain.model.SourceRecord
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AuditRepository
@@ -160,7 +160,7 @@ internal data class AccountAuditDiff(
     val ownersAdded: List<PersonAccountOwnershipAuditEntry>,
     val ownersRemoved: List<PersonAccountOwnershipAuditEntry>,
     val attributeChanges: List<AccountAttributeAuditEntry>,
-    val source: EntitySource?,
+    val source: SourceRecord?,
     val mergeNote: String? = null,
 ) {
     val hasFieldChanges: Boolean
@@ -201,7 +201,7 @@ internal fun computeAccountAuditDiffs(
     data class OwnershipChanges(
         val ownersAdded: List<PersonAccountOwnershipAuditEntry>,
         val ownersRemoved: List<PersonAccountOwnershipAuditEntry>,
-        val source: EntitySource?,
+        val source: SourceRecord?,
     )
 
     fun findOwnershipChangesForEntry(entry: AccountAuditEntry): OwnershipChanges {

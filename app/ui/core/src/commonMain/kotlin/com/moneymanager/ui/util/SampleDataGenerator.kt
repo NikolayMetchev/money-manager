@@ -2,17 +2,16 @@
 
 package com.moneymanager.ui.util
 
-import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Category
-import com.moneymanager.domain.model.EntityProvenance
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonId
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.AccountRepository
@@ -38,7 +37,6 @@ suspend fun generateSampleData(
     attributeTypeRepository: AttributeTypeRepository,
     transactionRepository: TransactionRepository,
     maintenance: Maintenance,
-    entitySource: EntitySource,
     progressFlow: MutableStateFlow<GenerationProgress>,
 ) {
     val random = Random.Default
@@ -104,12 +102,12 @@ suspend fun generateSampleData(
         ),
     )
 
-    val sampleProvenance = EntityProvenance.SampleGenerator(entitySource.deviceId)
+    val sampleSource = Source.SampleGenerator
     val categoryIds = mutableListOf<Long>()
     var categoriesCreated = 0
 
     for (parent in categoryHierarchy) {
-        val parentId = categoryRepository.createCategory(parent.category, sampleProvenance)
+        val parentId = categoryRepository.createCategory(parent.category, sampleSource)
         categoryIds.add(parentId)
         categoriesCreated++
 
@@ -125,7 +123,7 @@ suspend fun generateSampleData(
             val childId =
                 categoryRepository.createCategory(
                     child.copy(parentId = parentId),
-                    sampleProvenance,
+                    sampleSource,
                 )
             categoryIds.add(childId)
             categoriesCreated++
@@ -172,7 +170,7 @@ suspend fun generateSampleData(
                 middleName = middleName,
                 lastName = lastName,
             )
-        val personId = personRepository.createPerson(person, sampleProvenance)
+        val personId = personRepository.createPerson(person, sampleSource)
         personIds.add(personId)
     }
 
@@ -240,7 +238,7 @@ suspend fun generateSampleData(
             )
         }
 
-    val accountIds = accountRepository.createAccountsBatch(accountsToCreate) { sampleProvenance }
+    val accountIds = accountRepository.createAccountsBatch(accountsToCreate) { sampleSource }
 
     progressFlow.emit(
         GenerationProgress(
@@ -272,7 +270,7 @@ suspend fun generateSampleData(
             personAccountOwnershipRepository.createOwnership(
                 personId = personId,
                 accountId = accountId,
-                provenance = sampleProvenance,
+                source = sampleSource,
             )
         }
     }
@@ -391,7 +389,7 @@ suspend fun generateSampleData(
     transactionRepository.createTransfers(
         transfers = allTransfers,
         newAttributes = allNewAttributes,
-        sourceRecorder = entitySource.sampleGeneratorRecorder(),
+        sources = List(allTransfers.size) { Source.SampleGenerator },
         onProgress = { created, total ->
             transactionsCreated = created
             progressFlow.emit(

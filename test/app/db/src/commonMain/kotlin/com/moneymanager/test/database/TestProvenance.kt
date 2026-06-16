@@ -1,16 +1,13 @@
 package com.moneymanager.test.database
 
-import com.moneymanager.di.database.DatabaseComponent
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CurrencyId
-import com.moneymanager.domain.model.DeviceId
-import com.moneymanager.domain.model.EntityProvenance
-import com.moneymanager.domain.model.MergeId
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonId
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
@@ -18,36 +15,22 @@ import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 
 /**
- * Test-only convenience: production repository create/update methods require an [EntityProvenance]
- * so it can never be forgotten. Tests that don't care about provenance call the no-provenance
- * overloads below, which default to sample-generator provenance against the seeded SYSTEM device
- * (id 1 — inserted first by `seedDatabase`), a valid `device(id)` FK target in every seeded test DB.
- *
- * Tests that assert a specific source must call the real (provenance-bearing) methods directly.
+ * Test-only convenience: production repository create/update methods require a [Source] so it can
+ * never be forgotten. Tests that don't care about provenance call the no-source overloads below,
+ * which default to [Source.SampleGenerator]. Device identity is injected into the repositories, so
+ * tests no longer supply one. Tests that assert a specific source call the real (source-bearing)
+ * methods directly.
  */
-private val TEST_PROVENANCE: EntityProvenance = EntityProvenance.SampleGenerator(DeviceId(1))
+private val TEST_SOURCE: Source = Source.SampleGenerator
 
-/** Sample-generator provenance for the given [deviceId]. */
-fun testProvenance(deviceId: DeviceId): EntityProvenance = EntityProvenance.SampleGenerator(deviceId)
+/** A default [Source] for tests that don't care about provenance. */
+val testSource: Source = TEST_SOURCE
 
-/** A default [EntityProvenance] for the component's device. */
-val DatabaseComponent.testProvenance: EntityProvenance
-    get() = EntityProvenance.SampleGenerator(deviceId)
+suspend fun AccountRepository.createAccount(account: Account): AccountId = createAccount(account, TEST_SOURCE)
 
-suspend fun AccountRepository.createAccount(account: Account): AccountId = createAccount(account, TEST_PROVENANCE)
+suspend fun AccountRepository.createAccountsBatch(accounts: List<Account>): List<AccountId> = createAccountsBatch(accounts) { TEST_SOURCE }
 
-/** Merge against the seeded SYSTEM device (id 1); the merge source type is fixed regardless of device. */
-suspend fun AccountRepository.mergeAccounts(
-    deletedAccount: AccountId,
-    survivingAccount: AccountId,
-): MergeId = mergeAccounts(deletedAccount, survivingAccount, DeviceId(1))
-
-suspend fun AccountRepository.unmergeAccount(mergeId: MergeId): Unit = unmergeAccount(mergeId, DeviceId(1))
-
-suspend fun AccountRepository.createAccountsBatch(accounts: List<Account>): List<AccountId> =
-    createAccountsBatch(accounts) { TEST_PROVENANCE }
-
-suspend fun AccountRepository.updateAccount(account: Account): Long = updateAccount(account, TEST_PROVENANCE)
+suspend fun AccountRepository.updateAccount(account: Account): Long = updateAccount(account, TEST_SOURCE)
 
 suspend fun AccountRepository.updateAccountWithAttributes(
     account: Account?,
@@ -55,20 +38,20 @@ suspend fun AccountRepository.updateAccountWithAttributes(
     deletedAttributeIds: Set<Long>,
     updatedAttributes: Map<Long, NewAttribute>,
     newAttributes: List<NewAttribute>,
-): Long = updateAccountWithAttributes(account, accountId, deletedAttributeIds, updatedAttributes, newAttributes, TEST_PROVENANCE)
+): Long = updateAccountWithAttributes(account, accountId, deletedAttributeIds, updatedAttributes, newAttributes, TEST_SOURCE)
 
-suspend fun PersonRepository.createPerson(person: Person): PersonId = createPerson(person, TEST_PROVENANCE)
+suspend fun PersonRepository.createPerson(person: Person): PersonId = createPerson(person, TEST_SOURCE)
 
 suspend fun PersonAccountOwnershipRepository.createOwnership(
     personId: PersonId,
     accountId: AccountId,
-): Long = createOwnership(personId, accountId, TEST_PROVENANCE)
+): Long = createOwnership(personId, accountId, TEST_SOURCE)
 
-suspend fun CategoryRepository.createCategory(category: Category): Long = createCategory(category, TEST_PROVENANCE)
+suspend fun CategoryRepository.createCategory(category: Category): Long = createCategory(category, TEST_SOURCE)
 
-suspend fun CategoryRepository.updateCategory(category: Category): Unit = updateCategory(category, TEST_PROVENANCE)
+suspend fun CategoryRepository.updateCategory(category: Category): Unit = updateCategory(category, TEST_SOURCE)
 
 suspend fun CurrencyRepository.upsertCurrencyByCode(
     code: String,
     name: String,
-): CurrencyId = upsertCurrencyByCode(code, name, TEST_PROVENANCE)
+): CurrencyId = upsertCurrencyByCode(code, name, TEST_SOURCE)

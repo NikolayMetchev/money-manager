@@ -1,5 +1,6 @@
--- Generic source tracking for entity changes (Account, Person, Currency, PersonAccountOwnership, Category)
--- Similar to transfer_source but for non-transfer entities
+-- Generic source tracking for entity changes for every entity type, including transfers.
+-- This is the single provenance store: a transfer's source is an entity_source row with
+-- entity_type_id = 7 (TRANSFER) and entity_id = the transfer id.
 
 -- entity_type values:
 -- 1 = ACCOUNT
@@ -7,6 +8,8 @@
 -- 3 = CURRENCY
 -- 4 = PERSON_ACCOUNT_OWNERSHIP
 -- 5 = CATEGORY
+-- 6 = API_IMPORT_STRATEGY
+-- 7 = TRANSFER
 
 CREATE TABLE entity_type (
     id INTEGER PRIMARY KEY NOT NULL,
@@ -18,6 +21,8 @@ INSERT OR IGNORE INTO entity_type (id, name) VALUES (2, 'PERSON');
 INSERT OR IGNORE INTO entity_type (id, name) VALUES (3, 'CURRENCY');
 INSERT OR IGNORE INTO entity_type (id, name) VALUES (4, 'PERSON_ACCOUNT_OWNERSHIP');
 INSERT OR IGNORE INTO entity_type (id, name) VALUES (5, 'CATEGORY');
+INSERT OR IGNORE INTO entity_type (id, name) VALUES (6, 'API_IMPORT_STRATEGY');
+INSERT OR IGNORE INTO entity_type (id, name) VALUES (7, 'TRANSFER');
 
 CREATE TABLE entity_source (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -111,4 +116,75 @@ VALUES (?, ?, ?);
 insertQifSource:
 INSERT OR IGNORE INTO qif_entity_source (id, qif_import_id, qif_record_index)
 VALUES (?, ?, ?);
+
+-- Select a transfer's source for a specific revision (transfers are entity_type_id = 7, with the
+-- transfer id as entity_id). Returns the flat column shape SourceColumns reads, aliasing entity_id
+-- as transaction_id so the read mapper is shared with the other source reads.
+selectTransferSourceByRevision:
+SELECT
+    entity_source.id,
+    entity_source.entity_id AS transaction_id,
+    entity_source.revision_id,
+    entity_source.source_type_id,
+    entity_source.device_id,
+    csv_entity_source.csv_import_id,
+    csv_entity_source.csv_row_index,
+    qif_entity_source.qif_import_id,
+    qif_entity_source.qif_record_index,
+    api_entity_source.api_session_id,
+    api_entity_source.api_request_id,
+    api_entity_source.json_path AS api_json_path,
+    entity_source.created_at,
+    source_type.name AS source_type,
+    csv_import_metadata.original_file_name AS csv_file_name,
+    qif_import_metadata.original_file_name AS qif_file_name,
+    device_view.platform_name,
+    device_view.os_name,
+    device_view.machine_name,
+    device_view.device_make,
+    device_view.device_model
+FROM entity_source
+JOIN source_type ON entity_source.source_type_id = source_type.id
+JOIN device_view ON entity_source.device_id = device_view.id
+LEFT JOIN csv_entity_source ON entity_source.id = csv_entity_source.id
+LEFT JOIN csv_import_metadata ON csv_entity_source.csv_import_id = csv_import_metadata.id
+LEFT JOIN qif_entity_source ON entity_source.id = qif_entity_source.id
+LEFT JOIN qif_import_metadata ON qif_entity_source.qif_import_id = qif_import_metadata.id
+LEFT JOIN api_entity_source ON entity_source.id = api_entity_source.id
+WHERE entity_source.entity_type_id = 7 AND entity_source.entity_id = ? AND entity_source.revision_id = ?;
+
+-- Select all of a transfer's sources across revisions (transfers are entity_type_id = 7).
+selectAllTransferSourcesByTransaction:
+SELECT
+    entity_source.id,
+    entity_source.entity_id AS transaction_id,
+    entity_source.revision_id,
+    entity_source.source_type_id,
+    entity_source.device_id,
+    csv_entity_source.csv_import_id,
+    csv_entity_source.csv_row_index,
+    qif_entity_source.qif_import_id,
+    qif_entity_source.qif_record_index,
+    api_entity_source.api_session_id,
+    api_entity_source.api_request_id,
+    api_entity_source.json_path AS api_json_path,
+    entity_source.created_at,
+    source_type.name AS source_type,
+    csv_import_metadata.original_file_name AS csv_file_name,
+    qif_import_metadata.original_file_name AS qif_file_name,
+    device_view.platform_name,
+    device_view.os_name,
+    device_view.machine_name,
+    device_view.device_make,
+    device_view.device_model
+FROM entity_source
+JOIN source_type ON entity_source.source_type_id = source_type.id
+JOIN device_view ON entity_source.device_id = device_view.id
+LEFT JOIN csv_entity_source ON entity_source.id = csv_entity_source.id
+LEFT JOIN csv_import_metadata ON csv_entity_source.csv_import_id = csv_import_metadata.id
+LEFT JOIN qif_entity_source ON entity_source.id = qif_entity_source.id
+LEFT JOIN qif_import_metadata ON qif_entity_source.qif_import_id = qif_import_metadata.id
+LEFT JOIN api_entity_source ON entity_source.id = api_entity_source.id
+WHERE entity_source.entity_type_id = 7 AND entity_source.entity_id = ?
+ORDER BY entity_source.revision_id DESC;
 

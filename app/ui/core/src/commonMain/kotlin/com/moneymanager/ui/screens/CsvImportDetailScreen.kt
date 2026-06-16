@@ -29,9 +29,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.Maintenance
-import com.moneymanager.domain.model.SourceType
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csv.CsvRow
@@ -45,7 +44,7 @@ import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransferSourceRepository
-import com.moneymanager.importer.ImportEngine
+import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.ui.components.csv.CsvPreviewTable
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -68,7 +67,6 @@ fun CsvImportDetailScreen(
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     maintenance: Maintenance,
     transferSourceRepository: TransferSourceRepository,
-    entitySource: EntitySource,
     importEngine: ImportEngine,
     onBack: () -> Unit,
     onDeleted: () -> Unit,
@@ -342,15 +340,14 @@ fun CsvImportDetailScreen(
                         scrollToRowIndex = scrollToRowIndex,
                         onDuplicateSourceClick = { transferId, isPositiveAmount ->
                             scope.launch {
-                                val source =
+                                val csvSource =
                                     transferSourceRepository
                                         .getSourcesForTransaction(transferId)
-                                        .filter { it.sourceType == SourceType.CSV_IMPORT }
-                                        .minByOrNull { it.revisionId }
-                                val csvSource = source?.csvSource
-                                val sourceImportId = csvSource?.importId
-                                if (sourceImportId != null) {
-                                    onCsvSourceClick(sourceImportId, csvSource.rowIndex)
+                                        .mapNotNull { record -> (record.source as? Source.Csv)?.let { record to it } }
+                                        .minByOrNull { (record, _) -> record.revisionId }
+                                        ?.second
+                                if (csvSource != null) {
+                                    onCsvSourceClick(csvSource.importId, csvSource.rowIndex ?: 0)
                                 } else {
                                     onTransferClick?.invoke(transferId, isPositiveAmount)
                                 }
@@ -412,7 +409,6 @@ fun CsvImportDetailScreen(
             csvImportRepository = csvImportRepository,
             attributeTypeRepository = attributeTypeRepository,
             maintenance = maintenance,
-            entitySource = entitySource,
             importEngine = importEngine,
             onDismiss = { showApplyStrategyDialog = false },
             onImportComplete = { result ->

@@ -2,7 +2,6 @@ package com.moneymanager.database
 
 import com.moneymanager.database.service.CsvStrategyExportService
 import com.moneymanager.domain.CsvStrategyImportExport
-import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.repository.AccountAttributeRepository
@@ -62,8 +61,6 @@ data class Transactions(
     val attributeTypeRepository: AttributeTypeRepository,
     val relationshipTypeRepository: RelationshipTypeRepository,
     val transferRelationshipRepository: TransferRelationshipRepository,
-    val entitySource: EntitySource,
-    val sampleEntitySource: EntitySource,
 )
 
 data class People(

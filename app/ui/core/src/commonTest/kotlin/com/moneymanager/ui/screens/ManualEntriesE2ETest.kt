@@ -10,15 +10,14 @@ import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import androidx.compose.ui.test.waitUntilDoesNotExist
 import com.moneymanager.database.DatabaseManager
-import com.moneymanager.database.SampleGeneratorSourceRecorder
 import com.moneymanager.di.database.DatabaseComponent
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.DbLocation
-import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.test.database.createAccount
@@ -92,13 +91,11 @@ class ManualEntriesE2ETest {
                         targetAccountId = transferwise,
                         amount = Money.fromDisplayValue("0.06", currency),
                     )
-                val deviceId =
-                    databaseComponent.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
                 val wiseIdType = databaseComponent.attributeTypeRepository.getOrCreate("wise-id")
                 databaseComponent.transactionRepository.createTransfers(
                     transfers = listOf(fee),
                     newAttributes = mapOf(fee.id to listOf(NewAttribute(wiseIdType, "ACCRUAL_CHARGE-18326272"))),
-                    sourceRecorder = SampleGeneratorSourceRecorder(db.transferSourceQueries, deviceId),
+                    sources = listOf(Source.SampleGenerator),
                 )
             }
 

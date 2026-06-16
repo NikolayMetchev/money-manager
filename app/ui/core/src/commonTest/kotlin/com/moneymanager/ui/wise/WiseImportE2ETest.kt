@@ -1,7 +1,11 @@
 @file:OptIn(kotlin.time.ExperimentalTime::class)
 
 package com.moneymanager.ui.wise
-import com.moneymanager.database.port.DbEntitySource
+import com.moneymanager.apiimporter.downloadApiSessionAccounts
+import com.moneymanager.apiimporter.downloadApiSessionPeople
+import com.moneymanager.apiimporter.downloadApiSessionTransactions
+import com.moneymanager.apiimporter.importApiSessionPeople
+import com.moneymanager.apiimporter.importApiSessionTransactions
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.Person
@@ -10,11 +14,6 @@ import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.createApiClient
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createPerson
-import com.moneymanager.ui.api.downloadApiSessionAccounts
-import com.moneymanager.ui.api.downloadApiSessionPeople
-import com.moneymanager.ui.api.downloadApiSessionTransactions
-import com.moneymanager.ui.api.importApiSessionPeople
-import com.moneymanager.ui.api.importApiSessionTransactions
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpHeaders
@@ -145,18 +144,11 @@ class WiseImportE2ETest : DbTest() {
             val importResult =
                 importApiSessionTransactions(
                     apiSessionRepository = repositories.apiSessionRepository,
-                    accountRepository = repositories.accountRepository,
                     currencyRepository = repositories.currencyRepository,
-                    transactionRepository = repositories.transactionRepository,
-                    entitySource = DbEntitySource(repositories.transferSourceQueries, deviceId),
-                    personRepository = repositories.personRepository,
-                    personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                    personAttributeRepository = repositories.personAttributeRepository,
                     attributeTypeRepository = repositories.attributeTypeRepository,
-                    accountAttributeRepository = repositories.accountAttributeRepository,
-                    deviceId = deviceId,
                     sessionId = sessionId,
                     strategy = strategy,
+                    importEngine = repositories.importEngine,
                 )
 
             // One balance => one own account; the two unique statement rows import once each even
@@ -235,18 +227,11 @@ class WiseImportE2ETest : DbTest() {
             val importResult =
                 importApiSessionTransactions(
                     apiSessionRepository = repositories.apiSessionRepository,
-                    accountRepository = repositories.accountRepository,
                     currencyRepository = repositories.currencyRepository,
-                    transactionRepository = repositories.transactionRepository,
-                    entitySource = DbEntitySource(repositories.transferSourceQueries, deviceId),
-                    personRepository = repositories.personRepository,
-                    personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                    personAttributeRepository = repositories.personAttributeRepository,
                     attributeTypeRepository = repositories.attributeTypeRepository,
-                    accountAttributeRepository = repositories.accountAttributeRepository,
-                    deviceId = deviceId,
                     sessionId = sessionId,
                     strategy = strategy,
+                    importEngine = repositories.importEngine,
                 )
 
             assertEquals(0, importResult.transactionCount, "No transactions are downloaded for an accounts-only session")
@@ -302,18 +287,11 @@ class WiseImportE2ETest : DbTest() {
             )
             importApiSessionTransactions(
                 apiSessionRepository = repositories.apiSessionRepository,
-                accountRepository = repositories.accountRepository,
                 currencyRepository = repositories.currencyRepository,
-                transactionRepository = repositories.transactionRepository,
-                entitySource = DbEntitySource(repositories.transferSourceQueries, deviceId),
-                personRepository = repositories.personRepository,
-                personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                personAttributeRepository = repositories.personAttributeRepository,
                 attributeTypeRepository = repositories.attributeTypeRepository,
-                accountAttributeRepository = repositories.accountAttributeRepository,
-                deviceId = deviceId,
                 sessionId = accountsSessionId,
                 strategy = strategy,
+                importEngine = repositories.importEngine,
             )
 
             // 2. Download + import people from the profiles endpoint.
@@ -334,11 +312,8 @@ class WiseImportE2ETest : DbTest() {
                     apiSessionRepository = repositories.apiSessionRepository,
                     accountRepository = repositories.accountRepository,
                     accountAttributeRepository = repositories.accountAttributeRepository,
-                    personRepository = repositories.personRepository,
-                    personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                    personAttributeRepository = repositories.personAttributeRepository,
+                    importEngine = repositories.importEngine,
                     attributeTypeRepository = repositories.attributeTypeRepository,
-                    entitySource = DbEntitySource(repositories.transferSourceQueries, deviceId),
                     sessionId = peopleSessionId,
                     strategy = strategy,
                     accountsSessionId = accountsSessionId,
@@ -398,11 +373,8 @@ class WiseImportE2ETest : DbTest() {
                 apiSessionRepository = repositories.apiSessionRepository,
                 accountRepository = repositories.accountRepository,
                 accountAttributeRepository = repositories.accountAttributeRepository,
-                personRepository = repositories.personRepository,
-                personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                personAttributeRepository = repositories.personAttributeRepository,
+                importEngine = repositories.importEngine,
                 attributeTypeRepository = repositories.attributeTypeRepository,
-                entitySource = DbEntitySource(repositories.transferSourceQueries, deviceId),
                 sessionId = peopleSessionId,
                 strategy = strategy,
             )

@@ -74,6 +74,13 @@ exclude:
       - app/db/core/src/commonMain/kotlin/com/moneymanager/database/mapper/IdConversions.kt
       - app/db/core/src/commonMain/kotlin/com/moneymanager/database/mapper/InstantConversions.kt
       - app/db/core/src/commonMain/kotlin/com/moneymanager/database/mapper/SourceTypeConversions.kt
+  # Each audit/source query maps a distinct SQLDelight-generated row type to SourceRecord. Those row
+  # types share no supertype, so reading the identically-named source_* columns into SourceColumns /
+  # SourceDetailColumns is necessarily repeated per mapper — unavoidable codegen boilerplate, not real
+  # duplication that could be extracted.
+  - name: DuplicatedCode
+    paths:
+      - app/db/core/src/commonMain/kotlin/com/moneymanager/database/mapper
   - name: All
     paths:
       - build

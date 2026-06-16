@@ -29,10 +29,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.bigdecimal.BigDecimal
-import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.TransferMissingCompanion
@@ -71,7 +71,6 @@ fun ManualEntriesScreen(
     csvImportStrategyRepository: CsvImportStrategyRepository,
     transactionRepository: TransactionRepository,
     attributeTypeRepository: AttributeTypeRepository,
-    entitySource: EntitySource,
     maintenance: Maintenance,
     onTransactionsImported: () -> Unit,
 ) {
@@ -154,7 +153,6 @@ fun ManualEntriesScreen(
                                             entries = entries,
                                             transactionRepository = transactionRepository,
                                             attributeTypeRepository = attributeTypeRepository,
-                                            entitySource = entitySource,
                                         )
                                         maintenance.refreshMaterializedViews()
                                         entries.forEach { (matched, _) -> amounts.remove(matched.transferId) }
@@ -190,7 +188,6 @@ private suspend fun createCompanionTransfers(
     entries: List<Pair<TransferMissingCompanion, BigDecimal>>,
     transactionRepository: TransactionRepository,
     attributeTypeRepository: AttributeTypeRepository,
-    entitySource: EntitySource,
 ) {
     val linkTypeId = attributeTypeRepository.getOrCreate(rule.linkAttributeName)
     val transfers =
@@ -213,7 +210,7 @@ private suspend fun createCompanionTransfers(
     transactionRepository.createTransfers(
         transfers = transfers,
         newAttributes = newAttributes,
-        sourceRecorder = entitySource.manualRecorder(),
+        sources = List(transfers.size) { Source.Manual },
     )
 }
 

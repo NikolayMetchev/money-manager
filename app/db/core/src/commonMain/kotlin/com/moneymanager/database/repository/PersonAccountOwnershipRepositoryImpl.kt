@@ -4,13 +4,14 @@ import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
 import com.moneymanager.database.mapper.PersonAccountOwnershipMapper
-import com.moneymanager.database.recordEntityProvenance
+import com.moneymanager.database.recordSource
 import com.moneymanager.database.sql.MoneyManagerDatabase
 import com.moneymanager.domain.model.AccountId
-import com.moneymanager.domain.model.EntityProvenance
+import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.PersonAccountOwnership
 import com.moneymanager.domain.model.PersonId
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -19,6 +20,7 @@ import kotlinx.coroutines.withContext
 
 class PersonAccountOwnershipRepositoryImpl(
     database: MoneyManagerDatabase,
+    private val deviceId: DeviceId,
 ) : PersonAccountOwnershipRepository {
     private val queries = database.personQueries
     private val accountQueries = database.accountQueries
@@ -55,7 +57,7 @@ class PersonAccountOwnershipRepositoryImpl(
     override suspend fun createOwnership(
         personId: PersonId,
         accountId: AccountId,
-        provenance: EntityProvenance,
+        source: Source,
     ): Long =
         withContext(Dispatchers.Default) {
             queries.transactionWithResult {
@@ -64,11 +66,11 @@ class PersonAccountOwnershipRepositoryImpl(
                     account_id = accountId.id,
                 )
                 val id = queries.ownershipLastInsertRowId().executeAsOne()
-                entitySourceQueries.recordEntityProvenance(EntityType.PERSON_ACCOUNT_OWNERSHIP, id, 1L, provenance)
+                entitySourceQueries.recordSource(deviceId, EntityType.PERSON_ACCOUNT_OWNERSHIP, id, 1L, source)
                 // A manual ownership change is a change to the account, so bump its revision and record
                 // it in the account audit trail (the ownership change is matched to that revision in the
                 // audit UI). Import/sample ownerships are part of bulk creation and don't bump.
-                if (provenance is EntityProvenance.Manual) {
+                if (source is Source.Manual) {
                     accountQueries.bumpRevisionOnly(accountId.id)
                 }
                 id

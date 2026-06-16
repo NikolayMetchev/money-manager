@@ -2,16 +2,15 @@
 
 package com.moneymanager.database.repository
 import com.moneymanager.database.DatabaseConfig
-import com.moneymanager.database.SampleGeneratorSourceRecorder
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Currency
-import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.NewRelationship
 import com.moneymanager.domain.model.RelationshipTypeId
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.test.database.DbTest
@@ -55,10 +54,6 @@ class TransferRelationshipReconciliationTest : DbTest() {
         sourceId: AccountId,
         targetId: AccountId,
     ): Pair<TransferId, TransferId> {
-        val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
-
-        fun recorder() = SampleGeneratorSourceRecorder(transferSourceQueries, deviceId)
-
         fun transfer() =
             Transfer(
                 id = TransferId(-1),
@@ -74,9 +69,9 @@ class TransferRelationshipReconciliationTest : DbTest() {
                 .importTransfers(
                     transfers = listOf(transfer()),
                     newAttributes = emptyMap(),
-                    sourceRecorder = recorder(),
+                    sources = listOf(Source.SampleGenerator),
                     updates = emptyList(),
-                    updateSourceRecorder = recorder(),
+                    updateSources = emptyList(),
                 ).single()
 
         val excludedTypeId = AttributeTypeId(DatabaseConfig.EXCLUDED_ATTR_TYPE_ID)
@@ -88,9 +83,9 @@ class TransferRelationshipReconciliationTest : DbTest() {
                     newAttributes = mapOf(TransferId(-1) to listOf(NewAttribute(excludedTypeId, "reconciled"))),
                     newRelationships =
                         mapOf(TransferId(-1) to listOf(NewRelationship(relatedTransferId = originalId, typeId = reconciledTypeId))),
-                    sourceRecorder = recorder(),
+                    sources = listOf(Source.SampleGenerator),
                     updates = emptyList(),
-                    updateSourceRecorder = recorder(),
+                    updateSources = emptyList(),
                 ).single()
 
         return originalId to duplicateId
@@ -152,10 +147,6 @@ class TransferRelationshipReconciliationTest : DbTest() {
             val checkingId = createAccount("Checking")
             val shopId = createAccount("Coffee Shop")
             val feeAccountId = createAccount("Monzo Fees")
-            val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
-
-            fun recorder() = SampleGeneratorSourceRecorder(transferSourceQueries, deviceId)
-
             val feeTypeId = RelationshipTypeId(DatabaseConfig.FEE_RELATIONSHIP_TYPE_ID)
             // Both the main transfer and its fee are created in the same batch with temp ids; the fee
             // relationship on the main (id1) references the fee's temp id (-2), which the two-pass insert
@@ -185,9 +176,9 @@ class TransferRelationshipReconciliationTest : DbTest() {
                     newAttributes = emptyMap(),
                     newRelationships =
                         mapOf(TransferId(-1) to listOf(NewRelationship(relatedTransferId = TransferId(-2), typeId = feeTypeId))),
-                    sourceRecorder = recorder(),
+                    sources = List(2) { Source.SampleGenerator },
                     updates = emptyList(),
-                    updateSourceRecorder = recorder(),
+                    updateSources = emptyList(),
                 )
             assertEquals(2, createdIds.size)
             val mainId = createdIds[0]

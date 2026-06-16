@@ -32,7 +32,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csv.CsvRow
@@ -82,7 +81,6 @@ fun CsvStrategyEditorScreen(
     attributeTypeRepository: AttributeTypeRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    entitySource: EntitySource,
     onBack: () -> Unit,
 ) {
     val isEditMode = strategyId != null
@@ -282,7 +280,6 @@ fun CsvStrategyEditorScreen(
                         categoryRepository = categoryRepository,
                         personRepository = personRepository,
                         personAccountOwnershipRepository = personAccountOwnershipRepository,
-                        entitySource = entitySource,
                     )
                 EditorTab.AMOUNT_DATE ->
                     AmountDateTab(

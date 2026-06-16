@@ -3,7 +3,6 @@ package com.moneymanager.database
 import android.content.Context
 import androidx.sqlite.db.SupportSQLiteDatabase
 import app.cash.sqldelight.driver.android.AndroidSqliteDriver
-import com.moneymanager.database.repository.CurrencyRepositoryImpl
 import com.moneymanager.database.sql.MoneyManagerDatabase
 import com.moneymanager.domain.model.DEFAULT_DATABASE_NAME
 import com.moneymanager.domain.model.DbLocation
@@ -83,7 +82,7 @@ class AndroidDatabaseManager(
             onProgress(DatabaseInitializationProgress("Applying database settings...", 4, 6))
             if (isNewDatabase) {
                 onProgress(DatabaseInitializationProgress("Adding default currencies and settings...", 5, 6))
-                DatabaseConfig.seedDatabase(database, CurrencyRepositoryImpl(database))
+                DatabaseConfig.seedDatabase(database)
             } else {
                 onProgress(DatabaseInitializationProgress("Preparing repositories...", 5, 6))
             }

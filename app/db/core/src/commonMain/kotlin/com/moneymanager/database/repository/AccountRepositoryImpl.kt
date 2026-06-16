@@ -8,17 +8,16 @@ import app.cash.sqldelight.coroutines.mapToOneOrNull
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.mapper.AccountMapper
 import com.moneymanager.database.mapper.TransferMapper
-import com.moneymanager.database.recordEntityProvenance
+import com.moneymanager.database.recordSource
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountMerge
 import com.moneymanager.domain.model.AccountMergeContext
 import com.moneymanager.domain.model.DeviceId
-import com.moneymanager.domain.model.EntityProvenance
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.MergeId
 import com.moneymanager.domain.model.NewAttribute
-import com.moneymanager.domain.model.SourceType
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.repository.AccountRepository
 import kotlinx.coroutines.Dispatchers
@@ -30,6 +29,7 @@ import kotlin.time.Instant
 
 class AccountRepositoryImpl(
     private val database: MoneyManagerDatabaseWrapper,
+    private val deviceId: DeviceId,
 ) : AccountRepository {
     private val queries = database.accountQueries
     private val transferQueries = database.transferQueries
@@ -38,7 +38,6 @@ class AccountRepositoryImpl(
     private val personQueries = database.personQueries
     private val auditQueries = database.auditQueries
     private val entitySourceQueries = database.entitySourceQueries
-    private val transferSourceQueries = database.transferSourceQueries
 
     override fun getAllAccounts(): Flow<List<Account>> =
         queries
@@ -56,7 +55,7 @@ class AccountRepositoryImpl(
 
     override suspend fun createAccount(
         account: Account,
-        provenance: EntityProvenance,
+        source: Source,
     ): AccountId =
         withContext(Dispatchers.Default) {
             val id =
@@ -67,7 +66,7 @@ class AccountRepositoryImpl(
                         category_id = account.categoryId,
                     )
                     val newId = queries.lastInsertRowId().executeAsOne()
-                    entitySourceQueries.recordEntityProvenance(EntityType.ACCOUNT, newId, 1L, provenance)
+                    entitySourceQueries.recordSource(deviceId, EntityType.ACCOUNT, newId, 1L, source)
                     newId
                 }
             AccountId(id)
@@ -75,7 +74,7 @@ class AccountRepositoryImpl(
 
     override suspend fun createAccountsBatch(
         accounts: List<Account>,
-        provenanceFor: (Account) -> EntityProvenance,
+        sourceFor: (Account) -> Source,
     ): List<AccountId> =
         withContext(Dispatchers.Default) {
             queries.transactionWithResult {
@@ -86,7 +85,7 @@ class AccountRepositoryImpl(
                         category_id = account.categoryId,
                     )
                     val id = queries.lastInsertRowId().executeAsOne()
-                    entitySourceQueries.recordEntityProvenance(EntityType.ACCOUNT, id, 1L, provenanceFor(account))
+                    entitySourceQueries.recordSource(deviceId, EntityType.ACCOUNT, id, 1L, sourceFor(account))
                     AccountId(id)
                 }
             }
@@ -94,7 +93,7 @@ class AccountRepositoryImpl(
 
     override suspend fun updateAccount(
         account: Account,
-        provenance: EntityProvenance,
+        source: Source,
     ): Long =
         withContext(Dispatchers.Default) {
             queries.transactionWithResult {
@@ -104,7 +103,7 @@ class AccountRepositoryImpl(
                     id = account.id.id,
                 )
                 val revision = queries.selectRevisionById(account.id.id).executeAsOne()
-                entitySourceQueries.recordEntityProvenance(EntityType.ACCOUNT, account.id.id, revision, provenance)
+                entitySourceQueries.recordSource(deviceId, EntityType.ACCOUNT, account.id.id, revision, source)
                 revision
             }
         }
@@ -115,7 +114,7 @@ class AccountRepositoryImpl(
         deletedAttributeIds: Set<Long>,
         updatedAttributes: Map<Long, NewAttribute>,
         newAttributes: List<NewAttribute>,
-        provenance: EntityProvenance,
+        source: Source,
     ): Long =
         withContext(Dispatchers.Default) {
             val effectiveAccountId = account?.id ?: accountId
@@ -151,11 +150,12 @@ class AccountRepositoryImpl(
                         },
                         updateValue = { value, id -> attributeQueries.updateValue(value, id) },
                     )
-                entitySourceQueries.recordEntityProvenance(
+                entitySourceQueries.recordSource(
+                    deviceId,
                     EntityType.ACCOUNT,
                     effectiveAccountId.id,
                     finalRevision,
-                    provenance,
+                    source,
                 )
                 finalRevision
             }
@@ -187,7 +187,6 @@ class AccountRepositoryImpl(
     override suspend fun mergeAccounts(
         deletedAccount: AccountId,
         survivingAccount: AccountId,
-        deviceId: DeviceId,
     ): MergeId =
         withContext(Dispatchers.Default) {
             database.transactionWithResult {
@@ -251,18 +250,19 @@ class AccountRepositoryImpl(
                 // The reassignment bumped each affected transfer's revision; source those new revisions
                 // as a merge so the transaction audit trail isn't left with "source data missing".
                 (sourceSet + targetSet).forEach { transferId ->
-                    recordTransferSource(transferId, SourceType.MERGE, deviceId)
+                    recordTransferMergeSource(transferId, Source.Merge)
                 }
 
                 queries.delete(deletedAccount.id)
                 // Source the deleted account's DELETE audit entry (recorded at revision_id + 1 by the
                 // custom account delete trigger) as a merge, so the trail shows where it went rather than
                 // "source data missing". entity_source is independent of the now-deleted account row.
-                entitySourceQueries.recordEntityProvenance(
+                entitySourceQueries.recordSource(
+                    deviceId,
                     EntityType.ACCOUNT,
                     deletedAccount.id,
                     account.revision_id + 1,
-                    EntityProvenance.Merge(deviceId),
+                    Source.Merge,
                 )
 
                 MergeId(mergeId)
@@ -319,10 +319,7 @@ class AccountRepositoryImpl(
                 }.executeAsList()
         }
 
-    override suspend fun unmergeAccount(
-        mergeId: MergeId,
-        deviceId: DeviceId,
-    ): Unit =
+    override suspend fun unmergeAccount(mergeId: MergeId): Unit =
         withContext(Dispatchers.Default) {
             database.transaction {
                 val merge = mergeQueries.selectById(mergeId.id).executeAsOneOrNull() ?: return@transaction
@@ -343,11 +340,12 @@ class AccountRepositoryImpl(
                 )
                 // Source the recreated account's INSERT audit entry as a merge-undo so the trail shows
                 // where it came from (rather than "source data missing").
-                entitySourceQueries.recordEntityProvenance(
+                entitySourceQueries.recordSource(
+                    deviceId,
                     EntityType.ACCOUNT,
                     merge.deleted_account_id,
                     restoredRevision,
-                    EntityProvenance.MergeUndo(deviceId),
+                    Source.Unmerge,
                 )
 
                 // Restore attributes from the audit trail (no bump): the merge's cascade delete recorded
@@ -381,24 +379,24 @@ class AccountRepositoryImpl(
                         transferQueries.setTransferTargetAccount(targetAccount = merge.deleted_account_id, id = row.transfer_id)
                     }
                     // Moving a transfer back bumped its revision; source that new revision as a merge-undo.
-                    recordTransferSource(row.transfer_id, SourceType.MERGE_UNDO, deviceId)
+                    recordTransferMergeSource(row.transfer_id, Source.Unmerge)
                 }
 
                 mergeQueries.markReversed(mergeId.id)
             }
         }
 
-    /** Records [transferId]'s current revision as [sourceType] from [deviceId] in transfer_source. */
-    private fun recordTransferSource(
+    /** Records [transferId]'s current revision in entity_source for a merge/unmerge [source]. */
+    private fun recordTransferMergeSource(
         transferId: Long,
-        sourceType: SourceType,
-        deviceId: DeviceId,
+        source: Source,
     ) {
-        transferSourceQueries.insertSource(
-            transaction_id = transferId,
-            revision_id = transferQueries.selectRevisionById(transferId).executeAsOne(),
-            source_type_id = sourceType.id.toLong(),
-            device_id = deviceId.id,
+        entitySourceQueries.recordSource(
+            deviceId = deviceId,
+            entityType = EntityType.TRANSFER,
+            entityId = transferId,
+            revisionId = transferQueries.selectRevisionById(transferId).executeAsOne(),
+            source = source,
         )
     }
 }

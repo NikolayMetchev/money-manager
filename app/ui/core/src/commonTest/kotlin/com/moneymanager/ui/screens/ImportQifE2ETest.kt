@@ -13,7 +13,6 @@ import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import androidx.compose.ui.test.waitUntilDoesNotExist
 import androidx.compose.ui.test.waitUntilExactlyOneExists
 import com.moneymanager.database.DatabaseManager
-import com.moneymanager.database.qif.QifCsvAdapter
 import com.moneymanager.di.database.DatabaseComponent
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
@@ -30,7 +29,9 @@ import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.qif.QifColumns
 import com.moneymanager.qif.QifParser
+import com.moneymanager.qifimporter.QifCsvAdapter
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
@@ -96,17 +97,17 @@ class ImportQifE2ETest {
                         DateTimeParsingMapping(
                             id = FieldMappingId(Uuid.random()),
                             fieldType = TransferField.TIMESTAMP,
-                            dateColumnName = QifCsvAdapter.COL_DATE,
+                            dateColumnName = QifColumns.COL_DATE,
                             dateFormat = "dd/MM/yyyy",
                         ),
                     TransferField.DESCRIPTION to
-                        DirectColumnMapping(FieldMappingId(Uuid.random()), TransferField.DESCRIPTION, QifCsvAdapter.COL_PAYEE),
+                        DirectColumnMapping(FieldMappingId(Uuid.random()), TransferField.DESCRIPTION, QifColumns.COL_PAYEE),
                     TransferField.AMOUNT to
                         AmountParsingMapping(
                             id = FieldMappingId(Uuid.random()),
                             fieldType = TransferField.AMOUNT,
                             mode = AmountMode.SINGLE_COLUMN,
-                            amountColumnName = QifCsvAdapter.COL_AMOUNT,
+                            amountColumnName = QifColumns.COL_AMOUNT,
                         ),
                     TransferField.CURRENCY to
                         HardCodedCurrencyMapping(FieldMappingId(Uuid.random()), TransferField.CURRENCY, currencyId),

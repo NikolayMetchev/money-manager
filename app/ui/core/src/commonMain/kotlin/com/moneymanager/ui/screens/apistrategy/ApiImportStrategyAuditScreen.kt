@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.ApiImportStrategyAuditEntry
 import com.moneymanager.domain.model.AuditType
+import com.moneymanager.domain.model.SourceRecord
 import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
 import com.moneymanager.domain.model.apistrategy.ApiStrategyConfig
@@ -80,7 +81,7 @@ private data class ApiImportStrategyAuditDiff(
     val revisionId: Long,
     val name: FieldChange<String>,
     val configChanges: List<Pair<String, FieldChange<String>>>,
-    val source: com.moneymanager.domain.model.EntitySource?,
+    val source: SourceRecord?,
 ) {
     val hasChanges: Boolean
         get() = name is FieldChange.Changed || configChanges.isNotEmpty()

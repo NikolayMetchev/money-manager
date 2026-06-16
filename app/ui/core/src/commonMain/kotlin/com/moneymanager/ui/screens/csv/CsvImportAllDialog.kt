@@ -16,8 +16,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.moneymanager.database.csv.StrategyMatcher
-import com.moneymanager.domain.EntitySource
+import com.moneymanager.csvimporter.StrategyMatcher
+import com.moneymanager.csvimporter.bulkApplyCsv
+import com.moneymanager.csvimporter.needsSourceAccountOverride
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.csv.CsvImport
@@ -31,7 +32,7 @@ import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
-import com.moneymanager.importer.ImportEngine
+import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.LoadingTextButton
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
@@ -60,7 +61,6 @@ fun CsvImportAllDialog(
     csvImportRepository: CsvImportRepository,
     attributeTypeRepository: AttributeTypeRepository,
     maintenance: Maintenance,
-    entitySource: EntitySource,
     importEngine: ImportEngine,
     onDismiss: () -> Unit,
     onComplete: () -> Unit,
@@ -112,7 +112,6 @@ fun CsvImportAllDialog(
                             categoryRepository = categoryRepository,
                             personRepository = personRepository,
                             personAccountOwnershipRepository = personAccountOwnershipRepository,
-                            entitySource = entitySource,
                             enabled = !isImporting,
                             isError = sourceAccountId == null,
                         )
@@ -155,7 +154,6 @@ fun CsvImportAllDialog(
                                         csvImportRepository = csvImportRepository,
                                         attributeTypeRepository = attributeTypeRepository,
                                         maintenance = maintenance,
-                                        entitySource = entitySource,
                                         importEngine = importEngine,
                                         onProgress = { done, total -> progress = done to total },
                                     )

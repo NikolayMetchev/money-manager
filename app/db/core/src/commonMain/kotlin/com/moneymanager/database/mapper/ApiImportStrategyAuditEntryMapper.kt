@@ -14,24 +14,36 @@ import kotlin.uuid.Uuid
 
 object ApiImportStrategyAuditEntryMapper {
     fun map(from: SelectAuditHistoryForApiImportStrategy): ApiImportStrategyAuditEntry {
-        val deviceInfo =
-            auditDeviceInfo(
-                platformName = from.source_platform_name,
-                machineName = from.source_machine_name,
-                osName = from.source_os_name,
-                deviceMake = from.source_device_make,
-                deviceModel = from.source_device_model,
-            )
+        // The api_import_strategy_source table has no per-type detail rows (strategies are only
+        // manually/system created), so the import-detail columns are absent here.
         val source =
-            auditEntitySource(
-                sourceId = from.source_id,
-                sourceTypeName = from.source_type_name,
-                deviceId = from.source_device_id,
-                createdAt = from.source_created_at,
-                entityType = EntityType.API_IMPORT_STRATEGY,
-                entityId = 0,
-                revisionId = from.revision_id,
-                deviceInfo = deviceInfo,
+            buildSourceRecord(
+                SourceColumns(
+                    sourceId = from.source_id,
+                    sourceTypeName = from.source_type_name,
+                    deviceId = from.source_device_id,
+                    createdAt = from.source_created_at,
+                    entityType = EntityType.API_IMPORT_STRATEGY,
+                    entityId = 0,
+                    revisionId = from.revision_id,
+                    detail =
+                        SourceDetailColumns(
+                            platformName = from.source_platform_name,
+                            osName = from.source_os_name,
+                            machineName = from.source_machine_name,
+                            deviceMake = from.source_device_make,
+                            deviceModel = from.source_device_model,
+                            csvImportId = null,
+                            csvRowIndex = null,
+                            csvFileName = null,
+                            qifImportId = null,
+                            qifRecordIndex = null,
+                            qifFileName = null,
+                            apiSessionId = null,
+                            apiRequestId = null,
+                            apiJsonPath = null,
+                        ),
+                ),
             )
         val raw = ApiStrategyJsonCodec.decode(from.config_json)
         val config =

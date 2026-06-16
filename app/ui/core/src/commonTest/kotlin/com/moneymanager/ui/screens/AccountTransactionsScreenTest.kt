@@ -18,13 +18,9 @@ import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import androidx.compose.ui.test.waitUntilDoesNotExist
 import androidx.compose.ui.test.waitUntilExactlyOneExists
-import com.moneymanager.database.ManualSourceRecorder
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
-import com.moneymanager.database.SampleGeneratorSourceRecorder
-import com.moneymanager.database.port.DbEntitySource
 import com.moneymanager.database.port.DbMaintenance
 import com.moneymanager.di.database.DatabaseComponent
-import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
@@ -34,13 +30,12 @@ import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DbLocation
-import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.PageWithTargetIndex
 import com.moneymanager.domain.model.PagingInfo
 import com.moneymanager.domain.model.PagingResult
 import com.moneymanager.domain.model.PersonId
-import com.moneymanager.domain.model.SourceRecorder
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.AccountAttributeRepository
@@ -55,7 +50,7 @@ import com.moneymanager.domain.repository.TransferSourceRepository
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
-import com.moneymanager.test.database.testProvenance
+import com.moneymanager.test.database.testSource
 import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import com.moneymanager.ui.screens.transactions.AccountTransactionCard
 import com.moneymanager.ui.screens.transactions.AccountTransactionsScreen
@@ -119,7 +114,6 @@ class AccountTransactionsScreenTest {
             val accountRepository = createAccountRepository(listOf(checking, savings))
             val transactionRepository = createTransactionRepository(listOf(transfer))
             val transferSourceRepository = createTransferSourceRepository()
-            val entitySource = createStubEntitySource()
             val currencyRepository = createCurrencyRepository(listOf(usdCurrency))
             val categoryRepository = createCategoryRepository()
             val attributeTypeRepository = createAttributeTypeRepository()
@@ -136,7 +130,6 @@ class AccountTransactionsScreenTest {
                         accountId = currentAccountId,
                         transactionRepository = transactionRepository,
                         transferSourceRepository = transferSourceRepository,
-                        entitySource = entitySource,
                         accountRepository = accountRepository,
                         accountAttributeRepository = createAccountAttributeRepository(),
                         categoryRepository = categoryRepository,
@@ -216,7 +209,6 @@ class AccountTransactionsScreenTest {
             val accountRepository = createAccountRepository(listOf(checking, savings))
             val transactionRepository = createTransactionRepository(listOf(transfer))
             val transferSourceRepository = createTransferSourceRepository()
-            val entitySource = createStubEntitySource()
             val currencyRepository = createCurrencyRepository(listOf(usdCurrency))
             val categoryRepository = createCategoryRepository()
             val attributeTypeRepository = createAttributeTypeRepository()
@@ -232,7 +224,6 @@ class AccountTransactionsScreenTest {
                         accountId = currentAccountId,
                         transactionRepository = transactionRepository,
                         transferSourceRepository = transferSourceRepository,
-                        entitySource = entitySource,
                         accountRepository = accountRepository,
                         accountAttributeRepository = createAccountAttributeRepository(),
                         categoryRepository = categoryRepository,
@@ -300,7 +291,6 @@ class AccountTransactionsScreenTest {
                         accountId = checking.id,
                         transactionRepository = transactionRepository,
                         transferSourceRepository = createTransferSourceRepository(),
-                        entitySource = createStubEntitySource(),
                         accountRepository = accountRepository,
                         accountAttributeRepository = createAccountAttributeRepository(),
                         categoryRepository = createCategoryRepository(),
@@ -442,7 +432,6 @@ class AccountTransactionsScreenTest {
                         accountId = own.id,
                         transactionRepository = transactionRepository,
                         transferSourceRepository = createTransferSourceRepository(),
-                        entitySource = createStubEntitySource(),
                         accountRepository = accountRepository,
                         accountAttributeRepository = createAccountAttributeRepository(),
                         categoryRepository = createCategoryRepository(),
@@ -497,7 +486,7 @@ class AccountTransactionsScreenTest {
                             name = "E2E Test Checking",
                             openingDate = now,
                         ),
-                        repositories.testProvenance,
+                        testSource,
                     )
                 savingsAccountId =
                     repositories.accountRepository.createAccount(
@@ -506,7 +495,7 @@ class AccountTransactionsScreenTest {
                             name = "E2E Test Savings",
                             openingDate = now,
                         ),
-                        repositories.testProvenance,
+                        testSource,
                     )
 
                 // Create a transfer
@@ -519,10 +508,9 @@ class AccountTransactionsScreenTest {
                         targetAccountId = savingsAccountId,
                         amount = Money.fromDisplayValue("50", usdCurrency),
                     )
-                val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
                 repositories.transactionRepository.createTransfers(
                     transfers = listOf(transfer),
-                    sourceRecorder = SampleGeneratorSourceRecorder(repositories.transferSourceQueries, deviceId),
+                    sources = listOf(Source.SampleGenerator),
                 )
 
                 // Query back the created transfer to get the database-generated ID
@@ -554,7 +542,6 @@ class AccountTransactionsScreenTest {
                                 accountId = currentAccountId,
                                 transactionRepository = repositories.transactionRepository,
                                 transferSourceRepository = repositories.transferSourceRepository,
-                                entitySource = createDbEntitySource(repositories),
                                 accountRepository = repositories.accountRepository,
                                 accountAttributeRepository = repositories.accountAttributeRepository,
                                 categoryRepository = repositories.categoryRepository,
@@ -703,7 +690,7 @@ class AccountTransactionsScreenTest {
                             name = "Audit Test Checking",
                             openingDate = now,
                         ),
-                        repositories.testProvenance,
+                        testSource,
                     )
                 savingsAccountId =
                     repositories.accountRepository.createAccount(
@@ -712,7 +699,7 @@ class AccountTransactionsScreenTest {
                             name = "Audit Test Savings",
                             openingDate = now,
                         ),
-                        repositories.testProvenance,
+                        testSource,
                     )
 
                 // Create a transfer (revision 1)
@@ -725,10 +712,9 @@ class AccountTransactionsScreenTest {
                         targetAccountId = savingsAccountId,
                         amount = Money.fromDisplayValue("100", usdCurrency),
                     )
-                val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
                 repositories.transactionRepository.createTransfers(
                     transfers = listOf(transfer),
-                    sourceRecorder = ManualSourceRecorder(repositories.transferSourceQueries, deviceId),
+                    sources = listOf(Source.Manual),
                 )
 
                 // Query back the created transfer to get the database-generated ID
@@ -765,7 +751,6 @@ class AccountTransactionsScreenTest {
                                 accountId = currentAccountId,
                                 transactionRepository = repositories.transactionRepository,
                                 transferSourceRepository = repositories.transferSourceRepository,
-                                entitySource = createDbEntitySource(repositories),
                                 accountRepository = repositories.accountRepository,
                                 accountAttributeRepository = repositories.accountAttributeRepository,
                                 categoryRepository = repositories.categoryRepository,
@@ -884,7 +869,7 @@ class AccountTransactionsScreenTest {
                             name = "Combined Edit Checking",
                             openingDate = now,
                         ),
-                        repositories.testProvenance,
+                        testSource,
                     )
                 savingsAccountId =
                     repositories.accountRepository.createAccount(
@@ -893,7 +878,7 @@ class AccountTransactionsScreenTest {
                             name = "Combined Edit Savings",
                             openingDate = now,
                         ),
-                        repositories.testProvenance,
+                        testSource,
                     )
 
                 // Create a transfer (revision 1)
@@ -906,10 +891,9 @@ class AccountTransactionsScreenTest {
                         targetAccountId = savingsAccountId,
                         amount = Money.fromDisplayValue("100", usdCurrency),
                     )
-                val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
                 repositories.transactionRepository.createTransfers(
                     transfers = listOf(transfer),
-                    sourceRecorder = ManualSourceRecorder(repositories.transferSourceQueries, deviceId),
+                    sources = listOf(Source.Manual),
                 )
 
                 // Query back the created transfer to get the database-generated ID
@@ -946,7 +930,6 @@ class AccountTransactionsScreenTest {
                                 accountId = currentAccountId,
                                 transactionRepository = repositories.transactionRepository,
                                 transferSourceRepository = repositories.transferSourceRepository,
-                                entitySource = createDbEntitySource(repositories),
                                 accountRepository = repositories.accountRepository,
                                 accountAttributeRepository = repositories.accountAttributeRepository,
                                 categoryRepository = repositories.categoryRepository,
@@ -1211,18 +1194,5 @@ class AccountTransactionsScreenTest {
             everySuspend { fullRefreshMaterializedViews() } returns Duration.ZERO
         }
 
-    private fun createStubEntitySource(): EntitySource {
-        val recorder: SourceRecorder = mock(MockMode.autoUnit)
-        return mock(MockMode.autoUnit) {
-            every { manualRecorder() } returns recorder
-            every { sampleGeneratorRecorder() } returns recorder
-            every { csvImportRecorder(any(), any()) } returns recorder
-            every { apiImportRecorder(any(), any(), any()) } returns recorder
-        }
-    }
-
     private fun createDbMaintenance(repositories: DatabaseComponent): Maintenance = DbMaintenance(repositories.maintenanceService)
-
-    private fun createDbEntitySource(repositories: DatabaseComponent): EntitySource =
-        DbEntitySource(repositories.transferSourceQueries, repositories.deviceId)
 }

@@ -9,7 +9,7 @@ import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyAuditEntry
 import com.moneymanager.domain.model.CurrencyId
-import com.moneymanager.domain.model.EntitySource
+import com.moneymanager.domain.model.SourceRecord
 import com.moneymanager.domain.repository.AuditRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.ui.audit.AuditDiffCard
@@ -56,7 +56,7 @@ private data class CurrencyAuditDiff(
     val code: FieldChange<String>,
     val name: FieldChange<String>,
     val scaleFactor: FieldChange<Long>,
-    val source: EntitySource?,
+    val source: SourceRecord?,
 ) {
     val hasChanges: Boolean
         get() = listOf(code, name, scaleFactor).any { it is FieldChange.Changed }

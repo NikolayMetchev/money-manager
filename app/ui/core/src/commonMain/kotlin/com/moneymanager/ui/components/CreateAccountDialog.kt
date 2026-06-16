@@ -23,11 +23,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
-import com.moneymanager.domain.model.EntityProvenance
 import com.moneymanager.domain.model.PersonId
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CategoryRepository
@@ -55,7 +54,6 @@ fun CreateAccountDialog(
     personAttributeRepository: PersonAttributeRepository? = null,
     attributeTypeRepository: AttributeTypeRepository? = null,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    entitySource: EntitySource,
     onDismiss: () -> Unit,
     onAccountCreated: ((AccountId) -> Unit)? = null,
     initialName: String = "",
@@ -180,13 +178,12 @@ fun CreateAccountDialog(
                                         openingDate = now,
                                         categoryId = accountState.selectedCategoryId,
                                     )
-                                val provenance = EntityProvenance.Manual(entitySource.deviceId)
-                                val accountId = accountRepository.createAccount(newAccount, provenance)
+                                val accountId = accountRepository.createAccount(newAccount, Source.Manual)
                                 selectedOwnerIds.forEach { personId ->
                                     personAccountOwnershipRepository.createOwnership(
                                         personId = PersonId(personId),
                                         accountId = accountId,
-                                        provenance = provenance,
+                                        source = Source.Manual,
                                     )
                                 }
                                 onAccountCreated?.invoke(accountId)
@@ -226,7 +223,6 @@ fun CreateAccountDialog(
         EditPersonDialog(
             personToEdit = null,
             personRepository = personRepository,
-            entitySource = entitySource,
             onPersonCreated = { personId ->
                 selectedOwnerIdForAddition = personId.id
             },

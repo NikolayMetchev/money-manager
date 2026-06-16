@@ -3,206 +3,126 @@
 package com.moneymanager.database.repository
 
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
-import com.moneymanager.database.mapper.TransferSourceFromRevisionMapper
-import com.moneymanager.database.mapper.TransferSourceFromTransactionIdMapper
-import com.moneymanager.domain.model.ApiRequestId
-import com.moneymanager.domain.model.ApiSessionId
+import com.moneymanager.database.mapper.SourceColumns
+import com.moneymanager.database.mapper.SourceDetailColumns
+import com.moneymanager.database.mapper.buildSourceRecord
+import com.moneymanager.database.recordSource
+import com.moneymanager.database.sql.SelectAllTransferSourcesByTransaction
+import com.moneymanager.database.sql.SelectTransferSourceByRevision
 import com.moneymanager.domain.model.DeviceInfo
-import com.moneymanager.domain.model.JsonPath
+import com.moneymanager.domain.model.EntityType
+import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.model.SourceRecord
 import com.moneymanager.domain.model.TransferId
-import com.moneymanager.domain.model.TransferSource
-import com.moneymanager.domain.model.csv.CsvImportId
-import com.moneymanager.domain.repository.ApiSourceRecord
-import com.moneymanager.domain.repository.CsvImportSourceRecord
 import com.moneymanager.domain.repository.DeviceRepository
-import com.moneymanager.domain.repository.SampleGeneratorSourceRecord
 import com.moneymanager.domain.repository.TransferSourceRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
  * Implementation of TransferSourceRepository using SQLDelight.
- * Manages transfer source records for tracking provenance.
+ * Manages transfer source records for tracking provenance. Transfers are stored in the unified
+ * entity_source store as entity_type_id = 7 (TRANSFER), keyed by the transfer id.
  */
 class TransferSourceRepositoryImpl(
     database: MoneyManagerDatabaseWrapper,
     private val deviceRepository: DeviceRepository,
 ) : TransferSourceRepository {
-    private val queries = database.transferSourceQueries
-    private val csvImportQueries = database.csvImportQueries
+    private val queries = database.entitySourceQueries
 
     override suspend fun recordManualSource(
         transactionId: TransferId,
         revisionId: Long,
         deviceInfo: DeviceInfo,
-    ): TransferSource =
+    ): Unit =
         withContext(Dispatchers.Default) {
             val deviceId = deviceRepository.getOrCreateDevice(deviceInfo)
 
-            queries.insertManual(
-                transaction_id = transactionId.id,
-                revision_id = revisionId,
-                device_id = deviceId.id,
+            queries.recordSource(
+                deviceId = deviceId,
+                entityType = EntityType.TRANSFER,
+                entityId = transactionId.id,
+                revisionId = revisionId,
+                source = Source.Manual,
             )
-
-            queries
-                .selectByTransactionIdAndRevision(transactionId.id, revisionId)
-                .executeAsOne()
-                .let(TransferSourceFromRevisionMapper::map)
         }
 
-    override suspend fun recordCsvImportSource(
-        transactionId: TransferId,
-        revisionId: Long,
-        csvImportId: CsvImportId,
-        rowIndex: Long,
-    ): TransferSource =
-        withContext(Dispatchers.Default) {
-            // Get device_id from the CSV import metadata
-            val csvImport =
-                csvImportQueries
-                    .selectImportById(csvImportId.toString())
-                    .executeAsOne()
-
-            // Insert base TransferSource record
-            queries.insertCsvImportBase(
-                transaction_id = transactionId.id,
-                revision_id = revisionId,
-                device_id = csvImport.device_id,
-            )
-            // Get the auto-generated ID and insert CSV-specific details
-            val transferSourceId = queries.lastInsertedId().executeAsOne()
-            queries.insertCsvImportDetails(
-                id = transferSourceId,
-                csv_import_id = csvImportId.toString(),
-                csv_row_index = rowIndex,
-            )
-
-            queries
-                .selectByTransactionIdAndRevision(transactionId.id, revisionId)
-                .executeAsOne()
-                .let(TransferSourceFromRevisionMapper::map)
-        }
-
-    override suspend fun recordCsvImportSourcesBatch(
-        csvImportId: CsvImportId,
-        sources: List<CsvImportSourceRecord>,
-    ): Unit =
-        withContext(Dispatchers.Default) {
-            // Get device_id from the CSV import metadata
-            val csvImport = csvImportQueries.selectImportById(csvImportId.toString()).executeAsOne()
-            val deviceId = csvImport.device_id
-
-            queries.transaction {
-                sources.forEach { source ->
-                    // Insert base TransferSource record
-                    queries.insertCsvImportBase(
-                        transaction_id = source.transactionId.id,
-                        revision_id = source.revisionId,
-                        device_id = deviceId,
-                    )
-                    // Get the auto-generated ID and insert CSV-specific details
-                    val transferSourceId = queries.lastInsertedId().executeAsOne()
-                    queries.insertCsvImportDetails(
-                        id = transferSourceId,
-                        csv_import_id = csvImportId.toString(),
-                        csv_row_index = source.rowIndex,
-                    )
-                }
-            }
-        }
-
-    override suspend fun getSourcesForTransaction(transactionId: TransferId): List<TransferSource> =
+    override suspend fun getSourcesForTransaction(transactionId: TransferId): List<SourceRecord> =
         withContext(Dispatchers.Default) {
             queries
-                .selectAllByTransactionId(transactionId.id)
+                .selectAllTransferSourcesByTransaction(transactionId.id)
                 .executeAsList()
-                .map(TransferSourceFromTransactionIdMapper::map)
+                .mapNotNull { it.toSourceRecord() }
         }
 
     override suspend fun getSourceByRevision(
         transactionId: TransferId,
         revisionId: Long,
-    ): TransferSource? =
+    ): SourceRecord? =
         withContext(Dispatchers.Default) {
             queries
-                .selectByTransactionIdAndRevision(transactionId.id, revisionId)
+                .selectTransferSourceByRevision(transactionId.id, revisionId)
                 .executeAsOneOrNull()
-                ?.let(TransferSourceFromRevisionMapper::map)
-        }
-
-    override suspend fun recordSampleGeneratorSourcesBatch(
-        deviceInfo: DeviceInfo,
-        sources: List<SampleGeneratorSourceRecord>,
-    ): Unit =
-        withContext(Dispatchers.Default) {
-            val deviceId = deviceRepository.getOrCreateDevice(deviceInfo)
-
-            queries.transaction {
-                sources.forEach { source ->
-                    queries.insertSampleGenerator(
-                        transaction_id = source.transactionId.id,
-                        revision_id = source.revisionId,
-                        device_id = deviceId.id,
-                    )
-                }
-            }
-        }
-
-    override suspend fun recordApiSource(
-        transactionId: TransferId,
-        revisionId: Long,
-        sessionId: ApiSessionId,
-        requestId: ApiRequestId,
-        deviceInfo: DeviceInfo,
-        jsonPath: JsonPath,
-    ): TransferSource =
-        withContext(Dispatchers.Default) {
-            val deviceId = deviceRepository.getOrCreateDevice(deviceInfo)
-
-            queries.insertApiBase(
-                transaction_id = transactionId.id,
-                revision_id = revisionId,
-                device_id = deviceId.id,
-            )
-            val transferSourceId = queries.lastInsertedId().executeAsOne()
-            queries.insertApiDetails(
-                id = transferSourceId,
-                api_session_id = sessionId.id,
-                api_request_id = requestId.id,
-                json_path = jsonPath.value,
-            )
-
-            queries
-                .selectByTransactionIdAndRevision(transactionId.id, revisionId)
-                .executeAsOne()
-                .let(TransferSourceFromRevisionMapper::map)
-        }
-
-    override suspend fun recordApiSourcesBatch(
-        sessionId: ApiSessionId,
-        requestId: ApiRequestId,
-        deviceInfo: DeviceInfo,
-        sources: List<ApiSourceRecord>,
-    ): Unit =
-        withContext(Dispatchers.Default) {
-            val deviceId = deviceRepository.getOrCreateDevice(deviceInfo)
-
-            queries.transaction {
-                sources.forEach { source ->
-                    queries.insertApiBase(
-                        transaction_id = source.transactionId.id,
-                        revision_id = source.revisionId,
-                        device_id = deviceId.id,
-                    )
-                    val transferSourceId = queries.lastInsertedId().executeAsOne()
-                    queries.insertApiDetails(
-                        id = transferSourceId,
-                        api_session_id = sessionId.id,
-                        api_request_id = requestId.id,
-                        json_path = source.jsonPath.value,
-                    )
-                }
-            }
+                ?.toSourceRecord()
         }
 }
+
+private fun SelectTransferSourceByRevision.toSourceRecord(): SourceRecord? =
+    buildSourceRecord(
+        SourceColumns(
+            sourceId = id,
+            sourceTypeName = source_type,
+            deviceId = device_id,
+            createdAt = created_at,
+            entityType = EntityType.TRANSFER,
+            entityId = transaction_id,
+            revisionId = revision_id,
+            detail =
+                SourceDetailColumns(
+                    platformName = platform_name,
+                    osName = os_name,
+                    machineName = machine_name,
+                    deviceMake = device_make,
+                    deviceModel = device_model,
+                    csvImportId = csv_import_id,
+                    csvRowIndex = csv_row_index,
+                    csvFileName = csv_file_name,
+                    qifImportId = qif_import_id,
+                    qifRecordIndex = qif_record_index,
+                    qifFileName = qif_file_name,
+                    apiSessionId = api_session_id,
+                    apiRequestId = api_request_id,
+                    apiJsonPath = api_json_path,
+                ),
+        ),
+    )
+
+private fun SelectAllTransferSourcesByTransaction.toSourceRecord(): SourceRecord? =
+    buildSourceRecord(
+        SourceColumns(
+            sourceId = id,
+            sourceTypeName = source_type,
+            deviceId = device_id,
+            createdAt = created_at,
+            entityType = EntityType.TRANSFER,
+            entityId = transaction_id,
+            revisionId = revision_id,
+            detail =
+                SourceDetailColumns(
+                    platformName = platform_name,
+                    osName = os_name,
+                    machineName = machine_name,
+                    deviceMake = device_make,
+                    deviceModel = device_model,
+                    csvImportId = csv_import_id,
+                    csvRowIndex = csv_row_index,
+                    csvFileName = csv_file_name,
+                    qifImportId = qif_import_id,
+                    qifRecordIndex = qif_record_index,
+                    qifFileName = qif_file_name,
+                    apiSessionId = api_session_id,
+                    apiRequestId = api_request_id,
+                    apiJsonPath = api_json_path,
+                ),
+        ),
+    )

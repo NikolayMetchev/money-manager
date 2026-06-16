@@ -1,8 +1,13 @@
 @file:OptIn(kotlin.time.ExperimentalTime::class)
 
 package com.moneymanager.ui.starling
+import com.moneymanager.apiimporter.downloadApiSessionAccountIdentifiers
+import com.moneymanager.apiimporter.downloadApiSessionAccounts
+import com.moneymanager.apiimporter.downloadApiSessionPeople
+import com.moneymanager.apiimporter.downloadApiSessionTransactions
+import com.moneymanager.apiimporter.importApiSessionPeople
+import com.moneymanager.apiimporter.importApiSessionTransactions
 import com.moneymanager.database.DatabaseConfig
-import com.moneymanager.database.port.DbEntitySource
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.ApiSessionId
@@ -10,16 +15,11 @@ import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.JsonPath
+import com.moneymanager.domain.model.Source
 import com.moneymanager.rest.ApiSessionTrafficRecorder
 import com.moneymanager.rest.createApiClient
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
-import com.moneymanager.ui.api.downloadApiSessionAccountIdentifiers
-import com.moneymanager.ui.api.downloadApiSessionAccounts
-import com.moneymanager.ui.api.downloadApiSessionPeople
-import com.moneymanager.ui.api.downloadApiSessionTransactions
-import com.moneymanager.ui.api.importApiSessionPeople
-import com.moneymanager.ui.api.importApiSessionTransactions
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpHeaders
@@ -273,18 +273,11 @@ class StarlingImportE2ETest : DbTest() {
             val importResult =
                 importApiSessionTransactions(
                     apiSessionRepository = repositories.apiSessionRepository,
-                    accountRepository = repositories.accountRepository,
                     currencyRepository = repositories.currencyRepository,
-                    transactionRepository = repositories.transactionRepository,
-                    entitySource = DbEntitySource(repositories.transferSourceQueries, deviceId),
-                    personRepository = repositories.personRepository,
-                    personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                    personAttributeRepository = repositories.personAttributeRepository,
                     attributeTypeRepository = repositories.attributeTypeRepository,
-                    accountAttributeRepository = repositories.accountAttributeRepository,
-                    deviceId = deviceId,
                     sessionId = sessionId,
                     strategy = strategy,
+                    importEngine = repositories.importEngine,
                 )
 
             assertEquals(2, importResult.transactionCount, "Both feed items should import")
@@ -350,18 +343,11 @@ class StarlingImportE2ETest : DbTest() {
             )
             importApiSessionTransactions(
                 apiSessionRepository = repositories.apiSessionRepository,
-                accountRepository = repositories.accountRepository,
                 currencyRepository = repositories.currencyRepository,
-                transactionRepository = repositories.transactionRepository,
-                entitySource = DbEntitySource(repositories.transferSourceQueries, deviceId),
-                personRepository = repositories.personRepository,
-                personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                personAttributeRepository = repositories.personAttributeRepository,
                 attributeTypeRepository = repositories.attributeTypeRepository,
-                accountAttributeRepository = repositories.accountAttributeRepository,
-                deviceId = deviceId,
                 sessionId = sessionId,
                 strategy = strategy,
+                importEngine = repositories.importEngine,
             )
 
             val allAccounts = repositories.accountRepository.getAllAccounts().first()
@@ -401,7 +387,8 @@ class StarlingImportE2ETest : DbTest() {
                     .getAuditHistoryForAccount(account.id)
                     .first { it.auditType == AuditType.INSERT }
                     .source
-                    ?.apiSource
+                    ?.source
+                    ?.let { it as? Source.Api }
                     ?.jsonPath
             assertEquals(JsonPath("$.feedItems[0]"), originPath(coffee))
             assertEquals(JsonPath("$.feedItems[1]"), originPath(acme))
@@ -455,18 +442,11 @@ class StarlingImportE2ETest : DbTest() {
             )
             importApiSessionTransactions(
                 apiSessionRepository = repositories.apiSessionRepository,
-                accountRepository = repositories.accountRepository,
                 currencyRepository = repositories.currencyRepository,
-                transactionRepository = repositories.transactionRepository,
-                entitySource = DbEntitySource(repositories.transferSourceQueries, deviceId),
-                personRepository = repositories.personRepository,
-                personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                personAttributeRepository = repositories.personAttributeRepository,
                 attributeTypeRepository = repositories.attributeTypeRepository,
-                accountAttributeRepository = repositories.accountAttributeRepository,
-                deviceId = deviceId,
                 sessionId = sessionId,
                 strategy = strategy,
+                importEngine = repositories.importEngine,
             )
 
             val allAccounts = repositories.accountRepository.getAllAccounts().first()
@@ -542,18 +522,11 @@ class StarlingImportE2ETest : DbTest() {
             )
             importApiSessionTransactions(
                 apiSessionRepository = repositories.apiSessionRepository,
-                accountRepository = repositories.accountRepository,
                 currencyRepository = repositories.currencyRepository,
-                transactionRepository = repositories.transactionRepository,
-                entitySource = DbEntitySource(repositories.transferSourceQueries, deviceId),
-                personRepository = repositories.personRepository,
-                personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                personAttributeRepository = repositories.personAttributeRepository,
                 attributeTypeRepository = repositories.attributeTypeRepository,
-                accountAttributeRepository = repositories.accountAttributeRepository,
-                deviceId = deviceId,
                 sessionId = sessionId,
                 strategy = strategy,
+                importEngine = repositories.importEngine,
             )
 
             val allAccounts = repositories.accountRepository.getAllAccounts().first()
@@ -626,18 +599,11 @@ class StarlingImportE2ETest : DbTest() {
             )
             importApiSessionTransactions(
                 apiSessionRepository = repositories.apiSessionRepository,
-                accountRepository = repositories.accountRepository,
                 currencyRepository = repositories.currencyRepository,
-                transactionRepository = repositories.transactionRepository,
-                entitySource = DbEntitySource(repositories.transferSourceQueries, deviceId),
-                personRepository = repositories.personRepository,
-                personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                personAttributeRepository = repositories.personAttributeRepository,
                 attributeTypeRepository = repositories.attributeTypeRepository,
-                accountAttributeRepository = repositories.accountAttributeRepository,
-                deviceId = deviceId,
                 sessionId = sessionId,
                 strategy = strategy,
+                importEngine = repositories.importEngine,
             )
 
             val allAccounts = repositories.accountRepository.getAllAccounts().first()
@@ -666,7 +632,7 @@ class StarlingImportE2ETest : DbTest() {
             val originPaths =
                 repositories.auditRepository
                     .getAuditHistoryForAccount(ownAccount.id)
-                    .mapNotNull { it.source?.apiSource?.jsonPath }
+                    .mapNotNull { (it.source?.source as? Source.Api)?.jsonPath }
             assertTrue(
                 originPaths.contains(JsonPath("$.accounts[0]")),
                 "Adopted source account should record the accounts-endpoint origin: $originPaths",
@@ -726,18 +692,11 @@ class StarlingImportE2ETest : DbTest() {
             )
             importApiSessionTransactions(
                 apiSessionRepository = repositories.apiSessionRepository,
-                accountRepository = repositories.accountRepository,
                 currencyRepository = repositories.currencyRepository,
-                transactionRepository = repositories.transactionRepository,
-                entitySource = DbEntitySource(repositories.transferSourceQueries, deviceId),
-                personRepository = repositories.personRepository,
-                personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                personAttributeRepository = repositories.personAttributeRepository,
                 attributeTypeRepository = repositories.attributeTypeRepository,
-                accountAttributeRepository = repositories.accountAttributeRepository,
-                deviceId = deviceId,
                 sessionId = sessionId,
                 strategy = strategy,
+                importEngine = repositories.importEngine,
             )
 
             val allAccounts = repositories.accountRepository.getAllAccounts().first()
@@ -790,18 +749,11 @@ class StarlingImportE2ETest : DbTest() {
             )
             importApiSessionTransactions(
                 apiSessionRepository = repositories.apiSessionRepository,
-                accountRepository = repositories.accountRepository,
                 currencyRepository = repositories.currencyRepository,
-                transactionRepository = repositories.transactionRepository,
-                entitySource = DbEntitySource(repositories.transferSourceQueries, deviceId),
-                personRepository = repositories.personRepository,
-                personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                personAttributeRepository = repositories.personAttributeRepository,
                 attributeTypeRepository = repositories.attributeTypeRepository,
-                accountAttributeRepository = repositories.accountAttributeRepository,
-                deviceId = deviceId,
                 sessionId = sessionId,
                 strategy = strategy,
+                importEngine = repositories.importEngine,
             )
 
             // The own account carries the sort code + account number returned by the identifiers endpoint,
@@ -863,28 +815,18 @@ class StarlingImportE2ETest : DbTest() {
             // Mirrors the UI's combined import: transactions first (creates accounts), then people.
             importApiSessionTransactions(
                 apiSessionRepository = repositories.apiSessionRepository,
-                accountRepository = repositories.accountRepository,
                 currencyRepository = repositories.currencyRepository,
-                transactionRepository = repositories.transactionRepository,
-                entitySource = DbEntitySource(repositories.transferSourceQueries, deviceId),
-                personRepository = repositories.personRepository,
-                personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                personAttributeRepository = repositories.personAttributeRepository,
                 attributeTypeRepository = repositories.attributeTypeRepository,
-                accountAttributeRepository = repositories.accountAttributeRepository,
-                deviceId = deviceId,
                 sessionId = sessionId,
                 strategy = strategy,
+                importEngine = repositories.importEngine,
             )
             importApiSessionPeople(
                 apiSessionRepository = repositories.apiSessionRepository,
                 accountRepository = repositories.accountRepository,
                 accountAttributeRepository = repositories.accountAttributeRepository,
-                personRepository = repositories.personRepository,
-                personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                personAttributeRepository = repositories.personAttributeRepository,
+                importEngine = repositories.importEngine,
                 attributeTypeRepository = repositories.attributeTypeRepository,
-                entitySource = DbEntitySource(repositories.transferSourceQueries, deviceId),
                 sessionId = sessionId,
                 strategy = strategy,
                 accountsSessionId = sessionId,
@@ -942,11 +884,8 @@ class StarlingImportE2ETest : DbTest() {
                 apiSessionRepository = repositories.apiSessionRepository,
                 accountRepository = repositories.accountRepository,
                 accountAttributeRepository = repositories.accountAttributeRepository,
-                personRepository = repositories.personRepository,
-                personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                personAttributeRepository = repositories.personAttributeRepository,
+                importEngine = repositories.importEngine,
                 attributeTypeRepository = repositories.attributeTypeRepository,
-                entitySource = DbEntitySource(repositories.transferSourceQueries, deviceId),
                 sessionId = sessionId,
                 strategy = strategy,
                 accountsSessionId = sessionId,
@@ -956,18 +895,11 @@ class StarlingImportE2ETest : DbTest() {
             // account by reading the people responses from the same session.
             importApiSessionTransactions(
                 apiSessionRepository = repositories.apiSessionRepository,
-                accountRepository = repositories.accountRepository,
                 currencyRepository = repositories.currencyRepository,
-                transactionRepository = repositories.transactionRepository,
-                entitySource = DbEntitySource(repositories.transferSourceQueries, deviceId),
-                personRepository = repositories.personRepository,
-                personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                personAttributeRepository = repositories.personAttributeRepository,
                 attributeTypeRepository = repositories.attributeTypeRepository,
-                accountAttributeRepository = repositories.accountAttributeRepository,
-                deviceId = deviceId,
                 sessionId = sessionId,
                 strategy = strategy,
+                importEngine = repositories.importEngine,
             )
 
             val ada =
@@ -1015,11 +947,8 @@ class StarlingImportE2ETest : DbTest() {
                 apiSessionRepository = repositories.apiSessionRepository,
                 accountRepository = repositories.accountRepository,
                 accountAttributeRepository = repositories.accountAttributeRepository,
-                personRepository = repositories.personRepository,
-                personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                personAttributeRepository = repositories.personAttributeRepository,
+                importEngine = repositories.importEngine,
                 attributeTypeRepository = repositories.attributeTypeRepository,
-                entitySource = DbEntitySource(repositories.transferSourceQueries, deviceId),
                 sessionId = peopleSessionId,
                 strategy = strategy,
             )
@@ -1043,18 +972,11 @@ class StarlingImportE2ETest : DbTest() {
             )
             importApiSessionTransactions(
                 apiSessionRepository = repositories.apiSessionRepository,
-                accountRepository = repositories.accountRepository,
                 currencyRepository = repositories.currencyRepository,
-                transactionRepository = repositories.transactionRepository,
-                entitySource = DbEntitySource(repositories.transferSourceQueries, deviceId),
-                personRepository = repositories.personRepository,
-                personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                personAttributeRepository = repositories.personAttributeRepository,
                 attributeTypeRepository = repositories.attributeTypeRepository,
-                accountAttributeRepository = repositories.accountAttributeRepository,
-                deviceId = deviceId,
                 sessionId = txSessionId,
                 strategy = strategy,
+                importEngine = repositories.importEngine,
             )
 
             val ada =
@@ -1109,18 +1031,11 @@ class StarlingImportE2ETest : DbTest() {
             val importResult =
                 importApiSessionTransactions(
                     apiSessionRepository = repositories.apiSessionRepository,
-                    accountRepository = repositories.accountRepository,
                     currencyRepository = repositories.currencyRepository,
-                    transactionRepository = repositories.transactionRepository,
-                    entitySource = DbEntitySource(repositories.transferSourceQueries, deviceId),
-                    personRepository = repositories.personRepository,
-                    personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                    personAttributeRepository = repositories.personAttributeRepository,
                     attributeTypeRepository = repositories.attributeTypeRepository,
-                    accountAttributeRepository = repositories.accountAttributeRepository,
-                    deviceId = deviceId,
                     sessionId = sessionId,
                     strategy = strategy,
+                    importEngine = repositories.importEngine,
                 )
 
             // All three items are imported, including the declined one (kept for the record).

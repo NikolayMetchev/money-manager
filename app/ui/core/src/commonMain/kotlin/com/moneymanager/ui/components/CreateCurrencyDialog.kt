@@ -18,10 +18,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.repository.CurrencyRepository
-import com.moneymanager.ui.LocalDeviceId
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
-import com.moneymanager.ui.manualProvenance
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
 
@@ -43,7 +42,6 @@ fun CreateCurrencyDialog(
     var code by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }
     val saveState = rememberDialogSaveState()
-    val provenance = manualProvenance(LocalDeviceId.current)
 
     val scope = rememberSchemaAwareCoroutineScope()
 
@@ -91,7 +89,7 @@ fun CreateCurrencyDialog(
                             saveState.errorMessage = null
                             scope.launch {
                                 try {
-                                    val currencyId = currencyRepository.upsertCurrencyByCode(code.trim(), name.trim(), provenance)
+                                    val currencyId = currencyRepository.upsertCurrencyByCode(code.trim(), name.trim(), Source.Manual)
                                     onCurrencyCreated(currencyId)
                                 } catch (expected: Exception) {
                                     logger.error(expected) { "Failed to create currency: ${expected.message}" }

@@ -10,17 +10,20 @@ import com.moneymanager.database.mapper.AccountBalanceMapper
 import com.moneymanager.database.mapper.AccountRowMapper
 import com.moneymanager.database.mapper.TransferMapper
 import com.moneymanager.database.mapper.TransferMissingCompanionMapper
+import com.moneymanager.database.recordSource
 import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
 import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.AttributeTypeId
+import com.moneymanager.domain.model.DeviceId
+import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.NewRelationship
 import com.moneymanager.domain.model.PageWithTargetIndex
 import com.moneymanager.domain.model.PagingInfo
 import com.moneymanager.domain.model.PagingResult
-import com.moneymanager.domain.model.SourceRecorder
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferAttribute
@@ -36,11 +39,13 @@ import kotlin.time.Instant
 
 class TransactionRepositoryImpl(
     private val database: MoneyManagerDatabaseWrapper,
+    private val deviceId: DeviceId,
 ) : TransactionRepository {
     private val transferQueries = database.transferQueries
     private val transactionIdQueries = database.transactionIdQueries
     private val transferAttributeQueries = database.transferAttributeQueries
     private val transferRelationshipQueries = database.transferRelationshipQueries
+    private val entitySourceQueries = database.entitySourceQueries
 
     private fun loadAttributesForTransfers(transfers: List<Transfer>): List<Transfer> {
         if (transfers.isEmpty()) return transfers
@@ -302,11 +307,12 @@ class TransactionRepositoryImpl(
     override suspend fun createTransfers(
         transfers: List<Transfer>,
         newAttributes: Map<TransferId, List<NewAttribute>>,
-        sourceRecorder: SourceRecorder,
+        sources: List<Source>,
         batchSize: Int,
         onProgress: (suspend (created: Int, total: Int) -> Unit)?,
     ): List<TransferId> =
         withContext(Dispatchers.Default) {
+            require(sources.size == transfers.size) { "sources must align 1:1 with transfers" }
             val total = transfers.size
             val createdIds = mutableListOf<TransferId>()
 
@@ -317,13 +323,14 @@ class TransactionRepositoryImpl(
             for (batchStart in transfers.indices step effectiveBatchSize) {
                 val batchEnd = minOf(batchStart + effectiveBatchSize, transfers.size)
                 val batch = transfers.subList(batchStart, batchEnd)
+                val batchSources = sources.subList(batchStart, batchEnd)
 
                 transferQueries.transaction {
                     // Enable creation mode so attribute triggers record audit but don't bump revision.
                     // This allows initial attributes to be recorded at revision 1.
                     database.beginCreationMode()
                     try {
-                        createdIds += insertNewTransfers(batch, newAttributes, newRelationships = emptyMap(), sourceRecorder)
+                        createdIds += insertNewTransfers(batch, newAttributes, newRelationships = emptyMap(), batchSources)
                     } finally {
                         // Always restore normal trigger behavior
                         database.endCreationMode()
@@ -416,11 +423,13 @@ class TransactionRepositoryImpl(
         transfers: List<Transfer>,
         newAttributes: Map<TransferId, List<NewAttribute>>,
         newRelationships: Map<TransferId, List<NewRelationship>>,
-        sourceRecorder: SourceRecorder,
+        sources: List<Source>,
         updates: List<TransferUpdate>,
-        updateSourceRecorder: SourceRecorder,
+        updateSources: List<Source>,
     ): List<TransferId> =
         withContext(Dispatchers.Default) {
+            require(sources.size == transfers.size) { "sources must align 1:1 with transfers" }
+            require(updateSources.size == updates.size) { "updateSources must align 1:1 with updates" }
             transferQueries.transactionWithResult {
                 val createdIds = mutableListOf<TransferId>()
 
@@ -428,7 +437,7 @@ class TransactionRepositoryImpl(
                 if (transfers.isNotEmpty()) {
                     database.beginCreationMode()
                     try {
-                        createdIds += insertNewTransfers(transfers, newAttributes, newRelationships, sourceRecorder)
+                        createdIds += insertNewTransfers(transfers, newAttributes, newRelationships, sources)
                     } finally {
                         database.endCreationMode()
                     }
@@ -436,7 +445,7 @@ class TransactionRepositoryImpl(
 
                 // Apply updates: the field update bumps the revision; new attributes are added in
                 // creation mode so they don't bump it again.
-                updates.forEach { update ->
+                updates.forEachIndexed { index, update ->
                     val updatedTransfer = update.transfer
                     transferQueries.update(
                         timestamp = updatedTransfer.timestamp.toEpochMilliseconds(),
@@ -463,7 +472,13 @@ class TransactionRepositoryImpl(
                     }
                     // Record the source against the new revision.
                     val persisted = transferQueries.selectById(updatedTransfer.id.id, TransferMapper::mapRaw).executeAsOne()
-                    updateSourceRecorder.insert(persisted)
+                    entitySourceQueries.recordSource(
+                        deviceId,
+                        EntityType.TRANSFER,
+                        persisted.id.id,
+                        persisted.revisionId,
+                        updateSources[index],
+                    )
                 }
 
                 createdIds
@@ -478,13 +493,13 @@ class TransactionRepositoryImpl(
         transfers: List<Transfer>,
         newAttributes: Map<TransferId, List<NewAttribute>>,
         newRelationships: Map<TransferId, List<NewRelationship>>,
-        sourceRecorder: SourceRecorder,
+        sources: List<Source>,
     ): List<TransferId> {
         val createdIds = mutableListOf<TransferId>()
         // Pass 1: insert transfers + attributes and record source, building the input(temp) id -> real id
         // map so relationships can reference siblings created in the same batch (e.g. a fee transfer).
         val idMap = mutableMapOf<TransferId, TransferId>()
-        transfers.forEach { transfer ->
+        transfers.forEachIndexed { index, transfer ->
             transactionIdQueries.insert()
             val generatedId = transactionIdQueries.lastInsertedId().executeAsOne()
             val realId = TransferId(generatedId)
@@ -507,7 +522,7 @@ class TransactionRepositoryImpl(
                     attribute_value = attr.value,
                 )
             }
-            sourceRecorder.insert(transfer.copy(id = realId))
+            entitySourceQueries.recordSource(deviceId, EntityType.TRANSFER, realId.id, transfer.revisionId, sources[index])
         }
         // Pass 2: insert relationships now that every in-batch transfer has a real id. The owning transfer
         // is id1; the related transfer (id2) may be a pre-existing transfer (reconciliation) or a sibling

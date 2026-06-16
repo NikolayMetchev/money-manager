@@ -16,5 +16,5 @@ data class ApiImportStrategyAuditEntry(
     val config: ApiStrategyConfig,
     val createdAt: Instant,
     val updatedAt: Instant,
-    val source: EntitySource? = null,
+    val source: SourceRecord? = null,
 )

@@ -20,12 +20,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.model.AttributeType
-import com.moneymanager.domain.model.EntityProvenance
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonAttribute
 import com.moneymanager.domain.model.PersonId
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.PersonAttributeRepository
 import com.moneymanager.domain.repository.PersonRepository
@@ -41,7 +40,6 @@ private val logger = logging()
 fun EditPersonDialog(
     personToEdit: Person?,
     personRepository: PersonRepository,
-    entitySource: EntitySource,
     onDismiss: () -> Unit,
     onPersonCreated: ((PersonId) -> Unit)? = null,
     personAttributeRepository: PersonAttributeRepository? = null,
@@ -157,7 +155,7 @@ fun EditPersonDialog(
                                                 middleName = middleName.trim().ifBlank { null },
                                                 lastName = lastName.trim().ifBlank { null },
                                             ),
-                                            EntityProvenance.Manual(entitySource.deviceId),
+                                            Source.Manual,
                                         )
                                     }
                                 val personId = newPersonId ?: personToEdit!!.id

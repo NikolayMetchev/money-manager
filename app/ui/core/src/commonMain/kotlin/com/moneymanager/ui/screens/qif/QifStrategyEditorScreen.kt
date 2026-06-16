@@ -11,8 +11,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import com.moneymanager.database.qif.QifCsvAdapter
-import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.model.qif.QifImportId
@@ -26,6 +24,7 @@ import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.QifImportRepository
+import com.moneymanager.qifimporter.QifCsvAdapter
 import com.moneymanager.ui.screens.csvstrategy.editor.CsvStrategyEditorScreen
 
 /**
@@ -47,7 +46,6 @@ fun QifStrategyEditorScreen(
     attributeTypeRepository: AttributeTypeRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    entitySource: EntitySource,
     onBack: () -> Unit,
 ) {
     var sampleRows by remember { mutableStateOf<List<CsvRow>?>(null) }
@@ -79,7 +77,6 @@ fun QifStrategyEditorScreen(
         attributeTypeRepository = attributeTypeRepository,
         personRepository = personRepository,
         personAccountOwnershipRepository = personAccountOwnershipRepository,
-        entitySource = entitySource,
         onBack = onBack,
     )
 }

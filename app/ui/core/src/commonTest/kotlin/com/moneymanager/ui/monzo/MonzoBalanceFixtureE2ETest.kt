@@ -2,12 +2,10 @@
 
 package com.moneymanager.ui.monzo
 
-import com.moneymanager.database.port.DbEntitySource
+import com.moneymanager.apiimporter.importApiSessionTransactions
 import com.moneymanager.domain.model.ApiRequestId
-import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.test.database.DbTest
-import com.moneymanager.ui.api.importApiSessionTransactions
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.Serializable
@@ -113,18 +111,11 @@ class MonzoBalanceFixtureE2ETest : DbTest() {
 
             importApiSessionTransactions(
                 apiSessionRepository = repositories.apiSessionRepository,
-                accountRepository = repositories.accountRepository,
                 currencyRepository = repositories.currencyRepository,
-                transactionRepository = repositories.transactionRepository,
-                entitySource = DbEntitySource(database.transferSourceQueries, DeviceId(deviceId.id)),
-                personRepository = repositories.personRepository,
-                personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
-                personAttributeRepository = repositories.personAttributeRepository,
                 attributeTypeRepository = repositories.attributeTypeRepository,
-                accountAttributeRepository = repositories.accountAttributeRepository,
-                deviceId = DeviceId(deviceId.id),
                 sessionId = sessionId,
                 strategy = strategy,
+                importEngine = repositories.importEngine,
             )
 
             repositories.transactionRepository.getAccountBalances().first().let { actualBalances ->

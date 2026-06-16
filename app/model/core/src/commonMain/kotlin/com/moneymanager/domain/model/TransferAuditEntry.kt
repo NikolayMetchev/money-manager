@@ -31,7 +31,7 @@ data class TransferAuditEntry(
     val sourceAccountId: AccountId,
     val targetAccountId: AccountId,
     val amount: Money,
-    val source: TransferSource? = null,
+    val source: SourceRecord? = null,
     val attributeChanges: List<TransferAttributeAuditEntry> = emptyList(),
 )
 

@@ -2,11 +2,11 @@
 
 package com.moneymanager.database.port
 
-import com.moneymanager.database.recordEntityProvenance
+import com.moneymanager.database.recordSource
 import com.moneymanager.domain.model.DeviceInfo
-import com.moneymanager.domain.model.EntityProvenance
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.JsonPath
+import com.moneymanager.domain.model.Source
 import com.moneymanager.test.database.DbTest
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -29,17 +29,19 @@ class DbEntitySourceTest : DbTest() {
                 )
             val queries = database.entitySourceQueries
 
-            queries.recordEntityProvenance(
-                EntityType.ACCOUNT,
+            queries.recordSource(
+                deviceId = deviceId,
+                entityType = EntityType.ACCOUNT,
                 entityId = 99L,
                 revisionId = 1L,
-                provenance = EntityProvenance.ApiImport(deviceId, sessionId, requestId, JsonPath("$.accounts[0]")),
+                source = Source.Api(sessionId, requestId, JsonPath("$.accounts[0]")),
             )
-            queries.recordEntityProvenance(
-                EntityType.ACCOUNT,
+            queries.recordSource(
+                deviceId = deviceId,
+                entityType = EntityType.ACCOUNT,
                 entityId = 99L,
                 revisionId = 2L,
-                provenance = EntityProvenance.ApiImport(deviceId, sessionId, requestId, JsonPath("$.accounts[0].updated")),
+                source = Source.Api(sessionId, requestId, JsonPath("$.accounts[0].updated")),
             )
 
             val revisionOne =

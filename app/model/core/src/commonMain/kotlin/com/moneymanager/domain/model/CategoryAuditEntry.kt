@@ -27,5 +27,5 @@ data class CategoryAuditEntry(
     val name: String,
     val parentId: Long?,
     val parentName: String?,
-    val source: EntitySource? = null,
+    val source: SourceRecord? = null,
 )

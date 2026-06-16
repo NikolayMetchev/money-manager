@@ -10,7 +10,7 @@ import com.moneymanager.domain.model.NewRelationship
 import com.moneymanager.domain.model.PageWithTargetIndex
 import com.moneymanager.domain.model.PagingInfo
 import com.moneymanager.domain.model.PagingResult
-import com.moneymanager.domain.model.SourceRecorder
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TransactionId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
@@ -93,7 +93,7 @@ interface TransactionRepository {
      *
      * @param transfers List of transfers to create
      * @param newAttributes Map of transfer ID to attributes to create (attributes don't have IDs yet)
-     * @param sourceRecorder Strategy for recording source information (includes device info)
+     * @param sources Per-transfer [Source]s aligned 1:1 with [transfers]; device identity is injected.
      * @param batchSize Number of transfers to process per write batch (default 1000)
      * @param onProgress Optional callback for batch progress (called after each processed batch)
      * @return Generated transaction IDs in the same order as [transfers]
@@ -101,7 +101,7 @@ interface TransactionRepository {
     suspend fun createTransfers(
         transfers: List<Transfer>,
         newAttributes: Map<TransferId, List<NewAttribute>> = emptyMap(),
-        sourceRecorder: SourceRecorder,
+        sources: List<Source>,
         batchSize: Int = 1000,
         onProgress: (suspend (created: Int, total: Int) -> Unit)? = null,
     ): List<TransferId>
@@ -142,28 +142,29 @@ interface TransactionRepository {
      * @param transfers New transfers to create (with placeholder ids); attributes keyed by placeholder id.
      * @param newRelationships Relationships to create per new transfer, keyed by placeholder id; the new
      *   transfer becomes id1 and [NewRelationship.relatedTransferId] (an existing transfer) becomes id2.
-     * @param sourceRecorder Records the source of each created transfer (called once per transfer in order).
+     * @param sources Per-new-transfer [Source]s aligned 1:1 with [transfers].
      * @param updates Existing transfers to update, each with attributes to add.
-     * @param updateSourceRecorder Records the source of each updated transfer (once per update in order).
+     * @param updateSources Per-update [Source]s aligned 1:1 with [updates].
      * @return Generated transaction ids in the same order as [transfers].
      */
     suspend fun importTransfers(
         transfers: List<Transfer>,
         newAttributes: Map<TransferId, List<NewAttribute>>,
         newRelationships: Map<TransferId, List<NewRelationship>> = emptyMap(),
-        sourceRecorder: SourceRecorder,
+        sources: List<Source>,
         updates: List<TransferUpdate>,
-        updateSourceRecorder: SourceRecorder,
+        updateSources: List<Source>,
     ): List<TransferId> {
         // The default path delegates to createTransfers, which has no way to persist relationships.
         // Fail loudly rather than silently dropping them; the real DB impl overrides this method.
         require(newRelationships.isEmpty()) {
             "Default importTransfers does not persist newRelationships; override importTransfers in this implementation."
         }
+        require(updateSources.size == updates.size) { "updateSources must align 1:1 with updates" }
         // Default (non-atomic) implementation for fakes/alternative impls; the real impl overrides this
-        // to run everything in one transaction.
+        // to run everything in one transaction and record the per-update source.
         val created =
-            createTransfers(transfers = transfers, newAttributes = newAttributes, sourceRecorder = sourceRecorder)
+            createTransfers(transfers = transfers, newAttributes = newAttributes, sources = sources)
         updates.forEach { update ->
             updateTransfer(
                 transfer = update.transfer,
@@ -172,7 +173,6 @@ interface TransactionRepository {
                 newAttributes = update.newAttributes,
                 transactionId = update.transfer.id,
             )
-            updateSourceRecorder.insert(update.transfer)
         }
         return created
     }

@@ -49,7 +49,6 @@ import com.moneymanager.domain.CsvReferenceType
 import com.moneymanager.domain.CsvResolution
 import com.moneymanager.domain.CsvStrategyImportExport
 import com.moneymanager.domain.CsvUnresolvedReference
-import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Category
@@ -85,7 +84,6 @@ fun ImportStrategyDialog(
     currencyRepository: CurrencyRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    entitySource: EntitySource,
     onDismiss: () -> Unit,
     onImportSuccess: () -> Unit,
 ) {
@@ -198,7 +196,6 @@ fun ImportStrategyDialog(
                             categoryRepository = categoryRepository,
                             personRepository = personRepository,
                             personAccountOwnershipRepository = personAccountOwnershipRepository,
-                            entitySource = entitySource,
                             enabled = !isImporting,
                         )
                         Spacer(modifier = Modifier.height(8.dp))
@@ -351,7 +348,6 @@ private fun ReferenceResolutionRow(
     categoryRepository: CategoryRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    entitySource: EntitySource,
     enabled: Boolean,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -504,7 +500,6 @@ private fun ReferenceResolutionRow(
                             categoryRepository = categoryRepository,
                             personRepository = personRepository,
                             personAccountOwnershipRepository = personAccountOwnershipRepository,
-                            entitySource = entitySource,
                             initialName = reference.name,
                             onDismiss = { showCreateAccountDialog = false },
                             onAccountCreated = { accountId ->

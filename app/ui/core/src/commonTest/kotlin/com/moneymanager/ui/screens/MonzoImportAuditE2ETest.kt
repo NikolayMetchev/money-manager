@@ -11,8 +11,10 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import androidx.compose.ui.test.waitUntilDoesNotExist
+import com.moneymanager.apiimporter.downloadApiSessionAccounts
+import com.moneymanager.apiimporter.downloadApiSessionTransactions
+import com.moneymanager.apiimporter.importApiSessionTransactions
 import com.moneymanager.database.DatabaseManager
-import com.moneymanager.database.port.DbEntitySource
 import com.moneymanager.di.database.DatabaseComponent
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.DbLocation
@@ -22,9 +24,6 @@ import com.moneymanager.rest.createApiClient
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
-import com.moneymanager.ui.api.downloadApiSessionAccounts
-import com.moneymanager.ui.api.downloadApiSessionTransactions
-import com.moneymanager.ui.api.importApiSessionTransactions
 import com.moneymanager.ui.test.MoneyManagerTestApp
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import io.ktor.client.engine.mock.MockEngine
@@ -196,18 +195,11 @@ class MonzoImportAuditE2ETest {
                 )
                 importApiSessionTransactions(
                     apiSessionRepository = dc.apiSessionRepository,
-                    accountRepository = dc.accountRepository,
                     currencyRepository = dc.currencyRepository,
-                    transactionRepository = dc.transactionRepository,
-                    entitySource = DbEntitySource(db.transferSourceQueries, deviceId),
-                    personRepository = dc.personRepository,
-                    personAccountOwnershipRepository = dc.personAccountOwnershipRepository,
-                    personAttributeRepository = dc.personAttributeRepository,
                     attributeTypeRepository = dc.attributeTypeRepository,
-                    accountAttributeRepository = dc.accountAttributeRepository,
-                    deviceId = deviceId,
                     sessionId = sessionId,
                     strategy = strategy,
+                    importEngine = dc.importEngine,
                 )
             }
 

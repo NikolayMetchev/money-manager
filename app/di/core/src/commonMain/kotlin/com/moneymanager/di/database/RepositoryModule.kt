@@ -27,7 +27,6 @@ import com.moneymanager.database.repository.TransferRelationshipRepositoryImpl
 import com.moneymanager.database.repository.TransferSourceRepositoryImpl
 import com.moneymanager.database.service.CsvStrategyExportService
 import com.moneymanager.database.sql.EntitySourceQueries
-import com.moneymanager.database.sql.TransferSourceQueries
 import com.moneymanager.di.DatabaseScope
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.repository.AccountAttributeRepository
@@ -52,7 +51,8 @@ import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.domain.repository.TransferAttributeRepository
 import com.moneymanager.domain.repository.TransferRelationshipRepository
 import com.moneymanager.domain.repository.TransferSourceRepository
-import com.moneymanager.importer.ImportEngine
+import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importer.ImportEngineImpl
 import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
@@ -64,10 +64,6 @@ import dev.zacsweers.metro.SingleIn
 interface RepositoryModule {
     @Provides
     @SingleIn(DatabaseScope::class)
-    fun provideTransferSourceQueries(database: MoneyManagerDatabaseWrapper): TransferSourceQueries = database.transferSourceQueries
-
-    @Provides
-    @SingleIn(DatabaseScope::class)
     fun provideEntitySourceQueries(database: MoneyManagerDatabaseWrapper): EntitySourceQueries = database.entitySourceQueries
 
     @Provides
@@ -77,7 +73,10 @@ interface RepositoryModule {
 
     @Provides
     @SingleIn(DatabaseScope::class)
-    fun provideAccountRepository(database: MoneyManagerDatabaseWrapper): AccountRepository = AccountRepositoryImpl(database)
+    fun provideAccountRepository(
+        database: MoneyManagerDatabaseWrapper,
+        deviceId: DeviceId,
+    ): AccountRepository = AccountRepositoryImpl(database, deviceId)
 
     @Provides
     @SingleIn(DatabaseScope::class)
@@ -101,7 +100,10 @@ interface RepositoryModule {
 
     @Provides
     @SingleIn(DatabaseScope::class)
-    fun provideCategoryRepository(database: MoneyManagerDatabaseWrapper): CategoryRepository = CategoryRepositoryImpl(database)
+    fun provideCategoryRepository(
+        database: MoneyManagerDatabaseWrapper,
+        deviceId: DeviceId,
+    ): CategoryRepository = CategoryRepositoryImpl(database, deviceId)
 
     @Provides
     @SingleIn(DatabaseScope::class)
@@ -114,12 +116,17 @@ interface RepositoryModule {
 
     @Provides
     @SingleIn(DatabaseScope::class)
-    fun providePersonRepository(database: MoneyManagerDatabaseWrapper): PersonRepository = PersonRepositoryImpl(database)
+    fun providePersonRepository(
+        database: MoneyManagerDatabaseWrapper,
+        deviceId: DeviceId,
+    ): PersonRepository = PersonRepositoryImpl(database, deviceId)
 
     @Provides
     @SingleIn(DatabaseScope::class)
-    fun providePersonAccountOwnershipRepository(database: MoneyManagerDatabaseWrapper): PersonAccountOwnershipRepository =
-        PersonAccountOwnershipRepositoryImpl(database)
+    fun providePersonAccountOwnershipRepository(
+        database: MoneyManagerDatabaseWrapper,
+        deviceId: DeviceId,
+    ): PersonAccountOwnershipRepository = PersonAccountOwnershipRepositoryImpl(database, deviceId)
 
     @Provides
     @SingleIn(DatabaseScope::class)
@@ -147,7 +154,10 @@ interface RepositoryModule {
 
     @Provides
     @SingleIn(DatabaseScope::class)
-    fun provideCurrencyRepository(database: MoneyManagerDatabaseWrapper): CurrencyRepository = CurrencyRepositoryImpl(database)
+    fun provideCurrencyRepository(
+        database: MoneyManagerDatabaseWrapper,
+        deviceId: DeviceId,
+    ): CurrencyRepository = CurrencyRepositoryImpl(database, deviceId)
 
     @Provides
     @SingleIn(DatabaseScope::class)
@@ -160,12 +170,14 @@ interface RepositoryModule {
         accountRepository: AccountRepository,
         currencyRepository: CurrencyRepository,
         categoryRepository: CategoryRepository,
-        deviceId: DeviceId,
-    ): CsvStrategyExportService = CsvStrategyExportService(accountRepository, currencyRepository, categoryRepository, deviceId)
+    ): CsvStrategyExportService = CsvStrategyExportService(accountRepository, currencyRepository, categoryRepository)
 
     @Provides
     @SingleIn(DatabaseScope::class)
-    fun provideTransactionRepository(database: MoneyManagerDatabaseWrapper): TransactionRepository = TransactionRepositoryImpl(database)
+    fun provideTransactionRepository(
+        database: MoneyManagerDatabaseWrapper,
+        deviceId: DeviceId,
+    ): TransactionRepository = TransactionRepositoryImpl(database, deviceId)
 
     @Provides
     @SingleIn(DatabaseScope::class)
@@ -203,7 +215,7 @@ interface RepositoryModule {
         personAttributeRepository: PersonAttributeRepository,
         ownershipRepository: PersonAccountOwnershipRepository,
     ): ImportEngine =
-        ImportEngine(
+        ImportEngineImpl(
             transactionRepository = transactionRepository,
             accountRepository = accountRepository,
             accountAttributeRepository = accountAttributeRepository,

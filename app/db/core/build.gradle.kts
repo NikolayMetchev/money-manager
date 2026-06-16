@@ -12,7 +12,7 @@ kotlin {
             dependencies {
                 api(libs.kotlinx.coroutines.core)
                 api(libs.mappie.api)
-                api(projects.app.importmodel)
+                api(projects.app.importengineapi)
                 api(projects.app.model.core)
                 api(projects.utils.currency)
 
@@ -28,8 +28,10 @@ kotlin {
             dependencies {
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)
-                implementation(projects.app.importmodel)
+                implementation(projects.app.csvimporter)
+                implementation(projects.app.importengineapi)
                 implementation(projects.app.model.core)
+                implementation(projects.app.qifimporter)
                 implementation(projects.test.app.db)
             }
         }

@@ -101,13 +101,14 @@ class CsvTableManager(
             LEFT JOIN csv_import_error e ON e.csv_import_id = '$csvImportId' AND e.row_index = t.row_index
             LEFT JOIN (
                 SELECT
-                    csv_transfer_source.csv_import_id,
-                    csv_transfer_source.csv_row_index,
-                    MIN(transfer_source.transaction_id) AS transaction_id
-                FROM csv_transfer_source
-                JOIN transfer_source ON transfer_source.id = csv_transfer_source.id
-                WHERE csv_transfer_source.csv_import_id = '$csvImportId'
-                GROUP BY csv_transfer_source.csv_import_id, csv_transfer_source.csv_row_index
+                    csv_entity_source.csv_import_id,
+                    csv_entity_source.csv_row_index,
+                    MIN(entity_source.entity_id) AS transaction_id
+                FROM csv_entity_source
+                JOIN entity_source ON entity_source.id = csv_entity_source.id
+                WHERE csv_entity_source.csv_import_id = '$csvImportId'
+                  AND entity_source.entity_type_id = 7
+                GROUP BY csv_entity_source.csv_import_id, csv_entity_source.csv_row_index
             ) source_rows ON source_rows.csv_import_id = '$csvImportId'
                 AND source_rows.csv_row_index = t.row_index
             ORDER BY t.row_index

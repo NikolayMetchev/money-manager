@@ -7,7 +7,6 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.ApiSession
 import com.moneymanager.domain.model.DeviceId
@@ -24,12 +23,11 @@ import com.moneymanager.domain.repository.CsvImportRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
-import com.moneymanager.domain.repository.PersonAttributeRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.QifImportRepository
 import com.moneymanager.domain.repository.SettingsRepository
 import com.moneymanager.domain.repository.TransactionRepository
-import com.moneymanager.importer.ImportEngine
+import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.ui.navigation.ImportTab
 
 @Composable
@@ -49,11 +47,9 @@ fun ImportsScreen(
     accountRepository: AccountRepository,
     currencyRepository: CurrencyRepository,
     transactionRepository: TransactionRepository,
-    entitySource: EntitySource,
     maintenance: Maintenance,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    personAttributeRepository: PersonAttributeRepository,
     importEngine: ImportEngine,
     deviceId: DeviceId,
     onCsvImportClick: (CsvImportId) -> Unit,
@@ -101,7 +97,6 @@ fun ImportsScreen(
                     personAccountOwnershipRepository = personAccountOwnershipRepository,
                     attributeTypeRepository = attributeTypeRepository,
                     maintenance = maintenance,
-                    entitySource = entitySource,
                     importEngine = importEngine,
                     onImportClick = onCsvImportClick,
                     onStrategiesClick = onCsvStrategiesClick,
@@ -119,7 +114,6 @@ fun ImportsScreen(
                     attributeTypeRepository = attributeTypeRepository,
                     settingsRepository = settingsRepository,
                     maintenance = maintenance,
-                    entitySource = entitySource,
                     importEngine = importEngine,
                     onImportClick = onQifImportClick,
                     onStrategiesClick = onCsvStrategiesClick,
@@ -132,12 +126,8 @@ fun ImportsScreen(
                     accountAttributeRepository = accountAttributeRepository,
                     accountRepository = accountRepository,
                     currencyRepository = currencyRepository,
-                    transactionRepository = transactionRepository,
-                    entitySource = entitySource,
                     maintenance = maintenance,
-                    personRepository = personRepository,
-                    personAccountOwnershipRepository = personAccountOwnershipRepository,
-                    personAttributeRepository = personAttributeRepository,
+                    importEngine = importEngine,
                     deviceId = deviceId,
                     onMonzoConnectClick = onAddCredentialClick,
                     onApiStrategiesClick = onApiStrategiesClick,
@@ -149,7 +139,6 @@ fun ImportsScreen(
                     csvImportStrategyRepository = csvImportStrategyRepository,
                     transactionRepository = transactionRepository,
                     attributeTypeRepository = attributeTypeRepository,
-                    entitySource = entitySource,
                     maintenance = maintenance,
                     onTransactionsImported = onTransactionsImported,
                 )

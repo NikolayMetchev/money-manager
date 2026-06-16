@@ -1,13 +1,12 @@
 @file:OptIn(kotlin.time.ExperimentalTime::class)
 
 package com.moneymanager.database.repository
-import com.moneymanager.database.SampleGeneratorSourceRecorder
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
-import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.test.database.DbTest
@@ -26,7 +25,6 @@ class TransfersMissingCompanionTest : DbTest() {
         transfer: Transfer,
         attributes: Map<String, String>,
     ): TransferId {
-        val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
         val newAttributes =
             attributes.map { (name, value) ->
                 NewAttribute(repositories.attributeTypeRepository.getOrCreate(name), value)
@@ -35,7 +33,7 @@ class TransfersMissingCompanionTest : DbTest() {
             .createTransfers(
                 transfers = listOf(transfer),
                 newAttributes = mapOf(transfer.id to newAttributes),
-                sourceRecorder = SampleGeneratorSourceRecorder(transferSourceQueries, deviceId),
+                sources = listOf(Source.SampleGenerator),
             ).single()
     }
 

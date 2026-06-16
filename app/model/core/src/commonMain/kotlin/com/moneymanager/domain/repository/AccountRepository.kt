@@ -4,10 +4,9 @@ import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountMerge
 import com.moneymanager.domain.model.AccountMergeContext
-import com.moneymanager.domain.model.DeviceId
-import com.moneymanager.domain.model.EntityProvenance
 import com.moneymanager.domain.model.MergeId
 import com.moneymanager.domain.model.NewAttribute
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
 import kotlinx.coroutines.flow.Flow
 
@@ -18,13 +17,13 @@ interface AccountRepository {
 
     suspend fun createAccount(
         account: Account,
-        provenance: EntityProvenance,
+        source: Source,
     ): AccountId
 
-    /** Creates accounts in one transaction, recording each account's source via [provenanceFor]. */
+    /** Creates accounts in one transaction, recording each account's source via [sourceFor]. */
     suspend fun createAccountsBatch(
         accounts: List<Account>,
-        provenanceFor: (Account) -> EntityProvenance,
+        sourceFor: (Account) -> Source,
     ): List<AccountId>
 
     /**
@@ -32,7 +31,7 @@ interface AccountRepository {
      */
     suspend fun updateAccount(
         account: Account,
-        provenance: EntityProvenance,
+        source: Source,
     ): Long
 
     /**
@@ -46,7 +45,7 @@ interface AccountRepository {
         deletedAttributeIds: Set<Long>,
         updatedAttributes: Map<Long, NewAttribute>,
         newAttributes: List<NewAttribute>,
-        provenance: EntityProvenance,
+        source: Source,
     ): Long
 
     suspend fun deleteAccount(id: AccountId)
@@ -66,14 +65,13 @@ interface AccountRepository {
      * Throws if any transfers exist directly between the two accounts (they would become invalid
      * self-transfers); callers should surface this to the user before invoking.
      *
-     * The deleted account's DELETE audit entry is sourced as a merge on [deviceId].
+     * The deleted account's DELETE audit entry is sourced as a merge on the current device.
      *
      * @return the id of the recorded merge.
      */
     suspend fun mergeAccounts(
         deletedAccount: AccountId,
         survivingAccount: AccountId,
-        deviceId: DeviceId,
     ): MergeId
 
     /** Reversible (not yet undone) merges, most recent first, for surfacing an "undo merge" action. */
@@ -88,10 +86,7 @@ interface AccountRepository {
     /**
      * Reverses a previous [mergeAccounts]: recreates the deleted account (with its original id,
      * attributes and owners) and moves the reassigned transactions back. No-op if already reversed.
-     * The recreated account's audit entry is sourced as a merge-undo on [deviceId].
+     * The recreated account's audit entry is sourced as a merge-undo on the current device.
      */
-    suspend fun unmergeAccount(
-        mergeId: MergeId,
-        deviceId: DeviceId,
-    )
+    suspend fun unmergeAccount(mergeId: MergeId)
 }
