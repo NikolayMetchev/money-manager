@@ -2,20 +2,16 @@
 
 package com.moneymanager.database
 
-import com.moneymanager.database.sql.EntitySourceQueries
 import com.moneymanager.database.sql.TransferSourceQueries
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.DeviceId
-import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.SourceRecorder
-import com.moneymanager.domain.model.SourceType
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.qif.QifImportId
-import org.lighthousegames.logging.logging
 
 /** Manual entry from UI. */
 class ManualSourceRecorder(
@@ -119,103 +115,6 @@ class ApiImportSourceRecorder(
                 sessionId.id,
                 requestId.id,
                 jsonPath.value,
-            )
-        }
-    }
-}
-
-// ============================================================================
-// Entity Source Recorders (for Account, Person, Currency, PersonAccountOwnership)
-// ============================================================================
-
-/** Records source for entity operations (manual entry). */
-class ManualEntitySourceRecorder(
-    private val queries: EntitySourceQueries,
-    private val deviceId: DeviceId,
-) {
-    fun insert(
-        entityType: EntityType,
-        entityId: Long,
-        revisionId: Long,
-    ) {
-        queries.insertSource(
-            entity_type_id = entityType.id,
-            entity_id = entityId,
-            revision_id = revisionId,
-            source_type_id = SourceType.MANUAL.id.toLong(),
-            device_id = deviceId.id,
-        )
-    }
-}
-
-/** Records source for entity operations (sample data generator). */
-class SampleGeneratorEntitySourceRecorder(
-    private val queries: EntitySourceQueries,
-    private val deviceId: DeviceId,
-) {
-    fun insert(
-        entityType: EntityType,
-        entityId: Long,
-        revisionId: Long,
-    ) {
-        queries.insertSource(
-            entity_type_id = entityType.id,
-            entity_id = entityId,
-            revision_id = revisionId,
-            source_type_id = SourceType.SAMPLE_GENERATOR.id.toLong(),
-            device_id = deviceId.id,
-        )
-    }
-}
-
-/** Records source for entity operations (API import). */
-class ApiEntitySourceRecorder(
-    private val queries: EntitySourceQueries,
-    private val deviceId: DeviceId,
-    private val sessionId: ApiSessionId,
-    private val requestId: ApiRequestId,
-    private val jsonPath: JsonPath,
-) {
-    private val logger = logging()
-
-    fun insert(
-        entityType: EntityType,
-        entityId: Long,
-        revisionId: Long,
-    ) {
-        queries.transaction {
-            queries.insertSource(
-                entity_type_id = entityType.id,
-                entity_id = entityId,
-                revision_id = revisionId,
-                source_type_id = SourceType.API.id.toLong(),
-                device_id = deviceId.id,
-            )
-            val entitySource =
-                queries
-                    .selectEntitySourceForRevision(
-                        entity_type_id = entityType.id,
-                        entity_id = entityId,
-                        revision_id = revisionId,
-                    ).executeAsOne()
-            if (entitySource.source_type_id != SourceType.API.id.toLong()) {
-                logger.warn {
-                    "Skipped API entity source insert due to existing non-API source: entity_type_id=${entityType.id}, entity_id=$entityId, revision_id=$revisionId"
-                }
-                return@transaction
-            }
-            val entitySourceId = entitySource.id
-            if (queries.selectApiEntitySourceId(id = entitySourceId).executeAsOneOrNull() != null) {
-                logger.warn {
-                    "Suppressed duplicate API entity source: entity_type_id=${entityType.id}, entity_id=$entityId, revision_id=$revisionId"
-                }
-                return@transaction
-            }
-            queries.insertApiSource(
-                id = entitySourceId,
-                api_session_id = sessionId.id,
-                api_request_id = requestId.id,
-                json_path = jsonPath.value,
             )
         }
     }

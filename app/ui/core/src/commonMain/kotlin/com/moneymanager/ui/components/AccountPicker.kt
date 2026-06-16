@@ -65,6 +65,8 @@ fun AccountPicker(
     var expanded by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var showCreateAccountDialog by remember { mutableStateOf(false) }
+    // The name to pre-fill the create dialog with (the substring the user typed, if any).
+    var createAccountInitialName by remember { mutableStateOf("") }
 
     val filteredAccounts =
         remember(accounts, searchQuery, excludeAccountId) {
@@ -114,9 +116,15 @@ fun AccountPicker(
                 searchQuery = ""
             },
         ) {
+            val trimmedQuery = searchQuery.trim()
+            val createLabel =
+                if (trimmedQuery.isNotEmpty()) "+ Create \"$trimmedQuery\"" else "+ Create New Account"
             DropdownMenuItem(
-                text = { Text("+ Create New Account") },
+                text = { Text(createLabel) },
                 onClick = {
+                    // Pre-fill the create dialog with whatever the user typed so a not-found name
+                    // becomes a one-click new account.
+                    createAccountInitialName = trimmedQuery
                     showCreateAccountDialog = true
                     expanded = false
                     searchQuery = ""
@@ -143,6 +151,7 @@ fun AccountPicker(
             personRepository = personRepository,
             personAccountOwnershipRepository = personAccountOwnershipRepository,
             entitySource = entitySource,
+            initialName = createAccountInitialName,
             onDismiss = { showCreateAccountDialog = false },
             onAccountCreated = { accountId ->
                 onAccountSelected(accountId)

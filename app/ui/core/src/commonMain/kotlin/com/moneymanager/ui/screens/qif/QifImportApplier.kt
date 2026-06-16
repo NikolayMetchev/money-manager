@@ -12,6 +12,7 @@ import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.EntityProvenance
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvRow
@@ -229,7 +230,9 @@ internal suspend fun runImport(
             accountsToCreate.map { newAccount ->
                 Account(id = AccountId(0), name = newAccount.name, openingDate = Clock.System.now(), categoryId = newAccount.categoryId)
             }
-        runCatching { accountRepository.createAccountsBatch(newAccounts) }
+        // Record QIF provenance for each created account (atomically, in the repository).
+        val qifProvenance = EntityProvenance.QifImport(entitySource.deviceId, qifImport.id)
+        runCatching { accountRepository.createAccountsBatch(newAccounts) { qifProvenance } }
             .onFailure { logger.warn(it) { "Failed to bulk-create accounts" } }
     }
 

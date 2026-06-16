@@ -46,6 +46,7 @@ fun <D : Any> AuditScreen(
     diffKey: (D) -> Long,
     onBack: () -> Unit,
     diffCard: @Composable (D) -> Unit,
+    header: @Composable () -> Unit = {},
 ) {
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -88,6 +89,8 @@ fun <D : Any> AuditScreen(
         }
 
         Spacer(modifier = Modifier.height(16.dp))
+
+        header()
 
         if (isLoading) {
             Box(

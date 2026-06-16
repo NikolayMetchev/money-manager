@@ -1,6 +1,6 @@
 package com.moneymanager.importmodel
 
-import com.moneymanager.domain.model.EntityType
+import com.moneymanager.domain.model.EntityProvenance
 import com.moneymanager.domain.model.SourceRecorder
 
 /**
@@ -23,10 +23,10 @@ interface ImportProvenance {
      */
     fun updatedTransferRecorder(orderedRowKeys: List<ImportRowKey>): SourceRecorder = transferRecorder(orderedRowKeys)
 
-    /** Records provenance for a newly created account/person/ownership/etc. */
-    fun recordEntity(
-        entityType: EntityType,
-        entityId: Long,
-        revisionId: Long,
-    )
+    /**
+     * The [EntityProvenance] for accounts/people/ownerships the engine creates from this batch.
+     * The engine passes it to the repository create methods, which record the source atomically — so
+     * entity provenance can never be forgotten.
+     */
+    fun entityProvenance(): EntityProvenance
 }

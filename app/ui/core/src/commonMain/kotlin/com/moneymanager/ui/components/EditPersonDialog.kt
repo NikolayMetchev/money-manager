@@ -22,7 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.model.AttributeType
-import com.moneymanager.domain.model.EntityType
+import com.moneymanager.domain.model.EntityProvenance
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonAttribute
 import com.moneymanager.domain.model.PersonId
@@ -157,6 +157,7 @@ fun EditPersonDialog(
                                                 middleName = middleName.trim().ifBlank { null },
                                                 lastName = lastName.trim().ifBlank { null },
                                             ),
+                                            EntityProvenance.Manual(entitySource.deviceId),
                                         )
                                     }
                                 val personId = newPersonId ?: personToEdit!!.id
@@ -172,7 +173,6 @@ fun EditPersonDialog(
                                 // Only announce the new person once the full save (row + attributes)
                                 // has succeeded, so the parent never selects a half-saved person.
                                 if (newPersonId != null) {
-                                    entitySource.record(EntityType.PERSON, newPersonId.id, 1L)
                                     onPersonCreated?.invoke(newPersonId)
                                 }
                                 onDismiss()

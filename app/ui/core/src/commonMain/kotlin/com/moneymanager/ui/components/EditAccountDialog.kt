@@ -25,7 +25,7 @@ import androidx.compose.ui.Modifier
 import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AttributeType
-import com.moneymanager.domain.model.EntityType
+import com.moneymanager.domain.model.EntityProvenance
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.repository.AccountAttributeRepository
@@ -213,18 +213,18 @@ fun EditAccountDialog(
                                     }
                                 }
 
-                                // Atomic update: one revision bump for account + all attribute changes
-                                val finalRevisionId =
-                                    accountRepository.updateAccountWithAttributes(
-                                        account = updatedAccount,
-                                        accountId = account.id,
-                                        deletedAttributeIds = deletedAttributeIds,
-                                        updatedAttributes = updatedAttributes,
-                                        newAttributes = newAttributes,
-                                    )
+                                val provenance = EntityProvenance.Manual(entitySource.deviceId)
 
-                                // Record manual source for the single audit entry
-                                entitySource.record(EntityType.ACCOUNT, account.id.id, finalRevisionId)
+                                // Atomic update: one revision bump for account + all attribute changes.
+                                // The source for the resulting revision is recorded inside the repository.
+                                accountRepository.updateAccountWithAttributes(
+                                    account = updatedAccount,
+                                    accountId = account.id,
+                                    deletedAttributeIds = deletedAttributeIds,
+                                    updatedAttributes = updatedAttributes,
+                                    newAttributes = newAttributes,
+                                    provenance = provenance,
+                                )
 
                                 val existingOwnerIds = existingOwnerships.map { it.personId.id }.toSet()
                                 val ownersToAdd = selectedOwnerIds - existingOwnerIds
@@ -238,12 +238,11 @@ fun EditAccountDialog(
                                 }
 
                                 ownersToAdd.forEach { personId ->
-                                    val ownershipId =
-                                        personAccountOwnershipRepository.createOwnership(
-                                            personId = PersonId(personId),
-                                            accountId = account.id,
-                                        )
-                                    entitySource.record(EntityType.PERSON_ACCOUNT_OWNERSHIP, ownershipId, 1L)
+                                    personAccountOwnershipRepository.createOwnership(
+                                        personId = PersonId(personId),
+                                        accountId = account.id,
+                                        provenance = provenance,
+                                    )
                                 }
 
                                 onDismiss()

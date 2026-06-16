@@ -1,11 +1,11 @@
 @file:OptIn(kotlin.time.ExperimentalTime::class)
 
 package com.moneymanager.database.repository
-
 import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.test.database.DbTest
+import com.moneymanager.test.database.createPerson
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test

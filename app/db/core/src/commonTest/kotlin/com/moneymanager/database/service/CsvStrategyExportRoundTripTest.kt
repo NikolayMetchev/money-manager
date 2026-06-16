@@ -30,6 +30,7 @@ class CsvStrategyExportRoundTripTest : DbTest() {
                     accountRepository = repositories.accountRepository,
                     currencyRepository = repositories.currencyRepository,
                     categoryRepository = repositories.categoryRepository,
+                    deviceId = repositories.deviceId,
                 )
             val appVersion = AppVersion("1.0.0-test")
 

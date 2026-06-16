@@ -1,7 +1,6 @@
 @file:OptIn(ExperimentalTime::class, ExperimentalUuidApi::class)
 
 package com.moneymanager.ui.screens
-
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasText
@@ -32,9 +31,11 @@ import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
 import com.moneymanager.qif.QifParser
+import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
+import com.moneymanager.test.database.upsertCurrencyByCode
 import com.moneymanager.ui.screens.qif.dominantAccountType
 import com.moneymanager.ui.screens.qif.toImportRecords
 import com.moneymanager.ui.test.MoneyManagerTestApp

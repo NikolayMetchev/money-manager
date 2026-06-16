@@ -54,8 +54,11 @@ VALUES (?, ?, ?);
 
 update:
 UPDATE category
-SET name = ?, parent_id = ?
+SET revision_id = revision_id + 1, name = ?, parent_id = ?
 WHERE id = ?;
+
+selectRevisionById:
+SELECT revision_id FROM category WHERE id = ?;
 
 delete:
 DELETE FROM category WHERE id = ?;

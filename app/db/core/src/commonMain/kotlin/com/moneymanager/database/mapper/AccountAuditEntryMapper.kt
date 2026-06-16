@@ -42,5 +42,8 @@ private fun SelectAuditHistoryForAccount.toEntitySource(): EntitySource? {
         sourceApiSessionId = source_api_session_id,
         sourceApiRequestId = source_api_request_id,
         sourceApiJsonPath = source_api_json_path,
+        sourceCsvImportId = source_csv_import_id,
+        sourceCsvRowIndex = source_csv_row_index,
+        sourceCsvFileName = source_csv_file_name,
     )
 }

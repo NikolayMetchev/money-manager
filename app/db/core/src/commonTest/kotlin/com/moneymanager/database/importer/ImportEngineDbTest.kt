@@ -1,13 +1,12 @@
 @file:OptIn(kotlin.time.ExperimentalTime::class)
 
 package com.moneymanager.database.importer
-
 import com.moneymanager.database.SampleGeneratorSourceRecorder
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.DeviceInfo
-import com.moneymanager.domain.model.EntityType
+import com.moneymanager.domain.model.EntityProvenance
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.SourceRecorder
 import com.moneymanager.importer.ImportEngine
@@ -25,6 +24,7 @@ import com.moneymanager.importmodel.LocalAccountKey
 import com.moneymanager.importmodel.LocalPersonKey
 import com.moneymanager.importmodel.PersonMatchKey
 import com.moneymanager.test.database.DbTest
+import com.moneymanager.test.database.createAccount
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -50,11 +50,7 @@ class ImportEngineDbTest : DbTest() {
             override fun transferRecorder(orderedRowKeys: List<ImportRowKey>): SourceRecorder =
                 SampleGeneratorSourceRecorder(transferSourceQueries, deviceId)
 
-            override fun recordEntity(
-                entityType: EntityType,
-                entityId: Long,
-                revisionId: Long,
-            ) = Unit
+            override fun entityProvenance(): EntityProvenance = EntityProvenance.SampleGenerator(deviceId)
         }
     }
 
