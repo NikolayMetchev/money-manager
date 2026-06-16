@@ -52,7 +52,8 @@ import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.domain.repository.TransferAttributeRepository
 import com.moneymanager.domain.repository.TransferRelationshipRepository
 import com.moneymanager.domain.repository.TransferSourceRepository
-import com.moneymanager.importer.ImportEngine
+import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importer.ImportEngineImpl
 import dev.zacsweers.metro.ContributesTo
 import dev.zacsweers.metro.Provides
 import dev.zacsweers.metro.SingleIn
@@ -203,7 +204,7 @@ interface RepositoryModule {
         personAttributeRepository: PersonAttributeRepository,
         ownershipRepository: PersonAccountOwnershipRepository,
     ): ImportEngine =
-        ImportEngine(
+        ImportEngineImpl(
             transactionRepository = transactionRepository,
             accountRepository = accountRepository,
             accountAttributeRepository = accountAttributeRepository,

@@ -13,10 +13,10 @@ import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.ImportStatus
-import com.moneymanager.importmodel.AccountRef
-import com.moneymanager.importmodel.DedupePolicy
-import com.moneymanager.importmodel.ImportRowKey
-import com.moneymanager.importmodel.ImportTransfer
+import com.moneymanager.importengineapi.AccountRef
+import com.moneymanager.importengineapi.DedupePolicy
+import com.moneymanager.importengineapi.ImportRowKey
+import com.moneymanager.importengineapi.ImportTransfer
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

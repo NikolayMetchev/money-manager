@@ -34,16 +34,17 @@ import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonAttributeRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
-import com.moneymanager.importer.ImportEngine
-import com.moneymanager.importmodel.AccountRef
-import com.moneymanager.importmodel.DedupePolicy
-import com.moneymanager.importmodel.ExistingApiIdExtractor
-import com.moneymanager.importmodel.ExistingUniqueKeyExtractor
-import com.moneymanager.importmodel.ImportBatch
-import com.moneymanager.importmodel.ImportFee
-import com.moneymanager.importmodel.ImportResult
-import com.moneymanager.importmodel.ImportRowKey
-import com.moneymanager.importmodel.ImportTransfer
+import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importer.ImportEngineImpl
+import com.moneymanager.importengineapi.AccountRef
+import com.moneymanager.importengineapi.DedupePolicy
+import com.moneymanager.importengineapi.ExistingApiIdExtractor
+import com.moneymanager.importengineapi.ExistingUniqueKeyExtractor
+import com.moneymanager.importengineapi.ImportBatch
+import com.moneymanager.importengineapi.ImportFee
+import com.moneymanager.importengineapi.ImportResult
+import com.moneymanager.importengineapi.ImportRowKey
+import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.rest.ApiClient
 import com.moneymanager.rest.ApiHttpResponse
 import com.moneymanager.rest.ScaParams
@@ -634,7 +635,7 @@ suspend fun importApiSessionTransactions(
     accountsSessionId: ApiSessionId? = null,
     strategy: ApiImportStrategy,
     importEngine: ImportEngine =
-        ImportEngine(
+        ImportEngineImpl(
             transactionRepository = transactionRepository,
             accountRepository = accountRepository,
             accountAttributeRepository = accountAttributeRepository,

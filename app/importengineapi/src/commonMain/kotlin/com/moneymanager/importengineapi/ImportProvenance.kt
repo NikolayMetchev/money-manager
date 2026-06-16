@@ -1,4 +1,4 @@
-package com.moneymanager.importmodel
+package com.moneymanager.importengineapi
 
 import com.moneymanager.domain.model.EntityProvenance
 import com.moneymanager.domain.model.SourceRecorder

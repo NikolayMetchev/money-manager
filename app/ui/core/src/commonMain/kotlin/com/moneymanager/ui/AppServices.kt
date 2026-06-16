@@ -25,7 +25,8 @@ import com.moneymanager.domain.repository.QifImportRepository
 import com.moneymanager.domain.repository.SettingsRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.domain.repository.TransferSourceRepository
-import com.moneymanager.importer.ImportEngine
+import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importer.ImportEngineImpl
 
 data class AppServices(
     val accounts: AccountsDomain,
@@ -109,7 +110,7 @@ fun Application.toAppServices() =
                 entitySource = transactions.entitySource,
                 sampleEntitySource = transactions.sampleEntitySource,
                 importEngine =
-                    ImportEngine(
+                    ImportEngineImpl(
                         transactionRepository = transactions.transactionRepository,
                         accountRepository = accounts.accountRepository,
                         accountAttributeRepository = accounts.accountAttributeRepository,

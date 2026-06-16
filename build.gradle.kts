@@ -60,14 +60,14 @@ dependencyAnalysis {
             sourceSet("commonTest") {
                 onIncorrectConfiguration {
                     exclude(":app:model:core")
-                    exclude(":app:importmodel")
+                    exclude(":app:importengineapi")
                 }
             }
         }
 
-        // importmodel is a pure model module with no test sources; the multiplatform convention still
-        // injects kotlin("test") into commonTest, which DAGP then flags as unused.
-        project(":app:importmodel") {
+        // importengineapi is a pure model/interface module with no test sources; the multiplatform
+        // convention still injects kotlin("test") into commonTest, which DAGP then flags as unused.
+        project(":app:importengineapi") {
             ignoreSourceSet("commonTest")
         }
 

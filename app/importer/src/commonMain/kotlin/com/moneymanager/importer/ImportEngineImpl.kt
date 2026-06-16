@@ -19,42 +19,43 @@ import com.moneymanager.domain.repository.PersonAttributeRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.domain.repository.TransferUpdate
-import com.moneymanager.importmodel.AccountMatchKey
-import com.moneymanager.importmodel.AccountRef
-import com.moneymanager.importmodel.DedupePolicy
-import com.moneymanager.importmodel.ImportAccountIntent
-import com.moneymanager.importmodel.ImportBatch
-import com.moneymanager.importmodel.ImportOwnershipIntent
-import com.moneymanager.importmodel.ImportProgress
-import com.moneymanager.importmodel.ImportResult
-import com.moneymanager.importmodel.ImportRowKey
-import com.moneymanager.importmodel.ImportTransfer
-import com.moneymanager.importmodel.LocalAccountKey
-import com.moneymanager.importmodel.LocalPersonKey
-import com.moneymanager.importmodel.PersonMatchKey
-import com.moneymanager.importmodel.RowOutcome
+import com.moneymanager.importengineapi.AccountMatchKey
+import com.moneymanager.importengineapi.AccountRef
+import com.moneymanager.importengineapi.DedupePolicy
+import com.moneymanager.importengineapi.ImportAccountIntent
+import com.moneymanager.importengineapi.ImportBatch
+import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importengineapi.ImportOwnershipIntent
+import com.moneymanager.importengineapi.ImportProgress
+import com.moneymanager.importengineapi.ImportResult
+import com.moneymanager.importengineapi.ImportRowKey
+import com.moneymanager.importengineapi.ImportTransfer
+import com.moneymanager.importengineapi.LocalAccountKey
+import com.moneymanager.importengineapi.LocalPersonKey
+import com.moneymanager.importengineapi.PersonMatchKey
+import com.moneymanager.importengineapi.RowOutcome
 import kotlinx.coroutines.flow.first
 
 /**
- * The central import function. Takes a fully-built [ImportBatch] and performs the whole import:
+ * Database-backed [ImportEngine]. Takes a fully-built [ImportBatch] and performs the whole import:
  * creates (or reuses) accounts, people and ownerships, resolves transfer account references,
  * deduplicates against existing transfers, bulk-creates new transfers, applies updates for changed
- * duplicates, records provenance, and returns counts plus per-row created ids.
+ * duplicates, records the source of everything it writes, and returns counts plus per-row created ids.
  *
- * CSV, QIF and API importers each build an [ImportBatch] and call [import]; all shared import logic
- * lives here.
+ * This is the only place imported entities/transfers are written to the database. CSV/QIF/API
+ * importers build an [ImportBatch] and call [import]; all shared import logic lives here.
  */
-class ImportEngine(
+class ImportEngineImpl(
     private val transactionRepository: TransactionRepository,
     private val accountRepository: AccountRepository,
     private val accountAttributeRepository: AccountAttributeRepository,
     private val personRepository: PersonRepository,
     private val personAttributeRepository: PersonAttributeRepository,
     private val ownershipRepository: PersonAccountOwnershipRepository,
-) {
-    suspend fun import(
+) : ImportEngine {
+    override suspend fun import(
         batch: ImportBatch,
-        onProgress: (suspend (ImportProgress) -> Unit)? = null,
+        onProgress: (suspend (ImportProgress) -> Unit)?,
     ): ImportResult {
         onProgress?.invoke(ImportProgress("Resolving accounts"))
         val accountResolution = resolveAccounts(batch)

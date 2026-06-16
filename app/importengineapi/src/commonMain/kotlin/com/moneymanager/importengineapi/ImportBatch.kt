@@ -1,6 +1,6 @@
 @file:OptIn(kotlin.time.ExperimentalTime::class)
 
-package com.moneymanager.importmodel
+package com.moneymanager.importengineapi
 
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.ApiRequestId

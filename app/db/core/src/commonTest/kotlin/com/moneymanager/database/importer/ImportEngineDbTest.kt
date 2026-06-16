@@ -9,20 +9,20 @@ import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.EntityProvenance
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.SourceRecorder
-import com.moneymanager.importer.ImportEngine
-import com.moneymanager.importmodel.AccountMatchKey
-import com.moneymanager.importmodel.AccountRef
-import com.moneymanager.importmodel.DedupePolicy
-import com.moneymanager.importmodel.ImportAccountIntent
-import com.moneymanager.importmodel.ImportBatch
-import com.moneymanager.importmodel.ImportOwnershipIntent
-import com.moneymanager.importmodel.ImportPersonIntent
-import com.moneymanager.importmodel.ImportProvenance
-import com.moneymanager.importmodel.ImportRowKey
-import com.moneymanager.importmodel.ImportTransfer
-import com.moneymanager.importmodel.LocalAccountKey
-import com.moneymanager.importmodel.LocalPersonKey
-import com.moneymanager.importmodel.PersonMatchKey
+import com.moneymanager.importer.ImportEngineImpl
+import com.moneymanager.importengineapi.AccountMatchKey
+import com.moneymanager.importengineapi.AccountRef
+import com.moneymanager.importengineapi.DedupePolicy
+import com.moneymanager.importengineapi.ImportAccountIntent
+import com.moneymanager.importengineapi.ImportBatch
+import com.moneymanager.importengineapi.ImportOwnershipIntent
+import com.moneymanager.importengineapi.ImportPersonIntent
+import com.moneymanager.importengineapi.ImportProvenance
+import com.moneymanager.importengineapi.ImportRowKey
+import com.moneymanager.importengineapi.ImportTransfer
+import com.moneymanager.importengineapi.LocalAccountKey
+import com.moneymanager.importengineapi.LocalPersonKey
+import com.moneymanager.importengineapi.PersonMatchKey
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import kotlinx.coroutines.flow.first
@@ -35,7 +35,7 @@ class ImportEngineDbTest : DbTest() {
     private val baseTime = Instant.fromEpochMilliseconds(1_700_000_000_000)
 
     private fun engine() =
-        ImportEngine(
+        ImportEngineImpl(
             transactionRepository = repositories.transactionRepository,
             accountRepository = repositories.accountRepository,
             accountAttributeRepository = repositories.accountAttributeRepository,

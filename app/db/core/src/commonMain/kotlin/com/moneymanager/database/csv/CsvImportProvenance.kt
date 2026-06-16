@@ -4,8 +4,8 @@ import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.model.EntityProvenance
 import com.moneymanager.domain.model.SourceRecorder
 import com.moneymanager.domain.model.csv.CsvImportId
-import com.moneymanager.importmodel.ImportProvenance
-import com.moneymanager.importmodel.ImportRowKey
+import com.moneymanager.importengineapi.ImportProvenance
+import com.moneymanager.importengineapi.ImportRowKey
 
 /**
  * [ImportProvenance] for CSV imports: records transfer sources via [EntitySource.csvImportRecorder]

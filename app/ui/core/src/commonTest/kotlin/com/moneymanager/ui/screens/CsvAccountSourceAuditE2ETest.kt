@@ -33,7 +33,7 @@ import com.moneymanager.domain.model.csvstrategy.FieldMappingId
 import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
-import com.moneymanager.importer.ImportEngine
+import com.moneymanager.importer.ImportEngineImpl
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
@@ -141,7 +141,7 @@ class CsvAccountSourceAuditE2ETest {
                     maintenance = DbMaintenance(dc.maintenanceService),
                     entitySource = DbEntitySource(db.transferSourceQueries, deviceId),
                     importEngine =
-                        ImportEngine(
+                        ImportEngineImpl(
                             transactionRepository = dc.transactionRepository,
                             accountRepository = dc.accountRepository,
                             accountAttributeRepository = dc.accountAttributeRepository,

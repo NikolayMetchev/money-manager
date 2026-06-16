@@ -9,6 +9,7 @@ kotlin {
         val commonMain by getting {
             dependencies {
                 api(projects.app.db.core)
+                api(projects.app.importengineapi)
                 api(projects.app.importer)
                 api(projects.app.model.core)
             }
@@ -18,8 +19,10 @@ kotlin {
             dependencies {
                 api(libs.metro.runtime)
                 api(projects.app.db.core)
-                api(projects.app.importer)
+                api(projects.app.importengineapi)
                 api(projects.app.model.core)
+
+                implementation(projects.app.importer)
             }
         }
 
