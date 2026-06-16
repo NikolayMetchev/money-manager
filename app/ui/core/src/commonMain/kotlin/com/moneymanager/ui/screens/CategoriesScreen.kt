@@ -71,7 +71,7 @@ import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CategoryBalance
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
-import com.moneymanager.domain.model.EntityProvenance
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.ui.LocalDeviceId
@@ -318,7 +318,7 @@ fun CategoriesScreen(
                                                 try {
                                                     categoryRepository.updateCategory(
                                                         draggedCategory.copy(parentId = newParentId),
-                                                        EntityProvenance.Manual(deviceId),
+                                                        Source.Manual,
                                                     )
                                                 } catch (expected: Exception) {
                                                     logger.error(expected) {
@@ -710,7 +710,7 @@ fun EditCategoryDialog(
                                 name = trimmedName,
                                 parentId = selectedParentId,
                             ),
-                            EntityProvenance.Manual(deviceId),
+                            Source.Manual,
                         )
                     }
                 },

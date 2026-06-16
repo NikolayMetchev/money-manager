@@ -5,12 +5,13 @@ import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.mapper.PersonMapper
-import com.moneymanager.database.recordEntityProvenance
-import com.moneymanager.domain.model.EntityProvenance
+import com.moneymanager.database.recordSource
+import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonId
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.repository.PersonRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -19,6 +20,7 @@ import kotlinx.coroutines.withContext
 
 class PersonRepositoryImpl(
     private val database: MoneyManagerDatabaseWrapper,
+    private val deviceId: DeviceId,
 ) : PersonRepository {
     private val queries = database.personQueries
     private val attributeQueries = database.personAttributeQueries
@@ -40,7 +42,7 @@ class PersonRepositoryImpl(
 
     override suspend fun createPerson(
         person: Person,
-        provenance: EntityProvenance,
+        source: Source,
     ): PersonId =
         withContext(Dispatchers.Default) {
             val id =
@@ -51,7 +53,7 @@ class PersonRepositoryImpl(
                         last_name = person.lastName,
                     )
                     val newId = queries.lastInsertRowId().executeAsOne()
-                    entitySourceQueries.recordEntityProvenance(EntityType.PERSON, newId, 1L, provenance)
+                    entitySourceQueries.recordSource(deviceId, EntityType.PERSON, newId, 1L, source)
                     newId
                 }
             PersonId(id)

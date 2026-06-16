@@ -7,7 +7,6 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.ApiSession
 import com.moneymanager.domain.model.DeviceId
@@ -49,7 +48,6 @@ fun ImportsScreen(
     accountRepository: AccountRepository,
     currencyRepository: CurrencyRepository,
     transactionRepository: TransactionRepository,
-    entitySource: EntitySource,
     maintenance: Maintenance,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
@@ -101,7 +99,6 @@ fun ImportsScreen(
                     personAccountOwnershipRepository = personAccountOwnershipRepository,
                     attributeTypeRepository = attributeTypeRepository,
                     maintenance = maintenance,
-                    entitySource = entitySource,
                     importEngine = importEngine,
                     onImportClick = onCsvImportClick,
                     onStrategiesClick = onCsvStrategiesClick,
@@ -119,7 +116,6 @@ fun ImportsScreen(
                     attributeTypeRepository = attributeTypeRepository,
                     settingsRepository = settingsRepository,
                     maintenance = maintenance,
-                    entitySource = entitySource,
                     importEngine = importEngine,
                     onImportClick = onQifImportClick,
                     onStrategiesClick = onCsvStrategiesClick,
@@ -133,7 +129,6 @@ fun ImportsScreen(
                     accountRepository = accountRepository,
                     currencyRepository = currencyRepository,
                     transactionRepository = transactionRepository,
-                    entitySource = entitySource,
                     maintenance = maintenance,
                     personRepository = personRepository,
                     personAccountOwnershipRepository = personAccountOwnershipRepository,
@@ -149,7 +144,6 @@ fun ImportsScreen(
                     csvImportStrategyRepository = csvImportStrategyRepository,
                     transactionRepository = transactionRepository,
                     attributeTypeRepository = attributeTypeRepository,
-                    entitySource = entitySource,
                     maintenance = maintenance,
                     onTransactionsImported = onTransactionsImported,
                 )

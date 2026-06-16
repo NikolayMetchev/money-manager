@@ -3,18 +3,16 @@
 package com.moneymanager.ui.screens.csv
 
 import com.moneymanager.database.DatabaseConfig
-import com.moneymanager.database.csv.CsvImportProvenance
 import com.moneymanager.database.csv.CsvTransferMapper
 import com.moneymanager.database.csv.DiscoveredAccountMapping
 import com.moneymanager.database.csv.ImportPreparation
 import com.moneymanager.database.csv.NewAccount
 import com.moneymanager.database.csv.StrategyMatcher
-import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
-import com.moneymanager.domain.model.EntityProvenance
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.RelationshipTypeId
 import com.moneymanager.domain.model.TransferId
@@ -75,7 +73,6 @@ internal suspend fun bulkApplyCsv(
     csvImportRepository: CsvImportRepository,
     attributeTypeRepository: AttributeTypeRepository,
     maintenance: Maintenance,
-    entitySource: EntitySource,
     importEngine: ImportEngine,
     onProgress: (done: Int, total: Int) -> Unit,
 ): CsvBulkResult {
@@ -128,7 +125,6 @@ internal suspend fun bulkApplyCsv(
                     csvImportRepository = csvImportRepository,
                     attributeTypeRepository = attributeTypeRepository,
                     maintenance = maintenance,
-                    entitySource = entitySource,
                     importEngine = importEngine,
                     refreshViews = false,
                 )
@@ -228,7 +224,6 @@ private suspend fun persistMappingsWithFallback(
 private suspend fun createNewAccounts(
     accountRepository: AccountRepository,
     accountsToCreate: List<NewAccount>,
-    entitySource: EntitySource,
     csvImportId: CsvImportId,
     firstRowByAccountName: Map<String, Long>,
 ): Set<String> {
@@ -245,12 +240,12 @@ private suspend fun createNewAccounts(
         }
     // CSV provenance pointing each account at the first row that referenced it (its creation row);
     // row-less when unknown. Recorded atomically by the repository.
-    val provenanceFor: (Account) -> EntityProvenance = { account ->
-        EntityProvenance.CsvImport(entitySource.deviceId, csvImportId, firstRowByAccountName[account.name])
+    val sourceFor: (Account) -> Source = { account ->
+        Source.Csv(csvImportId, firstRowByAccountName[account.name])
     }
     try {
         // Bulk-create all accounts in a single database transaction
-        val createdIds = accountRepository.createAccountsBatch(newAccounts, provenanceFor)
+        val createdIds = accountRepository.createAccountsBatch(newAccounts, sourceFor)
         newAccounts.zip(createdIds).forEach { (account, _) -> createdAccountNames.add(account.name) }
         logger.info { "Created ${accountsToCreate.size} new accounts" }
     } catch (expected: Exception) {
@@ -258,7 +253,7 @@ private suspend fun createNewAccounts(
         logger.warn(expected) { "Bulk account creation failed, falling back to per-account creation" }
         for (account in newAccounts) {
             try {
-                accountRepository.createAccount(account, provenanceFor(account))
+                accountRepository.createAccount(account, sourceFor(account))
                 createdAccountNames.add(account.name)
                 logger.info { "Created new account: ${account.name}" }
             } catch (expectedAccountError: Exception) {
@@ -364,7 +359,6 @@ internal suspend fun runCsvImport(
     csvImportRepository: CsvImportRepository,
     attributeTypeRepository: AttributeTypeRepository,
     maintenance: Maintenance,
-    entitySource: EntitySource,
     importEngine: ImportEngine,
     refreshViews: Boolean = true,
 ): CsvImportResult {
@@ -391,7 +385,6 @@ internal suspend fun runCsvImport(
         createNewAccounts(
             accountRepository = accountRepository,
             accountsToCreate = accountsToCreate,
-            entitySource = entitySource,
             csvImportId = csvImport.id,
             firstRowByAccountName = firstRowByAccountName,
         )
@@ -498,7 +491,7 @@ internal suspend fun runCsvImport(
                         name = feeAccountName,
                         openingDate = Clock.System.now(),
                     ),
-                    EntityProvenance.CsvImport(entitySource.deviceId, csvImport.id),
+                    Source.Csv(csvImport.id),
                 )
         } else {
             null
@@ -546,7 +539,7 @@ internal suspend fun runCsvImport(
                 } else {
                     DedupePolicy.UniqueIdentifier
                 },
-            provenance = CsvImportProvenance(entitySource, csvImport.id),
+            source = Source.Csv(csvImport.id),
             uniqueKeyExtractor =
                 if (uniqueIdTypeNames.isEmpty()) {
                     null

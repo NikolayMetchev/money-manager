@@ -33,7 +33,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.filepicker.rememberMultipleFilePicker
-import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.qif.QifImport
 import com.moneymanager.domain.model.qif.QifImportId
@@ -74,7 +73,6 @@ fun QifImportsScreen(
     attributeTypeRepository: AttributeTypeRepository,
     settingsRepository: SettingsRepository,
     maintenance: Maintenance,
-    entitySource: EntitySource,
     importEngine: ImportEngine,
     onImportClick: (QifImportId) -> Unit,
     onStrategiesClick: () -> Unit = {},
@@ -238,7 +236,6 @@ fun QifImportsScreen(
                     attributeTypeRepository = attributeTypeRepository,
                     settingsRepository = settingsRepository,
                     maintenance = maintenance,
-                    entitySource = entitySource,
                     importEngine = importEngine,
                     onDismiss = { showImportAll = false },
                     onComplete = { showImportAll = false },

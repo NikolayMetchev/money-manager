@@ -8,9 +8,10 @@ import com.moneymanager.database.json.ApiStrategyJsonCodec
 import com.moneymanager.database.json.FieldMappingJsonCodec
 import com.moneymanager.database.qif.QifCsvAdapter
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.CurrencyScaleFactors
 import com.moneymanager.domain.model.DeviceId
-import com.moneymanager.domain.model.EntityProvenance
 import com.moneymanager.domain.model.EntityType
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.SourceType
 import com.moneymanager.domain.model.apistrategy.ApiAccountMappings
 import com.moneymanager.domain.model.apistrategy.ApiAmountFormat
@@ -842,7 +843,6 @@ object DatabaseConfig {
      */
     suspend fun seedDatabase(
         database: MoneyManagerDatabaseWrapper,
-        currencyRepository: CurrencyRepository,
     ) {
         with(database) {
             // Seed AuditType lookup table
@@ -939,10 +939,21 @@ object DatabaseConfig {
             // Seed the built-in CSV import strategies
             seedBuiltInCsvStrategies()
 
-            // Seed currencies with source tracking (recorded atomically inside upsertCurrencyByCode).
-            val systemCurrencyProvenance = EntityProvenance.System(DeviceId(systemDeviceId))
+            // Seed currencies with system source attribution. Recorded directly (not via the repository)
+            // so the SYSTEM device is preserved; this runs before the app's current device is known.
             allCurrencies.forEach { currency ->
-                currencyRepository.upsertCurrencyByCode(currency.code, currency.displayName, systemCurrencyProvenance)
+                val scaleFactor = CurrencyScaleFactors.getScaleFactor(currency.code)
+                currencyQueries.insert(currency.code, currency.displayName, scaleFactor.toLong())
+                // Fetch the id by code rather than last_insert_rowid(): the currency INSERT fires an audit
+                // trigger that also inserts a row, so the rowid is not reliably the currency's own.
+                val currencyId = currencyQueries.selectByCode(currency.code).executeAsOne().id
+                entitySourceQueries.recordSource(
+                    DeviceId(systemDeviceId),
+                    EntityType.CURRENCY,
+                    currencyId,
+                    1L,
+                    Source.System,
+                )
             }
         }
     }

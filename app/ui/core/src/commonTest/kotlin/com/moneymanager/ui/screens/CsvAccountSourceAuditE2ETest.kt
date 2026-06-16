@@ -11,7 +11,6 @@ import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import androidx.compose.ui.test.waitUntilDoesNotExist
 import com.moneymanager.database.DatabaseManager
 import com.moneymanager.database.csv.CsvTransferMapper
-import com.moneymanager.database.port.DbEntitySource
 import com.moneymanager.database.port.DbMaintenance
 import com.moneymanager.di.database.DatabaseComponent
 import com.moneymanager.domain.model.Account
@@ -139,7 +138,6 @@ class CsvAccountSourceAuditE2ETest {
                     csvImportRepository = dc.csvImportRepository,
                     attributeTypeRepository = dc.attributeTypeRepository,
                     maintenance = DbMaintenance(dc.maintenanceService),
-                    entitySource = DbEntitySource(db.transferSourceQueries, deviceId),
                     importEngine =
                         ImportEngineImpl(
                             transactionRepository = dc.transactionRepository,

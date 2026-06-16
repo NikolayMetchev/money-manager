@@ -3,12 +3,11 @@
 package com.moneymanager.test.database
 
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
-import com.moneymanager.database.SampleGeneratorSourceRecorder
 import com.moneymanager.database.sql.TransferSourceQueries
 import com.moneymanager.di.AppComponent
 import com.moneymanager.di.database.DatabaseComponent
 import com.moneymanager.domain.model.DbLocation
-import com.moneymanager.domain.model.DeviceInfo
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -43,10 +42,9 @@ open class DbTest {
      * Returns the created transfer with its database-generated ID.
      */
     protected suspend fun createTransfer(transfer: Transfer): Transfer {
-        val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
         repositories.transactionRepository.createTransfers(
             transfers = listOf(transfer),
-            sourceRecorder = SampleGeneratorSourceRecorder(transferSourceQueries, deviceId),
+            sources = listOf(Source.SampleGenerator),
         )
         // Query back the created transfer by its details (timestamp + description should be unique enough for tests)
         val allTransfers =

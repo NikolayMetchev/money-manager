@@ -1,14 +1,11 @@
 @file:OptIn(kotlin.time.ExperimentalTime::class)
 
 package com.moneymanager.database.importer
-import com.moneymanager.database.SampleGeneratorSourceRecorder
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
-import com.moneymanager.domain.model.DeviceInfo
-import com.moneymanager.domain.model.EntityProvenance
 import com.moneymanager.domain.model.Money
-import com.moneymanager.domain.model.SourceRecorder
+import com.moneymanager.domain.model.Source
 import com.moneymanager.importer.ImportEngineImpl
 import com.moneymanager.importengineapi.AccountMatchKey
 import com.moneymanager.importengineapi.AccountRef
@@ -17,7 +14,6 @@ import com.moneymanager.importengineapi.ImportAccountIntent
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportOwnershipIntent
 import com.moneymanager.importengineapi.ImportPersonIntent
-import com.moneymanager.importengineapi.ImportProvenance
 import com.moneymanager.importengineapi.ImportRowKey
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.LocalAccountKey
@@ -44,16 +40,6 @@ class ImportEngineDbTest : DbTest() {
             ownershipRepository = repositories.personAccountOwnershipRepository,
         )
 
-    private fun testProvenance(): ImportProvenance {
-        val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
-        return object : ImportProvenance {
-            override fun transferRecorder(orderedRowKeys: List<ImportRowKey>): SourceRecorder =
-                SampleGeneratorSourceRecorder(transferSourceQueries, deviceId)
-
-            override fun entityProvenance(): EntityProvenance = EntityProvenance.SampleGenerator(deviceId)
-        }
-    }
-
     private suspend fun gbp(): Currency =
         repositories.currencyRepository
             .getAllCurrencies()
@@ -73,7 +59,7 @@ class ImportEngineDbTest : DbTest() {
         sourceId: AccountId,
         currency: Currency,
         description: String,
-        provenance: ImportProvenance,
+        source: Source,
         counterpartyKey: String = "coffee-shop",
         counterpartyName: String = "Coffee Shop",
     ): ImportBatch {
@@ -91,7 +77,7 @@ class ImportEngineDbTest : DbTest() {
                     ),
                 ),
             dedupePolicy = DedupePolicy.FuzzyAllFields(),
-            provenance = provenance,
+            source = source,
             accountsToCreate =
                 listOf(
                     ImportAccountIntent(
@@ -109,15 +95,15 @@ class ImportEngineDbTest : DbTest() {
         runTest {
             val sourceId = createSourceAccount()
             val currency = gbp()
-            val provenance = testProvenance()
+            val source = Source.SampleGenerator
 
-            val first = engine().import(batchWithCounterparty(sourceId, currency, "Coffee", provenance))
+            val first = engine().import(batchWithCounterparty(sourceId, currency, "Coffee", source))
             assertEquals(1, first.accountsCreated)
             assertEquals(1, first.transfersImported)
             assertEquals(0, first.duplicates)
 
             // Re-import the identical batch: counterparty reused by name, transfer deduped.
-            val second = engine().import(batchWithCounterparty(sourceId, currency, "Coffee", provenance))
+            val second = engine().import(batchWithCounterparty(sourceId, currency, "Coffee", source))
             assertEquals(0, second.accountsCreated)
             assertEquals(0, second.transfersImported)
             assertEquals(1, second.duplicates)
@@ -137,15 +123,15 @@ class ImportEngineDbTest : DbTest() {
         runTest {
             val sourceId = createSourceAccount()
             val currency = gbp()
-            val provenance = testProvenance()
+            val source = Source.SampleGenerator
 
             engine().import(
-                batchWithCounterparty(sourceId, currency, "Tesco groceries weekly shop", provenance, "tesco", "Tesco"),
+                batchWithCounterparty(sourceId, currency, "Tesco groceries weekly shop", source, "tesco", "Tesco"),
             )
 
             // A genuinely different description (low similarity) must NOT be treated as a fuzzy duplicate.
             val changedBatch =
-                batchWithCounterparty(sourceId, currency, "British Gas direct debit", provenance, "tesco", "Tesco")
+                batchWithCounterparty(sourceId, currency, "British Gas direct debit", source, "tesco", "Tesco")
             val result = engine().import(changedBatch)
             assertEquals(1, result.transfersImported)
             assertEquals(0, result.duplicates)
@@ -166,12 +152,12 @@ class ImportEngineDbTest : DbTest() {
         runTest {
             val sourceId = createSourceAccount()
             val currency = gbp()
-            val provenance = testProvenance()
+            val source = Source.SampleGenerator
             val aliceKey = LocalPersonKey("alice")
             val bobKey = LocalPersonKey("bob")
 
             val batch =
-                batchWithCounterparty(sourceId, currency, "Coffee", provenance).copy(
+                batchWithCounterparty(sourceId, currency, "Coffee", source).copy(
                     peopleToCreate =
                         listOf(
                             ImportPersonIntent(

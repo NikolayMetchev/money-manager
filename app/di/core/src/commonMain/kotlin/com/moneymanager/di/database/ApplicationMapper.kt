@@ -8,9 +8,7 @@ import com.moneymanager.database.People
 import com.moneymanager.database.Settings
 import com.moneymanager.database.Transactions
 import com.moneymanager.database.port.DbCsvStrategyImportExport
-import com.moneymanager.database.port.DbEntitySource
 import com.moneymanager.database.port.DbMaintenance
-import com.moneymanager.database.port.DbSampleEntitySource
 
 fun DatabaseComponent.toApplication() =
     Application(
@@ -40,8 +38,6 @@ fun DatabaseComponent.toApplication() =
                 attributeTypeRepository = attributeTypeRepository,
                 relationshipTypeRepository = relationshipTypeRepository,
                 transferRelationshipRepository = transferRelationshipRepository,
-                entitySource = DbEntitySource(transferSourceQueries, deviceId),
-                sampleEntitySource = DbSampleEntitySource(transferSourceQueries, deviceId),
             ),
         people =
             People(

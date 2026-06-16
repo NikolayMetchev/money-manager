@@ -2,7 +2,7 @@ package com.moneymanager.domain.repository
 
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CategoryBalance
-import com.moneymanager.domain.model.EntityProvenance
+import com.moneymanager.domain.model.Source
 import kotlinx.coroutines.flow.Flow
 
 interface CategoryRepository {
@@ -18,12 +18,12 @@ interface CategoryRepository {
 
     suspend fun createCategory(
         category: Category,
-        provenance: EntityProvenance,
+        source: Source,
     ): Long
 
     suspend fun updateCategory(
         category: Category,
-        provenance: EntityProvenance,
+        source: Source,
     )
 
     suspend fun deleteCategory(id: Long)

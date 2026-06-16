@@ -3,7 +3,6 @@ package com.moneymanager.ui
 import com.moneymanager.database.Application
 import com.moneymanager.database.service.CsvStrategyExportService
 import com.moneymanager.domain.CsvStrategyImportExport
-import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.repository.AccountAttributeRepository
@@ -61,8 +60,6 @@ data class TransactionsDomain(
     val transactionRepository: TransactionRepository,
     val transferSourceRepository: TransferSourceRepository,
     val attributeTypeRepository: AttributeTypeRepository,
-    val entitySource: EntitySource,
-    val sampleEntitySource: EntitySource,
     val importEngine: ImportEngine,
 )
 
@@ -107,8 +104,6 @@ fun Application.toAppServices() =
                 transactionRepository = transactions.transactionRepository,
                 transferSourceRepository = transactions.transferSourceRepository,
                 attributeTypeRepository = transactions.attributeTypeRepository,
-                entitySource = transactions.entitySource,
-                sampleEntitySource = transactions.sampleEntitySource,
                 importEngine =
                     ImportEngineImpl(
                         transactionRepository = transactions.transactionRepository,

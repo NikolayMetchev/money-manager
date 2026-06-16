@@ -5,15 +5,13 @@ package com.moneymanager.ui.screens.qif
 import com.moneymanager.database.csv.CsvTransferMapper
 import com.moneymanager.database.csv.ImportPreparation
 import com.moneymanager.database.qif.QifCsvAdapter
-import com.moneymanager.database.qif.QifImportProvenance
-import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
-import com.moneymanager.domain.model.EntityProvenance
 import com.moneymanager.domain.model.NewAttribute
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
@@ -78,7 +76,6 @@ internal suspend fun bulkApplyQif(
     qifImportRepository: QifImportRepository,
     attributeTypeRepository: AttributeTypeRepository,
     maintenance: Maintenance,
-    entitySource: EntitySource,
     importEngine: ImportEngine,
     onProgress: (done: Int, total: Int) -> Unit,
 ): QifBulkResult {
@@ -123,7 +120,6 @@ internal suspend fun bulkApplyQif(
                     qifImportRepository = qifImportRepository,
                     attributeTypeRepository = attributeTypeRepository,
                     maintenance = maintenance,
-                    entitySource = entitySource,
                     importEngine = importEngine,
                     refreshViews = false,
                 )
@@ -212,7 +208,6 @@ internal suspend fun runImport(
     qifImportRepository: QifImportRepository,
     attributeTypeRepository: AttributeTypeRepository,
     maintenance: Maintenance,
-    entitySource: EntitySource,
     importEngine: ImportEngine,
     refreshViews: Boolean = true,
 ): QifImportResult {
@@ -231,8 +226,8 @@ internal suspend fun runImport(
                 Account(id = AccountId(0), name = newAccount.name, openingDate = Clock.System.now(), categoryId = newAccount.categoryId)
             }
         // Record QIF provenance for each created account (atomically, in the repository).
-        val qifProvenance = EntityProvenance.QifImport(entitySource.deviceId, qifImport.id)
-        runCatching { accountRepository.createAccountsBatch(newAccounts) { qifProvenance } }
+        val qifSource = Source.Qif(qifImport.id)
+        runCatching { accountRepository.createAccountsBatch(newAccounts) { qifSource } }
             .onFailure { logger.warn(it) { "Failed to bulk-create accounts" } }
     }
 
@@ -288,7 +283,7 @@ internal suspend fun runImport(
         ImportBatch(
             transfers = importTransfers,
             dedupePolicy = DedupePolicy.FuzzyAllFields(),
-            provenance = QifImportProvenance(entitySource, qifImport.id),
+            source = Source.Qif(qifImport.id),
         )
     val importResult = importEngine.import(batch)
 

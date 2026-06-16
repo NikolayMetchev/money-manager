@@ -2,7 +2,6 @@
 
 package com.moneymanager.ui.monzo
 
-import com.moneymanager.database.port.DbEntitySource
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.DeviceInfo
@@ -116,7 +115,6 @@ class MonzoBalanceFixtureE2ETest : DbTest() {
                 accountRepository = repositories.accountRepository,
                 currencyRepository = repositories.currencyRepository,
                 transactionRepository = repositories.transactionRepository,
-                entitySource = DbEntitySource(database.transferSourceQueries, DeviceId(deviceId.id)),
                 personRepository = repositories.personRepository,
                 personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                 personAttributeRepository = repositories.personAttributeRepository,

@@ -1,9 +1,9 @@
 package com.moneymanager.domain.repository
 
-import com.moneymanager.domain.model.EntityProvenance
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonId
+import com.moneymanager.domain.model.Source
 import kotlinx.coroutines.flow.Flow
 
 interface PersonRepository {
@@ -13,7 +13,7 @@ interface PersonRepository {
 
     suspend fun createPerson(
         person: Person,
-        provenance: EntityProvenance,
+        source: Source,
     ): PersonId
 
     suspend fun updatePerson(person: Person)

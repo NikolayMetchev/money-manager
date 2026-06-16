@@ -4,9 +4,7 @@ package com.moneymanager.database.repository
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AuditType
-import com.moneymanager.domain.model.DeviceId
-import com.moneymanager.domain.model.DeviceInfo
-import com.moneymanager.domain.model.EntityProvenance
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonId
@@ -17,7 +15,6 @@ import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
 import com.moneymanager.test.database.createOwnership
 import com.moneymanager.test.database.createPerson
-import com.moneymanager.test.database.mergeAccounts
 import com.moneymanager.test.database.updateAccount
 import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
@@ -40,7 +37,7 @@ class AccountRepositoryImplTest : DbTest() {
                 )
             val accountId =
                 repositories.accountRepository.createAccount(Account(id = AccountId(0), name = "Acct", openingDate = now))
-            val manual = EntityProvenance.Manual(DeviceId(1))
+            val manual = Source.Manual
 
             // Adding an owner is a change to the account: it must become a new revision.
             val ownershipId = repositories.personAccountOwnershipRepository.createOwnership(person, accountId, manual)
@@ -430,17 +427,15 @@ class AccountRepositoryImplTest : DbTest() {
                 ),
             )
 
-            // Merge/unmerge with a real (JVM) device, as the app does, so the recorded merge sources
-            // carry resolvable device info.
-            val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
+            // Merge/unmerge source rows are recorded against the injected device, so they carry
+            // resolvable device info (asserted below).
             val mergeId =
                 repositories.accountRepository.mergeAccounts(
                     deletedAccount = accountA,
                     survivingAccount = accountB,
-                    deviceId = deviceId,
                 )
 
-            repositories.accountRepository.unmergeAccount(mergeId, deviceId)
+            repositories.accountRepository.unmergeAccount(mergeId)
 
             // Account A is recreated with its original id and name
             val restored = repositories.accountRepository.getAccountById(accountA).first()
@@ -489,7 +484,7 @@ class AccountRepositoryImplTest : DbTest() {
             assertTrue(SourceType.MERGE_UNDO in transferSourceTypes, "the unmerge reassignment must be sourced")
             // Those sources also carry the acting device (not just a bare source type).
             val mergeSource = transferSources.first { it.sourceType == SourceType.MERGE }
-            assertEquals(DeviceInfo.Jvm("test-machine", "Test OS"), mergeSource.deviceInfo)
+            assertNotNull(mergeSource.deviceInfo)
 
             // Account B keeps only its own (zero) transfers
             assertEquals(

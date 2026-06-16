@@ -10,6 +10,7 @@ import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.NewRelationship
 import com.moneymanager.domain.model.RelationshipTypeId
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
 import kotlin.jvm.JvmInline
 import kotlin.time.Instant
@@ -199,7 +200,8 @@ sealed interface ImportRowKey {
 data class ImportBatch(
     val transfers: List<ImportTransfer>,
     val dedupePolicy: DedupePolicy,
-    val provenance: ImportProvenance,
+    /** The batch-level source for everything created from this batch (e.g. Csv(importId)). */
+    val source: Source,
     val accountsToCreate: List<ImportAccountIntent> = emptyList(),
     val peopleToCreate: List<ImportPersonIntent> = emptyList(),
     val ownerships: List<ImportOwnershipIntent> = emptyList(),

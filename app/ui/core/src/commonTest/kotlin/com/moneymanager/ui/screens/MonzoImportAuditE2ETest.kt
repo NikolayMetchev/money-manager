@@ -12,7 +12,6 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.waitUntilAtLeastOneExists
 import androidx.compose.ui.test.waitUntilDoesNotExist
 import com.moneymanager.database.DatabaseManager
-import com.moneymanager.database.port.DbEntitySource
 import com.moneymanager.di.database.DatabaseComponent
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.DbLocation
@@ -199,7 +198,6 @@ class MonzoImportAuditE2ETest {
                     accountRepository = dc.accountRepository,
                     currencyRepository = dc.currencyRepository,
                     transactionRepository = dc.transactionRepository,
-                    entitySource = DbEntitySource(db.transferSourceQueries, deviceId),
                     personRepository = dc.personRepository,
                     personAccountOwnershipRepository = dc.personAccountOwnershipRepository,
                     personAttributeRepository = dc.personAttributeRepository,

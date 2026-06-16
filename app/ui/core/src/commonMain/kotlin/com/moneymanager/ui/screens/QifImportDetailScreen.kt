@@ -23,7 +23,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.ImportStatus
@@ -61,7 +60,6 @@ fun QifImportDetailScreen(
     attributeTypeRepository: AttributeTypeRepository,
     settingsRepository: SettingsRepository,
     maintenance: Maintenance,
-    entitySource: EntitySource,
     importEngine: ImportEngine,
     onBack: () -> Unit,
     onCreateStrategy: (QifImportId) -> Unit,
@@ -153,7 +151,6 @@ fun QifImportDetailScreen(
             attributeTypeRepository = attributeTypeRepository,
             settingsRepository = settingsRepository,
             maintenance = maintenance,
-            entitySource = entitySource,
             importEngine = importEngine,
             onDismiss = { showApplyDialog = false },
             onImportComplete = {

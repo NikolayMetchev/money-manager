@@ -23,7 +23,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.database.csv.ImportPreparation
 import com.moneymanager.database.qif.QifCsvAdapter
-import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CurrencyId
@@ -85,7 +84,6 @@ fun QifApplyStrategyDialog(
     attributeTypeRepository: AttributeTypeRepository,
     settingsRepository: SettingsRepository,
     maintenance: Maintenance,
-    entitySource: EntitySource,
     importEngine: ImportEngine,
     onDismiss: () -> Unit,
     onImportComplete: (QifImportResult) -> Unit,
@@ -233,7 +231,6 @@ fun QifApplyStrategyDialog(
                         categoryRepository = categoryRepository,
                         personRepository = personRepository,
                         personAccountOwnershipRepository = personAccountOwnershipRepository,
-                        entitySource = entitySource,
                         enabled = !isImporting,
                         isError = selectedSourceAccountId == null,
                     )
@@ -313,7 +310,6 @@ fun QifApplyStrategyDialog(
                                     qifImportRepository = qifImportRepository,
                                     attributeTypeRepository = attributeTypeRepository,
                                     maintenance = maintenance,
-                                    entitySource = entitySource,
                                     importEngine = importEngine,
                                 )
                             // Remember the source account so the next QIF import pre-selects it.

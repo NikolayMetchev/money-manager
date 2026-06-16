@@ -17,7 +17,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.database.csv.StrategyMatcher
-import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.csv.CsvImport
@@ -60,7 +59,6 @@ fun CsvImportAllDialog(
     csvImportRepository: CsvImportRepository,
     attributeTypeRepository: AttributeTypeRepository,
     maintenance: Maintenance,
-    entitySource: EntitySource,
     importEngine: ImportEngine,
     onDismiss: () -> Unit,
     onComplete: () -> Unit,
@@ -112,7 +110,6 @@ fun CsvImportAllDialog(
                             categoryRepository = categoryRepository,
                             personRepository = personRepository,
                             personAccountOwnershipRepository = personAccountOwnershipRepository,
-                            entitySource = entitySource,
                             enabled = !isImporting,
                             isError = sourceAccountId == null,
                         )
@@ -155,7 +152,6 @@ fun CsvImportAllDialog(
                                         csvImportRepository = csvImportRepository,
                                         attributeTypeRepository = attributeTypeRepository,
                                         maintenance = maintenance,
-                                        entitySource = entitySource,
                                         importEngine = importEngine,
                                         onProgress = { done, total -> progress = done to total },
                                     )

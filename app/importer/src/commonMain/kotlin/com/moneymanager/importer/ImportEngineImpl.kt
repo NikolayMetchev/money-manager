@@ -22,6 +22,7 @@ import com.moneymanager.domain.repository.TransferUpdate
 import com.moneymanager.importengineapi.AccountMatchKey
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.DedupePolicy
+import com.moneymanager.importengineapi.forRow
 import com.moneymanager.importengineapi.ImportAccountIntent
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
@@ -183,7 +184,7 @@ class ImportEngineImpl(
                     openingDate = intent.openingDate,
                     categoryId = intent.categoryId,
                 ),
-                batch.provenance.entityProvenance(),
+                batch.source,
             )
         intent.attributes.forEach { attr ->
             accountAttributeRepository.insertInCreationMode(newId, attr.typeId, attr.value)
@@ -275,7 +276,7 @@ class ImportEngineImpl(
                         middleName = intent.middleName,
                         lastName = intent.lastName,
                     ),
-                    batch.provenance.entityProvenance(),
+                    batch.source,
                 )
             intent.attributes.forEach { attr ->
                 personAttributeRepository.insertInCreationMode(newId, attr.typeId, attr.value)
@@ -347,7 +348,7 @@ class ImportEngineImpl(
         val alreadyLinked =
             ownershipRepository.getOwnershipsByAccount(accountId).first().any { it.personId == personId }
         if (alreadyLinked) return false
-        ownershipRepository.createOwnership(personId, accountId, batch.provenance.entityProvenance())
+        ownershipRepository.createOwnership(personId, accountId, batch.source)
         return true
     }
 
@@ -460,7 +461,7 @@ class ImportEngineImpl(
                         amount = fee.amount,
                     )
                 // The fee uses its own row key when provided (so the audit trail points at the fee's
-                // source node), else the main's. The source recorder maps calls to keys positionally.
+                // source node), else the main's. Each transfer's source is derived from its own row key.
                 orderedRowKeys += fee.rowKey ?: t.rowKey
             }
         }
@@ -491,9 +492,9 @@ class ImportEngineImpl(
                 transfers = transfersToCreate,
                 newAttributes = newAttributes,
                 newRelationships = newRelationships,
-                sourceRecorder = batch.provenance.transferRecorder(orderedRowKeys),
+                sources = orderedRowKeys.map { batch.source.forRow(it) },
                 updates = updates,
-                updateSourceRecorder = batch.provenance.updatedTransferRecorder(orderedUpdateRowKeys),
+                updateSources = orderedUpdateRowKeys.map { batch.source.forRow(it) },
             )
         // Return only the main transfers' ids (fee transfers are interleaved), aligned to [toImport].
         val createdIds = mainResultIndices.map { allCreatedIds[it] }

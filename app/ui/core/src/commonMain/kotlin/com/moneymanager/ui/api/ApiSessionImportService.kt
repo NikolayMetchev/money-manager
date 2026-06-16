@@ -4,10 +4,8 @@ package com.moneymanager.ui.api
 
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.database.DatabaseConfig
-import com.moneymanager.database.api.ApiImportProvenance
-import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.model.*
-import com.moneymanager.domain.model.EntityProvenance
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.apistrategy.ApiAmountFormat
 import com.moneymanager.domain.model.apistrategy.ApiEndpointConfig
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
@@ -462,7 +460,6 @@ suspend fun importApiSessionPeople(
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     personAttributeRepository: PersonAttributeRepository,
     attributeTypeRepository: AttributeTypeRepository,
-    entitySource: EntitySource,
     sessionId: ApiSessionId,
     strategy: ApiImportStrategy,
     accountsSessionId: ApiSessionId? = null,
@@ -517,7 +514,6 @@ suspend fun importApiSessionPeople(
                             personRepository = personRepository,
                             personAttributeRepository = personAttributeRepository,
                             externalIdAttributeTypeId = externalIdAttributeTypeId,
-                            entitySource = entitySource,
                             sessionId = sessionId,
                             requestId = requestId,
                         )?.second == true
@@ -533,7 +529,6 @@ suspend fun importApiSessionPeople(
                                 personAccountOwnershipRepository = personAccountOwnershipRepository,
                                 personAttributeRepository = personAttributeRepository,
                                 externalIdAttributeTypeId = externalIdAttributeTypeId,
-                                entitySource = entitySource,
                                 sessionId = sessionId,
                                 requestId = requestId,
                             )
@@ -624,7 +619,6 @@ suspend fun importApiSessionTransactions(
     accountRepository: AccountRepository,
     currencyRepository: CurrencyRepository,
     transactionRepository: TransactionRepository,
-    entitySource: EntitySource,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     personAttributeRepository: PersonAttributeRepository,
@@ -652,7 +646,6 @@ suspend fun importApiSessionTransactions(
             accountRepository,
             currencyRepository,
             transactionRepository,
-            entitySource,
             personRepository,
             personAccountOwnershipRepository,
             personAttributeRepository,
@@ -783,7 +776,6 @@ private data class ImportSetup(
     val apiSessionRepository: ApiSessionRepository,
     val accountAttributeRepository: AccountAttributeRepository,
     val transactionRepository: TransactionRepository,
-    val entitySource: EntitySource,
     val personRepository: PersonRepository,
     val personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     val personAttributeRepository: PersonAttributeRepository,
@@ -795,7 +787,6 @@ private suspend fun setupImportSession(
     accountRepository: AccountRepository,
     currencyRepository: CurrencyRepository,
     transactionRepository: TransactionRepository,
-    entitySource: EntitySource,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     personAttributeRepository: PersonAttributeRepository,
@@ -899,7 +890,6 @@ private suspend fun setupImportSession(
         AccountCache(
             accountRepository = accountRepository,
             accountAttributeRepository = accountAttributeRepository,
-            entitySource = entitySource,
             sessionId = sessionId,
             accountApiSourceByExternalId = accountApiSourceByExternalId,
             sourceAccountExternalIdIndex = sourceAccountExternalIdIndex,
@@ -938,7 +928,6 @@ private suspend fun setupImportSession(
         apiSessionRepository = apiSessionRepository,
         accountAttributeRepository = accountAttributeRepository,
         transactionRepository = transactionRepository,
-        entitySource = entitySource,
         personRepository = personRepository,
         personAccountOwnershipRepository = personAccountOwnershipRepository,
         personAttributeRepository = personAttributeRepository,
@@ -1013,7 +1002,6 @@ private suspend fun importPeopleFromSession(setup: ImportSetup): Int {
         personRepository = setup.personRepository,
         personAccountOwnershipRepository = setup.personAccountOwnershipRepository,
         personAttributeRepository = setup.personAttributeRepository,
-        entitySource = setup.entitySource,
         accountApiSourceByExternalId = setup.accountCache.accountApiSourceByExternalId,
         sessionId = setup.sessionId,
         externalIdAttributeTypeId = externalIdAttributeTypeId,
@@ -1027,7 +1015,6 @@ private suspend fun importPeopleFromSession(setup: ImportSetup): Int {
             counterpartyIdField = setup.counterpartyIdField,
             nameMappings = setup.nameMappings,
             accountAttributeRepository = setup.accountAttributeRepository,
-            entitySource = setup.entitySource,
             personRepository = setup.personRepository,
             personAccountOwnershipRepository = setup.personAccountOwnershipRepository,
             personAttributeRepository = setup.personAttributeRepository,
@@ -1080,7 +1067,6 @@ private suspend fun linkGlobalHolderToOwnAccounts(
                             personAccountOwnershipRepository = setup.personAccountOwnershipRepository,
                             personAttributeRepository = setup.personAttributeRepository,
                             externalIdAttributeTypeId = externalIdAttributeTypeId,
-                            entitySource = setup.entitySource,
                             sessionId = setup.sessionId,
                             requestId = response.requestId,
                         ).newPeople
@@ -1410,7 +1396,6 @@ private suspend fun importPeopleFromAccounts(
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     personAttributeRepository: PersonAttributeRepository,
-    entitySource: EntitySource,
     accountApiSourceByExternalId: Map<String, AccountApiSource> = emptyMap(),
     sessionId: ApiSessionId,
     externalIdAttributeTypeId: AttributeTypeId? = null,
@@ -1433,7 +1418,6 @@ private suspend fun importPeopleFromAccounts(
                 personAccountOwnershipRepository = personAccountOwnershipRepository,
                 personAttributeRepository = personAttributeRepository,
                 externalIdAttributeTypeId = externalIdAttributeTypeId,
-                entitySource = entitySource,
                 sessionId = sessionId,
                 requestId = accountApiSourceByExternalId[account.id]?.requestId,
                 jsonPath = accountApiSourceByExternalId[account.id]?.jsonPath,
@@ -1455,7 +1439,6 @@ private suspend fun importPeopleFromCounterparties(
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     personAttributeRepository: PersonAttributeRepository,
-    entitySource: EntitySource,
     externalIdAttributeTypeId: AttributeTypeId?,
 ): Int {
     val peopleIndex = loadPeopleIndex(personRepository, personAttributeRepository, externalIdAttributeTypeId)
@@ -1505,7 +1488,6 @@ private suspend fun importPeopleFromCounterparties(
                     personAccountOwnershipRepository = personAccountOwnershipRepository,
                     personAttributeRepository = personAttributeRepository,
                     externalIdAttributeTypeId = externalIdAttributeTypeId,
-                    entitySource = entitySource,
                     sessionId = sessionId,
                     requestId = request.id,
                 ).newPeople
@@ -1523,7 +1505,6 @@ private suspend fun importOwnersForAccount(
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     personAttributeRepository: PersonAttributeRepository,
     externalIdAttributeTypeId: AttributeTypeId?,
-    entitySource: EntitySource,
     sessionId: ApiSessionId,
     requestId: ApiRequestId? = null,
     jsonPath: JsonPath? = null,
@@ -1544,7 +1525,6 @@ private suspend fun importOwnersForAccount(
                 personRepository = personRepository,
                 personAttributeRepository = personAttributeRepository,
                 externalIdAttributeTypeId = externalIdAttributeTypeId,
-                entitySource = entitySource,
                 sessionId = sessionId,
                 requestId = requestId,
             ) ?: continue
@@ -1553,7 +1533,7 @@ private suspend fun importOwnersForAccount(
             personAccountOwnershipRepository.createOwnership(
                 person.id,
                 accountId,
-                EntityProvenance.ApiImport(entitySource.deviceId, sessionId, requestId, jsonPath ?: owner.jsonPath),
+                Source.Api(sessionId, requestId, jsonPath ?: owner.jsonPath),
             )
             // Track the new link so duplicate owner entries in the same payload don't re-insert it.
             existingOwnerPersonIds += person.id
@@ -1579,7 +1559,6 @@ private suspend fun resolveOrCreatePerson(
     personRepository: PersonRepository,
     personAttributeRepository: PersonAttributeRepository,
     externalIdAttributeTypeId: AttributeTypeId?,
-    entitySource: EntitySource,
     sessionId: ApiSessionId,
     requestId: ApiRequestId? = null,
 ): Pair<Person, Boolean>? {
@@ -1617,7 +1596,7 @@ private suspend fun resolveOrCreatePerson(
     val newId =
         personRepository.createPerson(
             person,
-            EntityProvenance.ApiImport(entitySource.deviceId, sessionId, requestId, owner.jsonPath),
+            Source.Api(sessionId, requestId, owner.jsonPath),
         )
     val createdPerson = person.copy(id = newId)
     if (externalIdAttributeTypeId != null && externalId != null) {
@@ -2201,7 +2180,7 @@ private suspend fun importTransactionPages(
                     reconciledExclusionAttributeTypeId = AttributeTypeId(DatabaseConfig.EXCLUDED_ATTR_TYPE_ID),
                     reconciledRelationshipTypeId = RelationshipTypeId(DatabaseConfig.RECONCILED_RELATIONSHIP_TYPE_ID),
                 ),
-            provenance = ApiImportProvenance(setup.entitySource, setup.sessionId),
+            source = Source.Api(setup.sessionId),
             apiIdExtractor =
                 ExistingApiIdExtractor { transfer ->
                     transactionIdAttributeName?.let { name ->
@@ -2913,7 +2892,6 @@ private data class AccountApiSource(
 private class AccountCache(
     private val accountRepository: AccountRepository,
     private val accountAttributeRepository: AccountAttributeRepository,
-    private val entitySource: EntitySource,
     private val sessionId: ApiSessionId,
     val accountApiSourceByExternalId: Map<String, AccountApiSource>,
     private val sourceAccountExternalIdIndex: MutableMap<String, AccountId>,
@@ -2995,7 +2973,7 @@ private class AccountCache(
             // Record this provider's accounts-endpoint origin for the adopted account, even when the
             // name already matches (otherwise an unchanged-name adoption would never get this source).
             val renamed = existing.name != name
-            accountRepository.updateAccount(existing.copy(name = name), apiProvenance(accountApiSourceByExternalId[externalId]))
+            accountRepository.updateAccount(existing.copy(name = name), apiSourceFor(accountApiSourceByExternalId[externalId]))
             if (renamed) accountsByName = null
         }
         val attributes = accountAttributeRepository.getByAccount(existingId).first()
@@ -3127,7 +3105,7 @@ private class AccountCache(
             val provenanceByName =
                 toCreate
                     .groupBy { it.name.ifBlank { "Unknown" } }
-                    .mapValues { (_, requests) -> requests.mapTo(ArrayDeque()) { apiProvenance(it.apiSource) } }
+                    .mapValues { (_, requests) -> requests.mapTo(ArrayDeque()) { apiSourceFor(it.apiSource) } }
             val createdIds =
                 accountRepository.createAccountsBatch(accountsToCreate) { provenanceByName.getValue(it.name).removeFirst() }
             val counterpartyAttributeWrites = mutableListOf<AccountAttributeCreateInput>()
@@ -3192,7 +3170,7 @@ private class AccountCache(
         val newId =
             accountRepository.createAccount(
                 Account(id = AccountId(0L), name = normalizedName, openingDate = now),
-                apiProvenance(resolvedSource),
+                apiSourceFor(resolvedSource),
             )
         accountsByName = (accountsByName ?: emptyMap()) + (normalizedName to Account(id = newId, name = normalizedName, openingDate = now))
         onAccountCreated(externalId != null)
@@ -3204,11 +3182,11 @@ private class AccountCache(
     }
 
     /** API provenance from a per-entity source when known, else the session-level fallback. */
-    private fun apiProvenance(source: AccountApiSource?): EntityProvenance =
+    private fun apiSourceFor(source: AccountApiSource?): Source =
         if (source != null) {
-            EntityProvenance.ApiImport(entitySource.deviceId, source.sessionId, source.requestId, source.jsonPath)
+            Source.Api(source.sessionId, source.requestId, source.jsonPath)
         } else {
-            EntityProvenance.ApiImport(entitySource.deviceId, sessionId)
+            Source.Api(sessionId)
         }
 
     private suspend fun loadAccounts(): Map<String, Account> {

@@ -1,9 +1,9 @@
 package com.moneymanager.domain.repository
 
 import com.moneymanager.domain.model.AccountId
-import com.moneymanager.domain.model.EntityProvenance
 import com.moneymanager.domain.model.PersonAccountOwnership
 import com.moneymanager.domain.model.PersonId
+import com.moneymanager.domain.model.Source
 import kotlinx.coroutines.flow.Flow
 
 interface PersonAccountOwnershipRepository {
@@ -18,7 +18,7 @@ interface PersonAccountOwnershipRepository {
     suspend fun createOwnership(
         personId: PersonId,
         accountId: AccountId,
-        provenance: EntityProvenance,
+        source: Source,
     ): Long
 
     suspend fun deleteOwnership(id: Long)

@@ -1,7 +1,6 @@
 @file:OptIn(kotlin.time.ExperimentalTime::class)
 
 package com.moneymanager.ui.wise
-import com.moneymanager.database.port.DbEntitySource
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.Person
@@ -148,7 +147,6 @@ class WiseImportE2ETest : DbTest() {
                     accountRepository = repositories.accountRepository,
                     currencyRepository = repositories.currencyRepository,
                     transactionRepository = repositories.transactionRepository,
-                    entitySource = DbEntitySource(repositories.transferSourceQueries, deviceId),
                     personRepository = repositories.personRepository,
                     personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                     personAttributeRepository = repositories.personAttributeRepository,
@@ -238,7 +236,6 @@ class WiseImportE2ETest : DbTest() {
                     accountRepository = repositories.accountRepository,
                     currencyRepository = repositories.currencyRepository,
                     transactionRepository = repositories.transactionRepository,
-                    entitySource = DbEntitySource(repositories.transferSourceQueries, deviceId),
                     personRepository = repositories.personRepository,
                     personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                     personAttributeRepository = repositories.personAttributeRepository,
@@ -305,7 +302,6 @@ class WiseImportE2ETest : DbTest() {
                 accountRepository = repositories.accountRepository,
                 currencyRepository = repositories.currencyRepository,
                 transactionRepository = repositories.transactionRepository,
-                entitySource = DbEntitySource(repositories.transferSourceQueries, deviceId),
                 personRepository = repositories.personRepository,
                 personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                 personAttributeRepository = repositories.personAttributeRepository,
@@ -338,7 +334,6 @@ class WiseImportE2ETest : DbTest() {
                     personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                     personAttributeRepository = repositories.personAttributeRepository,
                     attributeTypeRepository = repositories.attributeTypeRepository,
-                    entitySource = DbEntitySource(repositories.transferSourceQueries, deviceId),
                     sessionId = peopleSessionId,
                     strategy = strategy,
                     accountsSessionId = accountsSessionId,
@@ -402,7 +397,6 @@ class WiseImportE2ETest : DbTest() {
                 personAccountOwnershipRepository = repositories.personAccountOwnershipRepository,
                 personAttributeRepository = repositories.personAttributeRepository,
                 attributeTypeRepository = repositories.attributeTypeRepository,
-                entitySource = DbEntitySource(repositories.transferSourceQueries, deviceId),
                 sessionId = peopleSessionId,
                 strategy = strategy,
             )

@@ -12,7 +12,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CurrencyId
-import com.moneymanager.domain.model.EntityProvenance
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.ui.error.ProvideSchemaAwareScope
@@ -884,13 +884,13 @@ class CategoriesScreenTest {
             every { getTopLevelCategories() } returns flow.map { cats -> cats.filter { it.parentId == null } }
             every { getCategoriesByParent(any()) } calls
                 { (parentId: Long) -> flow.map { cats -> cats.filter { it.parentId == parentId } } }
-            everySuspend { createCategory(any(), any()) } calls { (cat: Category, _: EntityProvenance) ->
+            everySuspend { createCategory(any(), any()) } calls { (cat: Category, _: Source) ->
                 val newId = (flow.value.maxOfOrNull { it.id } ?: 0L) + 1
                 val newCat = cat.copy(id = newId)
                 flow.value += newCat
                 newId
             }
-            everySuspend { updateCategory(any(), any()) } calls { (cat: Category, _: EntityProvenance) ->
+            everySuspend { updateCategory(any(), any()) } calls { (cat: Category, _: Source) ->
                 flow.value = flow.value.map { if (it.id == cat.id) cat else it }
             }
             everySuspend { deleteCategory(any()) } calls { (id: Long) ->

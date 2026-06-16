@@ -52,7 +52,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
-import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.ApiRequest
 import com.moneymanager.domain.model.ApiRequestId
@@ -126,7 +125,6 @@ fun ApiSessionsScreen(
     accountRepository: AccountRepository,
     currencyRepository: CurrencyRepository,
     transactionRepository: TransactionRepository,
-    entitySource: EntitySource,
     maintenance: Maintenance,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
@@ -261,7 +259,6 @@ fun ApiSessionsScreen(
                     accountRepository = accountRepository,
                     currencyRepository = currencyRepository,
                     transactionRepository = transactionRepository,
-                    entitySource = entitySource,
                     personRepository = personRepository,
                     personAccountOwnershipRepository = personAccountOwnershipRepository,
                     personAttributeRepository = personAttributeRepository,
@@ -290,7 +287,6 @@ fun ApiSessionsScreen(
                         personAccountOwnershipRepository = personAccountOwnershipRepository,
                         personAttributeRepository = personAttributeRepository,
                         attributeTypeRepository = attributeTypeRepository,
-                        entitySource = entitySource,
                         sessionId = session.id,
                         strategy = strategy,
                         accountsSessionId = session.id,

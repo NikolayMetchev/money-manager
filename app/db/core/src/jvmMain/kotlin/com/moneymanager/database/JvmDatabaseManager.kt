@@ -72,7 +72,7 @@ class JvmDatabaseManager : DatabaseManager {
 
             if (isNewDatabase) {
                 onProgress(DatabaseInitializationProgress("Adding default currencies and settings...", 6, 7))
-                DatabaseConfig.seedDatabase(database, CurrencyRepositoryImpl(database))
+                DatabaseConfig.seedDatabase(database)
             } else {
                 onProgress(DatabaseInitializationProgress("Preparing repositories...", 6, 7))
             }

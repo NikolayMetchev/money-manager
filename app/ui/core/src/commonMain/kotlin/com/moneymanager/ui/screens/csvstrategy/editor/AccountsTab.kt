@@ -13,7 +13,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.repository.AccountRepository
@@ -38,7 +37,6 @@ internal fun AccountsTab(
     categoryRepository: CategoryRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    entitySource: EntitySource,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text("Source Account (Optional)", style = MaterialTheme.typography.titleSmall)
@@ -71,7 +69,6 @@ internal fun AccountsTab(
                     categoryRepository = categoryRepository,
                     personRepository = personRepository,
                     personAccountOwnershipRepository = personAccountOwnershipRepository,
-                    entitySource = entitySource,
                     enabled = enabled,
                 )
             SourceAccountMode.TEMPLATE ->

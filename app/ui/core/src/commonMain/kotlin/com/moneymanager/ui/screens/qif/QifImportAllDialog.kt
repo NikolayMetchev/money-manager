@@ -16,7 +16,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.CurrencyId
@@ -61,7 +60,6 @@ fun QifImportAllDialog(
     attributeTypeRepository: AttributeTypeRepository,
     settingsRepository: SettingsRepository,
     maintenance: Maintenance,
-    entitySource: EntitySource,
     importEngine: ImportEngine,
     onDismiss: () -> Unit,
     onComplete: () -> Unit,
@@ -107,7 +105,6 @@ fun QifImportAllDialog(
                         categoryRepository = categoryRepository,
                         personRepository = personRepository,
                         personAccountOwnershipRepository = personAccountOwnershipRepository,
-                        entitySource = entitySource,
                         enabled = !isImporting,
                         isError = sourceAccountId == null,
                     )
@@ -150,7 +147,6 @@ fun QifImportAllDialog(
                                         qifImportRepository = qifImportRepository,
                                         attributeTypeRepository = attributeTypeRepository,
                                         maintenance = maintenance,
-                                        entitySource = entitySource,
                                         importEngine = importEngine,
                                         onProgress = { done, total -> progress = done to total },
                                     )

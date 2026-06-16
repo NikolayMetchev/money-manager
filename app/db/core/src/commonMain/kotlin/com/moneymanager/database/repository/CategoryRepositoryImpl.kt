@@ -4,15 +4,16 @@ import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
 import com.moneymanager.database.mapper.CategoryMapper
-import com.moneymanager.database.recordEntityProvenance
+import com.moneymanager.database.recordSource
 import com.moneymanager.database.sql.MoneyManagerDatabase
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CategoryBalance
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
-import com.moneymanager.domain.model.EntityProvenance
+import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.Money
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.repository.CategoryRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -21,6 +22,7 @@ import kotlinx.coroutines.withContext
 
 class CategoryRepositoryImpl(
     database: MoneyManagerDatabase,
+    private val deviceId: DeviceId,
 ) : CategoryRepository {
     private val queries = database.categoryQueries
     private val entitySourceQueries = database.entitySourceQueries
@@ -76,7 +78,7 @@ class CategoryRepositoryImpl(
 
     override suspend fun createCategory(
         category: Category,
-        provenance: EntityProvenance,
+        source: Source,
     ): Long =
         withContext(Dispatchers.Default) {
             queries.transactionWithResult {
@@ -85,14 +87,14 @@ class CategoryRepositoryImpl(
                     parent_id = category.parentId,
                 )
                 val id = queries.lastInsertRowId().executeAsOne()
-                entitySourceQueries.recordEntityProvenance(EntityType.CATEGORY, id, 1L, provenance)
+                entitySourceQueries.recordSource(deviceId, EntityType.CATEGORY, id, 1L, source)
                 id
             }
         }
 
     override suspend fun updateCategory(
         category: Category,
-        provenance: EntityProvenance,
+        source: Source,
     ): Unit =
         withContext(Dispatchers.Default) {
             queries.transactionWithResult {
@@ -102,7 +104,7 @@ class CategoryRepositoryImpl(
                     id = category.id,
                 )
                 val revision = queries.selectRevisionById(category.id).executeAsOne()
-                entitySourceQueries.recordEntityProvenance(EntityType.CATEGORY, category.id, revision, provenance)
+                entitySourceQueries.recordSource(deviceId, EntityType.CATEGORY, category.id, revision, source)
             }
         }
 

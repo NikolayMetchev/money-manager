@@ -22,10 +22,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AttributeType
-import com.moneymanager.domain.model.EntityProvenance
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.repository.AccountAttributeRepository
@@ -57,7 +56,6 @@ fun EditAccountDialog(
     personRepository: PersonRepository,
     personAttributeRepository: PersonAttributeRepository? = null,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    entitySource: EntitySource,
     onDismiss: () -> Unit,
 ) {
     val accountState = rememberAccountDialogState(initialName = account.name, initialCategoryId = account.categoryId)
@@ -213,8 +211,6 @@ fun EditAccountDialog(
                                     }
                                 }
 
-                                val provenance = EntityProvenance.Manual(entitySource.deviceId)
-
                                 // Atomic update: one revision bump for account + all attribute changes.
                                 // The source for the resulting revision is recorded inside the repository.
                                 accountRepository.updateAccountWithAttributes(
@@ -223,7 +219,7 @@ fun EditAccountDialog(
                                     deletedAttributeIds = deletedAttributeIds,
                                     updatedAttributes = updatedAttributes,
                                     newAttributes = newAttributes,
-                                    provenance = provenance,
+                                    source = Source.Manual,
                                 )
 
                                 val existingOwnerIds = existingOwnerships.map { it.personId.id }.toSet()
@@ -241,7 +237,7 @@ fun EditAccountDialog(
                                     personAccountOwnershipRepository.createOwnership(
                                         personId = PersonId(personId),
                                         accountId = account.id,
-                                        provenance = provenance,
+                                        source = Source.Manual,
                                     )
                                 }
 
@@ -281,7 +277,6 @@ fun EditAccountDialog(
         EditPersonDialog(
             personToEdit = null,
             personRepository = personRepository,
-            entitySource = entitySource,
             onDismiss = { accountState.showCreatePersonDialog = false },
             personAttributeRepository = personAttributeRepository,
             attributeTypeRepository = attributeTypeRepository,

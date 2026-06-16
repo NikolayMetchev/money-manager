@@ -16,7 +16,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.CategoryRepository
@@ -53,7 +52,6 @@ fun AccountPicker(
     categoryRepository: CategoryRepository,
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
-    entitySource: EntitySource,
     enabled: Boolean = true,
     excludeAccountId: AccountId? = null,
     isError: Boolean = false,
@@ -150,7 +148,6 @@ fun AccountPicker(
             categoryRepository = categoryRepository,
             personRepository = personRepository,
             personAccountOwnershipRepository = personAccountOwnershipRepository,
-            entitySource = entitySource,
             initialName = createAccountInitialName,
             onDismiss = { showCreateAccountDialog = false },
             onAccountCreated = { accountId ->

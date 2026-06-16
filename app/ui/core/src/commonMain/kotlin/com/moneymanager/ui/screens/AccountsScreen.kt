@@ -17,7 +17,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.scrollbar.VerticalScrollbarForLazyList
-import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountBalance
@@ -25,6 +24,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountMerge
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Person
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
@@ -33,12 +33,10 @@ import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
-import com.moneymanager.ui.LocalDeviceId
 import com.moneymanager.ui.components.CreateAccountDialog
 import com.moneymanager.ui.components.EditAccountDialog
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
-import com.moneymanager.ui.manualProvenance
 import com.moneymanager.ui.util.formatAmount
 import kotlinx.coroutines.launch
 import org.lighthousegames.logging.logging
@@ -55,7 +53,6 @@ fun AccountsScreen(
     personRepository: PersonRepository,
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     maintenance: Maintenance,
-    entitySource: EntitySource,
     scrollToAccountId: AccountId?,
     onAccountClick: (Account) -> Unit,
     onAuditClick: (Account) -> Unit = {},
@@ -201,7 +198,6 @@ fun AccountsScreen(
             categoryRepository = categoryRepository,
             personRepository = personRepository,
             personAccountOwnershipRepository = personAccountOwnershipRepository,
-            entitySource = entitySource,
             onDismiss = { showCreateDialog = false },
         )
     }
@@ -216,7 +212,6 @@ fun AccountsScreen(
             categoryRepository = categoryRepository,
             personRepository = personRepository,
             personAccountOwnershipRepository = personAccountOwnershipRepository,
-            entitySource = entitySource,
             onDismiss = { accountToEdit = null },
         )
     }
@@ -454,7 +449,6 @@ fun DeleteAccountDialog(
     var dropdownExpanded by remember { mutableStateOf(false) }
     var targetSearchQuery by remember { mutableStateOf("") }
     val scope = rememberSchemaAwareCoroutineScope()
-    val deviceId = LocalDeviceId.current
 
     val allAccounts by accountRepository
         .getAllAccounts()
@@ -607,7 +601,6 @@ fun DeleteAccountDialog(
                                 accountRepository.mergeAccounts(
                                     deletedAccount = account.id,
                                     survivingAccount = selectedTargetAccount!!.id,
-                                    deviceId = deviceId,
                                 )
                                 maintenance.fullRefreshMaterializedViews()
                             } else {
@@ -659,7 +652,6 @@ fun UnmergeAccountDialog(
     var isUnmerging by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val scope = rememberSchemaAwareCoroutineScope()
-    val deviceId = LocalDeviceId.current
 
     AlertDialog(
         onDismissRequest = { if (!isUnmerging) onDismiss() },
@@ -694,7 +686,7 @@ fun UnmergeAccountDialog(
                     errorMessage = null
                     scope.launch {
                         try {
-                            accountRepository.unmergeAccount(merge.id, deviceId)
+                            accountRepository.unmergeAccount(merge.id)
                             maintenance.fullRefreshMaterializedViews()
                             onDismiss()
                         } catch (expected: Exception) {
@@ -738,7 +730,7 @@ fun CreateCategoryDialog(
     var expanded by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSaving by remember { mutableStateOf(false) }
-    val provenance = manualProvenance(LocalDeviceId.current)
+    val source = Source.Manual
 
     val categories by categoryRepository
         .getAllCategories()
@@ -799,7 +791,7 @@ fun CreateCategoryDialog(
                                         name = name.trim(),
                                         parentId = selectedParentId,
                                     )
-                                val categoryId = categoryRepository.createCategory(newCategory, provenance)
+                                val categoryId = categoryRepository.createCategory(newCategory, source)
                                 onCategoryCreated(categoryId, name.trim())
                             } catch (expected: Exception) {
                                 logger.error(expected) { "Failed to create category: ${expected.message}" }

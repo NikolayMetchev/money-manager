@@ -4,13 +4,14 @@ import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
 import com.moneymanager.database.mapper.CurrencyMapper
-import com.moneymanager.database.recordEntityProvenance
+import com.moneymanager.database.recordSource
 import com.moneymanager.database.sql.MoneyManagerDatabase
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.CurrencyScaleFactors
-import com.moneymanager.domain.model.EntityProvenance
+import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.EntityType
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.repository.CurrencyRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -19,6 +20,7 @@ import kotlinx.coroutines.withContext
 
 class CurrencyRepositoryImpl(
     database: MoneyManagerDatabase,
+    private val deviceId: DeviceId,
 ) : CurrencyRepository {
     private val queries = database.currencyQueries
     private val entitySourceQueries = database.entitySourceQueries
@@ -47,7 +49,7 @@ class CurrencyRepositoryImpl(
     override suspend fun upsertCurrencyByCode(
         code: String,
         name: String,
-        provenance: EntityProvenance,
+        source: Source,
     ): CurrencyId =
         withContext(Dispatchers.Default) {
             queries.transactionWithResult {
@@ -58,7 +60,7 @@ class CurrencyRepositoryImpl(
                         queries.insert(code, name, scaleFactor.toLong())
                         val newId = queries.lastInsertedId().executeAsOne()
                         // Only a freshly inserted currency records a source (the existing branch keeps its own).
-                        entitySourceQueries.recordEntityProvenance(EntityType.CURRENCY, newId, 1L, provenance)
+                        entitySourceQueries.recordSource(deviceId, EntityType.CURRENCY, newId, 1L, source)
                         CurrencyId(newId)
                     }
             }

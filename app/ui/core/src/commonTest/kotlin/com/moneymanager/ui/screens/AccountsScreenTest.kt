@@ -6,7 +6,6 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
@@ -38,7 +37,6 @@ import kotlin.time.Duration
 
 @OptIn(ExperimentalTestApi::class)
 class AccountsScreenTest {
-    private val stubEntitySource = createEntitySource()
 
     @Test
     fun accountsScreen_displaysEmptyState_whenNoAccounts() =
@@ -58,7 +56,6 @@ class AccountsScreenTest {
                         personRepository = createPersonRepository(),
                         personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
                         maintenance = createMaintenance(),
-                        entitySource = stubEntitySource,
                         scrollToAccountId = null,
                         onAccountClick = {},
                     )
@@ -102,7 +99,6 @@ class AccountsScreenTest {
                         personRepository = createPersonRepository(),
                         personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
                         maintenance = createMaintenance(),
-                        entitySource = stubEntitySource,
                         scrollToAccountId = null,
                         onAccountClick = {},
                     )
@@ -132,7 +128,6 @@ class AccountsScreenTest {
                         personRepository = createPersonRepository(),
                         personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
                         maintenance = createMaintenance(),
-                        entitySource = stubEntitySource,
                         scrollToAccountId = null,
                         onAccountClick = {},
                     )
@@ -161,7 +156,6 @@ class AccountsScreenTest {
                         personRepository = createPersonRepository(),
                         personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
                         maintenance = createMaintenance(),
-                        entitySource = stubEntitySource,
                         scrollToAccountId = null,
                         onAccountClick = {},
                     )
@@ -198,7 +192,6 @@ class AccountsScreenTest {
                         personRepository = createPersonRepository(people),
                         personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
                         maintenance = createMaintenance(),
-                        entitySource = stubEntitySource,
                         scrollToAccountId = null,
                         onAccountClick = {},
                     )
@@ -239,7 +232,6 @@ class AccountsScreenTest {
                         personRepository = createPersonRepository(),
                         personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
                         maintenance = createMaintenance(),
-                        entitySource = stubEntitySource,
                         scrollToAccountId = null,
                         onAccountClick = {},
                     )
@@ -275,7 +267,6 @@ class AccountsScreenTest {
                         personRepository = createPersonRepository(),
                         personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
                         maintenance = createMaintenance(),
-                        entitySource = stubEntitySource,
                         scrollToAccountId = null,
                         onAccountClick = {},
                     )
@@ -308,7 +299,6 @@ class AccountsScreenTest {
                         personRepository = createPersonRepository(),
                         personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
                         maintenance = createMaintenance(),
-                        entitySource = stubEntitySource,
                         scrollToAccountId = null,
                         onAccountClick = {},
                     )
@@ -343,7 +333,6 @@ class AccountsScreenTest {
                         personRepository = createPersonRepository(),
                         personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
                         maintenance = createMaintenance(),
-                        entitySource = stubEntitySource,
                         scrollToAccountId = null,
                         onAccountClick = {},
                     )
@@ -386,7 +375,6 @@ class AccountsScreenTest {
                         personRepository = createPersonRepository(),
                         personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
                         maintenance = createMaintenance(),
-                        entitySource = stubEntitySource,
                         scrollToAccountId = null,
                         onAccountClick = {},
                     )
@@ -441,7 +429,6 @@ class AccountsScreenTest {
                         personRepository = createPersonRepository(),
                         personAccountOwnershipRepository = createPersonAccountOwnershipRepository(),
                         maintenance = createMaintenance(),
-                        entitySource = stubEntitySource,
                         scrollToAccountId = null,
                         onAccountClick = {},
                     )
@@ -515,8 +502,6 @@ class AccountsScreenTest {
             everySuspend { refreshMaterializedViews() } returns Duration.ZERO
             everySuspend { fullRefreshMaterializedViews() } returns Duration.ZERO
         }
-
-    private fun createEntitySource(): EntitySource = mock(MockMode.autoUnit)
 
     private fun createAccountAttributeRepository(): AccountAttributeRepository =
         mock(MockMode.autoUnit) {

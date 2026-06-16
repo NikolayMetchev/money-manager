@@ -35,7 +35,6 @@ import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.filepicker.rememberMultipleFilePicker
 import com.moneymanager.csv.CsvParseOptions
 import com.moneymanager.csv.CsvParser
-import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csv.CsvImportId
@@ -71,7 +70,6 @@ fun CsvImportsScreen(
     personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     attributeTypeRepository: AttributeTypeRepository,
     maintenance: Maintenance,
-    entitySource: EntitySource,
     importEngine: ImportEngine,
     onImportClick: (CsvImportId) -> Unit,
     onStrategiesClick: () -> Unit = {},
@@ -242,7 +240,6 @@ fun CsvImportsScreen(
                     csvImportRepository = csvImportRepository,
                     attributeTypeRepository = attributeTypeRepository,
                     maintenance = maintenance,
-                    entitySource = entitySource,
                     importEngine = importEngine,
                     onDismiss = { showImportAll = false },
                     onComplete = { showImportAll = false },

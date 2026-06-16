@@ -47,7 +47,6 @@ import com.moneymanager.database.csv.DiscoveredAccountMapping
 import com.moneymanager.database.csv.ImportPreparation
 import com.moneymanager.database.csv.NewAccount
 import com.moneymanager.database.csv.StrategyMatcher
-import com.moneymanager.domain.EntitySource
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
@@ -113,7 +112,6 @@ fun ApplyStrategyDialog(
     csvImportRepository: CsvImportRepository,
     attributeTypeRepository: AttributeTypeRepository,
     maintenance: Maintenance,
-    entitySource: EntitySource,
     importEngine: ImportEngine,
     onDismiss: () -> Unit,
     onImportComplete: (CsvImportResult) -> Unit,
@@ -295,7 +293,6 @@ fun ApplyStrategyDialog(
                         categoryRepository = categoryRepository,
                         personRepository = personRepository,
                         personAccountOwnershipRepository = personAccountOwnershipRepository,
-                        entitySource = entitySource,
                         enabled = !isImporting,
                         isError = selectedSourceAccountId == null,
                     )
@@ -383,7 +380,6 @@ fun ApplyStrategyDialog(
                                     csvImportRepository = csvImportRepository,
                                     attributeTypeRepository = attributeTypeRepository,
                                     maintenance = maintenance,
-                                    entitySource = entitySource,
                                     importEngine = importEngine,
                                 )
                             onImportComplete(result)
