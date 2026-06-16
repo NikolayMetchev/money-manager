@@ -716,7 +716,6 @@ private class ImportCounts(
     var totalImported = 0
     var totalDuplicates = 0
     var totalErrors = 0
-    var totalExcluded = 0
     var sourceAccountsCreated = 0
     var counterpartyAccountsCreated = 0
 
@@ -2643,7 +2642,6 @@ private class BatchPeopleResolver {
                     key = key,
                     match = match,
                     firstName = nameParts[0],
-                    middleName = null,
                     lastName = nameParts.getOrNull(1)?.ifBlank { null },
                     attributes =
                         if (externalId != null && externalIdAttributeTypeId != null) {

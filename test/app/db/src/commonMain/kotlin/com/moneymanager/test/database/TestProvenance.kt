@@ -1,6 +1,5 @@
 package com.moneymanager.test.database
 
-import com.moneymanager.di.database.DatabaseComponent
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Category
@@ -24,9 +23,8 @@ import com.moneymanager.domain.repository.PersonRepository
  */
 private val TEST_SOURCE: Source = Source.SampleGenerator
 
-/** A default [Source] for the component (kept for call-site compatibility). */
-val DatabaseComponent.testSource: Source
-    get() = TEST_SOURCE
+/** A default [Source] for tests that don't care about provenance. */
+val testSource: Source = TEST_SOURCE
 
 suspend fun AccountRepository.createAccount(account: Account): AccountId = createAccount(account, TEST_SOURCE)
 

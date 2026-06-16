@@ -831,7 +831,7 @@ object DatabaseConfig {
      *
      * @param database The database to seed
      */
-    suspend fun seedDatabase(database: MoneyManagerDatabaseWrapper) {
+    fun seedDatabase(database: MoneyManagerDatabaseWrapper) {
         with(database) {
             // Seed AuditType lookup table
             auditTypeQueries.insert(id = 1, name = "INSERT")

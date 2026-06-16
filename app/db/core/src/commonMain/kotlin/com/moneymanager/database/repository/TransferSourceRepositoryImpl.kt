@@ -4,6 +4,7 @@ package com.moneymanager.database.repository
 
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.mapper.SourceColumns
+import com.moneymanager.database.mapper.SourceDetailColumns
 import com.moneymanager.database.mapper.buildSourceRecord
 import com.moneymanager.database.recordSource
 import com.moneymanager.database.sql.SelectAllTransferSourcesByTransaction
@@ -76,20 +77,23 @@ private fun SelectTransferSourceByRevision.toSourceRecord(): SourceRecord? =
             entityType = EntityType.TRANSFER,
             entityId = transaction_id,
             revisionId = revision_id,
-            platformName = platform_name,
-            osName = os_name,
-            machineName = machine_name,
-            deviceMake = device_make,
-            deviceModel = device_model,
-            csvImportId = csv_import_id,
-            csvRowIndex = csv_row_index,
-            csvFileName = csv_file_name,
-            qifImportId = qif_import_id,
-            qifRecordIndex = qif_record_index,
-            qifFileName = qif_file_name,
-            apiSessionId = api_session_id,
-            apiRequestId = api_request_id,
-            apiJsonPath = api_json_path,
+            detail =
+                SourceDetailColumns(
+                    platformName = platform_name,
+                    osName = os_name,
+                    machineName = machine_name,
+                    deviceMake = device_make,
+                    deviceModel = device_model,
+                    csvImportId = csv_import_id,
+                    csvRowIndex = csv_row_index,
+                    csvFileName = csv_file_name,
+                    qifImportId = qif_import_id,
+                    qifRecordIndex = qif_record_index,
+                    qifFileName = qif_file_name,
+                    apiSessionId = api_session_id,
+                    apiRequestId = api_request_id,
+                    apiJsonPath = api_json_path,
+                ),
         ),
     )
 
@@ -103,19 +107,22 @@ private fun SelectAllTransferSourcesByTransaction.toSourceRecord(): SourceRecord
             entityType = EntityType.TRANSFER,
             entityId = transaction_id,
             revisionId = revision_id,
-            platformName = platform_name,
-            osName = os_name,
-            machineName = machine_name,
-            deviceMake = device_make,
-            deviceModel = device_model,
-            csvImportId = csv_import_id,
-            csvRowIndex = csv_row_index,
-            csvFileName = csv_file_name,
-            qifImportId = qif_import_id,
-            qifRecordIndex = qif_record_index,
-            qifFileName = qif_file_name,
-            apiSessionId = api_session_id,
-            apiRequestId = api_request_id,
-            apiJsonPath = api_json_path,
+            detail =
+                SourceDetailColumns(
+                    platformName = platform_name,
+                    osName = os_name,
+                    machineName = machine_name,
+                    deviceMake = device_make,
+                    deviceModel = device_model,
+                    csvImportId = csv_import_id,
+                    csvRowIndex = csv_row_index,
+                    csvFileName = csv_file_name,
+                    qifImportId = qif_import_id,
+                    qifRecordIndex = qif_record_index,
+                    qifFileName = qif_file_name,
+                    apiSessionId = api_session_id,
+                    apiRequestId = api_request_id,
+                    apiJsonPath = api_json_path,
+                ),
         ),
     )

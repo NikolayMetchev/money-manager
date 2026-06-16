@@ -16,10 +16,15 @@ import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 /**
- * The flat source columns selected by every audit/source query. Each builder method maps its
- * query row's columns onto these fields; [buildSourceRecord] then reconstructs the single read-side
- * [SourceRecord] (with its [Source] sealed value) from them. This is the one place entity- and
- * transfer-source rows are turned into the unified read model.
+ * The flat source columns selected by every audit/source query, split into the per-entity head
+ * (which row this source belongs to and when) and the common [SourceDetailColumns] tail (device
+ * metadata plus the per-source-type import detail columns). Splitting out the tail — which every
+ * query selects under the same generated names — keeps each mapper's construction down to its own
+ * entity head, instead of repeating the ~14 identical detail columns in every mapper.
+ *
+ * Each mapper maps its query row's columns onto these fields; [buildSourceRecord] then reconstructs
+ * the single read-side [SourceRecord] (with its [Source] sealed value) from them. This is the one
+ * place entity- and transfer-source rows are turned into the unified read model.
  */
 internal data class SourceColumns(
     val sourceId: Long?,
@@ -29,6 +34,14 @@ internal data class SourceColumns(
     val entityType: EntityType,
     val entityId: Long,
     val revisionId: Long,
+    val detail: SourceDetailColumns,
+)
+
+/**
+ * The device-metadata and per-source-type import detail columns shared by every audit/source query.
+ * Sources without per-type import detail rows simply pass nulls for the csv/qif/api fields.
+ */
+internal data class SourceDetailColumns(
     val platformName: String?,
     val osName: String?,
     val machineName: String?,
@@ -57,7 +70,8 @@ internal fun buildSourceRecord(columns: SourceColumns): SourceRecord? {
     val deviceId = columns.deviceId ?: return null
     val createdAt = columns.createdAt ?: return null
 
-    val (source, fileName) = columns.reconstructSource(SourceType.fromName(sourceTypeName))
+    val detail = columns.detail
+    val (source, fileName) = detail.reconstructSource(SourceType.fromName(sourceTypeName))
 
     return SourceRecord(
         id = sourceId,
@@ -68,11 +82,11 @@ internal fun buildSourceRecord(columns: SourceColumns): SourceRecord? {
         deviceId = deviceId,
         deviceInfo =
             auditDeviceInfo(
-                platformName = columns.platformName,
-                machineName = columns.machineName,
-                osName = columns.osName,
-                deviceMake = columns.deviceMake,
-                deviceModel = columns.deviceModel,
+                platformName = detail.platformName,
+                machineName = detail.machineName,
+                osName = detail.osName,
+                deviceMake = detail.deviceMake,
+                deviceModel = detail.deviceModel,
             ),
         fileName = fileName,
         createdAt = Instant.fromEpochMilliseconds(createdAt),
@@ -83,7 +97,7 @@ internal fun buildSourceRecord(columns: SourceColumns): SourceRecord? {
  * Reconstructs the [Source] for [sourceType] from this row's detail columns, paired with the
  * join-derived import file name (CSV/QIF only; null otherwise). Mirrors [Source.toSourceType].
  */
-private fun SourceColumns.reconstructSource(sourceType: SourceType): Pair<Source, String?> =
+private fun SourceDetailColumns.reconstructSource(sourceType: SourceType): Pair<Source, String?> =
     when (sourceType) {
         SourceType.MANUAL -> Source.Manual to null
         SourceType.SAMPLE_GENERATOR -> Source.SampleGenerator to null

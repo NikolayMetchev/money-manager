@@ -30,7 +30,6 @@ import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DbLocation
-import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.PageWithTargetIndex
 import com.moneymanager.domain.model.PagingInfo
@@ -487,7 +486,7 @@ class AccountTransactionsScreenTest {
                             name = "E2E Test Checking",
                             openingDate = now,
                         ),
-                        repositories.testSource,
+                        testSource,
                     )
                 savingsAccountId =
                     repositories.accountRepository.createAccount(
@@ -496,7 +495,7 @@ class AccountTransactionsScreenTest {
                             name = "E2E Test Savings",
                             openingDate = now,
                         ),
-                        repositories.testSource,
+                        testSource,
                     )
 
                 // Create a transfer
@@ -509,7 +508,6 @@ class AccountTransactionsScreenTest {
                         targetAccountId = savingsAccountId,
                         amount = Money.fromDisplayValue("50", usdCurrency),
                     )
-                val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
                 repositories.transactionRepository.createTransfers(
                     transfers = listOf(transfer),
                     sources = listOf(Source.SampleGenerator),
@@ -692,7 +690,7 @@ class AccountTransactionsScreenTest {
                             name = "Audit Test Checking",
                             openingDate = now,
                         ),
-                        repositories.testSource,
+                        testSource,
                     )
                 savingsAccountId =
                     repositories.accountRepository.createAccount(
@@ -701,7 +699,7 @@ class AccountTransactionsScreenTest {
                             name = "Audit Test Savings",
                             openingDate = now,
                         ),
-                        repositories.testSource,
+                        testSource,
                     )
 
                 // Create a transfer (revision 1)
@@ -714,7 +712,6 @@ class AccountTransactionsScreenTest {
                         targetAccountId = savingsAccountId,
                         amount = Money.fromDisplayValue("100", usdCurrency),
                     )
-                val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
                 repositories.transactionRepository.createTransfers(
                     transfers = listOf(transfer),
                     sources = listOf(Source.Manual),
@@ -872,7 +869,7 @@ class AccountTransactionsScreenTest {
                             name = "Combined Edit Checking",
                             openingDate = now,
                         ),
-                        repositories.testSource,
+                        testSource,
                     )
                 savingsAccountId =
                     repositories.accountRepository.createAccount(
@@ -881,7 +878,7 @@ class AccountTransactionsScreenTest {
                             name = "Combined Edit Savings",
                             openingDate = now,
                         ),
-                        repositories.testSource,
+                        testSource,
                     )
 
                 // Create a transfer (revision 1)
@@ -894,7 +891,6 @@ class AccountTransactionsScreenTest {
                         targetAccountId = savingsAccountId,
                         amount = Money.fromDisplayValue("100", usdCurrency),
                     )
-                val deviceId = repositories.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
                 repositories.transactionRepository.createTransfers(
                     transfers = listOf(transfer),
                     sources = listOf(Source.Manual),

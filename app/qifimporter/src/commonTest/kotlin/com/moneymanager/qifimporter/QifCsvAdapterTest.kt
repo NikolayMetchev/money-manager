@@ -1,5 +1,6 @@
 package com.moneymanager.qifimporter
 
+import com.moneymanager.domain.model.qif.QifColumns
 import com.moneymanager.domain.model.qif.QifImportRecord
 import com.moneymanager.domain.model.qif.QifRecordSplit
 import kotlin.test.Test
@@ -46,8 +47,8 @@ class QifCsvAdapterTest {
         assertEquals(1, rows.size)
         val row = rows.single()
         assertEquals(3, row.rowIndex)
-        assertEquals("-10.00", row.values[QifCsvAdapter.columns.first { it.originalName == QifCsvAdapter.COL_AMOUNT }.columnIndex])
-        assertEquals("Food", row.values[QifCsvAdapter.columns.first { it.originalName == QifCsvAdapter.COL_CATEGORY }.columnIndex])
+        assertEquals("-10.00", row.values[QifCsvAdapter.columns.first { it.originalName == QifColumns.COL_AMOUNT }.columnIndex])
+        assertEquals("Food", row.values[QifCsvAdapter.columns.first { it.originalName == QifColumns.COL_CATEGORY }.columnIndex])
     }
 
     @Test
@@ -69,8 +70,8 @@ class QifCsvAdapterTest {
 
         assertEquals(2, rows.size)
         assertTrue(rows.all { it.rowIndex == 5L })
-        val amountIdx = QifCsvAdapter.columns.first { it.originalName == QifCsvAdapter.COL_AMOUNT }.columnIndex
-        val transferIdx = QifCsvAdapter.columns.first { it.originalName == QifCsvAdapter.COL_TRANSFER_ACCOUNT }.columnIndex
+        val amountIdx = QifCsvAdapter.columns.first { it.originalName == QifColumns.COL_AMOUNT }.columnIndex
+        val transferIdx = QifCsvAdapter.columns.first { it.originalName == QifColumns.COL_TRANSFER_ACCOUNT }.columnIndex
         assertEquals(listOf("-60.00", "-30.00"), rows.map { it.values[amountIdx] })
         assertEquals("Cash", rows[1].values[transferIdx])
     }

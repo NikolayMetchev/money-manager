@@ -22,16 +22,8 @@ import kotlin.uuid.Uuid
  */
 object QifCsvAdapter {
     // The fixed column names are owned by QifColumns (db-free domain vocabulary) so the database can
-    // seed the built-in QIF strategy against the same names without depending on this adapter.
-    const val COL_DATE = QifColumns.COL_DATE
-    const val COL_AMOUNT = QifColumns.COL_AMOUNT
-    const val COL_PAYEE = QifColumns.COL_PAYEE
-    const val COL_MEMO = QifColumns.COL_MEMO
-    const val COL_CATEGORY = QifColumns.COL_CATEGORY
-    const val COL_TRANSFER_ACCOUNT = QifColumns.COL_TRANSFER_ACCOUNT
-    const val COL_CHECK_NUMBER = QifColumns.COL_CHECK_NUMBER
-    const val COL_CLEARED = QifColumns.COL_CLEARED
-    const val COL_ACCOUNT = QifColumns.COL_ACCOUNT
+    // seed the built-in QIF strategy against the same names without depending on this adapter; callers
+    // that need an individual column name reference QifColumns directly.
 
     /** Fixed column headers, in order, presented to the CSV engine. */
     val headers: List<String> = QifColumns.headers

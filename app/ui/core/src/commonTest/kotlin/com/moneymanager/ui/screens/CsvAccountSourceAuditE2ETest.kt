@@ -19,7 +19,6 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DbLocation
-import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvColumnId
 import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
@@ -81,8 +80,6 @@ class CsvAccountSourceAuditE2ETest {
             runBlocking {
                 val db = databaseManager.openDatabase(testDbLocation!!)
                 val dc = DatabaseComponent.create(db)
-                val deviceId = dc.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
-
                 // A manually-created source account the imported transfer flows out of.
                 val sourceAccountId =
                     dc.accountRepository.createAccount(

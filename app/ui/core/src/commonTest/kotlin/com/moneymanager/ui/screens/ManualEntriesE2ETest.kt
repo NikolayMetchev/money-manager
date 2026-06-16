@@ -15,7 +15,6 @@ import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.DbLocation
-import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Source
@@ -92,8 +91,6 @@ class ManualEntriesE2ETest {
                         targetAccountId = transferwise,
                         amount = Money.fromDisplayValue("0.06", currency),
                     )
-                val deviceId =
-                    databaseComponent.deviceRepository.getOrCreateDevice(DeviceInfo.Jvm("test-machine", "Test OS"))
                 val wiseIdType = databaseComponent.attributeTypeRepository.getOrCreate("wise-id")
                 databaseComponent.transactionRepository.createTransfers(
                     transfers = listOf(fee),

@@ -74,7 +74,6 @@ import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
-import com.moneymanager.ui.LocalDeviceId
 import com.moneymanager.ui.components.ErrorMessageText
 import com.moneymanager.ui.components.LoadingTextButton
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
@@ -99,7 +98,6 @@ fun CategoriesScreen(
     currencyRepository: CurrencyRepository,
     onAuditClick: (Category) -> Unit = {},
 ) {
-    val deviceId = LocalDeviceId.current
     val categories by categoryRepository
         .getAllCategories()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
@@ -626,7 +624,6 @@ fun EditCategoryDialog(
     categoryRepository: CategoryRepository,
     onDismiss: () -> Unit,
 ) {
-    val deviceId = LocalDeviceId.current
     var name by remember { mutableStateOf(category.name) }
     var selectedParentId by remember { mutableStateOf(category.parentId) }
     var expanded by remember { mutableStateOf(false) }

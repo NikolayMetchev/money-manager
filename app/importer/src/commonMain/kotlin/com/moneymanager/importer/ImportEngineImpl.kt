@@ -393,7 +393,7 @@ class ImportEngineImpl(
                     Person(
                         id = PersonId(0),
                         firstName = intent.firstName,
-                        middleName = intent.middleName,
+                        middleName = null,
                         lastName = intent.lastName,
                     ),
                     intent.source ?: batch.source,
@@ -404,7 +404,7 @@ class ImportEngineImpl(
             created++
             keyToId[intent.key] = newId
             byNameKey.getOrPut(
-                normalizeNameKey(personFullName(intent.firstName, intent.middleName, intent.lastName)),
+                normalizeNameKey(personFullName(intent.firstName, null, intent.lastName)),
             ) { newId }
             when (match) {
                 is PersonMatchKey.ByExternalId -> {

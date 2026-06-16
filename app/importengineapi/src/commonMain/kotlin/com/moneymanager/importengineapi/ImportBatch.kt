@@ -131,7 +131,6 @@ data class ImportPersonIntent(
     val key: LocalPersonKey,
     val match: PersonMatchKey,
     val firstName: String,
-    val middleName: String? = null,
     val lastName: String? = null,
     val attributes: List<NewAttribute> = emptyList(),
     /** Per-person origin (e.g. the API node the holder came from), used in place of [ImportBatch.source]. */

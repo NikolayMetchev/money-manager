@@ -19,6 +19,7 @@ import com.moneymanager.domain.model.csvstrategy.HardCodedAccountMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
 import com.moneymanager.domain.model.csvstrategy.TransferField
+import com.moneymanager.domain.model.qif.QifColumns
 import com.moneymanager.domain.model.qif.QifImportRecord
 import com.moneymanager.domain.model.qif.QifRecordSplit
 import com.moneymanager.qifimporter.QifCsvAdapter
@@ -67,17 +68,17 @@ class QifApplyIntegrationTest : DbTest() {
                         DateTimeParsingMapping(
                             id = FieldMappingId(Uuid.random()),
                             fieldType = TransferField.TIMESTAMP,
-                            dateColumnName = QifCsvAdapter.COL_DATE,
+                            dateColumnName = QifColumns.COL_DATE,
                             dateFormat = "MM/dd/yyyy",
                         ),
                     TransferField.DESCRIPTION to
-                        DirectColumnMapping(FieldMappingId(Uuid.random()), TransferField.DESCRIPTION, QifCsvAdapter.COL_PAYEE),
+                        DirectColumnMapping(FieldMappingId(Uuid.random()), TransferField.DESCRIPTION, QifColumns.COL_PAYEE),
                     TransferField.AMOUNT to
                         AmountParsingMapping(
                             id = FieldMappingId(Uuid.random()),
                             fieldType = TransferField.AMOUNT,
                             mode = AmountMode.SINGLE_COLUMN,
-                            amountColumnName = QifCsvAdapter.COL_AMOUNT,
+                            amountColumnName = QifColumns.COL_AMOUNT,
                         ),
                     TransferField.CURRENCY to
                         HardCodedCurrencyMapping(FieldMappingId(Uuid.random()), TransferField.CURRENCY, currency.id),
