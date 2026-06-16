@@ -502,6 +502,28 @@ UPDATE transfer
 SET revision_id = revision_id + 1, target_account_id = :targetAccount
 WHERE target_account_id = :accountToDelete;
 
+-- Current revision of a single transfer, for recording its source after a merge/unmerge reassignment.
+selectRevisionById:
+SELECT revision_id FROM transfer WHERE id = ?;
+
+-- Captured before a merge moves them, so unmerge can move back exactly the affected transfers.
+selectTransferIdsBySourceAccount:
+SELECT id FROM transfer WHERE source_account_id = ?;
+
+selectTransferIdsByTargetAccount:
+SELECT id FROM transfer WHERE target_account_id = ?;
+
+-- Point a single transfer's source/target back at a given account (used by unmerge).
+setTransferSourceAccount:
+UPDATE transfer
+SET revision_id = revision_id + 1, source_account_id = :sourceAccount
+WHERE id = :id;
+
+setTransferTargetAccount:
+UPDATE transfer
+SET revision_id = revision_id + 1, target_account_id = :targetAccount
+WHERE id = :id;
+
 -- Transfers whose match attribute fits the LIKE pattern but for which no transfer
 -- carries the link attribute with the same value (companion transaction missing).
 selectTransfersMissingCompanion:

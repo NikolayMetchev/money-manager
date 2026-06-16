@@ -214,7 +214,7 @@ class WiseCsvMapperTest {
     }
 
     @Test
-    fun `OUT fee is split into its own fee movement, not folded into the amount`() {
+    fun `OUT fee is split into its own fee movement and not folded into the amount`() {
         // Real export shape: 200.00 withdrawn, 7.29 fee. The main transfer is the 200.00 movement and
         // the 7.29 fee becomes its own linked fee transfer.
         val row =

@@ -148,6 +148,14 @@ INSERT INTO transfer_source (
 )
 VALUES (?, ?, 1, ?);
 
+-- Generic source insert with an explicit source_type_id (used for revisions produced by account
+-- merge / unmerge, which reassign transfers without a per-type detail row).
+insertSource:
+INSERT INTO transfer_source (
+    transaction_id, revision_id, source_type_id, device_id
+)
+VALUES (?, ?, ?, ?);
+
 -- Insert a new source record for CSV import (base record)
 insertCsvImportBase:
 INSERT INTO transfer_source (

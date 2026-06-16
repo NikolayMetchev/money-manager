@@ -12,6 +12,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CurrencyId
+import com.moneymanager.domain.model.EntityProvenance
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.ui.error.ProvideSchemaAwareScope
@@ -38,7 +39,7 @@ class CategoriesScreenTest {
             every { getAllCurrencies() } returns flowOf(emptyList())
             every { getCurrencyById(any()) } returns flowOf(null)
             every { getCurrencyByCode(any()) } returns flowOf(null)
-            everySuspend { upsertCurrencyByCode(any(), any()) } returns CurrencyId(1L)
+            everySuspend { upsertCurrencyByCode(any(), any(), any()) } returns CurrencyId(1L)
         }
 
     // region Display Tests
@@ -302,7 +303,7 @@ class CategoriesScreenTest {
 
             // Then - dialog should be dismissed and category created
             onNodeWithText("Create New Category").assertDoesNotExist()
-            verifySuspend { repository.createCategory(matches { it.name == "Entertainment" }) }
+            verifySuspend { repository.createCategory(matches { it.name == "Entertainment" }, any()) }
         }
 
     @Test
@@ -402,7 +403,7 @@ class CategoriesScreenTest {
 
             // Then - dialog should be dismissed
             onNodeWithText("Edit Category").assertDoesNotExist()
-            verifySuspend { repository.updateCategory(matches { it.name == "Food" }) }
+            verifySuspend { repository.updateCategory(matches { it.name == "Food" }, any()) }
         }
 
     @Test
@@ -759,7 +760,7 @@ class CategoriesScreenTest {
             waitForIdle()
 
             // Then
-            verifySuspend { repository.updateCategory(matches { it.parentId == 1L }) }
+            verifySuspend { repository.updateCategory(matches { it.parentId == 1L }, any()) }
         }
 
     // endregion
@@ -883,13 +884,13 @@ class CategoriesScreenTest {
             every { getTopLevelCategories() } returns flow.map { cats -> cats.filter { it.parentId == null } }
             every { getCategoriesByParent(any()) } calls
                 { (parentId: Long) -> flow.map { cats -> cats.filter { it.parentId == parentId } } }
-            everySuspend { createCategory(any()) } calls { (cat: Category) ->
+            everySuspend { createCategory(any(), any()) } calls { (cat: Category, _: EntityProvenance) ->
                 val newId = (flow.value.maxOfOrNull { it.id } ?: 0L) + 1
                 val newCat = cat.copy(id = newId)
                 flow.value += newCat
                 newId
             }
-            everySuspend { updateCategory(any()) } calls { (cat: Category) ->
+            everySuspend { updateCategory(any(), any()) } calls { (cat: Category, _: EntityProvenance) ->
                 flow.value = flow.value.map { if (it.id == cat.id) cat else it }
             }
             everySuspend { deleteCategory(any()) } calls { (id: Long) ->
