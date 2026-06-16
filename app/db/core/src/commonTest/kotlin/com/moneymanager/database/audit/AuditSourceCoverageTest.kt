@@ -1,13 +1,10 @@
 @file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
 
 package com.moneymanager.database.audit
-
 import app.cash.sqldelight.db.QueryResult
-import com.moneymanager.database.ManualEntitySourceRecorder
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Category
-import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonId
@@ -15,6 +12,10 @@ import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
 import com.moneymanager.test.database.DbTest
+import com.moneymanager.test.database.createAccount
+import com.moneymanager.test.database.createCategory
+import com.moneymanager.test.database.createOwnership
+import com.moneymanager.test.database.createPerson
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -60,7 +61,8 @@ class AuditSourceCoverageTest : DbTest() {
     @Test
     fun allEntityAuditEntriesHaveSource() =
         runTest {
-            val recorder = ManualEntitySourceRecorder(database.entitySourceQueries, repositories.deviceId)
+            // Entities created below record their source automatically inside the repository (the
+            // create methods require an EntityProvenance), so this test also proves that contract.
             val now = Clock.System.now()
             val coveredTables = mutableSetOf<String>()
 
@@ -94,12 +96,10 @@ class AuditSourceCoverageTest : DbTest() {
                 repositories.accountRepository.createAccount(
                     Account(id = AccountId(0), name = "Source Account", openingDate = now),
                 )
-            recorder.insert(EntityType.ACCOUNT, sourceAccountId.id, revisionId = 1)
             val targetAccountId =
                 repositories.accountRepository.createAccount(
                     Account(id = AccountId(0), name = "Target Account", openingDate = now),
                 )
-            recorder.insert(EntityType.ACCOUNT, targetAccountId.id, revisionId = 1)
             assertAllHaveSource(
                 "account",
                 repositories.auditRepository.getAuditHistoryForAccount(sourceAccountId),
@@ -111,7 +111,6 @@ class AuditSourceCoverageTest : DbTest() {
                 repositories.categoryRepository.createCategory(
                     Category(id = -1, name = "Test Category"),
                 )
-            recorder.insert(EntityType.CATEGORY, categoryId, revisionId = 1)
             assertAllHaveSource(
                 "user category",
                 repositories.auditRepository.getAuditHistoryForCategory(categoryId),
@@ -123,7 +122,6 @@ class AuditSourceCoverageTest : DbTest() {
                 repositories.personRepository.createPerson(
                     Person(id = PersonId(0), firstName = "Test", middleName = null, lastName = "User"),
                 )
-            recorder.insert(EntityType.PERSON, personId.id, revisionId = 1)
             assertAllHaveSource(
                 "person",
                 repositories.auditRepository.getAuditHistoryForPerson(personId),
@@ -133,7 +131,6 @@ class AuditSourceCoverageTest : DbTest() {
             // PersonAccountOwnership
             val ownershipId =
                 repositories.personAccountOwnershipRepository.createOwnership(personId, sourceAccountId)
-            recorder.insert(EntityType.PERSON_ACCOUNT_OWNERSHIP, ownershipId, revisionId = 1)
             assertAllHaveSource(
                 "person-account ownership",
                 repositories.auditRepository.getAuditHistoryForPersonAccountOwnership(ownershipId),

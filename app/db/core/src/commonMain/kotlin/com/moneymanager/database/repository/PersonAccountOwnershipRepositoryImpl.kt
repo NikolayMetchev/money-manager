@@ -4,8 +4,11 @@ import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
 import com.moneymanager.database.mapper.PersonAccountOwnershipMapper
+import com.moneymanager.database.recordEntityProvenance
 import com.moneymanager.database.sql.MoneyManagerDatabase
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.EntityProvenance
+import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.PersonAccountOwnership
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
@@ -18,6 +21,8 @@ class PersonAccountOwnershipRepositoryImpl(
     database: MoneyManagerDatabase,
 ) : PersonAccountOwnershipRepository {
     private val queries = database.personQueries
+    private val accountQueries = database.accountQueries
+    private val entitySourceQueries = database.entitySourceQueries
 
     override fun getOwnershipsByPerson(personId: PersonId): Flow<List<PersonAccountOwnership>> =
         queries
@@ -50,6 +55,7 @@ class PersonAccountOwnershipRepositoryImpl(
     override suspend fun createOwnership(
         personId: PersonId,
         accountId: AccountId,
+        provenance: EntityProvenance,
     ): Long =
         withContext(Dispatchers.Default) {
             queries.transactionWithResult {
@@ -57,13 +63,27 @@ class PersonAccountOwnershipRepositoryImpl(
                     person_id = personId.id,
                     account_id = accountId.id,
                 )
-                queries.ownershipLastInsertRowId().executeAsOne()
+                val id = queries.ownershipLastInsertRowId().executeAsOne()
+                entitySourceQueries.recordEntityProvenance(EntityType.PERSON_ACCOUNT_OWNERSHIP, id, 1L, provenance)
+                // A manual ownership change is a change to the account, so bump its revision and record
+                // it in the account audit trail (the ownership change is matched to that revision in the
+                // audit UI). Import/sample ownerships are part of bulk creation and don't bump.
+                if (provenance is EntityProvenance.Manual) {
+                    accountQueries.bumpRevisionOnly(accountId.id)
+                }
+                id
             }
         }
 
     override suspend fun deleteOwnership(id: Long): Unit =
         withContext(Dispatchers.Default) {
-            queries.ownershipDelete(id)
+            queries.transaction {
+                // deleteOwnership is only reachable from manual account editing, so removing an owner is
+                // a change to the account: bump its revision so it shows in the account audit trail.
+                val accountId = queries.ownershipSelectById(id).executeAsOneOrNull()?.account_id
+                queries.ownershipDelete(id)
+                accountId?.let { accountQueries.bumpRevisionOnly(it) }
+            }
         }
 
     override suspend fun deleteOwnershipsByPerson(personId: PersonId): Unit =

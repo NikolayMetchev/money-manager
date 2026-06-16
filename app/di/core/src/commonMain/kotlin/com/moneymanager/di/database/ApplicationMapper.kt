@@ -40,8 +40,8 @@ fun DatabaseComponent.toApplication() =
                 attributeTypeRepository = attributeTypeRepository,
                 relationshipTypeRepository = relationshipTypeRepository,
                 transferRelationshipRepository = transferRelationshipRepository,
-                entitySource = DbEntitySource(entitySourceQueries, transferSourceQueries, deviceId),
-                sampleEntitySource = DbSampleEntitySource(entitySourceQueries, transferSourceQueries, deviceId),
+                entitySource = DbEntitySource(transferSourceQueries, deviceId),
+                sampleEntitySource = DbSampleEntitySource(transferSourceQueries, deviceId),
             ),
         people =
             People(
