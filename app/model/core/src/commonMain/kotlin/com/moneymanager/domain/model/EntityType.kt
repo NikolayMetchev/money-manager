@@ -14,8 +14,8 @@ enum class EntityType(
     API_IMPORT_STRATEGY(6),
 
     /**
-     * A transfer source. Dormant for now (transfers still use the dedicated `transfer_source` tables);
-     * carried only as the read-side label on a transfer [SourceRecord]. Phase F wires the DB routing.
+     * A transfer source. Transfers share the unified `entity_source` store: a transfer's provenance is
+     * an `entity_source` row with `entity_type_id = 7` and `entity_id` = the transfer id.
      */
     TRANSFER(7),
 }

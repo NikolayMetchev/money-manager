@@ -5,10 +5,12 @@ package com.moneymanager.database.repository
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.mapper.SourceColumns
 import com.moneymanager.database.mapper.buildSourceRecord
-import com.moneymanager.database.sql.SelectAllByTransactionId
-import com.moneymanager.database.sql.SelectByTransactionIdAndRevision
+import com.moneymanager.database.recordSource
+import com.moneymanager.database.sql.SelectAllTransferSourcesByTransaction
+import com.moneymanager.database.sql.SelectTransferSourceByRevision
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.EntityType
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.SourceRecord
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.DeviceRepository
@@ -18,13 +20,14 @@ import kotlinx.coroutines.withContext
 
 /**
  * Implementation of TransferSourceRepository using SQLDelight.
- * Manages transfer source records for tracking provenance.
+ * Manages transfer source records for tracking provenance. Transfers are stored in the unified
+ * entity_source store as entity_type_id = 7 (TRANSFER), keyed by the transfer id.
  */
 class TransferSourceRepositoryImpl(
     database: MoneyManagerDatabaseWrapper,
     private val deviceRepository: DeviceRepository,
 ) : TransferSourceRepository {
-    private val queries = database.transferSourceQueries
+    private val queries = database.entitySourceQueries
 
     override suspend fun recordManualSource(
         transactionId: TransferId,
@@ -34,17 +37,19 @@ class TransferSourceRepositoryImpl(
         withContext(Dispatchers.Default) {
             val deviceId = deviceRepository.getOrCreateDevice(deviceInfo)
 
-            queries.insertManual(
-                transaction_id = transactionId.id,
-                revision_id = revisionId,
-                device_id = deviceId.id,
+            queries.recordSource(
+                deviceId = deviceId,
+                entityType = EntityType.TRANSFER,
+                entityId = transactionId.id,
+                revisionId = revisionId,
+                source = Source.Manual,
             )
         }
 
     override suspend fun getSourcesForTransaction(transactionId: TransferId): List<SourceRecord> =
         withContext(Dispatchers.Default) {
             queries
-                .selectAllByTransactionId(transactionId.id)
+                .selectAllTransferSourcesByTransaction(transactionId.id)
                 .executeAsList()
                 .mapNotNull { it.toSourceRecord() }
         }
@@ -55,13 +60,13 @@ class TransferSourceRepositoryImpl(
     ): SourceRecord? =
         withContext(Dispatchers.Default) {
             queries
-                .selectByTransactionIdAndRevision(transactionId.id, revisionId)
+                .selectTransferSourceByRevision(transactionId.id, revisionId)
                 .executeAsOneOrNull()
                 ?.toSourceRecord()
         }
 }
 
-private fun SelectByTransactionIdAndRevision.toSourceRecord(): SourceRecord? =
+private fun SelectTransferSourceByRevision.toSourceRecord(): SourceRecord? =
     buildSourceRecord(
         SourceColumns(
             sourceId = id,
@@ -88,7 +93,7 @@ private fun SelectByTransactionIdAndRevision.toSourceRecord(): SourceRecord? =
         ),
     )
 
-private fun SelectAllByTransactionId.toSourceRecord(): SourceRecord? =
+private fun SelectAllTransferSourcesByTransaction.toSourceRecord(): SourceRecord? =
     buildSourceRecord(
         SourceColumns(
             sourceId = id,

@@ -27,7 +27,6 @@ import com.moneymanager.database.repository.TransferRelationshipRepositoryImpl
 import com.moneymanager.database.repository.TransferSourceRepositoryImpl
 import com.moneymanager.database.service.CsvStrategyExportService
 import com.moneymanager.database.sql.EntitySourceQueries
-import com.moneymanager.database.sql.TransferSourceQueries
 import com.moneymanager.di.DatabaseScope
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.repository.AccountAttributeRepository
@@ -63,10 +62,6 @@ import dev.zacsweers.metro.SingleIn
  */
 @ContributesTo(DatabaseScope::class)
 interface RepositoryModule {
-    @Provides
-    @SingleIn(DatabaseScope::class)
-    fun provideTransferSourceQueries(database: MoneyManagerDatabaseWrapper): TransferSourceQueries = database.transferSourceQueries
-
     @Provides
     @SingleIn(DatabaseScope::class)
     fun provideEntitySourceQueries(database: MoneyManagerDatabaseWrapper): EntitySourceQueries = database.entitySourceQueries
@@ -131,8 +126,7 @@ interface RepositoryModule {
     fun providePersonAccountOwnershipRepository(
         database: MoneyManagerDatabaseWrapper,
         deviceId: DeviceId,
-    ): PersonAccountOwnershipRepository =
-        PersonAccountOwnershipRepositoryImpl(database, deviceId)
+    ): PersonAccountOwnershipRepository = PersonAccountOwnershipRepositoryImpl(database, deviceId)
 
     @Provides
     @SingleIn(DatabaseScope::class)

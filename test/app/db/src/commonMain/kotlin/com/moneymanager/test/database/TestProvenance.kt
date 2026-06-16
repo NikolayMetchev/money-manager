@@ -30,8 +30,7 @@ val DatabaseComponent.testSource: Source
 
 suspend fun AccountRepository.createAccount(account: Account): AccountId = createAccount(account, TEST_SOURCE)
 
-suspend fun AccountRepository.createAccountsBatch(accounts: List<Account>): List<AccountId> =
-    createAccountsBatch(accounts) { TEST_SOURCE }
+suspend fun AccountRepository.createAccountsBatch(accounts: List<Account>): List<AccountId> = createAccountsBatch(accounts) { TEST_SOURCE }
 
 suspend fun AccountRepository.updateAccount(account: Account): Long = updateAccount(account, TEST_SOURCE)
 

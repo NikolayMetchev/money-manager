@@ -284,7 +284,7 @@ class CsvImportRepositoryImplTest : DbTest() {
                     revisionId = createdTransfer.revisionId,
                 )
             assertNotNull(createdSource)
-            transferSourceQueries.insertCsvImportDetails(
+            entitySourceQueries.insertCsvSource(
                 id = createdSource.id,
                 csv_import_id = importId.id.toString(),
                 csv_row_index = 1,

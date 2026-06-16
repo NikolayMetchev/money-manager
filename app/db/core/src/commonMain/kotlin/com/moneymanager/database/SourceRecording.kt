@@ -3,12 +3,10 @@
 package com.moneymanager.database
 
 import com.moneymanager.database.sql.EntitySourceQueries
-import com.moneymanager.database.sql.TransferSourceQueries
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.SourceType
-import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.toSourceType
 
 /**
@@ -85,48 +83,3 @@ private fun EntitySourceQueries.entitySourceId(
     entityId: Long,
     revisionId: Long,
 ): Long = selectEntitySourceForRevision(entityType.id, entityId, revisionId).executeAsOne().id
-
-/**
- * Records a transfer's `transfer_source` (and any source-specific detail row) from a [Source], with
- * the injected [deviceId]. Replaces the old per-source SourceRecorder classes and their positional,
- * order-dependent bookkeeping: each transfer's source is recorded directly from the value it carries,
- * so there is no dependence on insertion order.
- */
-internal fun TransferSourceQueries.recordTransferSource(
-    deviceId: DeviceId,
-    transferId: TransferId,
-    revisionId: Long,
-    source: Source,
-) {
-    when (source) {
-        Source.Manual -> insertManual(transferId.id, revisionId, deviceId.id)
-        Source.SampleGenerator -> insertSampleGenerator(transferId.id, revisionId, deviceId.id)
-        Source.System, Source.Merge, Source.Unmerge ->
-            insertSource(transferId.id, revisionId, source.toSourceType().id.toLong(), deviceId.id)
-        is Source.Csv -> {
-            insertCsvImportBase(transferId.id, revisionId, deviceId.id)
-            insertCsvImportDetails(
-                lastInsertedId().executeAsOne(),
-                source.importId.id.toString(),
-                requireNotNull(source.rowIndex) { "CSV transfer source requires a row index" },
-            )
-        }
-        is Source.Qif -> {
-            insertQifImportBase(transferId.id, revisionId, deviceId.id)
-            insertQifImportDetails(
-                lastInsertedId().executeAsOne(),
-                source.importId.id.toString(),
-                requireNotNull(source.recordIndex) { "QIF transfer source requires a record index" },
-            )
-        }
-        is Source.Api -> {
-            insertApiBase(transferId.id, revisionId, deviceId.id)
-            insertApiDetails(
-                lastInsertedId().executeAsOne(),
-                source.sessionId.id,
-                requireNotNull(source.requestId) { "API transfer source requires a request id" }.id,
-                requireNotNull(source.jsonPath) { "API transfer source requires a json path" }.value,
-            )
-        }
-    }
-}

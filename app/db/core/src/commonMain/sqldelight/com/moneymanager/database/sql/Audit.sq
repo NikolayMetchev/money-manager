@@ -143,38 +143,39 @@ SELECT
     currency.code AS currency_code,
     currency.name AS currency_name,
     currency.scale_factor AS currency_scale_factor,
-    -- Source information
-    transfer_source.id AS source_id,
-    transfer_source.device_id,
+    -- Source information (transfers are entity_type_id = 7 in entity_source)
+    entity_source.id AS source_id,
+    entity_source.device_id,
     source_type.id AS source_type_id,
     source_type.name AS source_type,
-    csv_transfer_source.csv_import_id AS source_csv_import_id,
-    csv_transfer_source.csv_row_index AS source_csv_row_index,
+    csv_entity_source.csv_import_id AS source_csv_import_id,
+    csv_entity_source.csv_row_index AS source_csv_row_index,
     csv_import_metadata.original_file_name AS source_csv_file_name,
-    qif_transfer_source.qif_import_id AS source_qif_import_id,
-    qif_transfer_source.qif_record_index AS source_qif_record_index,
+    qif_entity_source.qif_import_id AS source_qif_import_id,
+    qif_entity_source.qif_record_index AS source_qif_record_index,
     qif_import_metadata.original_file_name AS source_qif_file_name,
-    api_transfer_source.api_session_id AS source_api_session_id,
-    api_transfer_source.api_request_id AS source_api_request_id,
-    api_transfer_source.json_path AS source_api_json_path,
+    api_entity_source.api_session_id AS source_api_session_id,
+    api_entity_source.api_request_id AS source_api_request_id,
+    api_entity_source.json_path AS source_api_json_path,
     device_view.platform_name AS source_platform_name,
     device_view.os_name AS source_os_name,
     device_view.machine_name AS source_machine_name,
     device_view.device_make AS source_device_make,
     device_view.device_model AS source_device_model,
-    transfer_source.created_at AS source_created_at
+    entity_source.created_at AS source_created_at
 FROM transfer_audit
 JOIN audit_type ON transfer_audit.audit_type_id = audit_type.id
 JOIN currency ON transfer_audit.currency_id = currency.id
-LEFT JOIN transfer_source ON transfer_audit.transfer_id = transfer_source.transaction_id
-    AND transfer_audit.revision_id = transfer_source.revision_id
-LEFT JOIN source_type ON transfer_source.source_type_id = source_type.id
-LEFT JOIN csv_transfer_source ON transfer_source.id = csv_transfer_source.id
-LEFT JOIN csv_import_metadata ON csv_transfer_source.csv_import_id = csv_import_metadata.id
-LEFT JOIN qif_transfer_source ON transfer_source.id = qif_transfer_source.id
-LEFT JOIN qif_import_metadata ON qif_transfer_source.qif_import_id = qif_import_metadata.id
-LEFT JOIN api_transfer_source ON transfer_source.id = api_transfer_source.id
-LEFT JOIN device_view ON transfer_source.device_id = device_view.id
+LEFT JOIN entity_source ON transfer_audit.transfer_id = entity_source.entity_id
+    AND transfer_audit.revision_id = entity_source.revision_id
+    AND entity_source.entity_type_id = 7
+LEFT JOIN source_type ON entity_source.source_type_id = source_type.id
+LEFT JOIN csv_entity_source ON entity_source.id = csv_entity_source.id
+LEFT JOIN csv_import_metadata ON csv_entity_source.csv_import_id = csv_import_metadata.id
+LEFT JOIN qif_entity_source ON entity_source.id = qif_entity_source.id
+LEFT JOIN qif_import_metadata ON qif_entity_source.qif_import_id = qif_import_metadata.id
+LEFT JOIN api_entity_source ON entity_source.id = api_entity_source.id
+LEFT JOIN device_view ON entity_source.device_id = device_view.id
 WHERE transfer_audit.transfer_id = ?
 ORDER BY transfer_audit.audit_timestamp DESC, transfer_audit.id DESC;
 

@@ -3,7 +3,7 @@
 package com.moneymanager.test.database
 
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
-import com.moneymanager.database.sql.TransferSourceQueries
+import com.moneymanager.database.sql.EntitySourceQueries
 import com.moneymanager.di.AppComponent
 import com.moneymanager.di.database.DatabaseComponent
 import com.moneymanager.domain.model.DbLocation
@@ -18,7 +18,7 @@ open class DbTest {
     protected lateinit var database: MoneyManagerDatabaseWrapper
     private lateinit var testDbLocation: DbLocation
     protected lateinit var repositories: DatabaseComponent
-    protected lateinit var transferSourceQueries: TransferSourceQueries
+    protected lateinit var entitySourceQueries: EntitySourceQueries
 
     @BeforeTest
     fun setup() =
@@ -28,7 +28,7 @@ open class DbTest {
             val databaseManager = component.databaseManager
             database = databaseManager.openDatabase(testDbLocation)
             repositories = DatabaseComponent.create(database)
-            transferSourceQueries = database.transferSourceQueries
+            entitySourceQueries = database.entitySourceQueries
         }
 
     @AfterTest

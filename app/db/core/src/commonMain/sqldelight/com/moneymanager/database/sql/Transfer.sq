@@ -14,7 +14,7 @@ CREATE TABLE transfer (
     FOREIGN KEY (currency_id) REFERENCES currency(id) ON DELETE RESTRICT
 );
 
-CREATE INDEX IF NOT EXISTS idx_transfer_source_account ON transfer(source_account_id);
+CREATE INDEX IF NOT EXISTS idx_transfer_src_account ON transfer(source_account_id);
 CREATE INDEX IF NOT EXISTS idx_transfer_target_account ON transfer(target_account_id);
 CREATE INDEX IF NOT EXISTS idx_transfer_currency ON transfer(currency_id);
 

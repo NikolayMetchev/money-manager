@@ -9,7 +9,6 @@ import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.mapper.AccountMapper
 import com.moneymanager.database.mapper.TransferMapper
 import com.moneymanager.database.recordSource
-import com.moneymanager.database.recordTransferSource
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountMerge
@@ -20,7 +19,6 @@ import com.moneymanager.domain.model.MergeId
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
-import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.repository.AccountRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -40,7 +38,6 @@ class AccountRepositoryImpl(
     private val personQueries = database.personQueries
     private val auditQueries = database.auditQueries
     private val entitySourceQueries = database.entitySourceQueries
-    private val transferSourceQueries = database.transferSourceQueries
 
     override fun getAllAccounts(): Flow<List<Account>> =
         queries
@@ -389,14 +386,15 @@ class AccountRepositoryImpl(
             }
         }
 
-    /** Records [transferId]'s current revision in transfer_source for a merge/unmerge [source]. */
+    /** Records [transferId]'s current revision in entity_source for a merge/unmerge [source]. */
     private fun recordTransferMergeSource(
         transferId: Long,
         source: Source,
     ) {
-        transferSourceQueries.recordTransferSource(
+        entitySourceQueries.recordSource(
             deviceId = deviceId,
-            transferId = TransferId(transferId),
+            entityType = EntityType.TRANSFER,
+            entityId = transferId,
             revisionId = transferQueries.selectRevisionById(transferId).executeAsOne(),
             source = source,
         )

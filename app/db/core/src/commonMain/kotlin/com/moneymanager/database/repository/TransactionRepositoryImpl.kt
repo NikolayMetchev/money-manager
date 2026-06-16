@@ -10,13 +10,14 @@ import com.moneymanager.database.mapper.AccountBalanceMapper
 import com.moneymanager.database.mapper.AccountRowMapper
 import com.moneymanager.database.mapper.TransferMapper
 import com.moneymanager.database.mapper.TransferMissingCompanionMapper
-import com.moneymanager.database.recordTransferSource
+import com.moneymanager.database.recordSource
 import com.moneymanager.domain.model.AccountBalance
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AccountRow
 import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.DeviceId
+import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.NewRelationship
 import com.moneymanager.domain.model.PageWithTargetIndex
@@ -44,7 +45,7 @@ class TransactionRepositoryImpl(
     private val transactionIdQueries = database.transactionIdQueries
     private val transferAttributeQueries = database.transferAttributeQueries
     private val transferRelationshipQueries = database.transferRelationshipQueries
-    private val transferSourceQueries = database.transferSourceQueries
+    private val entitySourceQueries = database.entitySourceQueries
 
     private fun loadAttributesForTransfers(transfers: List<Transfer>): List<Transfer> {
         if (transfers.isEmpty()) return transfers
@@ -471,7 +472,13 @@ class TransactionRepositoryImpl(
                     }
                     // Record the source against the new revision.
                     val persisted = transferQueries.selectById(updatedTransfer.id.id, TransferMapper::mapRaw).executeAsOne()
-                    transferSourceQueries.recordTransferSource(deviceId, persisted.id, persisted.revisionId, updateSources[index])
+                    entitySourceQueries.recordSource(
+                        deviceId,
+                        EntityType.TRANSFER,
+                        persisted.id.id,
+                        persisted.revisionId,
+                        updateSources[index],
+                    )
                 }
 
                 createdIds
@@ -515,7 +522,7 @@ class TransactionRepositoryImpl(
                     attribute_value = attr.value,
                 )
             }
-            transferSourceQueries.recordTransferSource(deviceId, realId, transfer.revisionId, sources[index])
+            entitySourceQueries.recordSource(deviceId, EntityType.TRANSFER, realId.id, transfer.revisionId, sources[index])
         }
         // Pass 2: insert relationships now that every in-batch transfer has a real id. The owning transfer
         // is id1; the related transfer (id2) may be a pre-existing transfer (reconciliation) or a sibling
