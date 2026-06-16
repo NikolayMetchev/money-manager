@@ -63,7 +63,7 @@ turbine = "1.2.1"
 # build-tool-pins bundle in moneymanager.kotlin-convention and gradle/build-logic/build.gradle.kts.
 buildtool-animal-sniffer = "1.27"
 buildtool-asm = "9.10.1"
-buildtool-checker-qual = "3.43.0"
+buildtool-checker-qual = "4.2.0"
 buildtool-commons-io = "2.22.0"
 buildtool-errorprone = "2.50.0"
 buildtool-grpc = "1.82.0"
