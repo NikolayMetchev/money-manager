@@ -1,9 +1,9 @@
 @file:OptIn(kotlin.uuid.ExperimentalUuidApi::class)
 
 package com.moneymanager.database.repository
-
 import com.moneymanager.database.DatabaseConfig
 import com.moneymanager.test.database.DbTest
+import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test

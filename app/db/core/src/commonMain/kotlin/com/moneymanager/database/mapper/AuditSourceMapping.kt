@@ -1,17 +1,20 @@
-@file:OptIn(ExperimentalTime::class)
+@file:OptIn(ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
 
 package com.moneymanager.database.mapper
 
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.ApiSessionId
 import com.moneymanager.domain.model.ApiSourceDetails
+import com.moneymanager.domain.model.CsvSourceDetails
 import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.EntitySource
 import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.JsonPath
 import com.moneymanager.domain.model.SourceType
+import com.moneymanager.domain.model.csv.CsvImportId
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
+import kotlin.uuid.Uuid
 
 internal fun auditDeviceInfo(
     platformName: String?,
@@ -49,6 +52,21 @@ internal fun auditApiSource(
         null
     }
 
+internal fun auditCsvSource(
+    importId: String?,
+    rowIndex: Long?,
+    fileName: String?,
+): CsvSourceDetails? =
+    if (importId != null && rowIndex != null) {
+        CsvSourceDetails(
+            importId = CsvImportId(Uuid.parse(importId)),
+            rowIndex = rowIndex,
+            fileName = fileName,
+        )
+    } else {
+        null
+    }
+
 internal fun auditEntitySource(
     sourceId: Long?,
     sourceTypeName: String?,
@@ -59,6 +77,7 @@ internal fun auditEntitySource(
     revisionId: Long,
     deviceInfo: DeviceInfo?,
     apiSource: ApiSourceDetails? = null,
+    csvSource: CsvSourceDetails? = null,
 ): EntitySource? {
     val resolvedSourceId = sourceId ?: return null
     val resolvedSourceTypeName = sourceTypeName ?: return null
@@ -75,5 +94,6 @@ internal fun auditEntitySource(
         deviceInfo = deviceInfo,
         createdAt = Instant.fromEpochMilliseconds(resolvedCreatedAt),
         apiSource = apiSource,
+        csvSource = csvSource,
     )
 }

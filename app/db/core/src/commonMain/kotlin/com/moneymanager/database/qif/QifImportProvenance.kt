@@ -1,7 +1,7 @@
 package com.moneymanager.database.qif
 
 import com.moneymanager.domain.EntitySource
-import com.moneymanager.domain.model.EntityType
+import com.moneymanager.domain.model.EntityProvenance
 import com.moneymanager.domain.model.SourceRecorder
 import com.moneymanager.domain.model.qif.QifImportId
 import com.moneymanager.importmodel.ImportProvenance
@@ -29,11 +29,5 @@ class QifImportProvenance(
         )
     }
 
-    override fun recordEntity(
-        entityType: EntityType,
-        entityId: Long,
-        revisionId: Long,
-    ) {
-        entitySource.record(entityType, entityId, revisionId)
-    }
+    override fun entityProvenance(): EntityProvenance = EntityProvenance.QifImport(entitySource.deviceId, qifImportId)
 }

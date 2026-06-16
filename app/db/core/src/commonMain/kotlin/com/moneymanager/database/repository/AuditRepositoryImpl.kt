@@ -62,6 +62,14 @@ class AuditRepositoryImpl(
             attachAccountAttributeChanges(accountId, entries)
         }
 
+    override suspend fun getLatestAuditedAccountNames(): Map<Long, String> =
+        withContext(Dispatchers.Default) {
+            queries
+                .selectLatestAuditedAccountNames()
+                .executeAsList()
+                .associate { it.account_id to it.name }
+        }
+
     override suspend fun getAuditHistoryForPerson(personId: PersonId): List<PersonAuditEntry> =
         withContext(Dispatchers.Default) {
             val entries =

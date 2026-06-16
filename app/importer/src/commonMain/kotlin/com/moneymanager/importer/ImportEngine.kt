@@ -5,7 +5,6 @@ package com.moneymanager.importer
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeTypeId
-import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.NewRelationship
 import com.moneymanager.domain.model.Person
@@ -183,11 +182,11 @@ class ImportEngine(
                     openingDate = intent.openingDate,
                     categoryId = intent.categoryId,
                 ),
+                batch.provenance.entityProvenance(),
             )
         intent.attributes.forEach { attr ->
             accountAttributeRepository.insertInCreationMode(newId, attr.typeId, attr.value)
         }
-        batch.provenance.recordEntity(EntityType.ACCOUNT, newId.id, revisionId = 1)
         return newId
     }
 
@@ -275,11 +274,11 @@ class ImportEngine(
                         middleName = intent.middleName,
                         lastName = intent.lastName,
                     ),
+                    batch.provenance.entityProvenance(),
                 )
             intent.attributes.forEach { attr ->
                 personAttributeRepository.insertInCreationMode(newId, attr.typeId, attr.value)
             }
-            batch.provenance.recordEntity(EntityType.PERSON, newId.id, revisionId = 1)
             created++
             keyToId[intent.key] = newId
             byNameKey.getOrPut(
@@ -347,8 +346,7 @@ class ImportEngine(
         val alreadyLinked =
             ownershipRepository.getOwnershipsByAccount(accountId).first().any { it.personId == personId }
         if (alreadyLinked) return false
-        val ownershipId = ownershipRepository.createOwnership(personId, accountId)
-        batch.provenance.recordEntity(EntityType.PERSON_ACCOUNT_OWNERSHIP, ownershipId, revisionId = 1)
+        ownershipRepository.createOwnership(personId, accountId, batch.provenance.entityProvenance())
         return true
     }
 

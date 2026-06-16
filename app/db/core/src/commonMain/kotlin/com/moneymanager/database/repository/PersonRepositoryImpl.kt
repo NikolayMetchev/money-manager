@@ -5,6 +5,9 @@ import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.mapper.PersonMapper
+import com.moneymanager.database.recordEntityProvenance
+import com.moneymanager.domain.model.EntityProvenance
+import com.moneymanager.domain.model.EntityType
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonId
@@ -19,6 +22,7 @@ class PersonRepositoryImpl(
 ) : PersonRepository {
     private val queries = database.personQueries
     private val attributeQueries = database.personAttributeQueries
+    private val entitySourceQueries = database.entitySourceQueries
 
     override fun getAllPeople(): Flow<List<Person>> =
         queries
@@ -34,7 +38,10 @@ class PersonRepositoryImpl(
             .mapToOneOrNull(Dispatchers.Default)
             .map { it?.let(PersonMapper::map) }
 
-    override suspend fun createPerson(person: Person): PersonId =
+    override suspend fun createPerson(
+        person: Person,
+        provenance: EntityProvenance,
+    ): PersonId =
         withContext(Dispatchers.Default) {
             val id =
                 queries.transactionWithResult {
@@ -43,7 +50,9 @@ class PersonRepositoryImpl(
                         middle_name = person.middleName,
                         last_name = person.lastName,
                     )
-                    queries.lastInsertRowId().executeAsOne()
+                    val newId = queries.lastInsertRowId().executeAsOne()
+                    entitySourceQueries.recordEntityProvenance(EntityType.PERSON, newId, 1L, provenance)
+                    newId
                 }
             PersonId(id)
         }

@@ -18,6 +18,12 @@ exclude:
   - name: KotlinUnreachableCode
     paths:
       - app/ui/core/src/commonTest/kotlin/com/moneymanager/ui/screens/MonzoImportAuditE2ETest.kt
+      - app/ui/core/src/commonTest/kotlin/com/moneymanager/ui/screens/CsvAccountSourceAuditE2ETest.kt
+  # account_merge tables keep an AUTOINCREMENT PK that is never SELECTed (rows are looked up by other
+  # columns); Qodana flags the unread PK column.
+  - name: UnusedColumn
+    paths:
+      - app/db/core/src/commonMain/sqldelight/com/moneymanager/database/sql/AccountMerge.sq
   - name: UnnecessaryModuleDependencyInspection
   - name: RedundantSuppression
     paths:
@@ -57,6 +63,8 @@ exclude:
       - app/di/core/src/commonMain/kotlin/com/moneymanager/di/AppComponent.kt
       - app/di/core/src/commonMain/kotlin/com/moneymanager/di/database/DatabaseComponent.kt
       - test/app/db/src/commonMain/kotlin/com/moneymanager/test/database/DbTest.kt
+      # Provenance test helpers: used cross-module (app/db/core tests), which Qodana misses here.
+      - test/app/db/src/commonMain/kotlin/com/moneymanager/test/database/TestProvenance.kt
       - utils/compose/scrollbar/src/jvmMain/kotlin/com/moneymanager/compose/scrollbar/PlatformScrollbar.kt
       - app/ui/core/src/jvmMain/kotlin/com/moneymanager/ui/DatabaseSelectionDialog.kt
       - app/ui/core/src/commonMain/kotlin/com/moneymanager/ui/MinimalErrorScreen.kt
@@ -75,6 +83,26 @@ exclude:
       - gradle/build-logic/build
       - app/db/core/build
       - app/ui/core/build
+  # False positives in a PR-touched test: `setValue` is used via 17 `by` delegations, and the mockery
+  # `calls { (code) -> ... it.code == code }` lambda isn't a constant condition. (PR runs analyse changed
+  # files, so these surface even though the lines are unchanged.)
+  - name: KotlinUnusedImport
+    paths:
+      - app/ui/core/src/commonTest/kotlin/com/moneymanager/ui/screens/AccountTransactionsScreenTest.kt
+  - name: KotlinConstantConditions
+    paths:
+      - app/ui/core/src/commonTest/kotlin/com/moneymanager/ui/screens/AccountTransactionsScreenTest.kt
+  # Static unused-symbol/parameter analysis is unreliable for test code: helpers, fixtures and
+  # repository factories are referenced only by `@Test` methods, which the PR-diff analysis doesn't
+  # treat as roots (verified false positives, e.g. helpers used 11-15x). Don't fail PRs on it in tests.
+  - name: UnusedSymbol
+    paths:
+      - app/ui/core/src/commonTest
+      - app/db/core/src/commonTest
+  - name: unused
+    paths:
+      - app/ui/core/src/commonTest
+      - app/db/core/src/commonTest
 include:
   - name: CheckDependencyLicenses
 failureConditions:
