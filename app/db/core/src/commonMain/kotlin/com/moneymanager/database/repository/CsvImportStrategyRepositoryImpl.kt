@@ -63,9 +63,8 @@ class CsvImportStrategyRepositoryImpl(
         source: Source,
     ): CsvImportStrategyId =
         withContext(coroutineContext) {
-            val now = Clock.System.now()
             database.transaction {
-                queries.insertStrategy(strategy, now)
+                queries.insertStrategy(strategy)
                 queries.insertSource(
                     strategy_id = strategy.id.id.toString(),
                     revision_id = 1,

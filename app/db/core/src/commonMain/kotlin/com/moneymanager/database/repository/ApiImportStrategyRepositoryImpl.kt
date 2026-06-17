@@ -57,16 +57,12 @@ class ApiImportStrategyRepositoryImpl(
         source: Source,
     ): ApiImportStrategyId =
         withContext(coroutineContext) {
-            // Use the current time as the authoritative creation timestamp rather than the one
-            // supplied in the domain object. This mirrors CsvImportStrategyRepositoryImpl and
-            // ensures the database always records when the row was actually persisted.
-            val now = Clock.System.now()
+            // created_at/updated_at are stamped with the current time by the table's column DEFAULTs,
+            // so the database always records when the row was actually persisted (not a domain value).
             queries.insert(
                 id = strategy.id.id.toString(),
                 name = strategy.name,
                 config_json = ApiStrategyJsonCodec.encode(strategy.toConfigJson()),
-                created_at = now.toEpochMilliseconds(),
-                updated_at = now.toEpochMilliseconds(),
             )
             queries.insertSource(
                 strategy_id = strategy.id.id.toString(),

@@ -5,8 +5,8 @@ CREATE TABLE api_import_strategy (
     revision_id INTEGER NOT NULL DEFAULT 1,
     name TEXT NOT NULL UNIQUE,
     config_json TEXT NOT NULL,
-    created_at INTEGER NOT NULL,
-    updated_at INTEGER NOT NULL
+    created_at INTEGER NOT NULL DEFAULT (CAST(strftime('%s', 'now') AS INTEGER) * 1000),
+    updated_at INTEGER NOT NULL DEFAULT (CAST(strftime('%s', 'now') AS INTEGER) * 1000)
 );
 
 CREATE INDEX idx_api_import_strategy_name ON api_import_strategy(name);
@@ -23,10 +23,10 @@ SELECT * FROM api_import_strategy WHERE id = ?;
 selectByName:
 SELECT * FROM api_import_strategy WHERE name = ?;
 
--- Insert a new strategy
+-- Insert a new strategy. created_at/updated_at are filled by their column DEFAULTs (current time).
 insert:
-INSERT INTO api_import_strategy (id, name, config_json, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?);
+INSERT INTO api_import_strategy (id, name, config_json)
+VALUES (?, ?, ?);
 
 -- Update an existing strategy
 update:

@@ -1066,13 +1066,10 @@ object DatabaseConfig {
                 builtInCounterpartyRules = monzoAtmRules,
                 personExternalIdAttribute = "monzo-external-id",
             )
-        val now = Clock.System.now().toEpochMilliseconds()
         apiImportStrategyQueries.insert(
             id = monzoStrategyId.toString(),
             name = "Monzo",
             config_json = ApiStrategyJsonCodec.encode(config),
-            created_at = now,
-            updated_at = now,
         )
         apiImportStrategyQueries.insertSource(
             strategy_id = monzoStrategyId.toString(),
@@ -1198,13 +1195,10 @@ object DatabaseConfig {
                     ),
                 personExternalIdAttribute = "wise-external-id",
             )
-        val now = Clock.System.now().toEpochMilliseconds()
         apiImportStrategyQueries.insert(
             id = wiseStrategyId.toString(),
             name = "Wise",
             config_json = ApiStrategyJsonCodec.encode(config),
-            created_at = now,
-            updated_at = now,
         )
         apiImportStrategyQueries.insertSource(
             strategy_id = wiseStrategyId.toString(),
@@ -1323,13 +1317,10 @@ object DatabaseConfig {
                     ),
                 personExternalIdAttribute = "starling-external-id",
             )
-        val now = Clock.System.now().toEpochMilliseconds()
         apiImportStrategyQueries.insert(
             id = starlingStrategyId.toString(),
             name = "Starling",
             config_json = ApiStrategyJsonCodec.encode(config),
-            created_at = now,
-            updated_at = now,
         )
         apiImportStrategyQueries.insertSource(
             strategy_id = starlingStrategyId.toString(),
@@ -1969,7 +1960,7 @@ object DatabaseConfig {
         // currencies are seeded); the QIF import dialog pre-selects this and the user can change it.
         val qifCurrencyId = CurrencyId(currencyQueries.selectByCode("GBP").executeAsOne().id)
         for (strategy in builtInCsvStrategies(now, qifCurrencyId)) {
-            csvImportStrategyQueries.insertStrategy(strategy, now)
+            csvImportStrategyQueries.insertStrategy(strategy)
             csvImportStrategyQueries.insertSource(
                 strategy_id = strategy.id.id.toString(),
                 revision_id = 1,
