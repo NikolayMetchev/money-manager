@@ -8,6 +8,7 @@ CREATE TABLE csv_import_strategy (
     attribute_mappings_json TEXT NOT NULL,
     row_rules_json TEXT NOT NULL DEFAULT '[]',
     companion_rules_json TEXT NOT NULL DEFAULT '[]',
+    content_match_rules_json TEXT NOT NULL DEFAULT '[]',
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
 );
@@ -28,13 +29,13 @@ SELECT * FROM csv_import_strategy WHERE name = ?;
 
 -- Insert a new strategy
 insert:
-INSERT INTO csv_import_strategy (id, name, identification_columns_json, field_mappings_json, attribute_mappings_json, row_rules_json, companion_rules_json, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+INSERT INTO csv_import_strategy (id, name, identification_columns_json, field_mappings_json, attribute_mappings_json, row_rules_json, companion_rules_json, content_match_rules_json, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- Update an existing strategy
 update:
 UPDATE csv_import_strategy
-SET revision_id = revision_id + 1, name = ?, identification_columns_json = ?, field_mappings_json = ?, attribute_mappings_json = ?, row_rules_json = ?, companion_rules_json = ?, updated_at = ?
+SET revision_id = revision_id + 1, name = ?, identification_columns_json = ?, field_mappings_json = ?, attribute_mappings_json = ?, row_rules_json = ?, companion_rules_json = ?, content_match_rules_json = ?, updated_at = ?
 WHERE id = ?;
 
 -- Delete a strategy by ID

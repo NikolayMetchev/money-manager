@@ -33,9 +33,11 @@ import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.AttributeColumnMapping
+import com.moneymanager.domain.model.csvstrategy.ColumnExtraction
 import com.moneymanager.domain.model.csvstrategy.ColumnPairSwap
 import com.moneymanager.domain.model.csvstrategy.CompanionTransactionRule
 import com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping
+import com.moneymanager.domain.model.csvstrategy.ContentMatchRule
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.model.csvstrategy.CurrencyLookupMapping
@@ -44,6 +46,8 @@ import com.moneymanager.domain.model.csvstrategy.DirectColumnMapping
 import com.moneymanager.domain.model.csvstrategy.FieldMappingId
 import com.moneymanager.domain.model.csvstrategy.HardCodedCurrencyMapping
 import com.moneymanager.domain.model.csvstrategy.HardCodedTimezoneMapping
+import com.moneymanager.domain.model.csvstrategy.RegexAccountMapping
+import com.moneymanager.domain.model.csvstrategy.RegexRule
 import com.moneymanager.domain.model.csvstrategy.RowCondition
 import com.moneymanager.domain.model.csvstrategy.RowConditionOperator
 import com.moneymanager.domain.model.csvstrategy.RowPreprocessingRule
@@ -1344,6 +1348,9 @@ object DatabaseConfig {
     /** Fixed UUID for the built-in QIF strategy so it can be referenced reliably. */
     val qifStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000005")
 
+    /** Fixed UUID for the built-in Santander QIF strategy so it can be referenced reliably. */
+    val santanderQifStrategyId: Uuid = Uuid.parse("00000000-0000-0000-0000-000000000006")
+
     /** Account name prefix shared with the Wise API import strategy ("Wise: " + currency code). */
     private const val WISE_ACCOUNT_PREFIX = "Wise: "
 
@@ -1367,10 +1374,13 @@ object DatabaseConfig {
 
     private fun qifMappingId(index: Int): FieldMappingId = builtInCsvMappingId(strategyGroup = 3, index = index)
 
+    private fun santanderQifMappingId(index: Int): FieldMappingId = builtInCsvMappingId(strategyGroup = 4, index = index)
+
     /** All built-in CSV import strategies seeded into a fresh database. */
     fun builtInCsvStrategies(now: Instant): List<CsvImportStrategy> =
         listOf(
             buildQifStrategy(now),
+            buildSantanderQifStrategy(now),
             buildWiseCsvStrategy(now),
             buildMonzoCsvStrategy(now),
         )
@@ -1604,6 +1614,244 @@ object DatabaseConfig {
     }
 
     /**
+     * Built-in QIF strategy for Santander UK statement exports. Santander packs the whole
+     * transaction description into the QIF Payee field (e.g. "DIRECT DEBIT PAYMENT TO AMERICAN
+     * EXPRESS REF …, MANDATE NO 0013, 1352.23"). This strategy parses it entirely via config: regex
+     * rules extract the clean counterparty into the target account (flagging person-to-person payees
+     * so the import also creates a Person + ownership), attribute mappings pull out the transaction
+     * type / reference / mandate / posted date, and the description is cleaned of its trailing amount.
+     *
+     * [ContentMatchRule]s let the QIF apply flow auto-detect this strategy from the Payee content;
+     * the generic [buildQifStrategy] (no content rules) remains the fallback for other banks. Like the
+     * generic QIF strategy, the source account and currency are chosen at import time.
+     */
+    @Suppress("LongMethod")
+    fun buildSantanderQifStrategy(now: Instant): CsvImportStrategy {
+        // First-match-wins rules over the Payee field; ${cp} extracts the clean counterparty name.
+        // Tuned against a full Santander statement history (~7k records, ~99.9% parsed). The middle
+        // rules use ".*?\bTO/\bFROM" to skip "VIA FASTER PAYMENT" / "REF.<x>" preludes that vary per row.
+        val counterpartyRules =
+            listOf(
+                // Cashback summary lines ("1 Direct Debit Payment for Water at 1,00% Cashback, 0.36").
+                RegexRule(pattern = "^\\d+ Direct Debit Payments?\\b", accountName = "Santander Cashback"),
+                RegexRule(pattern = "^MY OFFERS\\b", accountName = "Santander Cashback"),
+                RegexRule(pattern = "^DIRECT DEBIT INDEMNITY\\b", accountName = "Santander Direct Debit Indemnity"),
+                RegexRule(pattern = "^DIRECT DEBIT REVERSAL\\b", accountName = "Santander Direct Debit Reversal"),
+                RegexRule(
+                    pattern = "^DIRECT DEBIT PAYMENT TO\\s+(?<cp>.+?)(?:\\s+REF\\b|\\s+MANDATE\\b|,)",
+                    accountName = "Santander Direct Debit",
+                    accountNameTemplate = "\${cp}",
+                ),
+                RegexRule(
+                    pattern = "^CARD PAYMENT TO\\s+(?<cp>.+?)(?:,|\\s+ON\\b)",
+                    accountName = "Santander Card Payment",
+                    accountNameTemplate = "\${cp}",
+                ),
+                RegexRule(
+                    pattern = "^FASTER PAYMENTS RECEIPT\\b.*?\\bFROM\\s+(?<cp>[^,]+?)\\s*,",
+                    accountName = "Santander Faster Payment",
+                    accountNameTemplate = "\${cp}",
+                    counterpartyIsPerson = true,
+                ),
+                RegexRule(
+                    pattern = "^PAYM\\b.*?\\bFROM\\s+(?<cp>[^,]+?)\\s*(?:,|\\s+REFERENCE\\b)",
+                    accountName = "Santander Paym",
+                    accountNameTemplate = "\${cp}",
+                    counterpartyIsPerson = true,
+                ),
+                RegexRule(
+                    pattern = "^PAYM\\b.*?\\bTO\\s+(?<cp>.+?)(?:\\s+REFERENCE\\b|,)",
+                    accountName = "Santander Paym",
+                    accountNameTemplate = "\${cp}",
+                    counterpartyIsPerson = true,
+                ),
+                RegexRule(
+                    pattern = "^BILL PAYMENT\\b.*?\\bTO\\s+(?<cp>.+?)(?:\\s+REFERENCE\\b|\\s+MANDATE\\b|,)",
+                    accountName = "Santander Bill Payment",
+                    accountNameTemplate = "\${cp}",
+                    counterpartyIsPerson = true,
+                ),
+                RegexRule(
+                    pattern = "^BILL PAYMENT\\b.*?\\bFROM\\s+(?<cp>[^,]+?)\\s*(?:,|\\s+REFERENCE\\b)",
+                    accountName = "Santander Bill Payment",
+                    accountNameTemplate = "\${cp}",
+                    counterpartyIsPerson = true,
+                ),
+                RegexRule(
+                    pattern = "^PENDED\\b.*?\\bTO\\s+(?<cp>.+?)(?:\\s+REFERENCE\\b|,)",
+                    accountName = "Santander Pended Payment",
+                    accountNameTemplate = "\${cp}",
+                    counterpartyIsPerson = true,
+                ),
+                RegexRule(
+                    pattern = "^STANDING ORDER\\b.*?\\bTO\\s+(?<cp>.+?)(?:\\s+REFERENCE\\b|\\s+MANDATE\\b|,)",
+                    accountName = "Santander Standing Order",
+                    accountNameTemplate = "\${cp}",
+                    counterpartyIsPerson = true,
+                ),
+                RegexRule(
+                    pattern = "^Third party payment\\b.*?\\bto\\s+(?<cp>.+?)(?:\\s+Reference\\b|,)",
+                    accountName = "Santander Third Party Payment",
+                    accountNameTemplate = "\${cp}",
+                    counterpartyIsPerson = true,
+                ),
+                RegexRule(
+                    pattern = "^TRANSFER\\b.*?\\bTO\\s+(?<cp>.+?)(?:\\s+REFERENCE\\b|,)",
+                    accountName = "Santander Transfer",
+                    accountNameTemplate = "\${cp}",
+                    counterpartyIsPerson = true,
+                ),
+                RegexRule(
+                    pattern = "^TRANSFER\\b.*?\\bFROM\\s+(?<cp>[^,.]+?)\\s*(?:,|\\.|\\s+REFERENCE\\b)",
+                    accountName = "Santander Transfer",
+                    accountNameTemplate = "\${cp}",
+                    counterpartyIsPerson = true,
+                ),
+                // Cash / cheque movements consolidate to a single account each.
+                RegexRule(pattern = "^CASH\\b", accountName = "Cash"),
+                RegexRule(pattern = "^WITHDRAWAL\\b", accountName = "Cash"),
+                RegexRule(pattern = "^CHEQUE\\b", accountName = "Cheque"),
+                // Bank giro credit refs are often "<digits><NAME>"; strip leading digits to consolidate.
+                RegexRule(
+                    pattern = "^BANK GIRO CREDIT REF\\s+\\d*(?<cp>[^,]+?)\\s*,",
+                    accountName = "Santander Bank Giro Credit",
+                    accountNameTemplate = "\${cp}",
+                ),
+                RegexRule(
+                    pattern = "^CREDIT FROM\\s+(?<cp>.+?)(?:\\s+ON\\b|,)",
+                    accountName = "Santander Credit",
+                    accountNameTemplate = "\${cp}",
+                ),
+                RegexRule(pattern = "^INTEREST\\b", accountName = "Santander Interest"),
+                RegexRule(pattern = "^LOAN\\b", accountName = "Santander Loan"),
+                // Fixed-name rules (no template) for the various account-fee narratives.
+                RegexRule(
+                    pattern = "^(MONTHLY ACCOUNT FEE|MAINTAINING THE ACCOUNT|UNARRANGED|NON-STERLING|PENDED|PENDING)\\b",
+                    accountName = "Santander Fees",
+                ),
+            )
+        val fieldMappings =
+            mapOf(
+                TransferField.TARGET_ACCOUNT to
+                    RegexAccountMapping(
+                        id = santanderQifMappingId(1),
+                        fieldType = TransferField.TARGET_ACCOUNT,
+                        columnName = QifColumns.COL_PAYEE,
+                        rules = counterpartyRules,
+                        // Unmatched payees fall back to the explicit transfer-account/category like the generic QIF strategy.
+                        fallbackColumns = listOf(QifColumns.COL_TRANSFER_ACCOUNT, QifColumns.COL_CATEGORY),
+                    ),
+                TransferField.TIMESTAMP to
+                    DateTimeParsingMapping(
+                        id = santanderQifMappingId(2),
+                        fieldType = TransferField.TIMESTAMP,
+                        dateColumnName = QifColumns.COL_DATE,
+                        dateFormat = "dd/MM/yyyy",
+                    ),
+                TransferField.DESCRIPTION to
+                    DirectColumnMapping(
+                        id = santanderQifMappingId(3),
+                        fieldType = TransferField.DESCRIPTION,
+                        columnName = QifColumns.COL_PAYEE,
+                        fallbackColumns = listOf(QifColumns.COL_MEMO),
+                        // Strip the trailing ", <amount>[ GBP]" Santander repeats at the end of the payee.
+                        extraction = ColumnExtraction(pattern = "^(?<d>.*?),\\s*[\\d][\\d.,]*\\s*(?:GBP)?\\s*$", outputTemplate = "\${d}"),
+                    ),
+                TransferField.AMOUNT to
+                    AmountParsingMapping(
+                        id = santanderQifMappingId(4),
+                        fieldType = TransferField.AMOUNT,
+                        mode = AmountMode.SINGLE_COLUMN,
+                        amountColumnName = QifColumns.COL_AMOUNT,
+                        flipAccountsOnPositive = true,
+                    ),
+                TransferField.CURRENCY to
+                    HardCodedCurrencyMapping(
+                        id = santanderQifMappingId(5),
+                        fieldType = TransferField.CURRENCY,
+                        // Placeholder: the QIF apply flow overrides this with the user's chosen currency.
+                        currencyId = CurrencyId(1),
+                    ),
+                TransferField.TIMEZONE to
+                    HardCodedTimezoneMapping(
+                        id = santanderQifMappingId(6),
+                        fieldType = TransferField.TIMEZONE,
+                        timezoneId = "UTC",
+                    ),
+            )
+        // Transaction type: mutually-exclusive anchored patterns tag a fixed label on the matching row.
+        val typeMappings =
+            listOf(
+                "^\\d+ Direct Debit" to "CASHBACK",
+                "^MY OFFERS" to "CASHBACK",
+                "^CARD PAYMENT TO" to "CARD_PAYMENT",
+                "^DIRECT DEBIT" to "DIRECT_DEBIT",
+                "^FASTER PAYMENTS RECEIPT" to "FASTER_PAYMENT_IN",
+                "^PAYM\\b" to "PAYM",
+                "^BILL PAYMENT" to "BILL_PAYMENT",
+                "^STANDING ORDER" to "STANDING_ORDER",
+                "^Third party payment" to "THIRD_PARTY_PAYMENT",
+                "^TRANSFER\\b" to "TRANSFER",
+                "^CASH\\b" to "CASH",
+                "^CHEQUE\\b" to "CHEQUE",
+                "^BANK GIRO CREDIT" to "BANK_GIRO_CREDIT",
+                "^CREDIT FROM" to "CREDIT",
+                "^INTEREST" to "INTEREST",
+                "^LOAN\\b" to "LOAN",
+                "^(MONTHLY ACCOUNT FEE|MAINTAINING THE ACCOUNT)" to "ACCOUNT_FEE",
+            ).map { (pattern, label) ->
+                AttributeColumnMapping(
+                    columnName = QifColumns.COL_PAYEE,
+                    attributeTypeName = "santander-transaction-type",
+                    extraction = ColumnExtraction(pattern = pattern),
+                    emitWhenMatched = label,
+                )
+            }
+        val attributeMappings =
+            typeMappings +
+                listOf(
+                    AttributeColumnMapping(
+                        columnName = QifColumns.COL_PAYEE,
+                        attributeTypeName = "santander-reference",
+                        extraction =
+                            ColumnExtraction(
+                                pattern = "(?:REFERENCE|REF)\\b\\.?\\s*(?<ref>.+?)\\s*(?:,|\\s+MANDATE\\b)",
+                                outputTemplate = "\${ref}",
+                            ),
+                    ),
+                    AttributeColumnMapping(
+                        columnName = QifColumns.COL_PAYEE,
+                        attributeTypeName = "santander-mandate",
+                        extraction = ColumnExtraction(pattern = "MANDATE NO\\s*(?<m>\\d+)", outputTemplate = "\${m}"),
+                    ),
+                    AttributeColumnMapping(
+                        columnName = QifColumns.COL_PAYEE,
+                        attributeTypeName = "santander-posted-date",
+                        extraction = ColumnExtraction(pattern = "\\bON\\s+(?<d>\\d{2}-\\d{2}-\\d{4})", outputTemplate = "\${d}"),
+                    ),
+                )
+        return CsvImportStrategy(
+            id = CsvImportStrategyId(santanderQifStrategyId),
+            name = "Santander (QIF)",
+            identificationColumns = QifColumns.headers.toSet(),
+            fieldMappings = fieldMappings,
+            attributeMappings = attributeMappings,
+            contentMatchRules =
+                listOf(
+                    ContentMatchRule(
+                        columnName = QifColumns.COL_PAYEE,
+                        pattern =
+                            "^(CARD PAYMENT|DIRECT DEBIT|\\d+ DIRECT DEBIT|FASTER PAYMENTS RECEIPT|PAYM|BILL PAYMENT|" +
+                                "STANDING ORDER|Third party payment|CASH |CHEQUE|BANK GIRO CREDIT|MONTHLY ACCOUNT FEE|" +
+                                "INTEREST|MAINTAINING THE ACCOUNT|CREDIT FROM|TRANSFER)",
+                    ),
+                ),
+            createdAt = now,
+            updatedAt = now,
+        )
+    }
+
+    /**
      * Builds the built-in Monzo CSV import strategy for Monzo's transaction export.
      *
      * No SOURCE_ACCOUNT mapping is seeded (account ids are database-specific); the user picks
@@ -1712,6 +1960,7 @@ object DatabaseConfig {
                 attribute_mappings_json = FieldMappingJsonCodec.encodeAttributeMappings(strategy.attributeMappings),
                 row_rules_json = FieldMappingJsonCodec.encodeRowRules(strategy.rowPreprocessingRules),
                 companion_rules_json = FieldMappingJsonCodec.encodeCompanionRules(strategy.companionTransactionRules),
+                content_match_rules_json = FieldMappingJsonCodec.encodeContentRules(strategy.contentMatchRules),
                 created_at = now.toEpochMilliseconds(),
                 updated_at = now.toEpochMilliseconds(),
             )

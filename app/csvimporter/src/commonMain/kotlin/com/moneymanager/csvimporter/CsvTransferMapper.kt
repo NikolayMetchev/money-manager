@@ -20,6 +20,7 @@ import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csvstrategy.AccountLookupMapping
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
+import com.moneymanager.domain.model.csvstrategy.ColumnExtraction
 import com.moneymanager.domain.model.csvstrategy.ColumnPairSwap
 import com.moneymanager.domain.model.csvstrategy.ConditionalAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
@@ -70,6 +71,11 @@ sealed interface MappingResult {
         val discoveredMappings: List<DiscoveredAccountMapping> = emptyList(),
         /** Fee charged on the row, imported as its own linked fee transfer; null when there is none. */
         val feeAmount: Money? = null,
+        /**
+         * Name of the counterparty account when it was resolved via a person-flagged regex rule, so
+         * the import can additionally create a Person + ownership link; null otherwise.
+         */
+        val personalCounterpartyName: String? = null,
     ) : MappingResult {
         /** Convenience for flows where only the target side can discover a new account. */
         val newAccountName: String? get() = newAccounts.firstOrNull()?.name
@@ -112,6 +118,8 @@ data class CsvTransferWithAttributes(
     val discoveredMappings: List<DiscoveredAccountMapping> = emptyList(),
     /** Fee charged on the row, imported as its own linked fee transfer; null when there is none. */
     val feeAmount: Money? = null,
+    /** Counterparty account name when it is a person (drives Person + ownership creation); else null. */
+    val personalCounterpartyName: String? = null,
 )
 
 /**
@@ -217,6 +225,7 @@ class CsvTransferMapper(
                             rowIndex = row.rowIndex,
                             discoveredMappings = result.discoveredMappings,
                             feeAmount = result.feeAmount,
+                            personalCounterpartyName = result.personalCounterpartyName,
                         ),
                     )
                     // Count by status
@@ -326,6 +335,10 @@ class CsvTransferMapper(
             // Parse description
             val description = parseDescription(descriptionMapping, values)
 
+            // Detect a personal counterparty (resolved from the target mapping regardless of any
+            // account flip — the counterparty is the same account on whichever side it ends up).
+            val personalCounterpartyName = resolvePersonalCounterparty(targetMapping, values)
+
             // Create Money with absolute value (direction is indicated by source/target)
             val amount = Money.fromDisplayValue(rawAmount.abs(), currency)
 
@@ -376,6 +389,7 @@ class CsvTransferMapper(
                 existingTransferId = existingTransferId,
                 discoveredMappings = discoveredMappings,
                 feeAmount = feeAmount,
+                personalCounterpartyName = personalCounterpartyName,
             )
         } catch (expected: Exception) {
             MappingResult.Error(row.rowIndex, expected.message ?: "Unknown error")
@@ -390,9 +404,16 @@ class CsvTransferMapper(
         strategy.attributeMappings.mapNotNull { mapping ->
             val value = getColumnValueOrNull(mapping.columnName, values)?.trim()
             if (value.isNullOrBlank()) {
-                null
-            } else {
+                return@mapNotNull null
+            }
+            val extraction = mapping.extraction
+            // Unique-identifier columns always use the whole column value so the dedup key (which reads
+            // the raw column directly) and the stored attribute value never diverge.
+            if (extraction == null || mapping.isUniqueIdentifier) {
                 mapping.attributeTypeName to value
+            } else {
+                val extracted = applyExtraction(value, extraction) ?: return@mapNotNull null
+                mapping.attributeTypeName to (mapping.emitWhenMatched ?: extracted)
             }
         }
 
@@ -702,6 +723,7 @@ class CsvTransferMapper(
         val sourceColumnName: String,
         val sourceColumnValue: String,
         val matchedPattern: String?,
+        val counterpartyIsPerson: Boolean = false,
     )
 
     /**
@@ -718,13 +740,21 @@ class CsvTransferMapper(
         // Try each rule in order; first match wins
         if (primaryValue.isNotBlank()) {
             for (rule in mapping.rules) {
-                val regex = Regex(rule.pattern, RegexOption.IGNORE_CASE)
-                if (regex.containsMatchIn(primaryValue)) {
+                val match = Regex(rule.pattern, RegexOption.IGNORE_CASE).find(primaryValue)
+                if (match != null) {
+                    // When a template is configured, derive the name from the matched text via
+                    // capture-group substitution; otherwise use the fixed account name (legacy behaviour).
+                    val accountName =
+                        rule.accountNameTemplate
+                            ?.let { substituteTemplate(it, match).replace(Regex("\\s+"), " ").trim() }
+                            ?.takeIf { it.isNotBlank() }
+                            ?: rule.accountName
                     return RegexAccountResult(
-                        accountName = rule.accountName,
+                        accountName = accountName,
                         sourceColumnName = mapping.columnName,
                         sourceColumnValue = primaryValue,
                         matchedPattern = rule.pattern,
+                        counterpartyIsPerson = rule.counterpartyIsPerson,
                     )
                 }
             }
@@ -826,15 +856,94 @@ class CsvTransferMapper(
     /**
      * Gets the effective value from a DirectColumnMapping,
      * trying the primary column first, then fallbacks in order.
+     * When an [DirectColumnMapping.extraction] is configured, the resolved value is cleaned through it
+     * (falling back to the raw value if the pattern doesn't match, so nothing is lost).
      */
     private fun getDirectColumnValue(
         mapping: DirectColumnMapping,
         values: List<String>,
-    ): String =
-        mapping.allColumns
-            .map { getColumnValue(it, values) }
-            .firstOrNull { it.isNotBlank() }
-            .orEmpty()
+    ): String {
+        val raw =
+            mapping.allColumns
+                .map { getColumnValue(it, values) }
+                .firstOrNull { it.isNotBlank() }
+                .orEmpty()
+        val extraction = mapping.extraction ?: return raw
+        return applyExtraction(raw, extraction) ?: raw
+    }
+
+    /**
+     * Resolves whether the counterparty (target) account for this row is a person, returning its
+     * resolved account name when so (drives Person + ownership creation), or null otherwise.
+     */
+    private fun resolvePersonalCounterparty(
+        mapping: FieldMapping,
+        values: List<String>,
+    ): String? =
+        when (mapping) {
+            is RegexAccountMapping -> {
+                val result = getAccountNameFromRegexWithPattern(mapping, values)
+                if (result.counterpartyIsPerson && result.accountName.isNotBlank()) result.accountName else null
+            }
+            is ConditionalAccountMapping -> resolvePersonalCounterparty(resolveConditional(mapping, values), values)
+            else -> null
+        }
+
+    /**
+     * Runs [extraction]'s regex (case-insensitively) against [value] and substitutes its
+     * [ColumnExtraction.outputTemplate] from the match. Returns null when the pattern doesn't match.
+     */
+    private fun applyExtraction(
+        value: String,
+        extraction: ColumnExtraction,
+    ): String? {
+        val match = Regex(extraction.pattern, RegexOption.IGNORE_CASE).find(value) ?: return null
+        return substituteTemplate(extraction.outputTemplate, match)
+    }
+
+    /**
+     * Substitutes capture-group references in [template] from [match]. Supports `$0` (whole match),
+     * `$1`..`$9` (numbered groups) and `${name}` (named groups). Unknown/absent groups become "".
+     */
+    private fun substituteTemplate(
+        template: String,
+        match: MatchResult,
+    ): String {
+        val out = StringBuilder()
+        var i = 0
+        while (i < template.length) {
+            val token = parseTemplateToken(template, i, match)
+            if (token == null) {
+                out.append(template[i])
+                i++
+            } else {
+                out.append(token.first)
+                i += token.second
+            }
+        }
+        return out.toString()
+    }
+
+    /**
+     * Parses a `$`-token at [start] in [template], returning (substituted value, characters consumed)
+     * for `${name}` and `$0`..`$9`, or null when there is no token to substitute at this position.
+     */
+    private fun parseTemplateToken(
+        template: String,
+        start: Int,
+        match: MatchResult,
+    ): Pair<String, Int>? {
+        if (template[start] != '$' || start + 1 >= template.length) return null
+        val next = template[start + 1]
+        if (next == '{') {
+            val end = template.indexOf('}', startIndex = start + 2)
+            if (end == -1) return null
+            val value = (match.groups as? MatchNamedGroupCollection)?.get(template.substring(start + 2, end))?.value.orEmpty()
+            return value to (end - start + 1)
+        }
+        if (next.isDigit()) return match.groupValues.getOrNull(next - '0').orEmpty() to 2
+        return null
+    }
 
     private fun parseCurrency(
         mapping: FieldMapping,

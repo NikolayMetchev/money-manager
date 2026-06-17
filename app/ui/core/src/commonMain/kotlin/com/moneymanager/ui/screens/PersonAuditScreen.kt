@@ -22,6 +22,8 @@ import com.moneymanager.domain.model.PersonAttributeAuditEntry
 import com.moneymanager.domain.model.PersonAuditEntry
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.SourceRecord
+import com.moneymanager.domain.model.csv.CsvImportId
+import com.moneymanager.domain.model.qif.QifImportId
 import com.moneymanager.domain.repository.AuditRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.ui.audit.AuditDiffCard
@@ -40,6 +42,8 @@ fun PersonAuditScreen(
     auditRepository: AuditRepository,
     personRepository: PersonRepository,
     onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
+    onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
+    onQifSourceClick: (QifImportId, Long?) -> Unit = { _, _ -> },
     onBack: () -> Unit,
 ) {
     AuditScreen(
@@ -57,7 +61,7 @@ fun PersonAuditScreen(
         },
         diffKey = { it.id },
         onBack = onBack,
-        diffCard = { diff -> PersonAuditDiffCard(diff, onApiSourceClick) },
+        diffCard = { diff -> PersonAuditDiffCard(diff, onApiSourceClick, onCsvSourceClick, onQifSourceClick) },
     )
 }
 
@@ -153,6 +157,8 @@ private fun computePersonAuditDiffs(
 private fun PersonAuditDiffCard(
     diff: PersonAuditDiff,
     onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
+    onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
+    onQifSourceClick: (QifImportId, Long?) -> Unit = { _, _ -> },
 ) {
     AuditDiffCard(
         auditType = diff.auditType,
@@ -170,7 +176,12 @@ private fun PersonAuditDiffCard(
                 FieldValueRow("Middle Name", diff.middleName.value() ?: "(none)")
                 FieldValueRow("Last Name", diff.lastName.value() ?: "(none)")
                 PersonAttributeChangesSection(diff.attributeChanges)
-                SourceInfoSection(diff.source, onApiSourceClick = onApiSourceClick)
+                SourceInfoSection(
+                    diff.source,
+                    onApiSourceClick = onApiSourceClick,
+                    onCsvSourceClick = onCsvSourceClick,
+                    onQifSourceClick = onQifSourceClick,
+                )
             }
             AuditType.UPDATE -> {
                 if (!diff.hasChanges) {
@@ -207,7 +218,12 @@ private fun PersonAuditDiffCard(
                     }
                     PersonAttributeChangesSection(diff.attributeChanges)
                 }
-                SourceInfoSection(diff.source, onApiSourceClick = onApiSourceClick)
+                SourceInfoSection(
+                    diff.source,
+                    onApiSourceClick = onApiSourceClick,
+                    onCsvSourceClick = onCsvSourceClick,
+                    onQifSourceClick = onQifSourceClick,
+                )
             }
             AuditType.DELETE -> {
                 val errorColor = MaterialTheme.colorScheme.error
@@ -220,7 +236,13 @@ private fun PersonAuditDiffCard(
                 FieldValueRow("Middle Name", diff.middleName.value() ?: "(none)", errorColor)
                 FieldValueRow("Last Name", diff.lastName.value() ?: "(none)", errorColor)
                 PersonAttributeChangesSection(diff.attributeChanges, errorColor)
-                SourceInfoSection(diff.source, labelColor = errorColor.copy(alpha = 0.8f), onApiSourceClick = onApiSourceClick)
+                SourceInfoSection(
+                    diff.source,
+                    labelColor = errorColor.copy(alpha = 0.8f),
+                    onApiSourceClick = onApiSourceClick,
+                    onCsvSourceClick = onCsvSourceClick,
+                    onQifSourceClick = onQifSourceClick,
+                )
             }
         }
     }

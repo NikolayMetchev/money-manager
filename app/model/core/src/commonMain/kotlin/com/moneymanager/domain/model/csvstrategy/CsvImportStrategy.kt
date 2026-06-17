@@ -2,7 +2,21 @@
 
 package com.moneymanager.domain.model.csvstrategy
 
+import kotlinx.serialization.Serializable
 import kotlin.time.Instant
+
+/**
+ * A content-based match rule used to auto-detect a strategy from the data itself, for sources whose
+ * column set is fixed and therefore cannot distinguish formats (e.g. QIF, where every file has the
+ * same columns). A strategy is a content match for a file when a sampled row has a value in
+ * [columnName] matching [pattern] (case-insensitively). A strategy with no content rules never
+ * positively content-matches and so acts as the fallback.
+ */
+@Serializable
+data class ContentMatchRule(
+    val columnName: String,
+    val pattern: String,
+)
 
 /**
  * Represents a reusable CSV import strategy that defines how to map CSV columns
@@ -17,6 +31,8 @@ import kotlin.time.Instant
  *                                 before field mappings run (see [RowPreprocessingRule])
  * @property companionTransactionRules Rules flagging imported transfers that require a manually
  *                                     entered companion transaction (see [CompanionTransactionRule])
+ * @property contentMatchRules Rules that auto-detect this strategy from row content when the column
+ *                             set is fixed and cannot distinguish formats (see [ContentMatchRule]).
  * @property createdAt Timestamp when this strategy was created
  * @property updatedAt Timestamp when this strategy was last modified
  */
@@ -28,6 +44,7 @@ data class CsvImportStrategy(
     val attributeMappings: List<AttributeColumnMapping> = emptyList(),
     val rowPreprocessingRules: List<RowPreprocessingRule> = emptyList(),
     val companionTransactionRules: List<CompanionTransactionRule> = emptyList(),
+    val contentMatchRules: List<ContentMatchRule> = emptyList(),
     val createdAt: Instant,
     val updatedAt: Instant,
 ) {

@@ -168,6 +168,7 @@ class CsvStrategyExportService(
                     }.orEmpty(),
             rowPreprocessingRules = strategy.rowPreprocessingRules,
             companionTransactionRules = strategy.companionTransactionRules,
+            contentMatchRules = strategy.contentMatchRules,
         )
     }
 
@@ -380,6 +381,7 @@ class CsvStrategyExportService(
             attributeMappings = export.attributeMappings,
             rowPreprocessingRules = export.rowPreprocessingRules,
             companionTransactionRules = export.companionTransactionRules,
+            contentMatchRules = export.contentMatchRules,
             createdAt = now,
             updatedAt = now,
         )
@@ -447,6 +449,7 @@ class CsvStrategyExportService(
                     fieldType = fieldType,
                     columnName = columnName,
                     fallbackColumns = fallbackColumns,
+                    extraction = extraction,
                 )
             is AmountParsingMapping ->
                 AmountParsingExport(
@@ -555,6 +558,7 @@ class CsvStrategyExportService(
                     fieldType = fieldType,
                     columnName = columnName,
                     fallbackColumns = fallbackColumns,
+                    extraction = extraction,
                 )
             is AmountParsingExport ->
                 AmountParsingMapping(

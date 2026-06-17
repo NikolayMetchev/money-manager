@@ -62,12 +62,33 @@ data class AccountLookupMapping(
 }
 
 /**
- * A single regex rule that maps matched values to a specific account name.
+ * A reusable regex extraction: a [pattern] matched (case-insensitively) against a column value, and
+ * an [outputTemplate] producing the result from the match. Templates support `$0` (the whole match),
+ * `$1`..`$9` (numbered groups) and `${name}` (named groups). When the pattern does not match the
+ * caller decides the fallback. Used by regex account rules, attribute mappings and the description
+ * mapping so capture-group extraction lives in one place.
+ */
+@Serializable
+data class ColumnExtraction(
+    val pattern: String,
+    val outputTemplate: String = "$0",
+)
+
+/**
+ * A single regex rule that maps matched values to an account name.
+ *
+ * When [accountNameTemplate] is null the fixed [accountName] is used (the original behaviour). When
+ * set, the matched value is run through capture-group substitution (see [ColumnExtraction]) to derive
+ * the account name from the matched text — e.g. pattern `CARD PAYMENT TO (?<cp>.+?),` with template
+ * `${cp}` extracts the counterparty. [counterpartyIsPerson] marks the resolved counterparty as a
+ * person, so the import additionally creates a Person + ownership link rather than just an account.
  */
 @Serializable
 data class RegexRule(
     val pattern: String,
     val accountName: String,
+    val accountNameTemplate: String? = null,
+    val counterpartyIsPerson: Boolean = false,
 )
 
 /**
@@ -154,6 +175,10 @@ data class DateTimeParsingMapping(
  *
  * When [fallbackColumns] is specified, if the primary [columnName] is empty,
  * each fallback column is tried in order until a non-empty value is found.
+ *
+ * When [extraction] is set, the resolved column value is run through it to derive a cleaned
+ * description (e.g. stripping a trailing amount); if the pattern does not match, the raw value is
+ * kept so nothing is lost.
  */
 @Serializable
 data class DirectColumnMapping(
@@ -161,6 +186,7 @@ data class DirectColumnMapping(
     override val fieldType: TransferField,
     val columnName: String,
     val fallbackColumns: List<String> = emptyList(),
+    val extraction: ColumnExtraction? = null,
 ) : FieldMapping {
     /**
      * Returns all columns to check in priority order (primary first, then fallbacks).

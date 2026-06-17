@@ -670,6 +670,12 @@ fun MoneyManagerApp(
                                                 ),
                                             )
                                         },
+                                        onCsvSourceClick = { importId, rowIndex ->
+                                            navigationHistory.navigateTo(Screen.CsvImportDetail(importId, rowIndex))
+                                        },
+                                        onQifSourceClick = { importId, recordIndex ->
+                                            navigationHistory.navigateTo(Screen.QifImportDetail(importId, recordIndex))
+                                        },
                                         onBack = { navigationHistory.navigateBack() },
                                     )
                                 }
