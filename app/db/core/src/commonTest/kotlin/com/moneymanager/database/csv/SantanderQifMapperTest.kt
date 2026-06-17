@@ -10,6 +10,8 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.csv.CsvRow
+import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
+import com.moneymanager.domain.model.qif.QifColumns
 import com.moneymanager.qifimporter.QifCsvAdapter
 import com.moneymanager.qifimporter.qifCompatible
 import com.moneymanager.qifimporter.selectForQifContent
@@ -136,6 +138,40 @@ class SantanderQifMapperTest {
         assertEquals("SOME UNKNOWN NARRATIVE", newTargetName(r))
         assertNull(r.attrs()["santander-transaction-type"])
         assertNull(r.personalCounterpartyName)
+    }
+
+    @Test
+    fun `persisted account mapping suppresses person detection`() {
+        // A user-persisted mapping remaps the FASTER PAYMENTS counterparty onto an existing account.
+        val mapped = Account(id = AccountId(42), name = "My Savings", openingDate = now)
+        val mapping =
+            CsvAccountMapping(
+                id = 1L,
+                strategyId = strategy.id,
+                columnName = QifColumns.COL_PAYEE,
+                valuePattern = Regex("ZAKHARENKO O"),
+                accountId = mapped.id,
+                createdAt = now,
+                updatedAt = now,
+            )
+        val mapper =
+            CsvTransferMapper(
+                strategy = strategy,
+                columns = QifCsvAdapter.columns,
+                existingAccounts = mapOf(santander.name to santander, mapped.name to mapped),
+                existingCurrencies = mapOf(gbp.id to gbp),
+                existingCurrenciesByCode = mapOf(gbp.code to gbp),
+                accountMappings = listOf(mapping),
+                sourceAccountOverride = santander.id,
+            )
+        val r =
+            assertIs<MappingResult.Success>(
+                mapper.mapRow(row("FASTER PAYMENTS RECEIPT REF.OLGA FROM ZAKHARENKO O, 250.00", "250.00")),
+            )
+        // The persisted mapping overrode the counterparty, so no Person/ownership is created from the
+        // regex name, and no new account is discovered (it resolved to the mapped existing account).
+        assertNull(r.personalCounterpartyName)
+        assertTrue(r.newAccounts.isEmpty())
     }
 
     @Test
