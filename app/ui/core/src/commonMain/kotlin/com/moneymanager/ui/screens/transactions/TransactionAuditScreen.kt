@@ -63,7 +63,7 @@ fun TransactionAuditScreen(
     transactionRepository: TransactionRepository,
     currentDeviceId: DeviceId? = null,
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
-    onQifSourceClick: (QifImportId, Long) -> Unit = { _, _ -> },
+    onQifSourceClick: (QifImportId, Long?) -> Unit = { _, _ -> },
     onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
     onAccountClick: (AccountId) -> Unit = {},
     onBack: () -> Unit,
@@ -142,7 +142,7 @@ private fun TransactionAuditDiffCard(
     auditedAccountNames: Map<Long, String>,
     currentDeviceId: DeviceId? = null,
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
-    onQifSourceClick: (QifImportId, Long) -> Unit = { _, _ -> },
+    onQifSourceClick: (QifImportId, Long?) -> Unit = { _, _ -> },
     onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
     onAccountClick: (AccountId) -> Unit = {},
 ) {
@@ -196,7 +196,7 @@ private fun InsertDiffContent(
     auditedAccountNames: Map<Long, String>,
     currentDeviceId: DeviceId? = null,
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
-    onQifSourceClick: (QifImportId, Long) -> Unit = { _, _ -> },
+    onQifSourceClick: (QifImportId, Long?) -> Unit = { _, _ -> },
     onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
     onAccountClick: (AccountId) -> Unit = {},
 ) {
@@ -230,7 +230,7 @@ private fun UpdateDiffContent(
     auditedAccountNames: Map<Long, String>,
     currentDeviceId: DeviceId? = null,
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
-    onQifSourceClick: (QifImportId, Long) -> Unit = { _, _ -> },
+    onQifSourceClick: (QifImportId, Long?) -> Unit = { _, _ -> },
     onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
     onAccountClick: (AccountId) -> Unit = {},
 ) {
@@ -312,7 +312,7 @@ private fun DeleteDiffContent(
     auditedAccountNames: Map<Long, String>,
     currentDeviceId: DeviceId? = null,
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
-    onQifSourceClick: (QifImportId, Long) -> Unit = { _, _ -> },
+    onQifSourceClick: (QifImportId, Long?) -> Unit = { _, _ -> },
     onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
     onAccountClick: (AccountId) -> Unit = {},
 ) {
@@ -496,7 +496,7 @@ private fun SourceInfoSection(
     currentDeviceId: DeviceId? = null,
     labelColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
-    onQifSourceClick: (QifImportId, Long) -> Unit = { _, _ -> },
+    onQifSourceClick: (QifImportId, Long?) -> Unit = { _, _ -> },
     onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
 ) {
     if (source == null) return
@@ -552,14 +552,16 @@ private fun SourceInfoSection(
             is Source.Qif -> {
                 val recordIndex = origin.recordIndex
                 FieldValueRow("Origin", "QIF Import$thisDeviceSuffix", labelWidth = LABEL_WIDTH)
+                // The File link always opens the QIF import; only show a Record link when a single
+                // originating record is known (file-level provenance has none).
+                QifSourceLinkRow(
+                    label = "File",
+                    value = source.fileName ?: "Unknown file",
+                    qifImportId = origin.importId,
+                    recordIndex = recordIndex,
+                    onQifSourceClick = onQifSourceClick,
+                )
                 if (recordIndex != null) {
-                    QifSourceLinkRow(
-                        label = "File",
-                        value = source.fileName ?: "Unknown file",
-                        qifImportId = origin.importId,
-                        recordIndex = recordIndex,
-                        onQifSourceClick = onQifSourceClick,
-                    )
                     QifSourceLinkRow(
                         label = "Record",
                         value = recordIndex.toString(),
@@ -567,8 +569,6 @@ private fun SourceInfoSection(
                         recordIndex = recordIndex,
                         onQifSourceClick = onQifSourceClick,
                     )
-                } else {
-                    FieldValueRow("File", source.fileName ?: "Unknown file", labelWidth = LABEL_WIDTH)
                 }
                 DeviceInfoFields(source.deviceInfo)
             }
@@ -785,8 +785,8 @@ private fun QifSourceLinkRow(
     label: String,
     value: String,
     qifImportId: QifImportId,
-    recordIndex: Long,
-    onQifSourceClick: (QifImportId, Long) -> Unit,
+    recordIndex: Long?,
+    onQifSourceClick: (QifImportId, Long?) -> Unit,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),

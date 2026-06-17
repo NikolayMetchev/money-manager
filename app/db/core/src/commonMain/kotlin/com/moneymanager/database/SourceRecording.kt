@@ -34,21 +34,31 @@ internal fun EntitySourceQueries.recordSource(
     )
 
     when (source) {
-        // Always record the import detail row so the import id (and thus the audit trail's link back
-        // to the import) is preserved even when no single originating row/record is known — e.g. an
-        // account or category derived from the import as a whole. The row/record index stays null.
-        is Source.Csv ->
-            insertCsvSource(
-                id = entitySourceId(entityType, entityId, revisionId),
-                csv_import_id = source.importId.id.toString(),
-                csv_row_index = source.rowIndex,
-            )
-        is Source.Qif ->
-            insertQifSource(
-                id = entitySourceId(entityType, entityId, revisionId),
-                qif_import_id = source.importId.id.toString(),
-                qif_record_index = source.recordIndex,
-            )
+        // Record the import detail row so the import id (and thus the audit trail's link back to the
+        // import) is preserved even when no single originating row/record is known — e.g. an account or
+        // category derived from the import as a whole (the row/record index stays null). Guard on the
+        // persisted source type (mirroring the API branch): INSERT OR IGNORE above keeps any pre-existing
+        // row for this (entity, revision), so only attach CSV/QIF detail when that row is actually CSV/QIF.
+        is Source.Csv -> {
+            val entitySource = selectEntitySourceForRevision(entityType.id, entityId, revisionId).executeAsOne()
+            if (entitySource.source_type_id == SourceType.CSV_IMPORT.id.toLong()) {
+                insertCsvSource(
+                    id = entitySource.id,
+                    csv_import_id = source.importId.id.toString(),
+                    csv_row_index = source.rowIndex,
+                )
+            }
+        }
+        is Source.Qif -> {
+            val entitySource = selectEntitySourceForRevision(entityType.id, entityId, revisionId).executeAsOne()
+            if (entitySource.source_type_id == SourceType.QIF_IMPORT.id.toLong()) {
+                insertQifSource(
+                    id = entitySource.id,
+                    qif_import_id = source.importId.id.toString(),
+                    qif_record_index = source.recordIndex,
+                )
+            }
+        }
         is Source.Api -> {
             val requestId = source.requestId
             val jsonPath = source.jsonPath
@@ -76,9 +86,3 @@ internal fun EntitySourceQueries.recordSource(
         -> Unit
     }
 }
-
-private fun EntitySourceQueries.entitySourceId(
-    entityType: EntityType,
-    entityId: Long,
-    revisionId: Long,
-): Long = selectEntitySourceForRevision(entityType.id, entityId, revisionId).executeAsOne().id

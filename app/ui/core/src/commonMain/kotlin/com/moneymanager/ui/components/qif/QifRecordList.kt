@@ -47,8 +47,10 @@ fun QifRecordList(
     scrollToRecordIndex: Long? = null,
 ) {
     val lazyListState = rememberLazyListState()
-    val scrolledToRecordIndex = remember { mutableStateOf<Long?>(null) }
-    LaunchedEffect(scrollToRecordIndex, records.size) {
+    // Keyed on `records` so the one-time-scroll guard resets when the dataset changes (otherwise a later
+    // navigation to the same recordIndex over a different list would be skipped).
+    val scrolledToRecordIndex = remember(records) { mutableStateOf<Long?>(null) }
+    LaunchedEffect(scrollToRecordIndex, records) {
         val target = scrollToRecordIndex ?: return@LaunchedEffect
         if (scrolledToRecordIndex.value == target) return@LaunchedEffect
         val targetIndex = records.indexOfFirst { it.recordIndex == target }
