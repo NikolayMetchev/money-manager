@@ -344,34 +344,44 @@ suspend fun runImport(
     // ownership link to their counterparty account, in addition to the account itself. The engine
     // dedups people by name key and ownerships by (person, account), so repeats across rows/files and
     // re-imports collapse.
+    //
+    // The counterparty account id is read from the resolved transfer (the side that isn't the source
+    // account) rather than by name lookup, so a counterparty that resolved to an existing account with
+    // different casing/name still gets its Person + ownership. The value is paired with the first QIF
+    // record that referenced the person, so the person's audit source links back to that exact row
+    // (the engine writes ImportPersonIntent.source verbatim).
     val accountIdByName = latestAccounts.associate { it.name to it.id }
-    // The first QIF record that referenced each personal counterparty, so the person's audit source
-    // links back to the exact originating row (the engine writes ImportPersonIntent.source verbatim).
-    val firstRecordByPersonName =
-        finalPrep.validTransfers
-            .mapNotNull { row -> row.personalCounterpartyName?.takeIf(String::isNotBlank)?.let { it to row.rowIndex } }
-            .groupBy({ it.first }, { it.second })
-            .mapValues { (_, indexes) -> indexes.min() }
-    val personAccounts =
-        firstRecordByPersonName.keys
-            .mapNotNull { name -> accountIdByName[name]?.let { name to it } }
+    // name -> (counterparty account id, first referencing record index)
+    val personLinks = LinkedHashMap<String, Pair<AccountId, Long>>()
+    finalPrep.validTransfers.forEach { row ->
+        val name = row.personalCounterpartyName?.trim()?.takeIf { it.isNotEmpty() } ?: return@forEach
+        val counterpartyAccountId =
+            when (selectedSourceAccountId) {
+                row.transfer.sourceAccountId -> row.transfer.targetAccountId
+                row.transfer.targetAccountId -> row.transfer.sourceAccountId
+                else -> accountIdByName[name]
+            } ?: return@forEach
+        val previous = personLinks[name]
+        personLinks[name] =
+            (previous?.first ?: counterpartyAccountId) to minOf(previous?.second ?: row.rowIndex, row.rowIndex)
+    }
     val peopleToCreate =
-        personAccounts.map { (name, _) ->
-            val parts = name.trim().split(Regex("\\s+"))
+        personLinks.map { (name, link) ->
+            val parts = name.split(Regex("\\s+"))
             ImportPersonIntent(
                 key = LocalPersonKey(name),
                 match = PersonMatchKey.ByNameKey(normalizeNameKey(name)),
                 firstName = parts.first(),
                 lastName = parts.drop(1).joinToString(" ").ifBlank { null },
-                source = Source.Qif(qifImport.id, firstRecordByPersonName[name]),
+                source = Source.Qif(qifImport.id, link.second),
             )
         }
     val ownerships =
-        personAccounts.map { (name, accountId) ->
+        personLinks.map { (name, link) ->
             ImportOwnershipIntent(
                 personKey = LocalPersonKey(name),
-                account = AccountRef.Existing(accountId),
-                source = Source.Qif(qifImport.id, firstRecordByPersonName[name]),
+                account = AccountRef.Existing(link.first),
+                source = Source.Qif(qifImport.id, link.second),
             )
         }
     val batch =

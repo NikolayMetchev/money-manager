@@ -883,7 +883,13 @@ class CsvTransferMapper(
         when (mapping) {
             is RegexAccountMapping -> {
                 val result = getAccountNameFromRegexWithPattern(mapping, values)
-                if (result.counterpartyIsPerson && result.accountName.isNotBlank()) result.accountName else null
+                when {
+                    !result.counterpartyIsPerson || result.accountName.isBlank() -> null
+                    // A persisted account mapping intentionally remaps this counterparty (e.g. onto an
+                    // existing account), so don't auto-create a Person/ownership from the regex name.
+                    findPersistedMapping(result.sourceColumnName, result.sourceColumnValue) != null -> null
+                    else -> result.accountName
+                }
             }
             is ConditionalAccountMapping -> resolvePersonalCounterparty(resolveConditional(mapping, values), values)
             else -> null
