@@ -35,6 +35,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.moneymanager.compose.filepicker.rememberFilePicker
@@ -75,6 +77,7 @@ fun CsvStrategiesScreen(
     onStrategyClick: (CsvImportStrategy) -> Unit = {},
     onBack: () -> Unit = {},
     onEditStrategy: (CsvImportStrategyId, CsvImportId) -> Unit = { _, _ -> },
+    onAuditHistoryClick: (CsvImportStrategy) -> Unit = {},
 ) {
     val strategies by csvImportStrategyRepository
         .getAllStrategies()
@@ -255,6 +258,7 @@ fun CsvStrategiesScreen(
                                 onExportClick = {
                                     strategyPendingExportPrompt = strategy
                                 },
+                                onAuditClick = { onAuditHistoryClick(strategy) },
                             )
                         }
                     }
@@ -332,6 +336,7 @@ fun CsvStrategyCard(
     csvImportStrategyRepository: CsvImportStrategyRepository,
     onEditClick: () -> Unit,
     onExportClick: () -> Unit,
+    onAuditClick: () -> Unit = {},
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
 
@@ -369,6 +374,15 @@ fun CsvStrategyCard(
                 )
             }
             Row {
+                IconButton(
+                    onClick = onAuditClick,
+                    modifier = Modifier.semantics { contentDescription = "View audit history" },
+                ) {
+                    Text(
+                        text = "🕒",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                }
                 IconButton(
                     onClick = onExportClick,
                 ) {

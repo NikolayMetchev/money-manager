@@ -65,6 +65,7 @@ sealed class Screen(
 
     data class QifImportDetail(
         val importId: QifImportId,
+        val scrollToRecordIndex: Long? = null,
     ) : Screen("QIF Import")
 
     data class QifStrategyEditor(
@@ -100,6 +101,11 @@ sealed class Screen(
         val strategyId: ApiImportStrategyId,
         val strategyName: String,
     ) : Screen("API Strategy Audit: $strategyName")
+
+    data class CsvStrategyAuditHistory(
+        val strategyId: CsvImportStrategyId,
+        val strategyName: String,
+    ) : Screen("CSV Strategy Audit: $strategyName")
 
     data object ConnectApi : Screen("Connect API Account")
 

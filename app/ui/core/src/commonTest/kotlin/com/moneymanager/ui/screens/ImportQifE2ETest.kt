@@ -18,6 +18,7 @@ import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.DbLocation
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
@@ -157,7 +158,7 @@ class ImportQifE2ETest {
                 val source = accounts.first { it.name == "Cash Account" }
                 val target = accounts.first { it.name == "Expenses" }
 
-                component.csvImportStrategyRepository.createStrategy(qifStrategy(source.id, target.id, usdId))
+                component.csvImportStrategyRepository.createStrategy(qifStrategy(source.id, target.id, usdId), Source.Manual)
                 injectQifImport(component)
             }
 
@@ -266,7 +267,7 @@ class ImportQifE2ETest {
                 val accounts = component.accountRepository.getAllAccounts().first()
                 val source = accounts.first { it.name == "Cash Account" }
                 val target = accounts.first { it.name == "Expenses" }
-                component.csvImportStrategyRepository.createStrategy(qifStrategy(source.id, target.id, usdId))
+                component.csvImportStrategyRepository.createStrategy(qifStrategy(source.id, target.id, usdId), Source.Manual)
                 // Two files with identical transactions (different checksums): the second is all duplicates.
                 injectQifImport(component, fileName = "first.qif", checksum = "c1")
                 injectQifImport(component, fileName = "second.qif", checksum = "c2")
@@ -333,7 +334,7 @@ class ImportQifE2ETest {
                 val accounts = component.accountRepository.getAllAccounts().first()
                 val source = accounts.first { it.name == "Cash Account" }
                 val target = accounts.first { it.name == "Expenses" }
-                component.csvImportStrategyRepository.createStrategy(qifStrategy(source.id, target.id, usdId))
+                component.csvImportStrategyRepository.createStrategy(qifStrategy(source.id, target.id, usdId), Source.Manual)
                 // Remember the source account so the bulk dialog pre-fills it (no manual selection).
                 component.settingsRepository.setLastQifAccountId(source.id)
                 injectQifImport(component, fileName = "first.qif", checksum = "c1")

@@ -650,3 +650,62 @@ LEFT JOIN source_type ON api_import_strategy_source.source_type_id = source_type
 LEFT JOIN device_view ON api_import_strategy_source.device_id = device_view.id
 WHERE api_import_strategy_audit.api_import_strategy_id = ?
 ORDER BY api_import_strategy_audit.audit_timestamp DESC, api_import_strategy_audit.id DESC;
+
+-- csv_import_strategy_audit: Audit trail for csv_import_strategy table
+CREATE TABLE csv_import_strategy_audit (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    audit_timestamp INTEGER NOT NULL,
+    audit_type_id INTEGER NOT NULL,
+    csv_import_strategy_id TEXT NOT NULL,
+    revision_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    identification_columns_json TEXT NOT NULL,
+    field_mappings_json TEXT NOT NULL,
+    attribute_mappings_json TEXT NOT NULL,
+    row_rules_json TEXT NOT NULL,
+    companion_rules_json TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    FOREIGN KEY (audit_type_id) REFERENCES audit_type(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_csv_import_strategy_audit_strategy_id ON csv_import_strategy_audit(csv_import_strategy_id);
+CREATE INDEX IF NOT EXISTS idx_csv_import_strategy_audit_timestamp ON csv_import_strategy_audit(audit_timestamp);
+CREATE INDEX IF NOT EXISTS idx_csv_import_strategy_audit_type ON csv_import_strategy_audit(audit_type_id);
+CREATE INDEX IF NOT EXISTS idx_csv_import_strategy_audit_strategy_id_timestamp ON csv_import_strategy_audit(csv_import_strategy_id, audit_timestamp DESC);
+
+-- Get audit history for a csv import strategy
+selectAuditHistoryForCsvImportStrategy:
+SELECT
+    csv_import_strategy_audit.id,
+    csv_import_strategy_audit.audit_timestamp,
+    audit_type.name AS audit_type,
+    csv_import_strategy_audit.csv_import_strategy_id,
+    csv_import_strategy_audit.revision_id,
+    csv_import_strategy_audit.name,
+    csv_import_strategy_audit.identification_columns_json,
+    csv_import_strategy_audit.field_mappings_json,
+    csv_import_strategy_audit.attribute_mappings_json,
+    csv_import_strategy_audit.row_rules_json,
+    csv_import_strategy_audit.companion_rules_json,
+    csv_import_strategy_audit.created_at,
+    csv_import_strategy_audit.updated_at,
+    -- Source information
+    csv_import_strategy_source.id AS source_id,
+    csv_import_strategy_source.device_id AS source_device_id,
+    source_type.id AS source_type_id,
+    source_type.name AS source_type_name,
+    device_view.platform_name AS source_platform_name,
+    device_view.os_name AS source_os_name,
+    device_view.machine_name AS source_machine_name,
+    device_view.device_make AS source_device_make,
+    device_view.device_model AS source_device_model,
+    csv_import_strategy_source.created_at AS source_created_at
+FROM csv_import_strategy_audit
+JOIN audit_type ON csv_import_strategy_audit.audit_type_id = audit_type.id
+LEFT JOIN csv_import_strategy_source ON csv_import_strategy_audit.csv_import_strategy_id = csv_import_strategy_source.strategy_id
+    AND csv_import_strategy_audit.revision_id = csv_import_strategy_source.revision_id
+LEFT JOIN source_type ON csv_import_strategy_source.source_type_id = source_type.id
+LEFT JOIN device_view ON csv_import_strategy_source.device_id = device_view.id
+WHERE csv_import_strategy_audit.csv_import_strategy_id = ?
+ORDER BY csv_import_strategy_audit.audit_timestamp DESC, csv_import_strategy_audit.id DESC;

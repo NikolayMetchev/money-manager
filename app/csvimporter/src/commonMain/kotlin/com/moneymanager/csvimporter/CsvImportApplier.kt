@@ -259,11 +259,12 @@ private suspend fun createNewAccounts(
 }
 
 /**
- * Maps each new account's final name to the earliest CSV row that referenced it (its creation row),
- * so account provenance can point at the relevant row. Keyed by the final (possibly user-renamed)
- * account name to match the accounts actually created.
+ * Maps each new account's final name to the index of the earliest row/record that referenced it (its
+ * creation row), so account provenance can point at the relevant row. Keyed by the final (possibly
+ * user-renamed) account name to match the accounts actually created. Shared with the QIF importer,
+ * which reuses this CSV engine (QIF record indexes ARE these row indexes).
  */
-private fun buildFirstRowByAccountName(
+fun buildFirstRowByAccountName(
     preparation: ImportPreparation,
     newAccountNames: Map<String, String>,
 ): Map<String, Long> {
@@ -513,8 +514,9 @@ suspend fun runCsvImport(
                 }
             ImportTransfer(
                 rowKey = ImportRowKey.CsvRow(row.rowIndex),
-                source = AccountRef.Existing(row.transfer.sourceAccountId),
-                target = AccountRef.Existing(row.transfer.targetAccountId),
+                fromAccount = AccountRef.Existing(row.transfer.sourceAccountId),
+                toAccount = AccountRef.Existing(row.transfer.targetAccountId),
+                source = Source.Csv(csvImport.id),
                 timestamp = row.transfer.timestamp,
                 description = row.transfer.description,
                 amount = row.transfer.amount,
@@ -533,7 +535,6 @@ suspend fun runCsvImport(
                 } else {
                     DedupePolicy.UniqueIdentifier
                 },
-            source = Source.Csv(csvImport.id),
             uniqueKeyExtractor =
                 if (uniqueIdTypeNames.isEmpty()) {
                     null

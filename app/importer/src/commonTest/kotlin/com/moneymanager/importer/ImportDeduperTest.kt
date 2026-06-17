@@ -10,6 +10,7 @@ import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.NewRelationship
 import com.moneymanager.domain.model.RelationshipTypeId
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.ImportStatus
@@ -44,8 +45,10 @@ class ImportDeduperTest {
         tgt: AccountId = target,
     ) = ImportTransfer(
         rowKey = ImportRowKey.CsvRow(rowIndex),
-        source = AccountRef.Existing(src),
-        target = AccountRef.Existing(tgt),
+        fromAccount = AccountRef.Existing(src),
+        toAccount = AccountRef.Existing(tgt),
+        // Provenance is irrelevant to dedupe classification; any source works here.
+        source = Source.SampleGenerator,
         timestamp = timestamp,
         description = description,
         amount = money(amount),

@@ -34,6 +34,7 @@ import com.moneymanager.domain.model.PersonAccountOwnershipAuditEntry
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.SourceRecord
 import com.moneymanager.domain.model.csv.CsvImportId
+import com.moneymanager.domain.model.qif.QifImportId
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AuditRepository
 import com.moneymanager.domain.repository.CategoryRepository
@@ -61,6 +62,7 @@ fun AccountAuditScreen(
     maintenance: Maintenance,
     onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
+    onQifSourceClick: (QifImportId, Long?) -> Unit = { _, _ -> },
     onOwnerClick: (PersonId) -> Unit = {},
     onBack: () -> Unit,
 ) {
@@ -95,7 +97,7 @@ fun AccountAuditScreen(
         },
         diffKey = { it.id },
         onBack = onBack,
-        diffCard = { diff -> AccountAuditDiffCard(diff, onApiSourceClick, onCsvSourceClick, onOwnerClick) },
+        diffCard = { diff -> AccountAuditDiffCard(diff, onApiSourceClick, onCsvSourceClick, onQifSourceClick, onOwnerClick) },
         header = {
             MergeUndoSection(merges = mergesIntoThisAccount, onUndoClick = { mergeToUndo = it })
         },
@@ -349,6 +351,7 @@ private fun AccountAuditDiffCard(
     diff: AccountAuditDiff,
     onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
+    onQifSourceClick: (QifImportId, Long?) -> Unit = { _, _ -> },
     onOwnerClick: (PersonId) -> Unit = {},
 ) {
     AuditDiffCard(
@@ -373,7 +376,12 @@ private fun AccountAuditDiffCard(
                 FieldValueRow("Category", diff.categoryName.value() ?: "Uncategorized")
                 OwnershipChangesSection(diff.ownersAdded, diff.ownersRemoved, onOwnerClick)
                 AccountAttributeChangesSection(diff.attributeChanges)
-                SourceInfoSection(diff.source, onApiSourceClick = onApiSourceClick, onCsvSourceClick = onCsvSourceClick)
+                SourceInfoSection(
+                    diff.source,
+                    onApiSourceClick = onApiSourceClick,
+                    onCsvSourceClick = onCsvSourceClick,
+                    onQifSourceClick = onQifSourceClick,
+                )
             }
             AuditType.UPDATE -> {
                 if (!diff.hasChanges) {
@@ -395,7 +403,12 @@ private fun AccountAuditDiffCard(
                     OwnershipChangesSection(diff.ownersAdded, diff.ownersRemoved, onOwnerClick)
                     AccountAttributeChangesSection(diff.attributeChanges)
                 }
-                SourceInfoSection(diff.source, onApiSourceClick = onApiSourceClick, onCsvSourceClick = onCsvSourceClick)
+                SourceInfoSection(
+                    diff.source,
+                    onApiSourceClick = onApiSourceClick,
+                    onCsvSourceClick = onCsvSourceClick,
+                    onQifSourceClick = onQifSourceClick,
+                )
             }
             AuditType.DELETE -> {
                 val errorColor = MaterialTheme.colorScheme.error
@@ -411,6 +424,7 @@ private fun AccountAuditDiffCard(
                     labelColor = errorColor.copy(alpha = 0.8f),
                     onApiSourceClick = onApiSourceClick,
                     onCsvSourceClick = onCsvSourceClick,
+                    onQifSourceClick = onQifSourceClick,
                 )
             }
         }

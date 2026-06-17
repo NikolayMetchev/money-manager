@@ -32,6 +32,7 @@ import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.SourceRecord
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csv.CsvImportId
+import com.moneymanager.domain.model.qif.QifImportId
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AuditRepository
 import com.moneymanager.domain.repository.TransactionRepository
@@ -62,6 +63,7 @@ fun TransactionAuditScreen(
     transactionRepository: TransactionRepository,
     currentDeviceId: DeviceId? = null,
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
+    onQifSourceClick: (QifImportId, Long?) -> Unit = { _, _ -> },
     onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
     onAccountClick: (AccountId) -> Unit = {},
     onBack: () -> Unit,
@@ -125,6 +127,7 @@ fun TransactionAuditScreen(
                 auditedAccountNames = auditedAccountNames,
                 currentDeviceId = currentDeviceId,
                 onCsvSourceClick = onCsvSourceClick,
+                onQifSourceClick = onQifSourceClick,
                 onApiSourceClick = onApiSourceClick,
                 onAccountClick = onAccountClick,
             )
@@ -139,6 +142,7 @@ private fun TransactionAuditDiffCard(
     auditedAccountNames: Map<Long, String>,
     currentDeviceId: DeviceId? = null,
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
+    onQifSourceClick: (QifImportId, Long?) -> Unit = { _, _ -> },
     onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
     onAccountClick: (AccountId) -> Unit = {},
 ) {
@@ -149,11 +153,38 @@ private fun TransactionAuditDiffCard(
     ) {
         when (diff.auditType) {
             AuditType.INSERT ->
-                InsertDiffContent(diff, accounts, auditedAccountNames, currentDeviceId, onCsvSourceClick, onApiSourceClick, onAccountClick)
+                InsertDiffContent(
+                    diff,
+                    accounts,
+                    auditedAccountNames,
+                    currentDeviceId,
+                    onCsvSourceClick,
+                    onQifSourceClick,
+                    onApiSourceClick,
+                    onAccountClick,
+                )
             AuditType.UPDATE ->
-                UpdateDiffContent(diff, accounts, auditedAccountNames, currentDeviceId, onCsvSourceClick, onApiSourceClick, onAccountClick)
+                UpdateDiffContent(
+                    diff,
+                    accounts,
+                    auditedAccountNames,
+                    currentDeviceId,
+                    onCsvSourceClick,
+                    onQifSourceClick,
+                    onApiSourceClick,
+                    onAccountClick,
+                )
             AuditType.DELETE ->
-                DeleteDiffContent(diff, accounts, auditedAccountNames, currentDeviceId, onCsvSourceClick, onApiSourceClick, onAccountClick)
+                DeleteDiffContent(
+                    diff,
+                    accounts,
+                    auditedAccountNames,
+                    currentDeviceId,
+                    onCsvSourceClick,
+                    onQifSourceClick,
+                    onApiSourceClick,
+                    onAccountClick,
+                )
         }
     }
 }
@@ -165,6 +196,7 @@ private fun InsertDiffContent(
     auditedAccountNames: Map<Long, String>,
     currentDeviceId: DeviceId? = null,
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
+    onQifSourceClick: (QifImportId, Long?) -> Unit = { _, _ -> },
     onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
     onAccountClick: (AccountId) -> Unit = {},
 ) {
@@ -185,6 +217,7 @@ private fun InsertDiffContent(
             diff.source,
             currentDeviceId = currentDeviceId,
             onCsvSourceClick = onCsvSourceClick,
+            onQifSourceClick = onQifSourceClick,
             onApiSourceClick = onApiSourceClick,
         )
     }
@@ -197,6 +230,7 @@ private fun UpdateDiffContent(
     auditedAccountNames: Map<Long, String>,
     currentDeviceId: DeviceId? = null,
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
+    onQifSourceClick: (QifImportId, Long?) -> Unit = { _, _ -> },
     onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
     onAccountClick: (AccountId) -> Unit = {},
 ) {
@@ -265,6 +299,7 @@ private fun UpdateDiffContent(
             diff.source,
             currentDeviceId = currentDeviceId,
             onCsvSourceClick = onCsvSourceClick,
+            onQifSourceClick = onQifSourceClick,
             onApiSourceClick = onApiSourceClick,
         )
     }
@@ -277,6 +312,7 @@ private fun DeleteDiffContent(
     auditedAccountNames: Map<Long, String>,
     currentDeviceId: DeviceId? = null,
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
+    onQifSourceClick: (QifImportId, Long?) -> Unit = { _, _ -> },
     onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
     onAccountClick: (AccountId) -> Unit = {},
 ) {
@@ -299,6 +335,7 @@ private fun DeleteDiffContent(
             currentDeviceId = currentDeviceId,
             labelColor = errorColor.copy(alpha = 0.8f),
             onCsvSourceClick = onCsvSourceClick,
+            onQifSourceClick = onQifSourceClick,
             onApiSourceClick = onApiSourceClick,
         )
     }
@@ -459,6 +496,7 @@ private fun SourceInfoSection(
     currentDeviceId: DeviceId? = null,
     labelColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     onCsvSourceClick: (CsvImportId, Long) -> Unit = { _, _ -> },
+    onQifSourceClick: (QifImportId, Long?) -> Unit = { _, _ -> },
     onApiSourceClick: (ApiSessionId, ApiRequestId, String) -> Unit = { _, _, _ -> },
 ) {
     if (source == null) return
@@ -512,9 +550,26 @@ private fun SourceInfoSection(
                 DeviceInfoFields(source.deviceInfo)
             }
             is Source.Qif -> {
+                val recordIndex = origin.recordIndex
                 FieldValueRow("Origin", "QIF Import$thisDeviceSuffix", labelWidth = LABEL_WIDTH)
-                FieldValueRow("File", source.fileName ?: "Unknown file", labelWidth = LABEL_WIDTH)
-                origin.recordIndex?.let { FieldValueRow("Record", it.toString(), labelWidth = LABEL_WIDTH) }
+                // The File link always opens the QIF import; only show a Record link when a single
+                // originating record is known (file-level provenance has none).
+                QifSourceLinkRow(
+                    label = "File",
+                    value = source.fileName ?: "Unknown file",
+                    qifImportId = origin.importId,
+                    recordIndex = recordIndex,
+                    onQifSourceClick = onQifSourceClick,
+                )
+                if (recordIndex != null) {
+                    QifSourceLinkRow(
+                        label = "Record",
+                        value = recordIndex.toString(),
+                        qifImportId = origin.importId,
+                        recordIndex = recordIndex,
+                        onQifSourceClick = onQifSourceClick,
+                    )
+                }
                 DeviceInfoFields(source.deviceInfo)
             }
             Source.SampleGenerator -> {
@@ -718,6 +773,34 @@ private fun CsvSourceLinkRow(
         )
         TextButton(
             onClick = { onCsvSourceClick(csvImportId, rowIndex) },
+            contentPadding = PaddingValues(0.dp),
+        ) {
+            Text(value)
+        }
+    }
+}
+
+@Composable
+private fun QifSourceLinkRow(
+    label: String,
+    value: String,
+    qifImportId: QifImportId,
+    recordIndex: Long?,
+    onQifSourceClick: (QifImportId, Long?) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "$label:",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.width(LABEL_WIDTH),
+        )
+        TextButton(
+            onClick = { onQifSourceClick(qifImportId, recordIndex) },
             contentPadding = PaddingValues(0.dp),
         ) {
             Text(value)

@@ -548,7 +548,6 @@ suspend fun importApiSessionPeople(
         ImportBatch(
             transfers = emptyList(),
             dedupePolicy = DedupePolicy.None,
-            source = Source.Api(sessionId),
             peopleToCreate = people,
             ownerships = peopleResolver.ownershipIntents(),
         )
@@ -1586,8 +1585,9 @@ private suspend fun runImportEngine(
         orderedPrepared.map { p ->
             ImportTransfer(
                 rowKey = ImportRowKey.ApiJsonPath(p.requestId, p.item.jsonPath.value),
-                source = p.source,
-                target = p.target,
+                fromAccount = p.source,
+                toAccount = p.target,
+                source = Source.Api(setup.sessionId),
                 timestamp = p.timestamp,
                 description = p.description,
                 amount = p.amount,
@@ -1609,7 +1609,6 @@ private suspend fun runImportEngine(
                     reconciledExclusionAttributeTypeId = AttributeTypeId(WellKnownIds.EXCLUDED_ATTR_TYPE_ID),
                     reconciledRelationshipTypeId = RelationshipTypeId(WellKnownIds.RECONCILED_RELATIONSHIP_TYPE_ID),
                 ),
-            source = Source.Api(setup.sessionId),
             accountsToCreate = setup.accountResolver.intents(),
             peopleToCreate = setup.peopleResolver.intents(),
             ownerships = setup.peopleResolver.ownershipIntents(),
@@ -2381,9 +2380,9 @@ private class BatchAccountResolver {
     suspend fun resolveSourceAccount(
         externalId: String,
         name: String,
+        source: Source,
         sortCode: String? = null,
         accountNumber: String? = null,
-        source: Source? = null,
     ): LocalAccountKey =
         mutex.withLock {
             val normalizedName = name.ifBlank { "Unknown" }
@@ -2448,7 +2447,7 @@ private class BatchAccountResolver {
      */
     suspend fun resolveNamedAccount(
         name: String,
-        source: Source? = null,
+        source: Source,
     ): LocalAccountKey =
         mutex.withLock {
             val normalizedName = name.ifBlank { "Unknown" }
@@ -2473,11 +2472,11 @@ private class BatchAccountResolver {
      */
     suspend fun resolveCounterpartyAccount(
         counterpartyId: String?,
-        dedupeKey: String? = null,
         builtInType: String?,
         name: String,
+        source: Source,
+        dedupeKey: String? = null,
         personalIdentity: PersonalCounterpartyIdentity? = null,
-        source: Source? = null,
     ): LocalAccountKey =
         mutex.withLock {
             val normalizedName = name.ifBlank { "Unknown" }
@@ -2584,7 +2583,7 @@ private class BatchPeopleResolver {
         owner: ApiImportAccountOwner,
         account: AccountRef,
         externalIdAttributeTypeId: AttributeTypeId?,
-        source: Source? = null,
+        source: Source,
     ) = mutex.withLock {
         val personKey = resolvePerson(owner, externalIdAttributeTypeId, source) ?: return@withLock
         if (seenOwnerships.add(personKey to account)) {
@@ -2596,7 +2595,7 @@ private class BatchPeopleResolver {
     suspend fun linkPersonOnly(
         owner: ApiImportAccountOwner,
         externalIdAttributeTypeId: AttributeTypeId?,
-        source: Source? = null,
+        source: Source,
     ) = mutex.withLock {
         resolvePerson(owner, externalIdAttributeTypeId, source)
         Unit
@@ -2605,7 +2604,7 @@ private class BatchPeopleResolver {
     private fun resolvePerson(
         owner: ApiImportAccountOwner,
         externalIdAttributeTypeId: AttributeTypeId?,
-        source: Source?,
+        source: Source,
     ): LocalPersonKey? {
         val bankKey = owner.bankKey()
         val name = owner.preferredName?.trim().orEmpty()

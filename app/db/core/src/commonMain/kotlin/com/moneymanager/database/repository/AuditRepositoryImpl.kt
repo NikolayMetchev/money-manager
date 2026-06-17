@@ -5,6 +5,7 @@ package com.moneymanager.database.repository
 import com.moneymanager.database.mapper.AccountAuditEntryMapper
 import com.moneymanager.database.mapper.ApiImportStrategyAuditEntryMapper
 import com.moneymanager.database.mapper.CategoryAuditEntryMapper
+import com.moneymanager.database.mapper.CsvImportStrategyAuditEntryMapper
 import com.moneymanager.database.mapper.CurrencyAuditEntryMapper
 import com.moneymanager.database.mapper.OwnershipAuditHistoryForAccountMapper
 import com.moneymanager.database.mapper.PersonAccountOwnershipAuditEntryMapper
@@ -20,6 +21,7 @@ import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.AuditType
 import com.moneymanager.domain.model.CategoryAuditEntry
+import com.moneymanager.domain.model.CsvImportStrategyAuditEntry
 import com.moneymanager.domain.model.CurrencyAuditEntry
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.PersonAccountOwnershipAuditEntry
@@ -30,6 +32,7 @@ import com.moneymanager.domain.model.TransferAttributeAuditEntry
 import com.moneymanager.domain.model.TransferAuditEntry
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
+import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.repository.AuditRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -128,6 +131,14 @@ class AuditRepositoryImpl(
                 .selectAuditHistoryForApiImportStrategy(strategyId.id.toString())
                 .executeAsList()
                 .map(ApiImportStrategyAuditEntryMapper::map)
+        }
+
+    override suspend fun getAuditHistoryForCsvImportStrategy(strategyId: CsvImportStrategyId): List<CsvImportStrategyAuditEntry> =
+        withContext(Dispatchers.Default) {
+            queries
+                .selectAuditHistoryForCsvImportStrategy(strategyId.id.toString())
+                .executeAsList()
+                .map(CsvImportStrategyAuditEntryMapper::map)
         }
 
     private fun fetchAccountAttributeAudit(accountId: AccountId): List<AccountAttributeAuditEntry> =

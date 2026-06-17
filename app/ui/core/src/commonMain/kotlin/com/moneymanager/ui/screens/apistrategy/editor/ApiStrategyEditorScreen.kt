@@ -31,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
 import com.moneymanager.domain.repository.ApiImportStrategyRepository
@@ -158,9 +159,9 @@ fun ApiStrategyEditorScreen(
                         updatedAt = now,
                     )
                 if (isEditMode) {
-                    apiImportStrategyRepository.updateStrategy(strategy)
+                    apiImportStrategyRepository.updateStrategy(strategy, Source.Manual)
                 } else {
-                    apiImportStrategyRepository.createStrategy(strategy)
+                    apiImportStrategyRepository.createStrategy(strategy, Source.Manual)
                 }
                 onBack()
             } catch (expected: Exception) {

@@ -59,14 +59,21 @@ class PersonRepositoryImpl(
             PersonId(id)
         }
 
-    override suspend fun updatePerson(person: Person): Unit =
+    override suspend fun updatePerson(
+        person: Person,
+        source: Source,
+    ): Unit =
         withContext(Dispatchers.Default) {
-            queries.update(
-                first_name = person.firstName,
-                middle_name = person.middleName,
-                last_name = person.lastName,
-                id = person.id.id,
-            )
+            queries.transactionWithResult {
+                queries.update(
+                    first_name = person.firstName,
+                    middle_name = person.middleName,
+                    last_name = person.lastName,
+                    id = person.id.id,
+                )
+                val revision = queries.selectRevisionById(person.id.id).executeAsOne()
+                entitySourceQueries.recordSource(deviceId, EntityType.PERSON, person.id.id, revision, source)
+            }
         }
 
     override suspend fun updatePersonWithAttributes(
@@ -75,41 +82,51 @@ class PersonRepositoryImpl(
         deletedAttributeIds: Set<Long>,
         updatedAttributes: Map<Long, NewAttribute>,
         newAttributes: List<NewAttribute>,
+        source: Source,
     ): Long =
         withContext(Dispatchers.Default) {
             val effectivePersonId = person?.id ?: personId
 
             queries.transactionWithResult {
-                updateEntityWithAttributes(
-                    database = database,
-                    hasEntityChanges = person != null,
-                    deletedAttributeIds = deletedAttributeIds,
-                    updatedAttributes = updatedAttributes,
-                    newAttributes = newAttributes,
-                    updateEntity = {
-                        val personToUpdate = requireNotNull(person)
-                        queries.update(
-                            first_name = personToUpdate.firstName,
-                            middle_name = personToUpdate.middleName,
-                            last_name = personToUpdate.lastName,
-                            id = personToUpdate.id.id,
-                        )
-                    },
-                    bumpRevisionOnly = { queries.bumpRevisionOnly(effectivePersonId.id) },
-                    selectRevision = { queries.selectRevisionById(effectivePersonId.id).executeAsOne() },
-                    selectCurrentTypeId = { id ->
-                        attributeQueries.selectById(id).executeAsOneOrNull()?.attribute_type_id
-                    },
-                    deleteById = { id -> attributeQueries.deleteById(id) },
-                    insertAttribute = { attr ->
-                        attributeQueries.insert(
-                            person_id = effectivePersonId.id,
-                            attribute_type_id = attr.typeId.id,
-                            attribute_value = attr.value,
-                        )
-                    },
-                    updateValue = { value, id -> attributeQueries.updateValue(value, id) },
+                val finalRevision =
+                    updateEntityWithAttributes(
+                        database = database,
+                        hasEntityChanges = person != null,
+                        deletedAttributeIds = deletedAttributeIds,
+                        updatedAttributes = updatedAttributes,
+                        newAttributes = newAttributes,
+                        updateEntity = {
+                            val personToUpdate = requireNotNull(person)
+                            queries.update(
+                                first_name = personToUpdate.firstName,
+                                middle_name = personToUpdate.middleName,
+                                last_name = personToUpdate.lastName,
+                                id = personToUpdate.id.id,
+                            )
+                        },
+                        bumpRevisionOnly = { queries.bumpRevisionOnly(effectivePersonId.id) },
+                        selectRevision = { queries.selectRevisionById(effectivePersonId.id).executeAsOne() },
+                        selectCurrentTypeId = { id ->
+                            attributeQueries.selectById(id).executeAsOneOrNull()?.attribute_type_id
+                        },
+                        deleteById = { id -> attributeQueries.deleteById(id) },
+                        insertAttribute = { attr ->
+                            attributeQueries.insert(
+                                person_id = effectivePersonId.id,
+                                attribute_type_id = attr.typeId.id,
+                                attribute_value = attr.value,
+                            )
+                        },
+                        updateValue = { value, id -> attributeQueries.updateValue(value, id) },
+                    )
+                entitySourceQueries.recordSource(
+                    deviceId,
+                    EntityType.PERSON,
+                    effectivePersonId.id,
+                    finalRevision,
+                    source,
                 )
+                finalRevision
             }
         }
 

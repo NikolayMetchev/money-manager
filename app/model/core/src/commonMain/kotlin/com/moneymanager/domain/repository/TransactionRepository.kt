@@ -123,6 +123,7 @@ interface TransactionRepository {
      * @param updatedAttributes Map of attribute ID to (typeId, value) for updates
      * @param newAttributes List of (typeId, value) pairs for new attributes
      * @param transactionId The transaction ID (needed when transfer is null)
+     * @param source Provenance recorded against the new revision.
      */
     suspend fun updateTransfer(
         transfer: Transfer?,
@@ -130,6 +131,7 @@ interface TransactionRepository {
         updatedAttributes: Map<Long, NewAttribute>,
         newAttributes: List<NewAttribute>,
         transactionId: TransferId,
+        source: Source,
     )
 
     suspend fun deleteTransaction(id: Long)
@@ -165,13 +167,14 @@ interface TransactionRepository {
         // to run everything in one transaction and record the per-update source.
         val created =
             createTransfers(transfers = transfers, newAttributes = newAttributes, sources = sources)
-        updates.forEach { update ->
+        updates.forEachIndexed { index, update ->
             updateTransfer(
                 transfer = update.transfer,
                 deletedAttributeIds = emptySet(),
                 updatedAttributes = emptyMap(),
                 newAttributes = update.newAttributes,
                 transactionId = update.transfer.id,
+                source = updateSources[index],
             )
         }
         return created

@@ -7,8 +7,11 @@ import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.database.json.FieldMappingJsonCodec
+import com.moneymanager.domain.model.DeviceId
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
+import com.moneymanager.domain.model.toSourceType
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -21,7 +24,8 @@ import kotlin.time.Instant
 import kotlin.uuid.Uuid
 
 class CsvImportStrategyRepositoryImpl(
-    database: MoneyManagerDatabaseWrapper,
+    private val database: MoneyManagerDatabaseWrapper,
+    private val deviceId: DeviceId,
     private val coroutineContext: CoroutineContext = Dispatchers.Default,
 ) : CsvImportStrategyRepository {
     private val queries = database.csvImportStrategyQueries
@@ -53,36 +57,62 @@ class CsvImportStrategyRepositoryImpl(
             strategies.find { it.matchesColumns(headings) }
         }
 
-    override suspend fun createStrategy(strategy: CsvImportStrategy): CsvImportStrategyId =
+    override suspend fun createStrategy(
+        strategy: CsvImportStrategy,
+        source: Source,
+    ): CsvImportStrategyId =
         withContext(coroutineContext) {
             val now = Clock.System.now()
-            queries.insert(
-                id = strategy.id.id.toString(),
-                name = strategy.name,
-                identification_columns_json = FieldMappingJsonCodec.encodeColumns(strategy.identificationColumns),
-                field_mappings_json = FieldMappingJsonCodec.encode(strategy.fieldMappings),
-                attribute_mappings_json = FieldMappingJsonCodec.encodeAttributeMappings(strategy.attributeMappings),
-                row_rules_json = FieldMappingJsonCodec.encodeRowRules(strategy.rowPreprocessingRules),
-                companion_rules_json = FieldMappingJsonCodec.encodeCompanionRules(strategy.companionTransactionRules),
-                created_at = now.toEpochMilliseconds(),
-                updated_at = now.toEpochMilliseconds(),
-            )
+            database.transaction {
+                queries.insert(
+                    id = strategy.id.id.toString(),
+                    name = strategy.name,
+                    identification_columns_json = FieldMappingJsonCodec.encodeColumns(strategy.identificationColumns),
+                    field_mappings_json = FieldMappingJsonCodec.encode(strategy.fieldMappings),
+                    attribute_mappings_json = FieldMappingJsonCodec.encodeAttributeMappings(strategy.attributeMappings),
+                    row_rules_json = FieldMappingJsonCodec.encodeRowRules(strategy.rowPreprocessingRules),
+                    companion_rules_json = FieldMappingJsonCodec.encodeCompanionRules(strategy.companionTransactionRules),
+                    created_at = now.toEpochMilliseconds(),
+                    updated_at = now.toEpochMilliseconds(),
+                )
+                queries.insertSource(
+                    strategy_id = strategy.id.id.toString(),
+                    revision_id = 1,
+                    source_type_id = source.toSourceType().id.toLong(),
+                    device_id = deviceId.id,
+                )
+            }
             strategy.id
         }
 
-    override suspend fun updateStrategy(strategy: CsvImportStrategy): Unit =
+    override suspend fun updateStrategy(
+        strategy: CsvImportStrategy,
+        source: Source,
+    ): Unit =
         withContext(coroutineContext) {
             val now = Clock.System.now()
-            queries.update(
-                name = strategy.name,
-                identification_columns_json = FieldMappingJsonCodec.encodeColumns(strategy.identificationColumns),
-                field_mappings_json = FieldMappingJsonCodec.encode(strategy.fieldMappings),
-                attribute_mappings_json = FieldMappingJsonCodec.encodeAttributeMappings(strategy.attributeMappings),
-                row_rules_json = FieldMappingJsonCodec.encodeRowRules(strategy.rowPreprocessingRules),
-                companion_rules_json = FieldMappingJsonCodec.encodeCompanionRules(strategy.companionTransactionRules),
-                updated_at = now.toEpochMilliseconds(),
-                id = strategy.id.id.toString(),
-            )
+            // Wrap the update and its source attribution in a single transaction so the revision_id read
+            // back below reflects exactly this update and cannot interleave with a concurrent writer.
+            database.transaction {
+                queries.update(
+                    name = strategy.name,
+                    identification_columns_json = FieldMappingJsonCodec.encodeColumns(strategy.identificationColumns),
+                    field_mappings_json = FieldMappingJsonCodec.encode(strategy.fieldMappings),
+                    attribute_mappings_json = FieldMappingJsonCodec.encodeAttributeMappings(strategy.attributeMappings),
+                    row_rules_json = FieldMappingJsonCodec.encodeRowRules(strategy.rowPreprocessingRules),
+                    companion_rules_json = FieldMappingJsonCodec.encodeCompanionRules(strategy.companionTransactionRules),
+                    updated_at = now.toEpochMilliseconds(),
+                    id = strategy.id.id.toString(),
+                )
+                val persistedRevisionId =
+                    queries.selectById(strategy.id.id.toString()).executeAsOne().revision_id
+                queries.insertSource(
+                    strategy_id = strategy.id.id.toString(),
+                    revision_id = persistedRevisionId,
+                    source_type_id = source.toSourceType().id.toLong(),
+                    device_id = deviceId.id,
+                )
+            }
         }
 
     override suspend fun deleteStrategy(id: CsvImportStrategyId): Unit =

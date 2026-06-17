@@ -7,6 +7,7 @@ import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Currency
 import com.moneymanager.domain.model.Money
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.test.database.DbTest
@@ -480,6 +481,7 @@ class AuditFunctionalTest : DbTest() {
                 updatedAttributes = emptyMap(),
                 newAttributes = emptyList(),
                 transactionId = transfer.id,
+                source = Source.Manual,
             )
 
             val auditHistory = database.auditQueries.selectAuditHistoryForTransfer(transfer.id.id).executeAsList()
@@ -554,6 +556,7 @@ class AuditFunctionalTest : DbTest() {
                 updatedAttributes = emptyMap(),
                 newAttributes = emptyList(),
                 transactionId = transfer.id,
+                source = Source.Manual,
             )
 
             val auditHistory = database.auditQueries.selectAuditHistoryForTransfer(transfer.id.id).executeAsList()
@@ -608,6 +611,7 @@ class AuditFunctionalTest : DbTest() {
                 updatedAttributes = emptyMap(),
                 newAttributes = emptyList(),
                 transactionId = transfer.id,
+                source = Source.Manual,
             )
 
             // Second update (revisionId = 3)
@@ -625,6 +629,7 @@ class AuditFunctionalTest : DbTest() {
                 updatedAttributes = emptyMap(),
                 newAttributes = emptyList(),
                 transactionId = transfer.id,
+                source = Source.Manual,
             )
 
             val auditHistory = database.auditQueries.selectAuditHistoryForTransfer(transfer.id.id).executeAsList()

@@ -10,9 +10,10 @@ import com.moneymanager.database.json.ApiStrategyConfigJson
 import com.moneymanager.database.json.ApiStrategyJsonCodec
 import com.moneymanager.database.sql.Api_import_strategy
 import com.moneymanager.domain.model.DeviceId
-import com.moneymanager.domain.model.SourceType
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategy
 import com.moneymanager.domain.model.apistrategy.ApiImportStrategyId
+import com.moneymanager.domain.model.toSourceType
 import com.moneymanager.domain.repository.ApiImportStrategyRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -51,7 +52,10 @@ class ApiImportStrategyRepositoryImpl(
             .mapToOneOrNull(coroutineContext)
             .map { it?.let(::toDomain) }
 
-    override suspend fun createStrategy(strategy: ApiImportStrategy): ApiImportStrategyId =
+    override suspend fun createStrategy(
+        strategy: ApiImportStrategy,
+        source: Source,
+    ): ApiImportStrategyId =
         withContext(coroutineContext) {
             // Use the current time as the authoritative creation timestamp rather than the one
             // supplied in the domain object. This mirrors CsvImportStrategyRepositoryImpl and
@@ -67,13 +71,16 @@ class ApiImportStrategyRepositoryImpl(
             queries.insertSource(
                 strategy_id = strategy.id.id.toString(),
                 revision_id = 1,
-                source_type_id = SourceType.MANUAL.id.toLong(),
+                source_type_id = source.toSourceType().id.toLong(),
                 device_id = deviceId.id,
             )
             strategy.id
         }
 
-    override suspend fun updateStrategy(strategy: ApiImportStrategy): Unit =
+    override suspend fun updateStrategy(
+        strategy: ApiImportStrategy,
+        source: Source,
+    ): Unit =
         withContext(coroutineContext) {
             val now = Clock.System.now()
             // Wrap the update and its source attribution in a single transaction so the
@@ -94,7 +101,7 @@ class ApiImportStrategyRepositoryImpl(
                 queries.insertSource(
                     strategy_id = strategy.id.id.toString(),
                     revision_id = persistedRevisionId,
-                    source_type_id = SourceType.MANUAL.id.toLong(),
+                    source_type_id = source.toSourceType().id.toLong(),
                     device_id = deviceId.id,
                 )
             }

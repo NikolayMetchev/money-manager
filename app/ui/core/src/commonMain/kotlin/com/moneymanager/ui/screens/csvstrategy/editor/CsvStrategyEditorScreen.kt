@@ -32,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csv.CsvRow
@@ -223,9 +224,9 @@ fun CsvStrategyEditorScreen(
                         updatedAt = now,
                     )
                 if (isEditMode) {
-                    csvImportStrategyRepository.updateStrategy(strategy)
+                    csvImportStrategyRepository.updateStrategy(strategy, Source.Manual)
                 } else {
-                    csvImportStrategyRepository.createStrategy(strategy)
+                    csvImportStrategyRepository.createStrategy(strategy, Source.Manual)
                 }
                 onBack()
             } catch (expected: Exception) {

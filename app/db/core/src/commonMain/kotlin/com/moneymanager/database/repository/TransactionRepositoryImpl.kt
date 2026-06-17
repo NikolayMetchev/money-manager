@@ -350,6 +350,7 @@ class TransactionRepositoryImpl(
         updatedAttributes: Map<Long, NewAttribute>,
         newAttributes: List<NewAttribute>,
         transactionId: TransferId,
+        source: Source,
     ): Unit =
         withContext(Dispatchers.Default) {
             val hasAttributeChanges =
@@ -416,6 +417,16 @@ class TransactionRepositoryImpl(
                         database.endCreationMode()
                     }
                 }
+
+                // Record the source against the new revision.
+                val persisted = transferQueries.selectById(effectiveTransactionId.id, TransferMapper::mapRaw).executeAsOne()
+                entitySourceQueries.recordSource(
+                    deviceId,
+                    EntityType.TRANSFER,
+                    persisted.id.id,
+                    persisted.revisionId,
+                    source,
+                )
             }
         }
 

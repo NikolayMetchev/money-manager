@@ -149,8 +149,10 @@ interface RepositoryModule {
 
     @Provides
     @SingleIn(DatabaseScope::class)
-    fun provideCsvImportStrategyRepository(database: MoneyManagerDatabaseWrapper): CsvImportStrategyRepository =
-        CsvImportStrategyRepositoryImpl(database)
+    fun provideCsvImportStrategyRepository(
+        database: MoneyManagerDatabaseWrapper,
+        deviceId: DeviceId,
+    ): CsvImportStrategyRepository = CsvImportStrategyRepositoryImpl(database, deviceId)
 
     @Provides
     @SingleIn(DatabaseScope::class)

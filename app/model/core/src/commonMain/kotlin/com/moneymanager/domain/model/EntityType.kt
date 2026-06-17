@@ -18,4 +18,11 @@ enum class EntityType(
      * an `entity_source` row with `entity_type_id = 7` and `entity_id` = the transfer id.
      */
     TRANSFER(7),
+
+    /**
+     * A CSV import strategy. Like [API_IMPORT_STRATEGY], its provenance lives in a dedicated source
+     * table (`csv_import_strategy_source`), not the unified `entity_source` store; this enum value is
+     * only the read-model discriminator.
+     */
+    CSV_IMPORT_STRATEGY(8),
 }

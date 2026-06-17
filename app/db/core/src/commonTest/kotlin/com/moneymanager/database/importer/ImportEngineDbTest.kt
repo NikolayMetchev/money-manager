@@ -69,15 +69,15 @@ class ImportEngineDbTest : DbTest() {
                 listOf(
                     ImportTransfer(
                         rowKey = ImportRowKey.CsvRow(0),
-                        source = AccountRef.Existing(sourceId),
-                        target = AccountRef.Local(counterparty),
+                        fromAccount = AccountRef.Existing(sourceId),
+                        toAccount = AccountRef.Local(counterparty),
+                        source = source,
                         timestamp = baseTime,
                         description = description,
                         amount = Money(500, currency),
                     ),
                 ),
             dedupePolicy = DedupePolicy.FuzzyAllFields(),
-            source = source,
             accountsToCreate =
                 listOf(
                     ImportAccountIntent(
@@ -85,6 +85,7 @@ class ImportEngineDbTest : DbTest() {
                         match = AccountMatchKey.ByName(counterpartyName),
                         name = counterpartyName,
                         openingDate = baseTime,
+                        source = source,
                     ),
                 ),
         )
@@ -165,18 +166,20 @@ class ImportEngineDbTest : DbTest() {
                                 match = PersonMatchKey.ByNameKey("alice smith"),
                                 firstName = "Alice",
                                 lastName = "Smith",
+                                source = source,
                             ),
                             ImportPersonIntent(
                                 key = bobKey,
                                 match = PersonMatchKey.ByNameKey("bob jones"),
                                 firstName = "Bob",
                                 lastName = "Jones",
+                                source = source,
                             ),
                         ),
                     ownerships =
                         listOf(
-                            ImportOwnershipIntent(aliceKey, AccountRef.Existing(sourceId)),
-                            ImportOwnershipIntent(bobKey, AccountRef.Existing(sourceId)),
+                            ImportOwnershipIntent(aliceKey, AccountRef.Existing(sourceId), source),
+                            ImportOwnershipIntent(bobKey, AccountRef.Existing(sourceId), source),
                         ),
                 )
 

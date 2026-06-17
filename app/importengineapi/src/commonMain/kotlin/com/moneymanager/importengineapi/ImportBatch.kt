@@ -5,6 +5,7 @@ package com.moneymanager.importengineapi
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.ApiRequestId
 import com.moneymanager.domain.model.AttributeTypeId
+import com.moneymanager.domain.model.Auditable
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
@@ -93,10 +94,10 @@ data class ImportAccountIntent(
     val match: AccountMatchKey,
     val name: String,
     val openingDate: Instant,
+    /** Where this account came from (e.g. the import as a whole, or the API `$.accounts[i]` node). */
+    override val source: Source,
     val categoryId: Long = Category.UNCATEGORIZED_ID,
     val attributes: List<NewAttribute> = emptyList(),
-    /** Per-account origin (e.g. the API `$.accounts[i]` node), used in place of [ImportBatch.source]. */
-    val source: Source? = null,
     /**
      * When this intent reuses (adopts) a pre-existing account via the bank-identity fallback, whether to
      * re-point that account onto this intent — renaming it and adding this intent's attributes (e.g. the
@@ -105,7 +106,7 @@ data class ImportAccountIntent(
      * renaming the account they merge into.
      */
     val adoptOnBankMatch: Boolean = false,
-)
+) : Auditable
 
 /** How the engine decides whether a person already exists before creating them. */
 sealed interface PersonMatchKey {
@@ -131,18 +132,18 @@ data class ImportPersonIntent(
     val key: LocalPersonKey,
     val match: PersonMatchKey,
     val firstName: String,
+    /** Where this person came from (e.g. the import as a whole, or the API node the holder came from). */
+    override val source: Source,
     val lastName: String? = null,
     val attributes: List<NewAttribute> = emptyList(),
-    /** Per-person origin (e.g. the API node the holder came from), used in place of [ImportBatch.source]. */
-    val source: Source? = null,
-)
+) : Auditable
 
 data class ImportOwnershipIntent(
     val personKey: LocalPersonKey,
     val account: AccountRef,
-    /** Per-ownership origin (the API node the link came from), used in place of [ImportBatch.source]. */
-    val source: Source? = null,
-)
+    /** Where this ownership link came from (e.g. the import as a whole, or the API node it came from). */
+    override val source: Source,
+) : Auditable
 
 /**
  * A fee charged on a transaction, modelled as its own movement linked to the main transfer via a
@@ -158,6 +159,9 @@ data class ImportOwnershipIntent(
  * @property rowKey Provenance key for the fee movement; when null the engine falls back to the main
  *   transfer's row key. Producers set this to point the audit trail at the fee's own source node (e.g.
  *   the `atm_fees_detailed.fee_amount` JSON node) rather than the whole transaction.
+ *
+ * Note: unlike [ImportTransfer.source] (which is the provenance [Source]), [ImportFee.source] is the
+ * FROM account — a fee inherits the main transfer's provenance at engine time, so it is not [Auditable].
  */
 data class ImportFee(
     val source: AccountRef,
@@ -173,6 +177,10 @@ data class ImportFee(
  * [AccountRef.Local] (resolved by the engine from [ImportBatch.accountsToCreate]).
  *
  * @property rowKey Opaque per-row provenance + status-writeback key.
+ * @property fromAccount The account the money leaves (the transfer's source account).
+ * @property toAccount The account the money arrives in (the transfer's target account).
+ * @property source Where this transfer came from (the provenance [Source]); the engine fills in the
+ *   per-row detail from [rowKey] via `Source.forRow`.
  * @property attributes Transfer attributes with type ids already resolved by the builder.
  * @property relationships Relationships to existing transfers, created once this transfer's id exists.
  * @property uniqueKey Unique-identifier dedupe key (attribute name -> value), or null for fuzzy dedupe.
@@ -180,8 +188,9 @@ data class ImportFee(
  */
 data class ImportTransfer(
     val rowKey: ImportRowKey,
-    val source: AccountRef,
-    val target: AccountRef,
+    val fromAccount: AccountRef,
+    val toAccount: AccountRef,
+    override val source: Source,
     val timestamp: Instant,
     val description: String,
     val amount: Money,
@@ -192,7 +201,7 @@ data class ImportTransfer(
     val apiId: String? = null,
     val excludedFromBalances: Boolean = false,
     val fee: ImportFee? = null,
-)
+) : Auditable
 
 /** Opaque per-row provenance + status-writeback key, identifying the source row of a transfer. */
 sealed interface ImportRowKey {
@@ -220,8 +229,6 @@ sealed interface ImportRowKey {
 data class ImportBatch(
     val transfers: List<ImportTransfer>,
     val dedupePolicy: DedupePolicy,
-    /** The batch-level source for everything created from this batch (e.g. Csv(importId)). */
-    val source: Source,
     val accountsToCreate: List<ImportAccountIntent> = emptyList(),
     val peopleToCreate: List<ImportPersonIntent> = emptyList(),
     val ownerships: List<ImportOwnershipIntent> = emptyList(),

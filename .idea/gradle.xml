@@ -22,18 +22,21 @@
           <set>
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/app" />
+            <option value="$PROJECT_DIR$/app/apiimporter" />
+            <option value="$PROJECT_DIR$/app/csvimporter" />
             <option value="$PROJECT_DIR$/app/db" />
             <option value="$PROJECT_DIR$/app/db/core" />
             <option value="$PROJECT_DIR$/app/db/schemaspy" />
             <option value="$PROJECT_DIR$/app/di" />
             <option value="$PROJECT_DIR$/app/di/core" />
+            <option value="$PROJECT_DIR$/app/importengineapi" />
             <option value="$PROJECT_DIR$/app/importer" />
-            <option value="$PROJECT_DIR$/app/importmodel" />
             <option value="$PROJECT_DIR$/app/main" />
             <option value="$PROJECT_DIR$/app/main/android" />
             <option value="$PROJECT_DIR$/app/main/jvm" />
             <option value="$PROJECT_DIR$/app/model" />
             <option value="$PROJECT_DIR$/app/model/core" />
+            <option value="$PROJECT_DIR$/app/qifimporter" />
             <option value="$PROJECT_DIR$/app/ui" />
             <option value="$PROJECT_DIR$/app/ui/core" />
             <option value="$PROJECT_DIR$/gradle/build-logic" />

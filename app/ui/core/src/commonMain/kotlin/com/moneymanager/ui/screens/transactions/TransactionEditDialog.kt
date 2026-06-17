@@ -36,7 +36,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.Maintenance
-import com.moneymanager.domain.getDeviceInfo
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeType
 import com.moneymanager.domain.model.AttributeTypeId
@@ -53,7 +52,6 @@ import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
-import com.moneymanager.domain.repository.TransferSourceRepository
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.CurrencyPicker
 import com.moneymanager.ui.components.LoadingTextButton
@@ -72,7 +70,6 @@ import kotlin.time.Instant
 fun TransactionEditDialog(
     transaction: Transfer? = null,
     transactionRepository: TransactionRepository,
-    transferSourceRepository: TransferSourceRepository,
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
@@ -444,25 +441,16 @@ fun TransactionEditDialog(
                                                 deletedAttributeIds.add(originalExcludedAttr.id)
                                         }
 
-                                        // Use the atomic method to update transfer and attributes together
+                                        // Use the atomic method to update transfer and attributes together.
+                                        // updateTransfer records the provenance source itself.
                                         transactionRepository.updateTransfer(
                                             transfer = updatedTransfer,
                                             deletedAttributeIds = deletedAttributeIds,
                                             updatedAttributes = updatedAttributes,
                                             newAttributes = newAttributes,
                                             transactionId = transaction.id,
+                                            source = Source.Manual,
                                         )
-
-                                        // Record manual source for this update
-                                        val updated =
-                                            transactionRepository.getTransactionById(transaction.id.id).first()
-                                        if (updated != null) {
-                                            transferSourceRepository.recordManualSource(
-                                                transactionId = updated.id,
-                                                revisionId = updated.revisionId,
-                                                deviceInfo = getDeviceInfo(),
-                                            )
-                                        }
                                     } else {
                                         // CREATE MODE: Create new transaction
                                         val transfer =
