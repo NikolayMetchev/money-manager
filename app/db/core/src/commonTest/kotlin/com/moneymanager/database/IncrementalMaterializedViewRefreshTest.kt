@@ -5,6 +5,7 @@ import app.cash.sqldelight.db.QueryResult
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Money
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.test.database.DbTest
@@ -340,6 +341,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
                 updatedAttributes = emptyMap(),
                 newAttributes = emptyList(),
                 transactionId = transfer1.id,
+                source = Source.Manual,
             )
 
             // Verify incremental refresh produces correct results
@@ -403,6 +405,7 @@ class IncrementalMaterializedViewRefreshTest : DbTest() {
                 updatedAttributes = emptyMap(),
                 newAttributes = emptyList(),
                 transactionId = transfer.id,
+                source = Source.Manual,
             )
 
             // Should track 4 account-currency pairs:

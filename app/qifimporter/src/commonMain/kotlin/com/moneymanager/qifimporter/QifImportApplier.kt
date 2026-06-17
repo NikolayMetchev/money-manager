@@ -224,10 +224,14 @@ suspend fun runImport(
             accountsToCreate.map { newAccount ->
                 Account(id = AccountId(0), name = newAccount.name, openingDate = Clock.System.now(), categoryId = newAccount.categoryId)
             }
-        // Record QIF provenance for each created account (atomically, in the repository).
-        val qifSource = Source.Qif(qifImport.id)
-        runCatching { accountRepository.createAccountsBatch(newAccounts) { qifSource } }
-            .onFailure { logger.warn(it) { "Failed to bulk-create accounts" } }
+        // Record QIF provenance for each created account, stamping the first record that referenced it
+        // so the audit trail can link back to that exact QIF record (atomically, in the repository).
+        val firstRecordByAccountName = buildFirstRecordByAccountName(basePrep, selectedNewAccountNames)
+        runCatching {
+            accountRepository.createAccountsBatch(newAccounts) { account ->
+                Source.Qif(qifImport.id, firstRecordByAccountName[account.name])
+            }
+        }.onFailure { logger.warn(it) { "Failed to bulk-create accounts" } }
     }
 
     // Rebuild the mapper against the now-current accounts/mappings. Duplicate detection happens inside
@@ -270,8 +274,9 @@ suspend fun runImport(
             splitCounters[row.rowIndex] = splitIndex + 1
             ImportTransfer(
                 rowKey = ImportRowKey.QifRecord(row.rowIndex, splitIndex),
-                source = AccountRef.Existing(row.transfer.sourceAccountId),
-                target = AccountRef.Existing(row.transfer.targetAccountId),
+                fromAccount = AccountRef.Existing(row.transfer.sourceAccountId),
+                toAccount = AccountRef.Existing(row.transfer.targetAccountId),
+                source = Source.Qif(qifImport.id),
                 timestamp = row.transfer.timestamp,
                 description = row.transfer.description,
                 amount = row.transfer.amount,
@@ -282,7 +287,6 @@ suspend fun runImport(
         ImportBatch(
             transfers = importTransfers,
             dedupePolicy = DedupePolicy.FuzzyAllFields(),
-            source = Source.Qif(qifImport.id),
         )
     val importResult = importEngine.import(batch)
 
@@ -330,4 +334,27 @@ suspend fun runImport(
         duplicateCount = duplicateRecords.size,
         failedCount = finalPrep.errorRows.size,
     )
+}
+
+/**
+ * Maps each to-be-created account's final name to the index of the first QIF record that referenced it
+ * (its `discoveredMappings`), so the account's [Source.Qif] can point the audit trail at that record.
+ * Mirrors the CSV importer's `buildFirstRowByAccountName`; QIF record indexes ARE the row indexes here.
+ */
+private fun buildFirstRecordByAccountName(
+    preparation: ImportPreparation,
+    newAccountNames: Map<String, String>,
+): Map<String, Long> {
+    val firstRecord = mutableMapOf<String, Long>()
+    preparation.validTransfers
+        .sortedBy { it.rowIndex }
+        .forEach { transfer ->
+            transfer.discoveredMappings.forEach { mapping ->
+                val finalName = (newAccountNames[mapping.targetAccountName] ?: mapping.targetAccountName).trim()
+                if (finalName.isNotBlank() && finalName !in firstRecord) {
+                    firstRecord[finalName] = transfer.rowIndex
+                }
+            }
+        }
+    return firstRecord
 }

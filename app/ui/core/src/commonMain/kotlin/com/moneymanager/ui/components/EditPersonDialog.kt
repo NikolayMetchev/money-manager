@@ -145,6 +145,7 @@ fun EditPersonDialog(
                                                 middleName = middleName.trim().ifBlank { null },
                                                 lastName = lastName.trim().ifBlank { null },
                                             ),
+                                            Source.Manual,
                                         )
                                         null
                                     } else {

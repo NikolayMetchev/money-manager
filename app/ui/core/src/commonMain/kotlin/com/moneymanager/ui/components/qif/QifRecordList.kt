@@ -1,6 +1,7 @@
 package com.moneymanager.ui.components.qif
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,11 +13,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,13 +42,32 @@ fun QifRecordList(
     records: List<QifImportRecord>,
     onTransferClick: (TransferId, Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    // When set (e.g. arriving from an audit-trail source link), the matching record is scrolled into
+    // view, highlighted, and auto-expanded so the originating QIF lines are immediately visible.
+    scrollToRecordIndex: Long? = null,
 ) {
+    val lazyListState = rememberLazyListState()
+    val scrolledToRecordIndex = remember { mutableStateOf<Long?>(null) }
+    LaunchedEffect(scrollToRecordIndex, records.size) {
+        val target = scrollToRecordIndex ?: return@LaunchedEffect
+        if (scrolledToRecordIndex.value == target) return@LaunchedEffect
+        val targetIndex = records.indexOfFirst { it.recordIndex == target }
+        if (targetIndex >= 0) {
+            lazyListState.animateScrollToItem(targetIndex)
+            scrolledToRecordIndex.value = target
+        }
+    }
     LazyColumn(
         modifier = modifier,
+        state = lazyListState,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items(records, key = { it.recordIndex }) { record ->
-            QifRecordCard(record = record, onTransferClick = onTransferClick)
+            QifRecordCard(
+                record = record,
+                onTransferClick = onTransferClick,
+                highlighted = record.recordIndex == scrollToRecordIndex,
+            )
         }
     }
 }
@@ -54,8 +76,9 @@ fun QifRecordList(
 private fun QifRecordCard(
     record: QifImportRecord,
     onTransferClick: (TransferId, Boolean) -> Unit,
+    highlighted: Boolean = false,
 ) {
-    var expanded by remember { mutableStateOf(false) }
+    var expanded by remember(highlighted) { mutableStateOf(highlighted) }
     val containerColor =
         when {
             !record.supported -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
@@ -65,7 +88,16 @@ private fun QifRecordCard(
         }
 
     Card(
-        modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .then(
+                    if (highlighted) {
+                        Modifier.border(2.dp, MaterialTheme.colorScheme.primary, CardDefaults.shape)
+                    } else {
+                        Modifier
+                    },
+                ).clickable { expanded = !expanded },
         colors = CardDefaults.cardColors(containerColor = containerColor),
     ) {
         Column(modifier = Modifier.padding(12.dp)) {

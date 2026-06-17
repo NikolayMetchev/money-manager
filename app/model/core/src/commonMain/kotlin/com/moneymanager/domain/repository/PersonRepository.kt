@@ -16,7 +16,10 @@ interface PersonRepository {
         source: Source,
     ): PersonId
 
-    suspend fun updatePerson(person: Person)
+    suspend fun updatePerson(
+        person: Person,
+        source: Source,
+    )
 
     /**
      * Atomically updates person fields and/or attributes, producing a single revision bump.
@@ -29,6 +32,7 @@ interface PersonRepository {
         deletedAttributeIds: Set<Long>,
         updatedAttributes: Map<Long, NewAttribute>,
         newAttributes: List<NewAttribute>,
+        source: Source,
     ): Long
 
     suspend fun deletePerson(id: PersonId)

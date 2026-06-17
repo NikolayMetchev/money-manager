@@ -4,6 +4,7 @@ package com.moneymanager.database.repository
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Money
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.test.database.DbTest
@@ -142,6 +143,7 @@ class TransactionRepositoryImplTest : DbTest() {
                     deletedAttributeIds = emptySet(),
                     updatedAttributes = emptyMap(),
                     newAttributes = emptyList(),
+                    source = Source.Manual,
                     transactionId = createdTransfer.id,
                 )
             }

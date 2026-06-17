@@ -23,6 +23,7 @@ import com.moneymanager.domain.model.DeviceInfo
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.SourceRecord
 import com.moneymanager.domain.model.csv.CsvImportId
+import com.moneymanager.domain.model.qif.QifImportId
 
 @Composable
 fun FieldValueRow(
@@ -130,6 +131,7 @@ fun SourceInfoSection(
     labelWidth: Dp = 100.dp,
     onApiSourceClick: ((ApiSessionId, ApiRequestId, String) -> Unit)? = null,
     onCsvSourceClick: ((CsvImportId, Long) -> Unit)? = null,
+    onQifSourceClick: ((QifImportId, Long?) -> Unit)? = null,
 ) {
     Column(
         modifier = Modifier.padding(top = 8.dp),
@@ -191,9 +193,34 @@ fun SourceInfoSection(
                     DeviceInfoRows(source.deviceInfo, labelWidth)
                 }
                 is Source.Qif -> {
+                    val recordIndex = origin.recordIndex
+                    val fileName = source.fileName
                     FieldValueRow("Origin", "QIF Import", labelWidth = labelWidth)
-                    FieldValueRow("File", source.fileName ?: "Unknown file", labelWidth = labelWidth)
-                    origin.recordIndex?.let { FieldValueRow("Record", it.toString(), labelWidth = labelWidth) }
+                    if (onQifSourceClick != null) {
+                        // The File link always opens the QIF import; entities derived from the import as a
+                        // whole (e.g. accounts) have no single record, so only show a Record link when known.
+                        QifSourceLinkRow(
+                            label = "File",
+                            value = fileName ?: "Unknown file",
+                            importId = origin.importId,
+                            recordIndex = recordIndex,
+                            onQifSourceClick = onQifSourceClick,
+                            labelWidth = labelWidth,
+                        )
+                        if (recordIndex != null) {
+                            QifSourceLinkRow(
+                                label = "Record",
+                                value = recordIndex.toString(),
+                                importId = origin.importId,
+                                recordIndex = recordIndex,
+                                onQifSourceClick = onQifSourceClick,
+                                labelWidth = labelWidth,
+                            )
+                        }
+                    } else {
+                        FieldValueRow("File", fileName ?: "Unknown file", labelWidth = labelWidth)
+                        recordIndex?.let { FieldValueRow("Record", it.toString(), labelWidth = labelWidth) }
+                    }
                     DeviceInfoRows(source.deviceInfo, labelWidth)
                 }
                 Source.SampleGenerator -> {
@@ -283,6 +310,35 @@ private fun CsvSourceLinkRow(
         )
         TextButton(
             onClick = { onCsvSourceClick(importId, rowIndex) },
+            contentPadding = PaddingValues(0.dp),
+        ) {
+            Text(value)
+        }
+    }
+}
+
+@Composable
+private fun QifSourceLinkRow(
+    label: String,
+    value: String,
+    importId: QifImportId,
+    recordIndex: Long?,
+    onQifSourceClick: (QifImportId, Long?) -> Unit,
+    labelWidth: Dp = 100.dp,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "$label:",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.width(labelWidth),
+        )
+        TextButton(
+            onClick = { onQifSourceClick(importId, recordIndex) },
             contentPadding = PaddingValues(0.dp),
         ) {
             Text(value)

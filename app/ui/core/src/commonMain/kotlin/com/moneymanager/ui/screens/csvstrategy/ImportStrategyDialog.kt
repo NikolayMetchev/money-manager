@@ -53,6 +53,7 @@ import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Currency
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.domain.model.csvstrategy.export.CsvAccountMappingExport
@@ -237,7 +238,7 @@ fun ImportStrategyDialog(
                                     accounts = accountRepository.getAllAccounts().first(),
                                 )
 
-                            val persistedStrategyId = csvImportStrategyRepository.createStrategy(strategy)
+                            val persistedStrategyId = csvImportStrategyRepository.createStrategy(strategy, Source.Manual)
                             createdStrategyId = persistedStrategyId
                             resolvedAccountMappings.forEach { mapping ->
                                 csvAccountMappingRepository.createMapping(

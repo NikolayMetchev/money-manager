@@ -34,22 +34,21 @@ internal fun EntitySourceQueries.recordSource(
     )
 
     when (source) {
+        // Always record the import detail row so the import id (and thus the audit trail's link back
+        // to the import) is preserved even when no single originating row/record is known — e.g. an
+        // account or category derived from the import as a whole. The row/record index stays null.
         is Source.Csv ->
-            source.rowIndex?.let { row ->
-                insertCsvSource(
-                    id = entitySourceId(entityType, entityId, revisionId),
-                    csv_import_id = source.importId.id.toString(),
-                    csv_row_index = row,
-                )
-            }
+            insertCsvSource(
+                id = entitySourceId(entityType, entityId, revisionId),
+                csv_import_id = source.importId.id.toString(),
+                csv_row_index = source.rowIndex,
+            )
         is Source.Qif ->
-            source.recordIndex?.let { record ->
-                insertQifSource(
-                    id = entitySourceId(entityType, entityId, revisionId),
-                    qif_import_id = source.importId.id.toString(),
-                    qif_record_index = record,
-                )
-            }
+            insertQifSource(
+                id = entitySourceId(entityType, entityId, revisionId),
+                qif_import_id = source.importId.id.toString(),
+                qif_record_index = source.recordIndex,
+            )
         is Source.Api -> {
             val requestId = source.requestId
             val jsonPath = source.jsonPath

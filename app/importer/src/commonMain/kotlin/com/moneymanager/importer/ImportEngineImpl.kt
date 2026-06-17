@@ -9,6 +9,7 @@ import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.NewRelationship
 import com.moneymanager.domain.model.Person
 import com.moneymanager.domain.model.PersonId
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.WellKnownIds
@@ -29,7 +30,6 @@ import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importengineapi.ImportOwnershipIntent
 import com.moneymanager.importengineapi.ImportProgress
 import com.moneymanager.importengineapi.ImportResult
-import com.moneymanager.importengineapi.ImportRowKey
 import com.moneymanager.importengineapi.ImportTransfer
 import com.moneymanager.importengineapi.LocalAccountKey
 import com.moneymanager.importengineapi.LocalPersonKey
@@ -78,8 +78,8 @@ class ImportEngineImpl(
             batch.transfers.map { transfer ->
                 val fee = transfer.fee
                 transfer.copy(
-                    source = resolveRef(transfer.source, accountResolution.keyToId),
-                    target = resolveRef(transfer.target, accountResolution.keyToId),
+                    fromAccount = resolveRef(transfer.fromAccount, accountResolution.keyToId),
+                    toAccount = resolveRef(transfer.toAccount, accountResolution.keyToId),
                     fee =
                         fee?.copy(
                             source = resolveRef(fee.source, accountResolution.keyToId),
@@ -98,7 +98,7 @@ class ImportEngineImpl(
         val excluded = resolvedTransfers.count { it.excludedFromBalances }
 
         onProgress?.invoke(ImportProgress("Importing transactions"))
-        val createdIds = writeTransfers(toImport, toUpdate, batch)
+        val createdIds = writeTransfers(toImport, toUpdate)
 
         val createdTransferIds = toImport.zip(createdIds).associate { (classified, id) -> classified.transfer.rowKey to id }
 
@@ -161,11 +161,11 @@ class ImportEngineImpl(
             if (match != null) {
                 // A bank-identity (adopted) match re-points the existing account onto this intent only for
                 // own/source accounts; counterparties merge in silently keeping the existing account as-is.
-                if (match.adopted && intent.adoptOnBankMatch) adoptAccount(intent, match.id, batch, byName, byAttr)
+                if (match.adopted && intent.adoptOnBankMatch) adoptAccount(intent, match.id, byName, byAttr)
                 keyToId[intent.key] = match.id
                 continue
             }
-            val newId = createAccount(intent, batch)
+            val newId = createAccount(intent)
             created++
             keyToId[intent.key] = newId
             indexNewAccount(intent, newId, byName, byAttr, byPersonalKey)
@@ -209,13 +209,12 @@ class ImportEngineImpl(
     private suspend fun adoptAccount(
         intent: ImportAccountIntent,
         id: AccountId,
-        batch: ImportBatch,
         byName: MutableMap<String, AccountId>,
         byAttr: MutableMap<Pair<AttributeTypeId, String>, AccountId>,
     ) {
         val existing = accountRepository.getAccountById(id).first() ?: return
         if (existing.name != intent.name) {
-            accountRepository.updateAccount(existing.copy(name = intent.name), intent.source ?: batch.source)
+            accountRepository.updateAccount(existing.copy(name = intent.name), intent.source)
             byName.getOrPut(intent.name) { id }
         }
         val currentAttrs = accountAttributeRepository.getByAccount(id).first()
@@ -237,10 +236,7 @@ class ImportEngineImpl(
         return if (sortCode != null && accountNumber != null) personalCounterpartyKey(sortCode, accountNumber) else null
     }
 
-    private suspend fun createAccount(
-        intent: ImportAccountIntent,
-        batch: ImportBatch,
-    ): AccountId {
+    private suspend fun createAccount(intent: ImportAccountIntent): AccountId {
         val newId =
             accountRepository.createAccount(
                 Account(
@@ -249,7 +245,7 @@ class ImportEngineImpl(
                     openingDate = intent.openingDate,
                     categoryId = intent.categoryId,
                 ),
-                intent.source ?: batch.source,
+                intent.source,
             )
         intent.attributes.forEach { attr ->
             accountAttributeRepository.insertInCreationMode(newId, attr.typeId, attr.value)
@@ -396,7 +392,7 @@ class ImportEngineImpl(
                         middleName = null,
                         lastName = intent.lastName,
                     ),
-                    intent.source ?: batch.source,
+                    intent.source,
                 )
             intent.attributes.forEach { attr ->
                 personAttributeRepository.insertInCreationMode(newId, attr.typeId, attr.value)
@@ -449,14 +445,13 @@ class ImportEngineImpl(
         // Track links created/known so duplicate intents in the same batch don't re-insert.
         val seen = mutableSetOf<Pair<PersonId, AccountId>>()
         for (intent in batch.ownerships) {
-            if (createOwnershipIfNew(intent, batch, personKeyToId, accountKeyToId, seen)) created++
+            if (createOwnershipIfNew(intent, personKeyToId, accountKeyToId, seen)) created++
         }
         return created
     }
 
     private suspend fun createOwnershipIfNew(
         intent: ImportOwnershipIntent,
-        batch: ImportBatch,
         personKeyToId: PersonResolution,
         accountKeyToId: Map<LocalAccountKey, AccountId>,
         seen: MutableSet<Pair<PersonId, AccountId>>,
@@ -471,7 +466,7 @@ class ImportEngineImpl(
         val alreadyLinked =
             ownershipRepository.getOwnershipsByAccount(accountId).first().any { it.personId == personId }
         if (alreadyLinked) return false
-        ownershipRepository.createOwnership(personId, accountId, intent.source ?: batch.source)
+        ownershipRepository.createOwnership(personId, accountId, intent.source)
         return true
     }
 
@@ -487,7 +482,7 @@ class ImportEngineImpl(
 
         val accountIds =
             transfers
-                .flatMap { listOf(requireId(it.source), requireId(it.target)) }
+                .flatMap { listOf(requireId(it.fromAccount), requireId(it.toAccount)) }
                 .toSet()
 
         val rawTransfers =
@@ -535,7 +530,6 @@ class ImportEngineImpl(
     private suspend fun writeTransfers(
         toImport: List<Classified>,
         toUpdate: List<Classified>,
-        batch: ImportBatch,
     ): List<TransferId> {
         if (toImport.isEmpty() && toUpdate.isEmpty()) return emptyList()
 
@@ -546,7 +540,7 @@ class ImportEngineImpl(
         val transfersToCreate = mutableListOf<Transfer>()
         val newAttributes = mutableMapOf<TransferId, List<NewAttribute>>()
         val newRelationships = mutableMapOf<TransferId, List<NewRelationship>>()
-        val orderedRowKeys = mutableListOf<ImportRowKey>()
+        val orderedSources = mutableListOf<Source>()
         val mainResultIndices = mutableListOf<Int>()
         var tempCounter = 0
         toImport.forEach { classified ->
@@ -566,13 +560,13 @@ class ImportEngineImpl(
                     id = mainTempId,
                     timestamp = t.timestamp,
                     description = t.description,
-                    sourceAccountId = requireId(t.source),
-                    targetAccountId = requireId(t.target),
+                    sourceAccountId = requireId(t.fromAccount),
+                    targetAccountId = requireId(t.toAccount),
                     amount = t.amount,
                 )
             if (t.attributes.isNotEmpty()) newAttributes[mainTempId] = t.attributes
             if (relationships.isNotEmpty()) newRelationships[mainTempId] = relationships
-            orderedRowKeys += t.rowKey
+            orderedSources += t.source.forRow(t.rowKey)
             if (fee != null && feeTempId != null) {
                 transfersToCreate +=
                     Transfer(
@@ -583,14 +577,14 @@ class ImportEngineImpl(
                         targetAccountId = requireId(fee.target),
                         amount = fee.amount,
                     )
-                // The fee uses its own row key when provided (so the audit trail points at the fee's
-                // source node), else the main's. Each transfer's source is derived from its own row key.
-                orderedRowKeys += fee.rowKey ?: t.rowKey
+                // The fee inherits the main transfer's provenance source, resolved against its own row
+                // key when provided (so the audit trail points at the fee's source node), else the main's.
+                orderedSources += t.source.forRow(fee.rowKey ?: t.rowKey)
             }
         }
 
         val updates = mutableListOf<TransferUpdate>()
-        val orderedUpdateRowKeys = mutableListOf<ImportRowKey>()
+        val orderedUpdateSources = mutableListOf<Source>()
         for (classified in toUpdate) {
             val existingId = classified.existing ?: continue
             val t = classified.transfer
@@ -601,13 +595,13 @@ class ImportEngineImpl(
                             id = existingId,
                             timestamp = t.timestamp,
                             description = t.description,
-                            sourceAccountId = requireId(t.source),
-                            targetAccountId = requireId(t.target),
+                            sourceAccountId = requireId(t.fromAccount),
+                            targetAccountId = requireId(t.toAccount),
                             amount = t.amount,
                         ),
                     newAttributes = t.attributes,
                 )
-            orderedUpdateRowKeys += t.rowKey
+            orderedUpdateSources += t.source.forRow(t.rowKey)
         }
 
         val allCreatedIds =
@@ -615,9 +609,9 @@ class ImportEngineImpl(
                 transfers = transfersToCreate,
                 newAttributes = newAttributes,
                 newRelationships = newRelationships,
-                sources = orderedRowKeys.map { batch.source.forRow(it) },
+                sources = orderedSources,
                 updates = updates,
-                updateSources = orderedUpdateRowKeys.map { batch.source.forRow(it) },
+                updateSources = orderedUpdateSources,
             )
         // Return only the main transfers' ids (fee transfers are interleaved), aligned to [toImport].
         val createdIds = mainResultIndices.map { allCreatedIds[it] }

@@ -46,7 +46,6 @@ import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
-import com.moneymanager.domain.repository.TransferSourceRepository
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
@@ -113,7 +112,6 @@ class AccountTransactionsScreenTest {
 
             val accountRepository = createAccountRepository(listOf(checking, savings))
             val transactionRepository = createTransactionRepository(listOf(transfer))
-            val transferSourceRepository = createTransferSourceRepository()
             val currencyRepository = createCurrencyRepository(listOf(usdCurrency))
             val categoryRepository = createCategoryRepository()
             val attributeTypeRepository = createAttributeTypeRepository()
@@ -129,7 +127,6 @@ class AccountTransactionsScreenTest {
                     AccountTransactionsScreen(
                         accountId = currentAccountId,
                         transactionRepository = transactionRepository,
-                        transferSourceRepository = transferSourceRepository,
                         accountRepository = accountRepository,
                         accountAttributeRepository = createAccountAttributeRepository(),
                         categoryRepository = categoryRepository,
@@ -208,7 +205,6 @@ class AccountTransactionsScreenTest {
 
             val accountRepository = createAccountRepository(listOf(checking, savings))
             val transactionRepository = createTransactionRepository(listOf(transfer))
-            val transferSourceRepository = createTransferSourceRepository()
             val currencyRepository = createCurrencyRepository(listOf(usdCurrency))
             val categoryRepository = createCategoryRepository()
             val attributeTypeRepository = createAttributeTypeRepository()
@@ -223,7 +219,6 @@ class AccountTransactionsScreenTest {
                     AccountTransactionsScreen(
                         accountId = currentAccountId,
                         transactionRepository = transactionRepository,
-                        transferSourceRepository = transferSourceRepository,
                         accountRepository = accountRepository,
                         accountAttributeRepository = createAccountAttributeRepository(),
                         categoryRepository = categoryRepository,
@@ -290,7 +285,6 @@ class AccountTransactionsScreenTest {
                     AccountTransactionsScreen(
                         accountId = checking.id,
                         transactionRepository = transactionRepository,
-                        transferSourceRepository = createTransferSourceRepository(),
                         accountRepository = accountRepository,
                         accountAttributeRepository = createAccountAttributeRepository(),
                         categoryRepository = createCategoryRepository(),
@@ -431,7 +425,6 @@ class AccountTransactionsScreenTest {
                     AccountTransactionsScreen(
                         accountId = own.id,
                         transactionRepository = transactionRepository,
-                        transferSourceRepository = createTransferSourceRepository(),
                         accountRepository = accountRepository,
                         accountAttributeRepository = createAccountAttributeRepository(),
                         categoryRepository = createCategoryRepository(),
@@ -541,7 +534,6 @@ class AccountTransactionsScreenTest {
                             AccountTransactionsScreen(
                                 accountId = currentAccountId,
                                 transactionRepository = repositories.transactionRepository,
-                                transferSourceRepository = repositories.transferSourceRepository,
                                 accountRepository = repositories.accountRepository,
                                 accountAttributeRepository = repositories.accountAttributeRepository,
                                 categoryRepository = repositories.categoryRepository,
@@ -750,7 +742,6 @@ class AccountTransactionsScreenTest {
                             AccountTransactionsScreen(
                                 accountId = currentAccountId,
                                 transactionRepository = repositories.transactionRepository,
-                                transferSourceRepository = repositories.transferSourceRepository,
                                 accountRepository = repositories.accountRepository,
                                 accountAttributeRepository = repositories.accountAttributeRepository,
                                 categoryRepository = repositories.categoryRepository,
@@ -929,7 +920,6 @@ class AccountTransactionsScreenTest {
                             AccountTransactionsScreen(
                                 accountId = currentAccountId,
                                 transactionRepository = repositories.transactionRepository,
-                                transferSourceRepository = repositories.transferSourceRepository,
                                 accountRepository = repositories.accountRepository,
                                 accountAttributeRepository = repositories.accountAttributeRepository,
                                 categoryRepository = repositories.categoryRepository,
@@ -1146,12 +1136,6 @@ class AccountTransactionsScreenTest {
             every { getTopLevelCategories() } returns flowOf(categories.filter { it.parentId == null })
             every { getCategoriesByParent(any()) } calls { (parentId: Long) -> flowOf(categories.filter { it.parentId == parentId }) }
             everySuspend { createCategory(any(), any()) } returns 0L
-        }
-
-    private fun createTransferSourceRepository(): TransferSourceRepository =
-        mock(MockMode.autoUnit) {
-            everySuspend { getSourcesForTransaction(any()) } returns emptyList()
-            everySuspend { getSourceByRevision(any(), any()) } returns null
         }
 
     private fun createAttributeTypeRepository(): AttributeTypeRepository =

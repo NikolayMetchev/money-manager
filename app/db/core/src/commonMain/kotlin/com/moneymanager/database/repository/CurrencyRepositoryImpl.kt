@@ -66,14 +66,21 @@ class CurrencyRepositoryImpl(
             }
         }
 
-    override suspend fun updateCurrency(currency: Currency): Unit =
+    override suspend fun updateCurrency(
+        currency: Currency,
+        source: Source,
+    ): Unit =
         withContext(Dispatchers.Default) {
-            queries.update(
-                code = currency.code,
-                name = currency.name,
-                scale_factor = currency.scaleFactor,
-                id = currency.id.id,
-            )
+            queries.transactionWithResult {
+                queries.update(
+                    code = currency.code,
+                    name = currency.name,
+                    scale_factor = currency.scaleFactor,
+                    id = currency.id.id,
+                )
+                val revision = queries.selectById(currency.id.id).executeAsOne().revision_id
+                entitySourceQueries.recordSource(deviceId, EntityType.CURRENCY, currency.id.id, revision, source)
+            }
         }
 
     override suspend fun deleteCurrency(id: CurrencyId): Unit =

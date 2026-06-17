@@ -58,7 +58,6 @@ import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.TransactionRepository
-import com.moneymanager.domain.repository.TransferSourceRepository
 import com.moneymanager.ui.components.EditAccountDialog
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -108,7 +107,6 @@ private fun verticalMatrixScrollTarget(
 fun AccountTransactionsScreen(
     accountId: AccountId,
     transactionRepository: TransactionRepository,
-    transferSourceRepository: TransferSourceRepository,
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
@@ -977,7 +975,6 @@ fun AccountTransactionsScreen(
         TransactionEditDialog(
             transaction = transfer,
             transactionRepository = transactionRepository,
-            transferSourceRepository = transferSourceRepository,
             accountRepository = accountRepository,
             categoryRepository = categoryRepository,
             currencyRepository = currencyRepository,

@@ -3,6 +3,7 @@
 package com.moneymanager.database.repository
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AmountParsingMapping
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
@@ -110,7 +111,7 @@ class CsvAccountMappingRepositoryImplTest : DbTest() {
             )
 
         // Actually persist the strategy to the database
-        repositories.csvImportStrategyRepository.createStrategy(strategy)
+        repositories.csvImportStrategyRepository.createStrategy(strategy, Source.Manual)
         return strategy
     }
 

@@ -22,6 +22,7 @@ import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.DbLocation
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
 import com.moneymanager.test.database.createAccount
@@ -262,7 +263,7 @@ class ImportMonzoCsvE2ETest {
                     createTestStrategy(
                         headers = headers,
                     )
-                databaseComponent.csvImportStrategyRepository.createStrategy(strategy)
+                databaseComponent.csvImportStrategyRepository.createStrategy(strategy, Source.Manual)
 
                 databaseComponent.csvImportRepository.createImport(
                     fileName = "monzo_test_export.csv",
@@ -337,7 +338,7 @@ class ImportMonzoCsvE2ETest {
                     createTestStrategy(
                         headers = headers,
                     )
-                databaseComponent.csvImportStrategyRepository.createStrategy(strategy)
+                databaseComponent.csvImportStrategyRepository.createStrategy(strategy, Source.Manual)
 
                 val importedId =
                     databaseComponent.csvImportRepository.createImport(

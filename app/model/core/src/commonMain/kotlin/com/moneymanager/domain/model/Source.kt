@@ -10,7 +10,7 @@ import com.moneymanager.domain.model.qif.QifImportId
  * Device identity is deliberately **not** part of a [Source]: the current device is resolved once on
  * startup and injected into whatever writes audit rows (the repositories and the import engine), so a
  * [Source] value carries only origin-specific detail. Every entity built in an import batch carries a
- * [Source] (see [Sourceable]); the import engine knows how to persist each variant. Each variant maps
+ * [Source] (see [Auditable]); the import engine knows how to persist each variant. Each variant maps
  * to a [SourceType].
  */
 sealed interface Source {

@@ -75,6 +75,7 @@ fun CsvStrategiesScreen(
     onStrategyClick: (CsvImportStrategy) -> Unit = {},
     onBack: () -> Unit = {},
     onEditStrategy: (CsvImportStrategyId, CsvImportId) -> Unit = { _, _ -> },
+    onAuditHistoryClick: (CsvImportStrategy) -> Unit = {},
 ) {
     val strategies by csvImportStrategyRepository
         .getAllStrategies()
@@ -255,6 +256,7 @@ fun CsvStrategiesScreen(
                                 onExportClick = {
                                     strategyPendingExportPrompt = strategy
                                 },
+                                onAuditClick = { onAuditHistoryClick(strategy) },
                             )
                         }
                     }
@@ -332,6 +334,7 @@ fun CsvStrategyCard(
     csvImportStrategyRepository: CsvImportStrategyRepository,
     onEditClick: () -> Unit,
     onExportClick: () -> Unit,
+    onAuditClick: () -> Unit = {},
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
 
@@ -369,6 +372,14 @@ fun CsvStrategyCard(
                 )
             }
             Row {
+                IconButton(
+                    onClick = onAuditClick,
+                ) {
+                    Text(
+                        text = "🕒",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                }
                 IconButton(
                     onClick = onExportClick,
                 ) {

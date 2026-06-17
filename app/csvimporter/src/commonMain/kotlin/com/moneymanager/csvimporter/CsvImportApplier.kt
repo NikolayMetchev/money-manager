@@ -513,8 +513,9 @@ suspend fun runCsvImport(
                 }
             ImportTransfer(
                 rowKey = ImportRowKey.CsvRow(row.rowIndex),
-                source = AccountRef.Existing(row.transfer.sourceAccountId),
-                target = AccountRef.Existing(row.transfer.targetAccountId),
+                fromAccount = AccountRef.Existing(row.transfer.sourceAccountId),
+                toAccount = AccountRef.Existing(row.transfer.targetAccountId),
+                source = Source.Csv(csvImport.id),
                 timestamp = row.transfer.timestamp,
                 description = row.transfer.description,
                 amount = row.transfer.amount,
@@ -533,7 +534,6 @@ suspend fun runCsvImport(
                 } else {
                     DedupePolicy.UniqueIdentifier
                 },
-            source = Source.Csv(csvImport.id),
             uniqueKeyExtractor =
                 if (uniqueIdTypeNames.isEmpty()) {
                     null

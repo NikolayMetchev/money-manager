@@ -740,6 +740,70 @@ object DatabaseConfig {
     }
 
     /**
+     * Creates audit triggers for csv_import_strategy. Needed as a CUSTOM trigger set because the
+     * generic [createAuditTriggers] skips every `csv_import_` table (the prefix that excludes the
+     * dynamically-created CSV import data tables), so csv_import_strategy would otherwise be unaudited.
+     * Mirrors the generic triggers: INSERT stores NEW (type 1), UPDATE stores OLD except the bumped
+     * revision_id which uses NEW (type 2), DELETE stores OLD (type 3).
+     */
+    private fun MoneyManagerDatabaseWrapper.createCsvImportStrategyAuditTriggers() {
+        val auditColumns =
+            "csv_import_strategy_id, revision_id, name, identification_columns_json, field_mappings_json, " +
+                "attribute_mappings_json, row_rules_json, companion_rules_json, created_at, updated_at"
+        val newValues =
+            "NEW.id, NEW.revision_id, NEW.name, NEW.identification_columns_json, NEW.field_mappings_json, " +
+                "NEW.attribute_mappings_json, NEW.row_rules_json, NEW.companion_rules_json, NEW.created_at, NEW.updated_at"
+        val updateValues =
+            "OLD.id, NEW.revision_id, OLD.name, OLD.identification_columns_json, OLD.field_mappings_json, " +
+                "OLD.attribute_mappings_json, OLD.row_rules_json, OLD.companion_rules_json, OLD.created_at, OLD.updated_at"
+        val oldValues =
+            "OLD.id, OLD.revision_id, OLD.name, OLD.identification_columns_json, OLD.field_mappings_json, " +
+                "OLD.attribute_mappings_json, OLD.row_rules_json, OLD.companion_rules_json, OLD.created_at, OLD.updated_at"
+
+        execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_csv_import_strategy_insert_audit
+            AFTER INSERT ON csv_import_strategy
+            FOR EACH ROW
+            BEGIN
+                INSERT INTO csv_import_strategy_audit (audit_timestamp, audit_type_id, $auditColumns)
+                VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 1, $newValues);
+            END
+            """.trimIndent(),
+            0,
+        )
+
+        execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_csv_import_strategy_update_audit
+            AFTER UPDATE ON csv_import_strategy
+            FOR EACH ROW
+            BEGIN
+                INSERT INTO csv_import_strategy_audit (audit_timestamp, audit_type_id, $auditColumns)
+                VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 2, $updateValues);
+            END
+            """.trimIndent(),
+            0,
+        )
+
+        execute(
+            null,
+            """
+            CREATE TRIGGER IF NOT EXISTS trigger_csv_import_strategy_delete_audit
+            AFTER DELETE ON csv_import_strategy
+            FOR EACH ROW
+            BEGIN
+                INSERT INTO csv_import_strategy_audit (audit_timestamp, audit_type_id, $auditColumns)
+                VALUES (CAST(strftime('%s', 'now') AS INTEGER) * 1000, 3, $oldValues);
+            END
+            """.trimIndent(),
+            0,
+        )
+    }
+
+    /**
      * Creates audit triggers for person attributes.
      * Each attribute change bumps the person revision and records to person_attribute_audit.
      * Must be called BEFORE createAuditTriggers() so generic triggers are skipped via IF NOT EXISTS.
@@ -887,6 +951,9 @@ object DatabaseConfig {
             // its own forward revision rather than colliding with the prior change's revision.
             createAccountDeleteAuditTrigger()
 
+            // Custom csv_import_strategy audit triggers (the generic mechanism skips csv_import_* tables).
+            createCsvImportStrategyAuditTriggers()
+
             // Create audit triggers for all main tables
             // Category triggers are skipped because custom ones already exist (IF NOT EXISTS)
             createAuditTriggers()
@@ -923,9 +990,10 @@ object DatabaseConfig {
             seedMonzoStrategy(systemDeviceId)
             seedWiseStrategy(systemDeviceId)
             seedStarlingStrategy(systemDeviceId)
+            // NOTE: seedBuiltInCsvStrategies (called below) records its own SYSTEM source per strategy.
 
             // Seed the built-in CSV import strategies
-            seedBuiltInCsvStrategies()
+            seedBuiltInCsvStrategies(systemDeviceId)
 
             // Seed currencies with system source attribution. Recorded directly (not via the repository)
             // so the SYSTEM device is preserved; this runs before the app's current device is known.
@@ -1633,7 +1701,7 @@ object DatabaseConfig {
     }
 
     /** Seeds the built-in CSV import strategies during new-database initialisation. */
-    private fun MoneyManagerDatabaseWrapper.seedBuiltInCsvStrategies() {
+    private fun MoneyManagerDatabaseWrapper.seedBuiltInCsvStrategies(systemDeviceId: Long) {
         val now = Clock.System.now()
         for (strategy in builtInCsvStrategies(now)) {
             csvImportStrategyQueries.insert(
@@ -1646,6 +1714,12 @@ object DatabaseConfig {
                 companion_rules_json = FieldMappingJsonCodec.encodeCompanionRules(strategy.companionTransactionRules),
                 created_at = now.toEpochMilliseconds(),
                 updated_at = now.toEpochMilliseconds(),
+            )
+            csvImportStrategyQueries.insertSource(
+                strategy_id = strategy.id.id.toString(),
+                revision_id = 1,
+                source_type_id = SourceType.SYSTEM.id.toLong(),
+                device_id = systemDeviceId,
             )
         }
     }

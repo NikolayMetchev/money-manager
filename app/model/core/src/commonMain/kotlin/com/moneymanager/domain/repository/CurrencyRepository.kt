@@ -26,7 +26,10 @@ interface CurrencyRepository {
         source: Source,
     ): CurrencyId
 
-    suspend fun updateCurrency(currency: Currency)
+    suspend fun updateCurrency(
+        currency: Currency,
+        source: Source,
+    )
 
     suspend fun deleteCurrency(id: CurrencyId)
 }

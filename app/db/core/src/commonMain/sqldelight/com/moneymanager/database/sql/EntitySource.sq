@@ -10,6 +10,7 @@
 -- 5 = CATEGORY
 -- 6 = API_IMPORT_STRATEGY
 -- 7 = TRANSFER
+-- 8 = CSV_IMPORT_STRATEGY
 
 CREATE TABLE entity_type (
     id INTEGER PRIMARY KEY NOT NULL,
@@ -23,6 +24,7 @@ INSERT OR IGNORE INTO entity_type (id, name) VALUES (4, 'PERSON_ACCOUNT_OWNERSHI
 INSERT OR IGNORE INTO entity_type (id, name) VALUES (5, 'CATEGORY');
 INSERT OR IGNORE INTO entity_type (id, name) VALUES (6, 'API_IMPORT_STRATEGY');
 INSERT OR IGNORE INTO entity_type (id, name) VALUES (7, 'TRANSFER');
+INSERT OR IGNORE INTO entity_type (id, name) VALUES (8, 'CSV_IMPORT_STRATEGY');
 
 CREATE TABLE entity_source (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -63,10 +65,12 @@ CREATE INDEX IF NOT EXISTS idx_api_entity_source_request ON api_entity_source(ap
 -- csv_entity_source: CSV-specific data for CSV sources (source_type_id = 2), 1:1 with entity_source.
 -- Records which CSV import and which row created the entity (e.g. the first row that referenced a
 -- new account), so the audit trail can link back to that row in the CSV import detail.
+-- csv_row_index is nullable: an entity created from the import as a whole (e.g. an account derived
+-- from many rows) has a known import id but no single originating row.
 CREATE TABLE csv_entity_source (
     id INTEGER PRIMARY KEY,  -- Same as entity_source.id
     csv_import_id TEXT NOT NULL,
-    csv_row_index INTEGER NOT NULL,
+    csv_row_index INTEGER,
     FOREIGN KEY (id) REFERENCES entity_source(id),
     FOREIGN KEY (csv_import_id) REFERENCES csv_import_metadata(id)
 );
@@ -75,10 +79,12 @@ CREATE INDEX IF NOT EXISTS idx_csv_entity_source_import ON csv_entity_source(csv
 
 -- qif_entity_source: QIF-specific data for QIF sources (source_type_id = 6), 1:1 with entity_source.
 -- Records which QIF import and record created the entity, mirroring csv_entity_source.
+-- qif_record_index is nullable: an entity created from the import as a whole (e.g. an account
+-- derived from many records) has a known import id but no single originating record.
 CREATE TABLE qif_entity_source (
     id INTEGER PRIMARY KEY,  -- Same as entity_source.id
     qif_import_id TEXT NOT NULL,
-    qif_record_index INTEGER NOT NULL,
+    qif_record_index INTEGER,
     FOREIGN KEY (id) REFERENCES entity_source(id),
     FOREIGN KEY (qif_import_id) REFERENCES qif_import_metadata(id)
 );

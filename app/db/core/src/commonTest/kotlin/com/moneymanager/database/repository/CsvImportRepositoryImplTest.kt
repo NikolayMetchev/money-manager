@@ -5,6 +5,7 @@ import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.Money
+import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.Transfer
 import com.moneymanager.domain.model.TransferId
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
@@ -311,7 +312,7 @@ class CsvImportRepositoryImplTest : DbTest() {
                 createdAt = Clock.System.now(),
                 updatedAt = Clock.System.now(),
             )
-        repositories.csvImportStrategyRepository.createStrategy(strategy)
+        repositories.csvImportStrategyRepository.createStrategy(strategy, Source.Manual)
         return strategy
     }
 }

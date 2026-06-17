@@ -168,8 +168,8 @@ class ImportDeduper(
         window: Duration,
     ): Boolean {
         if (transfer.amount != existing.amount) return false
-        if (transfer.source.requireId() != existing.sourceAccountId) return false
-        if (transfer.target.requireId() != existing.targetAccountId) return false
+        if (transfer.fromAccount.requireId() != existing.sourceAccountId) return false
+        if (transfer.toAccount.requireId() != existing.targetAccountId) return false
         val delta = (transfer.timestamp - existing.timestamp).absoluteValue
         return delta <= window
     }
@@ -179,8 +179,8 @@ class ImportDeduper(
         existing: Transfer,
     ): Boolean {
         if (transfer.timestamp != existing.timestamp || transfer.amount != existing.amount) return false
-        val source = transfer.source.requireId()
-        val target = transfer.target.requireId()
+        val source = transfer.fromAccount.requireId()
+        val target = transfer.toAccount.requireId()
         return (source == existing.sourceAccountId && target == existing.targetAccountId) ||
             (source == existing.targetAccountId && target == existing.sourceAccountId)
     }
@@ -190,8 +190,8 @@ class ImportDeduper(
             id = id,
             timestamp = timestamp,
             description = description,
-            sourceAccountId = source.requireId(),
-            targetAccountId = target.requireId(),
+            sourceAccountId = fromAccount.requireId(),
+            targetAccountId = toAccount.requireId(),
             amount = amount,
         )
 
@@ -239,8 +239,8 @@ class ImportDeduper(
         existing: Transfer,
     ): Boolean =
         transfer.timestamp == existing.timestamp &&
-            transfer.source.requireId() == existing.sourceAccountId &&
-            transfer.target.requireId() == existing.targetAccountId &&
+            transfer.fromAccount.requireId() == existing.sourceAccountId &&
+            transfer.toAccount.requireId() == existing.targetAccountId &&
             transfer.amount == existing.amount &&
             transfer.description == existing.description
 
@@ -264,8 +264,8 @@ class ImportDeduper(
     ): Boolean {
         if (transfer.amount != existing.amount) return false
         val sharesAccount =
-            transfer.source.requireId() == existing.sourceAccountId ||
-                transfer.target.requireId() == existing.targetAccountId
+            transfer.fromAccount.requireId() == existing.sourceAccountId ||
+                transfer.toAccount.requireId() == existing.targetAccountId
         if (!sharesAccount) return false
         val withinDateTolerance =
             (transfer.timestamp - existing.timestamp).absoluteValue <= policy.dateTolerance

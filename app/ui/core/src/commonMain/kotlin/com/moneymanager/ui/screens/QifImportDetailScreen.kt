@@ -49,6 +49,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun QifImportDetailScreen(
     importId: QifImportId,
+    scrollToRecordIndex: Long? = null,
     qifImportRepository: QifImportRepository,
     csvImportStrategyRepository: CsvImportStrategyRepository,
     csvAccountMappingRepository: CsvAccountMappingRepository,
@@ -133,6 +134,7 @@ fun QifImportDetailScreen(
             records = records,
             onTransferClick = onTransferClick,
             modifier = Modifier.fillMaxWidth().weight(1f),
+            scrollToRecordIndex = scrollToRecordIndex,
         )
     }
 

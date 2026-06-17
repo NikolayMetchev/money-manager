@@ -61,6 +61,7 @@ import com.moneymanager.ui.screens.SettingsScreen
 import com.moneymanager.ui.screens.apistrategy.ApiImportStrategyAuditScreen
 import com.moneymanager.ui.screens.apistrategy.ApiStrategiesScreen
 import com.moneymanager.ui.screens.apistrategy.editor.ApiStrategyEditorScreen
+import com.moneymanager.ui.screens.csvstrategy.CsvImportStrategyAuditScreen
 import com.moneymanager.ui.screens.csvstrategy.CsvStrategiesScreen
 import com.moneymanager.ui.screens.csvstrategy.editor.CsvStrategyEditorScreen
 import com.moneymanager.ui.screens.qif.QifStrategyEditorScreen
@@ -357,7 +358,6 @@ fun MoneyManagerApp(
                                     AccountTransactionsScreen(
                                         accountId = currentlyViewedAccountId ?: screen.accountId,
                                         transactionRepository = services.transactions.transactionRepository,
-                                        transferSourceRepository = services.transactions.transferSourceRepository,
                                         accountRepository = services.accounts.accountRepository,
                                         accountAttributeRepository = services.accounts.accountAttributeRepository,
                                         categoryRepository = services.accounts.categoryRepository,
@@ -509,6 +509,7 @@ fun MoneyManagerApp(
                                 is Screen.QifImportDetail -> {
                                     QifImportDetailScreen(
                                         importId = screen.importId,
+                                        scrollToRecordIndex = screen.scrollToRecordIndex,
                                         qifImportRepository = services.imports.qifImportRepository,
                                         csvImportStrategyRepository = services.imports.csvImportStrategyRepository,
                                         csvAccountMappingRepository = services.imports.csvAccountMappingRepository,
@@ -548,6 +549,11 @@ fun MoneyManagerApp(
                                         onBack = { navigationHistory.navigateBack() },
                                         onEditStrategy = { strategyId, importId ->
                                             navigationHistory.navigateTo(Screen.CsvStrategyEditor(importId, strategyId))
+                                        },
+                                        onAuditHistoryClick = { strategy ->
+                                            navigationHistory.navigateTo(
+                                                Screen.CsvStrategyAuditHistory(strategy.id, strategy.name),
+                                            )
                                         },
                                     )
                                 }
@@ -594,6 +600,9 @@ fun MoneyManagerApp(
                                         onCsvSourceClick = { importId, rowIndex ->
                                             navigationHistory.navigateTo(Screen.CsvImportDetail(importId, rowIndex))
                                         },
+                                        onQifSourceClick = { importId, recordIndex ->
+                                            navigationHistory.navigateTo(Screen.QifImportDetail(importId, recordIndex))
+                                        },
                                         onApiSourceClick = { sessionId, requestId, jsonPath ->
                                             navigationHistory.navigateTo(
                                                 Screen.ApiSessionTraffic(
@@ -633,6 +642,9 @@ fun MoneyManagerApp(
                                         },
                                         onCsvSourceClick = { importId, rowIndex ->
                                             navigationHistory.navigateTo(Screen.CsvImportDetail(importId, rowIndex))
+                                        },
+                                        onQifSourceClick = { importId, recordIndex ->
+                                            navigationHistory.navigateTo(Screen.QifImportDetail(importId, recordIndex))
                                         },
                                         onOwnerClick = { personId ->
                                             navigationHistory.navigateTo(
@@ -685,6 +697,14 @@ fun MoneyManagerApp(
                                         onBack = { navigationHistory.navigateBack() },
                                     )
                                 }
+                                is Screen.CsvStrategyAuditHistory -> {
+                                    CsvImportStrategyAuditScreen(
+                                        strategyId = screen.strategyId,
+                                        auditRepository = services.audit.auditRepository,
+                                        csvImportStrategyRepository = services.imports.csvImportStrategyRepository,
+                                        onBack = { navigationHistory.navigateBack() },
+                                    )
+                                }
                                 is Screen.ConnectApi -> {
                                     LaunchedEffect(Unit) {
                                         currentlyViewedAccountId = null
@@ -734,7 +754,6 @@ fun MoneyManagerApp(
                 if (showTransactionDialog) {
                     TransactionEditDialog(
                         transactionRepository = services.transactions.transactionRepository,
-                        transferSourceRepository = services.transactions.transferSourceRepository,
                         accountRepository = services.accounts.accountRepository,
                         categoryRepository = services.accounts.categoryRepository,
                         currencyRepository = services.accounts.currencyRepository,
