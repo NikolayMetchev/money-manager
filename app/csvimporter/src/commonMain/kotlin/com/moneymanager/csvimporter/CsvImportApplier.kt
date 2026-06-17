@@ -259,11 +259,12 @@ private suspend fun createNewAccounts(
 }
 
 /**
- * Maps each new account's final name to the earliest CSV row that referenced it (its creation row),
- * so account provenance can point at the relevant row. Keyed by the final (possibly user-renamed)
- * account name to match the accounts actually created.
+ * Maps each new account's final name to the index of the earliest row/record that referenced it (its
+ * creation row), so account provenance can point at the relevant row. Keyed by the final (possibly
+ * user-renamed) account name to match the accounts actually created. Shared with the QIF importer,
+ * which reuses this CSV engine (QIF record indexes ARE these row indexes).
  */
-private fun buildFirstRowByAccountName(
+fun buildFirstRowByAccountName(
     preparation: ImportPreparation,
     newAccountNames: Map<String, String>,
 ): Map<String, Long> {

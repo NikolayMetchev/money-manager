@@ -127,7 +127,7 @@ private fun computeCsvImportStrategyAuditDiffs(
                 val newConfig =
                     when {
                         index == 0 -> currentConfig
-                        previousEntry != null -> entry.configFrom(previousEntry)
+                        previousEntry != null -> previousEntry.flatten()
                         else -> null
                     }
                 CsvImportStrategyAuditDiff(
@@ -151,8 +151,6 @@ private fun CsvImportStrategyAuditEntry.flatten(): Map<String, String> =
         rowRules = rowPreprocessingRules,
         companionRules = companionTransactionRules,
     )
-
-private fun CsvImportStrategyAuditEntry.configFrom(previous: CsvImportStrategyAuditEntry): Map<String, String> = previous.flatten()
 
 /**
  * Returns only the fields that differ between [oldConfig] (state before this change) and [newConfig]

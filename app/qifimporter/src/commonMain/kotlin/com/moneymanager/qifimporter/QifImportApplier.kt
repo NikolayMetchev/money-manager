@@ -6,6 +6,7 @@ import com.moneymanager.csvimporter.BulkImportResult
 import com.moneymanager.csvimporter.CsvTransferMapper
 import com.moneymanager.csvimporter.ImportPreparation
 import com.moneymanager.csvimporter.buildAccountsToCreate
+import com.moneymanager.csvimporter.buildFirstRowByAccountName
 import com.moneymanager.csvimporter.buildPendingAccountMappings
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.Account
@@ -226,7 +227,9 @@ suspend fun runImport(
             }
         // Record QIF provenance for each created account, stamping the first record that referenced it
         // so the audit trail can link back to that exact QIF record (atomically, in the repository).
-        val firstRecordByAccountName = buildFirstRecordByAccountName(basePrep, selectedNewAccountNames)
+        // QIF record indexes ARE the CSV-engine row indexes, so the shared helper gives us the first
+        // record that referenced each account.
+        val firstRecordByAccountName = buildFirstRowByAccountName(basePrep, selectedNewAccountNames)
         runCatching {
             accountRepository.createAccountsBatch(newAccounts) { account ->
                 Source.Qif(qifImport.id, firstRecordByAccountName[account.name])
@@ -334,27 +337,4 @@ suspend fun runImport(
         duplicateCount = duplicateRecords.size,
         failedCount = finalPrep.errorRows.size,
     )
-}
-
-/**
- * Maps each to-be-created account's final name to the index of the first QIF record that referenced it
- * (its `discoveredMappings`), so the account's [Source.Qif] can point the audit trail at that record.
- * Mirrors the CSV importer's `buildFirstRowByAccountName`; QIF record indexes ARE the row indexes here.
- */
-private fun buildFirstRecordByAccountName(
-    preparation: ImportPreparation,
-    newAccountNames: Map<String, String>,
-): Map<String, Long> {
-    val firstRecord = mutableMapOf<String, Long>()
-    preparation.validTransfers
-        .sortedBy { it.rowIndex }
-        .forEach { transfer ->
-            transfer.discoveredMappings.forEach { mapping ->
-                val finalName = (newAccountNames[mapping.targetAccountName] ?: mapping.targetAccountName).trim()
-                if (finalName.isNotBlank() && finalName !in firstRecord) {
-                    firstRecord[finalName] = transfer.rowIndex
-                }
-            }
-        }
-    return firstRecord
 }
