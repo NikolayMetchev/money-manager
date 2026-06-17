@@ -12,7 +12,6 @@ import com.moneymanager.domain.model.qif.QifImportRecord
 import com.moneymanager.qifimporter.bulkApplyQif
 import com.moneymanager.test.database.DbTest
 import com.moneymanager.test.database.createAccount
-import com.moneymanager.test.database.upsertCurrencyByCode
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -95,7 +94,6 @@ class SantanderQifE2ETest : DbTest() {
     )
 
     private suspend fun apply(qifImport: QifImport) {
-        val currencyId = repositories.currencyRepository.upsertCurrencyByCode("GBP", "British Pound")
         val sourceId =
             repositories.accountRepository
                 .getAllAccounts()
@@ -106,7 +104,6 @@ class SantanderQifE2ETest : DbTest() {
         bulkApplyQif(
             imports = listOf(qifImport),
             sourceAccountId = sourceId,
-            currencyId = currencyId,
             strategies = repositories.csvImportStrategyRepository.getAllStrategies().first(),
             currencies = repositories.currencyRepository.getAllCurrencies().first(),
             csvAccountMappingRepository = repositories.csvAccountMappingRepository,

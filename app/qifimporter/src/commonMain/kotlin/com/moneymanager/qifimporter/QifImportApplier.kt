@@ -110,15 +110,16 @@ fun List<CsvImportStrategy>.selectForQifContent(
 }
 
 /**
- * Applies the matching QIF strategy to every [imports] file using a single [sourceAccountId] and
- * [currencyId]. Payee/counterparty accounts are auto-created with their detected names (no per-file
- * confirmation). Refreshes materialized views once at the end. Reports progress via [onProgress].
+ * Applies the matching QIF strategy to every [imports] file using a single [sourceAccountId]. The
+ * currency comes from each file's auto-detected strategy (QIF data has none, so the strategy's
+ * configured currency is authoritative), so there is no per-import currency prompt. Payee/counterparty
+ * accounts are auto-created with their detected names (no per-file confirmation). Refreshes
+ * materialized views once at the end. Reports progress via [onProgress].
  */
 @Suppress("LongParameterList")
 suspend fun bulkApplyQif(
     imports: List<QifImport>,
     sourceAccountId: AccountId,
-    currencyId: CurrencyId,
     strategies: List<CsvImportStrategy>,
     currencies: List<Currency>,
     csvAccountMappingRepository: CsvAccountMappingRepository,
@@ -151,7 +152,8 @@ suspend fun bulkApplyQif(
                 return@forEachIndexed
             }
 
-            val strategy = matched.withQifCurrency(currencyId)
+            // The strategy's own (configured) currency is used — no per-import override.
+            val strategy = matched
             // Re-fetch accounts so payee accounts created by earlier files are seen.
             val accounts = accountRepository.getAllAccounts().first()
             val mappings = csvAccountMappingRepository.getMappingsForStrategy(matched.id).first()

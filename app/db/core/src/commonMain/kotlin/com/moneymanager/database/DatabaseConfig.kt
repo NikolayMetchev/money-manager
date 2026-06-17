@@ -994,10 +994,6 @@ object DatabaseConfig {
             seedMonzoStrategy(systemDeviceId)
             seedWiseStrategy(systemDeviceId)
             seedStarlingStrategy(systemDeviceId)
-            // NOTE: seedBuiltInCsvStrategies (called below) records its own SYSTEM source per strategy.
-
-            // Seed the built-in CSV import strategies
-            seedBuiltInCsvStrategies(systemDeviceId)
 
             // Seed currencies with system source attribution. Recorded directly (not via the repository)
             // so the SYSTEM device is preserved; this runs before the app's current device is known.
@@ -1015,6 +1011,11 @@ object DatabaseConfig {
                     Source.System,
                 )
             }
+
+            // Seed the built-in CSV/QIF import strategies AFTER currencies, so the QIF strategies can
+            // reference the real GBP currency id (their fixed currency is the default the QIF import
+            // dialog pre-selects). Records its own SYSTEM source per strategy.
+            seedBuiltInCsvStrategies(systemDeviceId)
         }
     }
 
@@ -1376,11 +1377,18 @@ object DatabaseConfig {
 
     private fun santanderQifMappingId(index: Int): FieldMappingId = builtInCsvMappingId(strategyGroup = 4, index = index)
 
-    /** All built-in CSV import strategies seeded into a fresh database. */
-    fun builtInCsvStrategies(now: Instant): List<CsvImportStrategy> =
+    /**
+     * All built-in CSV import strategies seeded into a fresh database. [qifCurrencyId] is the fixed
+     * currency the QIF strategies carry (the default the QIF import dialog pre-selects); it is resolved
+     * to GBP at seed time. Defaults to the first currency for callers without a resolved id (e.g. tests).
+     */
+    fun builtInCsvStrategies(
+        now: Instant,
+        qifCurrencyId: CurrencyId = CurrencyId(1),
+    ): List<CsvImportStrategy> =
         listOf(
-            buildQifStrategy(now),
-            buildSantanderQifStrategy(now),
+            buildQifStrategy(now, qifCurrencyId),
+            buildSantanderQifStrategy(now, qifCurrencyId),
             buildWiseCsvStrategy(now),
             buildMonzoCsvStrategy(now),
         )
@@ -1553,7 +1561,10 @@ object DatabaseConfig {
      * it matches any QIF file. The source account and currency are chosen at import time (QIF data
      * carries neither): the seeded CURRENCY mapping is a placeholder the QIF apply flow overrides.
      */
-    fun buildQifStrategy(now: Instant): CsvImportStrategy {
+    fun buildQifStrategy(
+        now: Instant,
+        currencyId: CurrencyId = CurrencyId(1),
+    ): CsvImportStrategy {
         val fieldMappings =
             mapOf(
                 // Prefer an explicit [transfer-account]; otherwise treat the payee (then category) as
@@ -1593,8 +1604,8 @@ object DatabaseConfig {
                     HardCodedCurrencyMapping(
                         id = qifMappingId(5),
                         fieldType = TransferField.CURRENCY,
-                        // Placeholder: the QIF apply flow overrides this with the user's chosen currency.
-                        currencyId = CurrencyId(1),
+                        // The QIF apply flow pre-selects this as the default; the user can override it.
+                        currencyId = currencyId,
                     ),
                 TransferField.TIMEZONE to
                     HardCodedTimezoneMapping(
@@ -1626,7 +1637,10 @@ object DatabaseConfig {
      * generic QIF strategy, the source account and currency are chosen at import time.
      */
     @Suppress("LongMethod")
-    fun buildSantanderQifStrategy(now: Instant): CsvImportStrategy {
+    fun buildSantanderQifStrategy(
+        now: Instant,
+        currencyId: CurrencyId = CurrencyId(1),
+    ): CsvImportStrategy {
         // First-match-wins rules over the Payee field; ${cp} extracts the clean counterparty name.
         // Tuned against a full Santander statement history (~7k records, ~99.9% parsed). The middle
         // rules use ".*?\bTO/\bFROM" to skip "VIA FASTER PAYMENT" / "REF.<x>" preludes that vary per row.
@@ -1769,8 +1783,9 @@ object DatabaseConfig {
                     HardCodedCurrencyMapping(
                         id = santanderQifMappingId(5),
                         fieldType = TransferField.CURRENCY,
-                        // Placeholder: the QIF apply flow overrides this with the user's chosen currency.
-                        currencyId = CurrencyId(1),
+                        // The QIF apply flow pre-selects this as the default (GBP for Santander); the
+                        // user can override it.
+                        currencyId = currencyId,
                     ),
                 TransferField.TIMEZONE to
                     HardCodedTimezoneMapping(
@@ -1951,7 +1966,10 @@ object DatabaseConfig {
     /** Seeds the built-in CSV import strategies during new-database initialisation. */
     private fun MoneyManagerDatabaseWrapper.seedBuiltInCsvStrategies(systemDeviceId: Long) {
         val now = Clock.System.now()
-        for (strategy in builtInCsvStrategies(now)) {
+        // QIF carries no currency, so the built-in QIF strategies default to GBP (resolved now that
+        // currencies are seeded); the QIF import dialog pre-selects this and the user can change it.
+        val qifCurrencyId = CurrencyId(currencyQueries.selectByCode("GBP").executeAsOne().id)
+        for (strategy in builtInCsvStrategies(now, qifCurrencyId)) {
             csvImportStrategyQueries.insert(
                 id = strategy.id.id.toString(),
                 name = strategy.name,
