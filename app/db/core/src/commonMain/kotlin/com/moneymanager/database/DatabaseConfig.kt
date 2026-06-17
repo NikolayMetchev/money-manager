@@ -5,7 +5,6 @@ package com.moneymanager.database
 import com.moneymanager.currency.Currency
 import com.moneymanager.database.json.ApiStrategyConfigJson
 import com.moneymanager.database.json.ApiStrategyJsonCodec
-import com.moneymanager.database.json.FieldMappingJsonCodec
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.CurrencyScaleFactors
 import com.moneymanager.domain.model.DeviceId
@@ -1652,73 +1651,73 @@ object DatabaseConfig {
                 RegexRule(pattern = "^DIRECT DEBIT INDEMNITY\\b", accountName = "Santander Direct Debit Indemnity"),
                 RegexRule(pattern = "^DIRECT DEBIT REVERSAL\\b", accountName = "Santander Direct Debit Reversal"),
                 RegexRule(
-                    pattern = "^DIRECT DEBIT PAYMENT TO\\s+(?<cp>.+?)(?:\\s+REF\\b|\\s+MANDATE\\b|,)",
+                    pattern = "^DIRECT DEBIT PAYMENT TO\\s+(.+?)(?:\\s+REF\\b|\\s+MANDATE\\b|,)",
                     accountName = "Santander Direct Debit",
-                    accountNameTemplate = "\${cp}",
+                    accountNameTemplate = "$1",
                 ),
                 RegexRule(
-                    pattern = "^CARD PAYMENT TO\\s+(?<cp>.+?)(?:,|\\s+ON\\b)",
+                    pattern = "^CARD PAYMENT TO\\s+(.+?)(?:,|\\s+ON\\b)",
                     accountName = "Santander Card Payment",
-                    accountNameTemplate = "\${cp}",
+                    accountNameTemplate = "$1",
                 ),
                 RegexRule(
-                    pattern = "^FASTER PAYMENTS RECEIPT\\b.*?\\bFROM\\s+(?<cp>[^,]+?)\\s*,",
+                    pattern = "^FASTER PAYMENTS RECEIPT\\b.*?\\bFROM\\s+([^,]+?)\\s*,",
                     accountName = "Santander Faster Payment",
-                    accountNameTemplate = "\${cp}",
+                    accountNameTemplate = "$1",
                     counterpartyIsPerson = true,
                 ),
                 RegexRule(
-                    pattern = "^PAYM\\b.*?\\bFROM\\s+(?<cp>[^,]+?)\\s*(?:,|\\s+REFERENCE\\b)",
+                    pattern = "^PAYM\\b.*?\\bFROM\\s+([^,]+?)\\s*(?:,|\\s+REFERENCE\\b)",
                     accountName = "Santander Paym",
-                    accountNameTemplate = "\${cp}",
+                    accountNameTemplate = "$1",
                     counterpartyIsPerson = true,
                 ),
                 RegexRule(
-                    pattern = "^PAYM\\b.*?\\bTO\\s+(?<cp>.+?)(?:\\s+REFERENCE\\b|,)",
+                    pattern = "^PAYM\\b.*?\\bTO\\s+(.+?)(?:\\s+REFERENCE\\b|,)",
                     accountName = "Santander Paym",
-                    accountNameTemplate = "\${cp}",
+                    accountNameTemplate = "$1",
                     counterpartyIsPerson = true,
                 ),
                 RegexRule(
-                    pattern = "^BILL PAYMENT\\b.*?\\bTO\\s+(?<cp>.+?)(?:\\s+REFERENCE\\b|\\s+MANDATE\\b|,)",
+                    pattern = "^BILL PAYMENT\\b.*?\\bTO\\s+(.+?)(?:\\s+REFERENCE\\b|\\s+MANDATE\\b|,)",
                     accountName = "Santander Bill Payment",
-                    accountNameTemplate = "\${cp}",
+                    accountNameTemplate = "$1",
                     counterpartyIsPerson = true,
                 ),
                 RegexRule(
-                    pattern = "^BILL PAYMENT\\b.*?\\bFROM\\s+(?<cp>[^,]+?)\\s*(?:,|\\s+REFERENCE\\b)",
+                    pattern = "^BILL PAYMENT\\b.*?\\bFROM\\s+([^,]+?)\\s*(?:,|\\s+REFERENCE\\b)",
                     accountName = "Santander Bill Payment",
-                    accountNameTemplate = "\${cp}",
+                    accountNameTemplate = "$1",
                     counterpartyIsPerson = true,
                 ),
                 RegexRule(
-                    pattern = "^PENDED\\b.*?\\bTO\\s+(?<cp>.+?)(?:\\s+REFERENCE\\b|,)",
+                    pattern = "^PENDED\\b.*?\\bTO\\s+(.+?)(?:\\s+REFERENCE\\b|,)",
                     accountName = "Santander Pended Payment",
-                    accountNameTemplate = "\${cp}",
+                    accountNameTemplate = "$1",
                     counterpartyIsPerson = true,
                 ),
                 RegexRule(
-                    pattern = "^STANDING ORDER\\b.*?\\bTO\\s+(?<cp>.+?)(?:\\s+REFERENCE\\b|\\s+MANDATE\\b|,)",
+                    pattern = "^STANDING ORDER\\b.*?\\bTO\\s+(.+?)(?:\\s+REFERENCE\\b|\\s+MANDATE\\b|,)",
                     accountName = "Santander Standing Order",
-                    accountNameTemplate = "\${cp}",
+                    accountNameTemplate = "$1",
                     counterpartyIsPerson = true,
                 ),
                 RegexRule(
-                    pattern = "^Third party payment\\b.*?\\bto\\s+(?<cp>.+?)(?:\\s+Reference\\b|,)",
+                    pattern = "^Third party payment\\b.*?\\bto\\s+(.+?)(?:\\s+Reference\\b|,)",
                     accountName = "Santander Third Party Payment",
-                    accountNameTemplate = "\${cp}",
+                    accountNameTemplate = "$1",
                     counterpartyIsPerson = true,
                 ),
                 RegexRule(
-                    pattern = "^TRANSFER\\b.*?\\bTO\\s+(?<cp>.+?)(?:\\s+REFERENCE\\b|,)",
+                    pattern = "^TRANSFER\\b.*?\\bTO\\s+(.+?)(?:\\s+REFERENCE\\b|,)",
                     accountName = "Santander Transfer",
-                    accountNameTemplate = "\${cp}",
+                    accountNameTemplate = "$1",
                     counterpartyIsPerson = true,
                 ),
                 RegexRule(
-                    pattern = "^TRANSFER\\b.*?\\bFROM\\s+(?<cp>[^,.]+?)\\s*(?:,|\\.|\\s+REFERENCE\\b)",
+                    pattern = "^TRANSFER\\b.*?\\bFROM\\s+([^,.]+?)\\s*(?:,|\\.|\\s+REFERENCE\\b)",
                     accountName = "Santander Transfer",
-                    accountNameTemplate = "\${cp}",
+                    accountNameTemplate = "$1",
                     counterpartyIsPerson = true,
                 ),
                 // Cash / cheque movements consolidate to a single account each.
@@ -1727,14 +1726,14 @@ object DatabaseConfig {
                 RegexRule(pattern = "^CHEQUE\\b", accountName = "Cheque"),
                 // Bank giro credit refs are often "<digits><NAME>"; strip leading digits to consolidate.
                 RegexRule(
-                    pattern = "^BANK GIRO CREDIT REF\\s+\\d*(?<cp>[^,]+?)\\s*,",
+                    pattern = "^BANK GIRO CREDIT REF\\s+\\d*([^,]+?)\\s*,",
                     accountName = "Santander Bank Giro Credit",
-                    accountNameTemplate = "\${cp}",
+                    accountNameTemplate = "$1",
                 ),
                 RegexRule(
-                    pattern = "^CREDIT FROM\\s+(?<cp>.+?)(?:\\s+ON\\b|,)",
+                    pattern = "^CREDIT FROM\\s+(.+?)(?:\\s+ON\\b|,)",
                     accountName = "Santander Credit",
-                    accountNameTemplate = "\${cp}",
+                    accountNameTemplate = "$1",
                 ),
                 RegexRule(pattern = "^INTEREST\\b", accountName = "Santander Interest"),
                 RegexRule(pattern = "^LOAN\\b", accountName = "Santander Loan"),
@@ -1769,7 +1768,7 @@ object DatabaseConfig {
                         columnName = QifColumns.COL_PAYEE,
                         fallbackColumns = listOf(QifColumns.COL_MEMO),
                         // Strip the trailing ", <amount>[ GBP]" Santander repeats at the end of the payee.
-                        extraction = ColumnExtraction(pattern = "^(?<d>.*?),\\s*[\\d][\\d.,]*\\s*(?:GBP)?\\s*$", outputTemplate = "\${d}"),
+                        extraction = ColumnExtraction(pattern = "^(.*?),\\s*[\\d][\\d.,]*\\s*(?:GBP)?\\s*$", outputTemplate = "$1"),
                     ),
                 TransferField.AMOUNT to
                     AmountParsingMapping(
@@ -1830,19 +1829,19 @@ object DatabaseConfig {
                         attributeTypeName = "santander-reference",
                         extraction =
                             ColumnExtraction(
-                                pattern = "(?:REFERENCE|REF)\\b\\.?\\s*(?<ref>.+?)\\s*(?:,|\\s+MANDATE\\b)",
-                                outputTemplate = "\${ref}",
+                                pattern = "(?:REFERENCE|REF)\\b\\.?\\s*(.+?)\\s*(?:,|\\s+MANDATE\\b)",
+                                outputTemplate = "$1",
                             ),
                     ),
                     AttributeColumnMapping(
                         columnName = QifColumns.COL_PAYEE,
                         attributeTypeName = "santander-mandate",
-                        extraction = ColumnExtraction(pattern = "MANDATE NO\\s*(?<m>\\d+)", outputTemplate = "\${m}"),
+                        extraction = ColumnExtraction(pattern = "MANDATE NO\\s*(\\d+)", outputTemplate = "$1"),
                     ),
                     AttributeColumnMapping(
                         columnName = QifColumns.COL_PAYEE,
                         attributeTypeName = "santander-posted-date",
-                        extraction = ColumnExtraction(pattern = "\\bON\\s+(?<d>\\d{2}-\\d{2}-\\d{4})", outputTemplate = "\${d}"),
+                        extraction = ColumnExtraction(pattern = "\\bON\\s+(\\d{2}-\\d{2}-\\d{4})", outputTemplate = "$1"),
                     ),
                 )
         return CsvImportStrategy(
@@ -1970,18 +1969,7 @@ object DatabaseConfig {
         // currencies are seeded); the QIF import dialog pre-selects this and the user can change it.
         val qifCurrencyId = CurrencyId(currencyQueries.selectByCode("GBP").executeAsOne().id)
         for (strategy in builtInCsvStrategies(now, qifCurrencyId)) {
-            csvImportStrategyQueries.insert(
-                id = strategy.id.id.toString(),
-                name = strategy.name,
-                identification_columns_json = FieldMappingJsonCodec.encodeColumns(strategy.identificationColumns),
-                field_mappings_json = FieldMappingJsonCodec.encode(strategy.fieldMappings),
-                attribute_mappings_json = FieldMappingJsonCodec.encodeAttributeMappings(strategy.attributeMappings),
-                row_rules_json = FieldMappingJsonCodec.encodeRowRules(strategy.rowPreprocessingRules),
-                companion_rules_json = FieldMappingJsonCodec.encodeCompanionRules(strategy.companionTransactionRules),
-                content_match_rules_json = FieldMappingJsonCodec.encodeContentRules(strategy.contentMatchRules),
-                created_at = now.toEpochMilliseconds(),
-                updated_at = now.toEpochMilliseconds(),
-            )
+            csvImportStrategyQueries.insertStrategy(strategy, now)
             csvImportStrategyQueries.insertSource(
                 strategy_id = strategy.id.id.toString(),
                 revision_id = 1,

@@ -6,6 +6,7 @@ import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import app.cash.sqldelight.coroutines.mapToOneOrNull
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
+import com.moneymanager.database.insertStrategy
 import com.moneymanager.database.json.FieldMappingJsonCodec
 import com.moneymanager.domain.model.DeviceId
 import com.moneymanager.domain.model.Source
@@ -64,18 +65,7 @@ class CsvImportStrategyRepositoryImpl(
         withContext(coroutineContext) {
             val now = Clock.System.now()
             database.transaction {
-                queries.insert(
-                    id = strategy.id.id.toString(),
-                    name = strategy.name,
-                    identification_columns_json = FieldMappingJsonCodec.encodeColumns(strategy.identificationColumns),
-                    field_mappings_json = FieldMappingJsonCodec.encode(strategy.fieldMappings),
-                    attribute_mappings_json = FieldMappingJsonCodec.encodeAttributeMappings(strategy.attributeMappings),
-                    row_rules_json = FieldMappingJsonCodec.encodeRowRules(strategy.rowPreprocessingRules),
-                    companion_rules_json = FieldMappingJsonCodec.encodeCompanionRules(strategy.companionTransactionRules),
-                    content_match_rules_json = FieldMappingJsonCodec.encodeContentRules(strategy.contentMatchRules),
-                    created_at = now.toEpochMilliseconds(),
-                    updated_at = now.toEpochMilliseconds(),
-                )
+                queries.insertStrategy(strategy, now)
                 queries.insertSource(
                     strategy_id = strategy.id.id.toString(),
                     revision_id = 1,
