@@ -538,6 +538,7 @@ fun MoneyManagerApp(
                                     CsvStrategiesScreen(
                                         csvImportStrategyRepository = services.imports.csvImportStrategyRepository,
                                         csvImportRepository = services.imports.csvImportRepository,
+                                        qifImportRepository = services.imports.qifImportRepository,
                                         csvAccountMappingRepository = services.imports.csvAccountMappingRepository,
                                         accountRepository = services.accounts.accountRepository,
                                         categoryRepository = services.accounts.categoryRepository,
@@ -549,6 +550,9 @@ fun MoneyManagerApp(
                                         onBack = { navigationHistory.navigateBack() },
                                         onEditStrategy = { strategyId, importId ->
                                             navigationHistory.navigateTo(Screen.CsvStrategyEditor(importId, strategyId))
+                                        },
+                                        onEditQifStrategy = { strategyId, qifImportId ->
+                                            navigationHistory.navigateTo(Screen.QifStrategyEditor(qifImportId, strategyId))
                                         },
                                         onAuditHistoryClick = { strategy ->
                                             navigationHistory.navigateTo(
