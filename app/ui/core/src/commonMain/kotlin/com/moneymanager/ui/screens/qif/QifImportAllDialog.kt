@@ -18,7 +18,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AccountId
-import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.qif.QifImport
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
@@ -33,7 +32,6 @@ import com.moneymanager.domain.repository.SettingsRepository
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.qifimporter.bulkApplyQif
 import com.moneymanager.ui.components.AccountPicker
-import com.moneymanager.ui.components.CurrencyPicker
 import com.moneymanager.ui.components.LoadingTextButton
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -42,11 +40,11 @@ import kotlinx.coroutines.launch
 
 /**
  * Applies the matching QIF strategy to every unimported file in one go, using a single source account
- * and currency chosen here. The source account defaults to (and is remembered as) the last account
- * used for QIF imports. Payee accounts auto-create with their detected names.
+ * chosen here. The currency is taken from each file's auto-detected strategy (so there is no currency
+ * prompt). The source account defaults to (and is remembered as) the last account used for QIF imports.
+ * Payee accounts auto-create with their detected names.
  */
 @Composable
-// Shares the single-file QIF apply flow's source-account/currency selection by design.
 @Suppress("LongParameterList", "LongMethod", "DuplicatedCode")
 fun QifImportAllDialog(
     unimported: List<QifImport>,
@@ -71,7 +69,6 @@ fun QifImportAllDialog(
     val accounts by accountRepository.getAllAccounts().collectAsStateWithSchemaErrorHandling(emptyList())
 
     var sourceAccountId by remember { mutableStateOf<AccountId?>(null) }
-    var selectedCurrencyId by remember { mutableStateOf<CurrencyId?>(null) }
     var isImporting by remember { mutableStateOf(false) }
     var progress by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     var summary by remember { mutableStateOf<String?>(null) }
@@ -80,12 +77,6 @@ fun QifImportAllDialog(
         if (sourceAccountId == null) {
             val last = settingsRepository.getLastQifAccountId().first()
             if (last != null && accounts.any { it.id == last }) sourceAccountId = last
-        }
-    }
-    LaunchedEffect(currencies) {
-        if (selectedCurrencyId == null && currencies.isNotEmpty()) {
-            val defaultId = settingsRepository.getDefaultCurrencyId().first()
-            selectedCurrencyId = defaultId?.takeIf { id -> currencies.any { it.id == id } } ?: currencies.firstOrNull()?.id
         }
     }
 
@@ -109,15 +100,6 @@ fun QifImportAllDialog(
                         enabled = !isImporting,
                         isError = sourceAccountId == null,
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    CurrencyPicker(
-                        selectedCurrencyId = selectedCurrencyId,
-                        onCurrencySelected = { selectedCurrencyId = it },
-                        label = "Currency",
-                        currencyRepository = currencyRepository,
-                        enabled = !isImporting,
-                        isError = selectedCurrencyId == null,
-                    )
                     progress?.let { (done, total) ->
                         Spacer(modifier = Modifier.height(12.dp))
                         Text("Importing ${done.coerceAtMost(total)} of $total…", style = MaterialTheme.typography.bodySmall)
@@ -132,7 +114,6 @@ fun QifImportAllDialog(
                 LoadingTextButton(
                     onClick = {
                         val source = sourceAccountId ?: return@LoadingTextButton
-                        val currency = selectedCurrencyId ?: return@LoadingTextButton
                         isImporting = true
                         scope.launch {
                             try {
@@ -140,7 +121,6 @@ fun QifImportAllDialog(
                                     bulkApplyQif(
                                         imports = unimported,
                                         sourceAccountId = source,
-                                        currencyId = currency,
                                         strategies = strategies,
                                         currencies = currencies,
                                         csvAccountMappingRepository = csvAccountMappingRepository,
@@ -158,7 +138,7 @@ fun QifImportAllDialog(
                             }
                         }
                     },
-                    enabled = !isImporting && sourceAccountId != null && selectedCurrencyId != null,
+                    enabled = !isImporting && sourceAccountId != null,
                     loading = isImporting,
                     label = "Import ${unimported.size} files",
                 )

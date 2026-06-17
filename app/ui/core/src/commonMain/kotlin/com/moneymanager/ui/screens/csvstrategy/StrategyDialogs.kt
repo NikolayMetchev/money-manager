@@ -34,8 +34,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.moneymanager.domain.model.csv.CsvImport
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
+import com.moneymanager.domain.model.qif.QifImport
 import com.moneymanager.domain.repository.CsvImportRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
+import com.moneymanager.domain.repository.QifImportRepository
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.launch
@@ -248,6 +250,100 @@ fun SelectCsvImportDialog(
                                 )
                                 Text(
                                     text = "Imported ${HumanReadable.timeAgo(csvImport.importTimestamp)}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+    )
+}
+
+/**
+ * Dialog for selecting a QIF import to use as sample data when editing a QIF strategy. QIF strategies
+ * are CSV strategies over the fixed QIF columns, so they need QIF (not CSV) files as their sample data.
+ */
+@Composable
+fun SelectQifImportDialog(
+    qifImportRepository: QifImportRepository,
+    onQifSelected: (QifImport) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val imports by qifImportRepository
+        .getAllImports()
+        .collectAsStateWithSchemaErrorHandling(initial = emptyList())
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Select QIF File") },
+        text = {
+            if (imports.isEmpty()) {
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 100.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "No QIF files available",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Import a QIF file first to use as sample data",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 400.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(imports) { qifImport ->
+                        Card(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onQifSelected(qifImport) },
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                        ) {
+                            Column(
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp),
+                            ) {
+                                Text(
+                                    text = qifImport.originalFileName,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "${qifImport.recordCount} records",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                Text(
+                                    text = "Imported ${HumanReadable.timeAgo(qifImport.importTimestamp)}",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )

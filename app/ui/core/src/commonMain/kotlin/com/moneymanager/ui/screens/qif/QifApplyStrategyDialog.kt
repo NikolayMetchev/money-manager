@@ -49,6 +49,7 @@ import com.moneymanager.qifimporter.QifCsvAdapter
 import com.moneymanager.qifimporter.QifImportResult
 import com.moneymanager.qifimporter.buildMapper
 import com.moneymanager.qifimporter.runImport
+import com.moneymanager.qifimporter.selectForQifContent
 import com.moneymanager.qifimporter.withQifCurrency
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.CurrencyPicker
@@ -142,9 +143,11 @@ fun QifApplyStrategyDialog(
         }
     }
 
-    LaunchedEffect(qifStrategies) {
+    LaunchedEffect(qifStrategies, rows) {
         if (selectedStrategy == null) {
-            selectedStrategy = qifStrategies.firstOrNull()
+            // Auto-detect the bank strategy from the file's content (e.g. Santander), with the generic
+            // QIF strategy as the fallback. The user can still override via the selector below.
+            selectedStrategy = qifStrategies.selectForQifContent(rows, QifCsvAdapter.columns)
         }
     }
 

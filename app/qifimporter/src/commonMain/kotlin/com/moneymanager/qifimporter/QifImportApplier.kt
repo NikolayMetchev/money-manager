@@ -16,6 +16,7 @@ import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.domain.model.csv.CsvColumn
 import com.moneymanager.domain.model.csv.CsvRow
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.model.csvstrategy.CsvAccountMapping
@@ -32,8 +33,13 @@ import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.DedupePolicy
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importengineapi.ImportOwnershipIntent
+import com.moneymanager.importengineapi.ImportPersonIntent
 import com.moneymanager.importengineapi.ImportRowKey
 import com.moneymanager.importengineapi.ImportTransfer
+import com.moneymanager.importengineapi.LocalPersonKey
+import com.moneymanager.importengineapi.PersonMatchKey
+import com.moneymanager.importengineapi.normalizeNameKey
 import kotlinx.coroutines.flow.first
 import org.lighthousegames.logging.logging
 import kotlin.time.Clock
@@ -59,16 +65,61 @@ fun List<CsvImportStrategy>.qifCompatible(): List<CsvImportStrategy> {
     return filter { it.identificationColumns.isNotEmpty() && it.identificationColumns.all { col -> col in qifHeaders } }
 }
 
+/** Number of leading rows sampled when content-matching a QIF file against a strategy. */
+private const val QIF_CONTENT_SAMPLE_SIZE = 50
+
 /**
- * Applies the matching QIF strategy to every [imports] file using a single [sourceAccountId] and
- * [currencyId]. Payee/counterparty accounts are auto-created with their detected names (no per-file
- * confirmation). Refreshes materialized views once at the end. Reports progress via [onProgress].
+ * Picks the QIF strategy whose [CsvImportStrategy.contentMatchRules] best fit the given [rows], so a
+ * bank-specific strategy is auto-detected from the data (QIF's fixed columns can't distinguish banks).
+ * A strategy with no content rules acts as the fallback: when nothing positively matches, the
+ * rule-less strategy is returned. Ties are broken deterministically by score, then name, then id.
+ * Returns null only when the receiver is empty.
+ */
+fun List<CsvImportStrategy>.selectForQifContent(
+    rows: List<CsvRow>,
+    columns: List<CsvColumn>,
+): CsvImportStrategy? {
+    if (isEmpty()) return null
+    val indexByName = columns.associate { it.originalName to it.columnIndex }
+    val sample = rows.take(QIF_CONTENT_SAMPLE_SIZE)
+
+    fun CsvImportStrategy.contentScore(): Int {
+        if (contentMatchRules.isEmpty()) return 0
+        val compiled = contentMatchRules.map { it.columnName to Regex(it.pattern, RegexOption.IGNORE_CASE) }
+        return sample.count { row ->
+            compiled.any { (columnName, regex) ->
+                val idx = indexByName[columnName] ?: return@any false
+                row.values.getOrNull(idx)?.let { regex.containsMatchIn(it) } == true
+            }
+        }
+    }
+
+    val byScore =
+        compareByDescending<Pair<CsvImportStrategy, Int>> { it.second }
+            .thenBy { it.first.name }
+            .thenBy { it.first.id.toString() }
+    val best =
+        map { it to it.contentScore() }
+            .filter { it.second > 0 }
+            .minWithOrNull(byScore)
+    if (best != null) return best.first
+
+    return filter { it.contentMatchRules.isEmpty() }
+        .minWithOrNull(compareBy({ it.name }, { it.id.toString() }))
+        ?: first()
+}
+
+/**
+ * Applies the matching QIF strategy to every [imports] file using a single [sourceAccountId]. The
+ * currency comes from each file's auto-detected strategy (QIF data has none, so the strategy's
+ * configured currency is authoritative), so there is no per-import currency prompt. Payee/counterparty
+ * accounts are auto-created with their detected names (no per-file confirmation). Refreshes
+ * materialized views once at the end. Reports progress via [onProgress].
  */
 @Suppress("LongParameterList")
 suspend fun bulkApplyQif(
     imports: List<QifImport>,
     sourceAccountId: AccountId,
-    currencyId: CurrencyId,
     strategies: List<CsvImportStrategy>,
     currencies: List<Currency>,
     csvAccountMappingRepository: CsvAccountMappingRepository,
@@ -88,18 +139,21 @@ suspend fun bulkApplyQif(
 
     imports.forEachIndexed { index, qifImport ->
         onProgress(index, imports.size)
-        val matched = qifStrategies.firstOrNull()
-        if (matched == null) {
-            skippedNoStrategy++
-            return@forEachIndexed
-        }
         try {
             val count = qifImportRepository.countRecords(qifImport.id)
             val records = qifImportRepository.getImportRecords(qifImport.id, count.coerceAtLeast(1), 0)
             val rows = QifCsvAdapter.toRows(records)
             if (rows.isEmpty()) return@forEachIndexed
 
-            val strategy = matched.withQifCurrency(currencyId)
+            // Auto-detect the bank strategy from the file's content (Santander vs the generic fallback).
+            val matched = qifStrategies.selectForQifContent(rows, QifCsvAdapter.columns)
+            if (matched == null) {
+                skippedNoStrategy++
+                return@forEachIndexed
+            }
+
+            // The strategy's own (configured) currency is used — no per-import override.
+            val strategy = matched
             // Re-fetch accounts so payee accounts created by earlier files are seen.
             val accounts = accountRepository.getAllAccounts().first()
             val mappings = csvAccountMappingRepository.getMappingsForStrategy(matched.id).first()
@@ -286,10 +340,46 @@ suspend fun runImport(
                 attributes = attributesFor(row.attributes),
             )
         }
+    // Personal counterparties (resolved via person-flagged strategy rules) become People with an
+    // ownership link to their counterparty account, in addition to the account itself. The engine
+    // dedups people by name key and ownerships by (person, account), so repeats across rows/files and
+    // re-imports collapse.
+    val accountIdByName = latestAccounts.associate { it.name to it.id }
+    // The first QIF record that referenced each personal counterparty, so the person's audit source
+    // links back to the exact originating row (the engine writes ImportPersonIntent.source verbatim).
+    val firstRecordByPersonName =
+        finalPrep.validTransfers
+            .mapNotNull { row -> row.personalCounterpartyName?.takeIf(String::isNotBlank)?.let { it to row.rowIndex } }
+            .groupBy({ it.first }, { it.second })
+            .mapValues { (_, indexes) -> indexes.min() }
+    val personAccounts =
+        firstRecordByPersonName.keys
+            .mapNotNull { name -> accountIdByName[name]?.let { name to it } }
+    val peopleToCreate =
+        personAccounts.map { (name, _) ->
+            val parts = name.trim().split(Regex("\\s+"))
+            ImportPersonIntent(
+                key = LocalPersonKey(name),
+                match = PersonMatchKey.ByNameKey(normalizeNameKey(name)),
+                firstName = parts.first(),
+                lastName = parts.drop(1).joinToString(" ").ifBlank { null },
+                source = Source.Qif(qifImport.id, firstRecordByPersonName[name]),
+            )
+        }
+    val ownerships =
+        personAccounts.map { (name, accountId) ->
+            ImportOwnershipIntent(
+                personKey = LocalPersonKey(name),
+                account = AccountRef.Existing(accountId),
+                source = Source.Qif(qifImport.id, firstRecordByPersonName[name]),
+            )
+        }
     val batch =
         ImportBatch(
             transfers = importTransfers,
             dedupePolicy = DedupePolicy.FuzzyAllFields(),
+            peopleToCreate = peopleToCreate,
+            ownerships = ownerships,
         )
     val importResult = importEngine.import(batch)
 

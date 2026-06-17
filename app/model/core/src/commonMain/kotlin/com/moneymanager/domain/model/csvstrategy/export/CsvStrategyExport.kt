@@ -2,7 +2,9 @@ package com.moneymanager.domain.model.csvstrategy.export
 
 import com.moneymanager.domain.model.csvstrategy.AmountMode
 import com.moneymanager.domain.model.csvstrategy.AttributeColumnMapping
+import com.moneymanager.domain.model.csvstrategy.ColumnExtraction
 import com.moneymanager.domain.model.csvstrategy.CompanionTransactionRule
+import com.moneymanager.domain.model.csvstrategy.ContentMatchRule
 import com.moneymanager.domain.model.csvstrategy.RegexRule
 import com.moneymanager.domain.model.csvstrategy.RowCondition
 import com.moneymanager.domain.model.csvstrategy.RowPreprocessingRule
@@ -32,6 +34,7 @@ data class CsvStrategyExport(
     val accountMappings: List<CsvAccountMappingExport> = emptyList(),
     val rowPreprocessingRules: List<RowPreprocessingRule> = emptyList(),
     val companionTransactionRules: List<CompanionTransactionRule> = emptyList(),
+    val contentMatchRules: List<ContentMatchRule> = emptyList(),
 )
 
 /**
@@ -143,6 +146,7 @@ data class DirectColumnExport(
     override val fieldType: TransferField,
     val columnName: String,
     val fallbackColumns: List<String> = emptyList(),
+    val extraction: ColumnExtraction? = null,
 ) : FieldMappingExport
 
 /**

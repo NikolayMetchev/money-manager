@@ -49,6 +49,7 @@ import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.csv.CsvImportId
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategy
 import com.moneymanager.domain.model.csvstrategy.CsvImportStrategyId
+import com.moneymanager.domain.model.qif.QifImportId
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CsvAccountMappingRepository
@@ -57,6 +58,8 @@ import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
+import com.moneymanager.domain.repository.QifImportRepository
+import com.moneymanager.qifimporter.QifCsvAdapter
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -66,6 +69,7 @@ import nl.jacobras.humanreadable.HumanReadable
 fun CsvStrategiesScreen(
     csvImportStrategyRepository: CsvImportStrategyRepository,
     csvImportRepository: CsvImportRepository,
+    qifImportRepository: QifImportRepository,
     csvAccountMappingRepository: CsvAccountMappingRepository,
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
@@ -77,15 +81,17 @@ fun CsvStrategiesScreen(
     onStrategyClick: (CsvImportStrategy) -> Unit = {},
     onBack: () -> Unit = {},
     onEditStrategy: (CsvImportStrategyId, CsvImportId) -> Unit = { _, _ -> },
+    onEditQifStrategy: (CsvImportStrategyId, QifImportId) -> Unit = { _, _ -> },
     onAuditHistoryClick: (CsvImportStrategy) -> Unit = {},
 ) {
     val strategies by csvImportStrategyRepository
         .getAllStrategies()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
 
-    // Edit flow state: pick a CSV to edit the strategy against, then navigate to the editor screen.
+    // Edit flow state: pick a sample file to edit the strategy against, then navigate to the editor.
+    // QIF strategies (columns are the fixed QIF fields) need a QIF file as sample data, not a CSV one.
     var strategyToEdit by remember { mutableStateOf<CsvImportStrategy?>(null) }
-    var showSelectCsvDialog by remember { mutableStateOf(false) }
+    var showSelectFileDialog by remember { mutableStateOf(false) }
 
     // Export state
     var strategyPendingExportPrompt by remember { mutableStateOf<CsvImportStrategy?>(null) }
@@ -253,7 +259,7 @@ fun CsvStrategiesScreen(
                                 onEditClick = {
                                     onStrategyClick(strategy)
                                     strategyToEdit = strategy
-                                    showSelectCsvDialog = true
+                                    showSelectFileDialog = true
                                 },
                                 onExportClick = {
                                     strategyPendingExportPrompt = strategy
@@ -288,21 +294,34 @@ fun CsvStrategiesScreen(
         )
     }
 
-    // Show CSV import selector dialog, then navigate to the editor screen for the chosen CSV.
+    // Show the sample-file selector, then navigate to the editor. QIF strategies (whose identification
+    // columns are exactly the fixed QIF fields) pick a QIF file and route to the QIF editor; all other
+    // strategies pick a CSV file.
     val editingStrategy = strategyToEdit
-    if (showSelectCsvDialog && editingStrategy != null) {
-        SelectCsvImportDialog(
-            csvImportRepository = csvImportRepository,
-            onCsvSelected = { csvImport ->
-                showSelectCsvDialog = false
-                strategyToEdit = null
-                onEditStrategy(editingStrategy.id, csvImport.id)
-            },
-            onDismiss = {
-                showSelectCsvDialog = false
-                strategyToEdit = null
-            },
-        )
+    if (showSelectFileDialog && editingStrategy != null) {
+        val dismiss = {
+            showSelectFileDialog = false
+            strategyToEdit = null
+        }
+        if (editingStrategy.isQifStrategy()) {
+            SelectQifImportDialog(
+                qifImportRepository = qifImportRepository,
+                onQifSelected = { qifImport ->
+                    dismiss()
+                    onEditQifStrategy(editingStrategy.id, qifImport.id)
+                },
+                onDismiss = dismiss,
+            )
+        } else {
+            SelectCsvImportDialog(
+                csvImportRepository = csvImportRepository,
+                onCsvSelected = { csvImport ->
+                    dismiss()
+                    onEditStrategy(editingStrategy.id, csvImport.id)
+                },
+                onDismiss = dismiss,
+            )
+        }
     }
 
     // Show import dialog when a strategy file has been parsed
@@ -419,3 +438,10 @@ fun CsvStrategyCard(
         )
     }
 }
+
+/**
+ * A QIF strategy is a CSV strategy whose identification columns are (a non-empty subset of) the fixed
+ * QIF fields, so it is edited against a QIF file rather than a CSV one.
+ */
+private fun CsvImportStrategy.isQifStrategy(): Boolean =
+    identificationColumns.isNotEmpty() && identificationColumns.all { it in QifCsvAdapter.headers }
