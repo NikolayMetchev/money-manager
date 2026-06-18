@@ -56,3 +56,10 @@ kotlin {
         }
     }
 }
+
+// The round-trip tests shared via commonTest use the DB test helper, which on Android needs
+// androidx.test.InstrumentationRegistry (a device). They already run via jvmTest and androidDeviceTest,
+// so skip the host-test run here (mirrors app/db/core).
+tasks.matching { it.name == "testAndroidHostTest" }.configureEach {
+    enabled = false
+}
