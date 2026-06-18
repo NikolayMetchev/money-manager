@@ -3,8 +3,7 @@ package com.moneymanager.di
 import com.moneymanager.database.DatabaseManager
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.localsettings.LocalSettings
-import com.moneymanager.remotestorage.RemoteStorageProviderFactory
-import com.moneymanager.remotestorage.sync.RemoteDatabaseSyncService
+import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import dev.zacsweers.metro.DependencyGraph
 import dev.zacsweers.metro.Provides
 
@@ -13,8 +12,7 @@ interface AppComponent {
     val databaseManager: DatabaseManager
     val appVersion: AppVersion
     val localSettings: LocalSettings
-    val remoteDatabaseSyncService: RemoteDatabaseSyncService
-    val remoteStorageProviderFactory: RemoteStorageProviderFactory
+    val remoteDatabaseController: RemoteDatabaseController
 
     @DependencyGraph.Factory
     interface Factory {

@@ -16,7 +16,6 @@ import com.moneymanager.di.AppComponent
 import com.moneymanager.di.AppComponentParams
 import com.moneymanager.di.database.DatabaseComponent
 import com.moneymanager.di.database.toApplication
-import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.ui.AppStartupHost
 import com.moneymanager.ui.components.DatabaseStartupProgressScreen
 import com.moneymanager.ui.error.GlobalSchemaErrorState
@@ -79,10 +78,7 @@ private fun MainWindow(onExit: () -> Unit) {
     val databaseManager = component.databaseManager
     val appVersion = component.appVersion
     val localSettings = component.localSettings
-    val remoteController =
-        remember {
-            RemoteDatabaseController(component.remoteDatabaseSyncService, component.remoteStorageProviderFactory)
-        }
+    val remoteController = component.remoteDatabaseController
     // The currently open database, tracked so we can push it and clean up on app close.
     val openDatabase = remember { arrayOfNulls<MoneyManagerDatabaseWrapper>(1) }
     val scope = rememberCoroutineScope()

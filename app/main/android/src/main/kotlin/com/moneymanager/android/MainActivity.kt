@@ -88,8 +88,7 @@ class MainActivity : ComponentActivity() {
 
         val params = AppComponentParams(context = applicationContext)
         val component: AppComponent = AppComponent.create(params)
-        val controller =
-            RemoteDatabaseController(component.remoteDatabaseSyncService, component.remoteStorageProviderFactory)
+        val controller = component.remoteDatabaseController
         remoteController = controller
 
         setContent {
