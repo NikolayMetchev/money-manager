@@ -61,6 +61,7 @@ class ImportEngineImpl(
     override suspend fun import(
         batch: ImportBatch,
         onProgress: (suspend (ImportProgress) -> Unit)?,
+        batchSize: Int,
     ): ImportResult {
         onProgress?.invoke(ImportProgress("Resolving accounts"))
         val accountResolution = resolveAccounts(batch)
@@ -97,8 +98,8 @@ class ImportEngineImpl(
         val duplicates = classified.count { it.status == ImportStatus.DUPLICATE }
         val excluded = resolvedTransfers.count { it.excludedFromBalances }
 
-        onProgress?.invoke(ImportProgress("Importing transactions"))
-        val createdIds = writeTransfers(toImport, toUpdate)
+        onProgress?.invoke(ImportProgress("Importing transactions", fraction = 0f, processed = 0, total = toImport.size))
+        val createdIds = writeTransfers(toImport, toUpdate, batchSize, onProgress)
 
         val createdTransferIds = toImport.zip(createdIds).associate { (classified, id) -> classified.transfer.rowKey to id }
 
@@ -389,7 +390,7 @@ class ImportEngineImpl(
                     Person(
                         id = PersonId(0),
                         firstName = intent.firstName,
-                        middleName = null,
+                        middleName = intent.middleName,
                         lastName = intent.lastName,
                     ),
                     intent.source,
@@ -524,26 +525,92 @@ class ImportEngineImpl(
     }
 
     /**
-     * Creates the IMPORTED transfers and applies the UPDATED ones in a SINGLE database transaction
-     * (one bulk-insert transaction). Returns the created ids, aligned to [toImport] order.
+     * Creates the IMPORTED transfers and applies the UPDATED ones. [batchSize] transfers are written per
+     * database transaction: the default ([Int.MAX_VALUE]) writes everything (creates + updates) in one
+     * transaction — the historical behaviour — while a smaller value chunks the creates across several
+     * transactions and reports per-chunk progress, so a huge batch (e.g. sample-data generation) doesn't
+     * freeze on one giant transaction. Updates ride with the final create chunk, so the single-chunk case
+     * still applies creates and updates atomically together. Returns the created ids, aligned to
+     * [toImport] order.
      */
     private suspend fun writeTransfers(
         toImport: List<Classified>,
         toUpdate: List<Classified>,
+        batchSize: Int,
+        onProgress: (suspend (ImportProgress) -> Unit)?,
     ): List<TransferId> {
         if (toImport.isEmpty() && toUpdate.isEmpty()) return emptyList()
 
+        val chunks = toImport.chunked(batchSize.coerceAtLeast(1))
+        if (chunks.isEmpty()) {
+            // No creates, only updates: apply them in their own transaction.
+            val (updates, updateSources) = buildUpdates(toUpdate)
+            transactionRepository.importTransfers(
+                transfers = emptyList(),
+                newAttributes = emptyMap(),
+                newRelationships = emptyMap(),
+                sources = emptyList(),
+                updates = updates,
+                updateSources = updateSources,
+            )
+            return emptyList()
+        }
+
+        val total = toImport.size
+        val createdIds = mutableListOf<TransferId>()
+        var written = 0
+        chunks.forEachIndexed { index, chunk ->
+            val payload = buildCreatePayload(chunk)
+            // Updates ride with the final create chunk (one transaction in the common single-chunk case).
+            val (updates, updateSources) =
+                if (index == chunks.lastIndex) buildUpdates(toUpdate) else emptyList<TransferUpdate>() to emptyList()
+            val allCreatedIds =
+                transactionRepository.importTransfers(
+                    transfers = payload.transfers,
+                    newAttributes = payload.newAttributes,
+                    newRelationships = payload.newRelationships,
+                    sources = payload.sources,
+                    updates = updates,
+                    updateSources = updateSources,
+                )
+            // Keep only the main transfers' ids (fee transfers are interleaved), aligned to [toImport].
+            createdIds += payload.mainResultIndices.map { allCreatedIds[it] }
+            written += chunk.size
+            onProgress?.invoke(
+                ImportProgress(
+                    detail = "Importing transactions",
+                    fraction = written.toFloat() / total,
+                    processed = written,
+                    total = total,
+                ),
+            )
+        }
+        require(toImport.size == createdIds.size)
+        return createdIds
+    }
+
+    /** The transfers (with fees expanded), attributes, relationships and sources to create for one chunk. */
+    private class CreatePayload(
+        val transfers: List<Transfer>,
+        val newAttributes: Map<TransferId, List<NewAttribute>>,
+        val newRelationships: Map<TransferId, List<NewRelationship>>,
+        val sources: List<Source>,
+        // Indices into [transfers] of each main transfer, so callers map results back to chunk order.
+        val mainResultIndices: List<Int>,
+    )
+
+    private fun buildCreatePayload(chunk: List<Classified>): CreatePayload {
         // Assign negative temp ids so newAttributes/newRelationships can be keyed before real ids exist.
         // A main transfer carrying a fee expands into two transfers (main + fee) created in this same
-        // batch; the fee is linked to the main via a `fee` relationship resolved by the repository's
-        // in-batch id map. We track each main's position so only main ids are returned, aligned to toImport.
+        // chunk; the fee is linked to the main via a `fee` relationship resolved by the repository's
+        // in-batch id map (which is per importTransfers call, so a main and its fee must stay together).
         val transfersToCreate = mutableListOf<Transfer>()
         val newAttributes = mutableMapOf<TransferId, List<NewAttribute>>()
         val newRelationships = mutableMapOf<TransferId, List<NewRelationship>>()
         val orderedSources = mutableListOf<Source>()
         val mainResultIndices = mutableListOf<Int>()
         var tempCounter = 0
-        toImport.forEach { classified ->
+        chunk.forEach { classified ->
             val t = classified.transfer
             val mainTempId = TransferId(-(++tempCounter).toLong())
             val fee = t.fee
@@ -582,7 +649,10 @@ class ImportEngineImpl(
                 orderedSources += t.source.forRow(fee.rowKey ?: t.rowKey)
             }
         }
+        return CreatePayload(transfersToCreate, newAttributes, newRelationships, orderedSources, mainResultIndices)
+    }
 
+    private fun buildUpdates(toUpdate: List<Classified>): Pair<List<TransferUpdate>, List<Source>> {
         val updates = mutableListOf<TransferUpdate>()
         val orderedUpdateSources = mutableListOf<Source>()
         for (classified in toUpdate) {
@@ -603,20 +673,7 @@ class ImportEngineImpl(
                 )
             orderedUpdateSources += t.source.forRow(t.rowKey)
         }
-
-        val allCreatedIds =
-            transactionRepository.importTransfers(
-                transfers = transfersToCreate,
-                newAttributes = newAttributes,
-                newRelationships = newRelationships,
-                sources = orderedSources,
-                updates = updates,
-                updateSources = orderedUpdateSources,
-            )
-        // Return only the main transfers' ids (fee transfers are interleaved), aligned to [toImport].
-        val createdIds = mainResultIndices.map { allCreatedIds[it] }
-        require(toImport.size == createdIds.size)
-        return createdIds
+        return updates to orderedUpdateSources
     }
 
     // endregion

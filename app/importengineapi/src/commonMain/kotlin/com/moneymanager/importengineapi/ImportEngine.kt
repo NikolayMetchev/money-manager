@@ -12,8 +12,16 @@ package com.moneymanager.importengineapi
  * ([com.moneymanager.importer.ImportEngineImpl]) happens exclusively in the DI module.
  */
 interface ImportEngine {
+    /**
+     * @param batchSize How many transfers to write per database transaction. The default writes the
+     *   whole batch in a single transaction (the behaviour all importers relied on historically). Large
+     *   producers (e.g. the sample-data generator, which creates hundreds of thousands of transfers) pass
+     *   a smaller value so the write is chunked into several transactions and [onProgress] reports
+     *   fine-grained progress instead of freezing on one giant transaction.
+     */
     suspend fun import(
         batch: ImportBatch,
         onProgress: (suspend (ImportProgress) -> Unit)? = null,
+        batchSize: Int = Int.MAX_VALUE,
     ): ImportResult
 }
