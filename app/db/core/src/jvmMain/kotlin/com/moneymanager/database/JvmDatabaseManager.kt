@@ -113,6 +113,16 @@ class JvmDatabaseManager : DatabaseManager {
             }
         }
 
+    override suspend fun databaseSizeBytes(location: DbLocation): Long? =
+        withContext(Dispatchers.IO) {
+            if (!location.path.exists()) {
+                null
+            } else {
+                val sidecars = listOf("${location.path}-wal", "${location.path}-shm").map { Paths.get(it) }
+                Files.size(location.path) + sidecars.sumOf { if (it.exists()) Files.size(it) else 0L }
+            }
+        }
+
     override suspend fun snapshot(database: MoneyManagerDatabaseWrapper): ByteArray =
         withContext(Dispatchers.IO) {
             // VACUUM INTO requires the target file to not already exist.

@@ -101,6 +101,16 @@ class RemoteDatabaseController(
         syncService.push(current.provider, current.binding, database, current.password)
     }
 
+    /** On-disk size in bytes of the local working copy at [location] (incl. WAL/SHM), or null. */
+    suspend fun localDatabaseSize(location: DbLocation): Long? = syncService.localDatabaseSize(location)
+
+    /** Size in bytes of the bound (compressed + encrypted) remote archive, or null if not bound/found. */
+    suspend fun remoteArchiveSize(): Long? {
+        val binding = syncService.activeBinding() ?: return null
+        val provider = resolve(binding.providerId, binding.providerConfig)
+        return provider.stat(binding.remoteFileId)?.sizeBytes
+    }
+
     /** Detaches the active database from remote storage (keeps the local working copy). */
     fun unbind() {
         syncService.clearBinding()

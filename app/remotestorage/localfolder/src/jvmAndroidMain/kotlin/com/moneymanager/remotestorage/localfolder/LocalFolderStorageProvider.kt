@@ -51,6 +51,11 @@ class LocalFolderStorageProvider(
             rootDir.listFiles()?.filter { it.isFile }?.map { it.toRemoteFile() } ?: emptyList()
         }
 
+    override suspend fun stat(fileId: String): RemoteFile? =
+        withContext(Dispatchers.IO) {
+            File(rootDir, fileId).takeIf { it.isFile }?.toRemoteFile()
+        }
+
     override suspend fun download(fileId: String): ByteArray =
         withContext(Dispatchers.IO) {
             val file = File(rootDir, fileId)
@@ -58,7 +63,11 @@ class LocalFolderStorageProvider(
             file.readBytes()
         }
 
-    override suspend fun upload(fileId: String?, name: String, bytes: ByteArray): RemoteFile =
+    override suspend fun upload(
+        fileId: String?,
+        name: String,
+        bytes: ByteArray,
+    ): RemoteFile =
         withContext(Dispatchers.IO) {
             rootDir.mkdirs()
             val target = File(rootDir, fileId ?: name)

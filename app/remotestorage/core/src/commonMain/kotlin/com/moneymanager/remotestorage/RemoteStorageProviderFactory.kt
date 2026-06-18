@@ -23,5 +23,8 @@ interface RemoteStorageProviderFactory {
      *
      * @throws IllegalArgumentException if [providerId] is unknown to this build
      */
-    fun create(providerId: String, config: String?): RemoteStorageProvider
+    fun create(
+        providerId: String,
+        config: String?,
+    ): RemoteStorageProvider
 }

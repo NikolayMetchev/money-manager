@@ -128,6 +128,17 @@ class AndroidDatabaseManager(
             context.deleteDatabase(location.name)
         }
 
+    override suspend fun databaseSizeBytes(location: DbLocation): Long? =
+        withContext(Dispatchers.IO) {
+            val dbFile = context.getDatabasePath(location.name)
+            if (!dbFile.exists()) {
+                null
+            } else {
+                // File.length() is 0 for absent sidecars, so no existence guard is needed.
+                dbFile.length() + File("${dbFile.path}-wal").length() + File("${dbFile.path}-shm").length()
+            }
+        }
+
     override suspend fun snapshot(database: MoneyManagerDatabaseWrapper): ByteArray =
         withContext(Dispatchers.IO) {
             // VACUUM INTO requires the target file to not already exist.

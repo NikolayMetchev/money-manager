@@ -13,6 +13,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -29,6 +30,7 @@ import com.moneymanager.remotestorage.sync.RemoteDatabaseBinding
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.launch
+import nl.jacobras.humanreadable.HumanReadable
 
 /**
  * Settings card for backing the active database with a remote-storage provider (issue #86): create a
@@ -50,6 +52,14 @@ fun CloudStorageCard(
     var createType by remember { mutableStateOf<RemoteStorageType?>(null) }
     var openType by remember { mutableStateOf<RemoteStorageType?>(null) }
     var showResume by remember { mutableStateOf(false) }
+
+    var refreshTick by remember { mutableStateOf(0) }
+    var localSize by remember { mutableStateOf<Long?>(null) }
+    var remoteSize by remember { mutableStateOf<Long?>(null) }
+    LaunchedEffect(binding, sessionActive, refreshTick) {
+        localSize = runCatching { controller.localDatabaseSize(currentDatabaseLocation) }.getOrNull()
+        remoteSize = if (binding != null) runCatching { controller.remoteArchiveSize() }.getOrNull() else null
+    }
 
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -86,8 +96,10 @@ fun CloudStorageCard(
                         busy = true
                         scope.launch {
                             runCatching { controller.syncNow(database) }
-                                .onSuccess { message = "Synced to ${currentBinding.remoteName}" }
-                                .onFailure { message = "Sync failed: ${it.message}" }
+                                .onSuccess {
+                                    message = "Synced to ${currentBinding.remoteName}"
+                                    refreshTick++
+                                }.onFailure { message = "Sync failed: ${it.message}" }
                             busy = false
                         }
                     },
@@ -100,6 +112,8 @@ fun CloudStorageCard(
                     },
                 )
             }
+
+            StorageSizes(localSize = localSize, remoteSize = remoteSize)
 
             message?.let { Text(text = it, style = MaterialTheme.typography.bodySmall) }
         }
@@ -162,6 +176,19 @@ fun CloudStorageCard(
                 }
             },
         )
+    }
+}
+
+@Composable
+private fun StorageSizes(
+    localSize: Long?,
+    remoteSize: Long?,
+) {
+    if (localSize == null && remoteSize == null) return
+    localSize?.let { Text("Local database: ${HumanReadable.fileSize(it)}", style = MaterialTheme.typography.bodySmall) }
+    remoteSize?.let { remote ->
+        val ratio = localSize?.takeIf { it > 0 }?.let { " (${remote * 100 / it}% of local)" } ?: ""
+        Text("Remote, compressed: ${HumanReadable.fileSize(remote)}$ratio", style = MaterialTheme.typography.bodySmall)
     }
 }
 

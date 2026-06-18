@@ -54,6 +54,9 @@ class RemoteDatabaseSyncService(
     /** Persists [binding] as the active remote-backed database (used after an open-from-remote flow). */
     fun bind(binding: RemoteDatabaseBinding) = bindingStore.save(binding)
 
+    /** On-disk size of the working copy at [location] (incl. WAL/SHM), or null if absent. */
+    suspend fun localDatabaseSize(location: DbLocation): Long? = databaseManager.databaseSizeBytes(location)
+
     /**
      * Returns true if [password] correctly decrypts the remote archive for [binding] (downloads and
      * attempts to unpack it, without touching the local copy). Used to safely resume a session before

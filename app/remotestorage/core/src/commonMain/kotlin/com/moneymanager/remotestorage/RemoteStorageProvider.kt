@@ -35,6 +35,12 @@ interface RemoteStorageProvider {
     /** Lists the database archives this app has stored in the provider. */
     suspend fun list(): List<RemoteFile>
 
+    /**
+     * Returns the descriptor (including [RemoteFile.sizeBytes]) for [fileId], or null if it's absent.
+     * The default scans [list]; providers should override when a cheaper direct lookup exists.
+     */
+    suspend fun stat(fileId: String): RemoteFile? = list().firstOrNull { it.id == fileId }
+
     /** Downloads the raw archive bytes for [fileId]. */
     suspend fun download(fileId: String): ByteArray
 

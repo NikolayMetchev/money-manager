@@ -74,6 +74,13 @@ interface DatabaseManager {
     suspend fun snapshot(database: MoneyManagerDatabaseWrapper): ByteArray
 
     /**
+     * Returns the on-disk size in bytes of the database at [location] (including the WAL/SHM
+     * sidecars), or null if it doesn't exist. Used to show how much data is stored locally versus the
+     * compressed remote copy.
+     */
+    suspend fun databaseSizeBytes(location: DbLocation): Long?
+
+    /**
      * Overwrites the database file at [location] with [bytes] (a snapshot produced by [snapshot]),
      * removing any stale WAL/SHM sidecars first.
      *
