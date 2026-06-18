@@ -19,7 +19,10 @@ kotlin {
         jvmMain {
             dependencies {
                 api(libs.androidx.compose.runtime.desktop)
+
                 implementation(libs.kotlinx.coroutines.core)
+                implementation(projects.utils.localsettings)
+
                 runtimeOnly(libs.kotlinx.coroutines.swing)
             }
         }
@@ -37,6 +40,7 @@ kotlin {
         val androidDeviceTest by getting {
             dependencies {
                 implementation(kotlin("test"))
+
                 runtimeOnly(libs.androidx.test.runner)
             }
         }

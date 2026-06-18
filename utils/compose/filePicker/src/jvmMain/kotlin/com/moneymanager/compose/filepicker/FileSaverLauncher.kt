@@ -2,6 +2,7 @@
 
 package com.moneymanager.compose.filepicker
 
+import com.moneymanager.localsettings.KEY_LAST_DIRECTORY
 import java.awt.FileDialog
 import java.awt.Frame
 import java.io.File
@@ -27,7 +28,7 @@ actual class FileSaverLauncher(
             fileDialog.file = fileName
 
             // Open in the directory of the previous selection
-            LastDirectoryStore.load()?.let { fileDialog.directory = it }
+            localSettings.getString(KEY_LAST_DIRECTORY)?.let { fileDialog.directory = it }
 
             // Set file filter based on mime type
             val extension = mimeTypeToExtension(mimeType)
@@ -43,7 +44,7 @@ actual class FileSaverLauncher(
             val file = fileDialog.file
 
             if (directory != null && file != null) {
-                LastDirectoryStore.save(directory)
+                localSettings.putString(KEY_LAST_DIRECTORY, directory)
                 val targetFile = File(directory, file)
                 val result = writeFileContent(targetFile, content)
                 onResult(result)

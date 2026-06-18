@@ -12,6 +12,7 @@ kotlin {
                 api(projects.app.importengineapi)
                 api(projects.app.importer)
                 api(projects.app.model.core)
+                api(projects.utils.localsettings)
             }
         }
 
@@ -21,6 +22,7 @@ kotlin {
                 api(projects.app.db.core)
                 api(projects.app.importengineapi)
                 api(projects.app.model.core)
+                api(projects.utils.localsettings)
 
                 implementation(projects.app.importer)
             }

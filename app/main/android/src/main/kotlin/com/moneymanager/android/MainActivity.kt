@@ -45,6 +45,7 @@ class MainActivity : ComponentActivity() {
             AppStartupHost(
                 databaseManager = component.databaseManager,
                 appVersion = component.appVersion,
+                localSettings = component.localSettings,
                 createAppServices = { database ->
                     DatabaseComponent.create(database).toApplication().toAppServices()
                 },

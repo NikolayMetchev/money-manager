@@ -95,6 +95,7 @@ internal object MoneyManagerTestApp {
                     appVersion = appVersion,
                     databaseLocation = state.location,
                     services = dc.toApplication().toAppServices(),
+                    onRequestSwitchDatabase = {},
                 )
             }
             is TestDatabaseState.Loading -> {

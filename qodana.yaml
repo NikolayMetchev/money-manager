@@ -66,7 +66,9 @@ exclude:
       # Provenance test helpers: used cross-module (app/db/core tests), which Qodana misses here.
       - test/app/db/src/commonMain/kotlin/com/moneymanager/test/database/TestProvenance.kt
       - utils/compose/scrollbar/src/jvmMain/kotlin/com/moneymanager/compose/scrollbar/PlatformScrollbar.kt
-      - app/ui/core/src/jvmMain/kotlin/com/moneymanager/ui/DatabaseSelectionDialog.kt
+      # Platform-specific implementations referenced only via DI / expect-actual, which Qodana misses here.
+      - utils/localsettings/src/androidMain/kotlin/com/moneymanager/localsettings/AndroidLocalSettings.kt
+      - app/ui/core/src/androidMain/kotlin/com/moneymanager/ui/DatabaseLocationPickerLauncher.kt
       - app/ui/core/src/commonMain/kotlin/com/moneymanager/ui/MinimalErrorScreen.kt
       - app/ui/core/src/commonMain/kotlin/com/moneymanager/ui/SimpleFallbackErrorScreen.kt
       - app/ui/core/src/commonMain/kotlin/com/moneymanager/ui/ErrorDialog.kt
@@ -74,6 +76,22 @@ exclude:
       - app/db/core/src/commonMain/kotlin/com/moneymanager/database/mapper/IdConversions.kt
       - app/db/core/src/commonMain/kotlin/com/moneymanager/database/mapper/InstantConversions.kt
       - app/db/core/src/commonMain/kotlin/com/moneymanager/database/mapper/SourceTypeConversions.kt
+  # Metro DI module + platform factories contributed via @ContributesTo/@Provides and expect-actual:
+  # Qodana sees no direct usage (mirrors DatabaseManagerModule / CreateDatabaseManager.jvm.kt).
+  - name: unused
+    paths:
+      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/LocalSettingsModule.kt
+      - app/di/core/src/jvmMain/kotlin/com/moneymanager/di/CreateLocalSettings.jvm.kt
+      - app/model/core/src/commonMain/kotlin/com/moneymanager/domain/model/DbLocation.kt
+  - name: UnusedSymbol
+    paths:
+      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/LocalSettingsModule.kt
+  - name: UnusedDeclaration
+    paths:
+      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/LocalSettingsModule.kt
+  - name: UnusedSymbolLocal
+    paths:
+      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/LocalSettingsModule.kt
   # Each audit/source query maps a distinct SQLDelight-generated row type to SourceRecord. Those row
   # types share no supertype, so reading the identically-named source_* columns into SourceColumns /
   # SourceDetailColumns is necessarily repeated per mapper — unavoidable codegen boilerplate, not real
