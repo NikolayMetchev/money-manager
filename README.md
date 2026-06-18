@@ -82,8 +82,9 @@ A personal finance money manager built with **Kotlin Multiplatform** and **Compo
 | `utils/archive/` | Compress + password-encrypt the database archive (shared by remote backends) |
 | `app/model/core/` | Domain models and repository interfaces |
 | `app/db/core/` | SQLDelight database, repository implementations, mappers |
-| `app/importmodel/` | Shared import data structures and dedup policies |
-| `app/importer/` | Central import engine (CSV / QIF / API) and deduplication |
+| `app/importengineapi/` | DB-free import API — `ImportBatch`, dedup policies, source/key types |
+| `app/csvimporter/`, `app/qifimporter/`, `app/apiimporter/` | Per-format importers that build an `ImportBatch` (DB-free) |
+| `app/importer/` | Central import engine — applies an `ImportBatch`, deduplicates; the sole DB writer |
 | `app/remotestorage/core/` | Generic remote-storage provider interface (DB-free, backend-agnostic) |
 | `app/remotestorage/googledrive/` | Google Drive backend — Drive REST v3 over Ktor (JVM + Android) |
 | `app/remotestorage/sync/` | Hydrate/push orchestration + remote-binding persistence |
