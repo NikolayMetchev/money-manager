@@ -1,7 +1,8 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class)
+@file:OptIn(ExperimentalTime::class)
 
 package com.moneymanager.ui.util
 
+import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Category
@@ -30,6 +31,7 @@ import kotlinx.coroutines.flow.first
 import kotlin.random.Random
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
+import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 // Transfers are written one chunk per database transaction so the engine reports fine-grained progress
@@ -274,7 +276,7 @@ suspend fun generateSampleData(
 
             // Random amount (1-10000 with 2 decimal places)
             val amountCents = random.nextInt(100, 1000001)
-            val amount = "${amountCents / 100}.${(amountCents % 100).toString().padStart(2, '0')}"
+            val amount = BigDecimal("${amountCents / 100}.${(amountCents % 100).toString().padStart(2, '0')}")
 
             // 50% of transactions get 1-3 attributes
             val attributes: List<NewAttribute> =
