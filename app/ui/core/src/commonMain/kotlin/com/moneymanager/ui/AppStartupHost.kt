@@ -181,9 +181,15 @@ fun AppStartupHost(
                     scope.launch {
                         remoteUnlock = unlock.copy(busy = true, error = null)
                         databaseState =
-                            AppDatabaseState.Loading(DatabaseInitializationProgress("Restoring from cloud…", 0, 1))
+                            AppDatabaseState.Loading(DatabaseInitializationProgress("Restoring from cloud…", 0, 100))
                         try {
-                            val location = remoteController.restore(binding, password)
+                            val location =
+                                remoteController.restore(binding, password) { progress ->
+                                    databaseState =
+                                        AppDatabaseState.Loading(
+                                            DatabaseInitializationProgress(progress.message, (progress.fraction * 100).toInt(), 100),
+                                        )
+                                }
                             val error =
                                 openAndLoad(
                                     location = location,

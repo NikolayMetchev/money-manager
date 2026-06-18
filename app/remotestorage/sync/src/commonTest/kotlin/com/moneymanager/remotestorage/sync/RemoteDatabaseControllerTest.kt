@@ -7,9 +7,30 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class RemoteDatabaseControllerTest {
+    @Test
+    fun deleteLocalCacheRemovesWorkingCopy() =
+        runTest {
+            val manager = createTestDatabaseManager()
+            val location = createTestDatabaseLocation()
+            try {
+                val database = manager.openDatabase(location)
+                val sync = RemoteDatabaseSyncService(manager, InMemoryLocalSettings())
+                val controller = RemoteDatabaseController(sync, SingleProviderFactory(InMemoryStorageProvider()))
+                controller.createRemote("in-memory", null, "db.mmenc", location, database, "pw")
+                assertTrue(manager.databaseSizeBytes(location) != null, "working copy should exist after create")
+
+                database.close()
+                controller.deleteLocalCache()
+                assertNull(manager.databaseSizeBytes(location), "working copy should be deleted")
+            } finally {
+                deleteTestDatabase(location)
+            }
+        }
+
     @Test
     fun createSyncNowAndRestoreFlow() =
         runTest {

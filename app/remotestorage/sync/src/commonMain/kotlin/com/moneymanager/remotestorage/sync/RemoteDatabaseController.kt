@@ -2,6 +2,7 @@ package com.moneymanager.remotestorage.sync
 
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.DbLocation
+import com.moneymanager.domain.model.dbLocationFromString
 import com.moneymanager.remotestorage.RemoteFile
 import com.moneymanager.remotestorage.RemoteStorageProvider
 import com.moneymanager.remotestorage.RemoteStorageProviderFactory
@@ -66,9 +67,10 @@ class RemoteDatabaseController(
         localCachePath: DbLocation,
         database: MoneyManagerDatabaseWrapper,
         password: String,
+        onProgress: (SyncProgress) -> Unit = {},
     ): RemoteDatabaseBinding {
         val provider = resolve(providerId, config)
-        val binding = syncService.createRemote(provider, remoteName, localCachePath, database, password, config)
+        val binding = syncService.createRemote(provider, remoteName, localCachePath, database, password, config, onProgress)
         session = Session(provider, binding, password)
         markSynced(database)
         return binding
@@ -84,10 +86,11 @@ class RemoteDatabaseController(
         remoteFile: RemoteFile,
         localCachePath: DbLocation,
         password: String,
+        onProgress: (SyncProgress) -> Unit = {},
     ): DbLocation {
         val provider = resolve(providerId, config)
         val binding = RemoteDatabaseBinding(providerId, remoteFile.id, remoteFile.name, localCachePath.toString(), config)
-        val location = syncService.hydrate(provider, binding, password)
+        val location = syncService.hydrate(provider, binding, password, onProgress)
         syncService.bind(binding)
         session = Session(provider, binding, password)
         return location
@@ -97,9 +100,13 @@ class RemoteDatabaseController(
      * Restores the persisted [binding] on startup (requires the user's [password]); returns the
      * [DbLocation] to open.
      */
-    suspend fun restore(binding: RemoteDatabaseBinding, password: String): DbLocation {
+    suspend fun restore(
+        binding: RemoteDatabaseBinding,
+        password: String,
+        onProgress: (SyncProgress) -> Unit = {},
+    ): DbLocation {
         val provider = resolve(binding.providerId, binding.providerConfig)
-        val location = syncService.hydrate(provider, binding, password)
+        val location = syncService.hydrate(provider, binding, password, onProgress)
         session = Session(provider, binding, password)
         return location
     }
@@ -116,10 +123,17 @@ class RemoteDatabaseController(
         return true
     }
 
-    /** Pushes the open [database] to the bound remote file. No-op if there is no active session. */
-    suspend fun syncNow(database: MoneyManagerDatabaseWrapper) {
+    /**
+     * Pushes the open [database] to the bound remote file. No-op if there is no active session. Set
+     * [rebuildViews] false on close (the local copy is about to be discarded) to skip the rebuild.
+     */
+    suspend fun syncNow(
+        database: MoneyManagerDatabaseWrapper,
+        rebuildViews: Boolean = true,
+        onProgress: (SyncProgress) -> Unit = {},
+    ) {
         val current = session ?: return
-        syncService.push(current.provider, current.binding, database, current.password)
+        syncService.push(current.provider, current.binding, database, current.password, rebuildViews, onProgress)
         markSynced(database)
     }
 
@@ -131,6 +145,16 @@ class RemoteDatabaseController(
         val binding = syncService.activeBinding() ?: return null
         val provider = resolve(binding.providerId, binding.providerConfig)
         return provider.stat(binding.remoteFileId)?.sizeBytes
+    }
+
+    /**
+     * Deletes the local working copy of the bound database (the binding itself is kept, so the next
+     * launch restores it from the remote). No-op if there is no active binding. Call after the
+     * database connection is closed and a final [syncNow] has succeeded.
+     */
+    suspend fun deleteLocalCache() {
+        val binding = syncService.activeBinding() ?: return
+        syncService.deleteLocal(dbLocationFromString(binding.localCachePath))
     }
 
     /** Detaches the active database from remote storage (keeps the local working copy). */

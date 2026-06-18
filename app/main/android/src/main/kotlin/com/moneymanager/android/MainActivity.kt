@@ -5,14 +5,12 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import com.moneymanager.database.DatabaseManager
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.di.AppComponent
 import com.moneymanager.di.AppComponentParams
 import com.moneymanager.di.database.DatabaseComponent
 import com.moneymanager.di.database.toApplication
 import com.moneymanager.di.initializeVersionReader
-import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.ui.AppStartupHost
 import com.moneymanager.ui.error.GlobalSchemaErrorState
@@ -23,10 +21,8 @@ import kotlinx.coroutines.runBlocking
 private const val TAG = "MainActivity"
 
 class MainActivity : ComponentActivity() {
-    private var databaseManager: DatabaseManager? = null
     private var remoteController: RemoteDatabaseController? = null
     private var openDatabase: MoneyManagerDatabaseWrapper? = null
-    private var openLocation: DbLocation? = null
 
     /** Pushes the open cloud-backed database to its remote backing. Returns true on success. */
     private fun pushToRemoteIfActive(): Boolean {
@@ -48,14 +44,16 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         // A true "close": when finishing, push once more and drop the local working copy so only the
         // encrypted remote copy is kept between runs.
-        if (isFinishing && remoteController?.hasActiveSession() == true) {
+        val controller = remoteController
+        if (isFinishing && controller?.hasActiveSession() == true) {
             val pushed = pushToRemoteIfActive()
             openDatabase?.close()
             if (pushed) {
-                openLocation?.let { location ->
-                    runCatching { runBlocking { databaseManager?.deleteDatabase(location) } }
-                        .onFailure { Log.e(TAG, "Failed to delete local database on close", it) }
-                }
+                runCatching { runBlocking { controller.deleteLocalCache() } }
+                    .onSuccess { Log.i(TAG, "Deleted local working copy after syncing to cloud") }
+                    .onFailure { Log.e(TAG, "Failed to delete local database on close", it) }
+            } else {
+                Log.w(TAG, "Kept local database: cloud sync failed, so the local copy is the only safe copy")
             }
         }
         super.onDestroy()
@@ -83,7 +81,6 @@ class MainActivity : ComponentActivity() {
 
         val params = AppComponentParams(context = applicationContext)
         val component: AppComponent = AppComponent.create(params)
-        databaseManager = component.databaseManager
         val controller =
             RemoteDatabaseController(component.remoteDatabaseSyncService, component.remoteStorageProviderFactory)
         remoteController = controller
@@ -99,10 +96,7 @@ class MainActivity : ComponentActivity() {
                 onInfoLog = { message -> Log.i(TAG, message) },
                 onErrorLog = { message, error -> Log.e(TAG, message, error) },
                 remoteController = controller,
-                onDatabaseReady = { database, location ->
-                    openDatabase = database
-                    openLocation = location
-                },
+                onDatabaseReady = { database, _ -> openDatabase = database },
             )
         }
     }

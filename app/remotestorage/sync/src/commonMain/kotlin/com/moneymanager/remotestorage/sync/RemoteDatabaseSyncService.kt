@@ -43,9 +43,12 @@ class RemoteDatabaseSyncService(
         database: MoneyManagerDatabaseWrapper,
         password: String,
         providerConfig: String? = null,
+        onProgress: (SyncProgress) -> Unit = {},
     ): RemoteDatabaseBinding {
-        val archive = shrinkAndPack(database, password)
+        val archive = shrinkAndPack(database, password, rebuildAfter = true, onProgress = onProgress)
+        onProgress(SyncProgress("Uploading to cloud…", UPLOAD_FRACTION))
         val file = provider.upload(fileId = null, name = remoteName, bytes = archive)
+        onProgress(SyncProgress("Done", 1f))
         val binding = RemoteDatabaseBinding(provider.id, file.id, remoteName, localCachePath.toString(), providerConfig)
         bindingStore.save(binding)
         return binding
@@ -56,6 +59,9 @@ class RemoteDatabaseSyncService(
 
     /** On-disk size of the working copy at [location] (incl. WAL/SHM), or null if absent. */
     suspend fun localDatabaseSize(location: DbLocation): Long? = databaseManager.databaseSizeBytes(location)
+
+    /** Deletes the local working copy at [location] (main file + WAL/SHM sidecars). */
+    suspend fun deleteLocal(location: DbLocation) = databaseManager.deleteDatabase(location)
 
     /**
      * Returns true if [password] correctly decrypts the remote archive for [binding] (downloads and
@@ -74,51 +80,79 @@ class RemoteDatabaseSyncService(
             false
         }
 
-    /** Re-uploads [database] to the remote file recorded in [binding] (last-writer-wins). */
+    /**
+     * Re-uploads [database] to the remote file recorded in [binding] (last-writer-wins). Set
+     * [rebuildAfter] false when the live database is about to be discarded (e.g. on close) to skip the
+     * unnecessary materialized-view rebuild.
+     */
     suspend fun push(
         provider: RemoteStorageProvider,
         binding: RemoteDatabaseBinding,
         database: MoneyManagerDatabaseWrapper,
         password: String,
+        rebuildAfter: Boolean = true,
+        onProgress: (SyncProgress) -> Unit = {},
     ) {
-        val archive = shrinkAndPack(database, password)
+        val archive = shrinkAndPack(database, password, rebuildAfter, onProgress)
+        onProgress(SyncProgress("Uploading to cloud…", UPLOAD_FRACTION))
         provider.upload(fileId = binding.remoteFileId, name = binding.remoteName, bytes = archive)
+        onProgress(SyncProgress("Done", 1f))
     }
 
     /**
-     * Downloads and rehydrates the bound database into its local cache path, returning the
-     * [DbLocation] to open. After opening, callers should rebuild materialized views with
-     * [com.moneymanager.database.DatabaseMaintenanceService.fullRefreshMaterializedViews].
+     * Downloads and rehydrates the bound database into its local cache path (rebuilding its
+     * materialized views), returning the [DbLocation] to open.
      */
     suspend fun hydrate(
         provider: RemoteStorageProvider,
         binding: RemoteDatabaseBinding,
         password: String,
+        onProgress: (SyncProgress) -> Unit = {},
     ): DbLocation {
+        onProgress(SyncProgress("Downloading from cloud…", 0.1f))
         val archive = provider.download(binding.remoteFileId)
+        onProgress(SyncProgress("Decrypting and decompressing…", 0.45f))
         val databaseBytes = ArchiveCodec.unpack(archive, password)
+        onProgress(SyncProgress("Writing database…", 0.7f))
         val location = dbLocationFromString(binding.localCachePath)
         databaseManager.restore(location, databaseBytes)
         // The uploaded snapshot has its materialized views truncated; rebuild them so the working
         // copy is consistent before the app opens it.
+        onProgress(SyncProgress("Rebuilding views…", 0.85f))
         val opened = databaseManager.openDatabase(location)
         try {
             DatabaseMaintenanceServiceImpl(opened).fullRefreshMaterializedViews()
         } finally {
             opened.close()
         }
+        onProgress(SyncProgress("Done", 1f))
         return location
     }
 
     /**
-     * Truncates the (derived) materialized views, exports a compact snapshot, then rebuilds the views
-     * so the live database stays usable. Returns the encrypted archive bytes.
+     * Truncates the (derived) materialized views, exports a compact snapshot, optionally rebuilds the
+     * views so the live database stays usable, and returns the encrypted archive bytes.
      */
-    private suspend fun shrinkAndPack(database: MoneyManagerDatabaseWrapper, password: String): ByteArray {
+    private suspend fun shrinkAndPack(
+        database: MoneyManagerDatabaseWrapper,
+        password: String,
+        rebuildAfter: Boolean,
+        onProgress: (SyncProgress) -> Unit,
+    ): ByteArray {
         val maintenance = DatabaseMaintenanceServiceImpl(database)
+        onProgress(SyncProgress("Preparing database…", 0.1f))
         maintenance.truncateMaterializedViews()
+        onProgress(SyncProgress("Compacting database…", 0.35f))
         val snapshot = databaseManager.snapshot(database)
-        maintenance.fullRefreshMaterializedViews()
+        if (rebuildAfter) {
+            onProgress(SyncProgress("Rebuilding views…", 0.5f))
+            maintenance.fullRefreshMaterializedViews()
+        }
+        onProgress(SyncProgress("Encrypting…", 0.6f))
         return ArchiveCodec.pack(snapshot, password)
+    }
+
+    private companion object {
+        const val UPLOAD_FRACTION = 0.8f
     }
 }

@@ -23,6 +23,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.DbLocation
+import com.moneymanager.domain.model.defaultRemoteArchiveName
 import com.moneymanager.domain.model.remoteCacheLocation
 import com.moneymanager.remotestorage.RemoteFile
 import com.moneymanager.remotestorage.RemoteStorageType
@@ -133,7 +134,10 @@ fun CloudStorageCard(
     createType?.let { type ->
         CreateRemoteDialog(
             type = type,
-            defaultName = currentDatabaseLocation.toString().substringAfterLast('/').substringAfterLast('\\'),
+            defaultName =
+                defaultRemoteArchiveName(
+                    currentDatabaseLocation.toString().substringAfterLast('/').substringAfterLast('\\'),
+                ),
             onDismiss = { createType = null },
             onConfirm = { config, name, password ->
                 createType = null
@@ -254,7 +258,7 @@ private fun CreateRemoteDialog(
     onConfirm: (config: String?, name: String, password: String) -> Unit,
 ) {
     var folder by remember { mutableStateOf("") }
-    var name by remember { mutableStateOf(defaultName.ifBlank { "money_manager.db" }) }
+    var name by remember { mutableStateOf(defaultName.ifBlank { "money_manager.mmenc" }) }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     val valid =
