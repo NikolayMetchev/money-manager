@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -29,6 +30,7 @@ import com.moneymanager.remotestorage.RemoteFile
 import com.moneymanager.remotestorage.RemoteStorageType
 import com.moneymanager.remotestorage.sync.RemoteDatabaseBinding
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
+import com.moneymanager.remotestorage.sync.SyncProgress
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -54,6 +56,7 @@ fun CloudStorageCard(
     var createType by remember { mutableStateOf<RemoteStorageType?>(null) }
     var openType by remember { mutableStateOf<RemoteStorageType?>(null) }
     var showResume by remember { mutableStateOf(false) }
+    var syncProgress by remember { mutableStateOf<SyncProgress?>(null) }
 
     var refreshTick by remember { mutableStateOf(0) }
     var localSize by remember { mutableStateOf<Long?>(null) }
@@ -107,11 +110,12 @@ fun CloudStorageCard(
                     onSyncNow = {
                         busy = true
                         scope.launch {
-                            runCatching { controller.syncNow(database) }
+                            runCatching { controller.syncNow(database) { syncProgress = it } }
                                 .onSuccess {
                                     message = "Synced to ${currentBinding.remoteName}"
                                     refreshTick++
                                 }.onFailure { message = "Sync failed: ${it.message}" }
+                            syncProgress = null
                             busy = false
                         }
                     },
@@ -126,6 +130,14 @@ fun CloudStorageCard(
             }
 
             StorageSizes(localSize = localSize, remoteSize = remoteSize)
+
+            syncProgress?.let { progress ->
+                Text(text = progress.message, style = MaterialTheme.typography.bodySmall)
+                LinearProgressIndicator(
+                    progress = { progress.fraction },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
 
             message?.let { Text(text = it, style = MaterialTheme.typography.bodySmall) }
         }
@@ -144,12 +156,15 @@ fun CloudStorageCard(
                 busy = true
                 scope.launch {
                     runCatching {
-                        controller.createRemote(type.id, config, name, currentDatabaseLocation, database, password)
+                        controller.createRemote(type.id, config, name, currentDatabaseLocation, database, password) {
+                            syncProgress = it
+                        }
                     }.onSuccess {
                         binding = it
                         sessionActive = true
                         message = "Stored in ${type.displayName} as ${it.remoteName}"
                     }.onFailure { message = "Upload failed: ${it.message}" }
+                    syncProgress = null
                     busy = false
                 }
             },
@@ -166,9 +181,12 @@ fun CloudStorageCard(
                 busy = true
                 scope.launch {
                     runCatching {
-                        controller.openRemote(type.id, config, file, remoteCacheLocation(file.name), password)
+                        controller.openRemote(type.id, config, file, remoteCacheLocation(file.name), password) {
+                            syncProgress = it
+                        }
                     }.onSuccess { onRequestSwitchDatabase(it) }
                         .onFailure { message = "Open failed: ${it.message}" }
+                    syncProgress = null
                     busy = false
                 }
             },
