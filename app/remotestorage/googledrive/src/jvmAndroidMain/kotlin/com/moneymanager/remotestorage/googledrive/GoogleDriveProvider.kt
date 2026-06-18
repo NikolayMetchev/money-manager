@@ -154,6 +154,9 @@ class GoogleDriveProvider(
         }
     }
 
+    override suspend fun accessTokenExpiresAtEpochMs(): Long? =
+        cachedToken?.expiresAtMillis ?: accountStore.accessToken(credentials.clientId)?.expiresAtMillis
+
     /** Finds (or creates on first use) the app's "Money Manager" Drive folder and returns its id. */
     private suspend fun folderId(): String {
         cachedFolderId?.let { return it }

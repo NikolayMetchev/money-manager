@@ -146,6 +146,12 @@ class RemoteDatabaseController(
         markSynced(database)
     }
 
+    /**
+     * For token-based providers, the epoch-millis instant the current session's access token expires
+     * (it refreshes silently after that), or null if there's no session or the provider has no token.
+     */
+    suspend fun accessTokenExpiresAtEpochMs(): Long? = session?.provider?.accessTokenExpiresAtEpochMs()
+
     /** On-disk size in bytes of the local working copy at [location] (incl. WAL/SHM), or null. */
     suspend fun localDatabaseSize(location: DbLocation): Long? = syncService.localDatabaseSize(location)
 

@@ -1,3 +1,5 @@
+@file:OptIn(kotlin.time.ExperimentalTime::class)
+
 package com.moneymanager.ui.screens
 
 import androidx.compose.foundation.clickable
@@ -38,6 +40,7 @@ import com.moneymanager.remotestorage.sync.SyncProgress
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.time.Clock
 import nl.jacobras.humanreadable.HumanReadable
 
 /**
@@ -71,11 +74,18 @@ fun CloudStorageCard(
         remoteSize = if (binding != null) runCatching { controller.remoteArchiveSize() }.getOrNull() else null
     }
 
-    // Poll for unsynced changes so the Sync button reflects the live state while Settings is open.
+    // Poll for unsynced changes (and the session token's expiry) so the card reflects live state.
     var dirty by remember { mutableStateOf(false) }
+    var tokenStatus by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(sessionActive, binding, refreshTick) {
         while (true) {
             dirty = sessionActive && runCatching { controller.hasUnsyncedChanges(database) }.getOrDefault(false)
+            tokenStatus =
+                if (sessionActive) {
+                    runCatching { controller.accessTokenExpiresAtEpochMs() }.getOrNull()?.let(::formatTokenStatus)
+                } else {
+                    null
+                }
             delay(2000)
         }
     }
@@ -153,6 +163,8 @@ fun CloudStorageCard(
             }
 
             StorageSizes(localSize = localSize, remoteSize = remoteSize)
+
+            tokenStatus?.let { Text(text = it, style = MaterialTheme.typography.bodySmall) }
 
             syncProgress?.let { progress ->
                 Text(text = progress.message, style = MaterialTheme.typography.bodySmall)
@@ -263,6 +275,20 @@ fun CloudStorageCard(
                 }
             },
         )
+    }
+}
+
+/**
+ * A human-friendly note about when the session's access token refreshes. Google access tokens are
+ * opaque (not JWTs), so the expiry isn't decoded from the token — it comes from the `expires_in` the
+ * token endpoint returned, persisted alongside the token. The refresh is automatic and silent.
+ */
+private fun formatTokenStatus(expiresAtEpochMs: Long): String {
+    val minutes = (expiresAtEpochMs - Clock.System.now().toEpochMilliseconds()) / 60_000L
+    return when {
+        minutes > 1 -> "Access token refreshes in ~$minutes min (automatic)"
+        minutes in 0L..1L -> "Access token refreshes shortly (automatic)"
+        else -> "Access token expired — refreshes automatically on next use"
     }
 }
 

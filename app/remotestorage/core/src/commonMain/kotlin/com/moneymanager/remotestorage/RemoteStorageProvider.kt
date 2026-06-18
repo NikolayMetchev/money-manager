@@ -58,6 +58,13 @@ interface RemoteStorageProvider {
 
     /** Deletes the remote file [fileId]. */
     suspend fun delete(fileId: String)
+
+    /**
+     * For token-based backends, the epoch-millis instant the cached access token expires (after which
+     * it is refreshed silently), or null if not applicable / unknown. Lets the UI show when the local
+     * session token will next refresh. Does not perform any network I/O.
+     */
+    suspend fun accessTokenExpiresAtEpochMs(): Long? = null
 }
 
 /** Descriptor for a remote database archive. */
