@@ -5,6 +5,8 @@ import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.remotestorage.RemoteFile
 import com.moneymanager.remotestorage.RemoteStorageProvider
 import com.moneymanager.remotestorage.RemoteStorageProviderFactory
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Session-scoped coordinator the UI/startup layer drives to put the active database under remote
@@ -25,12 +27,30 @@ class RemoteDatabaseController(
     )
 
     private var session: Session? = null
+    private var syncedToken: Long? = null
 
     /** The persisted binding for the active database, if it is remote-backed. */
     fun activeBinding(): RemoteDatabaseBinding? = syncService.activeBinding()
 
     /** True once a remote database has been created/opened/restored this run (password held in memory). */
     fun hasActiveSession(): Boolean = session != null
+
+    /** True once a sync baseline has been captured for this session (see [markSynced]). */
+    fun hasSyncBaseline(): Boolean = syncedToken != null
+
+    /** Records the current database state as "fully synced" (call when the live DB matches the remote). */
+    suspend fun markSynced(database: MoneyManagerDatabaseWrapper) {
+        syncedToken = currentToken(database)
+    }
+
+    /** True if [database] has logical changes that haven't been pushed since the last [markSynced]. */
+    suspend fun hasUnsyncedChanges(database: MoneyManagerDatabaseWrapper): Boolean {
+        val baseline = syncedToken ?: return false
+        return currentToken(database) != baseline
+    }
+
+    private suspend fun currentToken(database: MoneyManagerDatabaseWrapper): Long =
+        withContext(Dispatchers.Default) { database.dataChangeToken() }
 
     /** Lists the archives stored by [providerId] (signing in if needed) for an open-from-remote picker. */
     suspend fun list(providerId: String, config: String?): List<RemoteFile> {
@@ -50,6 +70,7 @@ class RemoteDatabaseController(
         val provider = resolve(providerId, config)
         val binding = syncService.createRemote(provider, remoteName, localCachePath, database, password, config)
         session = Session(provider, binding, password)
+        markSynced(database)
         return binding
     }
 
@@ -99,6 +120,7 @@ class RemoteDatabaseController(
     suspend fun syncNow(database: MoneyManagerDatabaseWrapper) {
         val current = session ?: return
         syncService.push(current.provider, current.binding, database, current.password)
+        markSynced(database)
     }
 
     /** On-disk size in bytes of the local working copy at [location] (incl. WAL/SHM), or null. */

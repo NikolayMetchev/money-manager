@@ -75,6 +75,21 @@ class DatabaseSnapshotAndShrinkTest : DbTest() {
         }
 
     @Test
+    fun dataChangeTokenTracksLogicalChangesButNotViewRebuilds() =
+        runTest {
+            val before = database.dataChangeToken()
+            repositories.accountRepository.createAccount(
+                Account(id = AccountId(0), name = "Tracked", openingDate = Clock.System.now()),
+            )
+            val afterChange = database.dataChangeToken()
+            assertTrue(afterChange > before, "creating an account should advance the change token")
+
+            // Rebuilding materialized views is not a logical change and must not move the token.
+            repositories.maintenanceService.fullRefreshMaterializedViews()
+            assertEquals(afterChange, database.dataChangeToken(), "view rebuild must not change the token")
+        }
+
+    @Test
     fun snapshotRestoreRoundTripPreservesData() =
         runTest {
             seedTransfer()

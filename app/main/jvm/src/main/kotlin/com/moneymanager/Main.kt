@@ -9,6 +9,7 @@ import androidx.compose.ui.window.rememberWindowState
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.di.AppComponent
 import com.moneymanager.di.AppComponentParams
+import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.di.database.DatabaseComponent
 import com.moneymanager.di.database.toApplication
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
@@ -77,16 +78,26 @@ private fun MainWindow(onExit: () -> Unit) {
         remember {
             RemoteDatabaseController(component.remoteDatabaseSyncService, component.remoteStorageProviderFactory)
         }
-    // The currently open database, tracked so we can push it to remote storage on app close.
+    // The currently open database + its location, tracked so we can push and clean up on app close.
     val openDatabase = remember { arrayOfNulls<MoneyManagerDatabaseWrapper>(1) }
+    val openLocation = remember { arrayOfNulls<DbLocation>(1) }
 
     Window(
         onCloseRequest = {
-            // Upload the latest database to its remote backing (if any) before exiting.
-            openDatabase[0]?.let { database ->
-                if (remoteController.hasActiveSession()) {
+            val database = openDatabase[0]
+            if (database != null && remoteController.hasActiveSession()) {
+                // Upload the latest database, then delete the local working copy: when cloud storage is
+                // in use only the encrypted remote copy is kept between runs.
+                val pushed =
                     runCatching { runBlocking { remoteController.syncNow(database) } }
                         .onFailure { logger.error(it) { "Failed to sync database on close" } }
+                        .isSuccess
+                database.close()
+                if (pushed) {
+                    openLocation[0]?.let { location ->
+                        runCatching { runBlocking { databaseManager.deleteDatabase(location) } }
+                            .onFailure { logger.error(it) { "Failed to delete local database on close" } }
+                    }
                 }
             }
             onExit()
@@ -104,7 +115,10 @@ private fun MainWindow(onExit: () -> Unit) {
             onInfoLog = { message -> logger.info { message } },
             onErrorLog = { message, error -> logger.error(error) { message } },
             remoteController = remoteController,
-            onDatabaseReady = { database -> openDatabase[0] = database },
+            onDatabaseReady = { database, location ->
+                openDatabase[0] = database
+                openLocation[0] = location
+            },
         )
     }
 }

@@ -15,6 +15,38 @@ class MoneyManagerDatabaseWrapper(
     fun close() = driver.close()
 
     /**
+     * A monotonically-increasing token reflecting how much logical data has changed: the total number
+     * of rows across the append-only `*_audit` tables. Every entity create/update/delete appends an
+     * audit row, while derived materialized-view rebuilds do not, so this is a stable "has the data
+     * changed since last sync?" signal that ignores our own view maintenance.
+     */
+    fun dataChangeToken(): Long {
+        val auditTables = mutableListOf<String>()
+        executeQuery(
+            null,
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name GLOB '*_audit'",
+            { cursor ->
+                while (cursor.next().value) {
+                    cursor.getString(0)?.let(auditTables::add)
+                }
+                QueryResult.Unit
+            },
+            0,
+        )
+        return auditTables.sumOf { table ->
+            executeQuery(
+                null,
+                "SELECT COUNT(*) FROM $table",
+                { cursor ->
+                    cursor.next()
+                    QueryResult.Value(cursor.getLong(0)!!)
+                },
+                0,
+            ).value
+        }
+    }
+
+    /**
      * Execute a SQL statement on the database.
      * Delegates to the underlying SqlDriver.
      */

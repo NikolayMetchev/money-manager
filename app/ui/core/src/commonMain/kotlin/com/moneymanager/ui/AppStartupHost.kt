@@ -1,6 +1,9 @@
 package com.moneymanager.ui
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -11,6 +14,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.unit.dp
 import com.moneymanager.database.DatabaseInitializationProgress
 import com.moneymanager.database.DatabaseManager
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
@@ -44,6 +49,12 @@ private sealed class AppDatabaseState {
     ) : AppDatabaseState()
 }
 
+private data class RemoteUnlockState(
+    val prompt: String,
+    val error: String? = null,
+    val busy: Boolean = false,
+)
+
 private fun initialDatabaseProgress() =
     DatabaseInitializationProgress(
         text = "Finding the default database...",
@@ -60,13 +71,21 @@ fun AppStartupHost(
     onInfoLog: (String) -> Unit,
     onErrorLog: (String, Throwable) -> Unit,
     remoteController: RemoteDatabaseController? = null,
-    onDatabaseReady: (MoneyManagerDatabaseWrapper?) -> Unit = {},
+    onDatabaseReady: (MoneyManagerDatabaseWrapper?, DbLocation?) -> Unit = { _, _ -> },
 ) {
     val scope = rememberCoroutineScope()
     var databaseState by remember { mutableStateOf<AppDatabaseState>(AppDatabaseState.Loading()) }
     var switchError by remember { mutableStateOf<Pair<DbLocation, Throwable>?>(null) }
+    var remoteUnlock by remember { mutableStateOf<RemoteUnlockState?>(null) }
 
     LaunchedEffect(Unit) {
+        // When the active database is cloud-backed its local copy was deleted on the previous close,
+        // so it must be restored from the remote — which requires the user's password first.
+        val binding = remoteController?.activeBinding()
+        if (binding != null) {
+            remoteUnlock = RemoteUnlockState(prompt = "Unlock “${binding.remoteName}” from cloud storage")
+            return@LaunchedEffect
+        }
         val location = resolveStartupLocation(databaseManager, localSettings)
         val error =
             openAndLoad(
@@ -97,7 +116,13 @@ fun AppStartupHost(
 
     when (val state = databaseState) {
         is AppDatabaseState.Loaded -> {
-            LaunchedEffect(state.database) { onDatabaseReady(state.database) }
+            LaunchedEffect(state.database) {
+                onDatabaseReady(state.database, state.location)
+                // Capture the "everything synced" baseline at session start for cloud-backed databases.
+                if (remoteController?.hasActiveSession() == true && !remoteController.hasSyncBaseline()) {
+                    remoteController.markSynced(state.database)
+                }
+            }
             MoneyManagerApp(
                 appVersion = appVersion,
                 databaseLocation = state.location,
@@ -147,6 +172,46 @@ fun AppStartupHost(
         )
     }
 
+    remoteUnlock?.let { unlock ->
+        RemoteDatabaseUnlockDialog(
+            state = unlock,
+            onUnlock = { password ->
+                val binding = remoteController?.activeBinding()
+                if (binding != null) {
+                    scope.launch {
+                        remoteUnlock = unlock.copy(busy = true, error = null)
+                        databaseState =
+                            AppDatabaseState.Loading(DatabaseInitializationProgress("Restoring from cloud…", 0, 1))
+                        try {
+                            val location = remoteController.restore(binding, password)
+                            val error =
+                                openAndLoad(
+                                    location = location,
+                                    databaseManager = databaseManager,
+                                    createAppServices = createAppServices,
+                                    databaseStateUpdater = { databaseState = it },
+                                    onInfoLog = onInfoLog,
+                                    onErrorLog = onErrorLog,
+                                )
+                            if (error == null) {
+                                localSettings.putString(KEY_LAST_DATABASE, location.toString())
+                                remoteUnlock = null
+                            } else {
+                                remoteUnlock = unlock.copy(busy = false, error = error.message ?: "Failed to open database")
+                            }
+                        } catch (expected: CancellationException) {
+                            throw expected
+                        } catch (expected: Exception) {
+                            onErrorLog("Failed to restore database from cloud", expected)
+                            databaseState = AppDatabaseState.Loading(initialDatabaseProgress())
+                            remoteUnlock = unlock.copy(busy = false, error = "Wrong password, or download failed")
+                        }
+                    }
+                }
+            },
+        )
+    }
+
     effectiveSchemaError?.let { (location, error) ->
         DatabaseSchemaErrorDialog(
             databaseLocation = location.toString(),
@@ -179,6 +244,37 @@ fun AppStartupHost(
             },
         )
     }
+}
+
+@Composable
+private fun RemoteDatabaseUnlockDialog(
+    state: RemoteUnlockState,
+    onUnlock: (String) -> Unit,
+) {
+    var password by remember { mutableStateOf("") }
+    AlertDialog(
+        // Non-dismissible: the local copy was deleted on close, so the password is required to proceed.
+        onDismissRequest = {},
+        title = { Text(state.prompt) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Password") },
+                    singleLine = true,
+                    enabled = !state.busy,
+                    visualTransformation = PasswordVisualTransformation(),
+                )
+                state.error?.let { Text(it) }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onUnlock(password) }, enabled = !state.busy && password.isNotEmpty()) {
+                Text(if (state.busy) "Restoring…" else "Unlock")
+            }
+        },
+    )
 }
 
 /**

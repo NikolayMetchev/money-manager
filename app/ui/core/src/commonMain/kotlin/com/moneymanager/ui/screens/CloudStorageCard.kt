@@ -29,6 +29,7 @@ import com.moneymanager.remotestorage.RemoteStorageType
 import com.moneymanager.remotestorage.sync.RemoteDatabaseBinding
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import nl.jacobras.humanreadable.HumanReadable
 
@@ -59,6 +60,15 @@ fun CloudStorageCard(
     LaunchedEffect(binding, sessionActive, refreshTick) {
         localSize = runCatching { controller.localDatabaseSize(currentDatabaseLocation) }.getOrNull()
         remoteSize = if (binding != null) runCatching { controller.remoteArchiveSize() }.getOrNull() else null
+    }
+
+    // Poll for unsynced changes so the Sync button reflects the live state while Settings is open.
+    var dirty by remember { mutableStateOf(false) }
+    LaunchedEffect(sessionActive, binding, refreshTick) {
+        while (true) {
+            dirty = sessionActive && runCatching { controller.hasUnsyncedChanges(database) }.getOrDefault(false)
+            delay(2000)
+        }
     }
 
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -92,6 +102,7 @@ fun CloudStorageCard(
                     binding = currentBinding,
                     sessionActive = sessionActive,
                     busy = busy,
+                    dirty = dirty,
                     onSyncNow = {
                         busy = true
                         scope.launch {
@@ -197,6 +208,7 @@ private fun BoundState(
     binding: RemoteDatabaseBinding,
     sessionActive: Boolean,
     busy: Boolean,
+    dirty: Boolean,
     onSyncNow: () -> Unit,
     onResume: () -> Unit,
     onDisconnect: () -> Unit,
@@ -205,9 +217,22 @@ private fun BoundState(
         text = "Synced to ${binding.remoteName}" + (binding.providerConfig?.let { " ($it)" } ?: ""),
         style = MaterialTheme.typography.bodyMedium,
     )
+    if (sessionActive && !dirty) {
+        Text(
+            text = "✓ Everything is synced",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.primary,
+        )
+    } else if (sessionActive) {
+        Text(
+            text = "Unsynced changes",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+    }
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         if (sessionActive) {
-            OutlinedButton(onClick = onSyncNow, enabled = !busy, modifier = Modifier.weight(1f)) {
+            // Enabled only when there are local changes to upload.
+            OutlinedButton(onClick = onSyncNow, enabled = !busy && dirty, modifier = Modifier.weight(1f)) {
                 Text("Sync now")
             }
         } else {

@@ -23,6 +23,8 @@ kotlin {
                 api(projects.app.model.core)
                 api(projects.app.remotestorage.core)
                 api(projects.utils.localsettings)
+
+                implementation(libs.kotlinx.coroutines.core)
             }
         }
 
@@ -32,6 +34,8 @@ kotlin {
                 api(projects.app.model.core)
                 api(projects.app.remotestorage.core)
                 api(projects.utils.localsettings)
+
+                implementation(libs.kotlinx.coroutines.core)
             }
         }
 
@@ -42,6 +46,12 @@ kotlin {
                 implementation(libs.sqldelight.runtime)
                 implementation(projects.test.app.db)
                 implementation(projects.utils.archive)
+            }
+        }
+
+        val jvmTest by getting {
+            dependencies {
+                implementation(projects.app.remotestorage.sync)
             }
         }
     }

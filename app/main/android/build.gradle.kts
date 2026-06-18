@@ -46,9 +46,11 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
     implementation(projects.app.db.core)
     implementation(projects.app.di.core)
+    implementation(projects.app.model.core)
     implementation(projects.app.remotestorage.core)
     implementation(projects.app.remotestorage.sync)
     implementation(projects.app.ui.core)
+    implementation(projects.utils.localsettings)
 }
 
 // Run release build as part of build to catch release issues early

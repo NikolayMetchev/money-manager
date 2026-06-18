@@ -108,9 +108,9 @@ class JvmDatabaseManager : DatabaseManager {
 
     override suspend fun deleteDatabase(location: DbLocation): Unit =
         withContext(Dispatchers.IO) {
-            if (location.exists()) {
-                Files.delete(location.path)
-            }
+            // Remove the main file and its WAL/SHM sidecars.
+            listOf(location.path, Paths.get("${location.path}-wal"), Paths.get("${location.path}-shm"))
+                .forEach { Files.deleteIfExists(it) }
         }
 
     override suspend fun databaseSizeBytes(location: DbLocation): Long? =
