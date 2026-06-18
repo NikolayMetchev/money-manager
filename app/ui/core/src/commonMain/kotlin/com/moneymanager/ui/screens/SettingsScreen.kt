@@ -35,6 +35,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.moneymanager.domain.Maintenance
+import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CategoryRepository
@@ -43,9 +44,11 @@ import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.SettingsRepository
 import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.ui.DatabasePickerMode
 import com.moneymanager.ui.components.CurrencyPicker
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
+import com.moneymanager.ui.rememberDatabaseLocationPicker
 import com.moneymanager.ui.util.GenerationProgress
 import com.moneymanager.ui.util.generateSampleData
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -105,6 +108,50 @@ private fun AutoSizeText(
 }
 
 @Composable
+private fun DatabaseCard(
+    currentDatabaseLocation: DbLocation,
+    onRequestSwitchDatabase: (DbLocation) -> Unit,
+) {
+    val databasePicker = rememberDatabaseLocationPicker { location -> location?.let(onRequestSwitchDatabase) }
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = "Database",
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+                text = "Current: $currentDatabaseLocation",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedButton(
+                    onClick = { databasePicker.launch(DatabasePickerMode.OPEN) },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("Open Database…")
+                }
+                OutlinedButton(
+                    onClick = { databasePicker.launch(DatabasePickerMode.CREATE) },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("Create New Database…")
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun SettingsScreen(
     currencyRepository: CurrencyRepository,
     categoryRepository: CategoryRepository,
@@ -115,6 +162,8 @@ fun SettingsScreen(
     transactionRepository: TransactionRepository,
     settingsRepository: SettingsRepository,
     maintenance: Maintenance,
+    currentDatabaseLocation: DbLocation,
+    onRequestSwitchDatabase: (DbLocation) -> Unit,
 ) {
     var showWarningDialog by remember { mutableStateOf(false) }
     var isGenerating by remember { mutableStateOf(false) }
@@ -173,6 +222,12 @@ fun SettingsScreen(
                 )
             }
         }
+
+        // Database Section
+        DatabaseCard(
+            currentDatabaseLocation = currentDatabaseLocation,
+            onRequestSwitchDatabase = onRequestSwitchDatabase,
+        )
 
         // Maintenance Section
         Card(

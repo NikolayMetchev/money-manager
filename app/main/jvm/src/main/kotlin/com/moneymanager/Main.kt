@@ -69,6 +69,7 @@ private fun MainWindow(onExit: () -> Unit) {
 
     val databaseManager = component.databaseManager
     val appVersion = component.appVersion
+    val localSettings = component.localSettings
 
     Window(
         onCloseRequest = onExit,
@@ -78,6 +79,7 @@ private fun MainWindow(onExit: () -> Unit) {
         AppStartupHost(
             databaseManager = databaseManager,
             appVersion = appVersion,
+            localSettings = localSettings,
             createAppServices = { database ->
                 DatabaseComponent.create(database).toApplication().toAppServices()
             },

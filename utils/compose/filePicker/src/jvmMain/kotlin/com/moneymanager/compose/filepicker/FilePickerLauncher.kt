@@ -3,11 +3,17 @@
 
 package com.moneymanager.compose.filepicker
 
+import com.moneymanager.localsettings.JvmLocalSettings
+import com.moneymanager.localsettings.KEY_LAST_DIRECTORY
+import com.moneymanager.localsettings.LocalSettings
 import java.awt.FileDialog
 import java.awt.Frame
 import java.io.File
 import java.io.FilenameFilter
 import kotlin.time.Instant
+
+/** Remembers the directory last used in a file dialog so subsequent dialogs reopen there. */
+internal val localSettings: LocalSettings = JvmLocalSettings()
 
 actual class FilePickerLauncher(
     private val mimeTypes: List<String>,
@@ -15,7 +21,7 @@ actual class FilePickerLauncher(
 ) {
     actual fun launch() {
         val files = showLoadDialog("Select a file", mimeTypes, multiple = false)
-        files.firstOrNull()?.parent?.let { LastDirectoryStore.save(it) }
+        files.firstOrNull()?.parent?.let { localSettings.putString(KEY_LAST_DIRECTORY, it) }
         onResult(files.firstOrNull()?.let { readFileAsResult(it) })
     }
 }
@@ -26,7 +32,7 @@ actual class MultipleFilePickerLauncher(
 ) {
     actual fun launch() {
         val files = showLoadDialog("Select files", mimeTypes, multiple = true)
-        files.firstOrNull()?.parent?.let { LastDirectoryStore.save(it) }
+        files.firstOrNull()?.parent?.let { localSettings.putString(KEY_LAST_DIRECTORY, it) }
         onResult(files.mapNotNull { readFileAsResult(it) })
     }
 }
@@ -44,7 +50,7 @@ private fun showLoadDialog(
     try {
         val fileDialog = FileDialog(frame, title, FileDialog.LOAD)
         fileDialog.isMultipleMode = multiple
-        LastDirectoryStore.load()?.let { fileDialog.directory = it }
+        localSettings.getString(KEY_LAST_DIRECTORY)?.let { fileDialog.directory = it }
 
         val extensions = mimeTypesToExtensions(mimeTypes)
         if (extensions.isNotEmpty()) {

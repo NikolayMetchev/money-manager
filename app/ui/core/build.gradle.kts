@@ -19,6 +19,7 @@ kotlin {
                 api(projects.app.model.core)
                 api(projects.app.qifimporter)
                 api(projects.utils.bigdecimal)
+                api(projects.utils.localsettings)
                 api(projects.utils.rest)
 
                 implementation(libs.human.readable)
@@ -83,11 +84,11 @@ kotlin {
                 api(projects.app.model.core)
                 api(projects.app.qifimporter)
                 api(projects.utils.bigdecimal)
+                api(projects.utils.localsettings)
 
                 implementation(libs.androidx.compose.runtime.annotation)
                 implementation(libs.compose.animation.core.desktop)
                 implementation(libs.compose.animation.desktop)
-                implementation(libs.compose.material.desktop)
                 implementation(libs.compose.material.icons.core.desktop)
                 implementation(libs.compose.material3.desktop)
                 implementation(libs.compose.ui.graphics.desktop)

@@ -78,6 +78,7 @@ fun MoneyManagerApp(
     appVersion: AppVersion,
     databaseLocation: DbLocation,
     services: AppServices,
+    onRequestSwitchDatabase: (DbLocation) -> Unit,
 ) {
     ProvideSchemaAwareScope {
         val scope = rememberSchemaAwareCoroutineScope()
@@ -348,6 +349,8 @@ fun MoneyManagerApp(
                                         transactionRepository = services.transactions.transactionRepository,
                                         settingsRepository = services.settings.settingsRepository,
                                         maintenance = services.imports.maintenance,
+                                        currentDatabaseLocation = databaseLocation,
+                                        onRequestSwitchDatabase = onRequestSwitchDatabase,
                                     )
                                 }
                                 is Screen.AccountTransactions -> {

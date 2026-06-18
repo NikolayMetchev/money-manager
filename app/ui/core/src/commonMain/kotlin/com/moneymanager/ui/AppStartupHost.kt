@@ -1,5 +1,8 @@
 package com.moneymanager.ui
 
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -13,6 +16,9 @@ import com.moneymanager.database.DatabaseManager
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.DbLocation
+import com.moneymanager.domain.model.dbLocationFromString
+import com.moneymanager.localsettings.KEY_LAST_DATABASE
+import com.moneymanager.localsettings.LocalSettings
 import com.moneymanager.ui.components.DatabaseSchemaErrorDialog
 import com.moneymanager.ui.components.DatabaseStartupProgressScreen
 import com.moneymanager.ui.error.GlobalSchemaErrorState
@@ -47,32 +53,28 @@ private fun initialDatabaseProgress() =
 fun AppStartupHost(
     databaseManager: DatabaseManager,
     appVersion: AppVersion,
+    localSettings: LocalSettings,
     createAppServices: (MoneyManagerDatabaseWrapper) -> AppServices,
     onInfoLog: (String) -> Unit,
     onErrorLog: (String, Throwable) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     var databaseState by remember { mutableStateOf<AppDatabaseState>(AppDatabaseState.Loading()) }
+    var switchError by remember { mutableStateOf<Pair<DbLocation, Throwable>?>(null) }
 
     LaunchedEffect(Unit) {
-        val location = databaseManager.getDefaultLocation()
-        try {
-            onInfoLog("Opening database at: $location")
-            val database =
-                databaseManager.openDatabaseWithProgress(location) { progress ->
-                    databaseState = AppDatabaseState.Loading(progress)
-                }
-            databaseState = AppDatabaseState.Loading(DatabaseInitializationProgress("Preparing application services...", 1, 1))
-            val services = createAppServices(database)
-            databaseState = AppDatabaseState.Loading(DatabaseInitializationProgress("Verifying this device...", 1, 1))
-            services.deviceId
-            databaseState = AppDatabaseState.Loaded(location, services)
-            onInfoLog("Database opened successfully")
-        } catch (expected: CancellationException) {
-            throw expected
-        } catch (expected: Exception) {
-            onErrorLog("Failed to open database: ${expected.message}", expected)
-            databaseState = AppDatabaseState.Error(location, expected)
+        val location = resolveStartupLocation(databaseManager, localSettings)
+        val error =
+            openAndLoad(
+                location = location,
+                databaseManager = databaseManager,
+                createAppServices = createAppServices,
+                databaseStateUpdater = { databaseState = it },
+                onInfoLog = onInfoLog,
+                onErrorLog = onErrorLog,
+            )
+        if (error == null) {
+            localSettings.putString(KEY_LAST_DATABASE, location.toString())
         }
     }
 
@@ -95,10 +97,36 @@ fun AppStartupHost(
                 appVersion = appVersion,
                 databaseLocation = state.location,
                 services = state.services,
+                onRequestSwitchDatabase = { target ->
+                    scope.launch {
+                        switchDatabase(
+                            target = target,
+                            currentState = databaseState,
+                            databaseManager = databaseManager,
+                            createAppServices = createAppServices,
+                            databaseStateUpdater = { databaseState = it },
+                            localSettings = localSettings,
+                            onInfoLog = onInfoLog,
+                            onErrorLog = onErrorLog,
+                            onSwitchFailed = { location, error -> switchError = location to error },
+                        )
+                    }
+                },
             )
         }
         is AppDatabaseState.Loading -> DatabaseStartupProgressScreen(state.progress)
         is AppDatabaseState.Error -> Unit
+    }
+
+    switchError?.let { (location, error) ->
+        AlertDialog(
+            onDismissRequest = { switchError = null },
+            confirmButton = {
+                TextButton(onClick = { switchError = null }) { Text("OK") }
+            },
+            title = { Text("Couldn't open database") },
+            text = { Text("Failed to open:\n$location\n\n${error.message ?: error::class.simpleName}") },
+        )
     }
 
     effectiveSchemaError?.let { (location, error) ->
@@ -132,6 +160,102 @@ fun AppStartupHost(
                 }
             },
         )
+    }
+}
+
+/**
+ * Resolves which database to open on startup: the last-opened one if it still exists, otherwise the
+ * platform default.
+ */
+private suspend fun resolveStartupLocation(
+    databaseManager: DatabaseManager,
+    localSettings: LocalSettings,
+): DbLocation {
+    val stored = localSettings.getString(KEY_LAST_DATABASE)?.let { dbLocationFromString(it) }
+    return if (stored != null && databaseManager.databaseExists(stored)) {
+        stored
+    } else {
+        databaseManager.getDefaultLocation()
+    }
+}
+
+/**
+ * Opens [location] (creating + seeding it if missing), builds the application services, and moves the
+ * state machine to Loaded. Returns null on success, or the failure cause (with the state left at
+ * Error) otherwise.
+ */
+private suspend fun openAndLoad(
+    location: DbLocation,
+    databaseManager: DatabaseManager,
+    createAppServices: (MoneyManagerDatabaseWrapper) -> AppServices,
+    databaseStateUpdater: (AppDatabaseState) -> Unit,
+    onInfoLog: (String) -> Unit,
+    onErrorLog: (String, Throwable) -> Unit,
+): Throwable? =
+    try {
+        onInfoLog("Opening database at: $location")
+        val database =
+            databaseManager.openDatabaseWithProgress(location) { progress ->
+                databaseStateUpdater(AppDatabaseState.Loading(progress))
+            }
+        databaseStateUpdater(AppDatabaseState.Loading(DatabaseInitializationProgress("Preparing application services...", 1, 1)))
+        val services = createAppServices(database)
+        databaseStateUpdater(AppDatabaseState.Loading(DatabaseInitializationProgress("Verifying this device...", 1, 1)))
+        services.deviceId
+        databaseStateUpdater(AppDatabaseState.Loaded(location, services))
+        onInfoLog("Database opened successfully")
+        null
+    } catch (expected: CancellationException) {
+        throw expected
+    } catch (expected: Exception) {
+        onErrorLog("Failed to open database: ${expected.message}", expected)
+        databaseStateUpdater(AppDatabaseState.Error(location, expected))
+        expected
+    }
+
+/**
+ * Switches the live database to [target], rebinding the whole UI to a fresh set of services.
+ * A schema-incompatible target is left in the Error state so the recovery dialog can engage; any
+ * other failure reverts to the previously open database so the user is never stranded.
+ */
+private suspend fun switchDatabase(
+    target: DbLocation,
+    currentState: AppDatabaseState,
+    databaseManager: DatabaseManager,
+    createAppServices: (MoneyManagerDatabaseWrapper) -> AppServices,
+    databaseStateUpdater: (AppDatabaseState) -> Unit,
+    localSettings: LocalSettings,
+    onInfoLog: (String) -> Unit,
+    onErrorLog: (String, Throwable) -> Unit,
+    onSwitchFailed: (DbLocation, Throwable) -> Unit,
+) {
+    if ((currentState as? AppDatabaseState.Loaded)?.location == target) return
+
+    onInfoLog("Switching database to: $target")
+    databaseStateUpdater(AppDatabaseState.Loading())
+    val error =
+        openAndLoad(
+            location = target,
+            databaseManager = databaseManager,
+            createAppServices = createAppServices,
+            databaseStateUpdater = databaseStateUpdater,
+            onInfoLog = onInfoLog,
+            onErrorLog = onErrorLog,
+        )
+    when {
+        error == null -> {
+            GlobalSchemaErrorState.clearError()
+            localSettings.putString(KEY_LAST_DATABASE, target.toString())
+        }
+        // Schema-incompatible targets fall through to the schema-error recovery dialog (state stays Error).
+        SchemaErrorDetector.isSchemaError(error) -> Unit
+        // Any other failure: surface it and revert so the user keeps working in the current database.
+        currentState is AppDatabaseState.Loaded -> {
+            onInfoLog("Reverting to previously open database: ${currentState.location}")
+            databaseStateUpdater(currentState)
+            onSwitchFailed(target, error)
+        }
+        else -> onSwitchFailed(target, error)
     }
 }
 
