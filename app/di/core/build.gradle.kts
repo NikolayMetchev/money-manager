@@ -27,6 +27,7 @@ kotlin {
                 api(projects.utils.localsettings)
 
                 implementation(projects.app.importer)
+                implementation(projects.app.remotestorage.googledrive)
                 implementation(projects.app.remotestorage.localfolder)
             }
         }
