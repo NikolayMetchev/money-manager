@@ -8,6 +8,7 @@ import com.moneymanager.domain.model.DEFAULT_DATABASE_NAME
 import com.moneymanager.domain.model.DbLocation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.File
 
 private val DEFAULT_DB_LOCATION = DbLocation(DEFAULT_DATABASE_NAME)
 
@@ -125,5 +126,28 @@ class AndroidDatabaseManager(
         withContext(Dispatchers.IO) {
             // Use Android's deleteDatabase method for proper cleanup
             context.deleteDatabase(location.name)
+        }
+
+    override suspend fun snapshot(database: MoneyManagerDatabaseWrapper): ByteArray =
+        withContext(Dispatchers.IO) {
+            // VACUUM INTO requires the target file to not already exist.
+            val tempFile = File.createTempFile("mm-snapshot", ".db", context.cacheDir)
+            tempFile.delete()
+            try {
+                database.executeWithParams("VACUUM INTO ?", 1, listOf(tempFile.absolutePath))
+                tempFile.readBytes()
+            } finally {
+                tempFile.delete()
+            }
+        }
+
+    override suspend fun restore(location: DbLocation, bytes: ByteArray): Unit =
+        withContext(Dispatchers.IO) {
+            val dbFile = context.getDatabasePath(location.name)
+            dbFile.parentFile?.mkdirs()
+            // Drop stale WAL/SHM sidecars so the restored file isn't shadowed by an old write-ahead log.
+            File("${dbFile.path}-wal").delete()
+            File("${dbFile.path}-shm").delete()
+            dbFile.writeBytes(bytes)
         }
 }

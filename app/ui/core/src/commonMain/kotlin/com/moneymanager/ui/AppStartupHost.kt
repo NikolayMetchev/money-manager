@@ -19,6 +19,7 @@ import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.dbLocationFromString
 import com.moneymanager.localsettings.KEY_LAST_DATABASE
 import com.moneymanager.localsettings.LocalSettings
+import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.ui.components.DatabaseSchemaErrorDialog
 import com.moneymanager.ui.components.DatabaseStartupProgressScreen
 import com.moneymanager.ui.error.GlobalSchemaErrorState
@@ -34,6 +35,7 @@ private sealed class AppDatabaseState {
     data class Loaded(
         val location: DbLocation,
         val services: AppServices,
+        val database: MoneyManagerDatabaseWrapper,
     ) : AppDatabaseState()
 
     data class Error(
@@ -57,6 +59,8 @@ fun AppStartupHost(
     createAppServices: (MoneyManagerDatabaseWrapper) -> AppServices,
     onInfoLog: (String) -> Unit,
     onErrorLog: (String, Throwable) -> Unit,
+    remoteController: RemoteDatabaseController? = null,
+    onDatabaseReady: (MoneyManagerDatabaseWrapper?) -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
     var databaseState by remember { mutableStateOf<AppDatabaseState>(AppDatabaseState.Loading()) }
@@ -93,10 +97,13 @@ fun AppStartupHost(
 
     when (val state = databaseState) {
         is AppDatabaseState.Loaded -> {
+            LaunchedEffect(state.database) { onDatabaseReady(state.database) }
             MoneyManagerApp(
                 appVersion = appVersion,
                 databaseLocation = state.location,
                 services = state.services,
+                remoteController = remoteController,
+                database = state.database,
                 onRequestSwitchDatabase = { target ->
                     scope.launch {
                         switchDatabase(
@@ -214,7 +221,7 @@ private suspend fun openAndLoad(
         val services = createAppServices(database)
         databaseStateUpdater(AppDatabaseState.Loading(DatabaseInitializationProgress("Verifying this device...", 1, 1)))
         services.deviceId
-        databaseStateUpdater(AppDatabaseState.Loaded(location, services))
+        databaseStateUpdater(AppDatabaseState.Loaded(location, services, database))
         onInfoLog("Database opened successfully")
         null
     } catch (expected: CancellationException) {
@@ -293,7 +300,7 @@ private suspend fun recreateDatabase(
 
         val database = databaseManager.openDatabase(location)
         val services = createAppServices(database)
-        databaseStateUpdater(AppDatabaseState.Loaded(location, services))
+        databaseStateUpdater(AppDatabaseState.Loaded(location, services, database))
         GlobalSchemaErrorState.clearError()
         onInfoLog("New database created successfully")
     } catch (expected: CancellationException) {

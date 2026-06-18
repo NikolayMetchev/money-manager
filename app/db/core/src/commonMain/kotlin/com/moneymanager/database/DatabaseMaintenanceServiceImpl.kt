@@ -54,6 +54,18 @@ class DatabaseMaintenanceServiceImpl(
             }
         }
 
+    override suspend fun truncateMaterializedViews(): Duration =
+        withContext(Dispatchers.Default) {
+            measureTime {
+                transferQueries.transaction {
+                    // Reuse the existing full-refresh DELETE statements, without repopulating.
+                    transferQueries.refreshAccountBalances()
+                    transferQueries.refreshRunningBalances()
+                    transferQueries.clearPendingChanges()
+                }
+            }
+        }
+
     override suspend fun fullRefreshMaterializedViews(): Duration =
         withContext(Dispatchers.Default) {
             measureTime {

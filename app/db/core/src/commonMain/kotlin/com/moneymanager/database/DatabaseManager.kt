@@ -61,6 +61,27 @@ interface DatabaseManager {
      * @throws Exception if deletion fails
      */
     suspend fun deleteDatabase(location: DbLocation)
+
+    /**
+     * Produces a fully-compacted, self-contained snapshot of [database] and returns its raw bytes.
+     *
+     * Implemented with SQLite `VACUUM INTO`, so the result is a single consistent database file with
+     * no separate WAL/SHM sidecars, regardless of the live database's current WAL state. Callers are
+     * responsible for any pre-shrink steps (e.g. [DatabaseMaintenanceService.truncateMaterializedViews]).
+     *
+     * @return the bytes of the snapshot database file
+     */
+    suspend fun snapshot(database: MoneyManagerDatabaseWrapper): ByteArray
+
+    /**
+     * Overwrites the database file at [location] with [bytes] (a snapshot produced by [snapshot]),
+     * removing any stale WAL/SHM sidecars first.
+     *
+     * Must be called while no database is open at [location]; the caller opens it afterwards (which,
+     * for a rehydrated remote database, should be followed by
+     * [DatabaseMaintenanceService.fullRefreshMaterializedViews]).
+     */
+    suspend fun restore(location: DbLocation, bytes: ByteArray)
 }
 
 data class DatabaseInitializationProgress(

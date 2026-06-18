@@ -46,6 +46,18 @@ interface DatabaseMaintenanceService {
     suspend fun refreshMaterializedViews(): Duration
 
     /**
+     * Empties all materialized-view tables (AccountBalanceMaterializedView,
+     * RunningBalanceMaterializedView) and the pending-changes tracking table.
+     *
+     * This is the "shrink" step before exporting a database snapshot for remote storage: the views
+     * are derived data and can be rebuilt on the other side with [fullRefreshMaterializedViews], so
+     * dropping them keeps the uploaded archive small.
+     *
+     * @return The duration the operation took to complete
+     */
+    suspend fun truncateMaterializedViews(): Duration
+
+    /**
      * Performs a full rebuild of all materialized views in the database.
      * This completely deletes and rebuilds AccountBalanceMaterializedView and
      * RunningBalanceMaterializedView from the Transfer table data.

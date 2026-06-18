@@ -1,0 +1,115 @@
+package com.moneymanager.remotestorage.sync
+
+import com.moneymanager.database.MoneyManagerDatabaseWrapper
+import com.moneymanager.domain.model.DbLocation
+import com.moneymanager.remotestorage.RemoteFile
+import com.moneymanager.remotestorage.RemoteStorageProvider
+import com.moneymanager.remotestorage.RemoteStorageProviderFactory
+
+/**
+ * Session-scoped coordinator the UI/startup layer drives to put the active database under remote
+ * storage. Wraps [RemoteDatabaseSyncService] with the provider reconstruction ([RemoteStorageProviderFactory])
+ * and the in-memory password for the current run (never persisted), so "Sync now" and push-on-close
+ * have everything they need without re-prompting.
+ *
+ * Deliberately free of Compose so it stays unit-testable.
+ */
+class RemoteDatabaseController(
+    private val syncService: RemoteDatabaseSyncService,
+    val providerFactory: RemoteStorageProviderFactory,
+) {
+    private data class Session(
+        val provider: RemoteStorageProvider,
+        val binding: RemoteDatabaseBinding,
+        val password: String,
+    )
+
+    private var session: Session? = null
+
+    /** The persisted binding for the active database, if it is remote-backed. */
+    fun activeBinding(): RemoteDatabaseBinding? = syncService.activeBinding()
+
+    /** True once a remote database has been created/opened/restored this run (password held in memory). */
+    fun hasActiveSession(): Boolean = session != null
+
+    /** Lists the archives stored by [providerId] (signing in if needed) for an open-from-remote picker. */
+    suspend fun list(providerId: String, config: String?): List<RemoteFile> {
+        val provider = resolve(providerId, config)
+        return provider.list()
+    }
+
+    /** Uploads the open [database] as a new remote archive and makes it the active remote-backed database. */
+    suspend fun createRemote(
+        providerId: String,
+        config: String?,
+        remoteName: String,
+        localCachePath: DbLocation,
+        database: MoneyManagerDatabaseWrapper,
+        password: String,
+    ): RemoteDatabaseBinding {
+        val provider = resolve(providerId, config)
+        val binding = syncService.createRemote(provider, remoteName, localCachePath, database, password, config)
+        session = Session(provider, binding, password)
+        return binding
+    }
+
+    /**
+     * Downloads + rehydrates an existing remote archive into [localCachePath], persists the binding and
+     * returns the [DbLocation] to switch the app to.
+     */
+    suspend fun openRemote(
+        providerId: String,
+        config: String?,
+        remoteFile: RemoteFile,
+        localCachePath: DbLocation,
+        password: String,
+    ): DbLocation {
+        val provider = resolve(providerId, config)
+        val binding = RemoteDatabaseBinding(providerId, remoteFile.id, remoteFile.name, localCachePath.toString(), config)
+        val location = syncService.hydrate(provider, binding, password)
+        syncService.bind(binding)
+        session = Session(provider, binding, password)
+        return location
+    }
+
+    /**
+     * Restores the persisted [binding] on startup (requires the user's [password]); returns the
+     * [DbLocation] to open.
+     */
+    suspend fun restore(binding: RemoteDatabaseBinding, password: String): DbLocation {
+        val provider = resolve(binding.providerId, binding.providerConfig)
+        val location = syncService.hydrate(provider, binding, password)
+        session = Session(provider, binding, password)
+        return location
+    }
+
+    /**
+     * Resumes syncing for the already-bound database by verifying [password] against the remote
+     * archive (without overwriting the local copy). Returns true and arms the session on success.
+     */
+    suspend fun resume(password: String): Boolean {
+        val binding = syncService.activeBinding() ?: return false
+        val provider = resolve(binding.providerId, binding.providerConfig)
+        if (!syncService.verify(provider, binding, password)) return false
+        session = Session(provider, binding, password)
+        return true
+    }
+
+    /** Pushes the open [database] to the bound remote file. No-op if there is no active session. */
+    suspend fun syncNow(database: MoneyManagerDatabaseWrapper) {
+        val current = session ?: return
+        syncService.push(current.provider, current.binding, database, current.password)
+    }
+
+    /** Detaches the active database from remote storage (keeps the local working copy). */
+    fun unbind() {
+        syncService.clearBinding()
+        session = null
+    }
+
+    private suspend fun resolve(providerId: String, config: String?): RemoteStorageProvider {
+        val provider = providerFactory.create(providerId, config)
+        if (!provider.isSignedIn()) provider.signIn()
+        return provider
+    }
+}

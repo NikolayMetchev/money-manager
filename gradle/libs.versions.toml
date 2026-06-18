@@ -31,6 +31,7 @@ compose-plugin = "1.11.1"
 compose-material-icons-desktop = "1.7.3"
 compose-material3-desktop = "1.9.0"
 compose-ui-test = "1.9.3"
+cryptography = "0.6.0"
 dependency-analysis = "3.15.0"
 detekt = "2.0.0-alpha.4"
 diamondedge-logging = "2.1.1"
@@ -129,6 +130,9 @@ compose-ui-text-desktop = { module = "org.jetbrains.compose.ui:ui-text-desktop",
 compose-ui-test-desktop = { module = "org.jetbrains.compose.ui:ui-test-desktop", version.ref = "compose-plugin" }
 compose-ui-unit-desktop = { module = "org.jetbrains.compose.ui:ui-unit-desktop", version.ref = "compose-plugin" }
 compose-ui-util-desktop = { module = "org.jetbrains.compose.ui:ui-util-desktop", version.ref = "compose-plugin" }
+cryptography-core = { module = "dev.whyoleg.cryptography:cryptography-core", version.ref = "cryptography" }
+cryptography-provider-jdk = { module = "dev.whyoleg.cryptography:cryptography-provider-jdk", version.ref = "cryptography" }
+cryptography-random = { module = "dev.whyoleg.cryptography:cryptography-random", version.ref = "cryptography" }
 dependency-analysis-gradle-plugin = { module = "com.autonomousapps:dependency-analysis-gradle-plugin", version.ref = "dependency-analysis" }
 detekt-gradle-plugin = { module = "dev.detekt:dev.detekt.gradle.plugin", version.ref = "detekt" }
 develocity-gradle-plugin = { module = "com.gradle:develocity-gradle-plugin", version.ref = "develocity" }

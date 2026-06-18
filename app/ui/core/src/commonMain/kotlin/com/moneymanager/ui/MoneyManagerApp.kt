@@ -27,11 +27,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AppVersion
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.TransferId
+import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.ui.background.BackgroundTaskPanel
 import com.moneymanager.ui.background.LocalBackgroundTaskManager
 import com.moneymanager.ui.background.rememberBackgroundTaskManager
@@ -79,6 +81,8 @@ fun MoneyManagerApp(
     databaseLocation: DbLocation,
     services: AppServices,
     onRequestSwitchDatabase: (DbLocation) -> Unit,
+    remoteController: RemoteDatabaseController? = null,
+    database: MoneyManagerDatabaseWrapper? = null,
 ) {
     ProvideSchemaAwareScope {
         val scope = rememberSchemaAwareCoroutineScope()
@@ -351,6 +355,8 @@ fun MoneyManagerApp(
                                         maintenance = services.imports.maintenance,
                                         currentDatabaseLocation = databaseLocation,
                                         onRequestSwitchDatabase = onRequestSwitchDatabase,
+                                        remoteController = remoteController,
+                                        database = database,
                                     )
                                 }
                                 is Screen.AccountTransactions -> {

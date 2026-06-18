@@ -18,6 +18,8 @@ kotlin {
                 api(projects.app.importer)
                 api(projects.app.model.core)
                 api(projects.app.qifimporter)
+                api(projects.app.remotestorage.core)
+                api(projects.app.remotestorage.sync)
                 api(projects.utils.bigdecimal)
                 api(projects.utils.localsettings)
                 api(projects.utils.rest)
@@ -83,6 +85,7 @@ kotlin {
                 api(projects.app.importengineapi)
                 api(projects.app.model.core)
                 api(projects.app.qifimporter)
+                api(projects.app.remotestorage.sync)
                 api(projects.utils.bigdecimal)
                 api(projects.utils.localsettings)
 

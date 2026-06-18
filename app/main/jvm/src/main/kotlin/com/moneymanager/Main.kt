@@ -6,15 +6,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.di.AppComponent
 import com.moneymanager.di.AppComponentParams
 import com.moneymanager.di.database.DatabaseComponent
 import com.moneymanager.di.database.toApplication
+import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.ui.AppStartupHost
 import com.moneymanager.ui.error.GlobalSchemaErrorState
 import com.moneymanager.ui.error.SchemaErrorDetector
 import com.moneymanager.ui.toAppServices
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.swing.Swing
 import org.lighthousegames.logging.logging
 
@@ -70,9 +73,24 @@ private fun MainWindow(onExit: () -> Unit) {
     val databaseManager = component.databaseManager
     val appVersion = component.appVersion
     val localSettings = component.localSettings
+    val remoteController =
+        remember {
+            RemoteDatabaseController(component.remoteDatabaseSyncService, component.remoteStorageProviderFactory)
+        }
+    // The currently open database, tracked so we can push it to remote storage on app close.
+    val openDatabase = remember { arrayOfNulls<MoneyManagerDatabaseWrapper>(1) }
 
     Window(
-        onCloseRequest = onExit,
+        onCloseRequest = {
+            // Upload the latest database to its remote backing (if any) before exiting.
+            openDatabase[0]?.let { database ->
+                if (remoteController.hasActiveSession()) {
+                    runCatching { runBlocking { remoteController.syncNow(database) } }
+                        .onFailure { logger.error(it) { "Failed to sync database on close" } }
+                }
+            }
+            onExit()
+        },
         title = "Money Manager",
         state = rememberWindowState(width = 1000.dp, height = 900.dp),
     ) {
@@ -85,6 +103,8 @@ private fun MainWindow(onExit: () -> Unit) {
             },
             onInfoLog = { message -> logger.info { message } },
             onErrorLog = { message, error -> logger.error(error) { message } },
+            remoteController = remoteController,
+            onDatabaseReady = { database -> openDatabase[0] = database },
         )
     }
 }

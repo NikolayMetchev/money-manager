@@ -9,6 +9,12 @@ class MoneyManagerDatabaseWrapper(
     private val driver: SqlDriver,
 ) : MoneyManagerDatabase by MoneyManagerDatabase(driver) {
     /**
+     * Closes the underlying driver/connection. Used for short-lived databases opened off the main
+     * session (e.g. rehydrating a remote snapshot) so the file can be safely reopened afterwards.
+     */
+    fun close() = driver.close()
+
+    /**
      * Execute a SQL statement on the database.
      * Delegates to the underlying SqlDriver.
      */
