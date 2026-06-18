@@ -37,14 +37,11 @@ import androidx.compose.ui.unit.sp
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.DbLocation
-import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
-import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
-import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.SettingsRepository
-import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.ui.DatabasePickerMode
 import com.moneymanager.ui.components.CurrencyPicker
@@ -157,11 +154,8 @@ private fun DatabaseCard(
 fun SettingsScreen(
     currencyRepository: CurrencyRepository,
     categoryRepository: CategoryRepository,
-    accountRepository: AccountRepository,
-    personRepository: PersonRepository,
-    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     attributeTypeRepository: AttributeTypeRepository,
-    transactionRepository: TransactionRepository,
+    importEngine: ImportEngine,
     settingsRepository: SettingsRepository,
     maintenance: Maintenance,
     currentDatabaseLocation: DbLocation,
@@ -504,11 +498,8 @@ fun SettingsScreen(
                                 generateSampleData(
                                     currencyRepository = currencyRepository,
                                     categoryRepository = categoryRepository,
-                                    accountRepository = accountRepository,
-                                    personRepository = personRepository,
-                                    personAccountOwnershipRepository = personAccountOwnershipRepository,
                                     attributeTypeRepository = attributeTypeRepository,
-                                    transactionRepository = transactionRepository,
+                                    importEngine = importEngine,
                                     maintenance = maintenance,
                                     progressFlow = progressFlow,
                                 )

@@ -1,52 +1,65 @@
-@file:OptIn(kotlin.time.ExperimentalTime::class, kotlin.uuid.ExperimentalUuidApi::class)
+@file:OptIn(ExperimentalTime::class)
 
 package com.moneymanager.ui.util
 
+import com.moneymanager.bigdecimal.BigDecimal
 import com.moneymanager.domain.Maintenance
-import com.moneymanager.domain.model.Account
-import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeTypeId
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
-import com.moneymanager.domain.model.Person
-import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.Source
-import com.moneymanager.domain.model.Transfer
-import com.moneymanager.domain.model.TransferId
-import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
-import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
-import com.moneymanager.domain.repository.PersonRepository
-import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.importengineapi.AccountMatchKey
+import com.moneymanager.importengineapi.AccountRef
+import com.moneymanager.importengineapi.DedupePolicy
+import com.moneymanager.importengineapi.ImportAccountIntent
+import com.moneymanager.importengineapi.ImportBatch
+import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importengineapi.ImportOwnershipIntent
+import com.moneymanager.importengineapi.ImportPersonIntent
+import com.moneymanager.importengineapi.ImportRowKey
+import com.moneymanager.importengineapi.ImportTransfer
+import com.moneymanager.importengineapi.LocalAccountKey
+import com.moneymanager.importengineapi.LocalPersonKey
+import com.moneymanager.importengineapi.PersonMatchKey
+import com.moneymanager.importengineapi.normalizeNameKey
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlin.random.Random
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
+import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
+// Transfers are written one chunk per database transaction so the engine reports fine-grained progress
+// instead of freezing on one giant transaction for the hundreds of thousands of rows this generates.
+private const val SAMPLE_IMPORT_BATCH_SIZE = 5000
+
+private const val ACCOUNT_COUNT = 100
+
+/**
+ * Generates sample data through the central [ImportEngine] — the sole DB writer for entities and
+ * transfers — so accounts, people, ownerships and transactions are created exactly the way a real
+ * import creates them (with `Source.SampleGenerator` provenance). Categories and attribute types have
+ * no engine creation path, so (mirroring how real importers behave) they are created directly up front
+ * and then referenced by id from the batch.
+ */
 suspend fun generateSampleData(
     currencyRepository: CurrencyRepository,
     categoryRepository: CategoryRepository,
-    accountRepository: AccountRepository,
-    personRepository: PersonRepository,
-    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     attributeTypeRepository: AttributeTypeRepository,
-    transactionRepository: TransactionRepository,
+    importEngine: ImportEngine,
     maintenance: Maintenance,
     progressFlow: MutableStateFlow<GenerationProgress>,
 ) {
     val random = Random.Default
+    val sampleSource = Source.SampleGenerator
 
     // Step 1: Fetch currencies
-    progressFlow.emit(
-        GenerationProgress(
-            currentOperation = "Fetching currencies...",
-        ),
-    )
+    progressFlow.emit(GenerationProgress(currentOperation = "Fetching currencies..."))
 
     val allCurrencies = currencyRepository.getAllCurrencies().first()
     check(allCurrencies.isNotEmpty()) { "No currencies found in database. Please create currencies first." }
@@ -85,12 +98,9 @@ suspend fun generateSampleData(
 
     check(selectedCurrencies.isNotEmpty()) { "No currencies available for sample data generation." }
 
-    // Step 2: Generate and create categories with hierarchical structure
-    progressFlow.emit(
-        GenerationProgress(
-            currentOperation = "Generating categories...",
-        ),
-    )
+    // Step 2: Generate and create categories with hierarchical structure. Categories have no import-engine
+    // creation path, so they are created directly and then referenced by id from the account intents.
+    progressFlow.emit(GenerationProgress(currentOperation = "Generating categories..."))
 
     val categoryHierarchy = generateCategoryHierarchy()
     val totalCategories = categoryHierarchy.sumOf { 1 + it.children.size }
@@ -102,7 +112,6 @@ suspend fun generateSampleData(
         ),
     )
 
-    val sampleSource = Source.SampleGenerator
     val categoryIds = mutableListOf<Long>()
     var categoriesCreated = 0
 
@@ -138,14 +147,14 @@ suspend fun generateSampleData(
         }
     }
 
-    // Step 2.5: Generate people
-    progressFlow.emit(
+    val baseProgress =
         GenerationProgress(
             categoriesCreated = categoriesCreated,
             totalCategories = totalCategories,
-            currentOperation = "Creating people...",
-        ),
-    )
+        )
+
+    // Step 3: People intents
+    progressFlow.emit(baseProgress.copy(currentOperation = "Preparing people..."))
 
     val peopleNames =
         listOf(
@@ -161,140 +170,53 @@ suspend fun generateSampleData(
             Triple("Henry", "David", "Ford"),
         )
 
-    val personIds = mutableListOf<PersonId>()
-    for ((firstName, middleName, lastName) in peopleNames) {
-        val person =
-            Person(
-                id = PersonId(0),
+    val peopleIntents =
+        peopleNames.mapIndexed { index, (firstName, middleName, lastName) ->
+            val fullName = listOfNotNull(firstName, middleName, lastName).joinToString(" ")
+            ImportPersonIntent(
+                key = LocalPersonKey("person-$index"),
+                match = PersonMatchKey.ByNameKey(normalizeNameKey(fullName)),
                 firstName = firstName,
                 middleName = middleName,
                 lastName = lastName,
+                source = sampleSource,
             )
-        val personId = personRepository.createPerson(person, sampleSource)
-        personIds.add(personId)
-    }
+        }
 
-    progressFlow.emit(
-        GenerationProgress(
-            categoriesCreated = categoriesCreated,
-            totalCategories = totalCategories,
-            currentOperation = "Created ${personIds.size} people",
-        ),
-    )
+    // Step 4: Account intents with category assignments
+    progressFlow.emit(baseProgress.copy(currentOperation = "Preparing accounts..."))
 
-    // Step 3: Generate account names
-    progressFlow.emit(
-        GenerationProgress(
-            categoriesCreated = categoriesCreated,
-            totalCategories = totalCategories,
-            currentOperation = "Generating account names...",
-        ),
-    )
-
-    val accountNames = generateAccountNames()
-
-    // Step 4: Determine transaction counts per account (variable distribution)
-    val transactionCounts = mutableListOf<Int>()
-    for (i in 0 until 100) {
-        val count =
-            when {
-                i < 20 -> random.nextInt(5000, 10001) // 20% get 5000-10000 transactions
-                i < 70 -> random.nextInt(1000, 3001) // 50% get 1000-3000 transactions
-                else -> random.nextInt(100, 501) // 30% get 100-500 transactions
-            }
-        transactionCounts.add(count)
-    }
-
-    val totalExpectedTransactions = transactionCounts.sum()
-
-    progressFlow.emit(
-        GenerationProgress(
-            categoriesCreated = categoriesCreated,
-            totalCategories = totalCategories,
-            totalTransactions = totalExpectedTransactions,
-            currentOperation = "Creating accounts...",
-        ),
-    )
-
-    // Step 5: Create accounts in batch with category assignments
     val now = Clock.System.now()
-
-    progressFlow.emit(
-        GenerationProgress(
-            categoriesCreated = categoriesCreated,
-            totalCategories = totalCategories,
-            totalTransactions = totalExpectedTransactions,
-            currentOperation = "Creating 100 accounts in batch...",
-        ),
-    )
-
-    val accountsToCreate =
-        accountNames.map { name ->
-            Account(
-                id = AccountId(0),
+    val accountNames = generateAccountNames()
+    val accountKeys = List(accountNames.size) { LocalAccountKey("acct-$it") }
+    val accountIntents =
+        accountNames.mapIndexed { index, name ->
+            ImportAccountIntent(
+                key = accountKeys[index],
+                // The generator always creates fresh accounts; it never reuses existing ones.
+                match = AccountMatchKey.AlwaysCreate,
                 name = name,
                 openingDate = now.minus(random.nextInt(1, 3650).days),
+                source = sampleSource,
                 categoryId = categoryIds.random(random),
             )
         }
 
-    val accountIds = accountRepository.createAccountsBatch(accountsToCreate) { sampleSource }
-
-    progressFlow.emit(
-        GenerationProgress(
-            categoriesCreated = categoriesCreated,
-            totalCategories = totalCategories,
-            accountsCreated = 100,
-            totalTransactions = totalExpectedTransactions,
-            currentOperation = "Created all 100 accounts",
-        ),
-    )
-
-    // Step 5.5: Assign owners to accounts
-    progressFlow.emit(
-        GenerationProgress(
-            categoriesCreated = categoriesCreated,
-            totalCategories = totalCategories,
-            accountsCreated = 100,
-            totalTransactions = totalExpectedTransactions,
-            currentOperation = "Assigning owners to accounts...",
-        ),
-    )
-
-    for (accountId in accountIds) {
-        // Most accounts have 1 owner, some have 2 (joint accounts)
-        val ownerCount = if (random.nextDouble() < 0.15) 2 else 1
-        val selectedOwners = personIds.shuffled(random).take(ownerCount)
-
-        for (personId in selectedOwners) {
-            personAccountOwnershipRepository.createOwnership(
-                personId = personId,
-                accountId = accountId,
-                source = sampleSource,
-            )
+    // Step 5: Ownership intents — most accounts have one owner, some are joint (two owners).
+    val ownershipIntents =
+        accountKeys.flatMap { accountKey ->
+            val ownerCount = if (random.nextDouble() < 0.15) 2 else 1
+            peopleIntents.shuffled(random).take(ownerCount).map { person ->
+                ImportOwnershipIntent(
+                    personKey = person.key,
+                    account = AccountRef.Local(accountKey),
+                    source = sampleSource,
+                )
+            }
         }
-    }
 
-    progressFlow.emit(
-        GenerationProgress(
-            categoriesCreated = categoriesCreated,
-            totalCategories = totalCategories,
-            accountsCreated = 100,
-            totalTransactions = totalExpectedTransactions,
-            currentOperation = "Assigned owners to all accounts",
-        ),
-    )
-
-    // Step 6: Create sample attribute types first (needed for generating attributes)
-    progressFlow.emit(
-        GenerationProgress(
-            categoriesCreated = categoriesCreated,
-            totalCategories = totalCategories,
-            accountsCreated = 100,
-            totalTransactions = totalExpectedTransactions,
-            currentOperation = "Creating attribute types...",
-        ),
-    )
+    // Step 6: Attribute types (no engine creation path; resolved up front like real importers do).
+    progressFlow.emit(baseProgress.copy(currentOperation = "Creating attribute types..."))
 
     val attributeTypeNames =
         listOf(
@@ -310,60 +232,51 @@ suspend fun generateSampleData(
 
     val attributeTypeIds = mutableListOf<AttributeTypeId>()
     for (typeName in attributeTypeNames) {
-        val typeId = attributeTypeRepository.getOrCreate(typeName)
-        attributeTypeIds.add(typeId)
+        attributeTypeIds.add(attributeTypeRepository.getOrCreate(typeName))
     }
 
-    // Step 7: Generate transactions with attributes
+    // Step 7: Determine transaction counts per account (variable distribution)
+    val transactionCounts =
+        List(ACCOUNT_COUNT) { i ->
+            when {
+                i < 20 -> random.nextInt(5000, 10001) // 20% get 5000-10000 transactions
+                i < 70 -> random.nextInt(1000, 3001) // 50% get 1000-3000 transactions
+                else -> random.nextInt(100, 501) // 30% get 100-500 transactions
+            }
+        }
+    val totalExpectedTransactions = transactionCounts.sum()
+
     progressFlow.emit(
-        GenerationProgress(
-            categoriesCreated = categoriesCreated,
-            totalCategories = totalCategories,
-            accountsCreated = 100,
+        baseProgress.copy(
             totalTransactions = totalExpectedTransactions,
             currentOperation = "Generating transactions with attributes...",
         ),
     )
 
+    // Step 8: Generate transfers referencing batch-local accounts.
     val startDate = Instant.parse("2015-01-01T00:00:00Z")
     val endDate = Instant.parse("2025-12-31T23:59:59Z")
     val dateRangeMillis = endDate.toEpochMilliseconds() - startDate.toEpochMilliseconds()
 
-    // Generate all transactions with their attributes
-    val allTransfers = mutableListOf<Transfer>()
-    val allNewAttributes = mutableMapOf<TransferId, List<NewAttribute>>()
-
-    for ((accountIndex, accountId) in accountIds.withIndex()) {
+    val transfers = ArrayList<ImportTransfer>(totalExpectedTransactions)
+    var rowIndex = 0L
+    for (accountIndex in accountKeys.indices) {
         val transactionCount = transactionCounts[accountIndex]
-
-        repeat(transactionCount) { _ ->
+        repeat(transactionCount) {
             // Random timestamp between 2015-2025
             val randomMillis = random.nextLong(dateRangeMillis)
             val timestamp = Instant.fromEpochMilliseconds(startDate.toEpochMilliseconds() + randomMillis)
 
             // Random target account (different from source)
-            val targetAccountId = accountIds.filter { it != accountId }.random(random)
+            var targetIndex = random.nextInt(accountKeys.size - 1)
+            if (targetIndex >= accountIndex) targetIndex++
 
             // Random currency
             val currency = selectedCurrencies.random(random)
 
             // Random amount (1-10000 with 2 decimal places)
             val amountCents = random.nextInt(100, 1000001)
-            val amount = "${amountCents / 100}.${(amountCents % 100).toString().padStart(2, '0')}"
-
-            // Random description
-            val description = generateTransactionDescription(random)
-
-            // Placeholder ID - real ID generated by database
-            val transfer =
-                Transfer(
-                    id = TransferId(0L),
-                    timestamp = timestamp,
-                    description = description,
-                    sourceAccountId = accountId,
-                    targetAccountId = targetAccountId,
-                    amount = Money.fromDisplayValue(amount, currency),
-                )
+            val amount = BigDecimal("${amountCents / 100}.${(amountCents % 100).toString().padStart(2, '0')}")
 
             // 50% of transactions get 1-3 attributes
             val attributes: List<NewAttribute> =
@@ -376,42 +289,60 @@ suspend fun generateSampleData(
                     emptyList()
                 }
 
-            allTransfers.add(transfer)
-            if (attributes.isNotEmpty()) {
-                allNewAttributes[transfer.id] = attributes
-            }
+            transfers.add(
+                ImportTransfer(
+                    rowKey = ImportRowKey.CsvRow(rowIndex++),
+                    fromAccount = AccountRef.Local(accountKeys[accountIndex]),
+                    toAccount = AccountRef.Local(accountKeys[targetIndex]),
+                    source = sampleSource,
+                    timestamp = timestamp,
+                    description = generateTransactionDescription(random),
+                    amount = Money.fromDisplayValue(amount, currency),
+                    attributes = attributes,
+                ),
+            )
         }
     }
 
-    // Step 8: Create transactions with attributes and sources in batches
-    var transactionsCreated = 0
+    // Step 9: Hand the whole batch to the import engine — the single writer for accounts, people,
+    // ownerships and transfers. No deduplication: every generated transfer is imported.
+    val batch =
+        ImportBatch(
+            transfers = transfers,
+            dedupePolicy = DedupePolicy.None,
+            accountsToCreate = accountIntents,
+            peopleToCreate = peopleIntents,
+            ownerships = ownershipIntents,
+        )
 
-    transactionRepository.createTransfers(
-        transfers = allTransfers,
-        newAttributes = allNewAttributes,
-        sources = List(allTransfers.size) { Source.SampleGenerator },
-        onProgress = { created, total ->
-            transactionsCreated = created
+    importEngine.import(
+        batch = batch,
+        onProgress = { progress ->
+            val processed = progress.processed
             progressFlow.emit(
-                GenerationProgress(
-                    categoriesCreated = categoriesCreated,
-                    totalCategories = totalCategories,
-                    accountsCreated = 100,
-                    transactionsCreated = created,
-                    totalTransactions = total,
-                    currentOperation = "Created $created/$total transactions...",
+                baseProgress.copy(
+                    // Accounts are created before the transfer-write phase, so by the time the engine
+                    // reports processed counts every account exists.
+                    accountsCreated = if (processed != null) ACCOUNT_COUNT else baseProgress.accountsCreated,
+                    transactionsCreated = processed ?: 0,
+                    totalTransactions = progress.total ?: totalExpectedTransactions,
+                    currentOperation =
+                        if (processed != null) {
+                            "Created $processed/${progress.total} transactions..."
+                        } else {
+                            progress.detail
+                        },
                 ),
             )
         },
+        batchSize = SAMPLE_IMPORT_BATCH_SIZE,
     )
 
     // Refresh materialized views
     progressFlow.emit(
-        GenerationProgress(
-            categoriesCreated = categoriesCreated,
-            totalCategories = totalCategories,
-            accountsCreated = 100,
-            transactionsCreated = transactionsCreated,
+        baseProgress.copy(
+            accountsCreated = ACCOUNT_COUNT,
+            transactionsCreated = totalExpectedTransactions,
             totalTransactions = totalExpectedTransactions,
             currentOperation = "Refreshing materialized views...",
         ),
@@ -420,11 +351,9 @@ suspend fun generateSampleData(
 
     // Final progress update
     progressFlow.emit(
-        GenerationProgress(
-            categoriesCreated = categoriesCreated,
-            totalCategories = totalCategories,
-            accountsCreated = 100,
-            transactionsCreated = transactionsCreated,
+        baseProgress.copy(
+            accountsCreated = ACCOUNT_COUNT,
+            transactionsCreated = totalExpectedTransactions,
             totalTransactions = totalExpectedTransactions,
             currentOperation = "Sample data generation complete!",
         ),
@@ -432,7 +361,7 @@ suspend fun generateSampleData(
 }
 
 private fun generateAccountNames(): List<String> {
-    val count = 100
+    val count = ACCOUNT_COUNT
     val prefixes =
         listOf(
             "Personal",
@@ -756,7 +685,7 @@ private fun generateCategoryHierarchy(): List<CategoryWithChildren> =
 
 data class GenerationProgress(
     val accountsCreated: Int = 0,
-    val totalAccounts: Int = 100,
+    val totalAccounts: Int = ACCOUNT_COUNT,
     val categoriesCreated: Int = 0,
     val totalCategories: Int = 0,
     val transactionsCreated: Int = 0,

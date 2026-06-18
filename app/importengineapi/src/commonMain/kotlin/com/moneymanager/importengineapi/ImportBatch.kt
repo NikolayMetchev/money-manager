@@ -134,6 +134,7 @@ data class ImportPersonIntent(
     val firstName: String,
     /** Where this person came from (e.g. the import as a whole, or the API node the holder came from). */
     override val source: Source,
+    val middleName: String? = null,
     val lastName: String? = null,
     val attributes: List<NewAttribute> = emptyList(),
 ) : Auditable
