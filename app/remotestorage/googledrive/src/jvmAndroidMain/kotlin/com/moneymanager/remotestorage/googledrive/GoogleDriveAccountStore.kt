@@ -59,9 +59,19 @@ class GoogleDriveAccountStore(
         clearAccessToken(clientId)
     }
 
-    private fun refreshKey(clientId: String) = "gdrive.refreshToken.$clientId"
+    // Key by a short, stable hash of the client id, never the raw id: a Google OAuth client id is
+    // ~72 chars, and the JVM LocalSettings backing (java.util.prefs) rejects keys over 80 chars — which
+    // silently dropped the token, forcing a re-auth on every call. String.hashCode is deterministic
+    // across runs/platforms, so the same client always maps to the same handle.
+    private fun handle(clientId: String): String = clientId.hashCode().toUInt().toString(MAX_RADIX)
 
-    private fun accessKey(clientId: String) = "gdrive.accessToken.$clientId"
+    private fun refreshKey(clientId: String) = "gdrive.rt.${handle(clientId)}"
 
-    private fun expiryKey(clientId: String) = "gdrive.accessTokenExpiry.$clientId"
+    private fun accessKey(clientId: String) = "gdrive.at.${handle(clientId)}"
+
+    private fun expiryKey(clientId: String) = "gdrive.ate.${handle(clientId)}"
+
+    private companion object {
+        const val MAX_RADIX = 36
+    }
 }
