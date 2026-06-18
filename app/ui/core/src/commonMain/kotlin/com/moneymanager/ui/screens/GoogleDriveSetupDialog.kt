@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.moneymanager.compose.filepicker.rememberFilePicker
 import com.moneymanager.remotestorage.RemoteFile
 import com.moneymanager.remotestorage.googledrive.GoogleDriveCredentials
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
@@ -75,6 +76,11 @@ fun GoogleDriveSetupDialog(
 
     val parsedConfig = remember(credentialsJson) { GoogleDriveCredentials.parseCredentialsJson(credentialsJson)?.toConfig() }
 
+    val filePicker =
+        rememberFilePicker(mimeTypes = listOf("application/json", "text/plain")) { result ->
+            result?.let { credentialsJson = it.content }
+        }
+
     fun connect() {
         val config = parsedConfig ?: return
         connecting = true
@@ -109,19 +115,31 @@ fun GoogleDriveSetupDialog(
                         onClick = { uriHandler.openUri(CLOUD_CONSOLE_CREDENTIALS_URL) },
                         modifier = Modifier.fillMaxWidth(),
                     ) { Text("Open Google Cloud Console") }
+                    OutlinedButton(
+                        onClick = { filePicker.launch() },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("Choose credentials.json file…") }
+                    when {
+                        parsedConfig != null ->
+                            Text(
+                                "✓ Loaded OAuth client credentials.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        credentialsJson.isNotBlank() ->
+                            Text(
+                                "That file isn't a Google OAuth client (expected a Desktop app credentials.json).",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                    }
+                    Text("…or paste the credentials.json contents:", style = MaterialTheme.typography.bodySmall)
                     OutlinedTextField(
                         value = credentialsJson,
                         onValueChange = { credentialsJson = it },
-                        label = { Text("Paste credentials.json") },
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 96.dp),
+                        label = { Text("credentials.json") },
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 72.dp),
                     )
-                    if (credentialsJson.isNotBlank() && parsedConfig == null) {
-                        Text(
-                            "That doesn't look like a Google OAuth client file (expected a Desktop app credentials.json).",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                    }
                 } else if (mode == GoogleDriveSetupMode.CREATE) {
                     Text("Connected to Google Drive.", color = MaterialTheme.colorScheme.primary)
                     OutlinedTextField(name, { name = it }, label = { Text("Archive name") }, singleLine = true)
