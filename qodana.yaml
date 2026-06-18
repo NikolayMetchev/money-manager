@@ -92,6 +92,47 @@ exclude:
   - name: UnusedSymbolLocal
     paths:
       - app/di/core/src/commonMain/kotlin/com/moneymanager/di/LocalSettingsModule.kt
+  # Remote-storage DI factories/modules contributed via Metro @ContributesTo/@Provides and expect-actual,
+  # plus platform impls referenced only via DI: Qodana sees no direct usage (mirrors LocalSettingsModule).
+  - name: unused
+    paths:
+      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/remotestorage/CreateRemoteStorageProviderFactory.kt
+      - app/di/core/src/jvmMain/kotlin/com/moneymanager/di/remotestorage/CreateRemoteStorageProviderFactory.jvm.kt
+      - app/di/core/src/androidMain/kotlin/com/moneymanager/di/remotestorage/CreateRemoteStorageProviderFactory.android.kt
+      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/remotestorage/RemoteStorageModule.kt
+  - name: UnusedSymbol
+    paths:
+      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/remotestorage/CreateRemoteStorageProviderFactory.kt
+      - app/di/core/src/jvmMain/kotlin/com/moneymanager/di/remotestorage/CreateRemoteStorageProviderFactory.jvm.kt
+      - app/di/core/src/androidMain/kotlin/com/moneymanager/di/remotestorage/CreateRemoteStorageProviderFactory.android.kt
+      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/remotestorage/RemoteStorageModule.kt
+      - app/remotestorage/googledrive/src/androidMain/kotlin/com/moneymanager/remotestorage/googledrive/AndroidBrowserLauncher.kt
+  - name: UnusedDeclaration
+    paths:
+      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/remotestorage/CreateRemoteStorageProviderFactory.kt
+      - app/di/core/src/jvmMain/kotlin/com/moneymanager/di/remotestorage/CreateRemoteStorageProviderFactory.jvm.kt
+      - app/di/core/src/androidMain/kotlin/com/moneymanager/di/remotestorage/CreateRemoteStorageProviderFactory.android.kt
+      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/remotestorage/RemoteStorageModule.kt
+  - name: UnusedSymbolLocal
+    paths:
+      - app/di/core/src/commonMain/kotlin/com/moneymanager/di/remotestorage/RemoteStorageModule.kt
+  # Interface default intentionally returns null for non-token backends (Google Drive overrides it).
+  - name: SameReturnValue
+    paths:
+      - app/remotestorage/core/src/commonMain/kotlin/com/moneymanager/remotestorage/RemoteStorageProvider.kt
+  # False positive: the return runs after a try/catch whose try can succeed (AES-GCM decrypt path).
+  - name: KotlinUnreachableCode
+    paths:
+      - utils/archive/src/commonMain/kotlin/com/moneymanager/archive/ArchiveCodec.kt
+  # CryptographyProvider.get is not an operator fun, so the indexing-operator suggestion doesn't compile.
+  - name: ReplaceGetOrSet
+    paths:
+      - utils/archive/src/commonMain/kotlin/com/moneymanager/archive/ArchiveCodec.kt
+  # Compose setup dialogs intentionally repeat small field/label fragments across create/open branches.
+  - name: DuplicatedCode
+    paths:
+      - app/ui/core/src/commonMain/kotlin/com/moneymanager/ui/screens/CloudStorageCard.kt
+      - app/ui/core/src/commonMain/kotlin/com/moneymanager/ui/screens/GoogleDriveSetupDialog.kt
   # Each audit/source query maps a distinct SQLDelight-generated row type to SourceRecord. Those row
   # types share no supertype, so reading the identically-named source_* columns into SourceColumns /
   # SourceDetailColumns is necessarily repeated per mapper — unavoidable codegen boilerplate, not real

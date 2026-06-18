@@ -41,6 +41,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import nl.jacobras.humanreadable.HumanReadable
 import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Settings card for backing the active database with a remote-storage provider (issue #86): create a
@@ -85,7 +86,7 @@ fun CloudStorageCard(
                 } else {
                     null
                 }
-            delay(2000)
+            delay(2.seconds)
         }
     }
 
@@ -270,8 +271,6 @@ fun CloudStorageCard(
 
     if (showResume) {
         PasswordDialog(
-            title = "Enter sync password",
-            confirmLabel = "Resume sync",
             onDismiss = { showResume = false },
             onConfirm = { password ->
                 showResume = false
@@ -463,18 +462,16 @@ private fun OpenRemoteDialog(
 
 @Composable
 private fun PasswordDialog(
-    title: String,
-    confirmLabel: String,
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
 ) {
     var password by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(title) },
+        title = { Text("Enter sync password") },
         text = { PasswordField(password, { password = it }, "Password") },
         confirmButton = {
-            TextButton(onClick = { onConfirm(password) }, enabled = password.isNotEmpty()) { Text(confirmLabel) }
+            TextButton(onClick = { onConfirm(password) }, enabled = password.isNotEmpty()) { Text("Resume sync") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )

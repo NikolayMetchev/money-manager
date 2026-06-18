@@ -19,7 +19,7 @@ actual fun createRemoteStorageProviderFactory(
         override fun types(): List<RemoteStorageType> =
             listOf(
                 RemoteStorageType(LOCAL_FOLDER_PROVIDER_ID, "Local / Synced Folder", requiresFolder = true),
-                RemoteStorageType(GOOGLE_DRIVE_PROVIDER_ID, "Google Drive", requiresFolder = false),
+                RemoteStorageType(GOOGLE_DRIVE_PROVIDER_ID, "Google Drive"),
             )
 
         override fun create(

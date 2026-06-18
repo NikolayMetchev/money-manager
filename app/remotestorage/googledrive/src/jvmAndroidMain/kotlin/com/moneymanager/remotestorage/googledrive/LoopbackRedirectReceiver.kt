@@ -7,6 +7,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.URLDecoder
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 
 /**
  * A minimal localhost HTTP listener that captures the OAuth authorization code redirected to
@@ -24,14 +26,14 @@ class LoopbackRedirectReceiver : AutoCloseable {
     val redirectUri: String = "http://$LOOPBACK_HOST:${serverSocket.localPort}"
 
     /**
-     * Waits (up to [timeoutMillis]) for the browser to hit the loopback redirect, then returns the
-     * `code` query parameter. Throws [RemoteAuthException] on an OAuth `error`, a timeout, or a
-     * malformed request.
+     * Waits (up to [timeout]) for the browser to hit the loopback redirect, then returns the `code`
+     * query parameter. Throws [RemoteAuthException] on an OAuth `error`, a timeout, or a malformed
+     * request.
      */
-    suspend fun awaitCode(timeoutMillis: Long = DEFAULT_TIMEOUT_MILLIS): String =
+    suspend fun awaitCode(timeout: Duration = DEFAULT_TIMEOUT): String =
         withContext(Dispatchers.IO) {
             val requestTarget =
-                withTimeoutOrNull(timeoutMillis) { acceptRequestTarget() }
+                withTimeoutOrNull(timeout) { acceptRequestTarget() }
                     ?: throw RemoteAuthException("Timed out waiting for Google sign-in to complete")
             extractCode(requestTarget)
         }
@@ -71,7 +73,7 @@ class LoopbackRedirectReceiver : AutoCloseable {
 
     private companion object {
         const val LOOPBACK_HOST = "127.0.0.1"
-        const val DEFAULT_TIMEOUT_MILLIS = 300_000L
+        val DEFAULT_TIMEOUT = 5.minutes
         val RESPONSE_BODY =
             buildString {
                 val page =
