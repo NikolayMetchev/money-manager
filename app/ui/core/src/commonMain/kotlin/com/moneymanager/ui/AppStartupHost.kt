@@ -115,7 +115,18 @@ fun AppStartupHost(
             )
         }
         is AppDatabaseState.Loading -> DatabaseStartupProgressScreen(state.progress)
-        is AppDatabaseState.Error -> Unit
+        is AppDatabaseState.Error -> {
+            // Schema errors are handled by the recovery dialog below; show other failures so the
+            // user isn't left on a blank screen.
+            if (!SchemaErrorDetector.isSchemaError(state.error)) {
+                MinimalErrorScreen(
+                    message =
+                        "Failed to open database:\n${state.location}\n\n" +
+                            (state.error.message ?: state.error::class.simpleName.orEmpty()),
+                    stackTrace = state.error.stackTraceToString(),
+                )
+            }
+        }
     }
 
     switchError?.let { (location, error) ->
@@ -171,7 +182,8 @@ private suspend fun resolveStartupLocation(
     databaseManager: DatabaseManager,
     localSettings: LocalSettings,
 ): DbLocation {
-    val stored = localSettings.getString(KEY_LAST_DATABASE)?.let { dbLocationFromString(it) }
+    // A corrupted persisted value (e.g. an invalid path) must not crash startup; fall back to default.
+    val stored = localSettings.getString(KEY_LAST_DATABASE)?.let { runCatching { dbLocationFromString(it) }.getOrNull() }
     return if (stored != null && databaseManager.databaseExists(stored)) {
         stored
     } else {
