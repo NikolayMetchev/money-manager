@@ -34,14 +34,13 @@ import com.moneymanager.remotestorage.RemoteFile
 import com.moneymanager.remotestorage.RemoteStorageType
 import com.moneymanager.remotestorage.googledrive.GOOGLE_DRIVE_FOLDER_NAME
 import com.moneymanager.remotestorage.googledrive.GOOGLE_DRIVE_PROVIDER_ID
-import com.moneymanager.remotestorage.sync.RemoteDatabaseBinding
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.remotestorage.sync.SyncProgress
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.time.Clock
 import nl.jacobras.humanreadable.HumanReadable
+import kotlin.time.Clock
 
 /**
  * Settings card for backing the active database with a remote-storage provider (issue #86): create a
@@ -184,7 +183,12 @@ fun CloudStorageCard(
         )
 
     // Shared create/open handlers so the folder dialogs and the Google Drive wizard drive the same flow.
-    fun startCreate(type: RemoteStorageType, config: String?, name: String, password: String) {
+    fun startCreate(
+        type: RemoteStorageType,
+        config: String?,
+        name: String,
+        password: String,
+    ) {
         createType = null
         busy = true
         scope.launch {
@@ -202,7 +206,12 @@ fun CloudStorageCard(
         }
     }
 
-    fun startOpen(type: RemoteStorageType, config: String?, file: RemoteFile, password: String) {
+    fun startOpen(
+        type: RemoteStorageType,
+        config: String?,
+        file: RemoteFile,
+        password: String,
+    ) {
         openType = null
         busy = true
         scope.launch {

@@ -22,7 +22,10 @@ actual fun createRemoteStorageProviderFactory(
                 RemoteStorageType(GOOGLE_DRIVE_PROVIDER_ID, "Google Drive", requiresFolder = false),
             )
 
-        override fun create(providerId: String, config: String?): RemoteStorageProvider =
+        override fun create(
+            providerId: String,
+            config: String?,
+        ): RemoteStorageProvider =
             when (providerId) {
                 LOCAL_FOLDER_PROVIDER_ID ->
                     LocalFolderStorageProvider.forPath(requireNotNull(config) { "A folder path is required" })

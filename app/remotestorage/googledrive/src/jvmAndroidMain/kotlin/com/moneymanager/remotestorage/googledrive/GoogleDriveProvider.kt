@@ -54,7 +54,10 @@ class GoogleDriveProvider(
 ) : RemoteStorageProvider {
     private val oauth = GoogleOAuth(httpClient)
 
-    private data class CachedToken(val token: String, val expiresAtMillis: Long)
+    private data class CachedToken(
+        val token: String,
+        val expiresAtMillis: Long,
+    )
 
     private var cachedToken: CachedToken? = null
     private var cachedFolderId: String? = null
@@ -165,7 +168,12 @@ class GoogleDriveProvider(
                 "and trashed = false"
         val url = "$FILES_ENDPOINT?q=${query.encodeURLParameter()}&spaces=drive&fields=${"files(id)".encodeURLParameter()}"
         val body = withAuthRetry { token -> httpClient.get(url) { bearer(token) } }.requireBody("find Drive folder")
-        val id = json.decodeFromString<DriveFileList>(body).files.firstOrNull()?.id ?: createFolder()
+        val id =
+            json
+                .decodeFromString<DriveFileList>(body)
+                .files
+                .firstOrNull()
+                ?.id ?: createFolder()
         cachedFolderId = id
         return id
     }
@@ -248,7 +256,9 @@ class GoogleDriveProvider(
     )
 
     @Serializable
-    private data class DriveFileList(val files: List<DriveFile> = emptyList())
+    private data class DriveFileList(
+        val files: List<DriveFile> = emptyList(),
+    )
 
     private companion object {
         const val FILES_ENDPOINT = "https://www.googleapis.com/drive/v3/files"
@@ -283,13 +293,14 @@ class GoogleDriveProvider(
             metadataJson: String,
             media: ByteArray,
         ): ByteArray =
-            ByteArrayOutputStream().apply {
-                write("--$boundary\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n".toByteArray())
-                write(metadataJson.toByteArray())
-                write("\r\n--$boundary\r\nContent-Type: application/octet-stream\r\n\r\n".toByteArray())
-                write(media)
-                write("\r\n--$boundary--\r\n".toByteArray())
-            }.toByteArray()
+            ByteArrayOutputStream()
+                .apply {
+                    write("--$boundary\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n".toByteArray())
+                    write(metadataJson.toByteArray())
+                    write("\r\n--$boundary\r\nContent-Type: application/octet-stream\r\n\r\n".toByteArray())
+                    write(media)
+                    write("\r\n--$boundary--\r\n".toByteArray())
+                }.toByteArray()
 
         fun String.jsonQuoted(): String = JsonPrimitive(this).toString()
     }

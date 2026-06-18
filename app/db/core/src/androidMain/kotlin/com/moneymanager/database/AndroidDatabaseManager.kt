@@ -152,7 +152,10 @@ class AndroidDatabaseManager(
             }
         }
 
-    override suspend fun restore(location: DbLocation, bytes: ByteArray): Unit =
+    override suspend fun restore(
+        location: DbLocation,
+        bytes: ByteArray,
+    ): Unit =
         withContext(Dispatchers.IO) {
             val dbFile = context.getDatabasePath(location.name)
             dbFile.parentFile?.mkdirs()

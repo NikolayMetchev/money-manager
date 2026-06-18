@@ -9,7 +9,10 @@ import dev.whyoleg.cryptography.operations.IvAuthenticatedCipher
 import dev.whyoleg.cryptography.random.CryptographyRandom
 
 /** Thrown when an archive can't be decrypted (wrong password) or is tampered with / corrupted. */
-class ArchiveDecryptionException(message: String, cause: Throwable? = null) : Exception(message, cause)
+class ArchiveDecryptionException(
+    message: String,
+    cause: Throwable? = null,
+) : Exception(message, cause)
 
 /**
  * Compresses then encrypts a byte payload (and the inverse). Pure commonMain so every remote-storage
@@ -27,7 +30,10 @@ object ArchiveCodec {
     private const val PBKDF2_ITERATIONS = 210_000
     private val headerLength = MAGIC.size + 1 + SALT_LENGTH
 
-    suspend fun pack(plain: ByteArray, password: String): ByteArray {
+    suspend fun pack(
+        plain: ByteArray,
+        password: String,
+    ): ByteArray {
         require(password.isNotEmpty()) { "Password must not be empty" }
         val compressed = deflate(plain)
         val salt = CryptographyRandom.Default.nextBytes(SALT_LENGTH)
@@ -35,7 +41,10 @@ object ArchiveCodec {
         return MAGIC + byteArrayOf(VERSION) + salt + ciphertext
     }
 
-    suspend fun unpack(packed: ByteArray, password: String): ByteArray {
+    suspend fun unpack(
+        packed: ByteArray,
+        password: String,
+    ): ByteArray {
         require(password.isNotEmpty()) { "Password must not be empty" }
         val (salt, ciphertext) = splitArchive(packed)
         val compressed =
@@ -59,7 +68,10 @@ object ArchiveCodec {
         return packed.copyOfRange(MAGIC.size + 1, headerLength) to packed.copyOfRange(headerLength, packed.size)
     }
 
-    private suspend fun cipherFor(password: String, salt: ByteArray): IvAuthenticatedCipher {
+    private suspend fun cipherFor(
+        password: String,
+        salt: ByteArray,
+    ): IvAuthenticatedCipher {
         val provider = CryptographyProvider.Default
         val derivation =
             provider.get(PBKDF2).secretDerivation(

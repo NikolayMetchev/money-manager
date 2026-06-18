@@ -136,7 +136,10 @@ class JvmDatabaseManager : DatabaseManager {
             }
         }
 
-    override suspend fun restore(location: DbLocation, bytes: ByteArray): Unit =
+    override suspend fun restore(
+        location: DbLocation,
+        bytes: ByteArray,
+    ): Unit =
         withContext(Dispatchers.IO) {
             location.path.parent?.let { parentDir ->
                 if (!parentDir.exists()) {

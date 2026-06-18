@@ -2,8 +2,8 @@ package com.moneymanager.remotestorage.sync
 
 import com.moneymanager.archive.ArchiveCodec
 import com.moneymanager.archive.ArchiveDecryptionException
-import com.moneymanager.database.DatabaseManager
 import com.moneymanager.database.DatabaseMaintenanceServiceImpl
+import com.moneymanager.database.DatabaseManager
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.dbLocationFromString

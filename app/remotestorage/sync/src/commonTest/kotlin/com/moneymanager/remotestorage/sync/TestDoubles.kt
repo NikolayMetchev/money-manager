@@ -28,13 +28,16 @@ class InMemoryStorageProvider(
         signedIn = false
     }
 
-    override suspend fun list(): List<RemoteFile> =
-        files.map { (id, value) -> RemoteFile(id, value.first, value.second.size.toLong()) }
+    override suspend fun list(): List<RemoteFile> = files.map { (id, value) -> RemoteFile(id, value.first, value.second.size.toLong()) }
 
     override suspend fun download(fileId: String): ByteArray =
         files[fileId]?.second ?: throw RemoteStorageException("No such file: $fileId")
 
-    override suspend fun upload(fileId: String?, name: String, bytes: ByteArray): RemoteFile {
+    override suspend fun upload(
+        fileId: String?,
+        name: String,
+        bytes: ByteArray,
+    ): RemoteFile {
         val id = fileId ?: "file-${counter++}"
         files[id] = name to bytes
         return RemoteFile(id, name, bytes.size.toLong())
@@ -51,7 +54,10 @@ class SingleProviderFactory(
 ) : RemoteStorageProviderFactory {
     override fun types(): List<RemoteStorageType> = listOf(RemoteStorageType(provider.id, provider.displayName))
 
-    override fun create(providerId: String, config: String?): RemoteStorageProvider = provider
+    override fun create(
+        providerId: String,
+        config: String?,
+    ): RemoteStorageProvider = provider
 }
 
 /** Counts rows in [table] (test helper). */
@@ -72,7 +78,10 @@ class InMemoryLocalSettings : LocalSettings {
 
     override fun getString(key: String): String? = map[key]
 
-    override fun putString(key: String, value: String) {
+    override fun putString(
+        key: String,
+        value: String,
+    ) {
         map[key] = value
     }
 

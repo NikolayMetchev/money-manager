@@ -88,7 +88,10 @@ interface DatabaseManager {
      * for a rehydrated remote database, should be followed by
      * [DatabaseMaintenanceService.fullRefreshMaterializedViews]).
      */
-    suspend fun restore(location: DbLocation, bytes: ByteArray)
+    suspend fun restore(
+        location: DbLocation,
+        bytes: ByteArray,
+    )
 }
 
 data class DatabaseInitializationProgress(

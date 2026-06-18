@@ -38,7 +38,12 @@ class LoopbackRedirectReceiver : AutoCloseable {
 
     private fun acceptRequestTarget(): String? =
         serverSocket.accept().use { socket ->
-            val requestLine = socket.getInputStream().bufferedReader().readLine().orEmpty()
+            val requestLine =
+                socket
+                    .getInputStream()
+                    .bufferedReader()
+                    .readLine()
+                    .orEmpty()
             socket.getOutputStream().writer().apply {
                 write(RESPONSE_BODY)
                 flush()
@@ -50,10 +55,12 @@ class LoopbackRedirectReceiver : AutoCloseable {
     private fun extractCode(requestTarget: String?): String {
         val query = requestTarget?.substringAfter('?', "").orEmpty()
         val params =
-            query.split('&').mapNotNull { pair ->
-                val key = pair.substringBefore('=', "")
-                if (key.isEmpty()) null else key to URLDecoder.decode(pair.substringAfter('=', ""), "UTF-8")
-            }.toMap()
+            query
+                .split('&')
+                .mapNotNull { pair ->
+                    val key = pair.substringBefore('=', "")
+                    if (key.isEmpty()) null else key to URLDecoder.decode(pair.substringAfter('=', ""), "UTF-8")
+                }.toMap()
         params["error"]?.let { throw RemoteAuthException("Google sign-in was denied: $it") }
         return params["code"] ?: throw RemoteAuthException("Google sign-in did not return an authorization code")
     }
