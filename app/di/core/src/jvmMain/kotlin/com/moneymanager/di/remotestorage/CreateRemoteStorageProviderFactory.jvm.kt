@@ -5,7 +5,6 @@ import com.moneymanager.remotestorage.RemoteStorageProvider
 import com.moneymanager.remotestorage.RemoteStorageProviderFactory
 import com.moneymanager.remotestorage.RemoteStorageType
 import com.moneymanager.remotestorage.localfolder.LocalFolderStorageProvider
-import java.io.File
 
 @Suppress("ktlint:standard:function-naming")
 actual fun createRemoteStorageProviderFactory(params: AppComponentParams): RemoteStorageProviderFactory =
@@ -16,7 +15,7 @@ actual fun createRemoteStorageProviderFactory(params: AppComponentParams): Remot
         override fun create(providerId: String, config: String?): RemoteStorageProvider =
             when (providerId) {
                 LOCAL_FOLDER_PROVIDER_ID ->
-                    LocalFolderStorageProvider(File(requireNotNull(config) { "A folder path is required" }))
+                    LocalFolderStorageProvider.forPath(requireNotNull(config) { "A folder path is required" })
                 else -> throw IllegalArgumentException("Unknown remote storage provider: $providerId")
             }
     }

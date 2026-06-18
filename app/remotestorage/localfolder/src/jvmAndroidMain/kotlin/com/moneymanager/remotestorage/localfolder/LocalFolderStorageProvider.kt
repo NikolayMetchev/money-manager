@@ -18,6 +18,26 @@ class LocalFolderStorageProvider(
     override val id: String = "local-folder",
     override val displayName: String = "Local Folder",
 ) : RemoteStorageProvider {
+    companion object {
+        /**
+         * Builds a provider for a user-entered [path], expanding a leading `~` to the user's home
+         * directory (the JVM does not do tilde expansion, so `File("~/mm")` would otherwise create a
+         * literal `~` folder under the working directory).
+         */
+        fun forPath(path: String): LocalFolderStorageProvider = LocalFolderStorageProvider(resolveUserPath(path))
+
+        private fun resolveUserPath(path: String): File {
+            val trimmed = path.trim()
+            val home = System.getProperty("user.home").orEmpty()
+            return when {
+                home.isEmpty() -> File(trimmed)
+                trimmed == "~" -> File(home)
+                trimmed.startsWith("~/") || trimmed.startsWith("~\\") -> File(home, trimmed.substring(2))
+                else -> File(trimmed)
+            }
+        }
+    }
+
     override suspend fun isSignedIn(): Boolean = true
 
     override suspend fun signIn() {

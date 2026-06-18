@@ -2,12 +2,14 @@ package com.moneymanager.remotestorage.localfolder
 
 import com.moneymanager.remotestorage.RemoteStorageException
 import kotlinx.coroutines.test.runTest
+import java.io.File
 import java.nio.file.Files
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 class LocalFolderStorageProviderTest {
     private val tempDir = Files.createTempDirectory("localfolder-test").toFile()
@@ -42,5 +44,22 @@ class LocalFolderStorageProviderTest {
     fun downloadMissingFileFails() =
         runTest {
             assertFailsWith<RemoteStorageException> { provider.download("nope.mmdb") }
+        }
+
+    @Test
+    fun forPathExpandsLeadingTildeToUserHome() =
+        runTest {
+            val home = System.getProperty("user.home")
+            val uniqueDir = "mm-tilde-test-${System.nanoTime()}"
+            val tildeProvider = LocalFolderStorageProvider.forPath("~/$uniqueDir")
+            try {
+                tildeProvider.upload(fileId = null, name = "db.mmdb", bytes = byteArrayOf(7))
+                // Written under the real home directory, not a literal "~" folder in the working dir.
+                assertTrue(File(home, "$uniqueDir/db.mmdb").isFile)
+                assertTrue(!File("~/$uniqueDir").exists())
+            } finally {
+                File(home, uniqueDir).deleteRecursively()
+                File("~").deleteRecursively()
+            }
         }
 }
