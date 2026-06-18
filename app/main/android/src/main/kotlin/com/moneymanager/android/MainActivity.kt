@@ -24,33 +24,40 @@ class MainActivity : ComponentActivity() {
     private var remoteController: RemoteDatabaseController? = null
     private var openDatabase: MoneyManagerDatabaseWrapper? = null
 
-    /** Pushes the open cloud-backed database to its remote backing. Returns true on success. */
-    private fun pushToRemoteIfActive(): Boolean {
+    /**
+     * Ensures the remote copy is current, uploading only if the database changed since the last sync.
+     * Returns true if the remote is up to date afterwards (nothing to push, or the push succeeded).
+     */
+    private fun ensureRemoteUpToDate(): Boolean {
         val controller = remoteController ?: return false
         val database = openDatabase ?: return false
         if (!controller.hasActiveSession()) return false
-        return runCatching { runBlocking { controller.syncNow(database) } }
-            .onFailure { Log.e(TAG, "Failed to sync database", it) }
-            .isSuccess
+        return runCatching {
+            runBlocking {
+                if (controller.hasUnsyncedChanges(database)) {
+                    controller.syncNow(database)
+                }
+            }
+        }.onFailure { Log.e(TAG, "Failed to sync database", it) }.isSuccess
     }
 
     override fun onStop() {
         // Keep the remote copy current when backgrounded. The local copy is NOT removed here: onStop
         // also fires on a simple app switch, and the open database must survive a return to foreground.
-        pushToRemoteIfActive()
+        ensureRemoteUpToDate()
         super.onStop()
     }
 
     override fun onDestroy() {
-        // A true "close": when finishing, push once more and drop the local working copy so only the
+        // A true "close": when finishing, push any changes and drop the local working copy so only the
         // encrypted remote copy is kept between runs.
         val controller = remoteController
         if (isFinishing && controller?.hasActiveSession() == true) {
-            val pushed = pushToRemoteIfActive()
+            val remoteUpToDate = ensureRemoteUpToDate()
             openDatabase?.close()
-            if (pushed) {
+            if (remoteUpToDate) {
                 runCatching { runBlocking { controller.deleteLocalCache() } }
-                    .onSuccess { Log.i(TAG, "Deleted local working copy after syncing to cloud") }
+                    .onSuccess { Log.i(TAG, "Deleted local working copy; cloud copy is up to date") }
                     .onFailure { Log.e(TAG, "Failed to delete local database on close", it) }
             } else {
                 Log.w(TAG, "Kept local database: cloud sync failed, so the local copy is the only safe copy")

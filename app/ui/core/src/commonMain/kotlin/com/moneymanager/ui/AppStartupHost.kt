@@ -52,7 +52,6 @@ private sealed class AppDatabaseState {
 private data class RemoteUnlockState(
     val prompt: String,
     val error: String? = null,
-    val busy: Boolean = false,
 )
 
 private fun initialDatabaseProgress() =
@@ -178,8 +177,10 @@ fun AppStartupHost(
             onUnlock = { password ->
                 val binding = remoteController?.activeBinding()
                 if (binding != null) {
+                    // Close the dialog immediately so the restore progress bar is clearly visible; it is
+                    // only reopened (with an error) if the password was wrong or the download failed.
+                    remoteUnlock = null
                     scope.launch {
-                        remoteUnlock = unlock.copy(busy = true, error = null)
                         databaseState =
                             AppDatabaseState.Loading(DatabaseInitializationProgress("Restoring from cloud…", 0, 100))
                         try {
@@ -201,16 +202,15 @@ fun AppStartupHost(
                                 )
                             if (error == null) {
                                 localSettings.putString(KEY_LAST_DATABASE, location.toString())
-                                remoteUnlock = null
                             } else {
-                                remoteUnlock = unlock.copy(busy = false, error = error.message ?: "Failed to open database")
+                                remoteUnlock = unlock.copy(error = error.message ?: "Failed to open database")
                             }
                         } catch (expected: CancellationException) {
                             throw expected
                         } catch (expected: Exception) {
                             onErrorLog("Failed to restore database from cloud", expected)
                             databaseState = AppDatabaseState.Loading(initialDatabaseProgress())
-                            remoteUnlock = unlock.copy(busy = false, error = "Wrong password, or download failed")
+                            remoteUnlock = unlock.copy(error = "Wrong password, or download failed")
                         }
                     }
                 }
@@ -269,15 +269,14 @@ private fun RemoteDatabaseUnlockDialog(
                     onValueChange = { password = it },
                     label = { Text("Password") },
                     singleLine = true,
-                    enabled = !state.busy,
                     visualTransformation = PasswordVisualTransformation(),
                 )
                 state.error?.let { Text(it) }
             }
         },
         confirmButton = {
-            TextButton(onClick = { onUnlock(password) }, enabled = !state.busy && password.isNotEmpty()) {
-                Text(if (state.busy) "Restoring…" else "Unlock")
+            TextButton(onClick = { onUnlock(password) }, enabled = password.isNotEmpty()) {
+                Text("Unlock")
             }
         },
     )

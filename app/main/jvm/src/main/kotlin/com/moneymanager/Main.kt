@@ -98,22 +98,30 @@ private fun MainWindow(onExit: () -> Unit) {
                 closeProgress != null -> Unit // a close sync is already in progress; ignore repeat clicks
                 database == null || !hasSession -> onExit()
                 else -> {
-                    // Upload the latest database (with a progress screen), then delete the local working
-                    // copy: when cloud storage is in use only the encrypted remote copy is kept between runs.
-                    closeProgress = DatabaseInitializationProgress("Preparing to sync…", 0, 100)
+                    // Upload the latest database only if it changed (with a progress screen), then delete
+                    // the local working copy: when cloud storage is in use only the encrypted remote copy
+                    // is kept between runs.
+                    closeProgress = DatabaseInitializationProgress("Checking for changes…", 0, 100)
                     scope.launch {
-                        val pushed =
-                            runCatching {
-                                remoteController.syncNow(database, rebuildViews = false) { progress ->
-                                    closeProgress =
-                                        DatabaseInitializationProgress(progress.message, (progress.fraction * 100).toInt(), 100)
-                                }
-                            }.onFailure { logger.error(it) { "Failed to sync database on close" } }.isSuccess
+                        // If we can't tell, assume changed and upload to be safe.
+                        val changed = runCatching { remoteController.hasUnsyncedChanges(database) }.getOrDefault(true)
+                        val remoteUpToDate =
+                            if (changed) {
+                                runCatching {
+                                    remoteController.syncNow(database, rebuildViews = false) { progress ->
+                                        closeProgress =
+                                            DatabaseInitializationProgress(progress.message, (progress.fraction * 100).toInt(), 100)
+                                    }
+                                }.onFailure { logger.error(it) { "Failed to sync database on close" } }.isSuccess
+                            } else {
+                                logger.info { "No changes since last sync; skipping upload on close" }
+                                true
+                            }
                         closeProgress = DatabaseInitializationProgress("Finishing…", 95, 100)
                         database.close()
-                        if (pushed) {
+                        if (remoteUpToDate) {
                             runCatching { remoteController.deleteLocalCache() }
-                                .onSuccess { logger.info { "Deleted local working copy after syncing to cloud" } }
+                                .onSuccess { logger.info { "Deleted local working copy; cloud copy is up to date" } }
                                 .onFailure { logger.error(it) { "Failed to delete local database on close" } }
                         } else {
                             logger.warn { "Kept local database: cloud sync failed, so the local copy is the only safe copy" }
