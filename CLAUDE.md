@@ -38,8 +38,12 @@ Money Manager is a Kotlin Multiplatform personal finance app targeting JVM and A
 | `gradle/build-logic/` | Convention plugins (kotlin, android, compose, metro, mappie) |
 | `utils/bigdecimal/` | Arbitrary-precision decimal arithmetic (JVM/Android) |
 | `utils/currency/` | Locale-aware currency formatting |
+| `utils/archive/` | Compress + password-encrypt the DB archive (`ArchiveCodec`); shared by remote backends |
 | `app/model/core/` | Domain models and repository interfaces |
 | `app/db/core/` | SQLDelight database, repository implementations, mappers |
+| `app/remotestorage/core/` | Generic `RemoteStorageProvider` interface + factory (DB-free, backend-agnostic) |
+| `app/remotestorage/googledrive/` | Google Drive backend — Drive REST v3 over Ktor (JVM + Android) |
+| `app/remotestorage/sync/` | Hydrate/push orchestration (`RemoteDatabaseSyncService`/`RemoteDatabaseController`) |
 | `app/di/core/` | Metro DI configuration |
 | `app/ui/core/` | Compose UI (JVM/Android only) |
 | `app/main/jvm/` | JVM Desktop entry point |
@@ -78,6 +82,34 @@ so existing local databases are expected to be deleted/recreated rather than mig
 **Important**: Store booleans as INTEGER (0/1). Don't use `AS Boolean` in .sq files.
 
 **Mappie** generates type-safe mappers from database entities to domain models. Annotate mapper interfaces with `@Mapper`.
+
+## Remote Storage (Cloud-backed databases)
+
+A database can optionally be backed by remote storage (currently **Google Drive**). SQLite can't run
+against a remote file, so a "cloud-backed database" is a **local working copy hydrated from the cloud on
+open and pushed back on close** (plus an explicit "Sync now"). Before upload the DB is **shrunk**
+(materialized views truncated + VACUUM via the snapshot path), **compressed and encrypted**; opening
+re-hydrates it (decrypt → inflate → write local `.db` → rebuild materialized views).
+
+**Layering — keep these separate (do not collapse them):**
+- `utils/archive` — `ArchiveCodec.pack/unpack`: Deflate → PBKDF2-SHA256 → AES-GCM. Pure `commonMain`,
+  backend-agnostic. Wrong password / tampering surfaces as `ArchiveDecryptionException`.
+- `app/remotestorage/core` — generic `RemoteStorageProvider` (a *dumb* file store:
+  `upload`/`download`/`list`/`delete`) + `RemoteStorageProviderFactory`. **DB-free and crypto-free** on
+  purpose, so backends stay reusable and testable. Don't add DB/encryption methods here.
+- `app/remotestorage/googledrive` — Drive REST v3 over the shared **Ktor** client, in one
+  `jvmAndroidMain` source set (runs on JVM **and** Android; the Google Java SDK is JVM-only and not used).
+  OAuth is the installed-app loopback flow; the only platform-specific piece is `BrowserLauncher`.
+- `app/remotestorage/sync` — composes `DatabaseManager` + `ArchiveCodec` + a provider:
+  `RemoteDatabaseSyncService` (the pipeline) and `RemoteDatabaseController` (session-scoped facade that
+  reconstructs the provider via the factory and holds the in-memory password). `RemoteDatabaseController`
+  is the single DI entry point exposed by `AppComponent`.
+
+**Bring-your-own credentials**: the app ships **no** Google secrets. Each user supplies their own OAuth
+client (Desktop type) via the in-app wizard; least-privilege `drive.file` scope. The refresh token is
+persisted in `LocalSettings` keyed by a short hash of the OAuth client id (raw ids exceed the JVM prefs
+80-char key limit). Connection scope is **per database** — each binding stores its own OAuth client, so
+different databases can use different Google accounts.
 
 ## Dependency Injection
 

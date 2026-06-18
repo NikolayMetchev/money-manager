@@ -27,6 +27,11 @@ A personal finance money manager built with **Kotlin Multiplatform** and **Compo
 * **Excluded transactions** — mark transactions to omit them from balance calculations while keeping them visible
 * **Running & account balances** — maintained via incrementally-refreshed materialized views
 * **Audit history** — full audit trail with timestamps and source attribution (device, file, API session)
+* **Cloud-backed databases** — optionally store your database on **Google Drive**: a local working copy is
+  hydrated from Drive on open and pushed back on close (and on demand via **Sync now**). Before upload the
+  database is shrunk (materialized views truncated + VACUUM), **compressed and password-encrypted**, so
+  Drive only ever holds an opaque blob. **Bring-your-own credentials** — you supply your own OAuth client
+  (no app-owned secrets) via an in-app wizard; least-privilege `drive.file` scope. Works on Desktop and Android.
 * **Desktop app** — JVM/Compose Desktop with native distributions (Windows, macOS, Linux)
 * **Android app**
 * **Database documentation** — auto-generated [SchemaSpy ER diagrams & docs](https://nikolaymetchev.github.io/money-manager/database/)
@@ -36,7 +41,6 @@ A personal finance money manager built with **Kotlin Multiplatform** and **Compo
 
 * Charting, slicing & dicing — data exploration
 * Budgeting and forecasting
-* Google Drive integration
 * AI classification of transactions
 * Export to GnuCash
 * Tags on all objects; categorisation hierarchy for accounts, people and assets
@@ -75,10 +79,14 @@ A personal finance money manager built with **Kotlin Multiplatform** and **Compo
 | `utils/parsers/csv/`, `utils/parsers/qif/` | CSV and QIF file parsers |
 | `utils/rest/` | REST/HTTP utilities |
 | `utils/compose/*` | Reusable Compose components (file picker, scrollbar) |
+| `utils/archive/` | Compress + password-encrypt the database archive (shared by remote backends) |
 | `app/model/core/` | Domain models and repository interfaces |
 | `app/db/core/` | SQLDelight database, repository implementations, mappers |
 | `app/importmodel/` | Shared import data structures and dedup policies |
 | `app/importer/` | Central import engine (CSV / QIF / API) and deduplication |
+| `app/remotestorage/core/` | Generic remote-storage provider interface (DB-free, backend-agnostic) |
+| `app/remotestorage/googledrive/` | Google Drive backend — Drive REST v3 over Ktor (JVM + Android) |
+| `app/remotestorage/sync/` | Hydrate/push orchestration + remote-binding persistence |
 | `app/di/core/` | Metro DI configuration |
 | `app/ui/core/` | Compose UI (JVM/Android) |
 | `app/main/jvm/` | JVM Desktop entry point |
