@@ -26,6 +26,7 @@ kotlin {
 
                 implementation(libs.human.readable)
                 implementation(libs.kmlogging)
+                implementation(projects.app.remotestorage.googledrive)
                 implementation(projects.utils.compose.filePicker)
                 implementation(projects.utils.compose.scrollbar)
                 implementation(projects.utils.currency)
@@ -85,6 +86,7 @@ kotlin {
                 api(projects.app.importengineapi)
                 api(projects.app.model.core)
                 api(projects.app.qifimporter)
+                api(projects.app.remotestorage.core)
                 api(projects.app.remotestorage.sync)
                 api(projects.utils.bigdecimal)
                 api(projects.utils.localsettings)

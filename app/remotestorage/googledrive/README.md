@@ -4,40 +4,51 @@ A [`RemoteStorageProvider`](../core) implementation that stores the encrypted, c
 archive (`*.mmenc`, produced by [`utils/archive`](../../../utils/archive)) on the user's Google Drive.
 
 The database is never opened "live" from Drive — SQLite needs a local file. A Drive-backed database is a
-**local working copy** that is hydrated from Drive on open and pushed back on close (see
+**local working copy** hydrated from Drive on open and pushed back on close (see
 [`app/remotestorage/sync`](../sync)). This module only provides the storage transport.
+
+## Design: REST over Ktor, runs on JVM **and** Android
+
+Unlike the Google Java SDK (whose OAuth helpers are JVM-only), this backend talks to the **Drive REST API
+v3 over the shared KMP [Ktor](../../../utils/rest) client** and does the OAuth code exchange itself, so the
+*entire* provider lives in one `jvmAndroidMain` source set and behaves identically on JVM and Android. The
+only platform-specific piece is launching the system browser ([`BrowserLauncher`](src) — `Desktop.browse`
+on JVM, an `ACTION_VIEW` intent on Android).
+
+- `GoogleDriveProvider` — Drive REST v3 (`list`/`download`/multipart `upload`/`delete`).
+- `GoogleOAuth` — consent URL, `code`→tokens, `refresh_token`→access token.
+- `LoopbackRedirectReceiver` — a raw `java.net.ServerSocket` on `127.0.0.1` that catches the OAuth redirect
+  (works on JVM and Android; loopback is the only redirect a Desktop OAuth client allows).
+- `GoogleDriveAccountStore` — persists the refresh token in `LocalSettings`, keyed by OAuth client id.
+
+## Bring-your-own credentials (no app-owned secrets)
+
+This app ships **no** Google API credentials. Each user creates **their own** OAuth client; the in-app
+setup wizard (Settings → Cloud storage → "Store/Open … Google Drive") guides them and never sees an
+app-owned secret. Per database: each Drive-backed database stores its own OAuth client in its binding, so
+different databases can use different Google accounts.
+
+### One-time setup the wizard walks the user through
+1. Open the [Google Cloud Console](https://console.cloud.google.com/) and create or pick a project.
+2. **APIs & Services → Library** → enable the **Google Drive API**.
+3. **APIs & Services → OAuth consent screen** → configure it (External is fine) and add the Google account
+   under **Test users** (the `drive.file` scope is "sensitive", so an unverified app must allowlist testers;
+   users otherwise see a bypassable "unverified app" warning).
+4. **Credentials → Create credentials → OAuth client ID** → application type **Desktop app** →
+   **Download JSON**.
+5. Paste that `credentials.json` into the wizard and **Sign in with Google**. The browser opens for consent;
+   the resulting refresh token is cached in `LocalSettings` so later launches refresh silently.
 
 ## Least privilege
 
 Only the **`drive.file`** scope is requested, so Money Manager can see and manage **only the files it
-created** — never the rest of the user's Drive. Uploaded archives are tagged with an
-`appProperties` marker (`moneymanagerDb=true`) so the app can find them again across devices.
+created** — never the rest of the user's Drive. Uploaded archives are tagged with an `appProperties`
+marker (`moneymanagerDb=true`) so the app can find them again across devices, and updates happen in place
+so the remote file id stays stable across syncs.
 
-## One-time setup: create an OAuth client
+## iOS (planned)
 
-The Drive API requires *your own* OAuth client; there is nothing to ship a secret for in an open-source
-desktop app, so each user supplies their own (this is the standard installed-app pattern).
-
-1. Open the [Google Cloud Console](https://console.cloud.google.com/) and create (or pick) a project.
-2. **APIs & Services → Library** → enable the **Google Drive API**.
-3. **APIs & Services → OAuth consent screen** → configure it (External is fine), add your Google
-   account under **Test users** while the app is unverified.
-4. **APIs & Services → Credentials → Create credentials → OAuth client ID** → application type
-   **Desktop app** → **Download JSON**.
-5. Save that file as `~/.moneymanager/google-drive-credentials.json` (the default location), or point the
-   provider at a custom path via the database binding's provider config.
-
-On first use, **Store database → Google Drive** opens your browser for consent; the resulting refresh
-token is cached under `~/.moneymanager/google-drive-tokens/` so later launches restore the session
-silently.
-
-## Platform support
-
-| Platform | Status | How |
-|----------|--------|-----|
-| **JVM (desktop)** | ✅ implemented | Installed-app OAuth via `google-oauth-client-jetty`; browser + localhost loopback (`LocalServerReceiver`), refresh token in `FileDataStoreFactory`. |
-| **Android** | ⚠️ follow-up | Use the Credential Manager / Google Sign-In account picker to obtain a `GoogleAccountCredential` with the `drive.file` scope, then reuse the Drive Java SDK. Needs Activity integration (account picker + consent) and an Android OAuth client (with the app's SHA-1), so it lives outside this pure-Kotlin module. Until then, Android falls back to the local/synced-folder backend (a Drive desktop-sync folder still works). |
-| **iOS** | ⚠️ planned | The Drive Java SDK is unavailable. The iOS `actual` will call the **Drive REST API via Ktor** (reuse `utils/rest`) with OAuth through the **GoogleSignIn iOS SDK / `ASWebAuthenticationSession`**, behind this same `RemoteStorageProvider` contract. The `commonMain` archive codec (KMP crypto) and the generic interface are exactly what make this drop-in. |
-
-Because every backend speaks the same `RemoteStorageProvider` interface and exchanges opaque
-`ByteArray` archives, adding OneDrive / Dropbox / iDrive later is the same shape as this module.
+The same REST-over-Ktor provider is a near drop-in for iOS; only `BrowserLauncher` and the loopback
+receiver need Apple actuals (or `ASWebAuthenticationSession`). The `commonMain` archive codec (KMP crypto)
+and the generic `RemoteStorageProvider` interface are what make this — and future OneDrive/Dropbox/iDrive
+backends — the same shape.

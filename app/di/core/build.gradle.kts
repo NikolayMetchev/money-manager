@@ -38,6 +38,7 @@ kotlin {
                 api(projects.app.remotestorage.core)
                 api(projects.app.remotestorage.sync)
 
+                implementation(projects.app.remotestorage.googledrive)
                 implementation(projects.app.remotestorage.localfolder)
             }
         }

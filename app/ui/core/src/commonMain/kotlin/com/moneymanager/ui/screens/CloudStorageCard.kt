@@ -28,6 +28,7 @@ import com.moneymanager.domain.model.defaultRemoteArchiveName
 import com.moneymanager.domain.model.remoteCacheLocation
 import com.moneymanager.remotestorage.RemoteFile
 import com.moneymanager.remotestorage.RemoteStorageType
+import com.moneymanager.remotestorage.googledrive.GOOGLE_DRIVE_PROVIDER_ID
 import com.moneymanager.remotestorage.sync.RemoteDatabaseBinding
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.remotestorage.sync.SyncProgress
@@ -143,54 +144,85 @@ fun CloudStorageCard(
         }
     }
 
-    createType?.let { type ->
-        CreateRemoteDialog(
-            type = type,
-            defaultName =
-                defaultRemoteArchiveName(
-                    currentDatabaseLocation.toString().substringAfterLast('/').substringAfterLast('\\'),
-                ),
-            onDismiss = { createType = null },
-            onConfirm = { config, name, password ->
-                createType = null
-                busy = true
-                scope.launch {
-                    runCatching {
-                        controller.createRemote(type.id, config, name, currentDatabaseLocation, database, password) {
-                            syncProgress = it
-                        }
-                    }.onSuccess {
-                        binding = it
-                        sessionActive = true
-                        message = "Stored in ${type.displayName} as ${it.remoteName}"
-                    }.onFailure { message = "Upload failed: ${it.message}" }
-                    syncProgress = null
-                    busy = false
-                }
-            },
+    val defaultArchiveName =
+        defaultRemoteArchiveName(
+            currentDatabaseLocation.toString().substringAfterLast('/').substringAfterLast('\\'),
         )
+
+    // Shared create/open handlers so the folder dialogs and the Google Drive wizard drive the same flow.
+    fun startCreate(type: RemoteStorageType, config: String?, name: String, password: String) {
+        createType = null
+        busy = true
+        scope.launch {
+            runCatching {
+                controller.createRemote(type.id, config, name, currentDatabaseLocation, database, password) {
+                    syncProgress = it
+                }
+            }.onSuccess {
+                binding = it
+                sessionActive = true
+                message = "Stored in ${type.displayName} as ${it.remoteName}"
+            }.onFailure { message = "Upload failed: ${it.message}" }
+            syncProgress = null
+            busy = false
+        }
+    }
+
+    fun startOpen(type: RemoteStorageType, config: String?, file: RemoteFile, password: String) {
+        openType = null
+        busy = true
+        scope.launch {
+            runCatching {
+                controller.openRemote(type.id, config, file, remoteCacheLocation(file.name), password) {
+                    syncProgress = it
+                }
+            }.onSuccess { onRequestSwitchDatabase(it) }
+                .onFailure { message = "Open failed: ${it.message}" }
+            syncProgress = null
+            busy = false
+        }
+    }
+
+    createType?.let { type ->
+        if (type.id == GOOGLE_DRIVE_PROVIDER_ID) {
+            GoogleDriveSetupDialog(
+                mode = GoogleDriveSetupMode.CREATE,
+                defaultName = defaultArchiveName,
+                onSignIn = { config -> controller.signInTo(type.id, config) },
+                onList = { config -> controller.list(type.id, config) },
+                onCreate = { config, name, password -> startCreate(type, config, name, password) },
+                onOpen = { _, _, _ -> },
+                onDismiss = { createType = null },
+            )
+        } else {
+            CreateRemoteDialog(
+                type = type,
+                defaultName = defaultArchiveName,
+                onDismiss = { createType = null },
+                onConfirm = { config, name, password -> startCreate(type, config, name, password) },
+            )
+        }
     }
 
     openType?.let { type ->
-        OpenRemoteDialog(
-            type = type,
-            onDismiss = { openType = null },
-            onList = { config -> controller.list(type.id, config) },
-            onConfirm = { config, file, password ->
-                openType = null
-                busy = true
-                scope.launch {
-                    runCatching {
-                        controller.openRemote(type.id, config, file, remoteCacheLocation(file.name), password) {
-                            syncProgress = it
-                        }
-                    }.onSuccess { onRequestSwitchDatabase(it) }
-                        .onFailure { message = "Open failed: ${it.message}" }
-                    syncProgress = null
-                    busy = false
-                }
-            },
-        )
+        if (type.id == GOOGLE_DRIVE_PROVIDER_ID) {
+            GoogleDriveSetupDialog(
+                mode = GoogleDriveSetupMode.OPEN,
+                defaultName = defaultArchiveName,
+                onSignIn = { config -> controller.signInTo(type.id, config) },
+                onList = { config -> controller.list(type.id, config) },
+                onCreate = { _, _, _ -> },
+                onOpen = { config, file, password -> startOpen(type, config, file, password) },
+                onDismiss = { openType = null },
+            )
+        } else {
+            OpenRemoteDialog(
+                type = type,
+                onDismiss = { openType = null },
+                onList = { config -> controller.list(type.id, config) },
+                onConfirm = { config, file, password -> startOpen(type, config, file, password) },
+            )
+        }
     }
 
     if (showResume) {
@@ -383,7 +415,7 @@ private fun PasswordDialog(
 }
 
 @Composable
-private fun PasswordField(
+internal fun PasswordField(
     value: String,
     onValueChange: (String) -> Unit,
     label: String,

@@ -15,8 +15,10 @@ import dev.zacsweers.metro.SingleIn
 interface RemoteStorageModule {
     @Provides
     @SingleIn(AppScope::class)
-    fun provideRemoteStorageProviderFactory(params: AppComponentParams): RemoteStorageProviderFactory =
-        createRemoteStorageProviderFactory(params)
+    fun provideRemoteStorageProviderFactory(
+        params: AppComponentParams,
+        localSettings: LocalSettings,
+    ): RemoteStorageProviderFactory = createRemoteStorageProviderFactory(params, localSettings)
 
     @Provides
     @SingleIn(AppScope::class)

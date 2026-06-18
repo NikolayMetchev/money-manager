@@ -1,20 +1,21 @@
 package com.moneymanager.di.remotestorage
 
 import com.moneymanager.di.AppComponentParams
+import com.moneymanager.localsettings.LocalSettings
 import com.moneymanager.remotestorage.RemoteStorageProvider
 import com.moneymanager.remotestorage.RemoteStorageProviderFactory
 import com.moneymanager.remotestorage.RemoteStorageType
+import com.moneymanager.remotestorage.googledrive.DesktopBrowserLauncher
 import com.moneymanager.remotestorage.googledrive.GOOGLE_DRIVE_PROVIDER_ID
-import com.moneymanager.remotestorage.googledrive.GoogleDriveProvider
+import com.moneymanager.remotestorage.googledrive.googleDriveProvider
 import com.moneymanager.remotestorage.localfolder.LocalFolderStorageProvider
-import java.io.File
 
 @Suppress("ktlint:standard:function-naming")
-actual fun createRemoteStorageProviderFactory(params: AppComponentParams): RemoteStorageProviderFactory =
+actual fun createRemoteStorageProviderFactory(
+    params: AppComponentParams,
+    localSettings: LocalSettings,
+): RemoteStorageProviderFactory =
     object : RemoteStorageProviderFactory {
-        // Where the Google Drive OAuth client secrets + cached token live by default.
-        private val appDir = File(System.getProperty("user.home"), ".moneymanager")
-
         override fun types(): List<RemoteStorageType> =
             listOf(
                 RemoteStorageType(LOCAL_FOLDER_PROVIDER_ID, "Local / Synced Folder", requiresFolder = true),
@@ -25,7 +26,7 @@ actual fun createRemoteStorageProviderFactory(params: AppComponentParams): Remot
             when (providerId) {
                 LOCAL_FOLDER_PROVIDER_ID ->
                     LocalFolderStorageProvider.forPath(requireNotNull(config) { "A folder path is required" })
-                GOOGLE_DRIVE_PROVIDER_ID -> GoogleDriveProvider.forConfig(config, appDir)
+                GOOGLE_DRIVE_PROVIDER_ID -> googleDriveProvider(config, localSettings, DesktopBrowserLauncher())
                 else -> throw IllegalArgumentException("Unknown remote storage provider: $providerId")
             }
     }

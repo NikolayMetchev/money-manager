@@ -53,6 +53,15 @@ class RemoteDatabaseController(
     private suspend fun currentToken(database: MoneyManagerDatabaseWrapper): Long =
         withContext(Dispatchers.Default) { database.dataChangeToken() }
 
+    /**
+     * Ensures there is a usable session with [providerId] for the given [config], performing interactive
+     * sign-in if needed (e.g. the Google Drive consent flow). Lets a setup wizard validate the connection
+     * before collecting an archive name/password. Throws if authentication fails.
+     */
+    suspend fun signInTo(providerId: String, config: String?) {
+        resolve(providerId, config)
+    }
+
     /** Lists the archives stored by [providerId] (signing in if needed) for an open-from-remote picker. */
     suspend fun list(providerId: String, config: String?): List<RemoteFile> {
         val provider = resolve(providerId, config)
