@@ -12,19 +12,22 @@ import io.ktor.client.request.get
 import io.ktor.client.request.patch
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import io.ktor.client.request.url
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
+import io.ktor.http.ContentType.Application.Json
+import io.ktor.http.ContentType.Application.OctetStream
+import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
-import io.ktor.http.encodeURLParameter
 import io.ktor.http.isSuccess
 import io.ktor.http.withCharset
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import java.io.ByteArrayOutputStream
 import kotlin.time.Instant
+import kotlinx.serialization.json.Json as JsonFormat
 
 /**
  * A [RemoteStorageProvider] backed by Google Drive, spoken directly over the Drive REST API v3 with the
@@ -81,24 +84,35 @@ class GoogleDriveProvider(
 
     override suspend fun list(): List<RemoteFile> =
         withContext(Dispatchers.IO) {
-            val query = "'${folderId()}' in parents and trashed = false"
-            val url =
-                "$FILES_ENDPOINT?q=${query.encodeURLParameter()}&spaces=drive" +
-                    "&fields=${"files($FILE_FIELDS)".encodeURLParameter()}"
-            val body = httpClient.get(url).requireBody("list Google Drive files")
+            val driveQuery = "'${folderId()}' in parents and trashed = false"
+            val body =
+                httpClient
+                    .get(FILES_ENDPOINT) {
+                        url {
+                            parameters.append("q", driveQuery)
+                            parameters.append("spaces", "drive")
+                            parameters.append("fields", "files($FILE_FIELDS)")
+                        }
+                    }.requireBody("list Google Drive files")
             json.decodeFromString<DriveFileList>(body).files.map { it.toRemoteFile() }
         }
 
     override suspend fun stat(fileId: String): RemoteFile? =
         withContext(Dispatchers.IO) {
-            val response = httpClient.get("$FILES_ENDPOINT/$fileId?fields=${FILE_FIELDS.encodeURLParameter()}")
+            val response =
+                httpClient.get("$FILES_ENDPOINT/$fileId") {
+                    url { parameters.append("fields", FILE_FIELDS) }
+                }
             if (!response.status.isSuccess()) return@withContext null
             json.decodeFromString<DriveFile>(response.bodyAsText()).toRemoteFile()
         }
 
     override suspend fun download(fileId: String): ByteArray =
         withContext(Dispatchers.IO) {
-            val response = httpClient.get("$FILES_ENDPOINT/$fileId?alt=media")
+            val response =
+                httpClient.get("$FILES_ENDPOINT/$fileId") {
+                    url { parameters.append("alt", "media") }
+                }
             if (!response.status.isSuccess()) {
                 throw RemoteStorageException("Failed to download $fileId from Google Drive (${response.status.value})")
             }
@@ -120,19 +134,16 @@ class GoogleDriveProvider(
                     DriveFileMetadata(name = name)
                 }
             val body = multipartRelated(boundary, json.encodeToString(metadata), bytes)
-            val fields = FILE_FIELDS.encodeURLParameter()
-            val url =
-                if (fileId == null) {
-                    "$UPLOAD_ENDPOINT?uploadType=multipart&fields=$fields"
-                } else {
-                    "$UPLOAD_ENDPOINT/$fileId?uploadType=multipart&fields=$fields"
+            val endpoint = if (fileId == null) UPLOAD_ENDPOINT else "$UPLOAD_ENDPOINT/$fileId"
+            val configure: HttpRequestBuilder.() -> Unit = {
+                url {
+                    parameters.append("uploadType", "multipart")
+                    parameters.append("fields", FILE_FIELDS)
                 }
+                multipartBody(boundary, body)
+            }
             val response =
-                if (fileId == null) {
-                    httpClient.post(url) { multipartBody(boundary, body) }
-                } else {
-                    httpClient.patch(url) { multipartBody(boundary, body) }
-                }
+                if (fileId == null) httpClient.post(endpoint, configure) else httpClient.patch(endpoint, configure)
             json.decodeFromString<DriveFile>(response.requireBody("upload to Google Drive")).toRemoteFile()
         }
 
@@ -150,9 +161,16 @@ class GoogleDriveProvider(
     /** Finds (or creates on first use) the app's "Money Manager" Drive folder and returns its id. */
     private suspend fun folderId(): String {
         cachedFolderId?.let { return it }
-        val query = "mimeType = '$FOLDER_MIME_TYPE' and name = '$GOOGLE_DRIVE_FOLDER_NAME' and trashed = false"
-        val url = "$FILES_ENDPOINT?q=${query.encodeURLParameter()}&spaces=drive&fields=${"files(id)".encodeURLParameter()}"
-        val body = httpClient.get(url).requireBody("find Drive folder")
+        val driveQuery = "mimeType = '$FOLDER_MIME_TYPE' and name = '$GOOGLE_DRIVE_FOLDER_NAME' and trashed = false"
+        val body =
+            httpClient
+                .get(FILES_ENDPOINT) {
+                    url {
+                        parameters.append("q", driveQuery)
+                        parameters.append("spaces", "drive")
+                        parameters.append("fields", "files(id)")
+                    }
+                }.requireBody("find Drive folder")
         val id =
             json
                 .decodeFromString<DriveFileList>(body)
@@ -167,8 +185,9 @@ class GoogleDriveProvider(
         val metadata =
             DriveFileMetadata(name = GOOGLE_DRIVE_FOLDER_NAME, mimeType = FOLDER_MIME_TYPE, appProperties = APP_PROPERTIES)
         val response =
-            httpClient.post("$FILES_ENDPOINT?fields=id") {
-                contentType(ContentType.Application.Json)
+            httpClient.post(FILES_ENDPOINT) {
+                url { parameters.append("fields", "id") }
+                contentType(Json)
                 setBody(json.encodeToString(metadata))
             }
         return json.decodeFromString<DriveFile>(response.requireBody("create Drive folder")).id
@@ -217,7 +236,7 @@ class GoogleDriveProvider(
         const val FILE_FIELDS = "id,name,size,modifiedTime"
         const val HTTP_NOT_FOUND = 404
         val APP_PROPERTIES = mapOf(APP_PROPERTY_KEY to "true")
-        val json = Json { ignoreUnknownKeys = true }
+        val json = JsonFormat { ignoreUnknownKeys = true }
 
         fun HttpRequestBuilder.multipartBody(
             boundary: String,
@@ -235,15 +254,23 @@ class GoogleDriveProvider(
             metadataJson: String,
             media: ByteArray,
         ): ByteArray {
-            val jsonPart = ContentType.Application.Json.withCharset(Charsets.UTF_8)
-            val mediaPart = ContentType.Application.OctetStream
+            // MIME requires CRLF line endings, so they stay explicit (a raw string would emit LF and
+            // corrupt the body). A local writer drops the repeated .toByteArray() so the parts read clearly.
+            val jsonPart = Json.withCharset(Charsets.UTF_8)
+            val mediaPart = OctetStream
             return ByteArrayOutputStream()
                 .apply {
-                    write("--$boundary\r\nContent-Type: $jsonPart\r\n\r\n".toByteArray())
-                    write(metadataJson.toByteArray())
-                    write("\r\n--$boundary\r\nContent-Type: $mediaPart\r\n\r\n".toByteArray())
+                    val line = { text: String -> write("$text\r\n".toByteArray()) }
+                    line("--$boundary")
+                    line("${HttpHeaders.ContentType}: $jsonPart")
+                    line("")
+                    line(metadataJson)
+                    line("--$boundary")
+                    line("${HttpHeaders.ContentType}: $mediaPart")
+                    line("")
                     write(media)
-                    write("\r\n--$boundary--\r\n".toByteArray())
+                    line("")
+                    line("--$boundary--")
                 }.toByteArray()
         }
     }

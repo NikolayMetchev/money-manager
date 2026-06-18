@@ -5,7 +5,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.request.forms.submitForm
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.Parameters
-import io.ktor.http.encodeURLParameter
+import io.ktor.http.URLBuilder
 import io.ktor.http.isSuccess
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -30,16 +30,16 @@ class GoogleOAuth(
         clientId: String,
         redirectUri: String,
     ): String =
-        buildString {
-            append(AUTH_ENDPOINT)
-            append("?client_id=").append(clientId.encodeURLParameter())
-            append("&redirect_uri=").append(redirectUri.encodeURLParameter())
-            append("&response_type=code")
-            append("&scope=").append(DRIVE_FILE_SCOPE.encodeURLParameter())
-            // offline + consent forces Google to return a refresh token we can reuse silently later.
-            append("&access_type=offline")
-            append("&prompt=consent")
-        }
+        URLBuilder(AUTH_ENDPOINT)
+            .apply {
+                parameters.append("client_id", clientId)
+                parameters.append("redirect_uri", redirectUri)
+                parameters.append("response_type", "code")
+                parameters.append("scope", DRIVE_FILE_SCOPE)
+                // offline + consent forces Google to return a refresh token we can reuse silently later.
+                parameters.append("access_type", "offline")
+                parameters.append("prompt", "consent")
+            }.buildString()
 
     suspend fun exchangeCode(
         credentials: GoogleDriveCredentials,
