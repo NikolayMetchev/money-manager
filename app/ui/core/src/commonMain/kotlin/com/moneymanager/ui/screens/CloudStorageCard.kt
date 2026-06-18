@@ -119,16 +119,15 @@ fun CloudStorageCard(
             } else {
                 val type = controller.providerFactory.types().firstOrNull { it.id == currentBinding.providerId }
                 val providerLabel = type?.displayName ?: currentBinding.providerId
+                val isGoogleDrive = currentBinding.providerId == GOOGLE_DRIVE_PROVIDER_ID
                 val locationPath =
-                    when {
-                        type?.requiresFolder == true ->
-                            "${currentBinding.providerConfig.orEmpty().trimEnd('/', '\\')}/${currentBinding.remoteName}"
-                        currentBinding.providerId == GOOGLE_DRIVE_PROVIDER_ID ->
-                            "$GOOGLE_DRIVE_FOLDER_NAME/${currentBinding.remoteName}"
-                        else -> currentBinding.remoteName
+                    if (isGoogleDrive) {
+                        "$GOOGLE_DRIVE_FOLDER_NAME/${currentBinding.remoteName}"
+                    } else {
+                        currentBinding.remoteName
                     }
                 val onOpenRemote: (() -> Unit)? =
-                    if (currentBinding.providerId == GOOGLE_DRIVE_PROVIDER_ID) {
+                    if (isGoogleDrive) {
                         { uriHandler.openUri("https://drive.google.com/file/d/${currentBinding.remoteFileId}/view") }
                     } else {
                         null
@@ -183,7 +182,6 @@ fun CloudStorageCard(
             currentDatabaseLocation.toString().substringAfterLast('/').substringAfterLast('\\'),
         )
 
-    // Shared create/open handlers so the folder dialogs and the Google Drive wizard drive the same flow.
     fun startCreate(
         type: RemoteStorageType,
         config: String?,
@@ -228,45 +226,27 @@ fun CloudStorageCard(
     }
 
     createType?.let { type ->
-        if (type.id == GOOGLE_DRIVE_PROVIDER_ID) {
-            GoogleDriveSetupDialog(
-                mode = GoogleDriveSetupMode.CREATE,
-                defaultName = defaultArchiveName,
-                onSignIn = { config -> controller.signInTo(type.id, config) },
-                onList = { config -> controller.list(type.id, config) },
-                onCreate = { config, name, password -> startCreate(type, config, name, password) },
-                onOpen = { _, _, _ -> },
-                onDismiss = { createType = null },
-            )
-        } else {
-            CreateRemoteDialog(
-                type = type,
-                defaultName = defaultArchiveName,
-                onDismiss = { createType = null },
-                onConfirm = { config, name, password -> startCreate(type, config, name, password) },
-            )
-        }
+        GoogleDriveSetupDialog(
+            mode = GoogleDriveSetupMode.CREATE,
+            defaultName = defaultArchiveName,
+            onSignIn = { config -> controller.signInTo(type.id, config) },
+            onList = { config -> controller.list(type.id, config) },
+            onCreate = { config, name, password -> startCreate(type, config, name, password) },
+            onOpen = { _, _, _ -> },
+            onDismiss = { createType = null },
+        )
     }
 
     openType?.let { type ->
-        if (type.id == GOOGLE_DRIVE_PROVIDER_ID) {
-            GoogleDriveSetupDialog(
-                mode = GoogleDriveSetupMode.OPEN,
-                defaultName = defaultArchiveName,
-                onSignIn = { config -> controller.signInTo(type.id, config) },
-                onList = { config -> controller.list(type.id, config) },
-                onCreate = { _, _, _ -> },
-                onOpen = { config, file, password -> startOpen(type, config, file, password) },
-                onDismiss = { openType = null },
-            )
-        } else {
-            OpenRemoteDialog(
-                type = type,
-                onDismiss = { openType = null },
-                onList = { config -> controller.list(type.id, config) },
-                onConfirm = { config, file, password -> startOpen(type, config, file, password) },
-            )
-        }
+        GoogleDriveSetupDialog(
+            mode = GoogleDriveSetupMode.OPEN,
+            defaultName = defaultArchiveName,
+            onSignIn = { config -> controller.signInTo(type.id, config) },
+            onList = { config -> controller.list(type.id, config) },
+            onCreate = { _, _, _ -> },
+            onOpen = { config, file, password -> startOpen(type, config, file, password) },
+            onDismiss = { openType = null },
+        )
     }
 
     if (showResume) {
@@ -363,101 +343,6 @@ private fun BoundState(
             Text("Disconnect")
         }
     }
-}
-
-@Composable
-private fun CreateRemoteDialog(
-    type: RemoteStorageType,
-    defaultName: String,
-    onDismiss: () -> Unit,
-    onConfirm: (config: String?, name: String, password: String) -> Unit,
-) {
-    var folder by remember { mutableStateOf("") }
-    var name by remember { mutableStateOf(defaultName.ifBlank { "money_manager.mmenc" }) }
-    var password by remember { mutableStateOf("") }
-    var confirmPassword by remember { mutableStateOf("") }
-    val valid =
-        name.isNotBlank() &&
-            password.isNotEmpty() &&
-            password == confirmPassword &&
-            (!type.requiresFolder || folder.isNotBlank())
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Store in ${type.displayName}") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (type.requiresFolder) {
-                    OutlinedTextField(folder, { folder = it }, label = { Text("Folder path") }, singleLine = true)
-                }
-                OutlinedTextField(name, { name = it }, label = { Text("Archive name") }, singleLine = true)
-                PasswordField(password, { password = it }, "Password")
-                PasswordField(confirmPassword, { confirmPassword = it }, "Confirm password")
-                Text(
-                    "The database is compressed and encrypted with this password. Keep it safe — it can't be recovered.",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(folder.ifBlank { null }, name, password) }, enabled = valid) {
-                Text("Upload")
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-    )
-}
-
-@Composable
-private fun OpenRemoteDialog(
-    type: RemoteStorageType,
-    onDismiss: () -> Unit,
-    onList: suspend (config: String?) -> List<RemoteFile>,
-    onConfirm: (config: String?, file: RemoteFile, password: String) -> Unit,
-) {
-    val scope = rememberSchemaAwareCoroutineScope()
-    var folder by remember { mutableStateOf("") }
-    var files by remember { mutableStateOf<List<RemoteFile>>(emptyList()) }
-    var selected by remember { mutableStateOf<RemoteFile?>(null) }
-    var password by remember { mutableStateOf("") }
-    var listError by remember { mutableStateOf<String?>(null) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Open from ${type.displayName}") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (type.requiresFolder) {
-                    OutlinedTextField(folder, { folder = it }, label = { Text("Folder path") }, singleLine = true)
-                }
-                OutlinedButton(onClick = {
-                    scope.launch {
-                        runCatching { onList(folder.ifBlank { null }) }
-                            .onSuccess {
-                                files = it
-                                listError = null
-                            }.onFailure { listError = it.message }
-                    }
-                }) { Text("List databases") }
-                listError?.let { Text("Error: $it", style = MaterialTheme.typography.bodySmall) }
-                files.forEach { file ->
-                    TextButton(onClick = { selected = file }) {
-                        Text((if (selected == file) "✓ " else "") + file.name)
-                    }
-                }
-                if (selected != null) {
-                    PasswordField(password, { password = it }, "Password")
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = { selected?.let { onConfirm(folder.ifBlank { null }, it, password) } },
-                enabled = selected != null && password.isNotEmpty(),
-            ) { Text("Open") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-    )
 }
 
 @Composable

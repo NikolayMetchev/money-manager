@@ -8,7 +8,6 @@ import com.moneymanager.remotestorage.RemoteStorageType
 import com.moneymanager.remotestorage.googledrive.AndroidBrowserLauncher
 import com.moneymanager.remotestorage.googledrive.GOOGLE_DRIVE_PROVIDER_ID
 import com.moneymanager.remotestorage.googledrive.googleDriveProvider
-import com.moneymanager.remotestorage.localfolder.LocalFolderStorageProvider
 
 @Suppress("ktlint:standard:function-naming")
 actual fun createRemoteStorageProviderFactory(
@@ -18,19 +17,13 @@ actual fun createRemoteStorageProviderFactory(
     object : RemoteStorageProviderFactory {
         private val browser = AndroidBrowserLauncher(params.context.applicationContext)
 
-        override fun types(): List<RemoteStorageType> =
-            listOf(
-                RemoteStorageType(LOCAL_FOLDER_PROVIDER_ID, "Local / Synced Folder", requiresFolder = true),
-                RemoteStorageType(GOOGLE_DRIVE_PROVIDER_ID, "Google Drive"),
-            )
+        override fun types(): List<RemoteStorageType> = listOf(RemoteStorageType(GOOGLE_DRIVE_PROVIDER_ID, "Google Drive"))
 
         override fun create(
             providerId: String,
             config: String?,
         ): RemoteStorageProvider =
             when (providerId) {
-                LOCAL_FOLDER_PROVIDER_ID ->
-                    LocalFolderStorageProvider.forPath(requireNotNull(config) { "A folder path is required" })
                 GOOGLE_DRIVE_PROVIDER_ID -> googleDriveProvider(config, localSettings, browser)
                 else -> throw IllegalArgumentException("Unknown remote storage provider: $providerId")
             }

@@ -28,7 +28,6 @@ kotlin {
 
                 implementation(projects.app.importer)
                 implementation(projects.app.remotestorage.googledrive)
-                implementation(projects.app.remotestorage.localfolder)
             }
         }
 
@@ -39,7 +38,6 @@ kotlin {
                 api(projects.app.remotestorage.sync)
 
                 implementation(projects.app.remotestorage.googledrive)
-                implementation(projects.app.remotestorage.localfolder)
             }
         }
     }
