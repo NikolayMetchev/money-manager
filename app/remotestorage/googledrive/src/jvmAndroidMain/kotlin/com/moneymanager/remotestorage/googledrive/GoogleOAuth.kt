@@ -10,6 +10,7 @@ import io.ktor.http.isSuccess
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import java.security.SecureRandom
 
 /** Result of a token endpoint call. [refreshToken] is only present on the initial authorization. */
 data class GoogleTokens(
@@ -26,9 +27,17 @@ data class GoogleTokens(
 class GoogleOAuth(
     private val httpClient: HttpClient,
 ) {
+    /** A fresh, unguessable `state` value to bind the consent request to its callback (anti-CSRF). */
+    fun newState(): String {
+        val bytes = ByteArray(STATE_BYTES)
+        SecureRandom().nextBytes(bytes)
+        return bytes.joinToString("") { (it.toInt() and 0xff).toString(16).padStart(2, '0') }
+    }
+
     fun consentUrl(
         clientId: String,
         redirectUri: String,
+        state: String,
     ): String =
         URLBuilder(AUTH_ENDPOINT)
             .apply {
@@ -39,6 +48,8 @@ class GoogleOAuth(
                 // offline + consent forces Google to return a refresh token we can reuse silently later.
                 parameters.append("access_type", "offline")
                 parameters.append("prompt", "consent")
+                // state binds this request to the callback so a forged redirect can't inject a code (CSRF).
+                parameters.append("state", state)
             }.buildString()
 
     suspend fun exchangeCode(
@@ -91,6 +102,7 @@ class GoogleOAuth(
     private companion object {
         const val AUTH_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth"
         const val TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token"
+        const val STATE_BYTES = 16
         val json = Json { ignoreUnknownKeys = true }
     }
 }

@@ -69,7 +69,7 @@ fun CloudStorageCard(
     var refreshTick by remember { mutableStateOf(0) }
     var localSize by remember { mutableStateOf<Long?>(null) }
     var remoteSize by remember { mutableStateOf<Long?>(null) }
-    LaunchedEffect(binding, sessionActive, refreshTick) {
+    LaunchedEffect(binding, sessionActive, refreshTick, currentDatabaseLocation) {
         localSize = runCatching { controller.localDatabaseSize(currentDatabaseLocation) }.getOrNull()
         remoteSize = if (binding != null) runCatching { controller.remoteArchiveSize() }.getOrNull() else null
     }
@@ -77,7 +77,7 @@ fun CloudStorageCard(
     // Poll for unsynced changes (and the session token's expiry) so the card reflects live state.
     var dirty by remember { mutableStateOf(false) }
     var tokenStatus by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(sessionActive, binding, refreshTick) {
+    LaunchedEffect(sessionActive, binding, refreshTick, database) {
         while (true) {
             dirty = sessionActive && runCatching { controller.hasUnsyncedChanges(database) }.getOrDefault(false)
             tokenStatus =
@@ -218,8 +218,14 @@ fun CloudStorageCard(
                 controller.openRemote(type.id, config, file, remoteCacheLocation(file.name), password) {
                     syncProgress = it
                 }
-            }.onSuccess { onRequestSwitchDatabase(it) }
-                .onFailure { message = "Open failed: ${it.message}" }
+            }.onSuccess { location ->
+                // Reflect the now-bound remote session immediately; the card otherwise stays "unbound"
+                // until a full recomposition with fresh initial state.
+                binding = controller.activeBinding()
+                sessionActive = controller.hasActiveSession()
+                refreshTick++
+                onRequestSwitchDatabase(location)
+            }.onFailure { message = "Open failed: ${it.message}" }
             syncProgress = null
             busy = false
         }

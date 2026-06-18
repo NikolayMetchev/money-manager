@@ -31,8 +31,16 @@ internal actual fun inflate(data: ByteArray): ByteArray {
     try {
         while (!inflater.finished()) {
             val count = inflater.inflate(buffer)
-            if (count == 0 && inflater.needsInput()) break
-            output.write(buffer, 0, count)
+            when {
+                count > 0 -> output.write(buffer, 0, count)
+                // We never deflate with a preset dictionary; needing one means a malformed stream — and
+                // without this guard the loop would spin forever (count stays 0, finished stays false).
+                inflater.needsDictionary() -> throw IllegalArgumentException("Compressed payload requires a preset dictionary")
+                // All input consumed: normal end (incl. an empty payload). Upstream AES-GCM already
+                // authenticates these compressed bytes, so a truncated archive fails before we get here.
+                inflater.needsInput() -> break
+                else -> throw IllegalStateException("Inflater made no progress")
+            }
         }
     } finally {
         inflater.end()

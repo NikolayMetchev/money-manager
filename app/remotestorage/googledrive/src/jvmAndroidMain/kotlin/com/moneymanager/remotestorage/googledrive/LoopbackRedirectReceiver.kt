@@ -3,9 +3,9 @@ package com.moneymanager.remotestorage.googledrive
 import com.moneymanager.remotestorage.RemoteAuthException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import java.net.InetAddress
 import java.net.ServerSocket
+import java.net.SocketTimeoutException
 import java.net.URLDecoder
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
@@ -27,44 +27,72 @@ class LoopbackRedirectReceiver : AutoCloseable {
 
     /**
      * Waits (up to [timeout]) for the browser to hit the loopback redirect, then returns the `code`
-     * query parameter. Throws [RemoteAuthException] on an OAuth `error`, a timeout, or a malformed
-     * request.
+     * query parameter after checking the callback's `state` equals [expectedState]. Throws
+     * [RemoteAuthException] on an OAuth `error`, a timeout, a state mismatch, or a malformed request.
      */
-    suspend fun awaitCode(timeout: Duration = DEFAULT_TIMEOUT): String =
+    suspend fun awaitCode(
+        expectedState: String,
+        timeout: Duration = DEFAULT_TIMEOUT,
+    ): String =
         withContext(Dispatchers.IO) {
             val requestTarget =
-                withTimeoutOrNull(timeout) { acceptRequestTarget() }
+                acceptRequestTarget(timeout)
                     ?: throw RemoteAuthException("Timed out waiting for Google sign-in to complete")
-            extractCode(requestTarget)
+            extractCode(requestTarget, expectedState)
         }
 
-    private fun acceptRequestTarget(): String? =
-        serverSocket.accept().use { socket ->
-            val requestLine =
-                socket
-                    .getInputStream()
-                    .bufferedReader()
-                    .readLine()
-                    .orEmpty()
-            socket.getOutputStream().writer().apply {
-                write(RESPONSE_BODY)
-                flush()
+    // Enforce the timeout at the socket level: coroutine cancellation does not interrupt the blocking
+    // accept()/readLine(), so withTimeoutOrNull alone could hang the sign-in indefinitely.
+    private fun acceptRequestTarget(timeout: Duration): String? {
+        serverSocket.soTimeout = timeout.inWholeMilliseconds.coerceIn(1, Int.MAX_VALUE.toLong()).toInt()
+        return try {
+            serverSocket.accept().use { socket ->
+                socket.soTimeout = SOCKET_READ_TIMEOUT_MS
+                val requestLine =
+                    socket
+                        .getInputStream()
+                        .bufferedReader()
+                        .readLine()
+                        .orEmpty()
+                socket.getOutputStream().writer().apply {
+                    write(RESPONSE_BODY)
+                    flush()
+                }
+                // Request line looks like: "GET /?code=...&scope=... HTTP/1.1"
+                requestLine.split(' ').getOrNull(1)
             }
-            // Request line looks like: "GET /?code=...&scope=... HTTP/1.1"
-            requestLine.split(' ').getOrNull(1)
+        } catch (timedOut: SocketTimeoutException) {
+            null
         }
+    }
 
-    private fun extractCode(requestTarget: String?): String {
-        val query = requestTarget?.substringAfter('?', "").orEmpty()
-        val params =
-            query
-                .split('&')
-                .mapNotNull { pair ->
-                    val key = pair.substringBefore('=', "")
-                    if (key.isEmpty()) null else key to URLDecoder.decode(pair.substringAfter('=', ""), "UTF-8")
-                }.toMap()
-        params["error"]?.let { throw RemoteAuthException("Google sign-in was denied: $it") }
+    private fun extractCode(
+        requestTarget: String?,
+        expectedState: String,
+    ): String {
+        val params = parseQuery(requestTarget)
+        rejectErrorOrBadState(params, expectedState)
         return params["code"] ?: throw RemoteAuthException("Google sign-in did not return an authorization code")
+    }
+
+    private fun parseQuery(requestTarget: String?): Map<String, String> =
+        requestTarget
+            ?.substringAfter('?', "")
+            .orEmpty()
+            .split('&')
+            .mapNotNull { pair ->
+                val key = pair.substringBefore('=', "")
+                if (key.isEmpty()) null else key to URLDecoder.decode(pair.substringAfter('=', ""), "UTF-8")
+            }.toMap()
+
+    private fun rejectErrorOrBadState(
+        params: Map<String, String>,
+        expectedState: String,
+    ) {
+        params["error"]?.let { throw RemoteAuthException("Google sign-in was denied: $it") }
+        if (params["state"] != expectedState) {
+            throw RemoteAuthException("Google sign-in returned an unexpected state; aborting to prevent CSRF")
+        }
     }
 
     override fun close() {
@@ -73,6 +101,7 @@ class LoopbackRedirectReceiver : AutoCloseable {
 
     private companion object {
         const val LOOPBACK_HOST = "127.0.0.1"
+        const val SOCKET_READ_TIMEOUT_MS = 10_000
         val DEFAULT_TIMEOUT = 5.minutes
         val RESPONSE_BODY =
             buildString {

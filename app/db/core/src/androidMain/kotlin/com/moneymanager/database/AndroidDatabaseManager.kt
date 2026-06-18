@@ -160,8 +160,15 @@ class AndroidDatabaseManager(
             val dbFile = context.getDatabasePath(location.name)
             dbFile.parentFile?.mkdirs()
             // Drop stale WAL/SHM sidecars so the restored file isn't shadowed by an old write-ahead log.
-            File("${dbFile.path}-wal").delete()
-            File("${dbFile.path}-shm").delete()
+            // Fail if a surviving sidecar can't be removed (matches the JVM impl's deleteIfExists), since
+            // SQLite would otherwise replay the old WAL and silently shadow the restored main file.
+            deleteSidecarOrThrow("${dbFile.path}-wal")
+            deleteSidecarOrThrow("${dbFile.path}-shm")
             dbFile.writeBytes(bytes)
         }
+
+    private fun deleteSidecarOrThrow(path: String) {
+        val file = File(path)
+        check(!file.exists() || file.delete()) { "Failed to delete stale database sidecar: $path" }
+    }
 }

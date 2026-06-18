@@ -33,7 +33,12 @@ class RemoteDatabaseSyncServiceTest {
 
                 val hydrated = sync.hydrate(provider, binding.copy(localCachePath = targetLocation.toString()), "pw")
                 val restored = manager.openDatabase(hydrated)
-                assertEquals(originalCurrencies, restored.countRows("currency"), "data should survive the round trip")
+                try {
+                    assertEquals(originalCurrencies, restored.countRows("currency"), "data should survive the round trip")
+                } finally {
+                    restored.close()
+                }
+                database.close()
             } finally {
                 deleteTestDatabase(sourceLocation)
                 deleteTestDatabase(cacheLocation)
@@ -57,6 +62,7 @@ class RemoteDatabaseSyncServiceTest {
                 assertFailsWith<ArchiveDecryptionException> {
                     sync.hydrate(provider, binding.copy(localCachePath = targetLocation.toString()), "wrong")
                 }
+                database.close()
             } finally {
                 deleteTestDatabase(sourceLocation)
                 deleteTestDatabase(cacheLocation)

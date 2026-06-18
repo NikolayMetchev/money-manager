@@ -140,16 +140,24 @@ class RemoteDatabaseSyncService(
         onProgress: (SyncProgress) -> Unit,
     ): ByteArray {
         val maintenance = DatabaseMaintenanceServiceImpl(database)
-        onProgress(SyncProgress("Preparing database…", 0.1f))
-        maintenance.truncateMaterializedViews()
-        onProgress(SyncProgress("Compacting database…", 0.35f))
-        val snapshot = databaseManager.snapshot(database)
-        if (rebuildAfter) {
-            onProgress(SyncProgress("Rebuilding views…", 0.5f))
-            maintenance.fullRefreshMaterializedViews()
+        var truncated = false
+        try {
+            onProgress(SyncProgress("Preparing database…", 0.1f))
+            maintenance.truncateMaterializedViews()
+            truncated = true
+            onProgress(SyncProgress("Compacting database…", 0.35f))
+            val snapshot = databaseManager.snapshot(database)
+            onProgress(SyncProgress("Encrypting…", 0.6f))
+            return ArchiveCodec.pack(snapshot, password)
+        } finally {
+            // The live DB's views were truncated for the snapshot; always rebuild them so a failed
+            // snapshot/encrypt doesn't leave the running app with empty balances. Skipped only when the
+            // caller is about to discard the live DB (rebuildAfter = false, e.g. push-on-close).
+            if (rebuildAfter && truncated) {
+                onProgress(SyncProgress("Rebuilding views…", 0.5f))
+                maintenance.fullRefreshMaterializedViews()
+            }
         }
-        onProgress(SyncProgress("Encrypting…", 0.6f))
-        return ArchiveCodec.pack(snapshot, password)
     }
 
     private companion object {

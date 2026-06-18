@@ -59,8 +59,9 @@ class GoogleDriveProvider(
     override suspend fun signIn() {
         withContext(Dispatchers.IO) {
             LoopbackRedirectReceiver().use { receiver ->
-                browser.open(oauth.consentUrl(credentials.clientId, receiver.redirectUri))
-                val code = receiver.awaitCode()
+                val state = oauth.newState()
+                browser.open(oauth.consentUrl(credentials.clientId, receiver.redirectUri, state))
+                val code = receiver.awaitCode(state)
                 val tokens = oauth.exchangeCode(credentials, code, receiver.redirectUri)
                 val refreshToken =
                     tokens.refreshToken

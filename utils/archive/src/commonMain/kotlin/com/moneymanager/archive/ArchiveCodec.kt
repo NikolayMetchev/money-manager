@@ -7,6 +7,7 @@ import dev.whyoleg.cryptography.algorithms.PBKDF2
 import dev.whyoleg.cryptography.algorithms.SHA256
 import dev.whyoleg.cryptography.operations.IvAuthenticatedCipher
 import dev.whyoleg.cryptography.random.CryptographyRandom
+import kotlin.coroutines.cancellation.CancellationException
 
 /** Thrown when an archive can't be decrypted (wrong password) or is tampered with / corrupted. */
 class ArchiveDecryptionException(
@@ -47,14 +48,21 @@ object ArchiveCodec {
     ): ByteArray {
         require(password.isNotEmpty()) { "Password must not be empty" }
         val (salt, ciphertext) = splitArchive(packed)
-        val compressed =
-            try {
-                cipherFor(password, salt).decrypt(ciphertext)
-            } catch (expected: Exception) {
-                throw ArchiveDecryptionException("Wrong password or corrupted archive", expected)
-            }
-        return inflate(compressed)
+        // Both decrypt and inflate can fail on a wrong password or corrupted/truncated archive; surface
+        // either as ArchiveDecryptionException (the contract verify()/hydrate() rely on) while letting
+        // coroutine cancellation propagate untouched.
+        val compressed = asArchiveFailure { cipherFor(password, salt).decrypt(ciphertext) }
+        return asArchiveFailure { inflate(compressed) }
     }
+
+    private inline fun <T> asArchiveFailure(block: () -> T): T =
+        try {
+            block()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (expected: Exception) {
+            throw ArchiveDecryptionException("Wrong password or corrupted archive", expected)
+        }
 
     /** Validates the header and returns the (salt, ciphertext) sections, or throws if malformed. */
     private fun splitArchive(packed: ByteArray): Pair<ByteArray, ByteArray> {

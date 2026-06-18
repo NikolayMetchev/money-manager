@@ -102,12 +102,16 @@ class DatabaseSnapshotAndShrinkTest : DbTest() {
             try {
                 manager.restore(target, bytes)
                 val restored = manager.openDatabase(target)
-                assertEquals(2, restored.countRows("account"), "accounts should survive the round trip")
-                assertEquals(1, restored.countRows("transfer"), "transfer should survive the round trip")
+                try {
+                    assertEquals(2, restored.countRows("account"), "accounts should survive the round trip")
+                    assertEquals(1, restored.countRows("transfer"), "transfer should survive the round trip")
 
-                // Materialized views are truncated in real uploads; ensure a rehydrated DB can rebuild them.
-                DatabaseMaintenanceServiceImpl(restored).fullRefreshMaterializedViews()
-                assertTrue(restored.countRows("account_balance_materialized_view") > 0, "MV should rebuild after restore")
+                    // Materialized views are truncated in real uploads; ensure a rehydrated DB can rebuild them.
+                    DatabaseMaintenanceServiceImpl(restored).fullRefreshMaterializedViews()
+                    assertTrue(restored.countRows("account_balance_materialized_view") > 0, "MV should rebuild after restore")
+                } finally {
+                    restored.close()
+                }
             } finally {
                 deleteTestDatabase(target)
             }

@@ -48,12 +48,6 @@ kotlin {
                 implementation(projects.utils.archive)
             }
         }
-
-        val jvmTest by getting {
-            dependencies {
-                implementation(projects.app.remotestorage.sync)
-            }
-        }
     }
 }
 

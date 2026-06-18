@@ -7,4 +7,8 @@ package com.moneymanager.remotestorage.sync
 data class SyncProgress(
     val message: String,
     val fraction: Float,
-)
+) {
+    init {
+        require(fraction in 0f..1f) { "fraction must be in [0f, 1f], got $fraction" }
+    }
+}

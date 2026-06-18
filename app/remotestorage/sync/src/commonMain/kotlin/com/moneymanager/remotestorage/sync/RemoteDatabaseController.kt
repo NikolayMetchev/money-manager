@@ -182,6 +182,7 @@ class RemoteDatabaseController(
     fun unbind() {
         syncService.clearBinding()
         session = null
+        syncedToken = null
     }
 
     private suspend fun resolve(

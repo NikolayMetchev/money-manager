@@ -57,7 +57,10 @@ class SingleProviderFactory(
     override fun create(
         providerId: String,
         config: String?,
-    ): RemoteStorageProvider = provider
+    ): RemoteStorageProvider {
+        require(providerId == provider.id) { "Unknown providerId: $providerId" }
+        return provider
+    }
 }
 
 /** Counts rows in [table] (test helper). */

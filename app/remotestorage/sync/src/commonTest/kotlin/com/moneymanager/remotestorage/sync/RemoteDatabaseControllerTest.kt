@@ -59,8 +59,13 @@ class RemoteDatabaseControllerTest {
                 val freshController = RemoteDatabaseController(sync, SingleProviderFactory(provider))
                 val restoredLocation = freshController.restore(binding.copy(localCachePath = targetLocation.toString()), "pw")
                 val restored = manager.openDatabase(restoredLocation)
-                assertEquals(originalCurrencies, restored.countRows("currency"))
-                assertTrue(freshController.hasActiveSession())
+                try {
+                    assertEquals(originalCurrencies, restored.countRows("currency"))
+                    assertTrue(freshController.hasActiveSession())
+                } finally {
+                    restored.close()
+                }
+                database.close()
             } finally {
                 deleteTestDatabase(sourceLocation)
                 deleteTestDatabase(cacheLocation)
