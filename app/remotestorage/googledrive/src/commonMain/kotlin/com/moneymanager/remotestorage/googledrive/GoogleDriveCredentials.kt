@@ -7,6 +7,9 @@ import kotlinx.serialization.json.Json
 /** Provider id shared with the DI factory; persisted in the database binding to re-bind on launch. */
 const val GOOGLE_DRIVE_PROVIDER_ID = "google-drive"
 
+/** The Drive folder the app keeps its database archives in (created on first upload). */
+const val GOOGLE_DRIVE_FOLDER_NAME = "Money Manager"
+
 private val lenientJson = Json { ignoreUnknownKeys = true }
 
 /**

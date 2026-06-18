@@ -1,5 +1,6 @@
 package com.moneymanager.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,6 +21,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
@@ -28,6 +30,7 @@ import com.moneymanager.domain.model.defaultRemoteArchiveName
 import com.moneymanager.domain.model.remoteCacheLocation
 import com.moneymanager.remotestorage.RemoteFile
 import com.moneymanager.remotestorage.RemoteStorageType
+import com.moneymanager.remotestorage.googledrive.GOOGLE_DRIVE_FOLDER_NAME
 import com.moneymanager.remotestorage.googledrive.GOOGLE_DRIVE_PROVIDER_ID
 import com.moneymanager.remotestorage.sync.RemoteDatabaseBinding
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
@@ -49,6 +52,7 @@ fun CloudStorageCard(
     onRequestSwitchDatabase: (DbLocation) -> Unit,
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
+    val uriHandler = LocalUriHandler.current
     var binding by remember { mutableStateOf(controller.activeBinding()) }
     var sessionActive by remember { mutableStateOf(controller.hasActiveSession()) }
     var busy by remember { mutableStateOf(false) }
@@ -103,8 +107,26 @@ fun CloudStorageCard(
                     }
                 }
             } else {
+                val type = controller.providerFactory.types().firstOrNull { it.id == currentBinding.providerId }
+                val providerLabel = type?.displayName ?: currentBinding.providerId
+                val locationPath =
+                    when {
+                        type?.requiresFolder == true ->
+                            "${currentBinding.providerConfig.orEmpty().trimEnd('/', '\\')}/${currentBinding.remoteName}"
+                        currentBinding.providerId == GOOGLE_DRIVE_PROVIDER_ID ->
+                            "$GOOGLE_DRIVE_FOLDER_NAME/${currentBinding.remoteName}"
+                        else -> currentBinding.remoteName
+                    }
+                val onOpenRemote: (() -> Unit)? =
+                    if (currentBinding.providerId == GOOGLE_DRIVE_PROVIDER_ID) {
+                        { uriHandler.openUri("https://drive.google.com/file/d/${currentBinding.remoteFileId}/view") }
+                    } else {
+                        null
+                    }
                 BoundState(
-                    binding = currentBinding,
+                    providerLabel = providerLabel,
+                    locationPath = locationPath,
+                    onOpenRemote = onOpenRemote,
                     sessionActive = sessionActive,
                     busy = busy,
                     dirty = dirty,
@@ -259,7 +281,9 @@ private fun StorageSizes(
 
 @Composable
 private fun BoundState(
-    binding: RemoteDatabaseBinding,
+    providerLabel: String,
+    locationPath: String,
+    onOpenRemote: (() -> Unit)?,
     sessionActive: Boolean,
     busy: Boolean,
     dirty: Boolean,
@@ -267,10 +291,17 @@ private fun BoundState(
     onResume: () -> Unit,
     onDisconnect: () -> Unit,
 ) {
-    Text(
-        text = "Synced to ${binding.remoteName}" + (binding.providerConfig?.let { " ($it)" } ?: ""),
-        style = MaterialTheme.typography.bodyMedium,
-    )
+    Text(text = "Stored on $providerLabel", style = MaterialTheme.typography.bodyMedium)
+    if (onOpenRemote != null) {
+        Text(
+            text = "$locationPath ↗",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.clickable(onClick = onOpenRemote),
+        )
+    } else {
+        Text(text = locationPath, style = MaterialTheme.typography.bodySmall)
+    }
     if (sessionActive && !dirty) {
         Text(
             text = "✓ Everything is synced",
