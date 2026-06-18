@@ -7,6 +7,7 @@ import com.moneymanager.domain.model.DbLocation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.nio.file.Files
+import java.nio.file.Paths
 import java.util.Properties
 import kotlin.io.path.exists
 
@@ -107,8 +108,47 @@ class JvmDatabaseManager : DatabaseManager {
 
     override suspend fun deleteDatabase(location: DbLocation): Unit =
         withContext(Dispatchers.IO) {
-            if (location.exists()) {
-                Files.delete(location.path)
+            // Remove the main file and its WAL/SHM sidecars.
+            listOf(location.path, Paths.get("${location.path}-wal"), Paths.get("${location.path}-shm"))
+                .forEach { Files.deleteIfExists(it) }
+        }
+
+    override suspend fun databaseSizeBytes(location: DbLocation): Long? =
+        withContext(Dispatchers.IO) {
+            if (!location.path.exists()) {
+                null
+            } else {
+                val sidecars = listOf("${location.path}-wal", "${location.path}-shm").map { Paths.get(it) }
+                Files.size(location.path) + sidecars.sumOf { if (it.exists()) Files.size(it) else 0L }
             }
+        }
+
+    override suspend fun snapshot(database: MoneyManagerDatabaseWrapper): ByteArray =
+        withContext(Dispatchers.IO) {
+            // VACUUM INTO requires the target file to not already exist.
+            val tempFile = Files.createTempFile("mm-snapshot", ".db")
+            Files.delete(tempFile)
+            try {
+                database.executeWithParams("VACUUM INTO ?", 1, listOf(tempFile.toString()))
+                Files.readAllBytes(tempFile)
+            } finally {
+                Files.deleteIfExists(tempFile)
+            }
+        }
+
+    override suspend fun restore(
+        location: DbLocation,
+        bytes: ByteArray,
+    ): Unit =
+        withContext(Dispatchers.IO) {
+            location.path.parent?.let { parentDir ->
+                if (!parentDir.exists()) {
+                    Files.createDirectories(parentDir)
+                }
+            }
+            // Drop stale WAL/SHM sidecars so the restored file isn't shadowed by an old write-ahead log.
+            Files.deleteIfExists(Paths.get("${location.path}-wal"))
+            Files.deleteIfExists(Paths.get("${location.path}-shm"))
+            Files.write(location.path, bytes)
         }
 }

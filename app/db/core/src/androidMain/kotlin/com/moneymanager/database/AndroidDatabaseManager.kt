@@ -8,6 +8,7 @@ import com.moneymanager.domain.model.DEFAULT_DATABASE_NAME
 import com.moneymanager.domain.model.DbLocation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.File
 
 private val DEFAULT_DB_LOCATION = DbLocation(DEFAULT_DATABASE_NAME)
 
@@ -126,4 +127,48 @@ class AndroidDatabaseManager(
             // Use Android's deleteDatabase method for proper cleanup
             context.deleteDatabase(location.name)
         }
+
+    override suspend fun databaseSizeBytes(location: DbLocation): Long? =
+        withContext(Dispatchers.IO) {
+            val dbFile = context.getDatabasePath(location.name)
+            if (!dbFile.exists()) {
+                null
+            } else {
+                // File.length() is 0 for absent sidecars, so no existence guard is needed.
+                dbFile.length() + File("${dbFile.path}-wal").length() + File("${dbFile.path}-shm").length()
+            }
+        }
+
+    override suspend fun snapshot(database: MoneyManagerDatabaseWrapper): ByteArray =
+        withContext(Dispatchers.IO) {
+            // VACUUM INTO requires the target file to not already exist.
+            val tempFile = File.createTempFile("mm-snapshot", ".db", context.cacheDir)
+            tempFile.delete()
+            try {
+                database.executeWithParams("VACUUM INTO ?", 1, listOf(tempFile.absolutePath))
+                tempFile.readBytes()
+            } finally {
+                tempFile.delete()
+            }
+        }
+
+    override suspend fun restore(
+        location: DbLocation,
+        bytes: ByteArray,
+    ): Unit =
+        withContext(Dispatchers.IO) {
+            val dbFile = context.getDatabasePath(location.name)
+            dbFile.parentFile?.mkdirs()
+            // Drop stale WAL/SHM sidecars so the restored file isn't shadowed by an old write-ahead log.
+            // Fail if a surviving sidecar can't be removed (matches the JVM impl's deleteIfExists), since
+            // SQLite would otherwise replay the old WAL and silently shadow the restored main file.
+            deleteSidecarOrThrow("${dbFile.path}-wal")
+            deleteSidecarOrThrow("${dbFile.path}-shm")
+            dbFile.writeBytes(bytes)
+        }
+
+    private fun deleteSidecarOrThrow(path: String) {
+        val file = File(path)
+        check(!file.exists() || file.delete()) { "Failed to delete stale database sidecar: $path" }
+    }
 }

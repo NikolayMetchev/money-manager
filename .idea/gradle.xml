@@ -37,6 +37,10 @@
             <option value="$PROJECT_DIR$/app/model" />
             <option value="$PROJECT_DIR$/app/model/core" />
             <option value="$PROJECT_DIR$/app/qifimporter" />
+            <option value="$PROJECT_DIR$/app/remotestorage" />
+            <option value="$PROJECT_DIR$/app/remotestorage/core" />
+            <option value="$PROJECT_DIR$/app/remotestorage/googledrive" />
+            <option value="$PROJECT_DIR$/app/remotestorage/sync" />
             <option value="$PROJECT_DIR$/app/ui" />
             <option value="$PROJECT_DIR$/app/ui/core" />
             <option value="$PROJECT_DIR$/gradle/build-logic" />
@@ -44,11 +48,13 @@
             <option value="$PROJECT_DIR$/test/app" />
             <option value="$PROJECT_DIR$/test/app/db" />
             <option value="$PROJECT_DIR$/utils" />
+            <option value="$PROJECT_DIR$/utils/archive" />
             <option value="$PROJECT_DIR$/utils/bigdecimal" />
             <option value="$PROJECT_DIR$/utils/compose" />
             <option value="$PROJECT_DIR$/utils/compose/filePicker" />
             <option value="$PROJECT_DIR$/utils/compose/scrollbar" />
             <option value="$PROJECT_DIR$/utils/currency" />
+            <option value="$PROJECT_DIR$/utils/localsettings" />
             <option value="$PROJECT_DIR$/utils/parsers" />
             <option value="$PROJECT_DIR$/utils/parsers/csv" />
             <option value="$PROJECT_DIR$/utils/parsers/qif" />

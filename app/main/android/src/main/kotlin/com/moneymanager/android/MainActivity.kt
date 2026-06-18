@@ -5,19 +5,67 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.di.AppComponent
 import com.moneymanager.di.AppComponentParams
 import com.moneymanager.di.database.DatabaseComponent
 import com.moneymanager.di.database.toApplication
 import com.moneymanager.di.initializeVersionReader
+import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.ui.AppStartupHost
 import com.moneymanager.ui.error.GlobalSchemaErrorState
 import com.moneymanager.ui.error.SchemaErrorDetector
 import com.moneymanager.ui.toAppServices
+import kotlinx.coroutines.runBlocking
 
 private const val TAG = "MainActivity"
 
 class MainActivity : ComponentActivity() {
+    private var remoteController: RemoteDatabaseController? = null
+    private var openDatabase: MoneyManagerDatabaseWrapper? = null
+
+    /**
+     * Ensures the remote copy is current, uploading only if the database changed since the last sync.
+     * Returns true if the remote is up to date afterwards (nothing to push, or the push succeeded).
+     */
+    private fun ensureRemoteUpToDate(): Boolean {
+        val controller = remoteController ?: return false
+        val database = openDatabase ?: return false
+        if (!controller.hasActiveSession()) return false
+        return runCatching {
+            runBlocking {
+                if (controller.hasUnsyncedChanges(database)) {
+                    controller.syncNow(database)
+                }
+            }
+        }.onFailure { Log.e(TAG, "Failed to sync database", it) }.isSuccess
+    }
+
+    override fun onStop() {
+        // Keep the remote copy current when backgrounded. The local copy is NOT removed here: onStop
+        // also fires on a simple app switch, and the open database must survive a return to foreground.
+        ensureRemoteUpToDate()
+        super.onStop()
+    }
+
+    override fun onDestroy() {
+        // A true "close": when finishing, push any changes and drop the local working copy so only the
+        // encrypted remote copy is kept between runs.
+        val controller = remoteController
+        if (isFinishing && controller?.hasActiveSession() == true) {
+            val remoteUpToDate = ensureRemoteUpToDate()
+            openDatabase?.close()
+            if (remoteUpToDate) {
+                runCatching { runBlocking { controller.deleteLocalCache() } }
+                    .onSuccess { Log.i(TAG, "Deleted local working copy; cloud copy is up to date") }
+                    .onFailure { Log.e(TAG, "Failed to delete local database on close", it) }
+            } else {
+                Log.w(TAG, "Kept local database: cloud sync failed, so the local copy is the only safe copy")
+            }
+        }
+        super.onDestroy()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -40,6 +88,8 @@ class MainActivity : ComponentActivity() {
 
         val params = AppComponentParams(context = applicationContext)
         val component: AppComponent = AppComponent.create(params)
+        val controller = component.remoteDatabaseController
+        remoteController = controller
 
         setContent {
             AppStartupHost(
@@ -51,6 +101,8 @@ class MainActivity : ComponentActivity() {
                 },
                 onInfoLog = { message -> Log.i(TAG, message) },
                 onErrorLog = { message, error -> Log.e(TAG, message, error) },
+                remoteController = controller,
+                onDatabaseReady = { database, _ -> openDatabase = database },
             )
         }
     }

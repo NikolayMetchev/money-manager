@@ -34,6 +34,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.domain.Maintenance
 import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.repository.AccountRepository
@@ -44,6 +45,7 @@ import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
 import com.moneymanager.domain.repository.SettingsRepository
 import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.ui.DatabasePickerMode
 import com.moneymanager.ui.components.CurrencyPicker
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
@@ -164,6 +166,8 @@ fun SettingsScreen(
     maintenance: Maintenance,
     currentDatabaseLocation: DbLocation,
     onRequestSwitchDatabase: (DbLocation) -> Unit,
+    remoteController: RemoteDatabaseController? = null,
+    database: MoneyManagerDatabaseWrapper? = null,
 ) {
     var showWarningDialog by remember { mutableStateOf(false) }
     var isGenerating by remember { mutableStateOf(false) }
@@ -228,6 +232,16 @@ fun SettingsScreen(
             currentDatabaseLocation = currentDatabaseLocation,
             onRequestSwitchDatabase = onRequestSwitchDatabase,
         )
+
+        // Cloud Storage Section (only when the remote-sync dependencies are wired in)
+        if (remoteController != null && database != null) {
+            CloudStorageCard(
+                controller = remoteController,
+                database = database,
+                currentDatabaseLocation = currentDatabaseLocation,
+                onRequestSwitchDatabase = onRequestSwitchDatabase,
+            )
+        }
 
         // Maintenance Section
         Card(

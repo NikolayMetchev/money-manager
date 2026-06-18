@@ -55,6 +55,15 @@
       <module name="money-manager.app.qifimporter" options="-Xlint:all -Werror" />
       <module name="money-manager.app.qifimporter.jvmMain" options="-Xlint:all -Werror" />
       <module name="money-manager.app.qifimporter.jvmTest" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.remotestorage.core" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.remotestorage.core.jvmMain" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.remotestorage.core.jvmTest" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.remotestorage.googledrive" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.remotestorage.googledrive.jvmMain" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.remotestorage.googledrive.jvmTest" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.remotestorage.sync" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.remotestorage.sync.jvmMain" options="-Xlint:all -Werror" />
+      <module name="money-manager.app.remotestorage.sync.jvmTest" options="-Xlint:all -Werror" />
       <module name="money-manager.app.ui.core" options="-Xlint:all -Werror" />
       <module name="money-manager.app.ui.core.jvmDev" options="-Xlint:all -Werror" />
       <module name="money-manager.app.ui.core.jvmMain" options="-Xlint:all -Werror" />
@@ -62,6 +71,9 @@
       <module name="money-manager.test.app.db" options="-Xlint:all -Werror" />
       <module name="money-manager.test.app.db.jvmMain" options="-Xlint:all -Werror" />
       <module name="money-manager.test.app.db.jvmTest" options="-Xlint:all -Werror" />
+      <module name="money-manager.utils.archive" options="-Xlint:all -Werror" />
+      <module name="money-manager.utils.archive.jvmMain" options="-Xlint:all -Werror" />
+      <module name="money-manager.utils.archive.jvmTest" options="-Xlint:all -Werror" />
       <module name="money-manager.utils.bigdecimal" options="-Xlint:all -Werror" />
       <module name="money-manager.utils.bigdecimal.jvmMain" options="-Xlint:all -Werror" />
       <module name="money-manager.utils.bigdecimal.jvmTest" options="-Xlint:all -Werror" />
@@ -76,6 +88,9 @@
       <module name="money-manager.utils.currency" options="-Xlint:all -Werror" />
       <module name="money-manager.utils.currency.jvmMain" options="-Xlint:all -Werror" />
       <module name="money-manager.utils.currency.jvmTest" options="-Xlint:all -Werror" />
+      <module name="money-manager.utils.localsettings" options="-Xlint:all -Werror" />
+      <module name="money-manager.utils.localsettings.jvmMain" options="-Xlint:all -Werror" />
+      <module name="money-manager.utils.localsettings.jvmTest" options="-Xlint:all -Werror" />
       <module name="money-manager.utils.parsers.csv" options="-Xlint:all -Werror" />
       <module name="money-manager.utils.parsers.csv.jvmMain" options="-Xlint:all -Werror" />
       <module name="money-manager.utils.parsers.csv.jvmTest" options="-Xlint:all -Werror" />

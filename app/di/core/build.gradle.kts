@@ -22,15 +22,22 @@ kotlin {
                 api(projects.app.db.core)
                 api(projects.app.importengineapi)
                 api(projects.app.model.core)
+                api(projects.app.remotestorage.core)
+                api(projects.app.remotestorage.sync)
                 api(projects.utils.localsettings)
 
                 implementation(projects.app.importer)
+                implementation(projects.app.remotestorage.googledrive)
             }
         }
 
         val androidMain by getting {
             dependencies {
                 api(libs.metro.runtime)
+                api(projects.app.remotestorage.core)
+                api(projects.app.remotestorage.sync)
+
+                implementation(projects.app.remotestorage.googledrive)
             }
         }
     }

@@ -1,6 +1,9 @@
 package com.moneymanager.ui
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -11,6 +14,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.unit.dp
 import com.moneymanager.database.DatabaseInitializationProgress
 import com.moneymanager.database.DatabaseManager
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
@@ -19,6 +24,7 @@ import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.domain.model.dbLocationFromString
 import com.moneymanager.localsettings.KEY_LAST_DATABASE
 import com.moneymanager.localsettings.LocalSettings
+import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.ui.components.DatabaseSchemaErrorDialog
 import com.moneymanager.ui.components.DatabaseStartupProgressScreen
 import com.moneymanager.ui.error.GlobalSchemaErrorState
@@ -34,6 +40,7 @@ private sealed class AppDatabaseState {
     data class Loaded(
         val location: DbLocation,
         val services: AppServices,
+        val database: MoneyManagerDatabaseWrapper,
     ) : AppDatabaseState()
 
     data class Error(
@@ -41,6 +48,11 @@ private sealed class AppDatabaseState {
         val error: Throwable,
     ) : AppDatabaseState()
 }
+
+private data class RemoteUnlockState(
+    val prompt: String,
+    val error: String? = null,
+)
 
 private fun initialDatabaseProgress() =
     DatabaseInitializationProgress(
@@ -57,12 +69,22 @@ fun AppStartupHost(
     createAppServices: (MoneyManagerDatabaseWrapper) -> AppServices,
     onInfoLog: (String) -> Unit,
     onErrorLog: (String, Throwable) -> Unit,
+    remoteController: RemoteDatabaseController? = null,
+    onDatabaseReady: (MoneyManagerDatabaseWrapper?, DbLocation?) -> Unit = { _, _ -> },
 ) {
     val scope = rememberCoroutineScope()
     var databaseState by remember { mutableStateOf<AppDatabaseState>(AppDatabaseState.Loading()) }
     var switchError by remember { mutableStateOf<Pair<DbLocation, Throwable>?>(null) }
+    var remoteUnlock by remember { mutableStateOf<RemoteUnlockState?>(null) }
 
     LaunchedEffect(Unit) {
+        // When the active database is cloud-backed its local copy was deleted on the previous close,
+        // so it must be restored from the remote — which requires the user's password first.
+        val binding = remoteController?.activeBinding()
+        if (binding != null) {
+            remoteUnlock = RemoteUnlockState(prompt = "Unlock “${binding.remoteName}” from cloud storage")
+            return@LaunchedEffect
+        }
         val location = resolveStartupLocation(databaseManager, localSettings)
         val error =
             openAndLoad(
@@ -93,10 +115,19 @@ fun AppStartupHost(
 
     when (val state = databaseState) {
         is AppDatabaseState.Loaded -> {
+            LaunchedEffect(state.database) {
+                onDatabaseReady(state.database, state.location)
+                // Capture the "everything synced" baseline at session start for cloud-backed databases.
+                if (remoteController?.hasActiveSession() == true && !remoteController.hasSyncBaseline()) {
+                    remoteController.markSynced(state.database)
+                }
+            }
             MoneyManagerApp(
                 appVersion = appVersion,
                 databaseLocation = state.location,
                 services = state.services,
+                remoteController = remoteController,
+                database = state.database,
                 onRequestSwitchDatabase = { target ->
                     scope.launch {
                         switchDatabase(
@@ -140,6 +171,53 @@ fun AppStartupHost(
         )
     }
 
+    remoteUnlock?.let { unlock ->
+        RemoteDatabaseUnlockDialog(
+            state = unlock,
+            onUnlock = { password ->
+                val binding = remoteController?.activeBinding()
+                if (binding != null) {
+                    // Close the dialog immediately so the restore progress bar is clearly visible; it is
+                    // only reopened (with an error) if the password was wrong or the download failed.
+                    remoteUnlock = null
+                    scope.launch {
+                        databaseState =
+                            AppDatabaseState.Loading(DatabaseInitializationProgress("Restoring from cloud…", 0, 100))
+                        try {
+                            val location =
+                                remoteController.restore(binding, password) { progress ->
+                                    databaseState =
+                                        AppDatabaseState.Loading(
+                                            DatabaseInitializationProgress(progress.message, (progress.fraction * 100).toInt(), 100),
+                                        )
+                                }
+                            val error =
+                                openAndLoad(
+                                    location = location,
+                                    databaseManager = databaseManager,
+                                    createAppServices = createAppServices,
+                                    databaseStateUpdater = { databaseState = it },
+                                    onInfoLog = onInfoLog,
+                                    onErrorLog = onErrorLog,
+                                )
+                            if (error == null) {
+                                localSettings.putString(KEY_LAST_DATABASE, location.toString())
+                            } else {
+                                remoteUnlock = unlock.copy(error = error.message ?: "Failed to open database")
+                            }
+                        } catch (expected: CancellationException) {
+                            throw expected
+                        } catch (expected: Exception) {
+                            onErrorLog("Failed to restore database from cloud", expected)
+                            databaseState = AppDatabaseState.Loading(initialDatabaseProgress())
+                            remoteUnlock = unlock.copy(error = "Wrong password, or download failed")
+                        }
+                    }
+                }
+            },
+        )
+    }
+
     effectiveSchemaError?.let { (location, error) ->
         DatabaseSchemaErrorDialog(
             databaseLocation = location.toString(),
@@ -172,6 +250,36 @@ fun AppStartupHost(
             },
         )
     }
+}
+
+@Composable
+private fun RemoteDatabaseUnlockDialog(
+    state: RemoteUnlockState,
+    onUnlock: (String) -> Unit,
+) {
+    var password by remember { mutableStateOf("") }
+    AlertDialog(
+        // Non-dismissible: the local copy was deleted on close, so the password is required to proceed.
+        onDismissRequest = {},
+        title = { Text(state.prompt) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Password") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                )
+                state.error?.let { Text(it) }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onUnlock(password) }, enabled = password.isNotEmpty()) {
+                Text("Unlock")
+            }
+        },
+    )
 }
 
 /**
@@ -214,7 +322,7 @@ private suspend fun openAndLoad(
         val services = createAppServices(database)
         databaseStateUpdater(AppDatabaseState.Loading(DatabaseInitializationProgress("Verifying this device...", 1, 1)))
         services.deviceId
-        databaseStateUpdater(AppDatabaseState.Loaded(location, services))
+        databaseStateUpdater(AppDatabaseState.Loaded(location, services, database))
         onInfoLog("Database opened successfully")
         null
     } catch (expected: CancellationException) {
@@ -293,7 +401,7 @@ private suspend fun recreateDatabase(
 
         val database = databaseManager.openDatabase(location)
         val services = createAppServices(database)
-        databaseStateUpdater(AppDatabaseState.Loaded(location, services))
+        databaseStateUpdater(AppDatabaseState.Loaded(location, services, database))
         GlobalSchemaErrorState.clearError()
         onInfoLog("New database created successfully")
     } catch (expected: CancellationException) {
