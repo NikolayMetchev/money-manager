@@ -74,6 +74,7 @@ internal fun mimeTypesToExtensions(mimeTypes: List<String>): List<String> =
             when (mimeType) {
                 "text/csv" -> listOf(".csv")
                 "text/plain" -> listOf(".txt", ".csv")
+                "application/json" -> listOf(".json")
                 "application/qif", "application/x-qif" -> listOf(".qif")
                 "text/tab-separated-values" -> listOf(".tsv")
                 "application/vnd.ms-excel" -> listOf(".csv", ".xls")

@@ -77,7 +77,7 @@ fun GoogleDriveSetupDialog(
     val parsedConfig = remember(credentialsJson) { GoogleDriveCredentials.parseCredentialsJson(credentialsJson)?.toConfig() }
 
     val filePicker =
-        rememberFilePicker(mimeTypes = listOf("application/json", "text/plain")) { result ->
+        rememberFilePicker(mimeTypes = listOf("application/json")) { result ->
             result?.let { credentialsJson = it.content }
         }
 
