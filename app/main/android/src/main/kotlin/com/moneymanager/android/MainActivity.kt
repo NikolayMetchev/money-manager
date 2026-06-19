@@ -5,6 +5,8 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import com.moneymanager.android.auth.AndroidGoogleAccessTokenSource
+import com.moneymanager.android.auth.GoogleAuthConsentLauncher
 import com.moneymanager.database.MoneyManagerDatabaseWrapper
 import com.moneymanager.di.AppComponent
 import com.moneymanager.di.AppComponentParams
@@ -23,6 +25,10 @@ private const val TAG = "MainActivity"
 class MainActivity : ComponentActivity() {
     private var remoteController: RemoteDatabaseController? = null
     private var openDatabase: MoneyManagerDatabaseWrapper? = null
+
+    // Bridges the Google Drive (AuthorizationClient) consent sheet to a suspend call; must be registered
+    // before the Activity is STARTED, so it's attached in onCreate and detached in onDestroy.
+    private val googleAuthConsentLauncher = GoogleAuthConsentLauncher()
 
     /**
      * Ensures the remote copy is current, uploading only if the database changed since the last sync.
@@ -49,6 +55,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        googleAuthConsentLauncher.detach()
         // A true "close": when finishing, push any changes and drop the local working copy so only the
         // encrypted remote copy is kept between runs.
         val controller = remoteController
@@ -86,7 +93,12 @@ class MainActivity : ComponentActivity() {
 
         initializeVersionReader(applicationContext)
 
-        val params = AppComponentParams(context = applicationContext)
+        googleAuthConsentLauncher.attach(this)
+        val params =
+            AppComponentParams(
+                context = applicationContext,
+                googleTokenSource = AndroidGoogleAccessTokenSource(applicationContext, googleAuthConsentLauncher),
+            )
         val component: AppComponent = AppComponent.create(params)
         val controller = component.remoteDatabaseController
         remoteController = controller

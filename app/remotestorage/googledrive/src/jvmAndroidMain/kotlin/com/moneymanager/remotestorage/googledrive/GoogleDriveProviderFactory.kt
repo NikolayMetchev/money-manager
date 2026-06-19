@@ -15,11 +15,34 @@ private val tokenHttpClient by lazy { HttpClient(CIO) }
 // token. Cached for the app lifetime (bounded by the number of accounts) to avoid per-call client churn.
 private val driveClients = mutableMapOf<String, HttpClient>()
 
+/** Builds a [GoogleDriveProvider] over a platform [tokenSource] (Android's native auth path). */
+fun googleDriveProvider(tokenSource: GoogleAccessTokenSource): GoogleDriveProvider = GoogleDriveProvider(tokenSource)
+
 /**
- * Builds a [GoogleDriveProvider] from the [config] persisted in the database binding (the user's OAuth
- * client id/secret as JSON) plus the platform [browser] for the consent step. Tokens are read from /
- * written to [localSettings] via [GoogleDriveAccountStore]; the Drive REST client uses Ktor's Bearer
- * auth plugin to attach the access token and refresh it on a 401.
+ * A Drive REST [HttpClient] that attaches a bearer token from [loadToken] and, on a 401, re-fetches via
+ * [refreshToken]. Keeps the Ktor engine + Auth plugin wiring inside this module so platform token
+ * sources (e.g. the Android `AuthorizationClient` one) don't need Ktor on their classpath. The bearer
+ * "refresh token" is unused here (Android has none); refreshes go back through [refreshToken].
+ */
+fun buildBearerDriveClient(
+    loadToken: suspend () -> String?,
+    refreshToken: suspend () -> String?,
+): HttpClient =
+    HttpClient(CIO) {
+        install(Auth) {
+            bearer {
+                loadTokens { loadToken()?.let { BearerTokens(it, "") } }
+                refreshTokens { refreshToken()?.let { BearerTokens(it, "") } }
+                sendWithoutRequest { request -> request.url.host.endsWith("googleapis.com") }
+            }
+        }
+    }
+
+/**
+ * Builds a [GoogleDriveProvider] for the JVM/desktop loopback flow from the [config] persisted in the
+ * database binding (the user's OAuth client id/secret as JSON) plus the platform [browser] for the
+ * consent step. Tokens are read from / written to [localSettings] via [GoogleDriveAccountStore]; the
+ * Drive REST client uses Ktor's Bearer auth plugin to attach the access token and refresh it on a 401.
  */
 fun googleDriveProvider(
     config: String?,
@@ -36,7 +59,7 @@ fun googleDriveProvider(
         synchronized(driveClients) {
             driveClients.getOrPut(credentials.clientId) { buildDriveClient(credentials, accountStore, oauth) }
         }
-    return GoogleDriveProvider(credentials, accountStore, browser, oauth, driveClient)
+    return GoogleDriveProvider(JvmGoogleAccessTokenSource(credentials, accountStore, browser, oauth, driveClient))
 }
 
 private fun buildDriveClient(
