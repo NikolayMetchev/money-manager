@@ -51,7 +51,7 @@ kotlin {
 
         // buildHealth (dependency-analysis) requires this explicit self-reference: the jvmTest source set
         // uses the module's own main classes directly, which it flags as a transitive dep to declare.
-        val jvmTest by getting {
+        getByName("jvmTest") {
             dependencies {
                 implementation(projects.app.remotestorage.sync)
             }

@@ -20,15 +20,16 @@ kotlin {
         }
 
         // JVM and Android share the entire provider, OAuth, loopback receiver and account store.
-        val jvmAndroidMain by creating {
-            dependsOn(commonMain.get())
-            dependencies {
-                implementation(libs.kotlinx.coroutines.core)
-                implementation(libs.kotlinx.serialization.json)
-                implementation(libs.ktor.client.auth)
-                implementation(libs.ktor.client.cio)
+        val jvmAndroidMain =
+            create("jvmAndroidMain") {
+                dependsOn(commonMain.get())
+                dependencies {
+                    implementation(libs.kotlinx.coroutines.core)
+                    implementation(libs.kotlinx.serialization.json)
+                    implementation(libs.ktor.client.auth)
+                    implementation(libs.ktor.client.cio)
+                }
             }
-        }
 
         jvmMain {
             dependsOn(jvmAndroidMain)
@@ -56,7 +57,7 @@ kotlin {
             }
         }
 
-        val jvmTest by getting {
+        getByName("jvmTest") {
             dependencies {
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)

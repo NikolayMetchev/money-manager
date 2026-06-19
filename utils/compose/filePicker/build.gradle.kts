@@ -37,7 +37,7 @@ kotlin {
             }
         }
 
-        val androidDeviceTest by getting {
+        getByName("androidDeviceTest") {
             dependencies {
                 implementation(kotlin("test"))
 
