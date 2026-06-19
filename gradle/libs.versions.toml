@@ -56,7 +56,7 @@ metro = "1.2.1"
 mokkery = "3.4.1"
 schemaspy = "7.0.2"
 slf4j = "2.0.18"
-sort-dependencies = "0.18.0"
+sort-dependencies = "0.19.0"
 sqldelight = "2.3.2"
 turbine = "1.2.1"
 # Build-tool transitive-alignment versions: pin tooling transitives (Gradle plugins, annotation
