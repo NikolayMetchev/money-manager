@@ -27,12 +27,11 @@ import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.Source
-import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CategoryRepository
-import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonAttributeRepository
 import com.moneymanager.domain.repository.PersonRepository
+import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.screens.CreateCategoryDialog
@@ -48,12 +47,10 @@ private val logger = logging()
  */
 @Composable
 fun CreateAccountDialog(
-    accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
     personRepository: PersonRepository,
     personAttributeRepository: PersonAttributeRepository? = null,
     attributeTypeRepository: AttributeTypeRepository? = null,
-    personAccountOwnershipRepository: PersonAccountOwnershipRepository,
     onDismiss: () -> Unit,
     onAccountCreated: ((AccountId) -> Unit)? = null,
     initialName: String = "",
@@ -70,6 +67,7 @@ fun CreateAccountDialog(
         .getAllPeople()
         .collectAsStateWithSchemaErrorHandling(initial = emptyList())
     val scope = rememberSchemaAwareCoroutineScope()
+    val importEngine = LocalImportEngine.current
 
     AlertDialog(
         onDismissRequest = { if (!accountState.isSaving) onDismiss() },
@@ -178,9 +176,9 @@ fun CreateAccountDialog(
                                         openingDate = now,
                                         categoryId = accountState.selectedCategoryId,
                                     )
-                                val accountId = accountRepository.createAccount(newAccount, Source.Manual)
+                                val accountId = importEngine.createAccount(newAccount, Source.Manual)
                                 selectedOwnerIds.forEach { personId ->
-                                    personAccountOwnershipRepository.createOwnership(
+                                    importEngine.createOwnership(
                                         personId = PersonId(personId),
                                         accountId = accountId,
                                         source = Source.Manual,
@@ -222,7 +220,6 @@ fun CreateAccountDialog(
     if (accountState.showCreatePersonDialog) {
         EditPersonDialog(
             personToEdit = null,
-            personRepository = personRepository,
             onPersonCreated = { personId ->
                 selectedOwnerIdForAddition = personId.id
             },

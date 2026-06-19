@@ -24,6 +24,7 @@ import com.moneymanager.domain.repository.QifImportRepository
 import com.moneymanager.domain.repository.SettingsRepository
 import com.moneymanager.domain.repository.TransactionRepository
 import com.moneymanager.domain.repository.TransferSourceRepository
+import com.moneymanager.importengineapi.EditGate
 import com.moneymanager.importengineapi.ImportEngine
 import com.moneymanager.importer.ImportEngineImpl
 
@@ -78,7 +79,7 @@ data class AuditDomain(
     val auditRepository: AuditRepository,
 )
 
-fun Application.toAppServices() =
+fun Application.toAppServices(editGate: EditGate = EditGate.AlwaysWritable) =
     AppServices(
         accounts =
             AccountsDomain(
@@ -112,6 +113,8 @@ fun Application.toAppServices() =
                         personRepository = people.personRepository,
                         personAttributeRepository = people.personAttributeRepository,
                         ownershipRepository = people.personAccountOwnershipRepository,
+                        categoryRepository = accounts.categoryRepository,
+                        editGate = editGate,
                     ),
             ),
         people =

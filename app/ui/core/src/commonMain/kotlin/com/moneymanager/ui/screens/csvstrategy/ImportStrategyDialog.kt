@@ -336,7 +336,12 @@ private fun accountMappingReference(accountName: String): CsvUnresolvedReference
 
 /**
  * Row for resolving a single unresolved reference.
+ *
+ * [accountRepository] / [personAccountOwnershipRepository] are retained for call-site symmetry; account
+ * creation now writes through the [com.moneymanager.importengineapi.ImportEngine], so this row no longer
+ * uses them directly.
  */
+@Suppress("UnusedParameter")
 @Composable
 private fun ReferenceResolutionRow(
     reference: CsvUnresolvedReference,
@@ -497,10 +502,8 @@ private fun ReferenceResolutionRow(
 
                     if (showCreateAccountDialog) {
                         CreateAccountDialog(
-                            accountRepository = accountRepository,
                             categoryRepository = categoryRepository,
                             personRepository = personRepository,
-                            personAccountOwnershipRepository = personAccountOwnershipRepository,
                             initialName = reference.name,
                             onDismiss = { showCreateAccountDialog = false },
                             onAccountCreated = { accountId ->

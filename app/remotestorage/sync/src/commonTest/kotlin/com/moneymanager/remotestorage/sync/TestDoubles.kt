@@ -14,8 +14,17 @@ class InMemoryStorageProvider(
     override val id: String = "in-memory",
     override val displayName: String = "In-Memory",
 ) : RemoteStorageProvider {
-    private val files = mutableMapOf<String, Pair<String, ByteArray>>()
+    private data class Entry(
+        val name: String,
+        val bytes: ByteArray,
+        val revision: Int,
+    )
+
+    private val files = mutableMapOf<String, Entry>()
     private var counter = 0
+
+    // Monotonic, like Drive's headRevisionId: every content write yields a brand-new revision id.
+    private var revisionCounter = 0
     private var signedIn = true
 
     override suspend fun isSignedIn(): Boolean = signedIn
@@ -28,10 +37,11 @@ class InMemoryStorageProvider(
         signedIn = false
     }
 
-    override suspend fun list(): List<RemoteFile> = files.map { (id, value) -> RemoteFile(id, value.first, value.second.size.toLong()) }
+    override suspend fun list(): List<RemoteFile> = files.map { (id, entry) -> entry.toRemoteFile(id) }
 
-    override suspend fun download(fileId: String): ByteArray =
-        files[fileId]?.second ?: throw RemoteStorageException("No such file: $fileId")
+    override suspend fun stat(fileId: String): RemoteFile? = files[fileId]?.toRemoteFile(fileId)
+
+    override suspend fun download(fileId: String): ByteArray = files[fileId]?.bytes ?: throw RemoteStorageException("No such file: $fileId")
 
     override suspend fun upload(
         fileId: String?,
@@ -39,13 +49,25 @@ class InMemoryStorageProvider(
         bytes: ByteArray,
     ): RemoteFile {
         val id = fileId ?: "file-${counter++}"
-        files[id] = name to bytes
-        return RemoteFile(id, name, bytes.size.toLong())
+        val entry = Entry(name, bytes, revisionCounter++)
+        files[id] = entry
+        return entry.toRemoteFile(id)
     }
 
     override suspend fun delete(fileId: String) {
         files.remove(fileId)
     }
+
+    /** Test seam: simulate another device pushing new content to [fileId] (bumps its revision). */
+    fun externalPush(
+        fileId: String,
+        bytes: ByteArray,
+    ) {
+        val existing = files[fileId] ?: error("No such file to externally push: $fileId")
+        files[fileId] = existing.copy(bytes = bytes, revision = revisionCounter++)
+    }
+
+    private fun Entry.toRemoteFile(id: String) = RemoteFile(id, name, bytes.size.toLong(), revisionId = "rev-$revision")
 }
 
 /** A [RemoteStorageProviderFactory] that always hands back the same [provider] instance. */
@@ -74,6 +96,20 @@ fun MoneyManagerDatabaseWrapper.countRows(table: String): Long =
         },
         parameters = 0,
     ).value
+
+/**
+ * Appends an audit row so [MoneyManagerDatabaseWrapper.dataChangeToken] advances, simulating a local
+ * edit (the controller's "local dirty" signal) without going through the repositories.
+ */
+fun MoneyManagerDatabaseWrapper.bumpDataChange() {
+    execute(
+        identifier = null,
+        sql =
+            "INSERT INTO category_audit (audit_timestamp, audit_type_id, category_id, revision_id, name) " +
+                "VALUES (0, (SELECT id FROM audit_type LIMIT 1), 1, 1, 'dirty')",
+        parameters = 0,
+    )
+}
 
 /** In-memory [LocalSettings] for tests. */
 class InMemoryLocalSettings : LocalSettings {

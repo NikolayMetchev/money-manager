@@ -10,7 +10,6 @@ import com.moneymanager.domain.model.Money
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.repository.AttributeTypeRepository
-import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.importengineapi.AccountMatchKey
 import com.moneymanager.importengineapi.AccountRef
@@ -49,7 +48,6 @@ private const val ACCOUNT_COUNT = 100
  */
 suspend fun generateSampleData(
     currencyRepository: CurrencyRepository,
-    categoryRepository: CategoryRepository,
     attributeTypeRepository: AttributeTypeRepository,
     importEngine: ImportEngine,
     maintenance: Maintenance,
@@ -116,7 +114,7 @@ suspend fun generateSampleData(
     var categoriesCreated = 0
 
     for (parent in categoryHierarchy) {
-        val parentId = categoryRepository.createCategory(parent.category, sampleSource)
+        val parentId = importEngine.createCategory(parent.category, sampleSource)
         categoryIds.add(parentId)
         categoriesCreated++
 
@@ -130,7 +128,7 @@ suspend fun generateSampleData(
 
         for (child in parent.children) {
             val childId =
-                categoryRepository.createCategory(
+                importEngine.createCategory(
                     child.copy(parentId = parentId),
                     sampleSource,
                 )

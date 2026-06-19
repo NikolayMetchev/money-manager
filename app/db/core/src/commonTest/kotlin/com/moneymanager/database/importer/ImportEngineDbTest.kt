@@ -38,6 +38,7 @@ class ImportEngineDbTest : DbTest() {
             personRepository = repositories.personRepository,
             personAttributeRepository = repositories.personAttributeRepository,
             ownershipRepository = repositories.personAccountOwnershipRepository,
+            categoryRepository = repositories.categoryRepository,
         )
 
     private suspend fun gbp(): Currency =

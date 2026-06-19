@@ -108,7 +108,6 @@ fun AccountAuditScreen(
         UnmergeAccountDialog(
             merge = currentMergeToUndo,
             survivingAccountName = currentAccount?.name ?: "this account",
-            accountRepository = accountRepository,
             maintenance = maintenance,
             onDismiss = { mergeToUndo = null },
         )

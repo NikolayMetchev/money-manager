@@ -51,7 +51,7 @@ import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonRepository
-import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.components.AccountPicker
 import com.moneymanager.ui.components.CurrencyPicker
 import com.moneymanager.ui.components.LoadingTextButton
@@ -69,7 +69,6 @@ import kotlin.time.Instant
 @Composable
 fun TransactionEditDialog(
     transaction: Transfer? = null,
-    transactionRepository: TransactionRepository,
     accountRepository: AccountRepository,
     categoryRepository: CategoryRepository,
     currencyRepository: CurrencyRepository,
@@ -110,6 +109,7 @@ fun TransactionEditDialog(
     var showTimePicker by remember { mutableStateOf(false) }
 
     val scope = rememberSchemaAwareCoroutineScope()
+    val importEngine = LocalImportEngine.current
 
     // Attribute state - in edit mode, initialize from transaction's embedded attributes
     // (already loaded by TransactionsScreen via getTransactionById which calls loadAttributesForTransfer)
@@ -443,7 +443,7 @@ fun TransactionEditDialog(
 
                                         // Use the atomic method to update transfer and attributes together.
                                         // updateTransfer records the provenance source itself.
-                                        transactionRepository.updateTransfer(
+                                        importEngine.updateTransfer(
                                             transfer = updatedTransfer,
                                             deletedAttributeIds = deletedAttributeIds,
                                             updatedAttributes = updatedAttributes,
@@ -476,7 +476,7 @@ fun TransactionEditDialog(
                                             attributesToSave.add(NewAttribute(AttributeTypeId(-1), excludeReason))
                                         }
 
-                                        transactionRepository.createTransfers(
+                                        importEngine.createTransfers(
                                             transfers = listOf(transfer),
                                             newAttributes = mapOf(transfer.id to attributesToSave),
                                             sources = listOf(Source.Manual),

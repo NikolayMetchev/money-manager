@@ -28,12 +28,12 @@ import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.PersonId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.repository.AccountAttributeRepository
-import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonAttributeRepository
 import com.moneymanager.domain.repository.PersonRepository
+import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.screens.CreateCategoryDialog
@@ -49,7 +49,6 @@ private val logger = logging()
 @Composable
 fun EditAccountDialog(
     account: Account,
-    accountRepository: AccountRepository,
     accountAttributeRepository: AccountAttributeRepository,
     attributeTypeRepository: AttributeTypeRepository,
     categoryRepository: CategoryRepository,
@@ -103,6 +102,7 @@ fun EditAccountDialog(
     }
 
     val scope = rememberSchemaAwareCoroutineScope()
+    val importEngine = LocalImportEngine.current
 
     AlertDialog(
         onDismissRequest = { if (!accountState.isSaving) onDismiss() },
@@ -213,7 +213,7 @@ fun EditAccountDialog(
 
                                 // Atomic update: one revision bump for account + all attribute changes.
                                 // The source for the resulting revision is recorded inside the repository.
-                                accountRepository.updateAccountWithAttributes(
+                                importEngine.updateAccountWithAttributes(
                                     account = updatedAccount,
                                     accountId = account.id,
                                     deletedAttributeIds = deletedAttributeIds,
@@ -229,12 +229,12 @@ fun EditAccountDialog(
                                 ownersToRemove.forEach { personId ->
                                     val ownership = existingOwnerships.find { it.personId.id == personId }
                                     ownership?.let {
-                                        personAccountOwnershipRepository.deleteOwnership(it.id)
+                                        importEngine.deleteOwnership(it.id)
                                     }
                                 }
 
                                 ownersToAdd.forEach { personId ->
-                                    personAccountOwnershipRepository.createOwnership(
+                                    importEngine.createOwnership(
                                         personId = PersonId(personId),
                                         accountId = account.id,
                                         source = Source.Manual,
@@ -276,7 +276,6 @@ fun EditAccountDialog(
     if (accountState.showCreatePersonDialog) {
         EditPersonDialog(
             personToEdit = null,
-            personRepository = personRepository,
             onDismiss = { accountState.showCreatePersonDialog = false },
             personAttributeRepository = personAttributeRepository,
             attributeTypeRepository = attributeTypeRepository,

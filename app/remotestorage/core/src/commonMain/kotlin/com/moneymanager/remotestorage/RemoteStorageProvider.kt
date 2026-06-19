@@ -73,4 +73,12 @@ data class RemoteFile(
     val name: String,
     val sizeBytes: Long? = null,
     val modifiedAtEpochMs: Long? = null,
+    /**
+     * An opaque identifier that changes whenever the file's content changes (e.g. Drive's
+     * `headRevisionId`). Used to detect that another device pushed a newer version. Null if the
+     * backend doesn't expose one.
+     */
+    val revisionId: String? = null,
+    /** Content checksum (e.g. Drive's `md5Checksum`), for content-equality fallback. Null if unknown. */
+    val md5: String? = null,
 )

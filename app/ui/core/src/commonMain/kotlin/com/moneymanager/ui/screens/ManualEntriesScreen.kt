@@ -40,6 +40,8 @@ import com.moneymanager.domain.model.csvstrategy.CompanionTransactionRule
 import com.moneymanager.domain.repository.AttributeTypeRepository
 import com.moneymanager.domain.repository.CsvImportStrategyRepository
 import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import com.moneymanager.ui.util.displayDateTime
@@ -75,6 +77,7 @@ fun ManualEntriesScreen(
     onTransactionsImported: () -> Unit,
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
+    val importEngine = LocalImportEngine.current
     val groupsFlow =
         remember(csvImportStrategyRepository, transactionRepository) {
             csvImportStrategyRepository.getAllStrategies().flatMapLatest { strategies ->
@@ -151,7 +154,7 @@ fun ManualEntriesScreen(
                                         createCompanionTransfers(
                                             rule = group.rule,
                                             entries = entries,
-                                            transactionRepository = transactionRepository,
+                                            importEngine = importEngine,
                                             attributeTypeRepository = attributeTypeRepository,
                                         )
                                         maintenance.refreshMaterializedViews()
@@ -186,7 +189,7 @@ fun ManualEntriesScreen(
 private suspend fun createCompanionTransfers(
     rule: CompanionTransactionRule,
     entries: List<Pair<TransferMissingCompanion, BigDecimal>>,
-    transactionRepository: TransactionRepository,
+    importEngine: ImportEngine,
     attributeTypeRepository: AttributeTypeRepository,
 ) {
     val linkTypeId = attributeTypeRepository.getOrCreate(rule.linkAttributeName)
@@ -207,7 +210,7 @@ private suspend fun createCompanionTransfers(
             .mapIndexed { index, transfer ->
                 transfer.id to listOf(NewAttribute(linkTypeId, entries[index].first.matchValue))
             }.toMap()
-    transactionRepository.createTransfers(
+    importEngine.createTransfers(
         transfers = transfers,
         newAttributes = newAttributes,
         sources = List(transfers.size) { Source.Manual },

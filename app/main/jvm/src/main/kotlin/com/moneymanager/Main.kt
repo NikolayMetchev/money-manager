@@ -16,6 +16,8 @@ import com.moneymanager.di.AppComponent
 import com.moneymanager.di.AppComponentParams
 import com.moneymanager.di.database.DatabaseComponent
 import com.moneymanager.di.database.toApplication
+import com.moneymanager.importengineapi.EditingLockedException
+import com.moneymanager.remotestorage.sync.SyncResult
 import com.moneymanager.ui.AppStartupHost
 import com.moneymanager.ui.components.DatabaseStartupProgressScreen
 import com.moneymanager.ui.error.GlobalSchemaErrorState
@@ -103,12 +105,15 @@ private fun MainWindow(onExit: () -> Unit) {
                         val changed = runCatching { remoteController.hasUnsyncedChanges(database) }.getOrDefault(true)
                         val remoteUpToDate =
                             if (changed) {
+                                // Guarded push: if another device pushed since our last sync the upload is
+                                // refused (BLOCKED) rather than clobbering it — then we keep the local copy.
                                 runCatching {
                                     remoteController.syncNow(database, rebuildViews = false) { progress ->
                                         closeProgress =
                                             DatabaseInitializationProgress(progress.message, (progress.fraction * 100).toInt(), 100)
                                     }
-                                }.onFailure { logger.error(it) { "Failed to sync database on close" } }.isSuccess
+                                }.onFailure { logger.error(it) { "Failed to sync database on close" } }
+                                    .getOrNull() == SyncResult.UPLOADED
                             } else {
                                 logger.info { "No changes since last sync; skipping upload on close" }
                                 true
@@ -139,7 +144,11 @@ private fun MainWindow(onExit: () -> Unit) {
                 appVersion = appVersion,
                 localSettings = localSettings,
                 createAppServices = { database ->
-                    DatabaseComponent.create(database).toApplication().toAppServices()
+                    DatabaseComponent.create(database).toApplication().toAppServices(
+                        editGate = {
+                            if (remoteController.syncState.value.editingLocked) throw EditingLockedException()
+                        },
+                    )
                 },
                 onInfoLog = { message -> logger.info { message } },
                 onErrorLog = { message, error -> logger.error(error) { message } },

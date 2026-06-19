@@ -974,7 +974,6 @@ fun AccountTransactionsScreen(
     transactionToEdit?.let { transfer ->
         TransactionEditDialog(
             transaction = transfer,
-            transactionRepository = transactionRepository,
             accountRepository = accountRepository,
             categoryRepository = categoryRepository,
             currencyRepository = currencyRepository,
@@ -991,7 +990,6 @@ fun AccountTransactionsScreen(
     accountToEdit?.let { account ->
         EditAccountDialog(
             account = account,
-            accountRepository = accountRepository,
             accountAttributeRepository = accountAttributeRepository,
             attributeTypeRepository = attributeTypeRepository,
             categoryRepository = categoryRepository,

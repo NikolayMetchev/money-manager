@@ -18,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,6 +37,9 @@ import com.moneymanager.remotestorage.googledrive.GOOGLE_DRIVE_FOLDER_NAME
 import com.moneymanager.remotestorage.googledrive.GOOGLE_DRIVE_PROVIDER_ID
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
 import com.moneymanager.remotestorage.sync.SyncProgress
+import com.moneymanager.remotestorage.sync.SyncResult
+import com.moneymanager.remotestorage.sync.SyncState
+import com.moneymanager.remotestorage.sync.SyncStatus
 import com.moneymanager.ui.error.rememberSchemaAwareCoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -53,6 +57,7 @@ fun CloudStorageCard(
     database: MoneyManagerDatabaseWrapper,
     currentDatabaseLocation: DbLocation,
     onRequestSwitchDatabase: (DbLocation) -> Unit,
+    onReloadFromRemote: () -> Unit,
 ) {
     val scope = rememberSchemaAwareCoroutineScope()
     val uriHandler = LocalUriHandler.current
@@ -74,20 +79,28 @@ fun CloudStorageCard(
         remoteSize = if (binding != null) runCatching { controller.remoteArchiveSize() }.getOrNull() else null
     }
 
-    // Poll for unsynced changes (and the session token's expiry) so the card reflects live state.
-    var dirty by remember { mutableStateOf(false) }
+    // The controller owns the multi-device sync state; the card just reflects it.
+    val syncState by controller.syncState.collectAsState()
+    var confirmAction by remember { mutableStateOf<ConflictAction?>(null) }
+
+    // Light local-only poll for unsynced changes (no network) + the session token's expiry.
     var tokenStatus by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(sessionActive, binding, refreshTick, database) {
         while (true) {
-            dirty = sessionActive && runCatching { controller.hasUnsyncedChanges(database) }.getOrDefault(false)
-            tokenStatus =
-                if (sessionActive) {
-                    runCatching { controller.accessTokenExpiresAtEpochMs() }.getOrNull()?.let(::formatTokenStatus)
-                } else {
-                    null
-                }
+            if (sessionActive) {
+                runCatching { controller.refreshLocalDirty(database) }
+                tokenStatus = runCatching { controller.accessTokenExpiresAtEpochMs() }.getOrNull()?.let(::formatTokenStatus)
+            } else {
+                tokenStatus = null
+            }
             delay(2.seconds)
         }
+    }
+
+    // Check the remote once whenever a session arms (e.g. after open/resume). Detection is otherwise
+    // on demand via the "Check remote for changes" button — never polled.
+    LaunchedEffect(sessionActive, binding) {
+        if (sessionActive) runCatching { controller.checkRemote(database) }
     }
 
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -132,23 +145,59 @@ fun CloudStorageCard(
                     } else {
                         null
                     }
+
+                fun upload(force: Boolean) {
+                    busy = true
+                    scope.launch {
+                        runCatching { controller.syncNow(database, force = force) { syncProgress = it } }
+                            .onSuccess { result ->
+                                message =
+                                    when (result) {
+                                        SyncResult.UPLOADED -> "Uploaded to ${currentBinding.remoteName}"
+                                        SyncResult.BLOCKED ->
+                                            "The remote changed since your last sync — download first, or overwrite it."
+                                        SyncResult.NO_SESSION -> "No active cloud session"
+                                    }
+                                refreshTick++
+                            }.onFailure { message = "Upload failed: ${it.message}" }
+                        syncProgress = null
+                        busy = false
+                    }
+                }
+
+                // Re-hydrating overwrites the *currently open* working copy, so the live database must be
+                // closed before restore (or SQLite reports it busy, notably on Android). The app root owns
+                // the database lifecycle, so it performs the close → download → reopen as one operation.
+                fun download() = onReloadFromRemote()
+
                 BoundState(
                     providerLabel = providerLabel,
                     locationPath = locationPath,
                     onOpenRemote = onOpenRemote,
                     sessionActive = sessionActive,
                     busy = busy,
-                    dirty = dirty,
-                    onSyncNow = {
+                    syncState = syncState,
+                    onCheckRemote = {
                         busy = true
                         scope.launch {
-                            runCatching { controller.syncNow(database) { syncProgress = it } }
-                                .onSuccess {
-                                    message = "Synced to ${currentBinding.remoteName}"
-                                    refreshTick++
-                                }.onFailure { message = "Sync failed: ${it.message}" }
-                            syncProgress = null
+                            runCatching { controller.checkRemote(database) }
+                                .onSuccess { message = null }
+                                .onFailure { message = "Check failed: ${it.message}" }
                             busy = false
+                        }
+                    },
+                    onUpload = {
+                        if (syncState.status == SyncStatus.CONFLICT) {
+                            confirmAction = ConflictAction.UploadOverwrite
+                        } else {
+                            upload(force = false)
+                        }
+                    },
+                    onDownload = {
+                        if (syncState.status == SyncStatus.CONFLICT) {
+                            confirmAction = ConflictAction.DownloadDiscard
+                        } else {
+                            download()
                         }
                     },
                     onResume = { showResume = true },
@@ -159,6 +208,20 @@ fun CloudStorageCard(
                         message = "Disconnected from cloud storage (local copy kept)"
                     },
                 )
+
+                confirmAction?.let { action ->
+                    ConflictConfirmDialog(
+                        action = action,
+                        onConfirm = {
+                            confirmAction = null
+                            when (action) {
+                                ConflictAction.UploadOverwrite -> upload(force = true)
+                                ConflictAction.DownloadDiscard -> download()
+                            }
+                        },
+                        onDismiss = { confirmAction = null },
+                    )
+                }
             }
 
             StorageSizes(localSize = localSize, remoteSize = remoteSize)
@@ -301,6 +364,9 @@ private fun StorageSizes(
     }
 }
 
+/** Which side of a [SyncStatus.CONFLICT] the user chose to keep (the other side's changes are lost). */
+private enum class ConflictAction { UploadOverwrite, DownloadDiscard }
+
 @Composable
 private fun BoundState(
     providerLabel: String,
@@ -308,11 +374,16 @@ private fun BoundState(
     onOpenRemote: (() -> Unit)?,
     sessionActive: Boolean,
     busy: Boolean,
-    dirty: Boolean,
-    onSyncNow: () -> Unit,
+    syncState: SyncState,
+    onCheckRemote: () -> Unit,
+    onUpload: () -> Unit,
+    onDownload: () -> Unit,
     onResume: () -> Unit,
     onDisconnect: () -> Unit,
 ) {
+    // syncState.busy is set the instant a reload starts (see RemoteDatabaseController.beginBusy), so the
+    // actions disable immediately on click — before the loading screen replaces this card.
+    val actionsDisabled = busy || syncState.busy
     Text(text = "Stored on $providerLabel", style = MaterialTheme.typography.bodyMedium)
     if (onOpenRemote != null) {
         Text(
@@ -324,25 +395,32 @@ private fun BoundState(
     } else {
         Text(text = locationPath, style = MaterialTheme.typography.bodySmall)
     }
-    if (sessionActive && !dirty) {
-        Text(
-            text = "✓ Everything is synced",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.primary,
-        )
-    } else if (sessionActive) {
-        Text(
-            text = "Unsynced changes",
-            style = MaterialTheme.typography.bodyMedium,
-        )
+    if (sessionActive) {
+        SyncStatusLine(syncState.status)
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = onCheckRemote, enabled = !actionsDisabled, modifier = Modifier.weight(1f)) {
+                Text("Check remote for changes")
+            }
+        }
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(
+                onClick = onUpload,
+                enabled = !actionsDisabled && syncState.canUpload,
+                modifier = Modifier.weight(1f),
+            ) {
+                Text("Upload")
+            }
+            OutlinedButton(
+                onClick = onDownload,
+                enabled = !actionsDisabled && syncState.canDownload,
+                modifier = Modifier.weight(1f),
+            ) {
+                Text("Download")
+            }
+        }
     }
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (sessionActive) {
-            // Enabled only when there are local changes to upload.
-            OutlinedButton(onClick = onSyncNow, enabled = !busy && dirty, modifier = Modifier.weight(1f)) {
-                Text("Sync now")
-            }
-        } else {
+        if (!sessionActive) {
             OutlinedButton(onClick = onResume, enabled = !busy, modifier = Modifier.weight(1f)) {
                 Text("Enter password to sync")
             }
@@ -351,6 +429,56 @@ private fun BoundState(
             Text("Disconnect")
         }
     }
+}
+
+@Composable
+private fun SyncStatusLine(status: SyncStatus) {
+    val (text, highlight) =
+        when (status) {
+            SyncStatus.IN_SYNC -> "✓ Everything is synced" to true
+            SyncStatus.LOCAL_AHEAD -> "Local changes not uploaded" to false
+            SyncStatus.REMOTE_AHEAD -> "Another device updated this database — download to continue" to false
+            SyncStatus.CONFLICT -> "Conflict: both this device and another device changed the database" to false
+            SyncStatus.NO_SESSION -> "" to false
+        }
+    if (text.isEmpty()) return
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodyMedium,
+        color = if (highlight) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+    )
+}
+
+@Composable
+private fun ConflictConfirmDialog(
+    action: ConflictAction,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val (title, body, confirmLabel) =
+        when (action) {
+            ConflictAction.UploadOverwrite ->
+                Triple(
+                    "Overwrite remote changes?",
+                    "Another device changed this database since your last sync. Uploading now will overwrite " +
+                        "those changes with your local copy. This can't be undone.",
+                    "Overwrite remote",
+                )
+            ConflictAction.DownloadDiscard ->
+                Triple(
+                    "Discard local changes?",
+                    "Another device changed this database since your last sync. Downloading now will discard " +
+                        "your local unsynced changes. This can't be undone.",
+                    "Discard local",
+                )
+        }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = { Text(body) },
+        confirmButton = { TextButton(onClick = onConfirm) { Text(confirmLabel) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 @Composable

@@ -1,5 +1,7 @@
 package com.moneymanager.remotestorage.sync
 
+import com.moneymanager.database.MoneyManagerDatabaseWrapper
+import com.moneymanager.domain.model.DbLocation
 import com.moneymanager.test.database.createTestDatabaseLocation
 import com.moneymanager.test.database.createTestDatabaseManager
 import com.moneymanager.test.database.deleteTestDatabase
@@ -72,4 +74,147 @@ class RemoteDatabaseControllerTest {
                 deleteTestDatabase(targetLocation)
             }
         }
+
+    @Test
+    fun uploadDoesNotReportRemoteChanged() =
+        runTest {
+            withController { controller, _, database, location ->
+                controller.createRemote("in-memory", null, "db.mmdb", location, database, "pw")
+                database.bumpDataChange()
+                controller.refreshLocalDirty(database)
+                assertEquals(SyncStatus.LOCAL_AHEAD, controller.syncState.value.status)
+
+                assertEquals(SyncResult.UPLOADED, controller.syncNow(database))
+
+                // Our own upload must not look like an external change on the next check.
+                assertFalse(controller.remoteChanged(), "our own push should not register as a remote change")
+                controller.checkRemote(database)
+                assertEquals(SyncStatus.IN_SYNC, controller.syncState.value.status)
+            }
+        }
+
+    @Test
+    fun checkRemoteDetectsExternalPush() =
+        runTest {
+            withController { controller, provider, database, location ->
+                val binding = controller.createRemote("in-memory", null, "db.mmdb", location, database, "pw")
+                provider.externalPush(binding.remoteFileId, byteArrayOf(1, 2, 3))
+
+                controller.checkRemote(database)
+
+                val state = controller.syncState.value
+                assertEquals(SyncStatus.REMOTE_AHEAD, state.status)
+                assertTrue(state.editingLocked)
+                assertTrue(state.canDownload)
+                assertFalse(state.canUpload)
+            }
+        }
+
+    @Test
+    fun localEditMakesLocalAhead() =
+        runTest {
+            withController { controller, _, database, location ->
+                controller.createRemote("in-memory", null, "db.mmdb", location, database, "pw")
+                database.bumpDataChange()
+
+                controller.refreshLocalDirty(database)
+
+                val state = controller.syncState.value
+                assertEquals(SyncStatus.LOCAL_AHEAD, state.status)
+                assertTrue(state.canUpload)
+                assertFalse(state.canDownload)
+                assertFalse(state.editingLocked)
+            }
+        }
+
+    @Test
+    fun localEditPlusExternalPushIsConflict() =
+        runTest {
+            withController { controller, provider, database, location ->
+                val binding = controller.createRemote("in-memory", null, "db.mmdb", location, database, "pw")
+                database.bumpDataChange()
+                provider.externalPush(binding.remoteFileId, byteArrayOf(9))
+
+                controller.checkRemote(database)
+
+                val state = controller.syncState.value
+                assertEquals(SyncStatus.CONFLICT, state.status)
+                assertTrue(state.editingLocked)
+                assertTrue(state.canUpload)
+                assertTrue(state.canDownload)
+            }
+        }
+
+    @Test
+    fun guardedUploadAbortsWhenRemoteMoved() =
+        runTest {
+            withController { controller, provider, database, location ->
+                val binding = controller.createRemote("in-memory", null, "db.mmdb", location, database, "pw")
+                database.bumpDataChange()
+                val externalBytes = byteArrayOf(7, 7, 7)
+                provider.externalPush(binding.remoteFileId, externalBytes)
+
+                // Guarded upload must refuse rather than clobber the external content.
+                assertEquals(SyncResult.BLOCKED, controller.syncNow(database))
+                assertEquals(externalBytes.toList(), provider.download(binding.remoteFileId).toList())
+
+                // Forcing overwrites the remote with our copy.
+                assertEquals(SyncResult.UPLOADED, controller.syncNow(database, force = true))
+                assertFalse(externalBytes.toList() == provider.download(binding.remoteFileId).toList())
+            }
+        }
+
+    @Test
+    fun revisionBaselineSurvivesRestart() =
+        runTest {
+            val manager = createTestDatabaseManager()
+            val location = createTestDatabaseLocation()
+            try {
+                val database = manager.openDatabase(location)
+                val provider = InMemoryStorageProvider()
+                // A shared settings store is what carries the synced-revision baseline across "restarts".
+                val sync = RemoteDatabaseSyncService(manager, InMemoryLocalSettings())
+                val controller = RemoteDatabaseController(sync, SingleProviderFactory(provider))
+                val binding = controller.createRemote("in-memory", null, "db.mmdb", location, database, "pw")
+
+                // Another device pushes while we are "closed". Re-push the existing (valid) encrypted
+                // archive so resume's password check still passes; only the revision id changes.
+                provider.externalPush(binding.remoteFileId, provider.download(binding.remoteFileId))
+
+                // A fresh controller over the same persisted settings resumes and still detects the change.
+                val fresh = RemoteDatabaseController(sync, SingleProviderFactory(provider))
+                assertTrue(fresh.resume("pw"))
+                fresh.checkRemote(database)
+                assertEquals(SyncStatus.REMOTE_AHEAD, fresh.syncState.value.status)
+
+                database.close()
+            } finally {
+                deleteTestDatabase(location)
+            }
+        }
+
+    private suspend fun withController(
+        block: suspend (
+            controller: RemoteDatabaseController,
+            provider: InMemoryStorageProvider,
+            database: MoneyManagerDatabaseWrapper,
+            location: DbLocation,
+        ) -> Unit,
+    ) {
+        val manager = createTestDatabaseManager()
+        val location = createTestDatabaseLocation()
+        try {
+            val database = manager.openDatabase(location)
+            val provider = InMemoryStorageProvider()
+            val sync = RemoteDatabaseSyncService(manager, InMemoryLocalSettings())
+            val controller = RemoteDatabaseController(sync, SingleProviderFactory(provider))
+            try {
+                block(controller, provider, database, location)
+            } finally {
+                database.close()
+            }
+        } finally {
+            deleteTestDatabase(location)
+        }
+    }
 }

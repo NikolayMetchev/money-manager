@@ -5,6 +5,8 @@ package com.moneymanager.importer
 import com.moneymanager.domain.model.Account
 import com.moneymanager.domain.model.AccountId
 import com.moneymanager.domain.model.AttributeTypeId
+import com.moneymanager.domain.model.Category
+import com.moneymanager.domain.model.MergeId
 import com.moneymanager.domain.model.NewAttribute
 import com.moneymanager.domain.model.NewRelationship
 import com.moneymanager.domain.model.Person
@@ -16,6 +18,7 @@ import com.moneymanager.domain.model.WellKnownIds
 import com.moneymanager.domain.model.csv.ImportStatus
 import com.moneymanager.domain.repository.AccountAttributeRepository
 import com.moneymanager.domain.repository.AccountRepository
+import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
 import com.moneymanager.domain.repository.PersonAttributeRepository
 import com.moneymanager.domain.repository.PersonRepository
@@ -24,6 +27,7 @@ import com.moneymanager.domain.repository.TransferUpdate
 import com.moneymanager.importengineapi.AccountMatchKey
 import com.moneymanager.importengineapi.AccountRef
 import com.moneymanager.importengineapi.DedupePolicy
+import com.moneymanager.importengineapi.EditGate
 import com.moneymanager.importengineapi.ImportAccountIntent
 import com.moneymanager.importengineapi.ImportBatch
 import com.moneymanager.importengineapi.ImportEngine
@@ -57,12 +61,15 @@ class ImportEngineImpl(
     private val personRepository: PersonRepository,
     private val personAttributeRepository: PersonAttributeRepository,
     private val ownershipRepository: PersonAccountOwnershipRepository,
+    private val categoryRepository: CategoryRepository,
+    private val editGate: EditGate = EditGate.AlwaysWritable,
 ) : ImportEngine {
     override suspend fun import(
         batch: ImportBatch,
         onProgress: (suspend (ImportProgress) -> Unit)?,
         batchSize: Int,
     ): ImportResult {
+        editGate.ensureWritable()
         onProgress?.invoke(ImportProgress("Resolving accounts"))
         val accountResolution = resolveAccounts(batch)
 
@@ -135,6 +142,113 @@ class ImportEngineImpl(
             createdAccountIds = accountResolution.keyToId,
         )
     }
+
+    // region Manual edits — every method is gated, then delegates to the matching repository.
+
+    private inline fun <T> gated(block: () -> T): T {
+        editGate.ensureWritable()
+        return block()
+    }
+
+    override suspend fun createTransfers(
+        transfers: List<Transfer>,
+        newAttributes: Map<TransferId, List<NewAttribute>>,
+        sources: List<Source>,
+    ): List<TransferId> = gated { transactionRepository.createTransfers(transfers, newAttributes, sources) }
+
+    override suspend fun updateTransfer(
+        transfer: Transfer?,
+        deletedAttributeIds: Set<Long>,
+        updatedAttributes: Map<Long, NewAttribute>,
+        newAttributes: List<NewAttribute>,
+        transactionId: TransferId,
+        source: Source,
+    ) = gated {
+        transactionRepository.updateTransfer(transfer, deletedAttributeIds, updatedAttributes, newAttributes, transactionId, source)
+    }
+
+    override suspend fun deleteTransaction(id: Long) = gated { transactionRepository.deleteTransaction(id) }
+
+    override suspend fun createAccount(
+        account: Account,
+        source: Source,
+    ): AccountId = gated { accountRepository.createAccount(account, source) }
+
+    override suspend fun updateAccountWithAttributes(
+        account: Account?,
+        accountId: AccountId,
+        deletedAttributeIds: Set<Long>,
+        updatedAttributes: Map<Long, NewAttribute>,
+        newAttributes: List<NewAttribute>,
+        source: Source,
+    ): Long =
+        gated {
+            accountRepository.updateAccountWithAttributes(
+                account,
+                accountId,
+                deletedAttributeIds,
+                updatedAttributes,
+                newAttributes,
+                source,
+            )
+        }
+
+    override suspend fun deleteAccount(id: AccountId) = gated { accountRepository.deleteAccount(id) }
+
+    override suspend fun mergeAccounts(
+        deletedAccount: AccountId,
+        survivingAccount: AccountId,
+    ): MergeId = gated { accountRepository.mergeAccounts(deletedAccount, survivingAccount) }
+
+    override suspend fun unmergeAccount(mergeId: MergeId) = gated { accountRepository.unmergeAccount(mergeId) }
+
+    override suspend fun createCategory(
+        category: Category,
+        source: Source,
+    ): Long = gated { categoryRepository.createCategory(category, source) }
+
+    override suspend fun updateCategory(
+        category: Category,
+        source: Source,
+    ) = gated { categoryRepository.updateCategory(category, source) }
+
+    override suspend fun deleteCategory(id: Long) = gated { categoryRepository.deleteCategory(id) }
+
+    override suspend fun createPerson(
+        person: Person,
+        source: Source,
+    ): PersonId = gated { personRepository.createPerson(person, source) }
+
+    override suspend fun updatePersonWithAttributes(
+        person: Person?,
+        personId: PersonId,
+        deletedAttributeIds: Set<Long>,
+        updatedAttributes: Map<Long, NewAttribute>,
+        newAttributes: List<NewAttribute>,
+        source: Source,
+    ): Long =
+        gated {
+            personRepository.updatePersonWithAttributes(
+                person,
+                personId,
+                deletedAttributeIds,
+                updatedAttributes,
+                newAttributes,
+                source,
+            )
+        }
+
+    override suspend fun deletePerson(id: PersonId) = gated { personRepository.deletePerson(id) }
+
+    override suspend fun createOwnership(
+        personId: PersonId,
+        accountId: AccountId,
+        source: Source,
+    ): Long = gated { ownershipRepository.createOwnership(personId, accountId, source) }
+
+    override suspend fun deleteOwnership(id: Long) = gated { ownershipRepository.deleteOwnership(id) }
+
+    // endregion
 
     // region Accounts
 

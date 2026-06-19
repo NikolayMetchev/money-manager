@@ -74,6 +74,7 @@ import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Source
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.components.ErrorMessageText
 import com.moneymanager.ui.components.LoadingTextButton
 import com.moneymanager.ui.error.collectAsStateWithSchemaErrorHandling
@@ -153,6 +154,7 @@ fun CategoriesScreen(
         }
 
     val scope = rememberSchemaAwareCoroutineScope()
+    val importEngine = LocalImportEngine.current
     val listState = rememberLazyListState()
 
     // Shared horizontal scroll state for header and all rows
@@ -314,7 +316,7 @@ fun CategoriesScreen(
                                         if (draggedCategory.parentId != newParentId) {
                                             scope.launch {
                                                 try {
-                                                    categoryRepository.updateCategory(
+                                                    importEngine.updateCategory(
                                                         draggedCategory.copy(parentId = newParentId),
                                                         Source.Manual,
                                                     )
@@ -359,7 +361,6 @@ fun CategoriesScreen(
         EditCategoryDialog(
             category = category,
             categories = categories,
-            categoryRepository = categoryRepository,
             onDismiss = { editingCategory = null },
         )
     }
@@ -621,7 +622,6 @@ fun CreateCategoryDialogInCategories(
 fun EditCategoryDialog(
     category: Category,
     categories: List<Category>,
-    categoryRepository: CategoryRepository,
     onDismiss: () -> Unit,
 ) {
     var name by remember { mutableStateOf(category.name) }
@@ -632,6 +632,7 @@ fun EditCategoryDialog(
     var showDeleteConfirmation by remember { mutableStateOf(false) }
 
     val scope = rememberSchemaAwareCoroutineScope()
+    val importEngine = LocalImportEngine.current
 
     // Get descendants to prevent selecting them as parent (would create cycle)
     val forest = remember(categories) { buildCategoryForest(categories) }
@@ -702,7 +703,7 @@ fun EditCategoryDialog(
                         setError = { errorMessage = it },
                         onSuccess = onDismiss,
                     ) { trimmedName ->
-                        categoryRepository.updateCategory(
+                        importEngine.updateCategory(
                             category.copy(
                                 name = trimmedName,
                                 parentId = selectedParentId,
@@ -729,7 +730,6 @@ fun EditCategoryDialog(
     if (showDeleteConfirmation) {
         DeleteCategoryDialog(
             category = category,
-            categoryRepository = categoryRepository,
             onDismiss = { showDeleteConfirmation = false },
             onDeleted = onDismiss,
         )
@@ -836,13 +836,13 @@ internal fun ParentCategorySelector(
 @Composable
 fun DeleteCategoryDialog(
     category: Category,
-    categoryRepository: CategoryRepository,
     onDismiss: () -> Unit,
     onDeleted: () -> Unit,
 ) {
     var isDeleting by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val scope = rememberSchemaAwareCoroutineScope()
+    val importEngine = LocalImportEngine.current
 
     AlertDialog(
         onDismissRequest = { if (!isDeleting) onDismiss() },
@@ -881,7 +881,7 @@ fun DeleteCategoryDialog(
                     errorMessage = null
                     scope.launch {
                         try {
-                            categoryRepository.deleteCategory(category.id)
+                            importEngine.deleteCategory(category.id)
                             onDeleted()
                         } catch (expected: Exception) {
                             logger.error(expected) { "Failed to delete category: ${expected.message}" }

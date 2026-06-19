@@ -13,7 +13,9 @@ import com.moneymanager.di.AppComponentParams
 import com.moneymanager.di.database.DatabaseComponent
 import com.moneymanager.di.database.toApplication
 import com.moneymanager.di.initializeVersionReader
+import com.moneymanager.importengineapi.EditingLockedException
 import com.moneymanager.remotestorage.sync.RemoteDatabaseController
+import com.moneymanager.remotestorage.sync.SyncResult
 import com.moneymanager.ui.AppStartupHost
 import com.moneymanager.ui.error.GlobalSchemaErrorState
 import com.moneymanager.ui.error.SchemaErrorDetector
@@ -40,11 +42,11 @@ class MainActivity : ComponentActivity() {
         if (!controller.hasActiveSession()) return false
         return runCatching {
             runBlocking {
-                if (controller.hasUnsyncedChanges(database)) {
-                    controller.syncNow(database)
-                }
+                // Guarded push: a BLOCKED result (another device pushed) means the remote is NOT up to
+                // date from our side, so the local copy must be kept rather than deleted.
+                !controller.hasUnsyncedChanges(database) || controller.syncNow(database) == SyncResult.UPLOADED
             }
-        }.onFailure { Log.e(TAG, "Failed to sync database", it) }.isSuccess
+        }.onFailure { Log.e(TAG, "Failed to sync database", it) }.getOrDefault(false)
     }
 
     override fun onStop() {
@@ -109,7 +111,11 @@ class MainActivity : ComponentActivity() {
                 appVersion = component.appVersion,
                 localSettings = component.localSettings,
                 createAppServices = { database ->
-                    DatabaseComponent.create(database).toApplication().toAppServices()
+                    DatabaseComponent.create(database).toApplication().toAppServices(
+                        editGate = {
+                            if (controller.syncState.value.editingLocked) throw EditingLockedException()
+                        },
+                    )
                 },
                 onInfoLog = { message -> Log.i(TAG, message) },
                 onErrorLog = { message, error -> Log.e(TAG, message, error) },

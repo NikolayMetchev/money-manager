@@ -2,6 +2,7 @@
 
 package com.moneymanager.ui.screens
 
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -13,8 +14,17 @@ import androidx.compose.ui.test.performTextInput
 import com.moneymanager.domain.model.Category
 import com.moneymanager.domain.model.CurrencyId
 import com.moneymanager.domain.model.Source
+import com.moneymanager.domain.repository.AccountAttributeRepository
+import com.moneymanager.domain.repository.AccountRepository
 import com.moneymanager.domain.repository.CategoryRepository
 import com.moneymanager.domain.repository.CurrencyRepository
+import com.moneymanager.domain.repository.PersonAccountOwnershipRepository
+import com.moneymanager.domain.repository.PersonAttributeRepository
+import com.moneymanager.domain.repository.PersonRepository
+import com.moneymanager.domain.repository.TransactionRepository
+import com.moneymanager.importengineapi.ImportEngine
+import com.moneymanager.importer.ImportEngineImpl
+import com.moneymanager.ui.LocalImportEngine
 import com.moneymanager.ui.error.ProvideSchemaAwareScope
 import com.moneymanager.ui.test.runMoneyManagerComposeUiTest
 import dev.mokkery.MockMode
@@ -34,6 +44,19 @@ import kotlin.test.Test
 
 @OptIn(ExperimentalTestApi::class)
 class CategoriesScreenTest {
+    // A real engine wrapping the test's category repository: edits route through it (as in production),
+    // and because it delegates to [categoryRepository], the existing verifySuspend assertions still hold.
+    private fun importEngineFor(categoryRepository: CategoryRepository): ImportEngine =
+        ImportEngineImpl(
+            transactionRepository = mock<TransactionRepository>(MockMode.autoUnit),
+            accountRepository = mock<AccountRepository>(MockMode.autoUnit),
+            accountAttributeRepository = mock<AccountAttributeRepository>(MockMode.autoUnit),
+            personRepository = mock<PersonRepository>(MockMode.autoUnit),
+            personAttributeRepository = mock<PersonAttributeRepository>(MockMode.autoUnit),
+            ownershipRepository = mock<PersonAccountOwnershipRepository>(MockMode.autoUnit),
+            categoryRepository = categoryRepository,
+        )
+
     private val fakeCurrencyRepository: CurrencyRepository =
         mock(MockMode.autoUnit) {
             every { getAllCurrencies() } returns flowOf(emptyList())
@@ -53,10 +76,12 @@ class CategoriesScreenTest {
             // When
             setContent {
                 ProvideSchemaAwareScope {
-                    CategoriesScreen(
-                        categoryRepository = repository,
-                        currencyRepository = fakeCurrencyRepository,
-                    )
+                    CompositionLocalProvider(LocalImportEngine provides importEngineFor(repository)) {
+                        CategoriesScreen(
+                            categoryRepository = repository,
+                            currencyRepository = fakeCurrencyRepository,
+                        )
+                    }
                 }
             }
 
@@ -79,10 +104,12 @@ class CategoriesScreenTest {
             // When
             setContent {
                 ProvideSchemaAwareScope {
-                    CategoriesScreen(
-                        categoryRepository = repository,
-                        currencyRepository = fakeCurrencyRepository,
-                    )
+                    CompositionLocalProvider(LocalImportEngine provides importEngineFor(repository)) {
+                        CategoriesScreen(
+                            categoryRepository = repository,
+                            currencyRepository = fakeCurrencyRepository,
+                        )
+                    }
                 }
             }
 
@@ -100,10 +127,12 @@ class CategoriesScreenTest {
             // When
             setContent {
                 ProvideSchemaAwareScope {
-                    CategoriesScreen(
-                        categoryRepository = repository,
-                        currencyRepository = fakeCurrencyRepository,
-                    )
+                    CompositionLocalProvider(LocalImportEngine provides importEngineFor(repository)) {
+                        CategoriesScreen(
+                            categoryRepository = repository,
+                            currencyRepository = fakeCurrencyRepository,
+                        )
+                    }
                 }
             }
 
@@ -125,10 +154,12 @@ class CategoriesScreenTest {
             // When
             setContent {
                 ProvideSchemaAwareScope {
-                    CategoriesScreen(
-                        categoryRepository = repository,
-                        currencyRepository = fakeCurrencyRepository,
-                    )
+                    CompositionLocalProvider(LocalImportEngine provides importEngineFor(repository)) {
+                        CategoriesScreen(
+                            categoryRepository = repository,
+                            currencyRepository = fakeCurrencyRepository,
+                        )
+                    }
                 }
             }
 
@@ -152,10 +183,12 @@ class CategoriesScreenTest {
             // When
             setContent {
                 ProvideSchemaAwareScope {
-                    CategoriesScreen(
-                        categoryRepository = repository,
-                        currencyRepository = fakeCurrencyRepository,
-                    )
+                    CompositionLocalProvider(LocalImportEngine provides importEngineFor(repository)) {
+                        CategoriesScreen(
+                            categoryRepository = repository,
+                            currencyRepository = fakeCurrencyRepository,
+                        )
+                    }
                 }
             }
 
@@ -177,10 +210,12 @@ class CategoriesScreenTest {
             // When
             setContent {
                 ProvideSchemaAwareScope {
-                    CategoriesScreen(
-                        categoryRepository = repository,
-                        currencyRepository = fakeCurrencyRepository,
-                    )
+                    CompositionLocalProvider(LocalImportEngine provides importEngineFor(repository)) {
+                        CategoriesScreen(
+                            categoryRepository = repository,
+                            currencyRepository = fakeCurrencyRepository,
+                        )
+                    }
                 }
             }
 
@@ -207,10 +242,12 @@ class CategoriesScreenTest {
             // When
             setContent {
                 ProvideSchemaAwareScope {
-                    CategoriesScreen(
-                        categoryRepository = repository,
-                        currencyRepository = fakeCurrencyRepository,
-                    )
+                    CompositionLocalProvider(LocalImportEngine provides importEngineFor(repository)) {
+                        CategoriesScreen(
+                            categoryRepository = repository,
+                            currencyRepository = fakeCurrencyRepository,
+                        )
+                    }
                 }
             }
 
@@ -231,10 +268,12 @@ class CategoriesScreenTest {
             // When
             setContent {
                 ProvideSchemaAwareScope {
-                    CategoriesScreen(
-                        categoryRepository = repository,
-                        currencyRepository = fakeCurrencyRepository,
-                    )
+                    CompositionLocalProvider(LocalImportEngine provides importEngineFor(repository)) {
+                        CategoriesScreen(
+                            categoryRepository = repository,
+                            currencyRepository = fakeCurrencyRepository,
+                        )
+                    }
                 }
             }
 
@@ -257,10 +296,12 @@ class CategoriesScreenTest {
             // When
             setContent {
                 ProvideSchemaAwareScope {
-                    CategoriesScreen(
-                        categoryRepository = repository,
-                        currencyRepository = fakeCurrencyRepository,
-                    )
+                    CompositionLocalProvider(LocalImportEngine provides importEngineFor(repository)) {
+                        CategoriesScreen(
+                            categoryRepository = repository,
+                            currencyRepository = fakeCurrencyRepository,
+                        )
+                    }
                 }
             }
 
@@ -284,10 +325,12 @@ class CategoriesScreenTest {
             // When
             setContent {
                 ProvideSchemaAwareScope {
-                    CategoriesScreen(
-                        categoryRepository = repository,
-                        currencyRepository = fakeCurrencyRepository,
-                    )
+                    CompositionLocalProvider(LocalImportEngine provides importEngineFor(repository)) {
+                        CategoriesScreen(
+                            categoryRepository = repository,
+                            currencyRepository = fakeCurrencyRepository,
+                        )
+                    }
                 }
             }
 
@@ -321,10 +364,12 @@ class CategoriesScreenTest {
             // When
             setContent {
                 ProvideSchemaAwareScope {
-                    CategoriesScreen(
-                        categoryRepository = repository,
-                        currencyRepository = fakeCurrencyRepository,
-                    )
+                    CompositionLocalProvider(LocalImportEngine provides importEngineFor(repository)) {
+                        CategoriesScreen(
+                            categoryRepository = repository,
+                            currencyRepository = fakeCurrencyRepository,
+                        )
+                    }
                 }
             }
 
@@ -357,10 +402,12 @@ class CategoriesScreenTest {
             // When
             setContent {
                 ProvideSchemaAwareScope {
-                    CategoriesScreen(
-                        categoryRepository = repository,
-                        currencyRepository = fakeCurrencyRepository,
-                    )
+                    CompositionLocalProvider(LocalImportEngine provides importEngineFor(repository)) {
+                        CategoriesScreen(
+                            categoryRepository = repository,
+                            currencyRepository = fakeCurrencyRepository,
+                        )
+                    }
                 }
             }
 
@@ -384,10 +431,12 @@ class CategoriesScreenTest {
             // When
             setContent {
                 ProvideSchemaAwareScope {
-                    CategoriesScreen(
-                        categoryRepository = repository,
-                        currencyRepository = fakeCurrencyRepository,
-                    )
+                    CompositionLocalProvider(LocalImportEngine provides importEngineFor(repository)) {
+                        CategoriesScreen(
+                            categoryRepository = repository,
+                            currencyRepository = fakeCurrencyRepository,
+                        )
+                    }
                 }
             }
 
@@ -419,10 +468,12 @@ class CategoriesScreenTest {
             // When
             setContent {
                 ProvideSchemaAwareScope {
-                    CategoriesScreen(
-                        categoryRepository = repository,
-                        currencyRepository = fakeCurrencyRepository,
-                    )
+                    CompositionLocalProvider(LocalImportEngine provides importEngineFor(repository)) {
+                        CategoriesScreen(
+                            categoryRepository = repository,
+                            currencyRepository = fakeCurrencyRepository,
+                        )
+                    }
                 }
             }
 
@@ -451,10 +502,12 @@ class CategoriesScreenTest {
             // When
             setContent {
                 ProvideSchemaAwareScope {
-                    CategoriesScreen(
-                        categoryRepository = repository,
-                        currencyRepository = fakeCurrencyRepository,
-                    )
+                    CompositionLocalProvider(LocalImportEngine provides importEngineFor(repository)) {
+                        CategoriesScreen(
+                            categoryRepository = repository,
+                            currencyRepository = fakeCurrencyRepository,
+                        )
+                    }
                 }
             }
 
@@ -482,10 +535,12 @@ class CategoriesScreenTest {
             // When
             setContent {
                 ProvideSchemaAwareScope {
-                    CategoriesScreen(
-                        categoryRepository = repository,
-                        currencyRepository = fakeCurrencyRepository,
-                    )
+                    CompositionLocalProvider(LocalImportEngine provides importEngineFor(repository)) {
+                        CategoriesScreen(
+                            categoryRepository = repository,
+                            currencyRepository = fakeCurrencyRepository,
+                        )
+                    }
                 }
             }
 
@@ -509,10 +564,12 @@ class CategoriesScreenTest {
             // When
             setContent {
                 ProvideSchemaAwareScope {
-                    CategoriesScreen(
-                        categoryRepository = repository,
-                        currencyRepository = fakeCurrencyRepository,
-                    )
+                    CompositionLocalProvider(LocalImportEngine provides importEngineFor(repository)) {
+                        CategoriesScreen(
+                            categoryRepository = repository,
+                            currencyRepository = fakeCurrencyRepository,
+                        )
+                    }
                 }
             }
 
@@ -540,10 +597,12 @@ class CategoriesScreenTest {
             // When
             setContent {
                 ProvideSchemaAwareScope {
-                    CategoriesScreen(
-                        categoryRepository = repository,
-                        currencyRepository = fakeCurrencyRepository,
-                    )
+                    CompositionLocalProvider(LocalImportEngine provides importEngineFor(repository)) {
+                        CategoriesScreen(
+                            categoryRepository = repository,
+                            currencyRepository = fakeCurrencyRepository,
+                        )
+                    }
                 }
             }
 
@@ -574,10 +633,12 @@ class CategoriesScreenTest {
             // When
             setContent {
                 ProvideSchemaAwareScope {
-                    CategoriesScreen(
-                        categoryRepository = repository,
-                        currencyRepository = fakeCurrencyRepository,
-                    )
+                    CompositionLocalProvider(LocalImportEngine provides importEngineFor(repository)) {
+                        CategoriesScreen(
+                            categoryRepository = repository,
+                            currencyRepository = fakeCurrencyRepository,
+                        )
+                    }
                 }
             }
 
@@ -615,10 +676,12 @@ class CategoriesScreenTest {
             // When
             setContent {
                 ProvideSchemaAwareScope {
-                    CategoriesScreen(
-                        categoryRepository = repository,
-                        currencyRepository = fakeCurrencyRepository,
-                    )
+                    CompositionLocalProvider(LocalImportEngine provides importEngineFor(repository)) {
+                        CategoriesScreen(
+                            categoryRepository = repository,
+                            currencyRepository = fakeCurrencyRepository,
+                        )
+                    }
                 }
             }
 
@@ -641,10 +704,12 @@ class CategoriesScreenTest {
             // When
             setContent {
                 ProvideSchemaAwareScope {
-                    CategoriesScreen(
-                        categoryRepository = repository,
-                        currencyRepository = fakeCurrencyRepository,
-                    )
+                    CompositionLocalProvider(LocalImportEngine provides importEngineFor(repository)) {
+                        CategoriesScreen(
+                            categoryRepository = repository,
+                            currencyRepository = fakeCurrencyRepository,
+                        )
+                    }
                 }
             }
 
@@ -673,10 +738,12 @@ class CategoriesScreenTest {
             // When
             setContent {
                 ProvideSchemaAwareScope {
-                    CategoriesScreen(
-                        categoryRepository = repository,
-                        currencyRepository = fakeCurrencyRepository,
-                    )
+                    CompositionLocalProvider(LocalImportEngine provides importEngineFor(repository)) {
+                        CategoriesScreen(
+                            categoryRepository = repository,
+                            currencyRepository = fakeCurrencyRepository,
+                        )
+                    }
                 }
             }
 
@@ -707,10 +774,12 @@ class CategoriesScreenTest {
             // When
             setContent {
                 ProvideSchemaAwareScope {
-                    CategoriesScreen(
-                        categoryRepository = repository,
-                        currencyRepository = fakeCurrencyRepository,
-                    )
+                    CompositionLocalProvider(LocalImportEngine provides importEngineFor(repository)) {
+                        CategoriesScreen(
+                            categoryRepository = repository,
+                            currencyRepository = fakeCurrencyRepository,
+                        )
+                    }
                 }
             }
 
@@ -738,10 +807,12 @@ class CategoriesScreenTest {
             // When
             setContent {
                 ProvideSchemaAwareScope {
-                    CategoriesScreen(
-                        categoryRepository = repository,
-                        currencyRepository = fakeCurrencyRepository,
-                    )
+                    CompositionLocalProvider(LocalImportEngine provides importEngineFor(repository)) {
+                        CategoriesScreen(
+                            categoryRepository = repository,
+                            currencyRepository = fakeCurrencyRepository,
+                        )
+                    }
                 }
             }
 
@@ -782,10 +853,12 @@ class CategoriesScreenTest {
             // When
             setContent {
                 ProvideSchemaAwareScope {
-                    CategoriesScreen(
-                        categoryRepository = repository,
-                        currencyRepository = fakeCurrencyRepository,
-                    )
+                    CompositionLocalProvider(LocalImportEngine provides importEngineFor(repository)) {
+                        CategoriesScreen(
+                            categoryRepository = repository,
+                            currencyRepository = fakeCurrencyRepository,
+                        )
+                    }
                 }
             }
 
@@ -822,10 +895,12 @@ class CategoriesScreenTest {
             // When
             setContent {
                 ProvideSchemaAwareScope {
-                    CategoriesScreen(
-                        categoryRepository = repository,
-                        currencyRepository = fakeCurrencyRepository,
-                    )
+                    CompositionLocalProvider(LocalImportEngine provides importEngineFor(repository)) {
+                        CategoriesScreen(
+                            categoryRepository = repository,
+                            currencyRepository = fakeCurrencyRepository,
+                        )
+                    }
                 }
             }
 
@@ -851,10 +926,12 @@ class CategoriesScreenTest {
             // When
             setContent {
                 ProvideSchemaAwareScope {
-                    CategoriesScreen(
-                        categoryRepository = repository,
-                        currencyRepository = fakeCurrencyRepository,
-                    )
+                    CompositionLocalProvider(LocalImportEngine provides importEngineFor(repository)) {
+                        CategoriesScreen(
+                            categoryRepository = repository,
+                            currencyRepository = fakeCurrencyRepository,
+                        )
+                    }
                 }
             }
 
