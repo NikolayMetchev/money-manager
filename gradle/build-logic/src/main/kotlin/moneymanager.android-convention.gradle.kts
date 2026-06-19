@@ -68,12 +68,12 @@ kotlin {
     }
 
     sourceSets {
-        val jvmMain by getting {
+        getByName("jvmMain") {
             dependencies {
                 runtimeOnly(libs.findLibrary("kotlinx-coroutines-swing").get())
             }
         }
-        val commonTest by getting {
+        getByName("commonTest") {
             dependencies {
                 implementation(kotlin("test"))
             }

@@ -9,14 +9,14 @@ dependencies {
 }
 
 // SchemaSpy configuration for database documentation
-val schemaspyConfiguration: Configuration by configurations.creating
+val schemaspyConfiguration: Configuration = configurations.create("schemaspyConfiguration")
 
 dependencies {
     schemaspyConfiguration(libs.schemaspy)
     schemaspyConfiguration(libs.sqldelight.sqlite.driver)
 }
 
-val createDatabaseForSchemaSpy by tasks.registering(JavaExec::class) {
+tasks.register<JavaExec>("createDatabaseForSchemaSpy") {
     group = "documentation"
     description = "Create a SQLite database file with the schema for SchemaSpy analysis"
 
@@ -50,7 +50,7 @@ tasks.register<JavaExec>("generateSchemaSpyDocs") {
     group = "documentation"
     description = "Generate HTML database documentation using SchemaSpy"
 
-    dependsOn(createDatabaseForSchemaSpy)
+    dependsOn("createDatabaseForSchemaSpy")
 
     classpath = schemaspyConfiguration
     mainClass.set("org.schemaspy.Main")

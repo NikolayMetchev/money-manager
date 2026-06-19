@@ -6,9 +6,10 @@ plugins {
 kotlin {
     sourceSets {
         // Shared source set for JVM and Android (both have access to java.math.BigDecimal)
-        val jvmAndroidMain by creating {
-            dependsOn(commonMain.get())
-        }
+        val jvmAndroidMain =
+            create("jvmAndroidMain") {
+                dependsOn(commonMain.get())
+            }
 
         jvmMain {
             dependsOn(jvmAndroidMain)
