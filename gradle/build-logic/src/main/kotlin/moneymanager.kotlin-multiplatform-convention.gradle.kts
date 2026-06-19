@@ -13,7 +13,7 @@ configure<KotlinMultiplatformExtension> {
     jvmToolchain(libs.findVersion("jvm-toolchain").get().toString().toInt())
 
     sourceSets {
-        val jvmMain by getting {
+        getByName("jvmMain") {
             dependencies {
                 runtimeOnly(libs.findLibrary("kotlinx-coroutines-swing").get())
             }

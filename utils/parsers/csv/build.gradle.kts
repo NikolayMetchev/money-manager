@@ -5,7 +5,7 @@ plugins {
 
 kotlin {
     sourceSets {
-        val commonTest by getting {
+        getByName("commonTest") {
             dependencies {
                 implementation(kotlin("test"))
             }

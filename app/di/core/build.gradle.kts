@@ -6,7 +6,7 @@ plugins {
 
 kotlin {
     sourceSets {
-        val commonMain by getting {
+        getByName("commonMain") {
             dependencies {
                 api(projects.app.db.core)
                 api(projects.app.importengineapi)
@@ -16,7 +16,7 @@ kotlin {
             }
         }
 
-        val jvmMain by getting {
+        getByName("jvmMain") {
             dependencies {
                 api(libs.metro.runtime)
                 api(projects.app.db.core)
@@ -31,7 +31,7 @@ kotlin {
             }
         }
 
-        val androidMain by getting {
+        getByName("androidMain") {
             dependencies {
                 api(libs.metro.runtime)
                 api(projects.app.remotestorage.core)

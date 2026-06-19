@@ -6,7 +6,7 @@ plugins {
 
 kotlin {
     sourceSets {
-        val commonMain by getting {
+        getByName("commonMain") {
             dependencies {
                 api(projects.app.csvimporter)
                 api(projects.app.importengineapi)
@@ -16,7 +16,7 @@ kotlin {
             }
         }
 
-        val jvmMain by getting {
+        getByName("jvmMain") {
             dependencies {
                 api(projects.app.csvimporter)
                 api(projects.app.importengineapi)
@@ -27,14 +27,14 @@ kotlin {
             }
         }
 
-        val androidMain by getting {
+        getByName("androidMain") {
             dependencies {
                 implementation(libs.diamondedge.logging)
                 implementation(libs.kotlinx.coroutines.core)
             }
         }
 
-        val commonTest by getting {
+        getByName("commonTest") {
             dependencies {
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)

@@ -6,13 +6,13 @@ plugins {
 
 kotlin {
     sourceSets {
-        val commonMain by getting {
+        getByName("commonMain") {
             dependencies {
                 api(projects.app.model.core)
             }
         }
 
-        val jvmMain by getting {
+        getByName("jvmMain") {
             dependencies {
                 api(projects.app.model.core)
             }
