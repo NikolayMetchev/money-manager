@@ -35,7 +35,7 @@ kotlin {
             }
         }
 
-        val androidDeviceTest by getting {
+        getByName("androidDeviceTest") {
             dependencies {
                 runtimeOnly(libs.androidx.test.runner)
                 runtimeOnly(libs.kotlinx.coroutines.android)

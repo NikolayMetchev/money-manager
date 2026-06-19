@@ -5,7 +5,7 @@ plugins {
 
 kotlin {
     sourceSets {
-        val commonMain by getting {
+        getByName("commonMain") {
             dependencies {
                 api(projects.app.db.core)
                 api(projects.app.di.core)
@@ -14,7 +14,7 @@ kotlin {
                 implementation(libs.kotlinx.coroutines.test)
             }
         }
-        val jvmMain by getting {
+        getByName("jvmMain") {
             dependencies {
                 api(kotlin("test-junit"))
                 api(projects.app.db.core)
@@ -24,7 +24,7 @@ kotlin {
                 implementation(libs.kotlinx.coroutines.core)
             }
         }
-        val androidMain by getting {
+        getByName("androidMain") {
             dependencies {
                 api(kotlin("test-junit"))
 

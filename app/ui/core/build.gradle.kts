@@ -6,7 +6,7 @@ plugins {
 
 kotlin {
     sourceSets {
-        val commonMain by getting {
+        getByName("commonMain") {
             dependencies {
                 api(libs.kotlinx.coroutines.core)
                 api(libs.kotlinx.datetime)
@@ -34,10 +34,11 @@ kotlin {
                 implementation(projects.utils.parsers.qif)
             }
         }
-        val jvmAndroidMain by creating {
-            dependsOn(commonMain)
-        }
-        val commonTest by getting {
+        val jvmAndroidMain =
+            create("jvmAndroidMain") {
+                dependsOn(getByName("commonMain"))
+            }
+        getByName("commonTest") {
             dependencies {
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)
@@ -46,7 +47,7 @@ kotlin {
                 implementation(projects.test.app.db)
             }
         }
-        val androidMain by getting {
+        getByName("androidMain") {
             dependsOn(jvmAndroidMain)
             dependencies {
                 api(libs.androidx.compose.foundation)
@@ -72,7 +73,7 @@ kotlin {
                 runtimeOnly(libs.kotlinx.coroutines.android)
             }
         }
-        val jvmMain by getting {
+        getByName("jvmMain") {
             dependsOn(jvmAndroidMain)
             dependencies {
                 api(libs.androidx.compose.runtime.desktop)
@@ -110,7 +111,7 @@ kotlin {
                 runtimeOnly(libs.kotlinx.coroutines.swing)
             }
         }
-        val jvmTest by getting {
+        getByName("jvmTest") {
             dependencies {
                 implementation(kotlin("test"))
                 // Skiko native libraries for desktop UI tests
@@ -121,7 +122,7 @@ kotlin {
                 implementation(projects.app.di.core)
             }
         }
-        val androidDeviceTest by getting {
+        getByName("androidDeviceTest") {
             // Note: Cannot use dependsOn(commonTest) due to source set tree restrictions
             // Tests are shared via kotlin.srcDir() below
             dependencies {
@@ -138,7 +139,7 @@ kotlin {
             // Include commonTest resources for test database files
             resources.srcDir("src/commonTest/resources")
         }
-        val androidHostTest by getting {
+        getByName("androidHostTest") {
             dependencies {
                 implementation(libs.androidx.compose.runtime)
                 implementation(libs.androidx.compose.ui.test)

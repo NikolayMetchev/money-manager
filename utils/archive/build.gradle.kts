@@ -13,9 +13,10 @@ kotlin {
         }
 
         // Shared JVM+Android source set: both expose java.util.zip for Deflate/Inflate.
-        val jvmAndroidMain by creating {
-            dependsOn(commonMain.get())
-        }
+        val jvmAndroidMain =
+            create("jvmAndroidMain") {
+                dependsOn(commonMain.get())
+            }
 
         jvmMain {
             dependsOn(jvmAndroidMain)

@@ -8,17 +8,17 @@ val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
 
 configure<KotlinMultiplatformExtension> {
     sourceSets {
-        val commonMain by getting {
+        getByName("commonMain") {
             dependencies {
                 implementation(libs.findLibrary("kotlinx-coroutines-core").get())
             }
         }
-        val jvmMain by getting {
+        getByName("jvmMain") {
             dependencies {
                 runtimeOnly(libs.findLibrary("kotlinx-coroutines-swing").get())
             }
         }
-        val androidMain by getting {
+        getByName("androidMain") {
             dependencies {
                 runtimeOnly(libs.findLibrary("kotlinx-coroutines-android").get())
             }

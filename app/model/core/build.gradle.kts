@@ -6,27 +6,27 @@ plugins {
 
 kotlin {
     sourceSets {
-        val commonMain by getting {
+        getByName("commonMain") {
             dependencies {
                 api(libs.kotlinx.coroutines.core)
                 api(projects.utils.bigdecimal)
             }
         }
 
-        val jvmMain by getting {
+        getByName("jvmMain") {
             dependencies {
                 api(libs.kotlinx.serialization.core)
                 api(projects.utils.bigdecimal)
             }
         }
 
-        val androidMain by getting {
+        getByName("androidMain") {
             dependencies {
                 api(libs.kotlinx.serialization.core)
             }
         }
 
-        val commonTest by getting {
+        getByName("commonTest") {
             dependencies {
                 implementation(kotlin("test"))
             }
