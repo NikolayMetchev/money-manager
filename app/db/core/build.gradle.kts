@@ -8,7 +8,7 @@ plugins {
 
 kotlin {
     sourceSets {
-        val commonMain by getting {
+        getByName("commonMain") {
             dependencies {
                 api(libs.kotlinx.coroutines.core)
                 api(libs.mappie.api)
@@ -24,7 +24,7 @@ kotlin {
             }
         }
 
-        val commonTest by getting {
+        getByName("commonTest") {
             dependencies {
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)
@@ -36,7 +36,7 @@ kotlin {
             }
         }
 
-        val jvmMain by getting {
+        getByName("jvmMain") {
             dependencies {
                 api(libs.kotlinx.serialization.core)
                 api(projects.utils.currency)
@@ -45,14 +45,14 @@ kotlin {
             }
         }
 
-        val jvmTest by getting {
+        getByName("jvmTest") {
             dependencies {
                 implementation(projects.app.db.core)
                 implementation(projects.app.di.core)
             }
         }
 
-        val androidMain by getting {
+        getByName("androidMain") {
             dependencies {
                 api(libs.kotlinx.serialization.core)
 
@@ -61,13 +61,13 @@ kotlin {
             }
         }
 
-        val androidHostTest by getting {
+        getByName("androidHostTest") {
             dependencies {
                 implementation(projects.app.di.core)
             }
         }
 
-        val androidDeviceTest by getting {
+        getByName("androidDeviceTest") {
             // Note: Cannot use dependsOn(commonTest) due to source set tree restrictions
             // Tests are shared via srcDir() below, but we exclude the expect declarations
             // file since androidDeviceTest provides its own implementation

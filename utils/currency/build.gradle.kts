@@ -12,9 +12,10 @@ kotlin {
         }
 
         // Shared source set for JVM and Android (both have access to java.text.NumberFormat)
-        val jvmAndroidMain by creating {
-            dependsOn(commonMain.get())
-        }
+        val jvmAndroidMain =
+            create("jvmAndroidMain") {
+                dependsOn(commonMain.get())
+            }
 
         jvmMain {
             dependsOn(jvmAndroidMain)
