@@ -1,6 +1,5 @@
 package com.moneymanager.remotestorage.googledrive
 
-import com.moneymanager.remotestorage.RemoteAuthException
 import com.moneymanager.remotestorage.RemoteFile
 import com.moneymanager.remotestorage.RemoteStorageException
 import com.moneymanager.remotestorage.RemoteStorageProvider
@@ -29,57 +28,33 @@ import kotlin.time.Instant
 import kotlinx.serialization.json.Json as JsonFormat
 
 /**
- * A [RemoteStorageProvider] backed by Google Drive, spoken directly over the Drive REST API v3 with the
- * shared Ktor client so it runs identically on JVM and Android (the Google Java SDK's OAuth is JVM-only).
+ * A [RemoteStorageProvider] backed by Google Drive, spoken directly over the Drive REST API v3 with a
+ * shared Ktor client so the REST surface runs identically on JVM and Android (the Google Java SDK's
+ * OAuth is JVM-only).
  *
- * Bring-your-own-credentials: [credentials] is the user's own OAuth client (from their downloaded
- * `credentials.json`). [signIn] runs the installed-app loopback flow — open the consent page via
- * [browser], capture the code on [LoopbackRedirectReceiver], exchange it for tokens — and persists them
- * in [accountStore]. After that, sessions are silent: [httpClient] has Ktor's Bearer auth plugin
- * installed, which attaches the access token and, on a 401, refreshes it (via [oauth] + the stored
- * refresh token) and retries. Only a gone/revoked refresh token needs interactive re-authentication.
+ * Sign-in and access-token acquisition are delegated to a platform [GoogleAccessTokenSource] (JVM =
+ * installed-app loopback + refresh token; Android = native `AuthorizationClient`); the provider just
+ * reads [tokenSource]'s pre-authenticated [httpClient] for every Drive call.
  *
  * Archives live in a "[GOOGLE_DRIVE_FOLDER_NAME]" folder (created on first use). Least privilege: only
  * [DRIVE_FILE_SCOPE]; uploads are tagged with an appProperty, and updates happen in place so the remote
  * file id stays stable across syncs.
  */
 class GoogleDriveProvider(
-    private val credentials: GoogleDriveCredentials,
-    private val accountStore: GoogleDriveAccountStore,
-    private val browser: BrowserLauncher,
-    private val oauth: GoogleOAuth,
-    private val httpClient: HttpClient,
+    private val tokenSource: GoogleAccessTokenSource,
     override val id: String = GOOGLE_DRIVE_PROVIDER_ID,
     override val displayName: String = "Google Drive",
 ) : RemoteStorageProvider {
+    private val httpClient: HttpClient = tokenSource.httpClient
     private var cachedFolderId: String? = null
 
-    override suspend fun isSignedIn(): Boolean = accountStore.refreshToken(credentials.clientId) != null
+    override suspend fun isSignedIn(): Boolean = tokenSource.isSignedIn()
 
-    override suspend fun signIn() {
-        withContext(Dispatchers.IO) {
-            LoopbackRedirectReceiver().use { receiver ->
-                val state = oauth.newState()
-                browser.open(oauth.consentUrl(credentials.clientId, receiver.redirectUri, state))
-                val code = receiver.awaitCode(state)
-                val tokens = oauth.exchangeCode(credentials, code, receiver.redirectUri)
-                val refreshToken =
-                    tokens.refreshToken
-                        ?: throw RemoteAuthException(
-                            "Google did not return a refresh token. Remove Money Manager from your Google " +
-                                "account's third-party access and connect again.",
-                        )
-                accountStore.saveRefreshToken(credentials.clientId, refreshToken)
-                accountStore.saveAccessToken(credentials.clientId, tokens.accessToken, accessTokenExpiry(tokens.expiresInSeconds))
-                // No need to reset the Bearer plugin's cache: sign-in itself makes no Drive request, so the
-                // plugin first loads tokens (from the store) only on the next API call, after this persist.
-            }
-        }
-    }
+    override suspend fun signIn() = tokenSource.signIn()
 
     override suspend fun signOut() {
         cachedFolderId = null
-        accountStore.clear(credentials.clientId)
+        tokenSource.signOut()
     }
 
     override suspend fun list(): List<RemoteFile> =
@@ -156,7 +131,7 @@ class GoogleDriveProvider(
         }
     }
 
-    override suspend fun accessTokenExpiresAtEpochMs(): Long? = accountStore.accessToken(credentials.clientId)?.expiresAtMillis
+    override suspend fun accessTokenExpiresAtEpochMs(): Long? = tokenSource.accessTokenExpiresAtEpochMs()
 
     /** Finds (or creates on first use) the app's "Money Manager" Drive folder and returns its id. */
     private suspend fun folderId(): String {

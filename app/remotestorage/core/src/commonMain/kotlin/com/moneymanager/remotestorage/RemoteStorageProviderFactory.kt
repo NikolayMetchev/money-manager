@@ -4,6 +4,12 @@ package com.moneymanager.remotestorage
 data class RemoteStorageType(
     val id: String,
     val displayName: String,
+    /**
+     * Whether connecting requires user-supplied provider config (e.g. the JVM bring-your-own
+     * `credentials.json`). False when the platform authenticates natively (Android's
+     * `AuthorizationClient`), so the setup UI can skip the credentials step and pass a null config.
+     */
+    val requiresConfig: Boolean = true,
 )
 
 /**

@@ -35,9 +35,10 @@ kotlin {
             dependencies {
                 api(libs.metro.runtime)
                 api(projects.app.remotestorage.core)
+                // api (not implementation): GoogleAccessTokenSource is a field type of the Android
+                // AppComponentParams, so it's part of this module's ABI.
+                api(projects.app.remotestorage.googledrive)
                 api(projects.app.remotestorage.sync)
-
-                implementation(projects.app.remotestorage.googledrive)
             }
         }
     }

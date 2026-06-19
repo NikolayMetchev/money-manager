@@ -1,0 +1,54 @@
+package com.moneymanager.remotestorage.googledrive
+
+import com.moneymanager.remotestorage.RemoteAuthException
+import io.ktor.client.HttpClient
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+/**
+ * JVM/desktop [GoogleAccessTokenSource]: the installed-app loopback OAuth flow with the user's own
+ * ("bring your own") OAuth client, persisting a refresh token via [GoogleDriveAccountStore]. The Drive
+ * [httpClient] is the Bearer-plugin client built by the factory, which attaches the access token and
+ * silently refreshes it (via [oauth] + the stored refresh token) on a 401.
+ *
+ * This is the original [GoogleDriveProvider] sign-in logic, moved behind the token-source seam so the
+ * JVM behavior is unchanged while Android can swap in a native implementation.
+ */
+class JvmGoogleAccessTokenSource(
+    private val credentials: GoogleDriveCredentials,
+    private val accountStore: GoogleDriveAccountStore,
+    private val browser: BrowserLauncher,
+    private val oauth: GoogleOAuth,
+    override val httpClient: HttpClient,
+) : GoogleAccessTokenSource {
+    override suspend fun isSignedIn(): Boolean = accountStore.refreshToken(credentials.clientId) != null
+
+    override suspend fun signIn() {
+        withContext(Dispatchers.IO) {
+            LoopbackRedirectReceiver().use { receiver ->
+                val state = oauth.newState()
+                browser.open(oauth.consentUrl(credentials.clientId, receiver.redirectUri, state))
+                val code = receiver.awaitCode(state)
+                val tokens = oauth.exchangeCode(credentials, code, receiver.redirectUri)
+                val refreshToken =
+                    tokens.refreshToken
+                        ?: throw RemoteAuthException(
+                            "Google did not return a refresh token. Remove Money Manager from your Google " +
+                                "account's third-party access and connect again.",
+                        )
+                accountStore.saveRefreshToken(credentials.clientId, refreshToken)
+                accountStore.saveAccessToken(credentials.clientId, tokens.accessToken, accessTokenExpiry(tokens.expiresInSeconds))
+                // No need to reset the Bearer plugin's cache: sign-in itself makes no Drive request, so the
+                // plugin first loads tokens (from the store) only on the next API call, after this persist.
+            }
+        }
+    }
+
+    override suspend fun signOut() {
+        accountStore.clear(credentials.clientId)
+    }
+
+    override suspend fun accessToken(): String? = accountStore.accessToken(credentials.clientId)?.token
+
+    override suspend fun accessTokenExpiresAtEpochMs(): Long? = accountStore.accessToken(credentials.clientId)?.expiresAtMillis
+}

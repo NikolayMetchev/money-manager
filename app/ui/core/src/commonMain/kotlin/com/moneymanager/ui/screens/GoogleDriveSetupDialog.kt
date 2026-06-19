@@ -42,21 +42,26 @@ private val SETUP_INSTRUCTIONS =
     )
 
 /**
- * Guided, bring-your-own-credentials setup for Google Drive, modelled on the Monzo connect flow: open the
- * browser with step-by-step instructions, let the user paste their own `credentials.json`, sign in via the
- * loopback consent flow, then collect the archive name + password (create) or pick a file + password (open).
+ * Setup wizard for Google Drive, then collect the archive name + password (create) or pick a file +
+ * password (open).
  *
- * The wizard never sees app-owned secrets — only the user's OAuth client, serialized into the binding's
- * provider config via [GoogleDriveCredentials.toConfig].
+ * Two sign-in shapes, selected by [requiresConfig]:
+ * - **true** (JVM/desktop): guided bring-your-own-credentials — step-by-step instructions, let the user
+ *   paste their own `credentials.json`, sign in via the loopback consent flow. The wizard never sees
+ *   app-owned secrets — only the user's OAuth client, serialized into the binding's provider config via
+ *   [GoogleDriveCredentials.toConfig].
+ * - **false** (Android): native `AuthorizationClient` — no credentials step; a single "Sign in with
+ *   Google" button triggers the account/consent sheet, and `config` is null.
  */
 @Composable
 fun GoogleDriveSetupDialog(
     mode: GoogleDriveSetupMode,
     defaultName: String,
-    onSignIn: suspend (config: String) -> Unit,
-    onList: suspend (config: String) -> List<RemoteFile>,
-    onCreate: (config: String, name: String, password: String) -> Unit,
-    onOpen: (config: String, file: RemoteFile, password: String) -> Unit,
+    requiresConfig: Boolean,
+    onSignIn: suspend (config: String?) -> Unit,
+    onList: suspend (config: String?) -> List<RemoteFile>,
+    onCreate: (config: String?, name: String, password: String) -> Unit,
+    onOpen: (config: String?, file: RemoteFile, password: String) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val uriHandler = LocalUriHandler.current
@@ -74,6 +79,9 @@ fun GoogleDriveSetupDialog(
     var confirmPassword by remember { mutableStateOf("") }
 
     val parsedConfig = remember(credentialsJson) { GoogleDriveCredentials.parseCredentialsJson(credentialsJson)?.toConfig() }
+    // The config sent to the callbacks: the user's parsed credentials on JVM, null when auth is native.
+    val effectiveConfig = if (requiresConfig) parsedConfig else null
+    val canSignIn = !requiresConfig || parsedConfig != null
 
     val filePicker =
         rememberFilePicker(mimeTypes = listOf("application/json")) { result ->
@@ -81,13 +89,13 @@ fun GoogleDriveSetupDialog(
         }
 
     fun connect() {
-        val config = parsedConfig ?: return
+        if (!canSignIn) return
         connecting = true
         error = null
         scope.launch {
             runCatching {
-                onSignIn(config)
-                if (mode == GoogleDriveSetupMode.OPEN) files = onList(config)
+                onSignIn(effectiveConfig)
+                if (mode == GoogleDriveSetupMode.OPEN) files = onList(effectiveConfig)
             }.onSuccess { connected = true }
                 .onFailure { error = it.message ?: "Google sign-in failed" }
             connecting = false
@@ -106,7 +114,12 @@ fun GoogleDriveSetupDialog(
                 modifier = Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                if (!connected) {
+                if (!connected && !requiresConfig) {
+                    Text(
+                        "Sign in with your Google account to store this database in Google Drive.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                } else if (!connected) {
                     SETUP_INSTRUCTIONS.forEachIndexed { index, line ->
                         Text("${index + 1}. $line", style = MaterialTheme.typography.bodySmall)
                     }
@@ -171,17 +184,17 @@ fun GoogleDriveSetupDialog(
         confirmButton = {
             when {
                 !connected ->
-                    TextButton(onClick = ::connect, enabled = parsedConfig != null && !connecting) {
+                    TextButton(onClick = ::connect, enabled = canSignIn && !connecting) {
                         Text("Sign in with Google")
                     }
                 mode == GoogleDriveSetupMode.CREATE ->
                     TextButton(
-                        onClick = { parsedConfig?.let { onCreate(it, name, password) } },
+                        onClick = { onCreate(effectiveConfig, name, password) },
                         enabled = createValid,
                     ) { Text("Upload") }
                 else ->
                     TextButton(
-                        onClick = { selected?.let { file -> parsedConfig?.let { onOpen(it, file, password) } } },
+                        onClick = { selected?.let { file -> onOpen(effectiveConfig, file, password) } },
                         enabled = openValid,
                     ) { Text("Open") }
             }
